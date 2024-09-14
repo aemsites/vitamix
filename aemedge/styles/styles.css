@@ -20,8 +20,8 @@
   --link-hover-color: #1d3ecf;
 
   /* fonts */
-  --body-font-family: "Gotham Narrow SSm A", "Gotham Narrow SSm B", Helvetica, sans-serif;
-  --heading-font-family: "Sentinel A", "Sentinel B", Georgia, serif;
+  --body-font-family: "Gotham Narrow SSm A", "Gotham Narrow SSm B", helvetica, sans-serif;
+  --heading-font-family: "Sentinel A", "Sentinel B", georgia, serif;
 
   /* body sizes */
   --body-font-size-m: 22px;
