@@ -20,8 +20,8 @@
   --link-hover-color: #1d3ecf;
 
   /* fonts */
-  --body-font-family: roboto, roboto-fallback, sans-serif;
-  --heading-font-family: roboto-condensed, roboto-condensed-fallback, sans-serif;
+  --body-font-family: "Gotham Narrow SSm A", "Gotham Narrow SSm B", Helvetica, sans-serif;
+  --heading-font-family: "Sentinel A", "Sentinel B", Georgia, serif;
 
   /* body sizes */
   --body-font-size-m: 22px;
@@ -29,28 +29,45 @@
   --body-font-size-xs: 17px;
 
   /* heading sizes */
-  --heading-font-size-xxl: 55px;
-  --heading-font-size-xl: 44px;
-  --heading-font-size-l: 34px;
-  --heading-font-size-m: 27px;
-  --heading-font-size-s: 24px;
-  --heading-font-size-xs: 22px;
+  --heading-font-size-xxl: 35px;
+  --heading-font-size-xl: 28px;
+  --heading-font-size-l: 24px;
+  --heading-font-size-m: 16px;
+  --heading-font-size-s: 14px;
+  --heading-font-size-xs: 12px;
 
   /* nav height */
   --nav-height: 64px;
 }
 
-/* fallback fonts */
+
+/*
+  - ESaaS Demo Tool -
+  Fonts Fallbacks
+  Adapt styles/fonts.css:
+  (Do not to forget to add the fallback font to the --body-font-family and --heading-font-family variables)
+*/
+
 @font-face {
-  font-family: roboto-condensed-fallback;
-  size-adjust: 88.82%;
+  font-family: 'Gotham-Narrow-SSm-A Fallback';
+  font-style: normal;
+  font-weight: 400;
   src: local('Arial');
+  ascent-override: 96.00%;
+  descent-override: 24.00%;
+  line-gap-override: 0.00%;
+  size-adjust: 100.00%;
 }
 
 @font-face {
-  font-family: roboto-fallback;
-  size-adjust: 99.529%;
+  font-family: 'Sentinel-A Fallback';
+  font-style: normal;
+  font-weight: 400;
   src: local('Arial');
+  ascent-override: 96.00%;
+  descent-override: 24.00%;
+  line-gap-override: 0.00%;
+  size-adjust: 100.00%;
 }
 
 @media (width >= 900px) {
@@ -61,12 +78,12 @@
     --body-font-size-xs: 14px;
 
     /* heading sizes */
-    --heading-font-size-xxl: 45px;
-    --heading-font-size-xl: 36px;
-    --heading-font-size-l: 28px;
-    --heading-font-size-m: 22px;
-    --heading-font-size-s: 20px;
-    --heading-font-size-xs: 18px;
+    --heading-font-size-xxl: 75px;
+    --heading-font-size-xl: 28px;
+    --heading-font-size-l: 30px;
+    --heading-font-size-m: 16px;
+    --heading-font-size-s: 14px;
+    --heading-font-size-xs: 12px;
   }
 }
 
