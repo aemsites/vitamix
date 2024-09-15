@@ -12,12 +12,24 @@
 
 :root {
   /* colors */
-  --background-color: white;
+  --background-color: #d6d6d6;
   --light-color: #f8f8f8;
   --dark-color: #505050;
-  --text-color: #131313;
-  --link-color: #3b63fb;
-  --link-hover-color: #1d3ecf;
+  --text-color: #333f48;
+  --link-color: #fff;
+  --link-hover-color: #fff;
+  --color-background-primary: #000;
+  --color-background-secondary: #333f48;
+  --color-background-tertiary: #262626;
+  --color-background-quaternary: #192631;
+
+  /* buttons */
+  --color-button-primary: #fff;
+  --color-button-primary-border: #40596b;
+  --color-button-primary-hover: #fafafa;
+  --color-button-primary-border-hover: #c8102e;
+  --color-button-secondary: #fff;
+  --color-button-secondary-text: #40596b;
 
   /* fonts */
   --body-font-family: "Gotham Narrow SSm A", "Gotham Narrow SSm B", helvetica, sans-serif;
@@ -29,15 +41,16 @@
   --body-font-size-xs: 17px;
 
   /* heading sizes */
-  --heading-font-size-xxl: 35px;
-  --heading-font-size-xl: 28px;
-  --heading-font-size-l: 24px;
-  --heading-font-size-m: 16px;
-  --heading-font-size-s: 14px;
-  --heading-font-size-xs: 12px;
+  --heading-font-size-xxl: 75px;
+  --heading-font-size-xl: 44px;
+  --heading-font-size-l: 36px;
+  --heading-font-size-m: 27px;
+  --heading-font-size-s: 24px;
+  --heading-font-size-xs: 22px;
 
   /* nav height */
-  --nav-height: 64px;
+  --nav-height: 300px;
+  --max-content-size: 1440px;
 }
 
 
@@ -73,27 +86,27 @@
 @media (width >= 900px) {
   :root {
     /* body sizes */
-    --body-font-size-m: 18px;
-    --body-font-size-s: 16px;
-    --body-font-size-xs: 14px;
+    --body-font-size-m: 16px;
+    --body-font-size-s: 14px;
+    --body-font-size-xs: 12px;
 
     /* heading sizes */
     --heading-font-size-xxl: 75px;
-    --heading-font-size-xl: 28px;
-    --heading-font-size-l: 30px;
-    --heading-font-size-m: 16px;
-    --heading-font-size-s: 14px;
-    --heading-font-size-xs: 12px;
+    --heading-font-size-xl: 44px;
+    --heading-font-size-l: 36px;
+    --heading-font-size-m: 22px;
+    --heading-font-size-s: 20px;
+    --heading-font-size-xs: 18px;
   }
 }
 
 body {
   display: none;
   margin: 0;
-  background-color: var(--background-color);
   color: var(--text-color);
   font-family: var(--body-font-family);
   font-size: var(--body-font-size-m);
+  font-weight: 400;
   line-height: 1.6;
 }
 
@@ -124,7 +137,7 @@ h6 {
   margin-top: 0.8em;
   margin-bottom: 0.25em;
   font-family: var(--heading-font-family);
-  font-weight: 600;
+  font-weight: 300;
   line-height: 1.25;
   scroll-margin: 40px;
 }
@@ -159,6 +172,10 @@ pre {
   white-space: pre;
 }
 
+main {
+  background-color: var(--content-background-color);
+}
+
 main > div {
   margin: 40px 16px;
 }
@@ -179,7 +196,7 @@ a:any-link {
 
 a:hover {
   color: var(--link-hover-color);
-  text-decoration: underline;
+  text-decoration: none;
 }
 
 /* buttons */
@@ -188,29 +205,30 @@ button {
   box-sizing: border-box;
   display: inline-block;
   max-width: 100%;
-  margin: 12px 0;
-  border: 2px solid transparent;
-  border-radius: 2.4em;
-  padding: 0.5em 1.2em;
+  margin: 16px 16px 0;
+  background-color: var(--color-button-primary);
+  border: 1px solid var(--color-button-primary-border);
+  padding: 17px 36px;
+  text-transform: uppercase;
   font-family: var(--body-font-family);
-  font-style: normal;
-  font-weight: 500;
-  line-height: 1.25;
   text-align: center;
   text-decoration: none;
-  background-color: var(--link-color);
-  color: var(--background-color);
+  color: var(--color-button-primary-border);
+  font-size: .875rem !important;
+  line-height: 1.1429em;
   cursor: pointer;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  transition: color .25s ease, background-color .25s, border-color .25s ease;
 }
 
 a.button:hover,
 a.button:focus,
 button:hover,
 button:focus {
-  background-color: var(--link-hover-color);
+  border-color: var(--color-button-primary-border-hover);
+  background-color: var(--color-button-primary-hover);
   cursor: pointer;
 }
 
@@ -222,9 +240,18 @@ button:disabled:hover {
 
 a.button.secondary,
 button.secondary {
-  background-color: unset;
-  border: 2px solid currentcolor;
-  color: var(--text-color);
+  font-style: normal;
+  background-color: var(--color-background-secondary);
+  color: var(--color-button-primary)
+}
+
+a.button.secondary:hover,
+a.button.secondary:focus,
+button.secondary:hover,
+button.secondary:focus {
+  background-color: var(--color-button-primary);
+  color: var(--color-button-primary-border);
+  transition: color .25s ease, background-color .25s, border-color .25s ease;
 }
 
 main img {
@@ -246,11 +273,12 @@ main img {
 
 /* sections */
 main > .section {
-  margin: 40px 0;
+  max-width: var(--max-content-size);
+  margin: auto;
 }
 
 main > .section > div {
-  max-width: 1200px;
+  max-width: var(--max-content-size);
   margin: auto;
   padding: 0 24px;
 }
@@ -275,4 +303,40 @@ main .section.highlight {
 
 .section.hidden {
   display: none;
+}
+
+
+.section.secondary {
+  color: #fff;
+  background-color: var(--color-background-secondary);
+}
+
+.section.secondary-light {
+  background-color: var(--color-background-secondary-light);
+}
+
+.section.quaternary {
+  color: #fff;
+  background-color: var(--color-background-quaternary);
+}
+
+main .section.columns.center ul {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  list-style: none;
+  padding: 24px 0;
+}
+
+main .section.columns.center ul > li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+main .section.columns.center picture {
+  width: 30px;
+  height: 30px;
 }
