@@ -84,7 +84,7 @@ header nav .nav-hamburger > button {
 }
 
 header nav .nav-hamburger-icon {
-  background-image: url('/icons/icon-hamburger.svg');
+  background-image: url('/aemedge/icons/icon-hamburger.svg');
   background-size: 30px;
   box-sizing: border-box;
   display: block;
@@ -386,7 +386,7 @@ header .section.top.top2 .nav-search input[type="text"]::placeholder {
 }
 
 header .section.top.top2 .nav-search input[type="submit"]{
-  background-image: url('/icons/search.svg');
+  background-image: url('/aemedge/icons/search.svg');
   background-repeat: no-repeat;
   background-position: 50%;
   width: 10%;
