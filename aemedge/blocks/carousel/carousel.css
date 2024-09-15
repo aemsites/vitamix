@@ -1,3 +1,4 @@
+
 .carousel .carousel-slides-container {
   position: relative;
 }
@@ -30,6 +31,11 @@
   position: relative;
   width: 100%;
   min-height: min(50vw, calc(100dvh - var(--header-height)));
+}
+
+.carousel-container.one-two-columns .carousel-slide {
+  width: 33%;
+  flex: 0 0 33%;
 }
 
 .carousel .carousel-slide:has(.carousel-slide-content[data-align='center']) {
@@ -150,4 +156,95 @@
   .carousel .carousel-slide .carousel-slide-content[data-align='justify'] {
     --slide-content-width: auto;
   }
+}
+
+.carousel-container.one-two-columns {
+  display: flex;
+}
+
+.carousel-container.one-two-columns .default-content-wrapper {
+  min-width: 372px;
+  width: 372px;
+  padding-left: 120px;
+  padding-right: 0;
+}
+
+.carousel-container.one-two-columns .default-content-wrapper h2 {
+  line-height: 1.1667em;
+  margin: 0;
+  font-size: 2.8125rem;
+}
+
+.carousel-container.one-two-columns .default-content-wrapper p {
+  color: rgb(200 16 46);
+  font-size: .6875rem;
+  font-weight: 500;
+  letter-spacing: 0.1364em;
+  line-height: 1.4545em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.carousel-container.one-two-columns .carousel-wrapper {
+  width: calc(100% - 372px);
+  padding: 64px 0;
+}
+
+.carousel-container.one-two-columns .carousel-wrapper nav {
+  display: none;
+}
+
+.carousel-container.one-two-columns .carousel-slides {
+  margin-left: 32px;
+  margin-right: 32px;
+}
+
+.carousel-container.one-two-columns .carousel-slides > li:not(:last-child) {
+  border-right: 1px solid #cbcbcb;
+}
+
+.carousel-container.one-two-columns .carousel-slide-image {
+  max-width: 264px;
+  aspect-ratio: 4/3;
+  width: 100%;
+  margin: auto;
+}
+
+.carousel-container.one-two-columns .carousel-slide-image picture {
+  position: unset;
+}
+
+.carousel-container.one-two-columns .carousel-slide-content {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  background-color: unset;
+}
+
+.carousel-container.one-two-columns .carousel-slide-content p {
+  text-align: center;
+  margin: 0;
+  font-size: .875rem;
+  font-weight: 500;
+  line-height: 1.4286em;
+  text-transform: uppercase;
+}
+
+.carousel-container.one-two-columns .carousel-slide-content a {
+  border: none;
+  background-color: unset;
+  margin: 0;
+  margin-top: 16px;
+  padding: 0;
+}
+
+.carousel-container.one-two-columns .carousel-navigation-buttons button {
+  border-radius: unset;
+  background-color: #333f48;
+  color: white;
+}
+
+.carousel-container.one-two-columns .carousel-navigation-buttons button:hover {
+  background-color: white;
+  color: #333f48;
 }
