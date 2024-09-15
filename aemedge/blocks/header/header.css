@@ -1,9 +1,7 @@
 /* header and nav layout */
 header .nav-wrapper {
-  background-color: var(--background-color);
+  background-color: var(--content-background-color);
   width: 100%;
-  z-index: 2;
-  position: fixed;
 }
 
 header nav {
@@ -33,10 +31,11 @@ header nav[aria-expanded='true'] {
 @media (width >= 900px) {
   header nav {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     gap: 0 32px;
-    max-width: 1264px;
-    padding: 0 32px;
+    max-width: var(--max-content-size);
+    padding: 0;
   }
 
   header nav[aria-expanded='true'] {
@@ -157,15 +156,15 @@ header nav .nav-sections {
   visibility: hidden;
 }
 
+header nav .nav-sections img {
+  width: auto;
+  height: 24px;
+}
+
 header nav[aria-expanded='true'] .nav-sections {
   display: block;
   visibility: visible;
   align-self: start;
-}
-
-header nav .nav-sections img {
-  width: auto;
-  max-height: 22px;
 }
 
 header nav .nav-sections ul {
@@ -270,4 +269,18 @@ header nav .nav-sections ul > li > ul > li {
 /* tools */
 header nav .nav-tools {
   grid-area: tools;
+}
+
+header nav .nav-tools img {
+  width: auto;
+  height: 14px;
+}
+
+.section.secondary {
+  text-align: center;
+  flex-grow: 2;
+  width: 100%;
+  color: #fff;
+  padding: 16px 0;
+  background-color: var(--color-background-secondary);
 }
