@@ -8,18 +8,50 @@
   padding: 40px 24px;
   min-height: 300px;
   text-align: center;
+  display: block;
+}
+
+.hero.video {
+  min-height: 500px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #fff;
+  line-height: 1.1667em;
 }
 
 .hero h1 {
   max-width: 1200px;
   margin-left: auto;
   margin-right: auto;
-  color: #fff;
+}
+
+.hero.video h1 {
+  margin-top: 0;
+  margin-bottom: 0;
+  animation: fade-in-animation 1.5s ease 4.5s;
+  animation-iteration-count: 1;
+  animation-play-state: running;
+  animation-fill-mode: backwards;
+  position: relative;
+}
+
+.hero.video p {
+  text-transform: uppercase;
+  font-size: 18px;
+  font-weight: 500;
+  height: 26px;
+  letter-spacing: 2.4545px;
+  line-height: 26.1818px;
+  animation: fade-in-animation 1.5s ease 4.5s;
+  animation-iteration-count: 1;
+  animation-play-state: running;
+  animation-fill-mode: backwards;
+  position: relative;
 }
 
 .hero picture {
   position: absolute;
-  z-index: -1;
   inset: 0;
   object-fit: cover;
   box-sizing: border-box;
@@ -31,8 +63,72 @@
   height: 100%;
 }
 
+.hero.video video {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 50%;
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  min-height: 500px;
+}
+
+.hero.video .video-container::after {
+  content: " ";
+  display: block;
+  position: absolute;
+  height: 100%;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: color-mix(in srgb,#262626 75%,transparent);
+  animation: fade-in-animation 1.5s ease 4.5s;
+  animation-iteration-count: 1;
+  animation-play-state: running;
+  animation-fill-mode: backwards;
+}
+
+@keyframes fade-in-animation {
+  0% {
+      opacity: 0;
+  }
+
+  100% {
+      opacity: 1;
+  }
+}
+
+.hero .explore-icon {
+  position: absolute;
+  bottom: -3px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.hero .explore-icon::before {
+  content: 'EXPLORE';
+  position: absolute;
+  left: 50%;
+  bottom: 20px;
+  color: white;
+  font-weight: 500;
+  font-size: .6875rem;
+  letter-spacing: 0.1364em;
+  line-height: 1.4545em;
+  margin: 0;
+  text-transform: uppercase;
+  transform: translateX(-50%);
+}
+
 @media (width >= 900px) {
   .hero {
     padding: 40px 32px;
+  }
+
+  .hero.video,
+  .hero.video video {
+    min-height: 900px;
   }
 }
