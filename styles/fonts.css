@@ -1,0 +1,63 @@
+@font-face {
+  font-family: 'Sentinel A';
+  src: url('../fonts/sentinel-a-300.woff2') format('woff2');
+  font-display: swap;
+  font-style: normal;
+  font-weight: 300;
+}
+
+@font-face {
+  font-family: 'Sentinel B';
+  src: url('../fonts/sentinel-b-300.woff2') format('woff2');
+  font-display: swap;
+  font-style: normal;
+  font-weight: 300;
+}
+
+@font-face {
+  font-family: 'Sentinel A';
+  src: url('../fonts/sentinel-a-500.woff2') format('woff2');
+  font-display: swap;
+  font-style: normal;
+  font-weight: 500;
+}
+
+@font-face {
+  font-family: 'Sentinel B';
+  src: url('../fonts/sentinel-b-500.woff2') format('woff2');
+  font-display: swap;
+  font-style: normal;
+  font-weight: 500;
+}
+
+@font-face {
+  font-family: 'Gotham Narrow A';
+  src: url('../fonts/gotham-narrow-a-400.woff2') format('woff2');
+  font-display: swap;
+  font-style: normal;
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: 'Gotham Narrow B';
+  src: url('../fonts/gotham-narrow-b-400.woff2') format('woff2');
+  font-display: swap;
+  font-style: normal;
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: 'Gotham Narrow A';
+  src: url('../fonts/gotham-narrow-a-500.woff2') format('woff2');
+  font-display: swap;
+  font-style: normal;
+  font-weight: 500;
+}
+
+@font-face {
+  font-family: 'Gotham Narrow B';
+  src: url('../fonts/gotham-narrow-b-500.woff2') format('woff2');
+  font-display: swap;
+  font-style: normal;
+  font-weight: 500;
+}

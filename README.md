@@ -28,4 +28,4 @@ npm run lint
 
 ## URL Syntax
 
-https://{branch}--{repo}--{owner}.aem.page/
+https://{branch}--vitamix--aemsites.aem.page/

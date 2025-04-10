@@ -1,0 +1,41 @@
+:root {
+  /* border width */
+  --border-l: 4px;
+  --border-m: 2px;
+  --border-s: 1px; 
+
+  /* rounding */
+  --rounding-xl: 16px;
+   --rounding-l: 10px;
+   --rounding-m: 5px;
+   --rounding-s: 2px;
+
+  /* spacing */
+  --spacing-20: 2px;
+  --spacing-40: 4px;
+  --spacing-60: 8px;
+  --spacing-80: 12px;
+  --spacing-100: 16px; 
+  --spacing-200: 20px; /* base */
+  --spacing-300: 24px;
+  --spacing-400: 32px;
+  --spacing-500: 35px;
+  --spacing-600: 40px;
+  --spacing-700: 48px;
+  --spacing-800: 64px;
+  --spacing-900: 180px;
+
+  /* icons */
+  --icon-l: 28px;
+  --icon-m: 22px;
+  --icon-s: 16px;
+}
+
+@media (width >= 900px) {
+  :root {
+    /* icons */
+    --icon-l: 20px;
+    --icon-m: 16px;
+    --icon-s: 12px;
+  }
+}

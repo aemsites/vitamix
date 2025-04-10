@@ -1,0 +1,124 @@
+footer {
+  padding: var(--spacing-m) var(--horizontal-spacing);
+  background: var(--color-gray-300);
+  color: var(--color-gray-900);
+}
+
+footer a:any-link {
+  color: currentcolor;
+  text-decoration: none;
+}
+
+footer a:any-link:hover {
+  color: var(--color-gray);
+  text-decoration: underline;
+}
+
+footer p {
+  margin: 0;
+}
+
+footer ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+footer section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-600);
+}
+
+/* form */
+footer .footer-form {
+  grid-area: form;
+}
+
+/* stylelint-disable-next-line no-descending-specificity */
+footer .footer-form a {
+  color: var(--color-blue);
+}
+
+footer .footer-form sub {
+  font-size: var(--detail-size-xs);
+  line-height: 0;
+}
+
+/* social */
+footer .footer-social {
+  grid-area: social;
+}
+
+/* stylelint-disable-next-line no-descending-specificity */
+footer .footer-social a {
+  color: var(--color-gray);
+}
+
+footer .footer-social a.button {
+  width: var(--icon-m);
+  height: var(--icon-m);
+  border: 0;
+  border-radius: 50%;
+  padding: 0;
+  background: var(--color-gray-800);
+  color: var(--color-white);
+  font-size: var(--icon-m);
+  text-align: center;
+}
+
+footer .footer-social a.button:hover {
+  background: var(--color-gray-900);
+}
+
+footer .footer-social ul {
+  display: flex;
+  gap: var(--spacing-m);
+  margin: var(--spacing-80) 0;
+}
+
+footer .footer-social ul + p {
+  margin-top: var(--spacing-m);
+  display: flex;
+  align-items: center;
+  gap: 1ch;
+  line-height: 0;
+}
+
+/* links */
+footer .footer-links {
+  grid-area: links;
+  font-size: var(--body-size-s);
+}
+
+footer .footer-links > div >  ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-200);
+}
+
+footer .footer-links li {
+  flex-basis: 100%;
+}
+
+footer .footer-links li.subsection ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-200);
+  margin-top: var(--spacing-200);
+}
+
+footer .footer-links li.subsection {
+  flex: 1 0 calc(50% - var(--spacing-200));
+  margin-top: 0;
+}
+
+footer .footer-links li.subsection p {
+  font-weight: bold;
+}
+
+/* copyright */
+footer .footer-copyright {
+  grid-area: copyright;
+  text-align: center;
+}

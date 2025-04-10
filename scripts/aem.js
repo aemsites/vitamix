@@ -18,12 +18,13 @@ function sampleRUM(checkpoint, data) {
     window.hlx = window.hlx || {};
     sampleRUM.enhance = () => {};
     if (!window.hlx.rum) {
+      const param = new URLSearchParams(window.location.search).get('rum');
       const weight = (window.SAMPLE_PAGEVIEWS_AT_RATE === 'high' && 10)
         || (window.SAMPLE_PAGEVIEWS_AT_RATE === 'low' && 1000)
-        || (new URLSearchParams(window.location.search).get('rum') === 'on' && 1)
+        || (param === 'on' && 1)
         || 100;
       const id = Math.random().toString(36).slice(-4);
-      const isSelected = Math.random() * weight < 1;
+      const isSelected = param !== 'off' && Math.random() * weight < 1;
       // eslint-disable-next-line object-curly-newline, max-len
       window.hlx.rum = {
         weight,
@@ -80,7 +81,13 @@ function sampleRUM(checkpoint, data) {
             t: time,
             ...pingData,
           });
-          const { href: url, origin } = new URL(`.rum/${weight}`, sampleRUM.collectBaseURL);
+          const urlParams = window.RUM_PARAMS
+            ? `?${new URLSearchParams(window.RUM_PARAMS).toString()}`
+            : '';
+          const { href: url, origin } = new URL(
+            `.rum/${weight}${urlParams}`,
+            sampleRUM.collectBaseURL,
+          );
           const body = origin === window.location.origin
             ? new Blob([rumData], { type: 'application/json' })
             : rumData;
@@ -91,9 +98,16 @@ function sampleRUM(checkpoint, data) {
         sampleRUM.sendPing('top', timeShift());
 
         sampleRUM.enhance = () => {
+          // only enhance once
+          if (document.querySelector('script[src*="rum-enhancer"]')) return;
+          const { enhancerVersion, enhancerHash } = sampleRUM.enhancerContext || {};
           const script = document.createElement('script');
+          if (enhancerHash) {
+            script.integrity = enhancerHash;
+            script.setAttribute('crossorigin', 'anonymous');
+          }
           script.src = new URL(
-            '.rum/@adobe/helix-rum-enhancer@^2/src/index.js',
+            `.rum/@adobe/helix-rum-enhancer@${enhancerVersion || '^2'}/src/index.js`,
             sampleRUM.baseURL,
           ).href;
           document.head.appendChild(script);
@@ -131,15 +145,11 @@ function setup() {
       console.log(error);
     }
   }
-
-  // custom nav/footer path
-  window.hlx.nfp = `/aemedge${new URLSearchParams(window.location.search).get('nfp') || ''}`;
 }
 
 /**
  * Auto initializiation.
  */
-
 function init() {
   setup();
   sampleRUM();
@@ -376,44 +386,6 @@ function wrapTextNodes(block) {
 }
 
 /**
- * Decorates paragraphs containing a single link as buttons.
- * @param {Element} element container element
- */
-function decorateButtons(element) {
-  element.querySelectorAll('a').forEach((a) => {
-    a.title = a.title || a.textContent;
-    if (a.href !== a.textContent) {
-      const up = a.parentElement;
-      const twoup = a.parentElement.parentElement;
-      if (!a.querySelector('img')) {
-        if (up.childNodes.length === 1 && (up.tagName === 'P' || up.tagName === 'DIV')) {
-          a.className = 'button'; // default
-          up.classList.add('button-container');
-        }
-        if (
-          up.childNodes.length === 1
-          && up.tagName === 'STRONG'
-          && twoup.childNodes.length === 1
-          && twoup.tagName === 'P'
-        ) {
-          a.className = 'button primary';
-          twoup.classList.add('button-container');
-        }
-        if (
-          up.childNodes.length === 1
-          && up.tagName === 'EM'
-          && twoup.childNodes.length === 1
-          && twoup.tagName === 'P'
-        ) {
-          a.className = 'button secondary';
-          twoup.classList.add('button-container');
-        }
-      }
-    }
-  });
-}
-
-/**
  * Add <img> for icon, prefixed with codeBasePath and optional prefix.
  * @param {Element} [span] span element with icon classes
  * @param {string} [prefix] prefix to be added to icon src
@@ -617,20 +589,6 @@ function decorateBlocks(main) {
 }
 
 /**
- * Decorates linked pictures in a given block.
- * @param {HTMLElement} block - The block element containing the pictures.
- */
-function decorateLinkedPictures(block) {
-  block.querySelectorAll('picture + br + a').forEach((a) => {
-    // remove br
-    a.previousElementSibling.remove();
-    const picture = a.previousElementSibling;
-    a.textContent = '';
-    a.append(picture);
-  });
-}
-
-/**
  * Loads a block named 'header' into header
  * @param {Element} header header element
  * @returns {Promise}
@@ -655,7 +613,7 @@ async function loadFooter(footer) {
 }
 
 /**
- * Wait for Image.
+ * Wait for first (LCP) image.
  * @param {Element} section section element
  */
 async function waitForFirstImage(section) {
@@ -711,9 +669,8 @@ export {
   createOptimizedPicture,
   decorateBlock,
   decorateBlocks,
-  decorateButtons,
+  decorateIcon,
   decorateIcons,
-  decorateLinkedPictures,
   decorateSections,
   decorateTemplateAndTheme,
   fetchPlaceholders,
