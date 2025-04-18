@@ -5,6 +5,16 @@ import { loadFragment } from '../fragment/fragment.js';
 // media query match that indicates desktop width
 const isDesktop = window.matchMedia('(width >= 1000px)');
 
+function getCookies() {
+  const cookies = document.cookie.split(';');
+  const cookieMap = {};
+  cookies.forEach((cookie) => {
+    const [key, value] = cookie.split('=');
+    cookieMap[key.trim()] = value.trim();
+  });
+  return cookieMap;
+}
+
 function toggleHeader(desktop, nav, hamburger) {
   const hamburgerWrapper = hamburger.closest('div');
   const controls = hamburger.getAttribute('aria-controls').split(' ');
@@ -266,4 +276,17 @@ export default async function decorate(block) {
   block.append(navWrapper);
 
   swapIcons(block);
+
+  const cookies = getCookies();
+  const customer = cookies.vitamix_customer;
+  const cartItems = cookies.cart_items_count;
+  if (customer) {
+    const account = block.querySelector('.icon-account').parentElement;
+    account.lastChild.textContent = `${customer}'s Account`;
+  }
+  if (cartItems) {
+    const cart = block.querySelector('.icon-cart').parentElement;
+    cart.dataset.cartItems = cartItems;
+    cart.lastChild.textContent = `Cart (${cartItems})`;
+  }
 }

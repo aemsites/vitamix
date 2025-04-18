@@ -391,7 +391,28 @@ header .nav-cart {
   justify-content: center;
   height: 45px;
   text-align: center;
+  position: relative;
 }
+
+/* cart items */
+header .nav-cart [data-cart-items]::after {
+  content: attr(data-cart-items);
+  position: absolute;
+  background-color: #c8102e;
+  color: var(--color-white);
+  border-radius: 50%;
+  font-size: var(--detail-size-s);
+  font-weight: bold;
+  padding: 0 5px;
+  width: 15px;
+  height: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  top: 4px;
+  left: 27px;
+}
+
 
 @media (width >= 1000px) {
   header .nav-cart {
