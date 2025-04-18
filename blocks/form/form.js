@@ -155,6 +155,7 @@ function buildButton(field) {
   button.type = type;
   button.textContent = label;
   if (type === 'reset') button.classList.add('outline');
+  if (type === 'submit') button.dataset.thankYou = field.options;
   return button;
 }
 
@@ -325,10 +326,34 @@ function enableSubmission(form, path) {
     form.classList.add('footer-sign-up');
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      // const data = new FormData(form);
-      // const entries = Object.fromEntries(data.entries());
       // disable form and show loading button
       toggleForm(form);
+      const data = new FormData(form);
+      const entries = Object.fromEntries(data.entries());
+      const { email, mobile, optIn } = entries;
+      const payload = {
+        email,
+        mobile,
+        sms_optin: optIn ? '1' : '0',
+        lead_source: 'sub-em-footer-us',
+        pageUrl: window.location.href,
+        actionUrl: '/us/en_us/rest/V1/vitamix-api/newslettersubscribe',
+      };
+      const params = new URLSearchParams(payload);
+      try {
+        const resp = await fetch(`https://www.vitamix.com/bin/vitamix/newslettersubscription?${params.toString()}`);
+        if (!resp.ok) {
+          // eslint-disable-next-line no-console
+          console.error('Failed to submit newsletter subscription', resp);
+        }
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to submit newsletter subscription', error);
+      }
+      const thankYou = document.createElement('div');
+      thankYou.className = 'form-thank-you';
+      thankYou.innerHTML = `<p>${e.submitter.dataset.thankYou}</p>`;
+      form.replaceWith(thankYou);
     });
   }
 }
@@ -437,7 +462,7 @@ export default function decorate(block) {
   const observer = new IntersectionObserver((entries) => {
     entries.forEach(async (entry) => {
       if (entry.isIntersecting) {
-        const path = block.textContent.trim();
+        const path = new URL(block.querySelector('a').href).pathname;
         try {
           const resp = await fetch(new URL(path, window.location.origin));
           if (!resp.ok) throw new Error(`${resp.status}: ${resp.statusText}`);

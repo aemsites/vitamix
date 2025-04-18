@@ -108,3 +108,11 @@
   border-color: var(--color-gray);
   background: var(--color-gray);
 }
+
+.form .form-thank-you {
+  margin: var(--spacing-m) 0;
+  padding: var(--spacing-m);
+  color: #1b6313;
+  background-color: #f9fbf9;;
+}
+
