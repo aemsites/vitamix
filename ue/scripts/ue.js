@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     cardsBlocks.forEach((cardsBlock) => {
-      observer.observe(cardsBlock, { childList: true });
+      observer.observe(cardsBlock, { childList: true, subtree: true });
     });
   };
 
