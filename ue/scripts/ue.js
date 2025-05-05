@@ -8,12 +8,12 @@ document.addEventListener('DOMContentLoaded', () => {
       mutations.forEach((mutation) => {
         const addedUlElements = mutation.addedNodes;
         if (mutation.type === 'childList' && addedUlElements.length === 1 && addedUlElements[0].tagName === 'UL') {
-          const ulElement = addedUlElements[0];
-          const removedDivElements = mutation.removedNodes.filter((node) => node.tagName === 'DIV');
+          const ulEl = addedUlElements[0];
+          const removedDivEl = [...mutation.removedNodes].filter((node) => node.tagName === 'DIV');
 
-          removedDivElements.forEach((div, index) => {
-            if (index < ulElement.children.length) {
-              moveInstrumentation(div, ulElement.children[index]);
+          removedDivEl.forEach((div, index) => {
+            if (index < ulEl.children.length) {
+              moveInstrumentation(div, ulEl.children[index]);
             }
           });
         }
