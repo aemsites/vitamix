@@ -7,9 +7,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const observer = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
         const addedUlElements = mutation.addedNodes;
-
         if (mutation.type === 'childList' && addedUlElements.length === 1 && addedUlElements[0].tagName === 'UL') {
-          const ulElement = addedUlElements.addedNodes[0];
+          const ulElement = addedUlElements[0];
           const removedDivElements = mutation.removedNodes.filter((node) => node.tagName === 'DIV');
 
           removedDivElements.forEach((div, index) => {
