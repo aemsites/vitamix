@@ -7,7 +7,7 @@ export default function decorate(block) {
   [...block.children].forEach((row) => {
     // move all children from row into list item
     const li = document.createElement('li');
-    moveInstrumentation(row, li);
+    //moveInstrumentation(row, li);
     while (row.firstElementChild) li.append(row.firstElementChild);
 
     // assign classes based on content
@@ -30,7 +30,7 @@ export default function decorate(block) {
   // replace images with optimized versions
   ul.querySelectorAll('picture > img').forEach((img) => {
     const optimizedPic = createOptimizedPicture(img.src, img.alt, false, [{ width: '750' }]);
-    moveInstrumentation(img, optimizedPic.querySelector('img'));
+    //moveInstrumentation(img, optimizedPic.querySelector('img'));
     img.closest('picture').replaceWith(optimizedPic);
   });
 
