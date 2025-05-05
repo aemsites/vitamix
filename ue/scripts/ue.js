@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
       mutations.forEach((mutation) => {
         const addedUlElements = mutation.addedNodes;
         if (mutation.type === 'childList' && mutation.target.tagName === 'DIV') {
+          // handle card div > li replacements
           if (addedUlElements.length === 1 && addedUlElements[0].tagName === 'UL') {
             const ulEl = addedUlElements[0];
             const removedDivEl = [...mutation.removedNodes].filter((node) => node.tagName === 'DIV');
@@ -17,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
           }
 
+          // handle card-image picture replacements
           if (mutation.target.classList.contains('card-image')) {
             const addedPictureEl = [...mutation.addedNodes].filter((node) => node.tagName === 'PICTURE');
             const removedPictureEl = [...mutation.removedNodes].filter((node) => node.tagName === 'PICTURE');
