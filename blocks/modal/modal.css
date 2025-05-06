@@ -52,6 +52,7 @@ body.modal-open {
   background-color: transparent;
   color: var(--color-white);
   line-height: 0;
+  box-shadow: none;
 }
 
 .modal .close-button .icon.icon-close {
@@ -84,20 +85,37 @@ body.modal-open {
 }
 
 /* sign-up modal */
+.modal[data-modal-path$="sign-up"] dialog {
+  max-width: 1000px;
+  max-height: 750px;
+  height: 90dvh;
+  width: 90dvw;
+}
+
 .modal[data-modal-path$="sign-up"] dialog .modal-content {
-  background-color: var(--color-gray-200);
+  background-color: #e0e1e3;
   display: flex;
+  height: 100%;
+  max-height: calc(90dvh - 64px);
 }
 
 .modal[data-modal-path$="sign-up"] dialog .modal-content .section:nth-child(1) {
   display: none;
   line-height: 0;
   flex: 1;
+  position: relative;
 }
 
 .modal[data-modal-path$="sign-up"] dialog .modal-content .section:nth-child(1) picture {
   display: block;
+  position: absolute;
+  inset: 0;
+}
+
+.modal[data-modal-path$="sign-up"] dialog .modal-content .section:nth-child(1) picture img {
+  width: 100%;
   height: 100%;
+  object-fit: cover;
 }
 
 @media (width >= 900px) {
@@ -107,9 +125,26 @@ body.modal-open {
 }
 
 .modal[data-modal-path$="sign-up"] dialog .modal-content .section:nth-child(2) {
-  padding: 32px;
-  flex: 1.5;
+  padding: 16px 0;
+  flex: 1;
 }
 
+@media (width >= 900px) {
+  .modal[data-modal-path$="sign-up"] dialog .modal-content .section:nth-child(2) {
+    padding: 32px;
+  }
+}
 
+.modal[data-modal-path$="sign-up"] dialog .modal-content .section:nth-child(2) p:first-of-type {
+  font-family: var(--heading-font-family);
+  font-size: var(--heading-size-xl);
+  line-height: 1;
+}
 
+.modal[data-modal-path$="sign-up"] dialog .modal-content .section:nth-child(2) p:first-of-type strong {
+  font-weight: 500;
+}
+
+.modal[data-modal-path$="sign-up"] dialog .modal-content .section:nth-child(2) p:nth-of-type(2) {
+  text-transform: uppercase;
+}
