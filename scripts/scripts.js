@@ -12,7 +12,6 @@ import {
   loadCSS,
   createOptimizedPicture,
   sampleRUM,
-  loadScript,
 } from './aem.js';
 
 /**
