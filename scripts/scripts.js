@@ -373,8 +373,10 @@ async function loadPage() {
 
 // UE Editor support
 if (window.location.hostname.includes('ue.da.live')) {
-  loadScript('/ue/scripts/ue.js');
+  // eslint-disable-next-line import/no-unresolved
+  import(`${window.hlx.codeBasePath}/ue/scripts/ue.js`).then(({ default: ue }) => ue());
 }
+
 loadPage();
 
 // DA Live Preview
