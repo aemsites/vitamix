@@ -12,6 +12,7 @@ import {
   loadCSS,
   createOptimizedPicture,
   sampleRUM,
+  loadScript,
 } from './aem.js';
 
 /**
@@ -370,6 +371,10 @@ async function loadPage() {
   loadDelayed();
 }
 
+// UE Editor support
+if (window.location.hostname.includes('ue.da.live')) {
+  loadScript('/ue/scripts/ue.js');
+}
 loadPage();
 
 // DA Live Preview
