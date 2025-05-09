@@ -31,6 +31,12 @@
         "id": "card",
         "fields": [
           {
+            "component": "text",
+            "valueType": "string",
+            "name": "classes",
+            "label": "Options"
+          },
+          {
             "component": "reference",
             "valueType": "string",
             "name": "div:nth-child(1)>picture:nth-child(1)>img:nth-child(3)[src]",
