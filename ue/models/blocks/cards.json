@@ -32,7 +32,6 @@
         "fields": [
           {
             "component": "multiselect",
-            "valueType": "string",
             "name": "classes",
             "label": "Options",
             "options": [
