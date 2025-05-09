@@ -31,10 +31,24 @@
         "id": "cards",
         "fields": [
           {
-            "component": "text",
+            "component": "select",
             "valueType": "string",
             "name": "classes",
-            "label": "Options"
+            "label": "Options",
+            "options": [
+              {
+                "value": "articles",
+                "label": "Articles"
+              },
+              {
+                "value": "grid",
+                "label": "Grid"
+              },
+              {
+                "value": "knockout",
+                "label": "Knockout"
+              }
+            ]
           }
         ]
       },
