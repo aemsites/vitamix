@@ -74,7 +74,7 @@
     "id": "cards",
     "fields": [
       {
-        "component": "select",
+        "component": "multiselect",
         "valueType": "string",
         "name": "classes",
         "label": "Options",
