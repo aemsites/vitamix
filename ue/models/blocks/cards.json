@@ -28,14 +28,19 @@
     ],
     "models": [
       {
-        "id": "card",
+        "id": "cards",
         "fields": [
           {
             "component": "text",
             "valueType": "string",
             "name": "classes",
             "label": "Options"
-          },
+          }
+        ]
+      },
+      {
+        "id": "card",
+        "fields": [
           {
             "component": "reference",
             "valueType": "string",
