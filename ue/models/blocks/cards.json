@@ -37,15 +37,15 @@
             "options": [
               {
                 "value": "articles",
-                "label": "Articles"
+                "name": "Articles"
               },
               {
                 "value": "grid",
-                "label": "Grid"
+                "name": "Grid"
               },
               {
                 "value": "knockout",
-                "label": "Knockout"
+                "name": "Knockout"
               }
             ]
           }
