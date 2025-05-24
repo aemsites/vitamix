@@ -139,7 +139,7 @@ function createTabContent(tab, specifications, data) {
   const { custom } = data;
   switch (tab.id) {
     case 'specifications':
-      if (custom.specifications) {
+      if (specifications) {
         content.appendChild(createSpecificationsContent(specifications));
       }
       break;
@@ -205,14 +205,19 @@ function initializeTabs(container) {
  * @returns {Element} The specifications container element
  */
 export default function renderSpecs(specifications, parent, data) {
+  const tabs = [
+    { id: 'specifications', label: 'Specifications', show: !!specifications },
+    { id: 'warranty', label: 'Warranty', show: !!data.custom.warranty },
+    { id: 'resources', label: 'Resources', show: !!data.custom.resources },
+  ].filter((tab) => tab.show);
+
+  // if there are no tabs, don't render anything
+  if (tabs.length === 0) {
+    return;
+  }
+
   const specsContainer = document.createElement('div');
   specsContainer.classList.add('tabs-container');
-
-  const tabs = [
-    { id: 'specifications', label: 'Specifications' },
-    { id: 'warranty', label: 'Warranty' },
-    { id: 'resources', label: 'Resources' },
-  ];
 
   const tabButtons = createTabButtons(tabs);
   specsContainer.appendChild(tabButtons);
@@ -221,10 +226,8 @@ export default function renderSpecs(specifications, parent, data) {
   contents.classList.add('tab-contents');
 
   tabs.forEach((tab) => {
-    if (data.custom[tab.id]) {
-      const content = createTabContent(tab, specifications, data);
-      contents.appendChild(content);
-    }
+    const content = createTabContent(tab, specifications, data);
+    contents.appendChild(content);
   });
 
   specsContainer.appendChild(contents);

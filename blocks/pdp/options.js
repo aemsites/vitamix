@@ -12,7 +12,7 @@ function onOptionChange(block, variants, color) {
   const variantColor = variant.options.color;
   selectedOptionLabel.textContent = `Color: ${variantColor}`;
 
-  const selectedImage = block.querySelector('.gallery-selected-image');
+  const selectedImage = block.querySelector('.lcp-image');
   const currentImage = selectedImage.querySelector('picture');
   currentImage.remove();
   selectedImage.append(variant.images[0].cloneNode(true));
@@ -45,6 +45,11 @@ function onOptionChange(block, variants, color) {
  * @returns {Element} The options container element
  */
 export default function renderOptions(block, variants) {
+  // if there are no variants, don't render anything
+  if (!variants || variants.length === 0) {
+    return;
+  }
+
   const optionsContainer = document.createElement('div');
   optionsContainer.classList.add('options');
 
@@ -107,5 +112,6 @@ export default function renderOptions(block, variants) {
 
   optionsContainer.append(cookbookContainer);
 
+  // eslint-disable-next-line consistent-return
   return optionsContainer;
 }

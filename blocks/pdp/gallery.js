@@ -1,10 +1,10 @@
 /**
- * Attaches click listeners to each gallery image and assigns them to the .gallery-selected-image.
+ * Attaches click listeners to each gallery image and assigns them to the .lcp-image.
  * @param {Element} galleryImages - The gallery images container element
  * @param {Element} selectedImageElement - The selected image element
  */
 export function attachImageListeners(galleryImages, selectedImageElement) {
-  // Add click listener to each gallery image and assign to .gallery-selected-image
+  // Add click listener to each gallery image and assign to .lcp-image
   // TODO: This is adding multiple listeners to the same element
   galleryImages.querySelectorAll('picture').forEach((picture) => {
     picture.addEventListener('click', () => {
@@ -18,7 +18,7 @@ export function attachImageListeners(galleryImages, selectedImageElement) {
       // add selected class to the clicked picture
       picture.classList.add('selected');
 
-      // swap the selected picture with the .gallery-selected-image
+      // swap the selected picture with the .lcp-image
       const currentImage = selectedImageElement.querySelector('picture');
       currentImage.remove();
       selectedImageElement.append(picture.cloneNode(true));
@@ -35,25 +35,31 @@ export default function renderGallery(block, variants) {
   const galleryContainer = document.createElement('div');
   galleryContainer.classList.add('gallery');
 
-  const defaultVariant = variants[0];
-
-  const selectedImage = block.querySelector('.gallery-selected-image');
+  const selectedImage = block.querySelector('.lcp-image');
   galleryContainer.append(selectedImage);
 
-  const galleryImages = document.createElement('div');
-  galleryImages.classList.add('gallery-images');
-  defaultVariant.images[0].classList.add('selected');
+  if (variants && variants.length > 0) {
+    const defaultVariant = variants[0];
+    const galleryImages = document.createElement('div');
+    galleryImages.classList.add('gallery-images');
+    defaultVariant.images[0]?.classList.add('selected');
 
-  const images = block.querySelectorAll('.img-wrapper');
+    const images = block.querySelectorAll('.img-wrapper');
+    let firstVariantImages = defaultVariant.images;
 
-  // Keep track of the default product images
-  window.defaultProductImages = Array.from(images).map((image) => image.cloneNode(true));
+    const type = document.head.querySelector('meta[name="type"]')?.content;
+    if (type === 'bundle') {
+      firstVariantImages = [];
+    }
+    // Keep track of the default product images
+    window.defaultProductImages = Array.from(images).map((image) => image.cloneNode(true));
 
-  galleryImages.append(...defaultVariant.images, ...images);
+    galleryImages.append(...firstVariantImages, ...images);
 
-  attachImageListeners(galleryImages, selectedImage);
+    attachImageListeners(galleryImages, selectedImage);
 
-  galleryContainer.append(galleryImages);
+    galleryContainer.append(galleryImages);
+  }
 
   return galleryContainer;
 }

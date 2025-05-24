@@ -162,7 +162,7 @@
   font-weight: var(--weight-medium);
 }
 
-.details h3 {
+.details h3, h4 {
   font-family: var(--body-font-family);
   font-size: var(--heading-size-xs);
   font-weight: var(--weight-medium);
@@ -298,7 +298,7 @@
   display: none;
 }
 
-.gallery-selected-image img {
+.lcp-image img {
   width: 100%;
   aspect-ratio: 1 / 1;
 }
@@ -354,14 +354,13 @@
 @media (width >= 768px) {
   .pdp {
     padding-top: var(--spacing-xl);
-    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
-    grid-template-areas: 
+    grid-template-columns: 2fr 3fr;
+    grid-template-areas:
       "title gallery"
       "pricing gallery"
       "options gallery"
       "add-to-cart gallery"
       "details gallery"
-      "details specs";
   }
 
   .details .tabs-container {

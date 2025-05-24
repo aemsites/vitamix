@@ -187,28 +187,8 @@ export function buildCarousel(container, visibleSlides = 1, pagination = true) {
   return container;
 }
 
-/**
- * Builds hero block and prepends to main in a new section.
- * @param {Element} main The container element
- */
-function buildPDPBlock(main) {
-  const section = document.createElement('div');
-
-  const lcpPicture = main.querySelector('div:nth-child(2) picture');
-  const lcpImage = lcpPicture.querySelector('img');
-  lcpImage.loading = 'eager';
-
-  const selectedImage = document.createElement('div');
-  selectedImage.classList.add('gallery-selected-image');
-  selectedImage.append(lcpPicture.cloneNode(true));
-
-  const lcp = main.querySelector('div:first-child');
-  lcp.append(selectedImage);
-  lcp.remove();
-
-  const divs = Array.from(main.querySelectorAll(':scope > div'));
-
-  window.variants = divs.map((div) => {
+function parseVariants(sections) {
+  return sections.map((div) => {
     const name = div.querySelector('h2')?.textContent.trim();
 
     const metadata = {};
@@ -232,36 +212,66 @@ function buildPDPBlock(main) {
     const imagesHTML = div.querySelectorAll('picture');
 
     return {
-      name,
       ...metadata,
+      name,
       options,
       images: imagesHTML,
     };
   });
+}
 
-  // product bus pages won't have nav or footer meta tags for now
-  const existingMeta = document.head.querySelector('meta[name="nav"]');
-  if (!existingMeta) {
-    const navMeta = document.createElement('meta');
-    navMeta.name = 'nav';
-    navMeta.content = '/us/en_us/nav/nav';
-    document.head.appendChild(navMeta);
+/**
+ * Builds hero block and prepends to main in a new section.
+ * @param {Element} main The container element
+ */
+function buildPDPBlock(main) {
+  const section = document.createElement('div');
+  const type = document.head.querySelector('meta[name="type"]')?.content;
 
-    const footerMeta = document.createElement('meta');
-    footerMeta.name = 'footer';
-    footerMeta.content = '/us/en_us/footer/footer';
-    document.head.appendChild(footerMeta);
+  const isValidType = ['simple', 'configurable', 'bundle'].includes(type);
+  if (isValidType) {
+    const lcpPictureSelector = type === 'simple'
+      ? 'picture:first-of-type'
+      : 'div:nth-child(2) picture';
+
+    const lcpPicture = main.querySelector(lcpPictureSelector);
+    const lcpImage = lcpPicture?.querySelector('img');
+    if (lcpImage) {
+      lcpImage.loading = 'eager';
+    }
+
+    const selectedImage = document.createElement('div');
+    selectedImage.classList.add('lcp-image');
+    selectedImage.append(lcpPicture.cloneNode(true));
+
+    const lcp = main.querySelector('div:first-child');
+    lcp.append(selectedImage);
+    lcp.remove();
+
+    if (type === 'simple') {
+      lcpPicture.remove();
+    }
+
+    section.append(buildBlock('pdp', { elems: [...lcp.children] }));
   }
 
-  // take all children of main and append to section
-  section.append(buildBlock('pdp', { elems: [...lcp.children] }));
+  const variantSections = Array.from(main.querySelectorAll(':scope > div'));
+  window.variants = parseVariants(variantSections);
 
-  // remove all children of main
-  while (main.firstChild) {
-    main.removeChild(main.firstChild);
+  const navMeta = document.head.querySelector('meta[name="nav"]');
+  if (!navMeta) {
+    [
+      ['nav', '/us/en_us/nav/nav'],
+      ['footer', '/us/en_us/footer/footer'],
+    ].forEach(([name, content]) => {
+      const meta = document.createElement('meta');
+      meta.name = name;
+      meta.content = content;
+      document.head.appendChild(meta);
+    });
   }
 
-  // prepend pdp section to main
+  main.textContent = '';
   main.prepend(section);
 }
 
