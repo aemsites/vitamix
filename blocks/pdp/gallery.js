@@ -38,20 +38,22 @@ export default function renderGallery(block, variants) {
   const selectedImage = block.querySelector('.lcp-image');
   galleryContainer.append(selectedImage);
 
-  if (variants && variants.length > 0) {
-    const defaultVariant = variants[0];
+  if (variants) {
+    let firstVariantImages = [];
     const galleryImages = document.createElement('div');
     galleryImages.classList.add('gallery-images');
-    defaultVariant.images[0]?.classList.add('selected');
-
-    const images = block.querySelectorAll('.img-wrapper');
-    let firstVariantImages = defaultVariant.images;
-
-    const type = document.head.querySelector('meta[name="type"]')?.content;
-    if (type === 'bundle') {
-      firstVariantImages = [];
+    if (variants.length > 0) {
+      const defaultVariant = variants[0];
+      defaultVariant.images[0]?.classList.add('selected');
+      firstVariantImages = defaultVariant.images;
+      const type = document.head.querySelector('meta[name="type"]')?.content;
+      if (type === 'bundle') {
+        firstVariantImages = [];
+      }
     }
+
     // Keep track of the default product images
+    const images = block.querySelectorAll('.img-wrapper');
     window.defaultProductImages = Array.from(images).map((image) => image.cloneNode(true));
 
     galleryImages.append(...firstVariantImages, ...images);
