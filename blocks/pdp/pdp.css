@@ -548,3 +548,19 @@
   color: var(--color-white);
   text-align: center;
 }
+
+.pdp-warrenty-option {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-s);
+  margin: var(--spacing-s) 0;
+  font-size: var(--body-size-s);
+  font-weight: var(--weight-medium);
+  color: var(--color-text);
+}
+
+.pdp-warrenty-option input {
+  height: 24px;
+  width: 24px;
+  margin: 0;
+}

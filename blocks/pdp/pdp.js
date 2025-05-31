@@ -196,7 +196,7 @@ export default function decorate(block) {
   buyBox.classList.add('pdp-buy-box');
 
   const pricingContainer = renderPricing(block);
-  const optionsContainer = renderOptions(block, variants);
+  const optionsContainer = renderOptions(block, variants, jsonLdData.custom.options);
   const addToCartContainer = renderAddToCart(block);
   const compareContainer = renderCompare();
   const freeShippingContainer = renderFreeShipping(jsonLdData.offers);
