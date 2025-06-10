@@ -252,8 +252,8 @@ function parseVariants(sections) {
 
 // eslint-disable-next-line no-unused-vars
 export function checkOutOfStock(sku) {
-  // const { availability } = window.jsonLdData.offers.find((offer) => offer.sku === sku);
-  const availability = 'https://schema.org/InStock';
+  const { availability } = window.jsonLdData.offers.find((offer) => offer.sku === sku);
+  // const availability = 'https://schema.org/InStock';
   return availability === 'https://schema.org/OutOfStock';
 }
 
