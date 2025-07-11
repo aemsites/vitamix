@@ -1,3 +1,4 @@
+import { extractPricing } from '../blocks/pdp/pricing.js';
 import {
   loadHeader,
   loadFooter,
@@ -293,10 +294,14 @@ function parseVariants(sections) {
 
     const imagesHTML = div.querySelectorAll('picture');
 
+    const priceHTML = div.querySelector('p:nth-of-type(1)');
+    const price = extractPricing(priceHTML);
+
     return {
       ...metadata,
       name,
       options,
+      price,
       images: imagesHTML,
     };
   });
