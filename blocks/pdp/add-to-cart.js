@@ -75,16 +75,17 @@ function toggleFixedAddToCart(container) {
  */
 export default function renderAddToCart(block, custom) {
   // extract config options from custom object
-  const { findLocally, findDealer, commercial } = custom;
+  const { findLocally, findDealer } = custom;
+  const outOfStock = checkOutOfStock(window.jsonLdData.offers[0].sku);
 
   //  check if product should show "Find Locally" instead of add to cart if:
   // findLocally is enabled, findDealer is enabled but not commercial, OR product is out of stock
-  if (findLocally === 'Yes' || (findDealer === 'Yes' && commercial !== 'Yes') || checkOutOfStock(window.jsonLdData.offers[0].sku)) {
+  if (findLocally === 'Yes' || outOfStock) {
     return renderFindLocally(block);
   }
 
   // check if product should show "Find Dealer" instead of add to cart
-  if (findDealer === 'Yes') {
+  if (findDealer === 'Yes' && outOfStock) {
     return renderFindDealer(block);
   }
 
