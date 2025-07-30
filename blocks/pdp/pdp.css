@@ -533,6 +533,18 @@ a.button.pdp-find-locally-button {
   justify-content: flex-start;
 }
 
+@media (width >= 900px) {
+  .pdp-buy-box {
+    min-height: 40vw;
+  }
+}
+
+@media (width >= 2000px) {
+  .pdp-buy-box {
+    min-height: calc(2000px * 0.4);
+  }
+}
+
 .pdp-compare-button {
   background-color: var(--color-gray-300);
   color: var(--color-text);
