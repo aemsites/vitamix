@@ -1,0 +1,43 @@
+name: Integration Tests
+
+on:
+  push:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        browser: [chromium]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js 20
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Install Playwright Browsers
+      run: npx playwright install chromium --with-deps
+    
+    - name: Get branch name
+      id: branch
+      run: echo "branch=${GITHUB_REF#refs/heads/}" >> $GITHUB_OUTPUT
+    
+    - name: Run Playwright tests on desktop
+      env:
+        BRANCH: ${{ steps.branch.outputs.branch }}
+        BASE_URL: https://${{ steps.branch.outputs.branch }}--vitamix--aemsites.aem.network
+      run: npx playwright test --reporter=html
+      
+    - name: Run Playwright tests on mobile
+      env:
+        BRANCH: ${{ steps.branch.outputs.branch }}
+        BASE_URL: https://${{ steps.branch.outputs.branch }}--vitamix--aemsites.aem.network
+      run: npx playwright test --project="Mobile Chrome"

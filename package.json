@@ -11,7 +11,13 @@
     "build:json:models": "merge-json-cli -i \"ue/models/component-models.json\" -o \"component-models.json\"",
     "build:json:definitions": "merge-json-cli -i \"ue/models/component-definition.json\" -o \"component-definition.json\"",
     "build:json:filters": "merge-json-cli -i \"ue/models/component-filters.json\" -o \"component-filters.json\"",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:install": "playwright install",
+    "test:report": "playwright show-report"
   },
   "repository": {
     "type": "git",
@@ -25,6 +31,7 @@
   "homepage": "https://github.com/adobe/aem-boilerplate#readme",
   "devDependencies": {
     "@babel/eslint-parser": "7.25.1",
+    "@playwright/test": "^1.40.0",
     "eslint": "8.57.0",
     "eslint-config-airbnb-base": "15.0.0",
     "eslint-plugin-import": "2.29.1",
