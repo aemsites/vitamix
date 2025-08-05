@@ -46,7 +46,7 @@ jobs:
       run: npm ci
     
     - name: Install Playwright Browsers
-      run: npx playwright install chromium --with-deps
+      run: npx playwright install --with-deps
     
     - name: Get PR branch name
       id: branch
@@ -57,25 +57,18 @@ jobs:
         BRANCH_NAME=$(echo "$PR_DATA" | jq -r '.head.ref')
         echo "branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
     
-    - name: Run Playwright tests on desktop
+    - name: Run Playwright tests
+      id: tests
       env:
         BRANCH: ${{ steps.branch.outputs.branch }}
         BASE_URL: https://${{ steps.branch.outputs.branch }}--vitamix--aemsites.aem.network
       run: npx playwright test --reporter=html
-      continue-on-error: true
-      
-    - name: Run Playwright tests on mobile
-      env:
-        BRANCH: ${{ steps.branch.outputs.branch }}
-        BASE_URL: https://${{ steps.branch.outputs.branch }}--vitamix--aemsites.aem.network
-      run: npx playwright test --project="Mobile Chrome"
-      continue-on-error: true
     
     - name: Upload Playwright Report
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: playwright-report
+        name: playwright-report-${{ github.run_id }}
         path: playwright-report/
         retention-days: 30
     
@@ -88,7 +81,7 @@ jobs:
             owner: context.repo.owner,
             repo: context.repo.repo,
             comment_id: ${{ steps.comment.outputs.result }},
-            body: '✅ Integration tests passed! 🎉\n\n**Desktop & Mobile tests completed successfully.**'
+            body: '✅ **Integration tests passed!** 🎉\n\n**All Playwright tests completed successfully.**\n\n📊 [View detailed report](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})'
           })
     
     - name: Comment on PR - Failure
@@ -100,5 +93,5 @@ jobs:
             owner: context.repo.owner,
             repo: context.repo.repo,
             comment_id: ${{ steps.comment.outputs.result }},
-            body: '❌ Integration tests failed.\n\nCheck the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.'
+            body: '❌ **Integration tests failed.**\n\n🔍 [Check the workflow run for details](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})\n📊 Test report will be available in the artifacts section.'
           })
