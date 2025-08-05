@@ -2,7 +2,9 @@
 coverage/*
 logs/*
 node_modules/*
-.vscode
+.vscode/settings.json
+playwright-report/*
+test-results/*
 
 helix-importer-ui
 .DS_Store
