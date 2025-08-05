@@ -16,6 +16,20 @@ jobs:
         browser: [chromium]
     
     steps:
+    - name: Comment on PR - Starting
+      id: comment
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { data: comment } = await github.rest.issues.createComment({
+            issue_number: ${{ github.event.issue.number }},
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: '🚀 Integration tests are starting... This will take a few minutes.'
+          });
+          return comment.id;
+        result-encoding: string
+    
     - name: Checkout code
       uses: actions/checkout@v4
       with:
@@ -70,11 +84,11 @@ jobs:
       uses: actions/github-script@v7
       with:
         script: |
-          github.rest.issues.createComment({
-            issue_number: ${{ github.event.issue.number }},
+          await github.rest.issues.updateComment({
             owner: context.repo.owner,
             repo: context.repo.repo,
-            body: '✅ Integration tests passed! 🎉'
+            comment_id: ${{ steps.comment.outputs.result }},
+            body: '✅ Integration tests passed! 🎉\n\n**Desktop & Mobile tests completed successfully.**'
           })
     
     - name: Comment on PR - Failure
@@ -82,9 +96,9 @@ jobs:
       uses: actions/github-script@v7
       with:
         script: |
-          github.rest.issues.createComment({
-            issue_number: ${{ github.event.issue.number }},
+          await github.rest.issues.updateComment({
             owner: context.repo.owner,
             repo: context.repo.repo,
-            body: '❌ Integration tests failed. Check the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.'
+            comment_id: ${{ steps.comment.outputs.result }},
+            body: '❌ Integration tests failed.\n\nCheck the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.'
           })
