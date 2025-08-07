@@ -42,13 +42,15 @@ export async function getCurrentBranch() {
 }
 
 /**
- * Build a product URL for testing
+ * Build a product URL for testing, set martech to off by default
  * @param {string} productPath - The product path (e.g., '/us/en_us/products/ascent-x3')
  * @param {string} branch - The branch name
  * @returns {string} The full product URL
  */
 export function buildProductUrl(productPath, branch = 'main', queryParams = {}) {
   const baseUrl = getBaseUrl(branch);
+
+  queryParams.martech = 'off';
   const queryString = new URLSearchParams(queryParams).toString();
   return `${baseUrl}${productPath}${queryString ? `?${queryString}` : ''}`;
 }
