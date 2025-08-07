@@ -926,6 +926,13 @@ async function loadDelayed() {
     if (params.get('martech') === 'on') {
       import('./consented.js');
     } else {
+      window.addEventListener('CookiebotOnDialogDisplay', () => {
+        if (new RegExp(`${window.Cookiebot.userCountry.toUpperCase()}`)
+          .test('AT|BE|BG|CY|CZ|DE|DK|EE|ES|FI|FR|GB|GR|HR|HU|IE|IT|LT|LU|LV|MT|NL|PL|PT|RO|SE|SI|SK')) {
+          window.Cookiebot.dialog.consentLevel = 'strict';
+          window.Cookiebot.dialog.detachOnscrollEvent();
+        }
+      });
       window.addEventListener('CookiebotOnConsentReady', () => {
         if (window.Cookiebot.consented) {
           import('./consented.js');
