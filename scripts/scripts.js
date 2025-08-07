@@ -931,6 +931,8 @@ async function loadDelayed() {
           .test('AT|BE|BG|CY|CZ|DE|DK|EE|ES|FI|FR|GB|GR|HR|HU|IE|IT|LT|LU|LV|MT|NL|PL|PT|RO|SE|SI|SK')) {
           window.Cookiebot.dialog.consentLevel = 'strict';
           window.Cookiebot.dialog.detachOnscrollEvent();
+          /* eslint-disable-next-line no-console */
+          console.log('Cookiebot dialog consent level set to strict');
         }
       });
       window.addEventListener('CookiebotOnConsentReady', () => {
