@@ -170,7 +170,7 @@ export function renderOptions(block, variants, custom) {
       };
       const warrentyValue = document.createElement('div');
       warrentyValue.classList.add('pdp-warrenty-option');
-      warrentyValue.textContent = `${option.name} (${formatPrice(+option.price)})`;
+      warrentyValue.textContent = `${option.name} (${formatPrice(+option.finalPrice)})`;
       if (options.length > 1) {
         const radio = document.createElement('input');
         radio.type = 'radio';
