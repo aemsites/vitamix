@@ -206,6 +206,17 @@ export default function renderAddToCart(block, parent) {
     // add product to cart with selected options and quantity
     await cartApi.addToCart(sku, selectedOptions, quantity);
 
+    if (window.selectedWarranty?.finalPrice && window.selectedWarranty.finalPrice !== '0.00') {
+      // add warranty to cart
+      const qty = Number.parseInt(window.selectedWarranty.finalPrice, 10)
+        / Number.parseInt(window.selectedWarranty.price, 10);
+      if (Number.isNaN(qty)) {
+        console.error('Invalid warranty quantity:', window.selectedWarranty.name);
+      } else {
+        await cartApi.addToCart(window.selectedWarranty.sku, [], qty);
+      }
+    }
+
     // redirect to cart page after successful addition
     window.location.href = '/us/en_us/checkout/cart/';
   });
