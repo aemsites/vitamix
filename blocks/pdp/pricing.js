@@ -86,26 +86,30 @@ export default function renderPricing(block, variant) {
   pricingContainer.append(paymentsPlaceholder);
 
   if (+pricing.final > 50) {
-    setTimeout(() => {
-      // eslint-disable-next-line camelcase, no-underscore-dangle
-      window._affirm_config = {
-        public_api_key: '6PJNMXGC9XLXNFHX',
-        script: 'https://cdn1.affirm.com/js/v2/affirm.js',
-        locale: 'en_US',
-        country_code: 'USA',
-        logo: 'blue',
-        min_order_total: '50.00',
-        max_order_total: '50000',
-        selector: '#als_pdp',
-        currency_rate: null,
-        backorders_options: [],
-        element_id: 'als_pdp',
-      };
+    const io = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        io.disconnect();
+        // eslint-disable-next-line camelcase, no-underscore-dangle
+        window._affirm_config = {
+          public_api_key: '6PJNMXGC9XLXNFHX',
+          script: 'https://cdn1.affirm.com/js/v2/affirm.js',
+          locale: 'en_US',
+          country_code: 'USA',
+          logo: 'blue',
+          min_order_total: '50.00',
+          max_order_total: '50000',
+          selector: '#als_pdp',
+          currency_rate: null,
+          backorders_options: [],
+          element_id: 'als_pdp',
+        };
 
-      /* eslint-disable */
-    (function(m,g,n,d,a,e,h,c){var b=m[n]||{},k=document.createElement(e),p=document.getElementsByTagName(e)[0],l=function(a,b,c){return function(){a[b]._.push([c,arguments])}};b[d]=l(b,d,"set");var f=b[d];b[a]={};b[a]._=[];f._=[];b._=[];b[a][h]=l(b,a,h);b[c]=function(){b._.push([h,arguments])};a=0;for(c="set add save post open empty reset on off trigger ready setProduct".split(" ");a<c.length;a++)f[c[a]]=l(b,d,c[a]);a=0;for(c=["get","token","url","items"];a<c.length;a++)f[c[a]]=function(){};k.async=
-        !0;k.src=g[e];p.parentNode.insertBefore(k,p);delete g[e];f(g);m[n]=b})(window,_affirm_config,"affirm","checkout","ui","script","ready","jsReady");
-    }, 500);      
+        /* eslint-disable */
+      (function(m,g,n,d,a,e,h,c){var b=m[n]||{},k=document.createElement(e),p=document.getElementsByTagName(e)[0],l=function(a,b,c){return function(){a[b]._.push([c,arguments])}};b[d]=l(b,d,"set");var f=b[d];b[a]={};b[a]._=[];f._=[];b._=[];b[a][h]=l(b,a,h);b[c]=function(){b._.push([h,arguments])};a=0;for(c="set add save post open empty reset on off trigger ready setProduct".split(" ");a<c.length;a++)f[c[a]]=l(b,d,c[a]);a=0;for(c=["get","token","url","items"];a<c.length;a++)f[c[a]]=function(){};k.async=
+          !0;k.src=g[e];p.parentNode.insertBefore(k,p);delete g[e];f(g);m[n]=b})(window,_affirm_config,"affirm","checkout","ui","script","ready","jsReady");
+      }
+    });
+    io.observe(block);
   }
   /* eslint-enable */
 

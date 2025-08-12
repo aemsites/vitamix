@@ -62,9 +62,16 @@ async function renderReviews(block, reviewsId) {
   bazaarvoiceContainer.classList.add('pdp-reviews-container');
   bazaarvoiceContainer.innerHTML = `<div data-bv-show="reviews" data-bv-product-id="${reviewsId}"></div>`;
 
-  setTimeout(async () => {
-    await loadScript('https://apps.bazaarvoice.com/deployments/vitamix/main_site/production/en_US/bv.js');
-  }, 500);
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        io.disconnect();
+        loadScript('https://apps.bazaarvoice.com/deployments/vitamix/main_site/production/en_US/bv.js');
+      }
+    });
+  });
+
+  io.observe(block);
 
   window.bvCallback = () => { };
 
