@@ -195,8 +195,7 @@ export default function renderAddToCart(block, parent) {
 
     // add selected warranty if available
     if (window.selectedWarranty?.uid) {
-      // TODO: add warranty to cart
-      // selectedOptions.push(window.selectedWarranty.uid);
+      selectedOptions.push(window.selectedWarranty.uid);
     }
 
     // add any required bundle options
