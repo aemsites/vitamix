@@ -281,48 +281,125 @@ export function updateCartFromLocalStorage(options) {
   done();
 }
 
+function hasExtendedWarranty() {
+  return window.selectedWarranty?.price && window.selectedWarranty.price !== '0.00';
+}
+
+let pformKey;
+async function getFormKey() {
+  if (!pformKey) {
+    const resp = await fetch('/us/en_us/checkout/cart/');
+    const txt = await resp.text();
+    const input = txt.match(/<input name="form_key" type="hidden" value="([^"]+)"/);
+    pformKey = input ? input[1] : null;
+    // require refetch after 10 mins
+    setTimeout(() => {
+      pformKey = null;
+    }, 600000);
+  }
+  return pformKey;
+}
+
+function getProductID(sku) {
+  return 3231;
+}
+
+/**
+ * Add to cart using legacy form.
+ *
+ * Sample form data:
+ * product: 3231
+ * selected_configurable_option
+ * related_product
+ * item: 3231
+ * form_key: eWSonrPsyanQhEOB
+ * magic360gallery: 1
+ * movegalleryintotab: 1
+ * super_attribute[93]: 15
+ * warranty_skus[2646]: sku-warranty-7yr-std
+ * warranty_skus[3545]: 001314
+ * options[1758]: 3545
+ * warranty_sku: 001314
+ * index_id: 15
+ * qty: 1
+ * vitamixProductId: 3231
+ *
+ * @param {string} sku
+ * @param {string[]} options
+ * @param {number} quantity
+ */
+async function addToCartLegacy(sku, options, quantity) {
+  const uenc = btoa(window.location.href);
+  const [productId, formKey] = await Promise.all([getProductID(sku), getFormKey()]);
+  const url = `/us/en_us/checkout/cart/add/uenc/${uenc}/product/${productId}/`;
+
+  const formData = new FormData();
+  formData.append('product', productId);
+  // formData.append('selected_configurable_option');
+  // formData.append('related_product');
+  formData.append('item', productId);
+  formData.append('form_key', formKey);
+  // formData.append('magic360gallery', 1);
+  // formData.append('movegalleryintotab', 1);
+  formData.append('super_attribute[93]', 15);
+  formData.append('warranty_skus[2646]', 'sku-warranty-7yr-std');
+  formData.append('warranty_skus[3545]', '001314');
+
+  const resp = await fetch(url, {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
+  });
+  if (!resp.ok) {
+    console.error('Failed to add item to cart', resp);
+  }
+  return resp;
+}
+
 export async function addToCart(sku, options, quantity) {
   const done = waitForCart();
   try {
-    const variables = {
-      cartId: store.getCartId(),
-      cartItems: [{
-        sku,
-        quantity,
-        selected_options: options,
-      }],
-    };
+    if (hasExtendedWarranty()) {
+      await addToCartLegacy(sku, options, quantity);
+    } else {
+      const variables = {
+        cartId: store.getCartId(),
+        cartItems: [{
+          sku,
+          quantity,
+          selected_options: options,
+        }],
+      };
 
-    const { data, errors } = await performMonolithGraphQLQuery(
-      addProductsToCartMutation,
-      variables,
-      false,
-      false,
-    );
-    handleCartErrors(errors);
+      const { data, errors } = await performMonolithGraphQLQuery(
+        addProductsToCartMutation,
+        variables,
+        false,
+        false,
+      );
+      handleCartErrors(errors);
 
-    const { cart, user_errors: userErrors } = data.addProductsToCart;
-    if (userErrors && userErrors.length > 0) {
-      console.error('User errors while adding item to cart', userErrors);
-    }
-
-    cart.items = cart.items.filter((item) => item);
-
-    // Adding a new line item to the cart incorrectly returns the total
-    // quantity so we check that and update if necessary
-    if (cart.items.length > 0) {
-      const lineItemTotalQuantity = cart.items.flatMap(
-        (item) => item.quantity,
-      ).reduce((partialSum, a) => partialSum + a, 0);
-      if (lineItemTotalQuantity !== cart.total_quantity) {
-        console.debug('Incorrect total quantity from AC, updating.');
-        cart.total_quantity = lineItemTotalQuantity;
+      const { cart, user_errors: userErrors } = data.addProductsToCart;
+      if (userErrors && userErrors.length > 0) {
+        console.error('User errors while adding item to cart', userErrors);
       }
+
+      cart.items = cart.items.filter((item) => item);
+
+      // Adding a new line item to the cart incorrectly returns the total
+      // quantity so we check that and update if necessary
+      if (cart.items.length > 0) {
+        const lineItemTotalQuantity = cart.items.flatMap(
+          (item) => item.quantity,
+        ).reduce((partialSum, a) => partialSum + a, 0);
+        if (lineItemTotalQuantity !== cart.total_quantity) {
+          console.debug('Incorrect total quantity from AC, updating.');
+          cart.total_quantity = lineItemTotalQuantity;
+        }
+      }
+      console.debug('Added items to cart', variables, cart);
     }
-
     await store.updateCart();
-
-    console.debug('Added items to cart', variables, cart);
   } catch (err) {
     console.error('Could not add item to cart', err);
   } finally {
