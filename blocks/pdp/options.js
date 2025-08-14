@@ -182,7 +182,6 @@ export function renderOptions(block, variants, custom) {
         warrentyValue.prepend(radio);
 
         radio.addEventListener('change', () => {
-          // TODO: allow warranty to be selected
           window.selectedWarranty = option;
         });
       }

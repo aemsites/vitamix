@@ -338,12 +338,8 @@ async function addToCartLegacy(sku, options, quantity) {
 
   const formData = new FormData();
   formData.append('product', productId);
-  // formData.append('selected_configurable_option');
-  // formData.append('related_product');
   formData.append('item', productId);
   formData.append('form_key', formKey);
-  // formData.append('magic360gallery', 1);
-  // formData.append('movegalleryintotab', 1);
   formData.append('qty', quantity);
   formData.append('vitamixProductId', productId);
 
