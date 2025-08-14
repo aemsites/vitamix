@@ -301,7 +301,10 @@ async function getFormKey() {
 }
 
 function getProductID(sku) {
-  return 3231;
+  if (window.jsonLdData.custom.entityId) {
+    return window.jsonLdData.custom.entityId;
+  }
+  return sku; // TODO: lookup productId if necessary
 }
 
 /**
@@ -312,7 +315,7 @@ function getProductID(sku) {
  * selected_configurable_option
  * related_product
  * item: 3231
- * form_key: eWSonrPsyanQhEOB
+ * form_key: x
  * magic360gallery: 1
  * movegalleryintotab: 1
  * super_attribute[93]: 15
@@ -341,9 +344,33 @@ async function addToCartLegacy(sku, options, quantity) {
   formData.append('form_key', formKey);
   // formData.append('magic360gallery', 1);
   // formData.append('movegalleryintotab', 1);
-  formData.append('super_attribute[93]', 15);
-  formData.append('warranty_skus[2646]', 'sku-warranty-7yr-std');
-  formData.append('warranty_skus[3545]', '001314');
+  formData.append('qty', quantity);
+  formData.append('vitamixProductId', productId);
+
+  const warrantyIdsAdded = new Set();
+  options.forEach((option) => {
+    const decoded = atob(option);
+    const [type, key, value] = decoded.split('/');
+    if (type === 'configurable') {
+      formData.append(`super_attribute[${key}]`, value);
+      formData.append('index_id', value);
+    } else if (type === 'custom-option') {
+      formData.append(`options[${key}]`, value);
+      formData.append(`warranty_skus[${value}]`, window.selectedWarranty.sku);
+      formData.append('warranty_sku', window.selectedWarranty.sku);
+      warrantyIdsAdded.add(value);
+    }
+  });
+
+  // add other warranty skus
+  window.jsonLdData.custom.options?.forEach((option) => {
+    const decoded = atob(option.uid);
+    // eslint-disable-next-line no-unused-vars
+    const [type, _key, value] = decoded.split('/');
+    if (type === 'custom-option' && !warrantyIdsAdded.has(value)) {
+      formData.append(`warranty_skus[${value}]`, option.sku);
+    }
+  });
 
   const resp = await fetch(url, {
     method: 'POST',
@@ -352,10 +379,18 @@ async function addToCartLegacy(sku, options, quantity) {
   });
   if (!resp.ok) {
     console.error('Failed to add item to cart', resp);
+    throw new Error('Failed to add item to cart');
   }
   return resp;
 }
 
+/**
+ * Add to cart.
+ *
+ * @param {string} sku
+ * @param {string[]} options
+ * @param {number} quantity
+ */
 export async function addToCart(sku, options, quantity) {
   const done = waitForCart();
   try {
