@@ -285,6 +285,14 @@ function hasExtendedWarranty() {
   return window.selectedWarranty?.price && window.selectedWarranty.price !== '0.00';
 }
 
+function hasCouponParam() {
+  return window.location.search?.toLowerCase().includes('coupon');
+}
+
+function shouldUseLegacyAddToCart() {
+  return hasExtendedWarranty() || hasCouponParam();
+}
+
 let pformKey;
 async function getFormKey() {
   if (!pformKey) {
@@ -332,7 +340,9 @@ function getProductID(sku) {
  * @param {number} quantity
  */
 async function addToCartLegacy(sku, options, quantity) {
-  const uenc = btoa(window.location.href);
+  const uenc = window.location.href.includes('?')
+    ? window.location.href.split('?').map(btoa).join('_')
+    : btoa(window.location.href);
   const [productId, formKey] = await Promise.all([getProductID(sku), getFormKey()]);
   const url = `/us/en_us/checkout/cart/add/uenc/${uenc}/product/${productId}/`;
 
@@ -390,7 +400,7 @@ async function addToCartLegacy(sku, options, quantity) {
 export async function addToCart(sku, options, quantity) {
   const done = waitForCart();
   try {
-    if (hasExtendedWarranty()) {
+    if (shouldUseLegacyAddToCart()) {
       await addToCartLegacy(sku, options, quantity);
     } else {
       const variables = {
