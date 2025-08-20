@@ -106,6 +106,65 @@ test.describe('PDP Integration Tests', () => {
       console.log('✓ Add to Cart button is functional');
     });
 
+    test('add to cart button should work, with coupon, should use legacy atc', async ({ page }) => {
+      await page.route('**/us/en_us/checkout/cart/add/**', async (route) => {
+        // check that the correct uenc path segment exists
+        const url = new URL(route.request().url());
+        expect(url.pathname).toContain('/us/en_us/checkout/cart/add/uenc/aHR0cHM6Ly9jb3Vwb24tLXZpdGFtaXgtLWFlbXNpdGVzLmFlbS5uZXR3b3JrL3VzL2VuX3VzL3Byb2R1Y3RzL2FzY2VudC14Mw==_Q09VUE9OPXRlc3QmbWFydGVjaD1vZmY=/product/3641/');
+
+        const requestBody = route.request().postData();
+        // requestBody is a multipart form data string
+        // extract form data from the string
+        const boundary = requestBody.split('\n')[0];
+        const parts = requestBody.split(boundary).filter(Boolean);
+        const data = {};
+        parts.forEach((part) => {
+          const name = part.split('\n')[1].split('name="')[1].split('"')[0];
+          const value = part.split('\n')[3].trim();
+          data[name] = value;
+        });
+        expect(data).toEqual({
+          index_id: '534',
+          product: '3641',
+          item: '3641',
+          form_key: 'null',
+          qty: '1',
+          'super_attribute[93]': '534',
+          vitamixProductId: '3641',
+          'options[3002]': '3941',
+          warranty_sku: 'sku-10-year-standard-warranty',
+          'warranty_skus[3941]': 'sku-10-year-standard-warranty',
+        });
+
+        // Log the arguments that were passed to addToCart
+        console.log('✓ Add to Cart function called with correct variables');
+        await route.fulfill({
+          status: 200,
+        });
+      });
+
+      const productUrl = buildProductUrl(productPath, currentBranch, { COUPON: 'test' });
+      console.log('productUrl: ', productUrl);
+      await page.goto(productUrl);
+
+      // Wait for add to cart button
+      await waitForElement(page, '.quantity-container button');
+
+      const addToCartButton = page.locator('.quantity-container button');
+      await expect(addToCartButton).toContainText(/add to cart/i);
+
+      // Click the add to cart button
+      await addToCartButton.click();
+
+      // wait for page to navigate to the cart page
+      await page.waitForURL('**/checkout/cart/**');
+
+      // should redirect to the cart page
+      const currentUrl = new URL(page.url());
+      expect(currentUrl.pathname).toBe('/us/en_us/checkout/cart/');
+      console.log('✓ Add to Cart button is functional');
+    });
+
     test('should handle product variant selection', async ({ page }) => {
       const productUrl = buildProductUrl(productPath, currentBranch);
       await page.goto(productUrl);
@@ -215,22 +274,32 @@ test.describe('PDP Integration Tests', () => {
     });
 
     test('add to cart button should work with extended warranty', async ({ page }) => {
-      await page.route('**/graphql', async (route) => {
-        const requestBody = route.request().postDataJSON();
-        expect(requestBody.variables).toEqual({
-          cartItems: [
-            {
-              sku: 'VBND5200LB',
-              quantity: '1',
-              selected_options: [
-                'YnVuZGxlLzQzLzIyMy8x',
-                'Y3VzdG9tLW9wdGlvbi8zMDIzLzM5NjU=',
-                'YnVuZGxlLzQxLzIxMi8x',
-                'YnVuZGxlLzQxLzIxNS8x',
-                'YnVuZGxlLzQxLzIyMS8x',
-              ],
-            },
-          ],
+      await page.route('**/us/en_us/checkout/cart/add/**', async (route) => {
+        // check that the correct uenc path segment exists
+        const url = new URL(route.request().url());
+        expect(url.pathname).toEqual('/us/en_us/checkout/cart/add/uenc/aHR0cHM6Ly9jb3Vwb24tLXZpdGFtaXgtLWFlbXNpdGVzLmFlbS5uZXR3b3JrL3VzL2VuX3VzL3Byb2R1Y3RzLzUyMDAtbGVnYWN5LWJ1bmRsZQ==_bWFydGVjaD1vZmY=/product/3701/');
+
+        const requestBody = route.request().postData();
+        // requestBody is a multipart form data string
+        // extract form data from the string
+        const boundary = requestBody.split('\n')[0];
+        const parts = requestBody.split(boundary).filter(Boolean);
+        const data = {};
+        parts.forEach((part) => {
+          const name = part.split('\n')[1].split('name="')[1].split('"')[0];
+          const value = part.split('\n')[3].trim();
+          data[name] = value;
+        });
+        expect(data).toEqual({
+          product: '3701',
+          item: '3701',
+          form_key: 'null',
+          qty: '1',
+          vitamixProductId: '3701',
+          'options[3023]': '3965',
+          'warranty_skus[3965]': '001314',
+          warranty_sku: '001314',
+          'warranty_skus[3962]': 'sku-warranty-7yr-std',
         });
 
         // Log the arguments that were passed to addToCart
