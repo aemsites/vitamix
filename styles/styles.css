@@ -66,6 +66,10 @@
   --site-width: 2000px;
 }
 
+body.pdp-template {
+  --site-width: 1440px;
+}
+
 @media (width >= 900px) {
   :root {
     /* widths and heights */

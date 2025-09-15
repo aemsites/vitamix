@@ -208,6 +208,20 @@
   gap: 0;
 }
 
+.banner.aligned p.eyebrow {
+  color: unset;
+}
+
+.banner.aligned.right-text .img-wrapper img {
+  object-position: right;
+}
+
+@media (width >= 600px) {
+  .banner.aligned.right-text .img-wrapper img {
+    object-position: unset;
+  }
+}
+
 .banner.aligned .img-wrapper {
   position: relative;
   order: unset;

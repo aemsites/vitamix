@@ -2,7 +2,7 @@ import { buildSlide, buildThumbnails } from './gallery.js';
 import { rebuildIndices, checkOutOfStock } from '../../scripts/scripts.js';
 import { toClassName, getMetadata } from '../../scripts/aem.js';
 import renderPricing from './pricing.js';
-import { isVariantAvailableForSale } from './add-to-cart.js';
+import renderAddToCart, { isVariantAvailableForSale } from './add-to-cart.js';
 
 /**
  * Handles the change of an option.
@@ -89,11 +89,19 @@ export function onOptionChange(block, variants, color) {
   buildThumbnails(gallery);
 
   window.selectedVariant = variant;
+
+  // update add to cart
+  const addToCartContainer = renderAddToCart(block, window.jsonLdData);
+  if (addToCartContainer) {
+    block.querySelector('.add-to-cart').replaceWith(addToCartContainer);
+  }
 }
 
 /**
  * Renders the options section of the PDP block.
  * @param {Element} block - The PDP block element
+ * @param {any[]} variants - The variants of the product
+ * @param {Record<string, any>} custom - The custom data for the product
  * @returns {Element} The options container element
  */
 export function renderOptions(block, variants, custom) {
@@ -170,7 +178,7 @@ export function renderOptions(block, variants, custom) {
       };
       const warrentyValue = document.createElement('div');
       warrentyValue.classList.add('pdp-warrenty-option');
-      warrentyValue.textContent = `${option.name} (${formatPrice(+option.price)})`;
+      warrentyValue.textContent = `${option.name} (${formatPrice(+option.finalPrice)})`;
       if (options.length > 1) {
         const radio = document.createElement('input');
         radio.type = 'radio';

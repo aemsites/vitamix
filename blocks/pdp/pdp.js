@@ -64,7 +64,7 @@ async function renderReviews(block, reviewsId) {
 
   setTimeout(async () => {
     await loadScript('https://apps.bazaarvoice.com/deployments/vitamix/main_site/production/en_US/bv.js');
-  }, 5000);
+  }, 500);
 
   window.bvCallback = () => { };
 
@@ -121,15 +121,22 @@ function renderCompare(custom) {
   return compareContainer;
 }
 
-function renderContent() {
+function renderContent(detailsContainer) {
   const contentContainer = document.createElement('div');
   contentContainer.classList.add('pdp-content-fragment');
   const fragmentPath = window.location.pathname.replace('/products/', '/products/fragments/');
   const insertFragment = async () => {
     const fragment = await loadFragment(fragmentPath);
     if (fragment) {
-      while (fragment.firstChild) {
-        contentContainer.append(fragment.firstChild);
+      const sections = [...fragment.querySelectorAll('main > div.section')];
+      while (sections.length > 0) {
+        const section = sections.shift();
+        if (section.querySelector('h3#features')) {
+          detailsContainer.innerHTML = '<h2>About</h2>';
+          detailsContainer.append(section);
+        } else {
+          contentContainer.append(section);
+        }
       }
     }
   };
@@ -138,7 +145,7 @@ function renderContent() {
 }
 
 function renderFreeShipping(offers) {
-  if (!offers[0] || offers[0].price < 99) return null;
+  if (!offers[0] || offers[0].price < 150) return null;
   const freeShippingContainer = document.createElement('div');
   freeShippingContainer.classList.add('pdp-free-shipping-container');
   freeShippingContainer.innerHTML = `
@@ -275,7 +282,7 @@ export default function decorate(block) {
   const specsContainer = renderSpecs(specifications, custom, jsonLdData.name);
   specifications.remove();
 
-  const contentContainer = renderContent();
+  const contentContainer = renderContent(detailsContainer);
   const faqContainer = renderFAQ(block);
 
   renderReviews(block, reviewsId);
@@ -307,6 +314,10 @@ export default function decorate(block) {
     [window.selectedVariant] = variants;
   }
 
-  buyBox.dataset.sku = offers[0].sku;
-  buyBox.dataset.oos = checkOutOfStock(offers[0].sku);
+  buyBox.dataset.sku = window.selectedVariant?.sku || offers[0].sku;
+  buyBox.dataset.oos = checkOutOfStock(
+    window.selectedVariant
+      ? offers.find((offer) => offer.sku === window.selectedVariant.sku).sku
+      : offers[0].sku,
+  );
 }

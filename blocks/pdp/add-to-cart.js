@@ -94,7 +94,7 @@ export function isVariantAvailableForSale(variant) {
 export default function renderAddToCart(block, parent) {
   // Default selectedVariant to parent product, if simple product, selectedVariant will be undefined
   // TODO: this should be fixed with https://github.com/aemsites/vitamix/issues/185
-  let selectedVariant = parent;
+  let selectedVariant = parent.offers?.[0]?.custom ? parent.offers[0] : parent;
   if (window.selectedVariant) {
     // If we actually have a selected variant, use it instead of the parent product
     const { sku: selectedSku } = window.selectedVariant;
@@ -149,8 +149,8 @@ export default function renderAddToCart(block, parent) {
   const quantitySelect = document.createElement('select');
   quantitySelect.id = 'pdp-quantity-select';
 
-  // set maximum quantity (default to 5 if not specified)
-  const maxQuantity = custom.maxCartQty ? +custom.maxCartQty : 5;
+  // set maximum quantity (default to 3 if not specified)
+  const maxQuantity = custom.maxCartQty ? +custom.maxCartQty : 3;
 
   // populate quantity dropdown with options from 1 to maxQuantity
   for (let i = 1; i <= maxQuantity; i += 1) {

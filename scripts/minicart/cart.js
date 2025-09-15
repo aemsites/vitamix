@@ -281,48 +281,166 @@ export function updateCartFromLocalStorage(options) {
   done();
 }
 
+function hasExtendedWarranty() {
+  return window.selectedWarranty?.price && window.selectedWarranty.price !== '0.00';
+}
+
+function hasCouponParam() {
+  return window.location.search?.toLowerCase().includes('coupon');
+}
+
+function shouldUseLegacyAddToCart() {
+  return hasExtendedWarranty() || hasCouponParam();
+}
+
+let pformKey;
+async function getFormKey() {
+  if (!pformKey) {
+    const resp = await fetch('/us/en_us/checkout/cart/');
+    const txt = await resp.text();
+    const input = txt.match(/<input name="form_key" type="hidden" value="([^"]+)"/);
+    pformKey = input ? input[1] : null;
+    // require refetch after 10 mins
+    setTimeout(() => {
+      pformKey = null;
+    }, 600000);
+  }
+  return pformKey;
+}
+
+function getProductID(sku) {
+  if (window.jsonLdData.custom.entityId) {
+    return window.jsonLdData.custom.entityId;
+  }
+  return sku; // TODO: lookup productId if necessary
+}
+
+/**
+ * Add to cart using legacy form.
+ *
+ * Sample form data:
+ * product: 3231
+ * selected_configurable_option
+ * related_product
+ * item: 3231
+ * form_key: x
+ * magic360gallery: 1
+ * movegalleryintotab: 1
+ * super_attribute[93]: 15
+ * warranty_skus[2646]: sku-warranty-7yr-std
+ * warranty_skus[3545]: 001314
+ * options[1758]: 3545
+ * warranty_sku: 001314
+ * index_id: 15
+ * qty: 1
+ * vitamixProductId: 3231
+ *
+ * @param {string} sku
+ * @param {string[]} options
+ * @param {number} quantity
+ */
+async function addToCartLegacy(sku, options, quantity) {
+  const uenc = window.location.href.includes('?')
+    ? window.location.href.split('?').map(btoa).join('_')
+    : btoa(window.location.href);
+  const [productId, formKey] = await Promise.all([getProductID(sku), getFormKey()]);
+  const url = `/us/en_us/checkout/cart/add/uenc/${uenc}/product/${productId}/`;
+
+  const formData = new FormData();
+  formData.append('product', productId);
+  formData.append('item', productId);
+  formData.append('form_key', formKey);
+  formData.append('qty', quantity);
+  formData.append('vitamixProductId', productId);
+
+  const warrantyIdsAdded = new Set();
+  options.forEach((option) => {
+    const decoded = atob(option);
+    const [type, key, value] = decoded.split('/');
+    if (type === 'configurable') {
+      formData.append(`super_attribute[${key}]`, value);
+      formData.append('index_id', value);
+    } else if (type === 'custom-option') {
+      formData.append(`options[${key}]`, value);
+      formData.append(`warranty_skus[${value}]`, window.selectedWarranty.sku);
+      formData.append('warranty_sku', window.selectedWarranty.sku);
+      warrantyIdsAdded.add(value);
+    }
+  });
+
+  // add other warranty skus
+  window.jsonLdData.custom.options?.forEach((option) => {
+    const decoded = atob(option.uid);
+    // eslint-disable-next-line no-unused-vars
+    const [type, _key, value] = decoded.split('/');
+    if (type === 'custom-option' && !warrantyIdsAdded.has(value)) {
+      formData.append(`warranty_skus[${value}]`, option.sku);
+    }
+  });
+
+  const resp = await fetch(url, {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
+  });
+  if (!resp.ok) {
+    console.error('Failed to add item to cart', resp);
+    throw new Error('Failed to add item to cart');
+  }
+  return resp;
+}
+
+/**
+ * Add to cart.
+ *
+ * @param {string} sku
+ * @param {string[]} options
+ * @param {number} quantity
+ */
 export async function addToCart(sku, options, quantity) {
   const done = waitForCart();
   try {
-    const variables = {
-      cartId: store.getCartId(),
-      cartItems: [{
-        sku,
-        quantity,
-        selected_options: options,
-      }],
-    };
+    if (shouldUseLegacyAddToCart()) {
+      await addToCartLegacy(sku, options, quantity);
+    } else {
+      const variables = {
+        cartId: store.getCartId(),
+        cartItems: [{
+          sku,
+          quantity,
+          selected_options: options,
+        }],
+      };
 
-    const { data, errors } = await performMonolithGraphQLQuery(
-      addProductsToCartMutation,
-      variables,
-      false,
-      false,
-    );
-    handleCartErrors(errors);
+      const { data, errors } = await performMonolithGraphQLQuery(
+        addProductsToCartMutation,
+        variables,
+        false,
+        false,
+      );
+      handleCartErrors(errors);
 
-    const { cart, user_errors: userErrors } = data.addProductsToCart;
-    if (userErrors && userErrors.length > 0) {
-      console.error('User errors while adding item to cart', userErrors);
-    }
-
-    cart.items = cart.items.filter((item) => item);
-
-    // Adding a new line item to the cart incorrectly returns the total
-    // quantity so we check that and update if necessary
-    if (cart.items.length > 0) {
-      const lineItemTotalQuantity = cart.items.flatMap(
-        (item) => item.quantity,
-      ).reduce((partialSum, a) => partialSum + a, 0);
-      if (lineItemTotalQuantity !== cart.total_quantity) {
-        console.debug('Incorrect total quantity from AC, updating.');
-        cart.total_quantity = lineItemTotalQuantity;
+      const { cart, user_errors: userErrors } = data.addProductsToCart;
+      if (userErrors && userErrors.length > 0) {
+        console.error('User errors while adding item to cart', userErrors);
       }
+
+      cart.items = cart.items.filter((item) => item);
+
+      // Adding a new line item to the cart incorrectly returns the total
+      // quantity so we check that and update if necessary
+      if (cart.items.length > 0) {
+        const lineItemTotalQuantity = cart.items.flatMap(
+          (item) => item.quantity,
+        ).reduce((partialSum, a) => partialSum + a, 0);
+        if (lineItemTotalQuantity !== cart.total_quantity) {
+          console.debug('Incorrect total quantity from AC, updating.');
+          cart.total_quantity = lineItemTotalQuantity;
+        }
+      }
+      console.debug('Added items to cart', variables, cart);
     }
-
     await store.updateCart();
-
-    console.debug('Added items to cart', variables, cart);
   } catch (err) {
     console.error('Could not add item to cart', err);
   } finally {

@@ -44,6 +44,20 @@ export function getCookies() {
   return cookieMap;
 }
 
+function setAffiliateCoupon() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const { cjdata, cjevent, COUPON } = Object.fromEntries(urlParams);
+
+  if (!cjdata || !cjevent || !COUPON) return;
+
+  const loginUrl = new URL('https://www.vitamix.com/us/en_us/checkout/cart');
+  Object.entries({ cjdata, cjevent, COUPON }).forEach(([key, value]) => {
+    loginUrl.searchParams.set(key, value);
+  });
+
+  fetch(loginUrl.toString());
+}
+
 /**
  * Replaces image icon with its SVG equivalent.
  * @param {HTMLImageElement} icon - Icon image element
@@ -212,15 +226,38 @@ export function buildCarousel(container, pagination = true) {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = `nav-arrow nav-arrow-${label.toLowerCase()}`;
-    button.disabled = !i; // auto-disable first arrow
     button.setAttribute('aria-label', `${label} frame`);
     button.addEventListener('click', () => {
       const slideWidth = getSlideWidth(carousel);
       const visible = getVisibleSlides(container);
-      carousel.scrollBy({
-        left: !i ? -slideWidth * visible : slideWidth * visible,
-        behavior: 'smooth',
-      });
+      const { scrollLeft } = carousel;
+      const current = Math.round(scrollLeft / slideWidth);
+
+      if (!i) { // Previous button
+        if (current <= 0) {
+          // Loop to the end
+          carousel.scrollTo({
+            left: (slides.length - visible) * slideWidth,
+            behavior: 'smooth',
+          });
+        } else {
+          carousel.scrollBy({
+            left: -slideWidth * visible,
+            behavior: 'smooth',
+          });
+        }
+      } else if (current >= slides.length - visible) {
+        // Loop to the beginning
+        carousel.scrollTo({
+          left: 0,
+          behavior: 'smooth',
+        });
+      } else {
+        carousel.scrollBy({
+          left: slideWidth * visible,
+          behavior: 'smooth',
+        });
+      }
     });
     navEl.append(button);
   });
@@ -240,21 +277,6 @@ export function buildCarousel(container, pagination = true) {
       });
     });
   }
-
-  // enable scroll
-  carousel.addEventListener('scroll', () => {
-    const prev = container.querySelector('.nav-arrow-previous');
-    const next = container.querySelector('.nav-arrow-next');
-    [prev, next].forEach((b) => {
-      b.disabled = false;
-    });
-    const { scrollLeft } = carousel;
-    const slideWidth = getSlideWidth(carousel);
-    const visible = getVisibleSlides(container);
-    const current = Math.round(scrollLeft / slideWidth);
-    if (current < 1) prev.disabled = true;
-    else if (current >= slides.length - visible) next.disabled = true;
-  });
 
   // hide nav if all slides are visible
   const observer = new ResizeObserver(() => {
@@ -398,6 +420,9 @@ function buildAutoBlocks(main) {
     const pdpBlock = document.querySelector('.pdp');
     if (metaSku && !pdpBlock) {
       buildPDPBlock(main);
+    }
+    if (metaSku || pdpBlock) {
+      document.body.classList.add('pdp-template');
     }
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -637,6 +662,7 @@ export function decorateMain(main) {
   decorateButtons(main);
   decorateEyebrows(main);
   decorateDisclaimers(main);
+  setAffiliateCoupon();
 }
 
 /**

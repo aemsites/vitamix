@@ -152,3 +152,7 @@ footer .footer-copyright {
   grid-area: copyright;
   text-align: center;
 }
+
+footer .icon.icon-privacyoptions svg {
+  width: unset;
+}
