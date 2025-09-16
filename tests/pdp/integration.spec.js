@@ -110,7 +110,7 @@ test.describe('PDP Integration Tests', () => {
       await page.route('**/us/en_us/checkout/cart/add/**', async (route) => {
         // check that the correct uenc path segment exists
         const url = new URL(route.request().url());
-        expect(url.pathname).toContain('/us/en_us/checkout/cart/add/uenc/aHR0cHM6Ly9jb3Vwb24tLXZpdGFtaXgtLWFlbXNpdGVzLmFlbS5uZXR3b3JrL3VzL2VuX3VzL3Byb2R1Y3RzL2FzY2VudC14Mw==_Q09VUE9OPXRlc3QmbWFydGVjaD1vZmY=/product/3641/');
+        expect(url.pathname).toContain('/us/en_us/checkout/cart/add/uenc/aHR0cHM6Ly9hdGMtdmFyaWFudC0tdml0YW1peC0tYWVtc2l0ZXMuYWVtLm5ldHdvcmsvdXMvZW5fdXMvcHJvZHVjdHMvYXNjZW50LXgz_Q09VUE9OPXRlc3QmbWFydGVjaD1vZmY=/product/3641/');
 
         const requestBody = route.request().postData();
         // requestBody is a multipart form data string
@@ -237,9 +237,6 @@ test.describe('PDP Integration Tests', () => {
               selected_options: [
                 'YnVuZGxlLzQzLzIyMy8x',
                 'Y3VzdG9tLW9wdGlvbi8zMDIzLzM5NjI=',
-                'YnVuZGxlLzQxLzIxMi8x',
-                'YnVuZGxlLzQxLzIxNS8x',
-                'YnVuZGxlLzQxLzIyMS8x',
               ],
             },
           ],
@@ -277,7 +274,7 @@ test.describe('PDP Integration Tests', () => {
       await page.route('**/us/en_us/checkout/cart/add/**', async (route) => {
         // check that the correct uenc path segment exists
         const url = new URL(route.request().url());
-        expect(url.pathname).toEqual('/us/en_us/checkout/cart/add/uenc/aHR0cHM6Ly9jb3Vwb24tLXZpdGFtaXgtLWFlbXNpdGVzLmFlbS5uZXR3b3JrL3VzL2VuX3VzL3Byb2R1Y3RzLzUyMDAtbGVnYWN5LWJ1bmRsZQ==_bWFydGVjaD1vZmY=/product/3701/');
+        expect(url.pathname).toEqual('/us/en_us/checkout/cart/add/uenc/aHR0cHM6Ly9hdGMtdmFyaWFudC0tdml0YW1peC0tYWVtc2l0ZXMuYWVtLm5ldHdvcmsvdXMvZW5fdXMvcHJvZHVjdHMvNTIwMC1sZWdhY3ktYnVuZGxl_bWFydGVjaD1vZmY=/product/3701/');
 
         const requestBody = route.request().postData();
         // requestBody is a multipart form data string
