@@ -208,6 +208,10 @@ export default function renderAddToCart(block, parent) {
 
     // redirect to cart page after successful addition
     window.location.href = '/us/en_us/checkout/cart/';
+
+    // update button state to show ATC
+    addToCartButton.textContent = 'Add to Cart';
+    addToCartButton.removeAttribute('aria-disabled');
   });
 
   // assemble the quantity container with select and button
