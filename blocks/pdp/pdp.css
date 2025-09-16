@@ -168,6 +168,10 @@
   color: var(--color-text);
 }
 
+[data-oos="true"] .options .warranty {
+  display: none;
+}
+
 .add-to-cart {
   display: flex;
   flex-direction: column;
@@ -665,7 +669,7 @@ a.button.pdp-find-locally-button {
   object-fit: contain;
 }
 
-.pdp-warrenty-option {
+.pdp-warranty-option {
   display: flex;
   align-items: center;
   gap: var(--spacing-s);
@@ -675,7 +679,7 @@ a.button.pdp-find-locally-button {
   color: var(--color-text);
 }
 
-.pdp-warrenty-option input {
+.pdp-warranty-option input {
   height: 24px;
   width: 24px;
   margin: 0;

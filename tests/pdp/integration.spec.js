@@ -318,7 +318,7 @@ test.describe('PDP Integration Tests', () => {
       const extendedWarranty = page.locator('.warranty > div:first-of-type');
       await expect(extendedWarranty).toContainText(/warranty/i);
 
-      const warrantyOptions = page.locator('.pdp-warrenty-option');
+      const warrantyOptions = page.locator('.pdp-warranty-option');
       const add3YearWarrantyContainer = warrantyOptions.nth(1);
       const add3YearWarrantyInput = add3YearWarrantyContainer.locator('input');
       await add3YearWarrantyInput.click();

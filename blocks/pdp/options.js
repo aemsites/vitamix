@@ -2,7 +2,7 @@ import { buildSlide, buildThumbnails } from './gallery.js';
 import { rebuildIndices, checkOutOfStock } from '../../scripts/scripts.js';
 import { toClassName, getMetadata } from '../../scripts/aem.js';
 import renderPricing from './pricing.js';
-import renderAddToCart, { isVariantAvailableForSale } from './add-to-cart.js';
+import renderAddToCart from './add-to-cart.js';
 
 /**
  * Handles the change of an option.
@@ -155,19 +155,13 @@ export function renderOptions(block, variants, custom) {
   oosMessage.textContent = 'This color is temporarily out of stock.';
   optionsContainer.append(oosMessage);
 
-  const { sku: selectedSku } = window.selectedVariant || variants[0];
-  const selectedVariant = window.jsonLdData.offers.find((variant) => variant.sku === selectedSku);
-  const isAvailableForSale = isVariantAvailableForSale(selectedVariant);
-  // eslint-disable-next-line consistent-return
-  if (!isAvailableForSale) return optionsContainer;
-
   if (options && options.length > 0) {
-    const warrentyContainer = document.createElement('div');
-    warrentyContainer.classList.add('warranty');
+    const warrantyContainer = document.createElement('div');
+    warrantyContainer.classList.add('warranty');
 
-    const warrentyHeading = document.createElement('div');
-    warrentyHeading.textContent = 'Warranty:';
-    warrentyContainer.append(warrentyHeading);
+    const warrantyHeading = document.createElement('div');
+    warrantyHeading.textContent = 'Warranty:';
+    warrantyContainer.append(warrantyHeading);
 
     options.forEach((option, i) => {
       const formatPrice = (price) => {
@@ -176,9 +170,9 @@ export function renderOptions(block, variants, custom) {
         }
         return 'Free';
       };
-      const warrentyValue = document.createElement('div');
-      warrentyValue.classList.add('pdp-warrenty-option');
-      warrentyValue.textContent = `${option.name} (${formatPrice(+option.finalPrice)})`;
+      const warrantyValue = document.createElement('div');
+      warrantyValue.classList.add('pdp-warranty-option');
+      warrantyValue.textContent = `${option.name} (${formatPrice(+option.finalPrice)})`;
       if (options.length > 1) {
         const radio = document.createElement('input');
         radio.type = 'radio';
@@ -187,18 +181,18 @@ export function renderOptions(block, variants, custom) {
         if (i === 0) {
           radio.checked = true;
         }
-        warrentyValue.prepend(radio);
+        warrantyValue.prepend(radio);
 
         radio.addEventListener('change', () => {
           window.selectedWarranty = option;
         });
       }
-      warrentyContainer.append(warrentyValue);
+      warrantyContainer.append(warrantyValue);
     });
     // set default warranty
     [window.selectedWarranty] = options;
 
-    optionsContainer.append(warrentyContainer);
+    optionsContainer.append(warrantyContainer);
   }
 
   // eslint-disable-next-line consistent-return
