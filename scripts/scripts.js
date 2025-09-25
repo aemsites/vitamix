@@ -229,7 +229,7 @@ export function buildCarousel(container, pagination = true) {
     button.setAttribute('aria-label', `${label} frame`);
     button.addEventListener('click', () => {
       const slideWidth = getSlideWidth(carousel);
-      const zoomLevel = Math.round((window.outerWidth / window.innerWidth) * 100) / 100;
+      const zoomLevel = Number((window.outerWidth / window.innerWidth).toFixed(2));
       const visible = getVisibleSlides(container);
       const { scrollLeft } = carousel;
       const current = Math.round(scrollLeft / slideWidth);
