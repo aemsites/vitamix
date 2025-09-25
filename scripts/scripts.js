@@ -229,6 +229,7 @@ export function buildCarousel(container, pagination = true) {
     button.setAttribute('aria-label', `${label} frame`);
     button.addEventListener('click', () => {
       const slideWidth = getSlideWidth(carousel);
+      const zoomLevel = Math.round((window.outerWidth / window.innerWidth) * 100) / 100;
       const visible = getVisibleSlides(container);
       const { scrollLeft } = carousel;
       const current = Math.round(scrollLeft / slideWidth);
@@ -237,12 +238,12 @@ export function buildCarousel(container, pagination = true) {
         if (current <= 0) {
           // Loop to the end
           carousel.scrollTo({
-            left: (slides.length - visible) * slideWidth,
+            left: (slides.length - visible) * slideWidth * zoomLevel,
             behavior: 'smooth',
           });
         } else {
           carousel.scrollBy({
-            left: -slideWidth * visible,
+            left: -slideWidth * visible * zoomLevel,
             behavior: 'smooth',
           });
         }
@@ -254,7 +255,7 @@ export function buildCarousel(container, pagination = true) {
         });
       } else {
         carousel.scrollBy({
-          left: slideWidth * visible,
+          left: slideWidth * visible * zoomLevel,
           behavior: 'smooth',
         });
       }
