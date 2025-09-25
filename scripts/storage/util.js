@@ -162,7 +162,7 @@ export function isCommerceStatePristine() {
  * Updates only the Magento cart and customer cache sections.
  *
  * @param {string[]} the sections that should be updated
- * @return {void}
+ * @return {Promise<void>}
  */
 export async function updateMagentoCacheSections(sections) {
   let result = {};

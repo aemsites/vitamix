@@ -164,34 +164,6 @@ export async function performMonolithGraphQLQuery(query, variables, GET = true, 
   return response.json();
 }
 
-const handleCartErrors = (errors) => {
-  if (!errors) {
-    return;
-  }
-
-  // Cart cannot be found
-  if (errors.some(({ extensions }) => extensions?.category === 'graphql-no-such-entity')) {
-    console.error('Cart does not exist, resetting cart');
-    store.resetCart();
-    return;
-  }
-
-  // No access to cart
-  if (errors.some(({ extensions }) => extensions?.category === 'graphql-authorization')) {
-    console.error('No access to cart, resetting cart');
-    store.resetCart();
-    return;
-  }
-
-  if (errors.some(({ extensions }) => extensions?.category === 'graphql-input')) {
-    console.error('Some items in the cart might not be available anymore');
-    return;
-  }
-
-  // Throw for everything else
-  throw new Error(errors);
-};
-
 /**
  * Function called when waiting for the cart to return.
  * TODO: Should be customized with selectors specific to your implementation.
@@ -224,7 +196,7 @@ export async function resolveSessionCartDrift(options) {
     return;
   }
 
-  let done = () => {};
+  let done = () => { };
   if (options.waitForCart) {
     done = waitForCart();
   }
@@ -248,7 +220,7 @@ export async function resolveSessionCartDrift(options) {
 }
 
 export function updateCartFromLocalStorage(options) {
-  let done = () => {};
+  let done = () => { };
   if (options.waitForCart) {
     done = waitForCart();
   }
@@ -281,25 +253,18 @@ export function updateCartFromLocalStorage(options) {
   done();
 }
 
-function hasExtendedWarranty() {
-  return window.selectedWarranty?.price && window.selectedWarranty.price !== '0.00';
-}
-
-function hasCouponParam() {
-  return window.location.search?.toLowerCase().includes('coupon');
-}
-
-function shouldUseLegacyAddToCart() {
-  return hasExtendedWarranty() || hasCouponParam();
-}
-
+/** @type {Promise<string | null>} */
 let pformKey;
-async function getFormKey() {
+export async function getFormKey() {
   if (!pformKey) {
-    const resp = await fetch('/us/en_us/checkout/cart/');
-    const txt = await resp.text();
-    const input = txt.match(/<input name="form_key" type="hidden" value="([^"]+)"/);
-    pformKey = input ? input[1] : null;
+    pformKey = fetch('/us/en_us/checkout/cart/')
+      .then((resp) => resp.text())
+      .then((txt) => {
+        const input = txt.match(/<input name="form_key" type="hidden" value="([^"]+)"/);
+        return input ? input[1] : null;
+      });
+    pformKey = await pformKey;
+
     // require refetch after 10 mins
     setTimeout(() => {
       pformKey = null;
@@ -400,47 +365,8 @@ async function addToCartLegacy(sku, options, quantity) {
 export async function addToCart(sku, options, quantity) {
   const done = waitForCart();
   try {
-    if (shouldUseLegacyAddToCart()) {
-      await addToCartLegacy(sku, options, quantity);
-    } else {
-      const variables = {
-        cartId: store.getCartId(),
-        cartItems: [{
-          sku,
-          quantity,
-          selected_options: options,
-        }],
-      };
-
-      const { data, errors } = await performMonolithGraphQLQuery(
-        addProductsToCartMutation,
-        variables,
-        false,
-        false,
-      );
-      handleCartErrors(errors);
-
-      const { cart, user_errors: userErrors } = data.addProductsToCart;
-      if (userErrors && userErrors.length > 0) {
-        console.error('User errors while adding item to cart', userErrors);
-      }
-
-      cart.items = cart.items.filter((item) => item);
-
-      // Adding a new line item to the cart incorrectly returns the total
-      // quantity so we check that and update if necessary
-      if (cart.items.length > 0) {
-        const lineItemTotalQuantity = cart.items.flatMap(
-          (item) => item.quantity,
-        ).reduce((partialSum, a) => partialSum + a, 0);
-        if (lineItemTotalQuantity !== cart.total_quantity) {
-          console.debug('Incorrect total quantity from AC, updating.');
-          cart.total_quantity = lineItemTotalQuantity;
-        }
-      }
-      console.debug('Added items to cart', variables, cart);
-    }
-    await store.updateCart();
+    await addToCartLegacy(sku, options, quantity);
+    await store.updateCart(false);
   } catch (err) {
     console.error('Could not add item to cart', err);
   } finally {
