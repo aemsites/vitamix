@@ -60,8 +60,10 @@ class Store {
     return Store.DEFAULT_CART;
   }
 
-  async updateCart() {
-    await updateMagentoCacheSections(['cart']);
+  async updateCart(updateCache = true) {
+    if (updateCache) {
+      await updateMagentoCacheSections(['cart']);
+    }
     this.notifySubscribers();
   }
 
@@ -88,6 +90,10 @@ class Store {
 export const store = new Store();
 
 export const cartApi = {
+  getFormKey: async () => {
+    const { getFormKey } = await import('./cart.js');
+    return getFormKey();
+  },
   addToCart: async (sku, options, quantity) => {
     const { addToCart } = await import('./cart.js');
     // const { showCart } = await import('./Minicart.js');

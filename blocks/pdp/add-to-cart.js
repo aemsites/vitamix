@@ -222,5 +222,11 @@ export default function renderAddToCart(block, parent) {
   // add quantity container to main add to cart container
   addToCartContainer.appendChild(quantityContainer);
 
+  // preload formkey on hover of atc container
+  addToCartContainer.addEventListener('mouseover', async () => {
+    const { cartApi } = await import('../../scripts/minicart/api.js');
+    await cartApi.getFormKey();
+  }, { once: true });
+
   return addToCartContainer;
 }
