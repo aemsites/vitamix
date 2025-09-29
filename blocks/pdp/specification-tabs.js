@@ -162,7 +162,7 @@ function createTabContent(tab, specifications, standardWarranty, custom, product
       }
       break;
     case 'warranty':
-      if (typeof custom.warranty === 'string' && !custom.warranty.toLowerCase().includes(NO_WARRANTY_PHRASE)) {
+      if (custom.warranty) {
         content.appendChild(createWarrantyContent(standardWarranty, custom.warranty));
       }
       break;
@@ -225,7 +225,7 @@ export default function renderSpecs(specifications, custom, productName) {
   const standardWarranty = options?.find((option) => option.name.includes('Standard Warranty'));
   const tabs = [
     { id: 'specifications', label: 'Specifications', show: !!specifications },
-    { id: 'warranty', label: 'Warranty', show: !!custom.warranty },
+    { id: 'warranty', label: 'Warranty', show: !!custom.warranty && !custom.warranty.toLowerCase().includes(NO_WARRANTY_PHRASE) },
     { id: 'resources', label: 'Resources', show: true },
   ].filter((tab) => tab.show);
 
