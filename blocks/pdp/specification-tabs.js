@@ -1,5 +1,7 @@
 import { createOptimizedPicture } from '../../scripts/aem.js';
 
+const NO_WARRANTY_PHRASE = 'this product does not include a warranty';
+
 /*
  * Creates the tab buttons for the specifications section.
  * @param {Array<{id: string, label: string}>} tabs - Array of tab objects with id and label.
@@ -160,7 +162,7 @@ function createTabContent(tab, specifications, standardWarranty, custom, product
       }
       break;
     case 'warranty':
-      if (custom.warranty) {
+      if (typeof custom.warranty === 'string' && !custom.warranty.toLowerCase().includes(NO_WARRANTY_PHRASE)) {
         content.appendChild(createWarrantyContent(standardWarranty, custom.warranty));
       }
       break;
