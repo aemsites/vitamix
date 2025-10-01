@@ -224,11 +224,11 @@ export default function renderAddToCart(block, parent) {
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to add item to cart', error);
-      window.location.href = '/us/en_us/checkout/cart/';
-      // update button state to show ATC
-      // addToCartButton.textContent = 'Add to Cart';
-      // addToCartButton.removeAttribute('aria-disabled');
     }
+
+    // update button state to show ATC
+    addToCartButton.textContent = 'Add to Cart';
+    addToCartButton.removeAttribute('aria-disabled');
   });
 
   // assemble the quantity container with select and button
