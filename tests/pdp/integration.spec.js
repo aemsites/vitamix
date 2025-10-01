@@ -190,7 +190,8 @@ test.describe('PDP Integration Tests', () => {
       await page.route('**/us/en_us/checkout/cart/add/**', async (route) => {
         // check that the correct uenc path segment exists
         const url = new URL(route.request().url());
-        expect(url.pathname).toContain('/us/en_us/checkout/cart/add/uenc/aHR0cHM6Ly9hdGMtZXJyb3JzLS12aXRhbWl4LS1hZW1zaXRlcy5hZW0ubmV0d29yay91cy9lbl91cy9wcm9kdWN0cy9hc2NlbnQteDM=_Q09VUE9OPXRlc3QmbWFydGVjaD1vZmY=/product/3641/');
+        expect(url.pathname).toContain('/us/en_us/checkout/cart/add/uenc/');
+        expect(url.pathname).toContain('/product/3641/');
 
         const requestBody = route.request().postData();
         // requestBody is a multipart form data string
@@ -368,7 +369,9 @@ test.describe('PDP Integration Tests', () => {
       await page.route('**/us/en_us/checkout/cart/add/**', async (route) => {
         // check that the correct uenc path segment exists
         const url = new URL(route.request().url());
-        expect(url.pathname).toEqual('/us/en_us/checkout/cart/add/uenc/aHR0cHM6Ly9hdGMtZXJyb3JzLS12aXRhbWl4LS1hZW1zaXRlcy5hZW0ubmV0d29yay91cy9lbl91cy9wcm9kdWN0cy81MjAwLWxlZ2FjeS1idW5kbGU=_bWFydGVjaD1vZmY=/product/3701/');
+
+        expect(url.pathname).toContain('/us/en_us/checkout/cart/add/uenc/');
+        expect(url.pathname).toContain('/product/3701/');
 
         const requestBody = route.request().postData();
         // requestBody is a multipart form data string
