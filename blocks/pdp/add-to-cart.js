@@ -1,5 +1,5 @@
 import { getMetadata } from '../../scripts/aem.js';
-import { checkOutOfStock } from '../../scripts/scripts.js';
+import { checkOutOfStock, getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 /**
  * Renders "Find Locally" button container.
@@ -209,8 +209,9 @@ export default function renderAddToCart(block, parent) {
       // add product to cart with selected options and quantity
       await cartApi.addToCart(sku, selectedOptions, quantity);
 
+      const { locale, language } = await getLocaleAndLanguage();
       // redirect to cart page after successful addition
-      window.location.href = '/us/en_us/checkout/cart/';
+      window.location.href = `/${locale}/${language}/checkout/cart/`;
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to add item to cart', error);
@@ -229,3 +230,15 @@ export default function renderAddToCart(block, parent) {
 
   return addToCartContainer;
 }
+
+window.addEventListener('pageshow', (event) => {
+  console.log('pageshow event', event);
+  if (event.persisted) {
+    // Page was restored from bfcache, reset any button states
+    const addToCartButton = document.querySelector('.add-to-cart button');
+    if (addToCartButton) {
+      addToCartButton.textContent = 'Add to Cart';
+      addToCartButton.removeAttribute('aria-disabled');
+    }
+  }
+});
