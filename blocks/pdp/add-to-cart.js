@@ -167,16 +167,6 @@ export default function renderAddToCart(block, parent) {
   const addToCartButton = document.createElement('button');
   addToCartButton.textContent = 'Add to Cart';
 
-  // reset button state when page is restored from bfcache
-  window.addEventListener('pageshow', (event) => {
-    console.log('pageshow event', event);
-    if (event.persisted) {
-      // Page was restored from bfcache, reset button state
-      addToCartButton.textContent = 'Add to Cart';
-      addToCartButton.removeAttribute('aria-disabled');
-    }
-  });
-
   // add click event handler for add to cart functionality
   addToCartButton.addEventListener('click', async () => {
     // update button state to show loading
