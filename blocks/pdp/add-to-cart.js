@@ -167,6 +167,16 @@ export default function renderAddToCart(block, parent) {
   const addToCartButton = document.createElement('button');
   addToCartButton.textContent = 'Add to Cart';
 
+  // reset button state when page is restored from bfcache
+  window.addEventListener('pageshow', (event) => {
+    console.log('pageshow event', event);
+    if (event.persisted) {
+      // Page was restored from bfcache, reset button state
+      addToCartButton.textContent = 'Add to Cart';
+      addToCartButton.removeAttribute('aria-disabled');
+    }
+  });
+
   // add click event handler for add to cart functionality
   addToCartButton.addEventListener('click', async () => {
     // update button state to show loading
@@ -214,10 +224,10 @@ export default function renderAddToCart(block, parent) {
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to add item to cart', error);
-    } finally {
+      window.location.href = '/us/en_us/checkout/cart/';
       // update button state to show ATC
-      addToCartButton.textContent = 'Add to Cart';
-      addToCartButton.removeAttribute('aria-disabled');
+      // addToCartButton.textContent = 'Add to Cart';
+      // addToCartButton.removeAttribute('aria-disabled');
     }
   });
 
