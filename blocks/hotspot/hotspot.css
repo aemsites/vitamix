@@ -1,0 +1,136 @@
+.hotspot {
+  position: relative;
+  overflow-x: auto;
+}
+
+.hotspot svg {
+  width: auto;
+  height: calc(100dvh - (2 * var(--horizontal-spacing)));
+  max-height: 720px;
+}
+
+@media (width >= 700px) {
+  .hotspot svg {
+    width: 100%;
+    height: auto;
+    max-height: unset;
+  }
+}
+
+.hotspot button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 64px;
+  height: 64px;
+  border: 0;
+  border-radius: 50%;
+  padding: 0;
+  background-color: #fff5;
+  transition: transform 0.4s;
+}
+
+@media (width >= 700px) {
+  .hotspot button {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+.hotspot button[aria-expanded="true"] {
+  transform: translate(-50%, -50%) rotate(135deg);
+}
+
+.hotspot button:hover {
+  background-color: #fffb;
+}
+
+.hotspot button::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background-color: var(--color-white);
+  z-index: -1;
+  animation: pulse 2.5s linear infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+
+  50% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+.hotspot [popover] {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 22px));
+  width: calc(160px + (var(--spacing-100) * 2));
+  margin: 0;
+  border: 0;
+  border-radius: var(--rounding-m);
+  padding: var(--spacing-100);
+  background-color: var(--color-white);
+  font-size: var(--body-size-xs);
+  text-align: center;
+}
+
+.hotspot [popover] p {
+  margin: 0;
+}
+
+.hotspot [popover] strong {
+  font-size: var(--body-size-m);
+}
+
+.hotspot [popover] img {
+  max-width: 160px;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  margin-bottom: var(--spacing-100);
+  border-radius: var(--rounding-m);
+}
+
+.hotspot i.glyph {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: var(--color-white);
+}
+
+@media (width >= 700px) {
+  .hotspot i.glyph {
+    width: 22px;
+    height: 22px;
+  }
+}
+
+.hotspot i.glyph::before,
+.hotspot i.glyph::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 60%;
+  height: 3px;
+  border-radius: var(--rounding-s);
+  background-color: var(--color-gray-800);
+}
+
+.hotspot i.glyph::before {
+  transform: translate(-50%, -50%) rotate(90deg);
+}
