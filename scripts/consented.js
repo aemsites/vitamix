@@ -103,7 +103,24 @@ r.parentNode.insertBefore(t,r)}}
 pintrk('load', '2621075961855'); pintrk('page');
 // End of Pinterest Tag
 
+// LinkedIn Insight Tag
+try {
+  const _linkedin_partner_id = "2976369"; /
+  window._linkedin_data_partner_ids = window._linkedin_data_partner_ids || [];
+  window._linkedin_data_partner_ids.push(_linkedin_partner_id);
 
+  (function(d){
+    var s = d.createElement('script');
+    s.type = 'text/javascript';
+    s.async = true;
+    s.src = 'https://snap.licdn.com/li.lms-analytics/insight.min.js';
+    var x = d.getElementsByTagName('script')[0];
+    x.parentNode.insertBefore(s, x);
+  })(document);
+} catch (e) {
+  console.error('LinkedIn Insight Tag failed to load', e);
+}
+// End of LinkedIn Insight Tag
 
 
 // TV Scientific Pixel Code
