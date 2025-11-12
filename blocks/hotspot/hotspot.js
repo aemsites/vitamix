@@ -380,7 +380,7 @@ function toggleExplore(block, button) {
 }
 
 /**
- * Builds and prepends the "Click to Explore" button inside a hotspot block 
+ * Builds and prepends the "Click to Explore" button for mobile
  * @param {HTMLElement} block - Block element
  */
 function buildExpand(block) {
