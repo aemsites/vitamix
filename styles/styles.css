@@ -39,8 +39,8 @@
   --color-eyebrow: var(--color-madder);
 
   /* fonts */
-  --serif-font-family: 'Sentinel A', 'Sentinel B', sentinel-fallback, georgia, serif;
-  --sans-serif-font-family: 'Gotham Narrow A', 'Gotham Narrow B', gotham-narrow-fallback, helvetica, sans-serif;
+  --serif-font-family: 'sentinel', sentinel-fallback, georgia, serif;
+  --sans-serif-font-family: 'gotham-narrow', gotham-narrow-fallback, helvetica, sans-serif;
   --body-font-family: var(--sans-serif-font-family);
   --heading-font-family: var(--serif-font-family);
   --code-font-family: monospace;
