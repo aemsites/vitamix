@@ -66,6 +66,8 @@ npm run test:report
 
 #### Run All Tests
 ```bash
+npm install
+npm run test:install
 npm test
 ```
 

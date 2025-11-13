@@ -40,12 +40,18 @@ export default function renderPricing(block, variant) {
     return null;
   }
 
-  pricingElement.remove();
+  if (!variant) pricingElement.remove();
+
+  // Check if the product is reconditioned
+  // If the variant is not null, check if the item condition is refurbished
+  // If the variant is null, check if the location href includes 'reconditioned'
+  // If both are false, item is not reconditioned
+  const isReconditioned = variant && variant.itemCondition ? variant.itemCondition.includes('RefurbishedCondition') : window.location.href.includes('reconditioned') || false;
 
   if (pricing.regular && pricing.regular > pricing.final) {
     const nowLabel = document.createElement('div');
     nowLabel.className = 'pricing-now';
-    nowLabel.textContent = 'Now';
+    nowLabel.textContent = isReconditioned ? 'Recon Price' : 'Now';
     pricingContainer.appendChild(nowLabel);
   }
 
@@ -61,7 +67,7 @@ export default function renderPricing(block, variant) {
     const savingsAmount = pricing.regular - pricing.final;
     const saveText = document.createElement('span');
     saveText.className = 'pricing-save';
-    saveText.textContent = `Save $${savingsAmount.toFixed(2)} | `;
+    saveText.textContent = isReconditioned ? `Save $${savingsAmount.toFixed(2)} | New ` : `Save $${savingsAmount.toFixed(2)} | Was `;
 
     const regularPrice = document.createElement('del');
     regularPrice.className = 'pricing-regular';
@@ -105,7 +111,7 @@ export default function renderPricing(block, variant) {
       /* eslint-disable */
     (function(m,g,n,d,a,e,h,c){var b=m[n]||{},k=document.createElement(e),p=document.getElementsByTagName(e)[0],l=function(a,b,c){return function(){a[b]._.push([c,arguments])}};b[d]=l(b,d,"set");var f=b[d];b[a]={};b[a]._=[];f._=[];b._=[];b[a][h]=l(b,a,h);b[c]=function(){b._.push([h,arguments])};a=0;for(c="set add save post open empty reset on off trigger ready setProduct".split(" ");a<c.length;a++)f[c[a]]=l(b,d,c[a]);a=0;for(c=["get","token","url","items"];a<c.length;a++)f[c[a]]=function(){};k.async=
         !0;k.src=g[e];p.parentNode.insertBefore(k,p);delete g[e];f(g);m[n]=b})(window,_affirm_config,"affirm","checkout","ui","script","ready","jsReady");
-    }, 5000);      
+    }, 500);      
   }
   /* eslint-enable */
 

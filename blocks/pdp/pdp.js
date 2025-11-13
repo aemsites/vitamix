@@ -6,7 +6,7 @@ import renderPricing, { extractPricing } from './pricing.js';
 // eslint-disable-next-line import/no-cycle
 import { renderOptions, onOptionChange } from './options.js';
 import { loadFragment } from '../fragment/fragment.js';
-import { checkOutOfStock } from '../../scripts/scripts.js';
+import { checkOutOfStock, isNextPipeline } from '../../scripts/scripts.js';
 import { openModal } from '../modal/modal.js';
 
 /**
@@ -38,13 +38,13 @@ function renderTitle(block, custom, reviewsId) {
 
 /**
  * Renders the details section of the PDP block.
- * @param {Element} block - The PDP block element
+ * @param {Element} features - The features element from the fragment
  * @returns {Element} The details container element
  */
-function renderDetails(block) {
+function renderDetails(features) {
   const detailsContainer = document.createElement('div');
   detailsContainer.classList.add('details');
-  detailsContainer.append(...block.children);
+  detailsContainer.append(...features.children);
   const h2 = document.createElement('h2');
   h2.textContent = 'About';
   detailsContainer.prepend(h2);
@@ -64,7 +64,7 @@ async function renderReviews(block, reviewsId) {
 
   setTimeout(async () => {
     await loadScript('https://apps.bazaarvoice.com/deployments/vitamix/main_site/production/en_US/bv.js');
-  }, 5000);
+  }, 500);
 
   window.bvCallback = () => { };
 
@@ -121,24 +121,57 @@ function renderCompare(custom) {
   return compareContainer;
 }
 
-function renderContent() {
-  const contentContainer = document.createElement('div');
-  contentContainer.classList.add('pdp-content-fragment');
+function renderContent(block) {
+  const { jsonLdData } = window;
+  const { custom } = jsonLdData;
+
+  block.querySelectorAll(':scope > div')?.forEach((div) => {
+    // Temporary fix to remove divs that don't have a class
+    // or the specifications block in initial html
+    if (div.classList.length === 0 || div.classList.contains('specifications')) {
+      div.remove();
+    }
+  });
+
+  const { features } = window;
+  if (features) {
+    const detailsContainer = renderDetails(features);
+    block.append(detailsContainer);
+  }
+
+  const { specifications } = window;
+  if (specifications) {
+    const specsContainer = renderSpecs(specifications, custom, jsonLdData.name);
+    block.append(specsContainer);
+  }
+}
+
+async function fetchFragment(block) {
   const fragmentPath = window.location.pathname.replace('/products/', '/products/fragments/');
-  const insertFragment = async () => {
-    const fragment = await loadFragment(fragmentPath);
-    if (fragment) {
-      while (fragment.firstChild) {
-        contentContainer.append(fragment.firstChild);
+  const fragment = await loadFragment(fragmentPath);
+  if (fragment) {
+    const sections = [...fragment.querySelectorAll('main > div.section')];
+    while (sections.length > 0) {
+      const section = sections.shift();
+      const h3 = section.querySelector('h3')?.textContent.toLowerCase();
+      if (h3) {
+        // Only include features for now, ignore all other sections with an h3
+        if (h3.includes('features')) {
+          window.features = section;
+        } else if (h3.includes('specifications')) {
+          window.specifications = section;
+        } else if (h3.includes('warranty')) {
+          window.warranty = section;
+        }
       }
     }
-  };
-  insertFragment();
-  return contentContainer;
+  }
+
+  renderContent(block);
 }
 
 function renderFreeShipping(offers) {
-  if (!offers[0] || offers[0].price < 99) return null;
+  if (!offers[0] || offers[0].price < 150) return null;
   const freeShippingContainer = document.createElement('div');
   freeShippingContainer.classList.add('pdp-free-shipping-container');
   freeShippingContainer.innerHTML = `
@@ -238,11 +271,115 @@ function renderShare() {
   return shareContainer;
 }
 
+async function renderFreeGift(offers) {
+  try {
+    const fetchGifts = async () => {
+      const resp = await fetch('/us/en_us/products/config/free-gifts.plain.html');
+      if (!resp.ok) return null;
+      const text = await resp.text();
+      const doc = new DOMParser().parseFromString(text, 'text/html');
+      const gifts = doc.querySelector('.free-gifts');
+      return [...gifts.children].map((gift) => {
+        const [dates, minPrice, label, body] = gift.children;
+        const datesText = dates.textContent;
+        const minPriceText = minPrice.textContent.startsWith('$') ? minPrice.textContent.slice(1) : minPrice.textContent;
+        const labelText = label.textContent;
+        const bodyText = body.innerHTML.replaceAll('./media_', './config/media_');
+        return {
+          dates: datesText,
+          minPrice: minPriceText,
+          label: labelText,
+          body: bodyText,
+        };
+      });
+    };
+
+    const gifts = await fetchGifts();
+    const parseDateRange = (dates) => {
+      const [startDateStr, endDateStr] = dates.split(' - ');
+
+      // Helper function to parse individual date strings with time and timezone
+      const parseDateWithTime = (dateStr) => {
+        // Handle formats like "9/12/2025 9am EDT" or "9/19/2025 3pm EDT"
+        const timeMatch = dateStr.match(/^(\d{1,2}\/\d{1,2}\/\d{4})\s+(\d{1,2})(am|pm)\s+([A-Z]{3,4})$/);
+
+        if (timeMatch) {
+          const [, datePart, hour, ampm, timezone] = timeMatch;
+
+          // Parse the date part (M/D/YYYY)
+          const [month, day, year] = datePart.split('/').map((num) => parseInt(num, 10));
+
+          // Convert hour to 24-hour format
+          let hour24 = parseInt(hour, 10);
+          if (ampm.toLowerCase() === 'pm' && hour24 !== 12) {
+            hour24 += 12;
+          } else if (ampm.toLowerCase() === 'am' && hour24 === 12) {
+            hour24 = 0;
+          }
+
+          // Handle timezone offset (simplified - you might want to use a proper timezone library)
+          // For now, we'll assume EDT is UTC-4 (Eastern Daylight Time)
+          const timezoneOffsets = {
+            EDT: -4, // UTC-4 hours
+            EST: -5, // UTC-5 hours
+            CDT: -5, // UTC-5 hours
+            CST: -6, // UTC-6 hours
+            MDT: -6, // UTC-6 hours
+            MST: -7, // UTC-7 hours
+            PDT: -7, // UTC-7 hours
+            PST: -8, // UTC-8 hours
+          };
+
+          const offsetHours = timezoneOffsets[timezone] || 0;
+
+          // Convert the local time to UTC by adding the offset
+          // If EDT is UTC-4, then 9am EDT = 1pm UTC (9 + 4 = 13)
+          const utcHour = hour24 - offsetHours;
+
+          // Create UTC date object directly
+          const utcDate = new Date(Date.UTC(year, month - 1, day, utcHour, 0, 0));
+
+          return utcDate;
+        }
+
+        // Fallback to simple date parsing for formats without time/timezone
+        return new Date(dateStr);
+      };
+
+      return [parseDateWithTime(startDateStr), parseDateWithTime(endDateStr)];
+    };
+
+    const findGift = (giftList, price) => giftList.find((gift) => {
+      const [startDate, endDate] = parseDateRange(gift.dates);
+      const today = new Date();
+      return today >= startDate && today <= endDate
+        && price >= +gift.minPrice;
+    });
+    const gift = findGift(gifts, +offers[0].price);
+    if (gift) {
+      const freeGiftContainer = document.createElement('div');
+      freeGiftContainer.classList.add('pdp-free-gift-container');
+      freeGiftContainer.innerHTML = `
+        <div class="pdp-free-gift-heading"><span>${gift.label}</span></div>
+        <div class="pdp-free-gift-body">
+          ${gift.body}
+        </div>
+      `;
+      return freeGiftContainer;
+    }
+    return null;
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error fetching free gifts:', error);
+    return null;
+  }
+}
+
 /**
  * Decorates the PDP block.
  * @param {Element} block - The PDP block element
  */
-export default function decorate(block) {
+export default async function decorate(block) {
   const { jsonLdData, variants } = window;
   const { custom, offers } = jsonLdData;
 
@@ -259,41 +396,36 @@ export default function decorate(block) {
   const optionsContainer = renderOptions(block, variants, custom);
   const addToCartContainer = renderAddToCart(block, jsonLdData);
   const compareContainer = renderCompare(custom);
+  const freeGiftContainer = await renderFreeGift(offers);
   const freeShippingContainer = renderFreeShipping(offers);
   const shareContainer = renderShare();
   buyBox.append(
     pricingContainer,
     optionsContainer || '',
+    freeGiftContainer || '',
     addToCartContainer,
     compareContainer,
     freeShippingContainer || '',
     shareContainer,
   );
 
-  const detailsContainer = renderDetails(block);
-  const specifications = detailsContainer.querySelector('.specifications');
-  const specsContainer = renderSpecs(specifications, custom, jsonLdData.name);
-  specifications.remove();
-
-  const contentContainer = renderContent();
   const faqContainer = renderFAQ(block);
 
-  renderReviews(block, reviewsId);
+  if (isNextPipeline()) {
+    // Content is already in the initial HTML
+    renderContent(block);
+  } else {
+    // Fetch and render the fragment for legacy pipeline
+    fetchFragment(block);
+  }
 
-  /* remove buttons styling from details */
-  detailsContainer.querySelectorAll('.button').forEach((button) => {
-    button.classList.remove('button');
-    button.parentElement.classList.remove('button-wrapper');
-  });
+  renderReviews(block, reviewsId);
 
   block.append(
     alertContainer || '',
     titleContainer,
     galleryContainer,
     buyBox,
-    contentContainer,
-    detailsContainer,
-    specsContainer,
     faqContainer,
     relatedProductsContainer || '',
   );
@@ -307,6 +439,10 @@ export default function decorate(block) {
     [window.selectedVariant] = variants;
   }
 
-  buyBox.dataset.sku = offers[0].sku;
-  buyBox.dataset.oos = checkOutOfStock(offers[0].sku);
+  buyBox.dataset.sku = window.selectedVariant?.sku || offers[0].sku;
+  buyBox.dataset.oos = checkOutOfStock(
+    window.selectedVariant
+      ? offers.find((offer) => offer.sku === window.selectedVariant.sku).sku
+      : offers[0].sku,
+  );
 }

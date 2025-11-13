@@ -44,21 +44,18 @@ export function getCookies() {
   return cookieMap;
 }
 
-function setDiscountCookie() {
+function setAffiliateCoupon() {
   const urlParams = new URLSearchParams(window.location.search);
-  const cjData = urlParams.get('cjdata');
-  const cjEvent = urlParams.get('cjevent');
-  const coupon = urlParams.get('COUPON');
-  if (coupon) {
-    document.cookie = `discount_coupon_url_code=${coupon}; path=/`;
-    document.cookie = `ebs_sender_id_coupon=${coupon}; path=/`;
-  }
-  if (cjData) {
-    document.cookie = `cjConsent=${cjData}; path=/`;
-  }
-  if (cjEvent) {
-    document.cookie = `discount_cjevent=${cjEvent}; path=/`;
-  }
+  const { cjdata, cjevent, COUPON } = Object.fromEntries(urlParams);
+
+  if (!cjdata || !cjevent || !COUPON) return;
+
+  const loginUrl = new URL('https://www.vitamix.com/us/en_us/checkout/cart');
+  Object.entries({ cjdata, cjevent, COUPON }).forEach(([key, value]) => {
+    loginUrl.searchParams.set(key, value);
+  });
+
+  fetch(loginUrl.toString());
 }
 
 /**
@@ -229,15 +226,38 @@ export function buildCarousel(container, pagination = true) {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = `nav-arrow nav-arrow-${label.toLowerCase()}`;
-    button.disabled = !i; // auto-disable first arrow
     button.setAttribute('aria-label', `${label} frame`);
     button.addEventListener('click', () => {
       const slideWidth = getSlideWidth(carousel);
       const visible = getVisibleSlides(container);
-      carousel.scrollBy({
-        left: !i ? -slideWidth * visible : slideWidth * visible,
-        behavior: 'smooth',
-      });
+      const { scrollLeft } = carousel;
+      const current = Math.round(scrollLeft / slideWidth);
+
+      if (!i) { // Previous button
+        if (current <= 0) {
+          // Loop to the end
+          carousel.scrollTo({
+            left: (slides.length - visible) * slideWidth,
+            behavior: 'smooth',
+          });
+        } else {
+          carousel.scrollBy({
+            left: -slideWidth * visible,
+            behavior: 'smooth',
+          });
+        }
+      } else if (current >= slides.length - visible) {
+        // Loop to the beginning
+        carousel.scrollTo({
+          left: 0,
+          behavior: 'smooth',
+        });
+      } else {
+        carousel.scrollBy({
+          left: slideWidth * visible,
+          behavior: 'smooth',
+        });
+      }
     });
     navEl.append(button);
   });
@@ -257,21 +277,6 @@ export function buildCarousel(container, pagination = true) {
       });
     });
   }
-
-  // enable scroll
-  carousel.addEventListener('scroll', () => {
-    const prev = container.querySelector('.nav-arrow-previous');
-    const next = container.querySelector('.nav-arrow-next');
-    [prev, next].forEach((b) => {
-      b.disabled = false;
-    });
-    const { scrollLeft } = carousel;
-    const slideWidth = getSlideWidth(carousel);
-    const visible = getVisibleSlides(container);
-    const current = Math.round(scrollLeft / slideWidth);
-    if (current < 1) prev.disabled = true;
-    else if (current >= slides.length - visible) next.disabled = true;
-  });
 
   // hide nav if all slides are visible
   const observer = new ResizeObserver(() => {
@@ -324,10 +329,71 @@ function parseVariants(sections) {
   });
 }
 
+function parseVariantsNext(sections) {
+  return sections.map((div) => {
+    const name = div.querySelector('h2')?.textContent.trim();
+
+    const metadata = {};
+    const options = {};
+
+    options.uid = div.dataset.uid;
+    options.color = div.dataset.color;
+    metadata.sku = div.dataset.sku;
+
+    const imagesHTML = div.querySelectorAll('picture');
+
+    const priceHTML = div.querySelector('p:nth-of-type(1)');
+    const price = extractPricing(priceHTML);
+
+    const ldVariant = window.jsonLdData.offers.find((offer) => offer.sku === metadata.sku);
+    if (ldVariant) {
+      metadata.itemCondition = ldVariant.itemCondition;
+      metadata.availability = ldVariant.availability;
+      metadata.custom = ldVariant.custom;
+    }
+
+    return {
+      ...metadata,
+      name,
+      options,
+      price,
+      images: imagesHTML,
+    };
+  });
+}
+
 // eslint-disable-next-line no-unused-vars
 export function checkOutOfStock(sku) {
   const { availability } = window.jsonLdData.offers.find((offer) => offer.sku === sku);
   return availability === 'https://schema.org/OutOfStock';
+}
+
+/**
+ * Checks if the current pipeline is the Next pipeline.
+ * @returns {boolean} True if the current pipeline is the Next pipeline, false otherwise.
+ */
+export function isNextPipeline() {
+  const pipelineMeta = document.head.querySelector('meta[name="pipeline"]')?.content;
+  return pipelineMeta === 'next';
+}
+
+/**
+ * Parses the PDP content sections from the initial HTML and stores them in the window object.
+ * @param {Array<Element>} sections - The sections to parse.
+ */
+function parsePDPContentSections(sections) {
+  sections.forEach((section) => {
+    const h3 = section.querySelector('h3')?.textContent.toLowerCase();
+    if (h3) {
+      if (h3.includes('features')) {
+        window.features = section;
+      } else if (h3.includes('specifications')) {
+        window.specifications = section;
+      } else if (h3.includes('warranty')) {
+        window.warranty = section;
+      }
+    }
+  });
 }
 
 /**
@@ -338,9 +404,18 @@ function buildPDPBlock(main) {
   const section = document.createElement('div');
   const type = document.head.querySelector('meta[name="type"]')?.content;
 
+  const nextPipeline = isNextPipeline();
   const isValidType = ['simple', 'configurable', 'bundle'].includes(type);
   if (isValidType) {
-    const lcpPicture = main.querySelector('div:nth-child(2) picture') || main.querySelector('picture:first-of-type');
+    // Find LCP picture element based on pipeline structure
+    // In both cases we try and pull the first picture from the first image in a variant section
+    // If it's a simple product, we pull the first picture on the page
+    let lcpPicture;
+    if (nextPipeline) {
+      lcpPicture = main.querySelector('div.section picture') || main.querySelector('picture:first-of-type');
+    } else {
+      lcpPicture = main.querySelector('div:nth-child(2) picture') || main.querySelector('picture:first-of-type');
+    }
     const lcpImage = lcpPicture?.querySelector('img');
     if (lcpImage) {
       lcpImage.loading = 'eager';
@@ -361,12 +436,24 @@ function buildPDPBlock(main) {
     section.append(buildBlock('pdp', { elems: [...lcp.children] }));
   }
 
-  const variantSections = Array.from(main.querySelectorAll(':scope > div'));
-  window.variants = parseVariants(variantSections);
-
   // Get the json-ld from the head and parse it
   const jsonLd = document.head.querySelector('script[type="application/ld+json"]');
   window.jsonLdData = jsonLd ? JSON.parse(jsonLd.textContent) : null;
+
+  // Select variant sections based on pipeline type
+  const selector = nextPipeline
+    ? ':scope > div.section'
+    : ':scope > div';
+  const variantSections = Array.from(main.querySelectorAll(selector));
+
+  // Parse variants using the appropriate parser
+  window.variants = nextPipeline
+    ? parseVariantsNext(variantSections)
+    : parseVariants(variantSections);
+
+  if (nextPipeline) {
+    parsePDPContentSections(Array.from(main.querySelectorAll(':scope > div')));
+  }
 
   const navMeta = document.head.querySelector('meta[name="nav"]');
   if (!navMeta) {
@@ -415,6 +502,9 @@ function buildAutoBlocks(main) {
     const pdpBlock = document.querySelector('.pdp');
     if (metaSku && !pdpBlock) {
       buildPDPBlock(main);
+    }
+    if (metaSku || pdpBlock) {
+      document.body.classList.add('pdp-template');
     }
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -527,6 +617,10 @@ function decorateImages(main) {
  * @param {HTMLElement} main - Main container element
  */
 function decorateEyebrows(main) {
+  // Disable auto eyebrows if the page is a PDP
+  const metaSku = document.querySelector('meta[name="sku"]');
+  if (metaSku) return;
+
   main.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach((h) => {
     const beforeH = h.previousElementSibling;
     if (beforeH && beforeH.tagName === 'P') {
@@ -536,7 +630,6 @@ function decorateEyebrows(main) {
       // ignore p tags with images or links
       const disqualifiers = beforeH.querySelector('img, a[href]');
       if (disqualifiers) return;
-
       beforeH.classList.add('eyebrow');
       h.dataset.eyebrow = beforeH.textContent.trim();
     }
@@ -616,6 +709,15 @@ function decorateSectionAnchors(main) {
 }
 
 /**
+ * Opens a modal dialog.
+ * @param {string} href - The href of the modal to open.
+ */
+export async function openModal(href) {
+  const { openModal: openModalFn } = await import(`${window.hlx.codeBasePath}/blocks/modal/modal.js`);
+  openModalFn(href);
+}
+
+/**
  * Automatically loads and opens modal dialogs.
  * @param {Document|HTMLElement} doc - Document or container to attach the event listener to.
  */
@@ -624,8 +726,7 @@ function autolinkModals(doc) {
     const origin = e.target.closest('a[href]');
     if (origin && origin.href && origin.href.includes('/modals/')) {
       e.preventDefault();
-      const { openModal } = await import(`${window.hlx.codeBasePath}/blocks/modal/modal.js`);
-      openModal(origin.href);
+      await openModal(origin.href);
     }
   });
 }
@@ -671,7 +772,7 @@ export function decorateMain(main) {
   decorateButtons(main);
   decorateEyebrows(main);
   decorateDisclaimers(main);
-  setDiscountCookie();
+  setAffiliateCoupon();
 }
 
 /**
@@ -689,6 +790,32 @@ function getTextColor(hex) {
   const b = parseInt(cleanHex.substring(4, 6), 16);
   const luminance = (r * 299 + g * 587 + b * 114) / 1000;
   return luminance > 128 ? 'dark' : 'light';
+}
+
+export function applyImgColor(block) {
+  const img = block.querySelector('img[src]');
+  if (img) {
+    import('./colorthief.js').then(({ default: ColorThief }) => {
+      const colorThief = new ColorThief();
+      const thumbnail = createOptimizedPicture(img.src, '', '', [{ width: 100 }]).querySelector('source').srcset;
+      const thumbnailImg = new Image();
+      thumbnailImg.src = thumbnail;
+      thumbnailImg.onload = () => {
+        const color = colorThief.getColor(thumbnailImg, 5, 10);
+        const [r, g, b] = color;
+        const y = Math.floor(r * 0.2126 + g * 0.7152 + b * 0.0722);
+        const brightness = {
+          darkest: 80,
+          dark: 160,
+          light: 200,
+          lightest: 256,
+        };
+        const brightnessKey = Object.keys(brightness).find((key) => y <= brightness[key]);
+        block.classList.add(`image-${brightnessKey}`);
+        block.style.setProperty('--image-color', `#${r.toString(16)}${g.toString(16)}${b.toString(16)}`);
+      };
+    });
+  }
 }
 
 /**
@@ -824,6 +951,17 @@ export function findBestAlertBanner(banners, date = new Date()) {
 }
 
 /**
+ * Gets the locale and language from the window.location.pathname.
+ * @returns {Object} Object with locale and language.
+ */
+export async function getLocaleAndLanguage() {
+  const pathSegments = window.location.pathname.split('/').filter(Boolean);
+  const locale = pathSegments[0] || 'us'; // fallback to 'us' if not found
+  const language = pathSegments[1] || 'en_us'; // fallback to 'en_us' if not found
+  return { locale, language };
+}
+
+/**
  * Loads and prepends nav banner.
  * @param {HTMLElement} main - Main element
  */
@@ -870,7 +1008,14 @@ async function loadNavBanner(main) {
  * @param {Element} doc The container element
  */
 async function loadEager(doc) {
-  document.documentElement.lang = 'en';
+  const language = window.location.pathname.split('/')[2] || 'en';
+  document.documentElement.lang = language;
+
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('simulateDate')) {
+    window.simulateDate = params.get('simulateDate');
+  }
+
   decorateTemplateAndTheme();
 
   const main = doc.querySelector('main');
@@ -912,6 +1057,24 @@ async function loadLazy(doc) {
   loadFonts();
   swapIcons(main);
   autolinkModals(document);
+
+  const syncSku = async () => {
+    // eslint-disable-next-line import/no-unresolved
+    const { openSyncModal } = await import('https://main--vitamix--aemsites.aem.page/tools/sidekick/sync/sync.js');
+    await openSyncModal();
+  };
+
+  const sk = document.querySelector('aem-sidekick');
+  if (sk) {
+    sk.addEventListener('custom:sync', syncSku);
+  } else {
+    // wait for sidekick to be loaded
+    document.addEventListener('sidekick-ready', () => {
+    // sidekick now loaded
+      document.querySelector('aem-sidekick')
+        .addEventListener('custom:sync', syncSku);
+    }, { once: true });
+  }
 }
 
 /**
@@ -922,7 +1085,14 @@ async function loadDelayed() {
   // eslint-disable-next-line import/no-cycle
   const params = new URLSearchParams(window.location.search);
   if (params.get('martech') !== 'off') {
-    await loadScript('https://consent.cookiebot.com/uc.js', { 'data-cbid': '1d1d4c74-9c10-49e5-9577-f8eb4ba520fb' });
+    await loadScript('https://consent.cookiebot.com/uc.js', {
+      'data-cbid': '1d1d4c74-9c10-49e5-9577-f8eb4ba520fb',
+      'data-blockingmode': 'auto',
+      'data-georegions': `
+        {'region':'US','cbid':'e9652803-d7e7-491b-a318-632a8f288b5b'},
+        {'region':'AT,BE,BG,HR,CY,CZ,DK,EE,FI,FR,DE,GR,HU,IE,IT,LV,LT,LU,MT,NL,PL,PT,RO,SK,SI,ES,SE,IS,LI,NO,UK','cbid':'1d1d4c74-9c10-49e5-9577-f8eb4ba520fb'}
+      `,
+    });
     if (params.get('martech') === 'on') {
       import('./consented.js');
     } else {

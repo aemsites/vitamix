@@ -94,7 +94,7 @@ export function isVariantAvailableForSale(variant) {
 export default function renderAddToCart(block, parent) {
   // Default selectedVariant to parent product, if simple product, selectedVariant will be undefined
   // TODO: this should be fixed with https://github.com/aemsites/vitamix/issues/185
-  let selectedVariant = parent;
+  let selectedVariant = parent.offers?.[0]?.custom ? parent.offers[0] : parent;
   if (window.selectedVariant) {
     // If we actually have a selected variant, use it instead of the parent product
     const { sku: selectedSku } = window.selectedVariant;
@@ -103,6 +103,8 @@ export default function renderAddToCart(block, parent) {
 
   // Only look at findLocally and findDealer from parent product
   const { findLocally, findDealer } = parent;
+  block.classList.remove('pdp-find-locally');
+  block.classList.remove('pdp-find-dealer');
 
   // Figure out if the selected variant is available for sale
   const isAvailableForSale = isVariantAvailableForSale(selectedVariant);
@@ -149,8 +151,8 @@ export default function renderAddToCart(block, parent) {
   const quantitySelect = document.createElement('select');
   quantitySelect.id = 'pdp-quantity-select';
 
-  // set maximum quantity (default to 5 if not specified)
-  const maxQuantity = custom.maxCartQty ? +custom.maxCartQty : 5;
+  // set maximum quantity (default to 3 if not specified)
+  const maxQuantity = custom.maxCartQty ? +custom.maxCartQty : 3;
 
   // populate quantity dropdown with options from 1 to maxQuantity
   for (let i = 1; i <= maxQuantity; i += 1) {
@@ -199,15 +201,24 @@ export default function renderAddToCart(block, parent) {
     }
 
     // add any required bundle options
-    if (custom.requiredBundleOptions) {
-      selectedOptions.push(...custom.requiredBundleOptions);
+    if (parent.custom && parent.custom.requiredBundleOptions) {
+      selectedOptions.push(...parent.custom.requiredBundleOptions);
     }
 
-    // add product to cart with selected options and quantity
-    await cartApi.addToCart(sku, selectedOptions, quantity);
+    try {
+      // add product to cart with selected options and quantity
+      await cartApi.addToCart(sku, selectedOptions, quantity);
 
-    // redirect to cart page after successful addition
-    window.location.href = '/us/en_us/checkout/cart/';
+      // redirect to cart page after successful addition
+      window.location.href = '/us/en_us/checkout/cart/';
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to add item to cart', error);
+    } finally {
+      // update button state to show ATC
+      addToCartButton.textContent = 'Add to Cart';
+      addToCartButton.removeAttribute('aria-disabled');
+    }
   });
 
   // assemble the quantity container with select and button

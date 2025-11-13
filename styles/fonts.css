@@ -61,3 +61,35 @@
   font-style: normal;
   font-weight: 500;
 }
+
+@font-face {
+  font-family: 'Gotham Narrow SSm A';
+  src: url('../fonts/gotham-narrow-a-400.woff2') format('woff2');
+  font-display: swap;
+  font-style: normal;
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: 'Gotham Narrow SSm B';
+  src: url('../fonts/gotham-narrow-b-400.woff2') format('woff2');
+  font-display: swap;
+  font-style: normal;
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: 'Gotham Narrow SSm A';
+  src: url('../fonts/gotham-narrow-a-500.woff2') format('woff2');
+  font-display: swap;
+  font-style: normal;
+  font-weight: 500;
+}
+
+@font-face {
+  font-family: 'Gotham Narrow SSm B';
+  src: url('../fonts/gotham-narrow-b-500.woff2') format('woff2');
+  font-display: swap;
+  font-style: normal;
+  font-weight: 500;
+}

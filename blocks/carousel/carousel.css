@@ -48,6 +48,10 @@
   object-fit: cover;
 }
 
+.carousel.items .slide-image {
+  width: 100%;
+}
+
 @media (width >= 600px) {
   .carousel.items.portrait img {
     aspect-ratio: 3 / 4;

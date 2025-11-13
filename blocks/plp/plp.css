@@ -1,0 +1,436 @@
+@import url('../pdp/color-swatches.css');
+
+/* stylelint-disable */
+main div.plp-container {
+  padding-top: 0;
+}
+
+main .plp-wrapper {
+  max-width: unset;
+}
+
+main .plp-controls {
+  text-align: center;
+}
+
+main .plp-controls button {
+  display: inline-block;
+  width: unset;
+}
+
+main .plp-facets {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: 100vw;
+  z-index: 1;
+  background-color: #0008;
+}
+
+main .plp-facets > div {
+  padding: 20px;
+  overflow-y: scroll;
+  width: 360px;
+  background-color: var(--color-background);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+main .plp-facets > div::after {
+  position: absolute;
+  background-image: url(/blocks/plp/close.svg);
+  background-size: contain;
+  content: ' ';
+  right: 20px;
+  top: 20px;
+  width: 24px;
+  height: 24px;
+  display: block;
+  cursor: pointer;
+  pointer-events: all;
+}
+
+main .plp-facets > div > * {
+  pointer-events: all;
+}
+
+main .plp-facets .plp-filters {
+  flex: 1;
+  overflow-y: scroll;
+}
+
+main .plp-facets .plp-apply-filters {
+  flex: 0;
+  height: 200px;
+  padding: 16px 0;
+  text-align: center;
+}
+
+main .plp-filters-selected span {
+  background-color: var(--overlay-charcoal);
+  padding: 10px 12px 10px 38px;
+  border-radius: 6px;
+  color: var(--color-background);
+  background-image: url(/blocks/plp/close-white.svg);
+  background-size: 25px;
+  background-position: 8px;
+  background-repeat: no-repeat;
+  margin-right: 8px;
+  margin-bottom: 8px;
+  display: inline-block;
+}
+
+main .plp-facet {
+  border-top: 2px solid #ccc;
+  padding-bottom: 14px;
+  margin: 20px 0;
+}
+
+main .plp-filters-selected:empty + p {
+  display: none;
+}
+
+main .plp-facets button {
+  font-size: var(--body-size-s);
+  width: unset;
+  margin: 0;
+}
+
+main .plp-facets h2 {
+  font-family: var(--body-font-family);
+  font-size: var(--body-size-l);
+  font-weight: 400;
+  margin-top: 5px;
+  margin-bottom: 20px;
+}
+
+main .plp-facets h3 {
+  font-family: var(--body-font-family);
+  font-size: var(--body-size-m);
+  font-weight: 400;
+  margin: 17px 0;
+}
+
+main .plp-facets input[type="checkbox"] {
+  display: none;
+}
+
+main .plp-facets label {
+  display: block;
+  padding-left: 30px;
+  background-image: url(/blocks/plp/checkbox.svg);
+  background-size: contain;
+  background-position: center left;
+  background-repeat: no-repeat;
+  margin: 16px 0;
+}
+
+main .plp-facets :checked + label {
+  background-image: url(/blocks/plp/checked.svg);
+}
+
+main .plp-facets.visible {
+  display: block;
+}
+
+main .plp-sortby {
+  text-align: center;
+  font-size: var(--body-size-s);
+  position: relative;
+}
+
+main .plp-sortby ul {
+  display: none;
+  position: absolute;
+  top: -40px;
+  right: calc(50% - 105px);
+  z-index: 1;
+  background-color: var(--color-background);
+  border: 1px solid #ddd;
+  text-align: left;
+  list-style: none;
+  padding: 0;
+  border-radius: 3px;
+  box-shadow: 0px 2px 5px 0px var(--overlay-light);
+  font-size: var(--body-font-size-m);
+  min-width: 190px;
+}
+
+main .plp-sortby ul li {
+  padding: 5px 10px;
+  border-bottom: 1px solid #ddd;
+}
+
+main .plp-sortby ul li.selected {
+  background: url(/blocks/plp/checkmark.svg) center right 10px no-repeat;
+}
+
+main .plp-sortby ul li:hover {
+  background-color: #eee;
+}
+
+main .plp-sortby ul.visible {
+  display: block;
+}
+
+main .plp-results {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+main .plp-results > div {
+  width: 100%;
+  position: relative;
+}
+
+@media (min-width: 600px) {
+  main .plp-results > div {
+    width: 50%;
+  }
+}
+
+main .plp-results h4 {
+  font-size: var(--body-font-size-m);
+  font-family: var(--body-font-family);
+  min-height: 40px;
+}
+
+main .plp-results .highlight {
+  background-color: var(--color-yellow);
+  padding: 0 2px;
+}
+
+main .plp-results {
+  font-size: var(--body-font-size-m);
+}
+
+/* Product card styling */
+main .plp-product-card {
+  width: 50%;
+  position: relative;
+  padding: 10px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-s);
+  cursor: pointer;
+  border: 2px solid transparent;
+  border-radius: 4px;
+}
+
+main .plp-product-card:hover {
+  background-color: var(--color-gray-400);
+  border-color: var(--color-gray-500);
+}
+
+main .plp-product-card img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+main .plp-product-card h4 {
+  font-size: var(--body-font-size-m);
+  font-family: var(--body-font-family);
+  margin: 10px 0 5px 0;
+}
+
+main .plp-product-card h4 a {
+  text-decoration: none;
+  color: inherit;
+}
+
+main .plp-product-card p {
+  margin: 5px 0;
+  font-size: var(--body-font-size-s);
+}
+
+@media (min-width: 900px) {
+  main .plp-facets > div::after {
+    display: none;
+  }
+
+  main .plp-facets .plp-apply-filters {
+    display: none;
+  }
+
+  main .plp-facets {
+    z-index: unset;
+    height: unset;
+    display: block;
+    background: unset;
+  }
+
+  main .plp-facets > div {
+    height: unset;
+  }
+
+  main .plp-facets .plp-filters {
+    overflow-y: unset;
+    height: unset;
+  }
+
+  main .plp-results {
+    grid-area: results;
+  }
+
+  main .plp-controls {
+    grid-area: controls;
+    text-align: left;
+  }
+
+  main .plp-controls button {
+    display: none;
+  }
+
+  main .plp-facets {
+    grid-area: facets;
+    display: unset;
+    position: unset;
+    width: 360px;
+  }
+
+  main .plp {
+    display: grid;
+    grid-template-areas: '- controls sortby' 'facets results results';
+  }
+
+  main .plp-sortby {
+    display: unset;
+    grid-area: sortby;
+    text-align: right;
+  }
+
+  main .plp-sortby p {
+    display: inline-block;
+    border-radius: 5px;
+    border: 2px solid #888;
+    padding: 5px 45px 5px 15px;
+    font-size: var(--body-font-size-m);
+    background: url(/blocks/plp/chevron-down.svg) center right 10px no-repeat;
+  }
+
+
+  main .plp-sortby ul {
+    top: 32px;
+    right: 0;
+    z-index: 1;
+    background-color: var(--color-background);
+    border: 1px solid #ddd;
+    text-align: left;
+    list-style: none;
+    padding: 0;
+    border-radius: 3px;
+    box-shadow: 0px 2px 5px 0px var(--overlay-light);
+    font-size: var(--body-font-m);
+    min-width: 174px;
+  }
+}
+
+@media (min-width: 1200px) {
+  main .plp-results > div,
+  main .plp-product-card {
+    width: calc(100%/3);
+  }
+}
+
+.plp-color-swatch {
+  width: 24px;
+  height: 24px;
+  border: 1px solid #333f48;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  cursor: pointer;
+  background-color: var(--color-white);
+}
+
+.plp-color-inner {
+  width: 16px;
+  height: 16px;
+  border: 1px solid #333f48;
+  border-radius: 50%;
+  position: relative;
+}
+
+.plp-color-swatch-oos.plp-color-inner::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: -webkit-gradient(linear, left top, right bottom,
+      color-stop(0%, #fff0),
+      color-stop(42%, #fff0),
+      color-stop(43%, #fff),
+      color-stop(46%, #fff),
+      color-stop(47%, #ff5216),
+      color-stop(53%, #ff5216),
+      color-stop(54%, #fff),
+      color-stop(57%, #fff),
+      color-stop(58%, #fff0),
+      color-stop(100%, #fff0));
+}
+
+.plp-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.plp-price {
+  font-weight: var(--weight-medium);
+}
+
+.plp-compare {
+  display: flex;
+  justify-content: center;
+  text-align: center;
+}
+
+.plp-compare a.button {
+  background-color: var(--color-gray-200);
+  color: var(--color-charcoal);
+  font-size: var(--body-font-size-m);
+  border: unset;
+  text-transform: unset;
+  width: 100%;
+}
+
+.plp-view-details a.button {
+  width: 100%;
+}
+
+/* carousel styling */
+.plp.carousel h3 a {
+  text-decoration: none;
+}
+
+.plp.carousel ul {
+  justify-content: safe center;
+}
+
+.plp.carousel li {
+  cursor: pointer;
+}
+
+.plp.carousel p.slide-body-price {
+  color: unset;
+}
+
+.plp.carousel .eyebrow {
+  color: var(--color-charcoal);
+}
+
+.plp.carousel .eyebrow + p {
+  margin-top: 0;
+}

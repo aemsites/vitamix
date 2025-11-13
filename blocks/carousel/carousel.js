@@ -103,6 +103,13 @@ export default function decorate(block) {
     block.parentElement.prepend(logo);
   }
 
+  if (indicatedSlides) {
+    const actualSlides = slides.length;
+    if (actualSlides > parseInt(indicatedSlides.replace('slides-', ''), 10)) {
+      block.dataset.slides = actualSlides;
+    }
+  }
+
   slides.forEach((s) => {
     const slide = document.createElement('li');
     [...s].forEach((cell) => {

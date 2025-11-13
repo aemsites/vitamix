@@ -66,6 +66,10 @@
   --site-width: 2000px;
 }
 
+body.pdp-template {
+  --site-width: 1440px;
+}
+
 @media (width >= 900px) {
   :root {
     /* widths and heights */
@@ -219,7 +223,7 @@ main .section.dark {
 }
 
 main .section.dark .eyebrow,
-main .section.dark a:any-link {
+main .section.dark a:any-link:not(.button) {
   color: var(--color-gray-500);
 }
 
@@ -262,8 +266,12 @@ main .section.banner.overlay::before {
   content: '';
   position: absolute;
   inset: 0;
-  background-color: var(--color-white);
-  opacity: 0.35;
+  z-index: 1;
+}
+
+main .section.banner.overlay.dark::before {
+  background-color: var(--color-charcoal);
+  opacity: 0.6;
 }
 
 main > .section.banner > div {

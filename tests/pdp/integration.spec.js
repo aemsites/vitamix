@@ -82,6 +82,20 @@ test.describe('PDP Integration Tests', () => {
         console.log('✓ Add to Cart function called with correct variables');
         await route.fulfill({
           status: 200,
+          body: JSON.stringify({
+            data: {
+              addProductsToCart: {
+                cart: {
+                  items: [
+                    {
+                      sku: 'Ascent X3',
+                      quantity: '1',
+                    },
+                  ],
+                },
+              },
+            },
+          }),
         });
       });
 
@@ -97,7 +111,133 @@ test.describe('PDP Integration Tests', () => {
       // Click the add to cart button
       await addToCartButton.click();
 
-      await page.waitForTimeout(3000);
+      // wait for page to navigate to the cart page
+      await page.waitForURL('**/checkout/cart/**');
+
+      // should redirect to the cart page
+      const currentUrl = new URL(page.url());
+      expect(currentUrl.pathname).toBe('/us/en_us/checkout/cart/');
+      console.log('✓ Add to Cart button is functional');
+    });
+
+    test('dialog should be shown if add to cart fails', async ({ page }) => {
+      await page.route('**/graphql', async (route) => {
+        const requestBody = route.request().postDataJSON();
+        expect(requestBody.variables).toEqual({
+          cartItems: [
+            {
+              sku: 'Ascent X3',
+              quantity: '1',
+              selected_options: [
+                'Y29uZmlndXJhYmxlLzkzLzUzNA==',
+                'Y3VzdG9tLW9wdGlvbi8zMDAyLzM5NDE=',
+              ],
+            },
+          ],
+        });
+
+        // Log the arguments that were passed to addToCart
+        console.log('✓ Add to Cart function called with correct variables');
+        await route.fulfill({
+          status: 200,
+          body: JSON.stringify({
+            data: {
+              addProductsToCart: {
+                cart: {
+                  id: 'oA7Idn8Om3ev2cAfUtBPfMypCtdnWz6F',
+                  items: [],
+                  prices: {
+                    subtotal_excluding_tax: {
+                      currency: 'USD',
+                      value: 0,
+                    },
+                  },
+                  total_quantity: 0,
+                },
+                user_errors: [
+                  {
+                    code: 'INSUFFICIENT_STOCK',
+                    message: 'The requested qty is not available',
+                  },
+                ],
+              },
+            },
+          }),
+        });
+      });
+
+      const productUrl = buildProductUrl(productPath, currentBranch);
+      await page.goto(productUrl);
+
+      // Wait for add to cart button
+      await waitForElement(page, '.quantity-container button');
+
+      const addToCartButton = page.locator('.quantity-container button');
+      await expect(addToCartButton).toContainText(/add to cart/i);
+
+      // Click the add to cart button
+      await addToCartButton.click();
+
+      await page.waitForTimeout(2000);
+
+      const element = page.locator('#atc-error');
+      await expect(element).toBeAttached();
+
+      console.log('✓ Error modal is shown on add to cart failure');
+    });
+
+    test('add to cart button should work, with coupon, should use legacy atc', async ({ page }) => {
+      await page.route('**/us/en_us/checkout/cart/add/**', async (route) => {
+        // check that the correct uenc path segment exists
+        const url = new URL(route.request().url());
+        expect(url.pathname).toContain('/us/en_us/checkout/cart/add/uenc/');
+
+        const requestBody = route.request().postData();
+        // requestBody is a multipart form data string
+        // extract form data from the string
+        const boundary = requestBody.split('\n')[0];
+        const parts = requestBody.split(boundary).filter(Boolean);
+        const data = {};
+        parts.forEach((part) => {
+          const name = part.split('\n')[1].split('name="')[1].split('"')[0];
+          const value = part.split('\n')[3].trim();
+          data[name] = value;
+        });
+        expect(data).toEqual({
+          index_id: '534',
+          product: '3641',
+          item: '3641',
+          form_key: 'null',
+          qty: '1',
+          'super_attribute[93]': '534',
+          vitamixProductId: '3641',
+          'options[3002]': '3941',
+          warranty_sku: 'sku-10-year-standard-warranty',
+          'warranty_skus[3941]': 'sku-10-year-standard-warranty',
+        });
+
+        // Log the arguments that were passed to addToCart
+        console.log('✓ Add to Cart function called with correct variables');
+        await route.fulfill({
+          status: 200,
+        });
+      });
+
+      const productUrl = buildProductUrl(productPath, currentBranch, { COUPON: 'test' });
+      console.log('productUrl: ', productUrl);
+      await page.goto(productUrl);
+
+      // Wait for add to cart button
+      await waitForElement(page, '.quantity-container button');
+
+      const addToCartButton = page.locator('.quantity-container button');
+      await expect(addToCartButton).toContainText(/add to cart/i);
+
+      // Click the add to cart button
+      await addToCartButton.click();
+
+      // wait for page to navigate to the cart page
+      await page.waitForURL('**/checkout/cart/**');
 
       // should redirect to the cart page
       const currentUrl = new URL(page.url());
@@ -189,6 +329,20 @@ test.describe('PDP Integration Tests', () => {
         console.log('✓ Add to Cart function called with correct variables');
         await route.fulfill({
           status: 200,
+          body: JSON.stringify({
+            data: {
+              addProductsToCart: {
+                cart: {
+                  items: [
+                    {
+                      sku: 'VBND5200LB',
+                      quantity: '1',
+                    },
+                  ],
+                },
+              },
+            },
+          }),
         });
       });
 
@@ -204,7 +358,8 @@ test.describe('PDP Integration Tests', () => {
       // Click the add to cart button
       await addToCartButton.click();
 
-      await page.waitForTimeout(3000);
+      // wait for page to navigate to the cart page
+      await page.waitForURL('**/checkout/cart/**');
 
       // should redirect to the cart page
       const currentUrl = new URL(page.url());
@@ -213,22 +368,33 @@ test.describe('PDP Integration Tests', () => {
     });
 
     test('add to cart button should work with extended warranty', async ({ page }) => {
-      await page.route('**/graphql', async (route) => {
-        const requestBody = route.request().postDataJSON();
-        expect(requestBody.variables).toEqual({
-          cartItems: [
-            {
-              sku: 'VBND5200LB',
-              quantity: '1',
-              selected_options: [
-                'YnVuZGxlLzQzLzIyMy8x',
-                'Y3VzdG9tLW9wdGlvbi8zMDIzLzM5NjU=',
-                'YnVuZGxlLzQxLzIxMi8x',
-                'YnVuZGxlLzQxLzIxNS8x',
-                'YnVuZGxlLzQxLzIyMS8x',
-              ],
-            },
-          ],
+      await page.route('**/us/en_us/checkout/cart/add/**', async (route) => {
+        // check that the correct uenc path segment exists
+        const url = new URL(route.request().url());
+        expect(url.pathname).toContain('/us/en_us/checkout/cart/add/uenc/');
+        expect(url.pathname).toContain('/product/3701/');
+
+        const requestBody = route.request().postData();
+        // requestBody is a multipart form data string
+        // extract form data from the string
+        const boundary = requestBody.split('\n')[0];
+        const parts = requestBody.split(boundary).filter(Boolean);
+        const data = {};
+        parts.forEach((part) => {
+          const name = part.split('\n')[1].split('name="')[1].split('"')[0];
+          const value = part.split('\n')[3].trim();
+          data[name] = value;
+        });
+        expect(data).toEqual({
+          product: '3701',
+          item: '3701',
+          form_key: 'null',
+          qty: '1',
+          vitamixProductId: '3701',
+          'options[3023]': '3965',
+          'warranty_skus[3965]': '001314',
+          warranty_sku: '001314',
+          'warranty_skus[3962]': 'sku-warranty-7yr-std',
         });
 
         // Log the arguments that were passed to addToCart
@@ -247,7 +413,7 @@ test.describe('PDP Integration Tests', () => {
       const extendedWarranty = page.locator('.warranty > div:first-of-type');
       await expect(extendedWarranty).toContainText(/warranty/i);
 
-      const warrantyOptions = page.locator('.pdp-warrenty-option');
+      const warrantyOptions = page.locator('.pdp-warranty-option');
       const add3YearWarrantyContainer = warrantyOptions.nth(1);
       const add3YearWarrantyInput = add3YearWarrantyContainer.locator('input');
       await add3YearWarrantyInput.click();
@@ -259,7 +425,8 @@ test.describe('PDP Integration Tests', () => {
       await expect(addToCartButton).toContainText(/add to cart/i);
       await addToCartButton.click();
 
-      await page.waitForTimeout(3000);
+      // wait for page to navigate to the cart page
+      await page.waitForURL('**/checkout/cart/**');
 
       // should redirect to the cart page
       const currentUrl = new URL(page.url());
@@ -324,6 +491,20 @@ test.describe('PDP Integration Tests', () => {
         console.log('✓ Add to Cart function called with correct variables');
         await route.fulfill({
           status: 200,
+          body: JSON.stringify({
+            data: {
+              addProductsToCart: {
+                cart: {
+                  items: [
+                    {
+                      sku: '056264',
+                      quantity: '1',
+                    },
+                  ],
+                },
+              },
+            },
+          }),
         });
       });
 
@@ -339,12 +520,129 @@ test.describe('PDP Integration Tests', () => {
       // Click the add to cart button
       await addToCartButton.click();
 
-      await page.waitForTimeout(3000);
+      // wait for page to navigate to the cart page
+      await page.waitForURL('**/checkout/cart/**');
 
       // should redirect to the cart page
       const currentUrl = new URL(page.url());
       expect(currentUrl.pathname).toBe('/us/en_us/checkout/cart/');
       console.log('✓ Add to Cart button is functional');
+    });
+  });
+
+  test.describe('Newsletter Subscription', () => {
+    const newsletterConfigs = [
+      {
+        modal: false,
+        smsOptin: false,
+        leadSource: 'sub-em-footer-us',
+        pageUrl: '/us/en_us/products/20-ounce-travel-cup',
+      },
+      {
+        modal: false,
+        smsOptin: true,
+        leadSource: 'sub-emsms-footer-us',
+        pageUrl: '/us/en_us/products/20-ounce-travel-cup',
+      },
+      {
+        modal: true,
+        smsOptin: false,
+        leadSource: 'sub-em-modal-us',
+        pageUrl: '/us/en_us/products/20-ounce-travel-cup',
+      },
+      {
+        modal: true,
+        smsOptin: true,
+        leadSource: 'sub-emsms-modal-us',
+        pageUrl: '/us/en_us/products/20-ounce-travel-cup',
+      },
+    ];
+
+    const newsLetterSubscription = async (page, config) => {
+      const {
+        modal,
+        smsOptin,
+        leadSource,
+        pageUrl,
+      } = config;
+
+      await page.route('**/bin/vitamix/newslettersubscription**', async (route) => {
+        const url = route.request().url();
+        const urlObj = new URL(url);
+
+        // Check the query parameters
+        expect(urlObj.searchParams.get('email')).toBe('test@test.com');
+        expect(urlObj.searchParams.get('mobile')).toBe('1234567890');
+        expect(urlObj.searchParams.get('sms_optin')).toBe(smsOptin ? '1' : '0');
+        expect(urlObj.searchParams.get('lead_source')).toBe(leadSource);
+        expect(urlObj.searchParams.get('pageUrl')).toContain(pageUrl);
+        expect(urlObj.searchParams.get('actionUrl')).toBe('/us/en_us/rest/V1/vitamix-api/newslettersubscribe');
+
+        console.log('✓ Newsletter subscription request intercepted with correct parameters');
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { message: 'Success' } }),
+        });
+      });
+
+      const productUrl = buildProductUrl(pageUrl, currentBranch);
+      await page.goto(productUrl);
+
+      let form = page.locator('form.footer-sign-up');
+
+      if (modal) {
+        if (page.viewportSize().width < 600) {
+          const hamburgerMenu = page.locator('header .nav-hamburger button');
+          await hamburgerMenu.click();
+        }
+
+        const signupButton = page.locator('header a[href*="/modals/sign-up"]');
+        await signupButton.click();
+
+        const modalForm = page.locator('dialog form.footer-sign-up');
+        await modalForm.waitFor({ state: 'visible', timeout: 10000 });
+
+        form = modalForm;
+      }
+
+      const emailInput = form.locator('.form-field #email');
+      await emailInput.fill('test@test.com');
+      await expect(emailInput).toHaveValue('test@test.com');
+
+      const phoneInput = form.locator('.form-field #mobile');
+      await phoneInput.fill('1234567890');
+      await expect(phoneInput).toHaveValue('1234567890');
+
+      if (smsOptin) {
+        const consentCheckbox = form.locator('label input[type="checkbox"]');
+        await consentCheckbox.click({ force: true });
+        // wait for consent checkbox to be checked
+        await expect(consentCheckbox).toBeChecked();
+      }
+
+      const submitButton = form.locator('button[type="submit"]');
+      await submitButton.click();
+
+      await page.waitForTimeout(1000);
+
+      console.log('✓ Newsletter subscription form is functional');
+    };
+
+    test('newsletter subscription should work in footer', async ({ page }) => {
+      await newsLetterSubscription(page, newsletterConfigs[0]);
+    });
+
+    test('newsletter subscription should work in footer with SMS', async ({ page }) => {
+      await newsLetterSubscription(page, newsletterConfigs[1]);
+    });
+
+    test('newsletter subscription should work in modal', async ({ page }) => {
+      await newsLetterSubscription(page, newsletterConfigs[2]);
+    });
+
+    test('newsletter subscription should work in modal with SMS', async ({ page }) => {
+      await newsLetterSubscription(page, newsletterConfigs[3]);
     });
   });
 });

@@ -53,6 +53,10 @@ export async function createModal(contentNodes, path) {
   block.id = title;
   block.append(dialog);
 
+  if (title.includes('atc')) {
+    block.id = 'atc-error';
+  }
+
   return {
     block,
     showModal: () => {
