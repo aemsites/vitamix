@@ -1086,6 +1086,19 @@ async function loadDelayed() {
   const params = new URLSearchParams(window.location.search);
   if (params.get('martech') !== 'off') {
     await loadScript('https://consent.cookiebot.com/uc.js', { 'data-cbid': '1d1d4c74-9c10-49e5-9577-f8eb4ba520fb' });
+    window.addEventListener('CookiebotOnDialogDisplay', () => {
+      const userCountry = new URLSearchParams(window.location.search).get('geoip-country') || window.Cookiebot.userCountry;
+      if (userCountry.startsWith('US-')) {
+        if (!window.Cookiebot.forceDialog) {
+          document.body.classList.add('hide-consent-banner-for-us');
+        } else {
+          document.body.classList.remove('hide-consent-banner-for-us');
+        }
+      } else {
+        window.Cookiebot.dialog.consentLevel = 'strict';
+        window.Cookiebot.dialog.detachOnscrollEvent();
+      }
+    });
     if (params.get('martech') === 'on') {
       import('./consented.js');
     } else {
