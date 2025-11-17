@@ -103,24 +103,6 @@ r.parentNode.insertBefore(t,r)}}
 pintrk('load', '2621075961855'); pintrk('page');
 // End of Pinterest Tag
 
-/* eslint-enable */
-
-// LinkedIn Insight Tag
-try {
-  const lpids = '_linkedin_data_partner_ids';
-  window[lpids] = window[lpids] || [];
-  window[lpids].push('2976369');
-  loadScript('https://snap.licdn.com/li.lms-analytics/insight.min.js');
-} catch (error) {
-  /* eslint-disable-next-line no-console */
-  console.error('LinkedIn Insight Tag failed to load', error);
-}
-
-// End of LinkedIn Insight Tag
-
-/* eslint-disable */
-
-
 // TV Scientific Pixel Code
 try {
 setTimeout(function () {var p, s, d, w;d = document;w = window.location;p = d.createElement("IMG");s = w.protocol + "//tvspix.com/t.png?&t=" + (new Date).getTime() + "&l=tvscientific-pix-o-4b66e973-23f2-45e9-91e5-aa5f89462df5&u3=" + encodeURIComponent(w.href);p.setAttribute("src", s);
