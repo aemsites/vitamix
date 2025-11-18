@@ -352,8 +352,7 @@ async function renderFreeGift(offers) {
     const findGift = (giftList, price) => giftList.find((gift) => {
       const [startDate, endDate] = parseDateRange(gift.dates);
       const today = new Date();
-      return today >= startDate && today <= endDate
-        && price >= +gift.minPrice;
+      return today >= startDate && today <= endDate;
     });
     const gift = findGift(gifts, +offers[0].price);
     if (gift) {
