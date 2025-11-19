@@ -329,16 +329,21 @@ function enableFooterSignUp(form) {
   form.classList.add('footer-sign-up');
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    const data = new FormData(form);
     // disable form and show loading button
     toggleForm(form);
-    const data = new FormData(form);
     const entries = Object.fromEntries(data.entries());
     const { email, mobile, optIn } = entries;
+    const country = window.location.pathname.split('/')[1];
+    let leadSource = optIn ? `sub-emsms-footer-${country}` : `sub-em-footer-${country}`;
+    if (form.closest('dialog')) {
+      leadSource = optIn ? `sub-emsms-modal-${country}` : `sub-em-modal-${country}`;
+    }
     const payload = {
       email,
       mobile,
       sms_optin: optIn ? '1' : '0',
-      lead_source: 'sub-em-footer-us',
+      lead_source: leadSource,
       pageUrl: window.location.href,
       actionUrl: '/us/en_us/rest/V1/vitamix-api/newslettersubscribe',
     };

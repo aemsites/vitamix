@@ -1,0 +1,14 @@
+User-agent: *
+Disallow: /cgi-bin/
+
+Sitemap: https://www.vitamix.com/ca/en_us.sitemap.xml
+Sitemap: https://www.vitamix.com/vr/en_us.sitemap.xml
+Sitemap: https://www.vitamix.com/mx/en_us.sitemap.xml
+Sitemap: https://www.vitamix.com/us/en_us.sitemap.xml
+
+Sitemap: https://www.vitamix.com/media/en_vr.magento_sitemap.xml
+Sitemap: https://www.vitamix.com/media/en_mx.magento_sitemap.xml
+Sitemap: https://www.vitamix.com/media/en_ca.magento_sitemap.xml
+Sitemap: https://www.vitamix.com/media/en_us.magento_sitemap.xml
+
+Sitemap: https://www.vitamix.com/us/en_us/products/sitemap.xml

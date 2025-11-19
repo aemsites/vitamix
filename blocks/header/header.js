@@ -102,6 +102,12 @@ function buildLanguageSelector(tool) {
     option.innerHTML = '';
     optionLink.replaceChildren(optionIcon.cloneNode(true), optionText);
     option.append(optionLink);
+    if (!window.location.pathname.includes('/products/')) { // if not on a product page
+      const targetPathSegments = new URL(optionLink.href).pathname.split('/');
+      const currentPathSegments = window.location.pathname.split('/');
+      const optionLinkHref = `${targetPathSegments.slice(0, 3).join('/')}/${currentPathSegments.slice(3).join('/')}`;
+      optionLink.href = optionLinkHref;
+    }
   });
 
   label.replaceWith(button);
@@ -169,8 +175,8 @@ function sanitizeNavList(ul) {
  * @param {HTMLElement} nav - Navigation container element
  */
 function enforceSubmenuState(nav) {
-  const submenuProducts = nav.querySelector('#submenu-products');
-  const toggleProducts = nav.querySelector('[aria-controls="submenu-products"]');
+  const submenuProducts = nav.querySelector('#submenu-products') || nav.querySelector('#submenu-produits');
+  const toggleProducts = nav.querySelector('[aria-controls="submenu-products"]') || nav.querySelector('[aria-controls="submenu-produits"]');
 
   if (!submenuProducts || !toggleProducts) return;
 
@@ -291,6 +297,9 @@ export default async function decorate(block) {
   const navMeta = getMetadata('nav');
   const navPath = navMeta ? new URL(navMeta, window.location).pathname : '/nav';
   const fragment = await loadFragment(navPath);
+  if (fragment.querySelector('.icon-logo-commercial')) {
+    block.closest('header').classList.add('header-commercial');
+  }
   rewriteLinks(fragment);
 
   // decorate nav DOM

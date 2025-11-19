@@ -39,6 +39,7 @@
 
 .cards.articles > ul li {
   margin: 0 auto;
+  width: 100%;
   max-width: 400px;
 }
 
@@ -504,21 +505,26 @@
 
 .cards.overlay > ul > li {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   position: relative;
-  min-height: 400px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.cards.overlay.tall > ul > li {
+  aspect-ratio: 4 / 3;
 }
 
 .cards.overlay > ul > li::after {
   content: '';
   position: absolute;
   inset: 0;
-  background-color: var(--shadow-100);
+  background-color: var(--shadow-200);
   transition: background 0.3s;
 }
 
 .cards.overlay > ul > li.card-click:hover::after {
-  background-color: var(--shadow-200);
+  background-color: var(--shadow-300);
 }
 
 .cards.overlay > ul > li.card-click a::after {
@@ -556,9 +562,17 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .cards.overlay > ul.rows-1 {
+    grid-template-columns: 1fr;
+  }
+
+  .cards.overlay > ul.rows-2,
+  .cards.overlay > ul.rows-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .cards.overlay > ul > li .card-body {
-    padding: var(--spacing-200);
-    padding-bottom: var(--spacing-600);
+    padding: var(--spacing-200) var(--horizontal-spacing);
   }
 }
 

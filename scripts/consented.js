@@ -2,11 +2,11 @@ import { loadScript } from './aem.js';
 
 if (localStorage.getItem('newsletter-popped-up') !== 'true') {
   localStorage.setItem('newsletter-popped-up', 'true');
-  const newsletterLink = document.querySelector('a[href="/us/en_us/nav/modals/sign-up"]');
+  const newsletterLink = document.querySelector('a[href*="/modals/sign-up"]');
   if (newsletterLink) {
     setTimeout(() => {
       newsletterLink.click();
-    }, 10000);
+    }, 5000);
   }
 }
 
@@ -26,7 +26,11 @@ currentEnvironment.dataset.deploymentEnv = 'prod';
 currentEnvironment.dataset.templatePath = '/conf/vitamix/settings/wcm/templates/default-page';
 document.body.appendChild(currentEnvironment);
 
-loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-chatbot.lc-5aa4591c22ce9007a60fafc1f19aa690-lc.min.js');
+const chatbot = document.createElement('div');
+chatbot.id = 'chatbot-container';
+document.body.appendChild(chatbot);
+
+loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-chatbot.lc-d95b877a5e0c2ce39cd26f0aa190faef-lc.min.js');
 loadScript('https://www.vitamix.com/etc.clientlibs/core/wcm/components/commons/site/clientlibs/container.lc-0a6aff292f5cc42142779cde92054524-lc.min.js');
 
 await loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-library.lc-259cf15444c5fe1f89e5c54df7b6e1e9-lc.min.js');
@@ -99,8 +103,45 @@ r.parentNode.insertBefore(t,r)}}
 pintrk('load', '2621075961855'); pintrk('page');
 // End of Pinterest Tag
 
+/* eslint-enable */
 
+// LinkedIn Insight Tag
+try {
+  const lpids = '_linkedin_data_partner_ids';
+  window[lpids] = window[lpids] || [];
+  window[lpids].push('2976369');
+  loadScript('https://snap.licdn.com/li.lms-analytics/insight.min.js');
+} catch (error) {
+  /* eslint-disable-next-line no-console */
+  console.error('LinkedIn Insight Tag failed to load', error);
+}
 
+// End of LinkedIn Insight Tag
+
+/* eslint-disable */
+
+// Big Happy Tag add 11-17-25 end 12-28-25
+try {
+  const adentifiAccountId = 26653;
+  const pageUrl = encodeURIComponent(window.location.href);
+  const uqNum = Math.random() * 10000000000000;
+
+  const pixelUrl =
+    'https://px.adentifi.com/Pixels?a_id=' + adentifiAccountId +
+    ';p_url=' + pageUrl +
+    ';uq=' + uqNum;
+
+  const img = document.createElement('img');
+  img.src = pixelUrl;
+  img.height = 1;
+  img.width = 1;
+  img.style.display = 'none';
+
+  document.body.appendChild(img);
+} catch (error) {
+  console.error('Adentifi pixel failed to load', error);
+}
+// End of Big Happy Tag
 
 // TV Scientific Pixel Code
 try {
@@ -154,4 +195,21 @@ loadScript('https://cdn.datasteam.io/js/D26F66D1AD707A.js');
   i=d.getElementsByTagName(t)[0],i.parentNode.insertBefore(n,i)
 })
 (window,document,"script","//bat.bing.com/bat.js","uetq");
+
+(function(w, d){
+  var id='spdt-capture', n='script';
+  if (!d.getElementById(id)) {
+    w.spdt =
+      w.spdt ||
+      function() {
+        (w.spdt.q = w.spdt.q || []).push(arguments);
+      };
+    var e = d.createElement(n); e.id = id; e.async=1;
+    e.src = 'https://pixel.byspotify.com/ping.min.js';
+    var s = d.getElementsByTagName(n)[0];
+    s.parentNode.insertBefore(e, s);
+  }
+  w.spdt('conf', { key: '18858202ee0c4082a0f7e6d3d8b53c94' });
+  w.spdt('view');
+})(window, document);
 
