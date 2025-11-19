@@ -1016,6 +1016,17 @@ async function loadEager(doc) {
     window.simulateDate = params.get('simulateDate');
   }
 
+  if (window.location.pathname.includes('/shop/')) {
+    const images = doc.querySelectorAll('img[src^="./media_"]');
+    images.forEach((img) => {
+      img.setAttribute('src', img.getAttribute('src').replace('./media_', '/us/en_us/media_'));
+    });
+    const sources = doc.querySelectorAll('source[srcset^="./media_"]');
+    sources.forEach((source) => {
+      source.setAttribute('srcset', source.getAttribute('srcset').replace('./media_', '/us/en_us/media_'));
+    });
+  }
+
   decorateTemplateAndTheme();
 
   const main = doc.querySelector('main');
