@@ -67,14 +67,13 @@
 .pdp-color-options {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: var(--spacing-s);
 }
 
 .pdp-color-swatch {
-  width: 24px;
-  height: 24px;
-  border: 1px solid #333f48;
-  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  border: 1px solid var(--color-charcoal);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -83,10 +82,9 @@
 }
 
 .pdp-color-inner {
-  width: 16px;
-  height: 16px;
-  border: 1px solid #333f48;
-  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  border: 1px solid var(--color-charcoal);
   position: relative;
 }
 
