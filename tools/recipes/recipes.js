@@ -68,6 +68,16 @@ export function initializeForm() {
   }
 }
 
+// Show error
+export function showError(message) {
+  const errorDiv = document.getElementById('error');
+  errorDiv.textContent = message;
+  errorDiv.classList.add('active');
+  setTimeout(() => {
+    errorDiv.classList.remove('active');
+  }, 5000);
+}
+
 // Display results
 export function displayResults(data, rawXml) {
   const resultsDiv = document.getElementById('results');
@@ -121,11 +131,11 @@ export function displayResults(data, rawXml) {
             <div class="recipe-brands-title">Brands:</div>
             <div class="brand-list">
               ${Array.from(brands).map((brand) => {
-                const brandName = brand.querySelector('BrandName')?.textContent || 'Unknown';
-                const classification = brand.querySelector('Classification')?.textContent || '';
-                const isPrimary = classification.toLowerCase() === 'primary';
-                return `<span class="brand-tag ${isPrimary ? 'primary' : ''}">${brandName}</span>`;
-              }).join('')}
+    const brandName = brand.querySelector('BrandName')?.textContent || 'Unknown';
+    const classification = brand.querySelector('Classification')?.textContent || '';
+    const isPrimary = classification.toLowerCase() === 'primary';
+    return `<span class="brand-tag ${isPrimary ? 'primary' : ''}">${brandName}</span>`;
+  }).join('')}
             </div>
           </div>
         ` : ''}
@@ -138,6 +148,7 @@ export function displayResults(data, rawXml) {
     responseDataPre.textContent = rawXml;
     resultsDiv.classList.add('active');
   } catch (e) {
+    // eslint-disable-next-line no-console
     console.error('Error parsing recipes:', e);
     showError(`Error parsing response: ${e.message}`);
   }
@@ -157,23 +168,16 @@ export function toggleRawXML() {
   }
 }
 
-// Show error
-export function showError(message) {
-  const errorDiv = document.getElementById('error');
-  errorDiv.textContent = message;
-  errorDiv.classList.add('active');
-  setTimeout(() => {
-    errorDiv.classList.remove('active');
-  }, 5000);
-}
-
 // Copy to clipboard
 export function copyToClipboard() {
   const responseData = document.getElementById('responseData').textContent;
   navigator.clipboard.writeText(responseData).then(() => {
+    // eslint-disable-next-line no-alert
     alert('Copied to clipboard!');
   }).catch((err) => {
+    // eslint-disable-next-line no-console
     console.error('Failed to copy:', err);
+    // eslint-disable-next-line no-alert
     alert('Failed to copy to clipboard');
   });
 }
@@ -217,6 +221,7 @@ export async function makeApiCallFromParams() {
     const xmlResponse = await fetchRecipes(params.user, params.pw, params.date);
     displayResults(null, xmlResponse);
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('Error:', error);
     showError(`Error: ${error.message}`);
   } finally {
@@ -234,8 +239,8 @@ export async function init() {
 
   initializeForm();
   await makeApiCallFromParams();
-  
-  // eslint-disable-next-line no-unused-vars
+
+  // eslint-disable-next-line no-unused-vars, no-undef
   const { context, token, actions } = await DA_SDK;
   Object.keys(context).forEach((key) => {
     const h3 = document.createElement('h3');
