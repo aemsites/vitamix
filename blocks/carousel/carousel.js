@@ -114,6 +114,7 @@ export default function decorate(block) {
   let qs = 0;
   slides.forEach((s) => {
     const slide = document.createElement('li');
+    slide.className = 'carousel-slide';
     [...s].forEach((cell) => {
       buildVideo(cell);
       if (cell.children.length === 1 && cell.querySelector('picture')) { // single picture element
