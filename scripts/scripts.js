@@ -1008,7 +1008,8 @@ async function loadNavBanner(main) {
  * @param {Element} doc The container element
  */
 async function loadEager(doc) {
-  const language = window.location.pathname.split('/')[2] || 'en';
+  const locale = window.location.pathname.split('/')[2];
+  const language = locale ? locale.split('_')[0] : 'en';
   document.documentElement.lang = language;
 
   const params = new URLSearchParams(window.location.search);
