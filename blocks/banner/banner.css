@@ -132,12 +132,12 @@
   z-index: -1;
 }
 
-.banner.compact.image-darkest::after,
 .banner.compact.image-lightest::after {
-  opacity: 0;
+  opacity: 0.33;
 }
 
 .banner.compact.image-dark::after,
+.banner.compact.image-darkest::after,
 .banner.compact.image-light::after {
   opacity: 0.66;
 }
@@ -276,7 +276,7 @@
   }
 
   .banner.aligned.image-darkest {
-    --overlay-opacity: 0;
+    --overlay-opacity: 0.2;
   }
 
   .banner.aligned.image-dark {
@@ -284,13 +284,13 @@
   }
 
   .banner.aligned.image-light {
-    --overlay-opacity: 0.2;
+    --overlay-opacity: 0.8;
   
     color: var(--color-charcoal);
   }
 
   .banner.aligned.image-lightest {
-    --overlay-opacity: 0;
+    --overlay-opacity: 0.2;
     
     color: var(--color-charcoal);
   }
@@ -301,12 +301,12 @@
   }
 
   .banner.aligned.left-text .img-wrapper::before {
-    background: linear-gradient(to right, transparent calc(100% - (400px + (3 * var(--horizontal-spacing)))), var(--image-color));
+    background: linear-gradient(to right, transparent, var(--image-color) 60%);
     opacity: var(--overlay-opacity);
   }
 
   .banner.aligned.right-text .img-wrapper::before {
-    background: linear-gradient(to right, var(--image-color), transparent calc(400px + (3 * var(--horizontal-spacing))));
+    background: linear-gradient(to right, var(--image-color) 60%, transparent);
     opacity: var(--overlay-opacity);
   }
 
