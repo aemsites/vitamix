@@ -1,0 +1,10 @@
+indices:
+  us_recipes:
+    include:
+      - /us/en_us/recipes/data/**
+    target: /us/en_us/recipes/data/query-index.json
+    properties:
+      title:
+        select: head > meta[name="og:title"]
+        value: |
+          attribute(el, 'content')
