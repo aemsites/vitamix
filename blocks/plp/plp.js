@@ -645,7 +645,7 @@ function buildFiltering(block, ph, config) {
 
 export default async function decorate(block) {
   const { locale, language } = await getLocaleAndLanguage();
-  const ph = await fetchPlaceholders(`/${locale}/${language}`);
+  const ph = await fetchPlaceholders(`/${locale}/${language}/products/config`);
   const config = readBlockConfig(block);
   const isCarousel = block.classList.contains('carousel');
 
