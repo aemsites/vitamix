@@ -247,15 +247,6 @@ export async function init() {
   const { context, token, actions } = await DA_SDK;
   // eslint-disable-next-line no-console
   console.log('DA SDK loaded', context, token, actions);
-  Object.keys(context).forEach((key) => {
-    const h3 = document.createElement('h3');
-    h3.textContent = `${key}`;
-
-    const para = document.createElement('p');
-    para.textContent = context[key];
-
-    document.body.append(h3, para);
-  });
 }
 
 init();
