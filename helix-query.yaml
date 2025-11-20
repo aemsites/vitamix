@@ -5,6 +5,6 @@ indices:
     target: /us/en_us/recipes/data/query-index.json
     properties:
       title:
-        select: head > meta[name="og:title"]
+        select: head > meta[property="og:title"]
         value: |
           attribute(el, 'content')
