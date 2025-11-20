@@ -288,6 +288,8 @@ function createProductColors(product) {
       if (color) {
         const colorSwatch = document.createElement('div');
         colorSwatch.className = 'plp-color-swatch';
+        colorSwatch.title = color;
+        colorSwatch.dataset.color = toClassName(color);
         const colorInner = document.createElement('div');
         colorInner.className = 'plp-color-inner';
         colorInner.style.backgroundColor = `var(--color-${toClassName(color)})`;
@@ -336,8 +338,17 @@ function createProductCard(product, ph) {
   const compare = createProductButton(product, ph, 'Compare');
 
   card.append(image, title, price, colors, viewDetails, compare);
-  card.addEventListener('click', () => {
-    viewDetails.querySelector('a').click();
+  card.addEventListener('click', (e) => {
+    const { target } = e;
+    const color = target.closest('[data-color]');
+    if (color) {
+      const { href } = viewDetails.querySelector('a');
+      const url = new URL(href, window.location.origin);
+      url.searchParams.set('color', color.dataset.color);
+      window.location.href = url.href;
+    } else {
+      viewDetails.querySelector('a').click();
+    }
   });
 
   return card;
@@ -424,6 +435,21 @@ async function buildProductCarousel(block, ph) {
   block.replaceWith(carousel);
   decorateBlock(carousel);
   await loadBlock(carousel);
+  carousel.addEventListener('click', (e) => {
+    const { target } = e;
+    const slide = target.closest('li.carousel-slide');
+    if (slide) {
+      const link = slide.querySelector('a[href]');
+      const color = target.closest('[data-color]');
+      if (color) {
+        const url = new URL(link.href, window.location.origin);
+        url.searchParams.set('color', color.dataset.color);
+        window.location.href = url.href;
+      } else {
+        link.click();
+      }
+    }
+  });
 }
 
 /**
