@@ -1,3 +1,6 @@
+// eslint-disable-next-line import/no-unresolved
+import DA_SDK from 'https://da.live/nx/utils/sdk.js';
+
 // Parse query parameters
 export function getQueryParams() {
   const params = new URLSearchParams(window.location.search);
@@ -242,6 +245,8 @@ export async function init() {
 
   // eslint-disable-next-line no-unused-vars, no-undef
   const { context, token, actions } = await DA_SDK;
+  // eslint-disable-next-line no-console
+  console.log('DA SDK loaded', context, token, actions);
   Object.keys(context).forEach((key) => {
     const h3 = document.createElement('h3');
     h3.textContent = `${key}`;
