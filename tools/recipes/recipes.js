@@ -8,6 +8,7 @@ export function getQueryParams() {
     user: params.get('user') || '',
     pw: params.get('pw') || '',
     date: params.get('date') || '',
+    recipe: params.get('recipe') || '',
   };
 }
 
@@ -32,6 +33,34 @@ export async function fetchRecipes(userId, password, dateUpdated) {
 
   // Use CORS proxy
   const apiUrl = `https://vitamix.calcmenuweb.com/ws/service.asmx/GetUpdatedRecipes?${queryParams.toString()}`;
+  const corsProxy = 'https://little-forest-58aa.david8603.workers.dev/?url=';
+
+  const response = await fetch(corsProxy + encodeURIComponent(apiUrl), {
+    method: 'GET',
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  const xmlText = await response.text();
+  return xmlText;
+}
+
+// Fetch recipe details
+export async function fetchRecipeDetails(userId, password, recipeNumber) {
+  // Create query parameters
+  const queryParams = new URLSearchParams({
+    ID: userId,
+    PSWD: password,
+    Kiosk: 'Website',
+    RecipeNumber: recipeNumber,
+    CodeTranslation: '1',
+    CodeNutrientSet: '0',
+  });
+
+  // Use CORS proxy
+  const apiUrl = `https://vitamix.calcmenuweb.com/ws/service.asmx/GetRecipeDetails?${queryParams.toString()}`;
   const corsProxy = 'https://little-forest-58aa.david8603.workers.dev/?url=';
 
   const response = await fetch(corsProxy + encodeURIComponent(apiUrl), {
@@ -81,12 +110,154 @@ export function showError(message) {
   }, 5000);
 }
 
+// Display recipe details on page
+export async function displayRecipeDetails(recipeNumber) {
+  const params = getQueryParams();
+
+  if (!params.user || !params.pw) {
+    showError('User credentials are required to view details');
+    return;
+  }
+
+  // Hide form and show detail view
+  const formSection = document.querySelector('.form-section');
+  const resultsDiv = document.getElementById('results');
+  const detailView = document.getElementById('detailView');
+  const detailContent = document.getElementById('detailContent');
+  const detailLoading = document.getElementById('detailLoading');
+
+  formSection.style.display = 'none';
+  resultsDiv.style.display = 'none';
+  detailView.style.display = 'block';
+  detailLoading.classList.add('active');
+  detailContent.innerHTML = '';
+
+  try {
+    const xmlResponse = await fetchRecipeDetails(params.user, params.pw, recipeNumber);
+
+    // Parse XML to extract name and description
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(xmlResponse, 'text/xml');
+
+    // Try to find recipe name and description
+    const recipeName = xmlDoc.querySelector('RecipeName, Name, recipeName, name')?.textContent.trim() || 'Recipe Details';
+    const recipeDescription = xmlDoc.querySelector('RecipeDescription, Description, recipeDescription, description')?.textContent.trim() || '';
+
+    // Extract metadata
+    // Extract Total Time from Time element with Name "Total Time"
+    let totalTime = '';
+    const timeElements = xmlDoc.querySelectorAll('Time');
+    Array.from(timeElements).forEach((timeElement) => {
+      const nameElement = timeElement.querySelector('Name');
+      if (nameElement && nameElement.textContent.trim() === 'Total Time') {
+        const hoursElement = timeElement.querySelector('RecipeTimeHH');
+        const minutesElement = timeElement.querySelector('RecipeTimeMM');
+        const secondsElement = timeElement.querySelector('RecipeTimeSS');
+
+        if (hoursElement || minutesElement || secondsElement) {
+          const hours = hoursElement?.textContent.trim() || '0';
+          const minutes = minutesElement?.textContent.trim() || '0';
+          const seconds = secondsElement?.textContent.trim() || '0';
+
+          // Format as HH:MM:SS
+          totalTime = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+      }
+    });
+
+    // Extract Yield from Main > Yield1 and Yield1_Unit
+    const mainElement = xmlDoc.querySelector('Main');
+    let recipeYield = '';
+    if (mainElement) {
+      const yield1 = mainElement.querySelector('Yield1')?.textContent.trim() || '';
+      const yield1Unit = mainElement.querySelector('Yield1_Unit')?.textContent.trim() || '';
+      if (yield1 && yield1Unit) {
+        recipeYield = `${yield1} ${yield1Unit}`;
+      } else if (yield1) {
+        recipeYield = yield1;
+      }
+    }
+
+    const difficulty = xmlDoc.querySelector('Difficulty, difficulty, Level, level')?.textContent.trim() || '';
+
+    // Extract Dietary Interests from Keywords section
+    const dietaryInterests = [];
+    const keywords = xmlDoc.querySelectorAll('Key');
+    Array.from(keywords).forEach((key) => {
+      const nameParent = key.querySelector('NameParent');
+      if (nameParent && nameParent.textContent.trim() === 'Dietary Interest') {
+        const name = key.querySelector('Name');
+        if (name) {
+          dietaryInterests.push(name.textContent.trim());
+        }
+      }
+    });
+    const dietaryInterestsStr = dietaryInterests.join(', ');
+
+    // Extract Compatible Containers from Brands section
+    const compatibleContainers = [];
+    const brands = xmlDoc.querySelectorAll('Brands > Brand');
+    Array.from(brands).forEach((brand) => {
+      const brandName = brand.querySelector('BrandName');
+      if (brandName) {
+        compatibleContainers.push(brandName.textContent.trim());
+      }
+    });
+    const compatibleContainersStr = compatibleContainers.join(', ');
+
+    // Build metadata table rows
+    const metadataRows = [
+      { name: 'Total Time', value: totalTime },
+      { name: 'Yield', value: recipeYield },
+      { name: 'Difficulty', value: difficulty },
+      { name: 'Compatible Containers', value: compatibleContainersStr },
+      { name: 'Dietary Interests', value: dietaryInterestsStr },
+    ].filter((row) => row.value).map((row) => `
+      <tr>
+        <td>${row.name}</td>
+        <td>${row.value}</td>
+      </tr>
+    `).join('');
+
+    // Display recipe info and raw XML in textarea
+    detailContent.innerHTML = `
+      <div class="recipe">
+        <h1>${recipeName}</h1>
+        ${recipeDescription ? `<p>${recipeDescription}</p>` : ''}
+        ${metadataRows ? `
+          <h2>Metadata</h2>
+          <table class="metadata-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${metadataRows}
+            </tbody>
+          </table>
+        ` : ''}
+      </div>
+      <textarea id="recipeXML" readonly>${xmlResponse}</textarea>
+    `;
+
+    detailLoading.classList.remove('active');
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error fetching recipe details:', error);
+    detailContent.innerHTML = `<p class="error">Failed to load recipe details: ${error.message}</p>`;
+    detailLoading.classList.remove('active');
+  }
+}
+
 // Display results
 export function displayResults(data, rawXml) {
   const resultsDiv = document.getElementById('results');
   const responseDataPre = document.getElementById('responseData');
   const recipeCount = document.getElementById('recipeCount');
   const recipeList = document.getElementById('recipeList');
+  const params = getQueryParams();
 
   // Parse XML and display recipes
   try {
@@ -142,6 +313,9 @@ export function displayResults(data, rawXml) {
             </div>
           </div>
         ` : ''}
+        <div class="recipe-actions">
+          <a href="?user=${encodeURIComponent(params.user)}&pw=${encodeURIComponent(params.pw)}&recipe=${encodeURIComponent(number)}" class="btn-view-details">View Details</a>
+        </div>
       `;
 
       recipeList.appendChild(recipeItem);
@@ -235,13 +409,29 @@ export async function makeApiCallFromParams() {
 
 // Initialize on page load
 export async function init() {
+  const params = getQueryParams();
+
   // Attach event listeners
   document.getElementById('toggleBtn').addEventListener('click', toggleRawXML);
   document.getElementById('copyBtn').addEventListener('click', copyToClipboard);
   document.getElementById('downloadBtn').addEventListener('click', downloadXML);
 
+  // Add back button listener
+  const backBtn = document.getElementById('backToList');
+  if (backBtn) {
+    backBtn.addEventListener('click', () => {
+      window.location.href = `?user=${encodeURIComponent(params.user)}&pw=${encodeURIComponent(params.pw)}`;
+    });
+  }
+
   initializeForm();
-  await makeApiCallFromParams();
+
+  // Check if we should display recipe details or list
+  if (params.recipe) {
+    await displayRecipeDetails(params.recipe);
+  } else {
+    await makeApiCallFromParams();
+  }
 
   // eslint-disable-next-line no-unused-vars, no-undef
   const { context, token, actions } = await DA_SDK;
