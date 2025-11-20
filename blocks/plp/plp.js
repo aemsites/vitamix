@@ -352,6 +352,7 @@ function createProductCard(product, ph) {
 async function styleRowAsSlide(content, ph) {
   const [image, body] = content.children;
   const link = body.querySelector('a[href]');
+  link.parentElement.remove();
   const { pathname } = new URL(link.href);
   const [product] = await lookupProducts([pathname]);
 
@@ -369,20 +370,14 @@ async function styleRowAsSlide(content, ph) {
     body.prepend(title);
   }
 
-  // authored content
-  const ps = body.querySelectorAll('p');
-  ps.forEach((p) => {
-    const a = p.querySelector('a[href]');
-    if (a) p.remove();
-  });
-
   // color options
   const colors = createProductColors(product);
   if (colors && colors.children.length > 0) {
     const colorOptions = document.createElement('p');
     colorOptions.className = 'eyebrow';
     colorOptions.textContent = ph.colorOptions || 'Color options';
-    body.append(colorOptions, colors);
+    body.insertBefore(colorOptions, title.nextSibling);
+    body.insertBefore(colors, colorOptions.nextSibling);
   }
 
   // starting at price
@@ -407,7 +402,7 @@ async function styleRowAsSlide(content, ph) {
 
   // "Shop Now" button
   const shopNow = createProductButton(product, ph, 'Shop Now');
-  body.appendChild(shopNow);
+  body.append(shopNow);
 }
 
 /**
@@ -421,7 +416,9 @@ async function buildProductCarousel(block, ph) {
   const rows = [...block.children];
   await Promise.all(rows.map((row) => styleRowAsSlide(row, ph)));
 
-  const elems = [...block.children].map((c) => [...c.children]);
+  const elems = [...block.children].map((row) => (
+    [...row.children].map((cell) => ({ elems: [...cell.children] }))
+  ));
   const carousel = buildBlock('carousel', elems);
   carousel.classList.add(...block.classList);
   block.replaceWith(carousel);
