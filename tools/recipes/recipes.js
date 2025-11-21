@@ -505,7 +505,7 @@ export function displayResults(data, rawXml) {
           </div>
         ` : ''}
         <div class="recipe-actions">
-          <a href="?user=${encodeURIComponent(params.user)}&pw=${encodeURIComponent(params.pw)}&recipe=${encodeURIComponent(number)}&status=${encodeURIComponent(status)}&dateCreated=${encodeURIComponent(dateCreated)}&dateUpdated=${encodeURIComponent(dateUpdated)}" class="btn-view-details">View Details</a>
+          <a href="?user=${encodeURIComponent(params.user)}&pw=${encodeURIComponent(params.pw)}&date=${encodeURIComponent(params.date)}&recipe=${encodeURIComponent(number)}&status=${encodeURIComponent(status)}&dateCreated=${encodeURIComponent(dateCreated)}&dateUpdated=${encodeURIComponent(dateUpdated)}" class="btn-view-details">View Details</a>
         </div>
       `;
 
