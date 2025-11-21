@@ -611,7 +611,9 @@ export async function init() {
   const backBtn = document.getElementById('backToList');
   if (backBtn) {
     backBtn.addEventListener('click', () => {
-      window.location.href = `?user=${encodeURIComponent(params.user)}&pw=${encodeURIComponent(params.pw)}`;
+      const url = `?user=${encodeURIComponent(params.user)}&pw=${encodeURIComponent(params.pw)}`;
+      const dateParam = params.date ? `&date=${encodeURIComponent(params.date)}` : '';
+      window.location.href = url + dateParam;
     });
   }
 
