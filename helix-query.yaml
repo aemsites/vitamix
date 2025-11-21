@@ -8,3 +8,27 @@ indices:
         select: head > meta[property="og:title"]
         value: |
           attribute(el, 'content')
+      image:
+        select: head > meta[property="og:image"]
+        value: |
+          attribute(el, 'content')
+      total-time:
+        select: head > meta[name="total-time"]
+        value: |
+          attribute(el, 'content')
+      yield:
+        select: head > meta[name="yield"]
+        value: |
+          attribute(el, 'content')
+      difficulty:
+        select: head > meta[name="difficulty"]
+        value: |
+          attribute(el, 'content')
+      compatible-containers:
+        select: head > meta[name="compatible-containers"]
+        value: |
+          attribute(el, 'content')
+      dietary-interests:
+        select: head > meta[name="dietary-interests"]
+        value: |
+          attribute(el, 'content')
