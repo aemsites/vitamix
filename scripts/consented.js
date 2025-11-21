@@ -103,23 +103,6 @@ r.parentNode.insertBefore(t,r)}}
 pintrk('load', '2621075961855'); pintrk('page');
 // End of Pinterest Tag
 
-/* eslint-enable */
-
-// LinkedIn Insight Tag
-try {
-  const lpids = '_linkedin_data_partner_ids';
-  window[lpids] = window[lpids] || [];
-  window[lpids].push('2976369');
-  loadScript('https://snap.licdn.com/li.lms-analytics/insight.min.js');
-} catch (error) {
-  /* eslint-disable-next-line no-console */
-  console.error('LinkedIn Insight Tag failed to load', error);
-}
-
-// End of LinkedIn Insight Tag
-
-/* eslint-disable */
-
 // Big Happy Tag add 11-17-25 end 12-28-25
 try {
   const adentifiAccountId = 26653;
