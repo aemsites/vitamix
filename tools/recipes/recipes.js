@@ -344,6 +344,9 @@ export async function displayRecipeDetails(recipeNumber) {
     ` : '';
 
     // Extract Directions/Procedure Steps
+    const procedureElement = xmlDoc.querySelector('Procedure');
+    const procedureNotes = procedureElement?.querySelector('Notes')?.textContent.trim() || '';
+
     const directions = [];
     const stepElements = xmlDoc.querySelectorAll('Procedure > Step');
     Array.from(stepElements).forEach((step) => {
@@ -358,6 +361,12 @@ export async function displayRecipeDetails(recipeNumber) {
       <ol class="directions-list">
         ${directions.map((dir) => `<li>${dir}</li>`).join('')}
       </ol>
+    ` : '';
+
+    // Create Notes section if procedure notes exist
+    const notesHtml = procedureNotes ? `
+      <h2>Notes</h2>
+      <p>${procedureNotes}</p>
     ` : '';
 
     // Extract Nutrition Information
@@ -429,6 +438,7 @@ export async function displayRecipeDetails(recipeNumber) {
         ${recipeDescription ? `<p>${recipeDescription}</p>` : ''}
         ${ingredientsHtml}
         ${directionsHtml}
+        ${notesHtml}
         ${nutritionHtml}
         ${metadataRows ? `
           <table>
