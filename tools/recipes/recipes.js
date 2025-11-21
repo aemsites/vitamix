@@ -9,6 +9,9 @@ export function getQueryParams() {
     pw: params.get('pw') || '',
     date: params.get('date') || '',
     recipe: params.get('recipe') || '',
+    status: params.get('status') || '',
+    dateCreated: params.get('dateCreated') || '',
+    dateUpdated: params.get('dateUpdated') || '',
   };
 }
 
@@ -143,6 +146,44 @@ export async function displayRecipeDetails(recipeNumber) {
     const recipeName = xmlDoc.querySelector('RecipeName, Name, recipeName, name')?.textContent.trim() || 'Recipe Details';
     const recipeDescription = xmlDoc.querySelector('RecipeDescription, Description, recipeDescription, description')?.textContent.trim() || '';
 
+    // Fetch recipe image from Vitamix website
+    let recipeImageSrc = '';
+    try {
+      // Convert recipe name to kebab-case
+      const kebabName = recipeName
+        .toLowerCase()
+        .replace(/[^\w\s-]/g, '') // Remove special characters
+        .replace(/\s+/g, '-') // Replace spaces with hyphens
+        .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
+        .trim();
+
+      // Fetch the recipe page through CORS proxy
+      const recipePageUrl = `https://www.vitamix.com/us/en_us/recipes/${kebabName}`;
+      const corsProxy = 'https://little-forest-58aa.david8603.workers.dev/?url=';
+      const pageResponse = await fetch(corsProxy + encodeURIComponent(recipePageUrl));
+
+      if (pageResponse.ok) {
+        const htmlText = await pageResponse.text();
+        const htmlParser = new DOMParser();
+        const htmlDoc = htmlParser.parseFromString(htmlText, 'text/html');
+
+        // Find the image with the specific class
+        const imageElement = htmlDoc.querySelector('.ognm-header-recipe__image-carousel__img');
+        if (imageElement) {
+          let src = imageElement.getAttribute('src') || '';
+          // Prefix with origin if it's a relative path
+          if (src && !src.startsWith('http')) {
+            const slash = src.startsWith('/') ? '' : '/';
+            src = `https://www.vitamix.com${slash}${src}`;
+          }
+          recipeImageSrc = src;
+        }
+      }
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Error fetching recipe image:', error);
+    }
+
     // Extract metadata
     // Extract Total Time from Time element with Name "Total Time"
     let totalTime = '';
@@ -180,19 +221,29 @@ export async function displayRecipeDetails(recipeNumber) {
 
     const difficulty = xmlDoc.querySelector('Difficulty, difficulty, Level, level')?.textContent.trim() || '';
 
-    // Extract Dietary Interests from Keywords section
+    // Extract Keywords from Keywords section
     const dietaryInterests = [];
+    const courses = [];
+    const recipeTypes = [];
     const keywords = xmlDoc.querySelectorAll('Key');
     Array.from(keywords).forEach((key) => {
       const nameParent = key.querySelector('NameParent');
-      if (nameParent && nameParent.textContent.trim() === 'Dietary Interest') {
-        const name = key.querySelector('Name');
-        if (name) {
-          dietaryInterests.push(name.textContent.trim());
+      const name = key.querySelector('Name');
+      if (nameParent && name) {
+        const parentText = nameParent.textContent.trim();
+        const nameText = name.textContent.trim();
+        if (parentText === 'Dietary Interest') {
+          dietaryInterests.push(nameText);
+        } else if (parentText === 'Course') {
+          courses.push(nameText);
+        } else if (parentText === 'Recipe type') {
+          recipeTypes.push(nameText);
         }
       }
     });
     const dietaryInterestsStr = dietaryInterests.join(', ');
+    const coursesStr = courses.join(', ');
+    const recipeTypesStr = recipeTypes.join(', ');
 
     // Extract Compatible Containers from Brands section
     const compatibleContainers = [];
@@ -205,12 +256,34 @@ export async function displayRecipeDetails(recipeNumber) {
     });
     const compatibleContainersStr = compatibleContainers.join(', ');
 
+    // Extract Allergens
+    const allergens = [];
+    const allergenElements = xmlDoc.querySelectorAll('Allergens > Allergen, allergens > allergen');
+    Array.from(allergenElements).forEach((allergen) => {
+      const name = allergen.querySelector('Name, name');
+      if (name) {
+        allergens.push(name.textContent.trim());
+      }
+    });
+    const allergensStr = allergens.join(', ');
+
+    // Get status and dates from query params
+    const recipeStatus = params.status || '';
+    const recipeCreatedDate = params.dateCreated ? new Date(params.dateCreated).toISOString() : '';
+    const recipeUpdatedDate = params.dateUpdated ? new Date(params.dateUpdated).toISOString() : '';
+
     // Build metadata table rows
     const metadataRows = [
       { name: 'Total Time', value: totalTime },
       { name: 'Yield', value: recipeYield },
       { name: 'Difficulty', value: difficulty },
       { name: 'Compatible Containers', value: compatibleContainersStr },
+      { name: 'Course', value: coursesStr },
+      { name: 'Recipe Type', value: recipeTypesStr },
+      { name: 'Allergens', value: allergensStr },
+      { name: 'Status', value: recipeStatus },
+      { name: 'Date Created', value: recipeCreatedDate },
+      { name: 'Date Updated', value: recipeUpdatedDate },
       { name: 'Dietary Interests', value: dietaryInterestsStr },
     ].filter((row) => row.value).map((row) => `
       <tr>
@@ -219,18 +292,136 @@ export async function displayRecipeDetails(recipeNumber) {
       </tr>
     `).join('');
 
+    // Extract Ingredients
+    const ingredients = [];
+    const ingredientElements = xmlDoc.querySelectorAll('Ingredients > Ingredient');
+    Array.from(ingredientElements).forEach((ingredient) => {
+      const quantityImperial = ingredient.querySelector('Quantity_Imperial')?.textContent.trim() || '';
+      const unitImperial = ingredient.querySelector('Unit_Imperial')?.textContent.trim() || '';
+      const quantityMetric = ingredient.querySelector('Quantity_Metric')?.textContent.trim() || '';
+      const unitMetric = ingredient.querySelector('Unit_Metric')?.textContent.trim() || '';
+      const name = ingredient.querySelector('Name')?.textContent.trim() || '';
+      const preparation = ingredient.querySelector('Preparation')?.textContent.trim() || '';
+
+      // Format: Quantity_Imperial Unit_Imperial (Quantity_Metric Unit_Metric) Name, Preparation
+      let ingredientStr = '';
+      if (quantityImperial && unitImperial) {
+        ingredientStr += `${quantityImperial} ${unitImperial}`;
+      }
+      if (quantityMetric && unitMetric) {
+        ingredientStr += ` (${quantityMetric} ${unitMetric})`;
+      }
+      if (name) {
+        ingredientStr += ` ${name}`;
+      }
+      if (preparation) {
+        ingredientStr += `, ${preparation}`;
+      }
+
+      if (ingredientStr.trim()) {
+        ingredients.push(ingredientStr.trim());
+      }
+    });
+
+    const ingredientsHtml = ingredients.length > 0 ? `
+      <h2>Ingredients</h2>
+      <ul class="ingredients-list">
+        ${ingredients.map((ing) => `<li>${ing}</li>`).join('')}
+      </ul>
+    ` : '';
+
+    // Extract Directions/Procedure Steps
+    const directions = [];
+    const stepElements = xmlDoc.querySelectorAll('Procedure > Step');
+    Array.from(stepElements).forEach((step) => {
+      const note = step.querySelector('Note')?.textContent.trim() || '';
+      if (note) {
+        directions.push(note);
+      }
+    });
+
+    const directionsHtml = directions.length > 0 ? `
+      <h2>Directions</h2>
+      <ol class="directions-list">
+        ${directions.map((dir) => `<li>${dir}</li>`).join('')}
+      </ol>
+    ` : '';
+
+    // Extract Nutrition Information
+    let nutritionHtml = '';
+    const nutritionElement = xmlDoc.querySelector('Nutrition');
+    if (nutritionElement) {
+      const portionSize = nutritionElement.querySelector('PortionSize')?.textContent.trim() || '';
+      const nutrients = nutritionElement.querySelectorAll('Nutrient');
+
+      // Helper function to find nutrient by key
+      const findNutrient = (key) => {
+        const nutrientEl = Array.from(nutrients).find((n) => {
+          const nutKey = n.querySelector('NutKey')?.textContent.trim();
+          const displayName = n.querySelector('DisplayName')?.textContent.trim();
+          return nutKey === key || displayName === key;
+        });
+        if (nutrientEl) {
+          const valueImposed = nutrientEl.querySelector('ValueImposed')?.textContent.trim() || '0';
+          const unit = nutrientEl.querySelector('Unit')?.textContent.trim() || '';
+          return { value: Math.round(parseFloat(valueImposed)), unit };
+        }
+        return null;
+      };
+
+      const calories = findNutrient('Calories');
+      const totalFat = findNutrient('Total Fat');
+      const totalCarbs = findNutrient('Carbohydrates');
+      const dietaryFiber = findNutrient('Dietary Fiber');
+      const sugars = findNutrient('Sugar');
+      const protein = findNutrient('Protein');
+      const cholesterol = findNutrient('Cholesterol');
+      const sodium = findNutrient('Sodium');
+
+      if (portionSize) {
+        const nutritionItems = [];
+        if (calories) nutritionItems.push(`<li>Calories: ${calories.value}</li>`);
+        if (totalFat) nutritionItems.push(`<li>Total Fat: ${totalFat.value}${totalFat.unit}</li>`);
+        if (totalCarbs) {
+          nutritionItems.push(`<li>Total Carbohydrate: ${totalCarbs.value}${totalCarbs.unit}`);
+          const subItems = [];
+          if (dietaryFiber) subItems.push(`<li>Dietary Fiber: ${dietaryFiber.value}${dietaryFiber.unit}</li>`);
+          if (sugars) subItems.push(`<li>Sugars: ${sugars.value}${sugars.unit}</li>`);
+          if (subItems.length > 0) {
+            nutritionItems.push(`<ul>${subItems.join('')}</ul>`);
+          }
+          nutritionItems.push('</li>');
+        }
+        if (protein) nutritionItems.push(`<li>Protein: ${protein.value}${protein.unit}</li>`);
+        if (cholesterol) nutritionItems.push(`<li>Cholesterol: ${cholesterol.value}${cholesterol.unit}</li>`);
+        if (sodium) nutritionItems.push(`<li>Sodium: ${sodium.value}${sodium.unit}</li>`);
+
+        if (nutritionItems.length > 0) {
+          nutritionHtml = `
+            <h2>Nutrition</h2>
+            <p>${portionSize}</p>
+            <ul>
+              ${nutritionItems.join('')}
+            </ul>
+          `;
+        }
+      }
+    }
+
     // Display recipe info and raw XML in textarea
     detailContent.innerHTML = `
       <div class="recipe">
+        ${recipeImageSrc ? `<img src="${recipeImageSrc}" alt="${recipeName}" />` : ''}
         <h1>${recipeName}</h1>
         ${recipeDescription ? `<p>${recipeDescription}</p>` : ''}
+        ${ingredientsHtml}
+        ${directionsHtml}
+        ${nutritionHtml}
         ${metadataRows ? `
-          <h2>Metadata</h2>
-          <table class="metadata-table">
+          <table>
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Value</th>
+                <th colspan="2">Metadata</th>
               </tr>
             </thead>
             <tbody>
@@ -297,8 +488,8 @@ export function displayResults(data, rawXml) {
         <div class="recipe-meta">
           <span><strong>Code:</strong> ${code}</span>
           <span><strong>Number:</strong> ${number}</span>
-          <span><strong>Created:</strong> ${new Date(dateCreated).toLocaleDateString()}</span>
-          <span><strong>Updated:</strong> ${new Date(dateUpdated).toLocaleDateString()}</span>
+          <span><strong>Created:</strong> ${new Date(dateCreated).toISOString()}</span>
+          <span><strong>Updated:</strong> ${new Date(dateUpdated).toISOString()}</span>
         </div>
         ${brands.length > 0 ? `
           <div class="recipe-brands">
@@ -314,7 +505,7 @@ export function displayResults(data, rawXml) {
           </div>
         ` : ''}
         <div class="recipe-actions">
-          <a href="?user=${encodeURIComponent(params.user)}&pw=${encodeURIComponent(params.pw)}&recipe=${encodeURIComponent(number)}" class="btn-view-details">View Details</a>
+          <a href="?user=${encodeURIComponent(params.user)}&pw=${encodeURIComponent(params.pw)}&recipe=${encodeURIComponent(number)}&status=${encodeURIComponent(status)}&dateCreated=${encodeURIComponent(dateCreated)}&dateUpdated=${encodeURIComponent(dateUpdated)}" class="btn-view-details">View Details</a>
         </div>
       `;
 
