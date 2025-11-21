@@ -146,19 +146,32 @@ export async function displayRecipeDetails(recipeNumber) {
     const recipeName = xmlDoc.querySelector('RecipeName, Name, recipeName, name')?.textContent.trim() || 'Recipe Details';
     const recipeDescription = xmlDoc.querySelector('RecipeDescription, Description, recipeDescription, description')?.textContent.trim() || '';
 
+    // Convert recipe name to kebab-case
+    const kebabName = recipeName
+      .toLowerCase()
+      .replace(/[^\w\s-]/g, '') // Remove special characters
+      .replace(/\s+/g, '-') // Replace spaces with hyphens
+      .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
+      .trim();
+
+    // Add "View on Vitamix.com" button to detail header
+    const detailHeader = detailView.querySelector('.detail-header');
+    let viewOnVitamixBtn = detailHeader.querySelector('.btn-view-on-vitamix');
+    if (!viewOnVitamixBtn) {
+      viewOnVitamixBtn = document.createElement('a');
+      viewOnVitamixBtn.className = 'btn-view-on-vitamix';
+      viewOnVitamixBtn.target = '_blank';
+      viewOnVitamixBtn.rel = 'noopener noreferrer';
+      viewOnVitamixBtn.textContent = 'View on Vitamix.com';
+      detailHeader.appendChild(viewOnVitamixBtn);
+    }
+    const recipePageUrl = `https://www.vitamix.com/us/en_us/recipes/${kebabName}`;
+    viewOnVitamixBtn.href = recipePageUrl;
+
     // Fetch recipe image from Vitamix website
     let recipeImageSrc = '';
     try {
-      // Convert recipe name to kebab-case
-      const kebabName = recipeName
-        .toLowerCase()
-        .replace(/[^\w\s-]/g, '') // Remove special characters
-        .replace(/\s+/g, '-') // Replace spaces with hyphens
-        .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
-        .trim();
-
       // Fetch the recipe page through CORS proxy
-      const recipePageUrl = `https://www.vitamix.com/us/en_us/recipes/${kebabName}`;
       const corsProxy = 'https://little-forest-58aa.david8603.workers.dev/?url=';
       const pageResponse = await fetch(corsProxy + encodeURIComponent(recipePageUrl));
 

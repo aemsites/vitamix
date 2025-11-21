@@ -350,6 +350,22 @@ pre {
   background-color: #5a6268;
 }
 
+.btn-view-on-vitamix {
+  background-color: #007bff;
+  color: white;
+  padding: 10px 20px;
+  font-size: 16px;
+  text-decoration: none;
+  border-radius: 4px;
+  display: inline-block;
+  transition: background-color 0.2s;
+  margin-left: auto;
+}
+
+.btn-view-on-vitamix:hover {
+  background-color: #0056b3;
+}
+
 .detail-content {
   padding: 0;
 }
