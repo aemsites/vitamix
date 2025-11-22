@@ -28,6 +28,26 @@ indices:
         select: head > meta[name="compatible-containers"]
         value: |
           attribute(el, 'content')
+      course:
+        select: head > meta[name="course"]
+        value: |
+          attribute(el, 'content')
+      recipe-type:
+        select: head > meta[name="recipe-type"]
+        value: |
+          attribute(el, 'content')
+      status:
+        select: head > meta[name="status"]
+        value: |
+          attribute(el, 'content')
+      date-created:
+        select: head > meta[name="date-created"]
+        value: |
+          attribute(el, 'content')
+      date-updated:
+        select: head > meta[name="date-updated"]
+        value: |
+          attribute(el, 'content')
       dietary-interests:
         select: head > meta[name="dietary-interests"]
         value: |
