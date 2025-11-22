@@ -57,7 +57,18 @@
       <div class="results" id="results">
         <h2>Results</h2>
         <div class="recipe-count" id="recipeCount"></div>
+        <div class="bulk-actions">
+          <label class="select-all-container">
+            <input type="checkbox" id="selectAll" />
+            <span>Select All</span>
+          </label>
+          <button id="bulkSyncBtn" class="btn-bulk-sync" disabled>Sync Selected with DA</button>
+        </div>
         <div id="recipeList" class="recipe-list"></div>
+        <div id="syncProgress" class="sync-progress" style="display: none;">
+          <h3>Sync Progress</h3>
+          <div id="syncLog" class="sync-log"></div>
+        </div>
       </div>
 
       <!-- Recipe Detail View -->

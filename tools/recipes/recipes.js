@@ -113,6 +113,242 @@ export function showError(message) {
   }, 5000);
 }
 
+// Add log entry to sync progress
+export function addLogEntry(message, type = 'info') {
+  const syncLog = document.getElementById('syncLog');
+  const entry = document.createElement('div');
+  entry.className = `log-entry ${type}`;
+  const timestamp = new Date().toLocaleTimeString();
+  entry.textContent = `[${timestamp}] ${message}`;
+  syncLog.appendChild(entry);
+  // Auto-scroll to bottom
+  syncLog.scrollTop = syncLog.scrollHeight;
+}
+
+// Update bulk sync button state
+export function updateBulkSyncButton() {
+  const checkboxes = document.querySelectorAll('.recipe-checkbox:checked');
+  const bulkSyncBtn = document.getElementById('bulkSyncBtn');
+  bulkSyncBtn.disabled = checkboxes.length === 0;
+  bulkSyncBtn.textContent = checkboxes.length > 0
+    ? `Sync Selected (${checkboxes.length})`
+    : 'Sync Selected with DA';
+}
+
+// Fetch recipe details and build HTML for sync
+export async function fetchRecipeDetailsForSync(recipeNumber, recipeName, userId, password) {
+  addLogEntry(`Fetching details for "${recipeName}" (${recipeNumber})...`, 'info');
+
+  const xmlResponse = await fetchRecipeDetails(userId, password, recipeNumber);
+  const parser = new DOMParser();
+  const xmlDoc = parser.parseFromString(xmlResponse, 'text/xml');
+
+  // Convert recipe name to kebab-case
+  const kebabName = recipeName
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .trim();
+
+  const recipePageUrl = `https://www.vitamix.com/us/en_us/recipes/${kebabName}`;
+
+  // Fetch recipe image from Vitamix website
+  let recipeImageSrc = '';
+  try {
+    addLogEntry(`  Fetching image from ${recipePageUrl}`, 'info');
+    const corsProxy = 'https://little-forest-58aa.david8603.workers.dev/?url=';
+    const pageResponse = await fetch(corsProxy + encodeURIComponent(recipePageUrl));
+
+    if (pageResponse.ok) {
+      const htmlText = await pageResponse.text();
+      const htmlParser = new DOMParser();
+      const htmlDoc = htmlParser.parseFromString(htmlText, 'text/html');
+
+      const imageElement = htmlDoc.querySelector('.ognm-header-recipe__image-carousel__img');
+      if (imageElement) {
+        let src = imageElement.getAttribute('src') || '';
+        if (src && !src.startsWith('http')) {
+          const slash = src.startsWith('/') ? '' : '/';
+          src = `https://www.vitamix.com${slash}${src}`;
+        }
+        recipeImageSrc = src;
+        addLogEntry('  ✓ Image found', 'success');
+      } else {
+        addLogEntry('  ⚠ No image found', 'warning');
+      }
+    }
+  } catch (error) {
+    addLogEntry(`  ⚠ Failed to fetch image: ${error.message}`, 'warning');
+  }
+
+  const recipeDescription = xmlDoc.querySelector('RecipeDescription, Description, recipeDescription, description')?.textContent.trim() || '';
+
+  // Extract ingredients (same logic as displayRecipeDetails)
+  const ingredients = [];
+  const ingredientElements = xmlDoc.querySelectorAll('Ingredient');
+  ingredientElements.forEach((ing) => {
+    const quantity = ing.querySelector('Quantity')?.textContent.trim() || '';
+    const unit = ing.querySelector('Unit')?.textContent.trim() || '';
+    const name = ing.querySelector('IngredientName')?.textContent.trim() || '';
+    const prep = ing.querySelector('Preparation')?.textContent.trim() || '';
+
+    let ingredientText = '';
+    if (quantity) ingredientText += quantity;
+    if (unit) ingredientText += ` ${unit}`;
+    if (name) ingredientText += ` ${name}`;
+    if (prep) ingredientText += `, ${prep}`;
+
+    if (ingredientText.trim()) {
+      ingredients.push(ingredientText.trim());
+    }
+  });
+
+  const ingredientsHtml = ingredients.length > 0 ? `
+    <h2>Ingredients</h2>
+    <ul class="ingredients-list">
+      ${ingredients.map((ing) => `<li>${ing}</li>`).join('')}
+    </ul>
+  ` : '';
+
+  // Extract directions
+  const directions = [];
+  const steps = xmlDoc.querySelectorAll('Step');
+  steps.forEach((step) => {
+    const note = step.querySelector('Note')?.textContent.trim() || '';
+    if (note) {
+      directions.push(note);
+    }
+  });
+
+  const directionsHtml = directions.length > 0 ? `
+    <h2>Directions</h2>
+    <ol class="directions-list">
+      ${directions.map((dir) => `<li>${dir}</li>`).join('')}
+    </ol>
+  ` : '';
+
+  // Build the recipe HTML
+  const recipeHtml = `
+    ${recipeImageSrc ? `<img src="${recipeImageSrc}" alt="${recipeName}" />` : ''}
+    <h1>${recipeName}</h1>
+    ${recipeDescription ? `<p>${recipeDescription}</p>` : ''}
+    ${ingredientsHtml}
+    ${directionsHtml}
+  `;
+
+  const htmlContent = `<html>
+<body>
+<main>
+${recipeHtml}
+</main>
+</body>
+</html>`;
+
+  return { htmlContent, kebabName };
+}
+
+// Bulk sync selected recipes with DA
+export async function bulkSyncWithDA() {
+  const checkboxes = document.querySelectorAll('.recipe-checkbox:checked');
+  if (checkboxes.length === 0) return;
+
+  const params = getQueryParams();
+  if (!params.user || !params.pw) {
+    showError('User credentials required for sync');
+    return;
+  }
+
+  // Check for DA token upfront
+  const token = window.sessionStorage.getItem('da-token');
+  if (!token) {
+    showError('DA token not found. Please wait for the page to fully load and try again.');
+    return;
+  }
+
+  const syncProgress = document.getElementById('syncProgress');
+  const syncLog = document.getElementById('syncLog');
+  const bulkSyncBtn = document.getElementById('bulkSyncBtn');
+
+  // Show progress and clear previous log
+  syncProgress.style.display = 'block';
+  syncLog.innerHTML = '';
+  bulkSyncBtn.disabled = true;
+  bulkSyncBtn.textContent = 'Syncing...';
+
+  addLogEntry(`Starting bulk sync of ${checkboxes.length} recipe(s)`, 'info');
+  addLogEntry('─────────────────────────────────────', 'info');
+
+  let successCount = 0;
+  let failCount = 0;
+
+  // eslint-disable-next-line no-plusplus
+  for (let i = 0; i < checkboxes.length; i++) {
+    const checkbox = checkboxes[i];
+    const { recipeNumber, recipeName } = checkbox.dataset;
+
+    addLogEntry(`\n[${i + 1}/${checkboxes.length}] Processing: ${recipeName}`, 'info');
+
+    try {
+      // Fetch details and build HTML
+      // eslint-disable-next-line no-await-in-loop
+      const { htmlContent, kebabName } = await fetchRecipeDetailsForSync(
+        recipeNumber,
+        recipeName,
+        params.user,
+        params.pw,
+      );
+
+      // Sync with DA
+      const lowercaseNumber = recipeNumber.toLowerCase();
+      const filename = `${kebabName}-${lowercaseNumber}.html`;
+
+      addLogEntry(`  Syncing to DA: ${filename}`, 'info');
+
+      const blob = new Blob([htmlContent], { type: 'text/html' });
+      const body = new FormData();
+      body.append('data', blob);
+
+      const opts = {
+        headers: { Authorization: `Bearer ${token}` },
+        method: 'POST',
+        body,
+      };
+
+      const fullpath = `https://admin.da.live/source/aemsites/vitamix/us/en_us/recipes/data/${filename}`;
+      // eslint-disable-next-line no-await-in-loop
+      const resp = await fetch(fullpath, opts);
+
+      if (!resp.ok) {
+        throw new Error(`${resp.status} ${resp.statusText}`);
+      }
+
+      addLogEntry(`  ✓ Successfully synced: ${filename}`, 'success');
+      // eslint-disable-next-line no-plusplus
+      successCount++;
+
+      // Uncheck the checkbox
+      checkbox.checked = false;
+    } catch (error) {
+      addLogEntry(`  ✗ Failed: ${error.message}`, 'error');
+      // eslint-disable-next-line no-plusplus
+      failCount++;
+    }
+
+    addLogEntry('─────────────────────────────────────', 'info');
+  }
+
+  // Final summary
+  addLogEntry('\n✓ Sync complete!', 'success');
+  addLogEntry(`  Success: ${successCount}`, successCount > 0 ? 'success' : 'info');
+  if (failCount > 0) {
+    addLogEntry(`  Failed: ${failCount}`, 'error');
+  }
+
+  bulkSyncBtn.disabled = false;
+  updateBulkSyncButton();
+}
+
 // Sync recipe with DA
 export async function syncWithDA(recipeName, recipeNumber) {
   const kebabName = recipeName
@@ -604,36 +840,44 @@ export function displayResults(data, rawXml) {
       const statusClass = status.toLowerCase();
 
       recipeItem.innerHTML = `
-        <div class="recipe-header">
-          <h3 class="recipe-title">${name}</h3>
-          <span class="recipe-status ${statusClass}">${status}</span>
-        </div>
-        <div class="recipe-meta">
-          <span><strong>Code:</strong> ${code}</span>
-          <span><strong>Number:</strong> ${number}</span>
-          <span><strong>Created:</strong> ${new Date(dateCreated).toISOString()}</span>
-          <span><strong>Updated:</strong> ${new Date(dateUpdated).toISOString()}</span>
-        </div>
-        ${brands.length > 0 ? `
-          <div class="recipe-brands">
-            <div class="brand-list">
-              ${Array.from(brands).map((brand) => {
+        <input type="checkbox" class="recipe-checkbox" data-recipe-number="${number}" data-recipe-name="${name.replace(/"/g, '&quot;')}" />
+        <div class="recipe-content">
+          <div class="recipe-header">
+            <h3 class="recipe-title">${name}</h3>
+            <span class="recipe-status ${statusClass}">${status}</span>
+          </div>
+          <div class="recipe-meta">
+            <span><strong>Code:</strong> ${code}</span>
+            <span><strong>Number:</strong> ${number}</span>
+            <span><strong>Created:</strong> ${new Date(dateCreated).toISOString()}</span>
+            <span><strong>Updated:</strong> ${new Date(dateUpdated).toISOString()}</span>
+          </div>
+          ${brands.length > 0 ? `
+            <div class="recipe-brands">
+              <div class="brand-list">
+                ${Array.from(brands).map((brand) => {
     const brandName = brand.querySelector('BrandName')?.textContent || 'Unknown';
     const classification = brand.querySelector('Classification')?.textContent || '';
     const isPrimary = classification.toLowerCase() === 'primary';
     return `<span class="brand-tag ${isPrimary ? 'primary' : ''}">${brandName}</span>`;
   }).join('')}
+              </div>
             </div>
-          </div>
-        ` : ''}
+          ` : ''}
+        </div>
       `;
 
-      // Make the whole item clickable
-      recipeItem.style.cursor = 'pointer';
+      // Make the content clickable (not the checkbox)
+      const recipeContent = recipeItem.querySelector('.recipe-content');
+      recipeContent.style.cursor = 'pointer';
       const detailUrl = `?user=${encodeURIComponent(params.user)}&pw=${encodeURIComponent(params.pw)}&date=${encodeURIComponent(params.date)}&recipe=${encodeURIComponent(number)}&status=${encodeURIComponent(status)}&dateCreated=${encodeURIComponent(dateCreated)}&dateUpdated=${encodeURIComponent(dateUpdated)}`;
-      recipeItem.addEventListener('click', () => {
+      recipeContent.addEventListener('click', () => {
         window.location.href = detailUrl;
       });
+
+      // Handle checkbox change
+      const checkbox = recipeItem.querySelector('.recipe-checkbox');
+      checkbox.addEventListener('change', updateBulkSyncButton);
 
       recipeList.appendChild(recipeItem);
     });
@@ -683,6 +927,24 @@ export async function makeApiCallFromParams() {
 // Initialize on page load
 export async function init() {
   const params = getQueryParams();
+
+  // Add select all checkbox listener
+  const selectAllCheckbox = document.getElementById('selectAll');
+  if (selectAllCheckbox) {
+    selectAllCheckbox.addEventListener('change', (e) => {
+      const checkboxes = document.querySelectorAll('.recipe-checkbox');
+      checkboxes.forEach((cb) => {
+        cb.checked = e.target.checked;
+      });
+      updateBulkSyncButton();
+    });
+  }
+
+  // Add bulk sync button listener
+  const bulkSyncBtn = document.getElementById('bulkSyncBtn');
+  if (bulkSyncBtn) {
+    bulkSyncBtn.addEventListener('click', bulkSyncWithDA);
+  }
 
   // Add back button listener
   const backBtn = document.getElementById('backToList');
