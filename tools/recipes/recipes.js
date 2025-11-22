@@ -142,8 +142,10 @@ ${recipeElement.innerHTML}
 
   // Get DA token
   // eslint-disable-next-line no-undef
-  const { token } = await DA_SDK;
-
+  const token = window.sessionStorage.getItem('da-token');
+  if (!token) {
+    throw new Error('DA token not found');
+  }
   // Create blob and form data
   const blob = new Blob([htmlContent], { type: 'text/html' });
   const body = new FormData();
@@ -750,6 +752,7 @@ export async function init() {
 
   // eslint-disable-next-line no-unused-vars, no-undef
   const { context, token, actions } = await DA_SDK;
+  window.sessionStorage.setItem('da-token', token);
   // eslint-disable-next-line no-console
   console.log('DA SDK loaded', context, token, actions);
 }
