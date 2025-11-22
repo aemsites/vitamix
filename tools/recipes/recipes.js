@@ -136,15 +136,27 @@ export function updateBulkSyncButton() {
 }
 
 // Fetch recipe details and build HTML for sync
-export async function fetchRecipeDetailsForSync(recipeNumber, recipeName, userId, password) {
+export async function fetchRecipeDetailsForSync(
+  recipeNumber,
+  recipeName,
+  userId,
+  password,
+  recipeStatus,
+  dateCreated,
+  dateUpdated,
+) {
   addLogEntry(`Fetching details for "${recipeName}" (${recipeNumber})...`, 'info');
 
   const xmlResponse = await fetchRecipeDetails(userId, password, recipeNumber);
   const parser = new DOMParser();
   const xmlDoc = parser.parseFromString(xmlResponse, 'text/xml');
 
+  // Get recipe name and description from XML
+  const xmlRecipeName = xmlDoc.querySelector('RecipeName, Name, recipeName, name')?.textContent.trim() || recipeName;
+  const recipeDescription = xmlDoc.querySelector('RecipeDescription, Description, recipeDescription, description')?.textContent.trim() || '';
+
   // Convert recipe name to kebab-case
-  const kebabName = recipeName
+  const kebabName = xmlRecipeName
     .toLowerCase()
     .replace(/[^\w\s-]/g, '')
     .replace(/\s+/g, '-')
@@ -182,25 +194,123 @@ export async function fetchRecipeDetailsForSync(recipeNumber, recipeName, userId
     addLogEntry(`  ⚠ Failed to fetch image: ${error.message}`, 'warning');
   }
 
-  const recipeDescription = xmlDoc.querySelector('RecipeDescription, Description, recipeDescription, description')?.textContent.trim() || '';
+  // Extract metadata
+  let totalTime = '';
+  const timeElements = xmlDoc.querySelectorAll('Time');
+  Array.from(timeElements).forEach((timeElement) => {
+    const nameElement = timeElement.querySelector('Name');
+    if (nameElement && nameElement.textContent.trim() === 'Total Time') {
+      const hoursElement = timeElement.querySelector('RecipeTimeHH');
+      const minutesElement = timeElement.querySelector('RecipeTimeMM');
+      const secondsElement = timeElement.querySelector('RecipeTimeSS');
 
-  // Extract ingredients (same logic as displayRecipeDetails)
+      if (hoursElement || minutesElement || secondsElement) {
+        const hours = hoursElement?.textContent.trim() || '0';
+        const minutes = minutesElement?.textContent.trim() || '0';
+        const seconds = secondsElement?.textContent.trim() || '0';
+        totalTime = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+      }
+    }
+  });
+
+  const mainElement = xmlDoc.querySelector('Main');
+  let recipeYield = '';
+  if (mainElement) {
+    const yield1 = mainElement.querySelector('Yield1')?.textContent.trim() || '';
+    const yield1Unit = mainElement.querySelector('Yield1_Unit')?.textContent.trim() || '';
+    if (yield1 && yield1Unit) {
+      recipeYield = `${yield1} ${yield1Unit}`;
+    } else if (yield1) {
+      recipeYield = yield1;
+    }
+  }
+
+  const difficulty = xmlDoc.querySelector('Difficulty, difficulty, Level, level')?.textContent.trim() || '';
+
+  const dietaryInterests = [];
+  const courses = [];
+  const recipeTypes = [];
+  const keywords = xmlDoc.querySelectorAll('Key');
+  Array.from(keywords).forEach((key) => {
+    const nameParent = key.querySelector('NameParent');
+    const name = key.querySelector('Name');
+    if (nameParent && name) {
+      const parentText = nameParent.textContent.trim();
+      const nameText = name.textContent.trim();
+      if (parentText === 'Dietary Interest') {
+        dietaryInterests.push(nameText);
+      } else if (parentText === 'Course') {
+        courses.push(nameText);
+      } else if (parentText === 'Recipe type') {
+        recipeTypes.push(nameText);
+      }
+    }
+  });
+
+  const compatibleContainers = [];
+  const brands = xmlDoc.querySelectorAll('Brands > Brand');
+  Array.from(brands).forEach((brand) => {
+    const brandName = brand.querySelector('BrandName');
+    if (brandName) {
+      compatibleContainers.push(brandName.textContent.trim());
+    }
+  });
+
+  const allergens = [];
+  const allergenElements = xmlDoc.querySelectorAll('Allergens > Allergen, allergens > allergen');
+  Array.from(allergenElements).forEach((allergen) => {
+    const name = allergen.querySelector('Name, name');
+    if (name) {
+      allergens.push(name.textContent.trim());
+    }
+  });
+
+  const metadataRows = [
+    { name: 'Total Time', value: totalTime },
+    { name: 'Yield', value: recipeYield },
+    { name: 'Difficulty', value: difficulty },
+    { name: 'Compatible Containers', value: compatibleContainers.join(', ') },
+    { name: 'Course', value: courses.join(', ') },
+    { name: 'Recipe Type', value: recipeTypes.join(', ') },
+    { name: 'Allergens', value: allergens.join(', ') },
+    { name: 'Status', value: recipeStatus },
+    { name: 'Date Created', value: dateCreated ? new Date(dateCreated).toISOString() : '' },
+    { name: 'Date Updated', value: dateUpdated ? new Date(dateUpdated).toISOString() : '' },
+    { name: 'Dietary Interests', value: dietaryInterests.join(', ') },
+  ].filter((row) => row.value).map((row) => `
+      <tr>
+        <td>${row.name}</td>
+        <td>${row.value}</td>
+      </tr>
+    `).join('');
+
+  // Extract ingredients
   const ingredients = [];
-  const ingredientElements = xmlDoc.querySelectorAll('Ingredient');
-  ingredientElements.forEach((ing) => {
-    const quantity = ing.querySelector('Quantity')?.textContent.trim() || '';
-    const unit = ing.querySelector('Unit')?.textContent.trim() || '';
-    const name = ing.querySelector('IngredientName')?.textContent.trim() || '';
-    const prep = ing.querySelector('Preparation')?.textContent.trim() || '';
+  const ingredientElements = xmlDoc.querySelectorAll('Ingredients > Ingredient');
+  Array.from(ingredientElements).forEach((ingredient) => {
+    const quantityImperial = ingredient.querySelector('Quantity_Imperial')?.textContent.trim() || '';
+    const unitImperial = ingredient.querySelector('Unit_Imperial')?.textContent.trim() || '';
+    const quantityMetric = ingredient.querySelector('Quantity_Metric')?.textContent.trim() || '';
+    const unitMetric = ingredient.querySelector('Unit_Metric')?.textContent.trim() || '';
+    const name = ingredient.querySelector('Name')?.textContent.trim() || '';
+    const preparation = ingredient.querySelector('Preparation')?.textContent.trim() || '';
 
-    let ingredientText = '';
-    if (quantity) ingredientText += quantity;
-    if (unit) ingredientText += ` ${unit}`;
-    if (name) ingredientText += ` ${name}`;
-    if (prep) ingredientText += `, ${prep}`;
+    let ingredientStr = '';
+    if (quantityImperial && unitImperial) {
+      ingredientStr += `${quantityImperial} ${unitImperial}`;
+    }
+    if (quantityMetric && unitMetric) {
+      ingredientStr += ` (${quantityMetric} ${unitMetric})`;
+    }
+    if (name) {
+      ingredientStr += ` ${name}`;
+    }
+    if (preparation) {
+      ingredientStr += `, ${preparation}`;
+    }
 
-    if (ingredientText.trim()) {
-      ingredients.push(ingredientText.trim());
+    if (ingredientStr.trim()) {
+      ingredients.push(ingredientStr.trim());
     }
   });
 
@@ -211,10 +321,13 @@ export async function fetchRecipeDetailsForSync(recipeNumber, recipeName, userId
     </ul>
   ` : '';
 
-  // Extract directions
+  // Extract directions and notes
+  const procedureElement = xmlDoc.querySelector('Procedure');
+  const procedureNotes = procedureElement?.querySelector('Notes')?.textContent.trim() || '';
+
   const directions = [];
-  const steps = xmlDoc.querySelectorAll('Step');
-  steps.forEach((step) => {
+  const stepElements = xmlDoc.querySelectorAll('Procedure > Step');
+  Array.from(stepElements).forEach((step) => {
     const note = step.querySelector('Note')?.textContent.trim() || '';
     if (note) {
       directions.push(note);
@@ -228,13 +341,92 @@ export async function fetchRecipeDetailsForSync(recipeNumber, recipeName, userId
     </ol>
   ` : '';
 
-  // Build the recipe HTML
+  const notesHtml = procedureNotes ? `
+    <h2>Notes</h2>
+    <p>${procedureNotes}</p>
+  ` : '';
+
+  // Extract nutrition
+  let nutritionHtml = '';
+  const nutritionElement = xmlDoc.querySelector('Nutrition');
+  if (nutritionElement) {
+    const portionSize = nutritionElement.querySelector('PortionSize')?.textContent.trim() || '';
+    const nutrients = nutritionElement.querySelectorAll('Nutrient');
+
+    const findNutrient = (key) => {
+      const nutrientEl = Array.from(nutrients).find((n) => {
+        const nutKey = n.querySelector('NutKey')?.textContent.trim();
+        const displayName = n.querySelector('DisplayName')?.textContent.trim();
+        return nutKey === key || displayName === key;
+      });
+      if (nutrientEl) {
+        const valueImposed = nutrientEl.querySelector('ValueImposed')?.textContent.trim() || '0';
+        const unit = nutrientEl.querySelector('Unit')?.textContent.trim() || '';
+        return { value: Math.round(parseFloat(valueImposed)), unit };
+      }
+      return null;
+    };
+
+    const calories = findNutrient('Calories');
+    const totalFat = findNutrient('Total Fat');
+    const totalCarbs = findNutrient('Carbohydrates');
+    const dietaryFiber = findNutrient('Dietary Fiber');
+    const sugars = findNutrient('Sugar');
+    const protein = findNutrient('Protein');
+    const cholesterol = findNutrient('Cholesterol');
+    const sodium = findNutrient('Sodium');
+
+    if (portionSize) {
+      const nutritionItems = [];
+      if (calories) nutritionItems.push(`<li>Calories: ${calories.value}</li>`);
+      if (totalFat) nutritionItems.push(`<li>Total Fat: ${totalFat.value}${totalFat.unit}</li>`);
+      if (totalCarbs) {
+        nutritionItems.push(`<li>Total Carbohydrate: ${totalCarbs.value}${totalCarbs.unit}`);
+        const subItems = [];
+        if (dietaryFiber) subItems.push(`<li>Dietary Fiber: ${dietaryFiber.value}${dietaryFiber.unit}</li>`);
+        if (sugars) subItems.push(`<li>Sugars: ${sugars.value}${sugars.unit}</li>`);
+        if (subItems.length > 0) {
+          nutritionItems.push(`<ul>${subItems.join('')}</ul>`);
+        }
+        nutritionItems.push('</li>');
+      }
+      if (protein) nutritionItems.push(`<li>Protein: ${protein.value}${protein.unit}</li>`);
+      if (cholesterol) nutritionItems.push(`<li>Cholesterol: ${cholesterol.value}${cholesterol.unit}</li>`);
+      if (sodium) nutritionItems.push(`<li>Sodium: ${sodium.value}${sodium.unit}</li>`);
+
+      if (nutritionItems.length > 0) {
+        nutritionHtml = `
+          <h2>Nutrition</h2>
+          <p>${portionSize}</p>
+          <ul>
+            ${nutritionItems.join('')}
+          </ul>
+        `;
+      }
+    }
+  }
+
+  // Build the complete recipe HTML
   const recipeHtml = `
-    ${recipeImageSrc ? `<img src="${recipeImageSrc}" alt="${recipeName}" />` : ''}
-    <h1>${recipeName}</h1>
+    ${recipeImageSrc ? `<img src="${recipeImageSrc}" alt="${xmlRecipeName}" />` : ''}
+    <h1>${xmlRecipeName}</h1>
     ${recipeDescription ? `<p>${recipeDescription}</p>` : ''}
     ${ingredientsHtml}
     ${directionsHtml}
+    ${notesHtml}
+    ${nutritionHtml}
+    ${metadataRows ? `
+      <table>
+        <thead>
+          <tr>
+            <th colspan="2">Metadata</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${metadataRows}
+        </tbody>
+      </table>
+    ` : ''}
   `;
 
   const htmlContent = `<html>
@@ -285,7 +477,13 @@ export async function bulkSyncWithDA() {
   // eslint-disable-next-line no-plusplus
   for (let i = 0; i < checkboxes.length; i++) {
     const checkbox = checkboxes[i];
-    const { recipeNumber, recipeName } = checkbox.dataset;
+    const {
+      recipeNumber,
+      recipeName,
+      recipeStatus,
+      dateCreated,
+      dateUpdated,
+    } = checkbox.dataset;
 
     addLogEntry(`\n[${i + 1}/${checkboxes.length}] Processing: ${recipeName}`, 'info');
 
@@ -297,6 +495,9 @@ export async function bulkSyncWithDA() {
         recipeName,
         params.user,
         params.pw,
+        recipeStatus,
+        dateCreated,
+        dateUpdated,
       );
 
       // Sync with DA
@@ -840,7 +1041,7 @@ export function displayResults(data, rawXml) {
       const statusClass = status.toLowerCase();
 
       recipeItem.innerHTML = `
-        <input type="checkbox" class="recipe-checkbox" data-recipe-number="${number}" data-recipe-name="${name.replace(/"/g, '&quot;')}" />
+        <input type="checkbox" class="recipe-checkbox" data-recipe-number="${number}" data-recipe-name="${name.replace(/"/g, '&quot;')}" data-recipe-status="${status}" data-date-created="${dateCreated}" data-date-updated="${dateUpdated}" />
         <div class="recipe-content">
           <div class="recipe-header">
             <h3 class="recipe-title">${name}</h3>
