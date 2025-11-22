@@ -148,12 +148,29 @@ export async function fetchRecipeDetailsForSync(
   addLogEntry(`Fetching details for "${recipeName}" (${recipeNumber})...`, 'info');
 
   const xmlResponse = await fetchRecipeDetails(userId, password, recipeNumber);
+
+  // Validate we got actual XML content
+  if (!xmlResponse || xmlResponse.trim().length === 0) {
+    throw new Error('Empty response from API');
+  }
+
   const parser = new DOMParser();
   const xmlDoc = parser.parseFromString(xmlResponse, 'text/xml');
+
+  // Check for XML parsing errors
+  const parserError = xmlDoc.querySelector('parsererror');
+  if (parserError) {
+    throw new Error('Invalid XML response from API');
+  }
 
   // Get recipe name and description from XML
   const xmlRecipeName = xmlDoc.querySelector('RecipeName, Name, recipeName, name')?.textContent.trim() || recipeName;
   const recipeDescription = xmlDoc.querySelector('RecipeDescription, Description, recipeDescription, description')?.textContent.trim() || '';
+
+  // Validate we have at least a recipe name
+  if (!xmlRecipeName || xmlRecipeName.length === 0) {
+    throw new Error('No recipe name found in API response');
+  }
 
   // Convert recipe name to kebab-case
   const kebabName = xmlRecipeName
@@ -294,17 +311,43 @@ export async function fetchRecipeDetailsForSync(
     const unitMetric = ingredient.querySelector('Unit_Metric')?.textContent.trim() || '';
     const name = ingredient.querySelector('Name')?.textContent.trim() || '';
     const preparation = ingredient.querySelector('Preparation')?.textContent.trim() || '';
+    const alternativeIngredient = ingredient.querySelector('AlternativeIngredient')?.textContent.trim() || '';
+
+    // Format metric quantity (remove .00 decimals)
+    const formatQuantity = (qty) => {
+      if (!qty) return '';
+      const num = parseFloat(qty);
+      return num % 1 === 0 ? num.toString() : qty;
+    };
 
     let ingredientStr = '';
-    if (quantityImperial && unitImperial) {
-      ingredientStr += `${quantityImperial} ${unitImperial}`;
+
+    // Add imperial quantity (with or without unit)
+    if (quantityImperial) {
+      ingredientStr += formatQuantity(quantityImperial);
+      if (unitImperial) {
+        ingredientStr += ` ${unitImperial}`;
+      }
     }
+
+    // Add metric in parentheses
     if (quantityMetric && unitMetric) {
-      ingredientStr += ` (${quantityMetric} ${unitMetric})`;
+      if (ingredientStr) ingredientStr += ' ';
+      ingredientStr += `(${formatQuantity(quantityMetric)} ${unitMetric})`;
     }
+
+    // Add ingredient name
     if (name) {
-      ingredientStr += ` ${name}`;
+      if (ingredientStr) ingredientStr += ' ';
+      ingredientStr += name;
     }
+
+    // Add alternative ingredient in brackets
+    if (alternativeIngredient) {
+      ingredientStr += ` [or ${alternativeIngredient}]`;
+    }
+
+    // Add preparation
     if (preparation) {
       ingredientStr += `, ${preparation}`;
     }
@@ -630,13 +673,29 @@ export async function displayRecipeDetails(recipeNumber) {
   try {
     const xmlResponse = await fetchRecipeDetails(params.user, params.pw, recipeNumber);
 
+    // Validate we got actual XML content
+    if (!xmlResponse || xmlResponse.trim().length === 0) {
+      throw new Error('Empty response from API');
+    }
+
     // Parse XML to extract name and description
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(xmlResponse, 'text/xml');
 
+    // Check for XML parsing errors
+    const parserError = xmlDoc.querySelector('parsererror');
+    if (parserError) {
+      throw new Error('Invalid XML response from API');
+    }
+
     // Try to find recipe name and description
     const recipeName = xmlDoc.querySelector('RecipeName, Name, recipeName, name')?.textContent.trim() || 'Recipe Details';
     const recipeDescription = xmlDoc.querySelector('RecipeDescription, Description, recipeDescription, description')?.textContent.trim() || '';
+
+    // Validate we have at least a recipe name
+    if (!recipeName || recipeName === 'Recipe Details') {
+      throw new Error('No recipe name found in API response');
+    }
 
     // Convert recipe name to kebab-case
     const kebabName = recipeName
@@ -853,18 +912,43 @@ export async function displayRecipeDetails(recipeNumber) {
       const unitMetric = ingredient.querySelector('Unit_Metric')?.textContent.trim() || '';
       const name = ingredient.querySelector('Name')?.textContent.trim() || '';
       const preparation = ingredient.querySelector('Preparation')?.textContent.trim() || '';
+      const alternativeIngredient = ingredient.querySelector('AlternativeIngredient')?.textContent.trim() || '';
 
-      // Format: Quantity_Imperial Unit_Imperial (Quantity_Metric Unit_Metric) Name, Preparation
+      // Format metric quantity (remove .00 decimals)
+      const formatQuantity = (qty) => {
+        if (!qty) return '';
+        const num = parseFloat(qty);
+        return num % 1 === 0 ? num.toString() : qty;
+      };
+
       let ingredientStr = '';
-      if (quantityImperial && unitImperial) {
-        ingredientStr += `${quantityImperial} ${unitImperial}`;
+
+      // Add imperial quantity (with or without unit)
+      if (quantityImperial) {
+        ingredientStr += formatQuantity(quantityImperial);
+        if (unitImperial) {
+          ingredientStr += ` ${unitImperial}`;
+        }
       }
+
+      // Add metric in parentheses
       if (quantityMetric && unitMetric) {
-        ingredientStr += ` (${quantityMetric} ${unitMetric})`;
+        if (ingredientStr) ingredientStr += ' ';
+        ingredientStr += `(${formatQuantity(quantityMetric)} ${unitMetric})`;
       }
+
+      // Add ingredient name
       if (name) {
-        ingredientStr += ` ${name}`;
+        if (ingredientStr) ingredientStr += ' ';
+        ingredientStr += name;
       }
+
+      // Add alternative ingredient in brackets
+      if (alternativeIngredient) {
+        ingredientStr += ` [or ${alternativeIngredient}]`;
+      }
+
+      // Add preparation
       if (preparation) {
         ingredientStr += `, ${preparation}`;
       }
