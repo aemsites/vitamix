@@ -747,6 +747,11 @@ export async function init() {
   } else {
     await makeApiCallFromParams();
   }
+
+  // eslint-disable-next-line no-unused-vars, no-undef
+  const { context, token, actions } = await DA_SDK;
+  // eslint-disable-next-line no-console
+  console.log('DA SDK loaded', context, token, actions);
 }
 
 init();
