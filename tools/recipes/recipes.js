@@ -113,6 +113,59 @@ export function showError(message) {
   }, 5000);
 }
 
+// Sync recipe with DA
+export async function syncWithDA(recipeName, recipeNumber) {
+  const kebabName = recipeName
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, '') // Remove special characters
+    .replace(/\s+/g, '-') // Replace spaces with hyphens
+    .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
+    .trim();
+
+  const lowercaseNumber = recipeNumber.toLowerCase();
+  const filename = `${kebabName}-${lowercaseNumber}.html`;
+
+  // Get the recipe content
+  const recipeElement = document.querySelector('.recipe');
+  if (!recipeElement) {
+    throw new Error('Recipe content not found');
+  }
+
+  // Create the HTML document
+  const htmlContent = `<html>
+<body>
+<main>
+${recipeElement.innerHTML}
+</main>
+</body>
+</html>`;
+
+  // Get DA token
+  // eslint-disable-next-line no-undef
+  const { token } = await DA_SDK;
+
+  // Create blob and form data
+  const blob = new Blob([htmlContent], { type: 'text/html' });
+  const body = new FormData();
+  body.append('data', blob);
+
+  const opts = {
+    headers: { Authorization: `Bearer ${token}` },
+    method: 'POST',
+    body,
+  };
+
+  const fullpath = `https://admin.da.live/source/aemsites/vitamix/us/en_us/recipes/data/${filename}`;
+
+  const resp = await fetch(fullpath, opts);
+
+  if (!resp.ok) {
+    throw new Error(`Failed to sync: ${resp.status} ${resp.statusText}`);
+  }
+
+  return { filename, url: fullpath };
+}
+
 // Display recipe details on page
 export async function displayRecipeDetails(recipeNumber) {
   const params = getQueryParams();
@@ -167,6 +220,52 @@ export async function displayRecipeDetails(recipeNumber) {
     }
     const recipePageUrl = `https://www.vitamix.com/us/en_us/recipes/${kebabName}`;
     viewOnVitamixBtn.href = recipePageUrl;
+
+    // Add "Sync with DA" button to detail header
+    let syncWithDABtn = detailHeader.querySelector('.btn-sync-with-da');
+    if (!syncWithDABtn) {
+      syncWithDABtn = document.createElement('button');
+      syncWithDABtn.className = 'btn-sync-with-da';
+      syncWithDABtn.textContent = 'Sync with DA';
+      detailHeader.appendChild(syncWithDABtn);
+
+      syncWithDABtn.addEventListener('click', async () => {
+        const originalText = syncWithDABtn.textContent;
+        try {
+          syncWithDABtn.disabled = true;
+          syncWithDABtn.textContent = 'Syncing...';
+
+          const result = await syncWithDA(recipeName, recipeNumber);
+
+          syncWithDABtn.textContent = '✓ Synced!';
+          syncWithDABtn.style.backgroundColor = '#28a745';
+
+          // eslint-disable-next-line no-console
+          console.log('Successfully synced recipe:', result);
+
+          // Reset button after 3 seconds
+          setTimeout(() => {
+            syncWithDABtn.textContent = originalText;
+            syncWithDABtn.style.backgroundColor = '';
+            syncWithDABtn.disabled = false;
+          }, 3000);
+        } catch (error) {
+          // eslint-disable-next-line no-console
+          console.error('Error syncing with DA:', error);
+          syncWithDABtn.textContent = '✗ Failed';
+          syncWithDABtn.style.backgroundColor = '#dc3545';
+
+          showError(`Failed to sync with DA: ${error.message}`);
+
+          // Reset button after 3 seconds
+          setTimeout(() => {
+            syncWithDABtn.textContent = originalText;
+            syncWithDABtn.style.backgroundColor = '';
+            syncWithDABtn.disabled = false;
+          }, 3000);
+        }
+      });
+    }
 
     // Fetch recipe image from Vitamix website
     let recipeImageSrc = '';
@@ -453,7 +552,7 @@ export async function displayRecipeDetails(recipeNumber) {
           </table>
         ` : ''}
       </div>
-      <textarea id="recipeXML" readonly>${xmlResponse}</textarea>
+      <textarea id="recipe-xml" readonly>${xmlResponse}</textarea>
     `;
 
     detailLoading.classList.remove('active');
@@ -648,11 +747,6 @@ export async function init() {
   } else {
     await makeApiCallFromParams();
   }
-
-  // eslint-disable-next-line no-unused-vars, no-undef
-  const { context, token, actions } = await DA_SDK;
-  // eslint-disable-next-line no-console
-  console.log('DA SDK loaded', context, token, actions);
 }
 
 init();
