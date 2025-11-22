@@ -472,11 +472,17 @@ export async function fetchRecipeDetailsForSync(
     ` : ''}
   `;
 
-  const htmlContent = `<html>
+  const htmlContent = `<!DOCTYPE html>
+<html>
+<head></head>
 <body>
+<header></header>
 <main>
+<div>
 ${recipeHtml}
+</div>
 </main>
+<footer></footer>
 </body>
 </html>`;
 
