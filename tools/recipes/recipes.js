@@ -569,7 +569,6 @@ export async function displayRecipeDetails(recipeNumber) {
 // Display results
 export function displayResults(data, rawXml) {
   const resultsDiv = document.getElementById('results');
-  const responseDataPre = document.getElementById('responseData');
   const recipeCount = document.getElementById('recipeCount');
   const recipeList = document.getElementById('recipeList');
   const params = getQueryParams();
@@ -594,8 +593,8 @@ export function displayResults(data, rawXml) {
       const dateCreated = recipe.getAttribute('DateCreated');
       const dateUpdated = recipe.getAttribute('DateUpdated');
 
-      // Get brands
-      const brands = recipe.querySelectorAll('Brand');
+      // Get brands (only direct children, not nested Brand elements)
+      const brands = recipe.querySelectorAll('Brands > Brand');
 
       // Create recipe item
       const recipeItem = document.createElement('div');
@@ -617,7 +616,6 @@ export function displayResults(data, rawXml) {
         </div>
         ${brands.length > 0 ? `
           <div class="recipe-brands">
-            <div class="recipe-brands-title">Brands:</div>
             <div class="brand-list">
               ${Array.from(brands).map((brand) => {
     const brandName = brand.querySelector('BrandName')?.textContent || 'Unknown';
@@ -628,64 +626,24 @@ export function displayResults(data, rawXml) {
             </div>
           </div>
         ` : ''}
-        <div class="recipe-actions">
-          <a href="?user=${encodeURIComponent(params.user)}&pw=${encodeURIComponent(params.pw)}&date=${encodeURIComponent(params.date)}&recipe=${encodeURIComponent(number)}&status=${encodeURIComponent(status)}&dateCreated=${encodeURIComponent(dateCreated)}&dateUpdated=${encodeURIComponent(dateUpdated)}" class="btn-view-details">View Details</a>
-        </div>
       `;
+
+      // Make the whole item clickable
+      recipeItem.style.cursor = 'pointer';
+      const detailUrl = `?user=${encodeURIComponent(params.user)}&pw=${encodeURIComponent(params.pw)}&date=${encodeURIComponent(params.date)}&recipe=${encodeURIComponent(number)}&status=${encodeURIComponent(status)}&dateCreated=${encodeURIComponent(dateCreated)}&dateUpdated=${encodeURIComponent(dateUpdated)}`;
+      recipeItem.addEventListener('click', () => {
+        window.location.href = detailUrl;
+      });
 
       recipeList.appendChild(recipeItem);
     });
 
-    // Store raw XML
-    responseDataPre.textContent = rawXml;
     resultsDiv.classList.add('active');
   } catch (e) {
     // eslint-disable-next-line no-console
     console.error('Error parsing recipes:', e);
     showError(`Error parsing response: ${e.message}`);
   }
-}
-
-// Toggle raw XML display
-export function toggleRawXML() {
-  const responseDataPre = document.getElementById('responseData');
-  const toggleBtn = document.getElementById('toggleBtn');
-
-  if (responseDataPre.style.display === 'none') {
-    responseDataPre.style.display = 'block';
-    toggleBtn.textContent = 'Hide Raw XML';
-  } else {
-    responseDataPre.style.display = 'none';
-    toggleBtn.textContent = 'Show Raw XML';
-  }
-}
-
-// Copy to clipboard
-export function copyToClipboard() {
-  const responseData = document.getElementById('responseData').textContent;
-  navigator.clipboard.writeText(responseData).then(() => {
-    // eslint-disable-next-line no-alert
-    alert('Copied to clipboard!');
-  }).catch((err) => {
-    // eslint-disable-next-line no-console
-    console.error('Failed to copy:', err);
-    // eslint-disable-next-line no-alert
-    alert('Failed to copy to clipboard');
-  });
-}
-
-// Download XML
-export function downloadXML() {
-  const responseData = document.getElementById('responseData').textContent;
-  const blob = new Blob([responseData], { type: 'text/xml' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `vitamix-recipes-${new Date().toISOString().split('T')[0]}.xml`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
 }
 
 // Make API call if query params are present
@@ -725,11 +683,6 @@ export async function makeApiCallFromParams() {
 // Initialize on page load
 export async function init() {
   const params = getQueryParams();
-
-  // Attach event listeners
-  document.getElementById('toggleBtn').addEventListener('click', toggleRawXML);
-  document.getElementById('copyBtn').addEventListener('click', copyToClipboard);
-  document.getElementById('downloadBtn').addEventListener('click', downloadXML);
 
   // Add back button listener
   const backBtn = document.getElementById('backToList');

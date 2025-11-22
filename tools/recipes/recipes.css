@@ -177,20 +177,6 @@ pre {
   line-height: 1.5;
 }
 
-.actions {
-  margin-top: 0;
-  margin-bottom: 20px;
-  display: flex;
-  gap: 10px;
-}
-
-.btn-secondary {
-  background-color: #6c757d;
-}
-
-.btn-secondary:hover {
-  background-color: #5a6268;
-}
 
 .recipe-list {
   margin-bottom: 20px;
@@ -272,13 +258,6 @@ pre {
   margin-top: 10px;
 }
 
-.recipe-brands-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #555;
-  margin-bottom: 8px;
-}
-
 .brand-list {
   display: flex;
   flex-wrap: wrap;
@@ -287,36 +266,15 @@ pre {
 
 .brand-tag {
   background-color: #e9ecef;
-  padding: 6px 12px;
-  border-radius: 4px;
-  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 3px;
+  font-size: 11px;
   color: #495057;
 }
 
 .brand-tag.primary {
   background-color: #4CAF50;
   color: white;
-}
-
-.recipe-actions {
-  margin-top: 15px;
-  padding-top: 15px;
-  border-top: 1px solid #e0e0e0;
-}
-
-.btn-view-details {
-  background-color: #007bff;
-  font-size: 14px;
-  padding: 8px 16px;
-  text-decoration: none;
-  color: white;
-  display: inline-block;
-  border-radius: 4px;
-  transition: background-color 0.2s;
-}
-
-.btn-view-details:hover {
-  background-color: #0056b3;
 }
 
 /* Detail View Styles */
