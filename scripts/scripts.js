@@ -506,6 +506,17 @@ function buildAutoBlocks(main) {
     if (metaSku || pdpBlock) {
       document.body.classList.add('pdp-template');
     }
+
+    // wrap recipes in block
+    if (document.querySelector('main') === main) {
+      const template = getMetadata('template');
+      if (template === 'recipe') {
+        const block = document.createElement('div');
+        block.classList.add('recipe');
+        block.append(...main.firstElementChild.children);
+        main.firstElementChild.append(block);
+      }
+    }
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Auto Blocking failed', error);

@@ -1,0 +1,93 @@
+main .recipe-header {
+    background-color: var(--color-charcoal);
+    color: var(--color-gray-100);
+    padding: var(--spacing-400);
+    display: grid;
+    grid-template-areas: 'details' 'image' 'additional-info';
+    gap: var(--spacing-400);
+}
+
+@media (width >= 900px) {
+    main .recipe-header {
+        grid-template-areas: 'image details' 'image additional-info';
+    }
+}
+
+main .recipe-header .recipe-details {
+    grid-area: details;
+}
+
+main .recipe-header .recipe-image {
+    grid-area: image;
+}
+
+main .recipe-header .recipe-additional-info {
+    grid-area: additional-info;
+}
+
+main .recipe-header a:any-link {
+    color: var(--color-gray-100);
+}
+
+main .recipe-header .recipe-rating {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+main .recipe-header .recipe-rating .recipe-stars {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+main .recipe-stats {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+main .recipe-stat {
+    width: 150px;
+    padding-left: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    background-size: 24px;
+    background-position: left center;
+    background-repeat: no-repeat;
+}
+
+main .recipe-stat-difficulty {
+    background-image: url('./difficulty.svg');
+}
+
+main .recipe-stat-total-time {
+    background-image: url('./time.svg');
+}
+
+main .recipe-stat-yields {
+    background-image: url('./yield.svg');
+}
+
+main .recipe-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 16px;
+}
+
+main > .recipe-container.section {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+.section > .recipe-wrapper {
+    margin: 0;
+    padding: 0;
+}
+
+main .recipe-body {
+    padding: var(--spacing-400);
+}
