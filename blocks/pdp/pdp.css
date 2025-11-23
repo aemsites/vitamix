@@ -179,7 +179,7 @@
   max-width: 250px;
   padding: 8px 16px;
   font-weight: var(--weight-light);
-  background-color: purple;
+  background-color: var(--color-charcoal);
   color: var(--color-white);
   border: none;
   border-radius: 4px;
@@ -187,11 +187,11 @@
 }
 
 .add-to-cart button:hover {
-  background-color: red;
+  background-color: #2B333A;
 }
 
 .add-to-cart button[aria-disabled="true"] {
-  background-color: purple;
+  background-color: #40596b;
   border: 1px solid #40596b;
   cursor: not-allowed;
 }
