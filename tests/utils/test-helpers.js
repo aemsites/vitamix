@@ -88,9 +88,6 @@ export async function assertPDPElements(page) {
   const imageCount = await images.count();
   expect(imageCount).toBeGreaterThan(0);
 
-  // Assert that specifications section exists
-  await assertElementExists(page, '.specifications', 'Product Specifications');
-
   // Assert that FAQ section exists
   await assertElementExists(page, '.faq-container', 'FAQ Section');
 

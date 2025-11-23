@@ -28,10 +28,7 @@ function createTabButtons(tabs) {
 function createSpecificationsContent(specifications) {
   const container = document.createElement('div');
   container.classList.add('specifications-container');
-
-  const heading = document.createElement('h3');
-  heading.textContent = 'Product Specifications';
-  container.append(heading, specifications.cloneNode(true));
+  container.append(specifications);
   return container;
 }
 
@@ -47,15 +44,11 @@ function createSpecificationsContent(specifications) {
 // eslint-disable-next-line no-unused-vars
 function createWarrantyContent(warranty, customWarranty) {
   const div = document.createElement('div');
-  div.innerHTML = customWarranty;
+  div.innerHTML = customWarranty.innerHTML;
   const p = div.querySelector('p');
   const lines = p.innerHTML.split('<br>');
 
-  let titleText = '';
-  if (lines[0].length < 100) {
-    titleText = lines[0].trim();
-    lines.shift();
-  }
+  const titleText = div.querySelector('h3')?.textContent;
 
   const text = lines.join('<br>').trim();
 
@@ -149,6 +142,7 @@ function createResourcesContent(resources, productName) {
  * @returns {HTMLDivElement} The content container for the tab.
  */
 function createTabContent(tab, specifications, standardWarranty, custom, productName) {
+  const { warranty } = window;
   const content = document.createElement('div');
   content.classList.add('tab-content');
   content.id = tab.id;
@@ -160,8 +154,8 @@ function createTabContent(tab, specifications, standardWarranty, custom, product
       }
       break;
     case 'warranty':
-      if (custom.warranty) {
-        content.appendChild(createWarrantyContent(standardWarranty, custom.warranty));
+      if (warranty) {
+        content.appendChild(createWarrantyContent(standardWarranty, warranty));
       }
       break;
     case 'resources':
@@ -220,10 +214,11 @@ function initializeTabs(container) {
  */
 export default function renderSpecs(specifications, custom, productName) {
   const { options } = custom;
+  const { warranty } = window;
   const standardWarranty = options?.find((option) => option.name.includes('Standard Warranty'));
   const tabs = [
     { id: 'specifications', label: 'Specifications', show: !!specifications },
-    { id: 'warranty', label: 'Warranty', show: !!custom.warranty },
+    { id: 'warranty', label: 'Warranty', show: warranty },
     { id: 'resources', label: 'Resources', show: true },
   ].filter((tab) => tab.show);
 

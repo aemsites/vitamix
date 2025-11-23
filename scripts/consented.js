@@ -2,7 +2,7 @@ import { loadScript } from './aem.js';
 
 if (localStorage.getItem('newsletter-popped-up') !== 'true') {
   localStorage.setItem('newsletter-popped-up', 'true');
-  const newsletterLink = document.querySelector('a[href="/us/en_us/nav/modals/sign-up"]');
+  const newsletterLink = document.querySelector('a[href*="/modals/sign-up"]');
   if (newsletterLink) {
     setTimeout(() => {
       newsletterLink.click();
@@ -27,7 +27,7 @@ currentEnvironment.dataset.templatePath = '/conf/vitamix/settings/wcm/templates/
 document.body.appendChild(currentEnvironment);
 
 const chatbot = document.createElement('div');
-chatbot.id = 'app';
+chatbot.id = 'chatbot-container';
 document.body.appendChild(chatbot);
 
 loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-chatbot.lc-d95b877a5e0c2ce39cd26f0aa190faef-lc.min.js');
@@ -103,8 +103,45 @@ r.parentNode.insertBefore(t,r)}}
 pintrk('load', '2621075961855'); pintrk('page');
 // End of Pinterest Tag
 
+/* eslint-enable */
 
+// LinkedIn Insight Tag
+try {
+  const lpids = '_linkedin_data_partner_ids';
+  window[lpids] = window[lpids] || [];
+  window[lpids].push('2976369');
+  loadScript('https://snap.licdn.com/li.lms-analytics/insight.min.js');
+} catch (error) {
+  /* eslint-disable-next-line no-console */
+  console.error('LinkedIn Insight Tag failed to load', error);
+}
 
+// End of LinkedIn Insight Tag
+
+/* eslint-disable */
+
+// Big Happy Tag add 11-17-25 end 12-28-25
+try {
+  const adentifiAccountId = 26653;
+  const pageUrl = encodeURIComponent(window.location.href);
+  const uqNum = Math.random() * 10000000000000;
+
+  const pixelUrl =
+    'https://px.adentifi.com/Pixels?a_id=' + adentifiAccountId +
+    ';p_url=' + pageUrl +
+    ';uq=' + uqNum;
+
+  const img = document.createElement('img');
+  img.src = pixelUrl;
+  img.height = 1;
+  img.width = 1;
+  img.style.display = 'none';
+
+  document.body.appendChild(img);
+} catch (error) {
+  console.error('Adentifi pixel failed to load', error);
+}
+// End of Big Happy Tag
 
 // TV Scientific Pixel Code
 try {

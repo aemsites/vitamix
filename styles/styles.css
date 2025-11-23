@@ -39,8 +39,8 @@
   --color-eyebrow: var(--color-madder);
 
   /* fonts */
-  --serif-font-family: 'Sentinel A', 'Sentinel B', sentinel-fallback, georgia, serif;
-  --sans-serif-font-family: 'Gotham Narrow A', 'Gotham Narrow B', gotham-narrow-fallback, helvetica, sans-serif;
+  --serif-font-family: 'sentinel', sentinel-fallback, georgia, serif;
+  --sans-serif-font-family: 'gotham-narrow', gotham-narrow-fallback, helvetica, sans-serif;
   --body-font-family: var(--sans-serif-font-family);
   --heading-font-family: var(--serif-font-family);
   --code-font-family: monospace;
@@ -223,7 +223,7 @@ main .section.dark {
 }
 
 main .section.dark .eyebrow,
-main .section.dark a:any-link {
+main .section.dark a:any-link:not(.button) {
   color: var(--color-gray-500);
 }
 
@@ -266,8 +266,12 @@ main .section.banner.overlay::before {
   content: '';
   position: absolute;
   inset: 0;
-  background-color: var(--color-white);
-  opacity: 0.35;
+  z-index: 1;
+}
+
+main .section.banner.overlay.dark::before {
+  background-color: var(--color-charcoal);
+  opacity: 0.6;
 }
 
 main > .section.banner > div {
@@ -808,4 +812,15 @@ body.fragment-preview::before {
   margin-bottom: 16px;
   font-size: 16px;
   font-weight: bold;
+}
+
+/* suppress automatically opening consent banner for us */
+/* stylelint-disable-next-line */
+body.hide-consent-banner-for-us #CybotCookiebotDialog {
+  visibility: hidden;
+}
+
+/* stylelint-disable-next-line */
+#CybotCookiebotDialogNav ul li:has(#CybotCookiebotDialogNavAbout) {
+  display: none;
 }

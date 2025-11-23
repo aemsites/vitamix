@@ -103,6 +103,8 @@ export default function renderAddToCart(block, parent) {
 
   // Only look at findLocally and findDealer from parent product
   const { findLocally, findDealer } = parent;
+  block.classList.remove('pdp-find-locally');
+  block.classList.remove('pdp-find-dealer');
 
   // Figure out if the selected variant is available for sale
   const isAvailableForSale = isVariantAvailableForSale(selectedVariant);
@@ -199,15 +201,24 @@ export default function renderAddToCart(block, parent) {
     }
 
     // add any required bundle options
-    if (custom.requiredBundleOptions) {
-      selectedOptions.push(...custom.requiredBundleOptions);
+    if (parent.custom && parent.custom.requiredBundleOptions) {
+      selectedOptions.push(...parent.custom.requiredBundleOptions);
     }
 
-    // add product to cart with selected options and quantity
-    await cartApi.addToCart(sku, selectedOptions, quantity);
+    try {
+      // add product to cart with selected options and quantity
+      await cartApi.addToCart(sku, selectedOptions, quantity);
 
-    // redirect to cart page after successful addition
-    window.location.href = '/us/en_us/checkout/cart/';
+      // redirect to cart page after successful addition
+      window.location.href = '/us/en_us/checkout/cart/';
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to add item to cart', error);
+    } finally {
+      // update button state to show ATC
+      addToCartButton.textContent = 'Add to Cart';
+      addToCartButton.removeAttribute('aria-disabled');
+    }
   });
 
   // assemble the quantity container with select and button

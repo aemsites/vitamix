@@ -1,0 +1,69 @@
+main.toc-left > .toc-container {
+  display: none;
+  position: sticky;
+  top: 0;
+  max-height: calc(100vh - var(--header-height));
+  overflow: auto;
+}
+
+main.toc-left > .toc-container > :first-child {
+  margin-bottom: 0;
+}
+
+main.toc-left > .toc-container > .toc-wrapper {
+  margin-top: var(--spacing-300);
+  padding-right: 0;
+}
+
+@media (width >= 800px) {
+  main.toc-left {
+    display: grid;
+    grid-template-columns: 1fr 3fr;
+  }
+  
+  main.toc-left > aside {
+    grid-column: 1 / span 2
+  }
+  
+  main.toc-left > * {
+    grid-column-start: 2;
+  }
+  
+  main.toc-left > .toc-container {
+    grid-column-start: 1;
+    display: block;
+  }
+}
+
+@media (width >= 900px) {
+  main.toc-left {
+    grid-template-columns: calc(((var(--site-width)) / 4) - 2 * var(--horizontal-spacing)) 3fr;
+  }
+}
+
+.toc-container h2 {
+  font-family: var(--body-font-family);
+  font-size: var(--heading-size-l);
+}
+
+.toc ul {
+  list-style: none;
+  padding: 0;
+}
+
+.toc ul > li {
+  font-size: var(--body-size-s);
+}
+
+.toc ul > li + li {
+  padding-top: var(--spacing-200);
+}
+
+.toc a {
+  text-decoration: none;
+}
+
+.toc a:hover,
+.toc a:focus {
+  text-decoration: underline;
+}

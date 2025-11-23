@@ -1,3 +1,4 @@
+import { toClassName } from '../../scripts/aem.js';
 import { buildCarousel, buildVideo } from '../../scripts/scripts.js';
 
 /**
@@ -103,8 +104,17 @@ export default function decorate(block) {
     block.parentElement.prepend(logo);
   }
 
+  if (indicatedSlides) {
+    const actualSlides = slides.length;
+    if (actualSlides > parseInt(indicatedSlides.replace('slides-', ''), 10)) {
+      block.dataset.slides = actualSlides;
+    }
+  }
+
+  let qs = 0;
   slides.forEach((s) => {
     const slide = document.createElement('li');
+    slide.className = 'carousel-slide';
     [...s].forEach((cell) => {
       buildVideo(cell);
       if (cell.children.length === 1 && cell.querySelector('picture')) { // single picture element
@@ -121,6 +131,24 @@ export default function decorate(block) {
             if (!variants.includes('linked')) variants.push('linked');
             if (!block.classList.contains('linked')) block.classList.add('linked');
           }
+        }
+        const quote = cell.querySelector('blockquote');
+        if (quote) {
+          qs += 1;
+          slide.classList.add('slide-quote');
+          const color = cell.querySelector('code');
+          if (color) {
+            slide.classList.add(`color-${toClassName(color.textContent.trim())}`);
+            color.remove();
+          } else {
+            slide.dataset.q = (qs % 3) + 1;
+          }
+          const quotes = cell.querySelectorAll('blockquote');
+          const quoteWrapper = quotes[0].parentElement;
+          const cite = document.createElement('cite');
+          const attr = [...quoteWrapper.children].filter((c) => c.tagName !== 'BLOCKQUOTE' && !c.querySelector('blockquote'));
+          cite.append(...attr);
+          cell.replaceChildren(...quotes, cite);
         }
         [...cell.querySelectorAll('p')].forEach((p) => {
           if (p.textContent.includes('$')) p.classList.add('slide-body-price');

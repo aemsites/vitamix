@@ -1,0 +1,411 @@
+.hotspot .caption {
+  padding: var(--horizontal-spacing);
+  background-color: var(--image-color);
+  text-align: center;
+}
+
+.hotspot button.expand {
+  position: absolute;
+  top: 1ch;
+  left: 1ch;
+  border: 0;
+  background-color: var(--image-color);
+  text-transform: none;
+  transition: background-color 0.2s;
+}
+
+.hotspot button.expand:disabled {
+  width: max-content;
+  background-color: var(--image-color);
+  cursor: default;
+}
+
+@media (width >= 700px) {
+  .hotspot button.expand {
+    display: none;
+  }
+}
+
+.hotspot .caption .eyebrow {
+  color: inherit;
+}
+
+.hotspot.image-darkest .caption,
+.hotspot.image-dark .caption,
+.hotspot.image-darkest button.expand,
+.hotspot.image-dark button.expand {
+  color: var(--color-white);
+}
+
+.hotspot.image-light .caption,
+.hotspot.image-lightest .caption,
+.hotspot.image-lightest button.expand,
+.hotspot.image-light button.expand {
+  color: var(--color-charcoal);
+}
+
+@media (width >= 700px) {
+  .hotspot .caption {
+    position: absolute;
+    z-index: 1;
+    width: 100%;
+  }
+
+  .hotspot.image-darkest .caption,
+  .hotspot.image-lightest .caption {
+    background-color: transparent;
+  }
+
+  .hotspot.image-dark .caption,
+  .hotspot.image-light .caption {
+    background: linear-gradient(to bottom, var(--image-color) 50%, transparent);
+  }
+}
+
+.hotspot.image-darkest button.expand:disabled,
+.hotspot.image-lightest button.expand:disabled {
+  background-color: transparent;
+}
+
+.hotspot .svg-wrapper {
+  display: block;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+}
+
+.hotspot svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  transition: height 1s;
+}
+
+.hotspot svg img {
+  width: 100%;
+  height: auto;
+}
+
+.hotspot[data-explore] svg {
+  width: auto;
+  height: calc(100dvh - var(--header-height));
+  max-height: 720px;
+}
+
+@media (width >= 700px) {
+  .hotspot svg,
+  .hotspot[data-explore] svg {
+    width: 100%;
+    height: auto;
+    max-height: unset;
+  }
+
+  .hotspot .svg-wrapper {
+    overflow: hidden;
+  }
+
+  .hotspot .svg-wrapper svg {
+    width: 200%;
+    transform: translateX(-25%);
+    transform-origin: center bottom;
+  }
+}
+
+@media (width >= 1000px) {
+  .hotspot .svg-wrapper svg {
+    width: 150%;
+    transform: translateX(-16.667%);
+  }
+}
+
+@media (width >= 1400px) {
+  .hotspot .svg-wrapper svg {
+    width: 100%;
+    transform: translateX(0);
+  }
+}
+
+.hotspot button.hs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 33px;
+  height: 33px;
+  border: 0;
+  border-radius: 50%;
+  padding: 0;
+  background-color: #fff5;
+  transition: transform 0.4s;
+  cursor: default;
+}
+
+.hotspot[data-explore] button.hs {
+  width: 44px;
+  height: 44px;
+  cursor: context-menu;
+}
+
+@media (width >= 700px) {
+  .hotspot button.hs {
+    width: 44px;
+    height: 44px;
+    cursor: context-menu;
+  }
+}
+
+.hotspot button.hs[aria-expanded="true"] {
+  transform: translate(-50%, -50%) rotate(135deg);
+}
+
+.hotspot[data-explore] button.hs:hover {
+  background-color: #fffb;
+}
+
+@media (width >= 700px) {
+  .hotspot button.hs:hover {
+    background-color: #fffb;
+  }
+}
+
+.hotspot[data-explore] button.hs::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background-color: var(--color-white);
+  z-index: -1;
+  animation: pulse 2.5s linear infinite;
+}
+
+@media (width >= 700px) {
+  .hotspot button.hs::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background-color: var(--color-white);
+    z-index: -1;
+    animation: pulse 2.5s linear infinite;
+  }
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+
+  50% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+.hotspot [popover] {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 22px));
+  width: calc(160px + (var(--spacing-100) * 2));
+  margin: 0;
+  border: 0;
+  border-radius: var(--rounding-m);
+  padding: var(--spacing-100);
+  background-color: var(--color-white);
+  font-size: var(--body-size-xs);
+  text-align: center;
+}
+
+.hotspot [popover] p {
+  margin: 0;
+}
+
+.hotspot [popover] strong {
+  font-size: var(--body-size-m);
+}
+
+.hotspot [popover] img {
+  max-width: 160px;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  margin-bottom: var(--spacing-100);
+  border-radius: var(--rounding-m);
+}
+
+.hotspot i.glyph {
+  position: relative;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background-color: var(--color-white);
+}
+
+.hotspot[data-explore] i.glyph {
+  width: 22px;
+  height: 22px;
+}
+
+@media (width >= 700px) {
+  .hotspot i.glyph {
+    width: 22px;
+    height: 22px;
+  }
+}
+
+.hotspot i.glyph::before,
+.hotspot i.glyph::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 60%;
+  height: 3px;
+  border-radius: var(--rounding-s);
+  background-color: var(--color-gray-800);
+}
+
+.hotspot i.glyph::before {
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+
+.hotspot[data-explore] i.glyph::before,
+.hotspot[data-explore] i.glyph::after {
+  content: '';
+}
+
+@media (width >= 700px) {
+  .hotspot i.glyph::before,
+  .hotspot i.glyph::after {
+    content: '';
+  }
+}
+
+/* EDITING MODE */
+.hotspot button.edit {
+  position: absolute;
+  top: var(--spacing-xs);
+  right: var(--spacing-xs);
+  padding: var(--spacing-s);
+  z-index: 2;
+}
+
+.hotspot .tooltip {
+  display: none;
+  position: absolute;
+  padding: var(--spacing-xs);
+  border-radius: var(--rounding-m);
+  background-color: var(--color-black);
+  color: var(--color-white);
+  font-family: monospace;
+  font-size: var(--body-size-xs);
+  cursor: copy;
+  transition: border-radius 0.2s, background-color 0.2s;
+}
+
+.hotspot .tooltip.copied,
+.hotspot .tooltip:hover {
+  background-color: var(--color-green);
+}
+
+.hotspot .tooltip.copied {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.hotspot .tooltip.copied::after {
+  content: 'Copied coordinates to clipboard!';
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  width: max-content;
+  border-radius: var(--rounding-m);
+  border-bottom-right-radius: 0;
+  padding: var(--spacing-xs);
+  background-color: var(--color-green);
+  font-family: var(--body-font-family);
+  text-align: center;
+  z-index: 1;
+}
+
+.hotspot[data-editing="true"] .tooltip[aria-hidden="false"] {
+  display: unset;
+}
+
+/* stylelint-disable-next-line no-descending-specificity */
+.hotspot[data-editing="true"] button.hs {
+  cursor: grab;
+  user-select: none;
+}
+
+.hotspot[data-editing="true"] button.hs::after {
+  content: none;
+  animation: none;
+}
+
+.hotspot[data-editing="true"] button.hs[data-unplaced]::before {
+  content: attr(title);
+  position: absolute;
+  top: calc(100% - var(--spacing-xs));
+  left: 50%;
+  width: max-content;
+  border-radius: var(--rounding-m);
+  padding: var(--spacing-xs);
+  background-color: var(--color-gray-900);
+  color: var(--color-white);
+  font-size: var(--body-size-xs);
+  animation: none;
+}
+
+.hotspot[data-editing="true"] button.hs[data-unplaced="true"] {
+  background-color: #fbdbe155;
+  transform: translate(-50%, -50%);
+}
+
+.hotspot[data-editing="true"] button.hs[data-unplaced="false"] {
+  background-color: #8f720055;
+  transform: translate(-50%, -50%);
+}
+
+.hotspot[data-editing="true"] button.hs[data-unplaced="true"]:hover {
+  background-color: #fbdbe1bb;
+}
+
+.hotspot[data-editing="true"] button.hs[data-unplaced="false"]:hover {
+  background-color: #8f7200bb;
+}
+
+.hotspot[data-editing="true"] button.hs[aria-dragging="true"] {
+  cursor: grabbing;
+}
+
+.hotspot[data-editing="true"] button.hs[data-unplaced="true"][aria-dragging="true"]:hover {
+  background-color: #fbdbe1bb;
+}
+
+.hotspot[data-editing="true"] button.hs[data-unplaced="false"][aria-dragging="true"]:hover {
+  background-color: #8f7200bb;
+}
+
+.hotspot[data-editing="true"] button.hs[data-unplaced="true"] i.glyph {
+  background-color: var(--color-red);
+}
+
+.hotspot[data-editing="true"] button.hs[data-unplaced="false"] i.glyph {
+  background-color: var(--color-yellow);
+}
+
+.hotspot[data-editing="true"] button.hs[data-unplaced="true"] i.glyph::before,
+.hotspot[data-editing="true"] button.hs[data-unplaced="true"] i.glyph::after {
+  background-color: #fbdbe1;
+}
+
+.hotspot[data-editing="true"] button.hs[data-unplaced="false"] i.glyph::before,
+.hotspot[data-editing="true"] button.hs[data-unplaced="false"] i.glyph::after {
+  background-color: #8f7200;
+}

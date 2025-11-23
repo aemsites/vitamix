@@ -42,10 +42,16 @@ export default function renderPricing(block, variant) {
 
   if (!variant) pricingElement.remove();
 
+  // Check if the product is reconditioned
+  // If the variant is not null, check if the item condition is refurbished
+  // If the variant is null, check if the location href includes 'reconditioned'
+  // If both are false, item is not reconditioned
+  const isReconditioned = variant && variant.itemCondition ? variant.itemCondition.includes('RefurbishedCondition') : window.location.href.includes('reconditioned') || false;
+
   if (pricing.regular && pricing.regular > pricing.final) {
     const nowLabel = document.createElement('div');
     nowLabel.className = 'pricing-now';
-    nowLabel.textContent = 'Now';
+    nowLabel.textContent = isReconditioned ? 'Recon Price' : 'Now';
     pricingContainer.appendChild(nowLabel);
   }
 
@@ -61,7 +67,7 @@ export default function renderPricing(block, variant) {
     const savingsAmount = pricing.regular - pricing.final;
     const saveText = document.createElement('span');
     saveText.className = 'pricing-save';
-    saveText.textContent = `Save $${savingsAmount.toFixed(2)} | `;
+    saveText.textContent = isReconditioned ? `Save $${savingsAmount.toFixed(2)} | New ` : `Save $${savingsAmount.toFixed(2)} | Was `;
 
     const regularPrice = document.createElement('del');
     regularPrice.className = 'pricing-regular';

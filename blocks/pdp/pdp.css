@@ -1,4 +1,5 @@
 @import url('./gallery.css');
+@import url('./color-swatches.css');
 
 /* stylelint-disable no-descending-specificity */
 .pdp-wrapper {
@@ -89,49 +90,6 @@
   position: relative;
 }
 
-/* product swatches colors */
-.pdp .pdp-color-swatch {
-  --color-matte-navy: #00263e;
-  --color-black: #000;
-  --color-red: #c03;
-  --color-brushed-stainless: #b0b3b7;
-  --color-brushed-stainless-metal-finish: #b5aa9d;
-  --color-white: #fff;
-  --color-slate: #666;
-  --color-grey: #e5e4e2;
-  --color-platinum: #e5e4e2;
-  --color-black-stainless-metal-finish: #161616;
-  --color-copper-metal-finish: #f2a57e;
-  --color-pearl-gray: #858583;
-  --color-graphite: #414141;
-  --color-candy-apple: #c00310;
-  --color-onyx: #353935;
-  --color-ruby: #e01160;
-  --color-orange: #ffa600;
-  --color-cinnamon: #d2691e;
-  --color-turquoise: #30d5c7;
-  --color-espresso: #67564e;
-  --color-cobalt: #0047ab;
-  --color-black-diamond: #928b8b;
-  --color-cream: #fffdd0;
-  --color-sour-apple-green: #e3edb5;
-  --color-purple: #800080;
-  --color-yellow: #f7f700;
-  --color-blue: #1131d4;
-  --color-1100001: #100;
-  --color-1100002: #100;
-  --color-graphite-metal-finish: #606060;
-  --color-candy-apple-red: #c00310;
-  --color-reflection: #f2a57e;
-  --color-color-not-available: ;
-  --color-abalone-grey: #3b363b;
-  --color-shadow-black: #000;
-  --color-polar-white: #fff;
-  --color-nano-gray: #5b6770;
-  --color-midnight-blue: #00263e;
-  --color-brushed-gold: #ccba78;
-}
-
 .pdp-color-swatch-oos.pdp-color-inner::after {
   content: '';
   position: absolute;
@@ -166,6 +124,10 @@
   font-size: var(--body-size-s);
   font-weight: var(--weight-medium);
   color: var(--color-text);
+}
+
+[data-oos="true"] .options .warranty {
+  display: none;
 }
 
 .add-to-cart {
@@ -665,7 +627,7 @@ a.button.pdp-find-locally-button {
   object-fit: contain;
 }
 
-.pdp-warrenty-option {
+.pdp-warranty-option {
   display: flex;
   align-items: center;
   gap: var(--spacing-s);
@@ -675,7 +637,7 @@ a.button.pdp-find-locally-button {
   color: var(--color-text);
 }
 
-.pdp-warrenty-option input {
+.pdp-warranty-option input {
   height: 24px;
   width: 24px;
   margin: 0;
@@ -719,4 +681,46 @@ main .section > div.pdp-wrapper {
 
 .section.pdp-container {
   margin-top: var(--spacing-l);
+}
+
+.pdp-free-gift-container {
+  max-width: 32em;
+}
+
+.pdp-free-gift-heading {
+  font-size: var(--body-size-s);
+  font-weight: var(--weight-medium);
+  color: var(--color-text);
+}
+
+.pdp-free-gift-body {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-s);
+  position: relative;
+  border: 1.5px solid var(--color-deep-rust);
+  border-radius: 4px;
+  padding: var(--spacing-s);
+  padding-left: 1em;
+  margin-top: var(--spacing-s);
+}
+
+.pdp-free-gift-body img {
+  width: 3em;
+  height: 3em;
+  margin-right: var(--spacing-s);
+}
+
+.pdp-free-gift-body::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  left: -10px;
+  height: 20px;
+  width: 20px;
+  background-image: url('/blocks/pdp/free-gift-icon.png');
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-position: center;
 }

@@ -175,8 +175,8 @@ function sanitizeNavList(ul) {
  * @param {HTMLElement} nav - Navigation container element
  */
 function enforceSubmenuState(nav) {
-  const submenuProducts = nav.querySelector('#submenu-products');
-  const toggleProducts = nav.querySelector('[aria-controls="submenu-products"]');
+  const submenuProducts = nav.querySelector('#submenu-products') || nav.querySelector('#submenu-produits');
+  const toggleProducts = nav.querySelector('[aria-controls="submenu-products"]') || nav.querySelector('[aria-controls="submenu-produits"]');
 
   if (!submenuProducts || !toggleProducts) return;
 
@@ -297,6 +297,9 @@ export default async function decorate(block) {
   const navMeta = getMetadata('nav');
   const navPath = navMeta ? new URL(navMeta, window.location).pathname : '/nav';
   const fragment = await loadFragment(navPath);
+  if (fragment.querySelector('.icon-logo-commercial')) {
+    block.closest('header').classList.add('header-commercial');
+  }
   rewriteLinks(fragment);
 
   // decorate nav DOM

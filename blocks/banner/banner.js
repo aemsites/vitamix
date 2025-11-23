@@ -1,8 +1,14 @@
-import { buildVideo } from '../../scripts/scripts.js';
+import { buildVideo, applyImgColor } from '../../scripts/scripts.js';
 
 export default function decorate(block) {
   [...block.querySelectorAll('div img, div svg')].forEach((img) => {
     const closestBlock = img.closest('.block');
+    if (img.complete) applyImgColor(block);
+    else if (img.tagName === 'IMG') {
+      img.addEventListener('load', () => {
+        applyImgColor(block);
+      });
+    }
     if (closestBlock !== block) return; // skip nested blocks
     const wrapper = img.closest('div');
     if (wrapper.children.length === 1) wrapper.className = 'img-wrapper';

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Simulate Date</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="robots" content="noindex">
+    </head>
+    <style>
+        body.dark {
+            --color-text: white;
+            --color-background: black;
+        }
+
+        body.light {
+            --color-text: black;
+            --color-background: white;
+        }
+
+        body {
+            /* background-color: var(--color-background); */
+            color: var(--color-text);
+            font-family: sans-serif;
+            width: 200px;
+            margin: 2em auto;
+        }
+
+        #simulate-date {
+            background-color: var(--color-background);
+            color: var(--color-text);
+            border: 1px solid var(--color-text);
+            border-radius: 0.25rem;
+            padding: 0.5rem 1rem;
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        body.dark #simulate-date::-webkit-calendar-picker-indicator {
+            filter: invert(1);
+        }
+
+        a#simulate-date-button:any-link {
+            display: block;
+            margin-top: 1rem;
+            padding: 0.5rem 1rem;
+            background-color: var(--color-text);
+            color: var(--color-background);
+            text-decoration: none;
+            border-radius: 0.25rem;
+            text-align: center;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+
+    </style>
+    <body>
+        <input type="datetime-local" id="simulate-date" />
+        <a target="_top" href="?" id="simulate-date-button">Simulate</button>
+        <script>
+            const params = new URLSearchParams(window.location.search);
+            const theme = params.get('theme') || 'dark';
+            const referrer = new URL(params.get('referrer'));
+            document.body.classList.add(theme);
+
+            const dateInput = document.getElementById('simulate-date');
+            dateInput.addEventListener('change', () => {
+                const simulateDate = dateInput.value;
+                const simulateDateButton = document.getElementById('simulate-date-button');
+                simulateDateButton.href = `https://${referrer.host}${referrer.pathname}?simulateDate=${simulateDate}`;
+            });
+        </script>
+    </body>
+</html>

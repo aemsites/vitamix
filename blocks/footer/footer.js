@@ -64,6 +64,7 @@ export default async function decorate(block) {
   if (cookieDeclaration) {
     cookieDeclaration.addEventListener('click', (e) => {
       e.preventDefault();
+      window.Cookiebot.forceDialog = true;
       window.Cookiebot.renew();
     });
   }
