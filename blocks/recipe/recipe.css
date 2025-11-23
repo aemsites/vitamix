@@ -199,11 +199,19 @@ main .recipe-header {
     gap: var(--spacing-600);
 }
 
+main .recipe-header.no-image {
+    grid-template-areas: 'details' 'additional-info';
+}
+
 @media (width >= 900px) {
     main .recipe-header {
         grid-template-areas: 'image details' 'image additional-info';
         padding: var(--spacing-800) var(--spacing-800);
         gap: var(--spacing-800);
+    }
+
+    main .recipe-header.no-image {
+        grid-template-areas: 'details' 'additional-info';
     }
 }
 

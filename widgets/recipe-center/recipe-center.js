@@ -197,11 +197,21 @@ function createRecipeCard(recipe) {
   link.href = recipe.path || '#';
   link.className = 'recipe-center-card-link';
 
-  const image = document.createElement('img');
-  image.src = new URL(recipe.image).pathname || '';
-  image.alt = recipe.title || '';
-  image.loading = 'lazy';
-  image.className = 'recipe-center-card-image';
+  // Check if image is the default-meta-image and use placeholder instead
+  const imagePath = new URL(recipe.image).pathname || '';
+  const isDefaultImage = imagePath.includes('default-meta-image');
+
+  let image;
+  if (isDefaultImage) {
+    image = document.createElement('div');
+    image.className = 'recipe-center-card-image recipe-center-card-image-placeholder';
+  } else {
+    image = document.createElement('img');
+    image.src = imagePath;
+    image.alt = recipe.title || '';
+    image.loading = 'lazy';
+    image.className = 'recipe-center-card-image';
+  }
 
   const content = document.createElement('div');
   content.className = 'recipe-center-card-content';

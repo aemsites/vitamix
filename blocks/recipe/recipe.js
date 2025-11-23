@@ -10,7 +10,10 @@ function wrapInDiv(element, className) {
     wrapper.append(element.nextElementSibling);
   }
   wrapper.prepend(element);
-  parentElement.insertBefore(wrapper, previousSibling.nextSibling);
+  parentElement.insertBefore(
+    wrapper,
+    previousSibling ? previousSibling.nextSibling : parentElement.firstElementChild,
+  );
 }
 
 function formatTime(timeString) {
@@ -85,8 +88,12 @@ export default async function decorate(block) {
 
   const recipeHeader = document.createElement('div');
   recipeHeader.classList.add('recipe-header');
+  if (!picture) {
+    recipeHeader.classList.add('no-image');
+  }
+
   recipeHeader.innerHTML = `<div class="recipe-details">
-    <h1>${h1.textContent}</h1>
+    <h1>${h1 ? h1.textContent : ''}</h1>
     <div class="recipe-rating">
       <div class="recipe-stars">
         <span class="star">★</span>
@@ -98,7 +105,7 @@ export default async function decorate(block) {
       <span class="review-count">100 reviews</span>
       <a href="#" class="write-review">Write a review</a>
     </div>
-    <p>${description.textContent}</p>
+    <p>${description ? description.textContent : ''}</p>
     <div class="recipe-stats">
      <div class="recipe-stat recipe-stat-total-time">
       <span class="recipe-stat-label">Total Time</span>
@@ -114,9 +121,7 @@ export default async function decorate(block) {
      </div>
     </div>
   </div>
-  <div class="recipe-image">
-    ${picture.outerHTML}
-  </div>
+  ${picture ? `<div class="recipe-image">${picture.outerHTML}</div>` : ''}
   <div class="recipe-additional-info">
     <div class="recipe-additional-info-item">
       <span class="recipe-dietary-interests">
@@ -137,9 +142,9 @@ export default async function decorate(block) {
     </div>
   </div>`;
 
-  h1.remove();
-  description.remove();
-  picture.remove();
+  if (h1) h1.remove();
+  if (description) description.remove();
+  if (picture) picture.remove();
 
   const recipeContainer = document.createElement('div');
   recipeContainer.classList.add('recipe-body');
