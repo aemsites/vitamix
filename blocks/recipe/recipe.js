@@ -1,6 +1,7 @@
 import { getMetadata } from '../../scripts/aem.js';
 
 function wrapInDiv(element, className) {
+  if (!element) return;
   const { previousSibling, parentElement } = element;
   const tag = element.tagName;
   const wrapper = document.createElement('div');
