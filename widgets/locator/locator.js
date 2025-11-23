@@ -63,7 +63,7 @@ async function geoCode(address) {
   return {
     location: r0?.geometry?.location || null,
     country: countryComp ? {
-      short: countryComp.short_name, 
+      short: countryComp.short_name,
       long: countryComp.long_name,
       type: 'country',
     } : null,
@@ -107,7 +107,7 @@ function findCommResults(data, location, countryShort, regionShort) {
   const wantCountry = (countryShort || '').toUpperCase();
   const wantRegion = (regionShort || '').toUpperCase();
 
-   // Local Representatives (country + region match)
+  // Local Representatives (country + region match)
   const localRep = data.filter((item) => {
     if (item.TYPE !== 'LOCAL REP') return false;
     const itemCountry = String(item.COUNTRY || '').toUpperCase();
@@ -204,51 +204,43 @@ function displayCommResults(results, location) {
     distance.classList.add('locator-distance');
     li.append(distance);
 
-    // const address = document.createElement('a');
-    // const addressQuery = `${result.NAME} ${result.ADDRESS_1}, ${result.CITY}, ${result.STATE_PROVINCE} ${result.POSTAL_CODE}`;
-    // address.href = `https://maps.google.com/?q=${encodeURIComponent(addressQuery)}`;
-    // address.target = '_blank';
-    // address.rel = 'noopener noreferrer';
-    // address.textContent = addressQuery;
-    // address.classList.add('locator-address');
-    // li.append(address);
     // Phone number
-  if (result.PHONE_NUMBER) {
-    const phoneWrapper = document.createElement('span');
-    phoneWrapper.classList.add('locator-phone');
-    const phoneLabel = document.createElement('strong');
-    phoneLabel.textContent = 'Phone: ';
-    phoneWrapper.append(phoneLabel);
+    if (result.PHONE_NUMBER) {
+      const phoneWrapper = document.createElement('span');
+      phoneWrapper.classList.add('locator-phone');
+      const phoneLabel = document.createElement('strong');
+      phoneLabel.textContent = 'Phone: ';
+      phoneWrapper.append(phoneLabel);
 
-    const phoneLink = document.createElement('a');
-    phoneLink.href = `tel:${result.PHONE_NUMBER}`;
-    phoneLink.textContent = result.PHONE_NUMBER;
-    phoneWrapper.append(phoneLink);
+      const phoneLink = document.createElement('a');
+      phoneLink.href = `tel:${result.PHONE_NUMBER}`;
+      phoneLink.textContent = result.PHONE_NUMBER;
+      phoneWrapper.append(phoneLink);
 
-    li.append(phoneWrapper);
-  }
+      li.append(phoneWrapper);
+    }
 
-  // Web address
-  if (result.WEB_ADDRESS) {
-    const webWrapper = document.createElement('span');
-    webWrapper.classList.add('locator-web');
+    // Web address
+    if (result.WEB_ADDRESS) {
+      const webWrapper = document.createElement('span');
+      webWrapper.classList.add('locator-web');
 
-    const webLabel = document.createElement('strong');
-    webLabel.textContent = 'Website: ';
-    webWrapper.append(webLabel);
+      const webLabel = document.createElement('strong');
+      webLabel.textContent = 'Website: ';
+      webWrapper.append(webLabel);
 
-    const webLink = document.createElement('a');
-    const webAddress = result.WEB_ADDRESS.startsWith('http')
-      ? result.WEB_ADDRESS
-      : `https://${result.WEB_ADDRESS}`;
+      const webLink = document.createElement('a');
+      const webAddress = result.WEB_ADDRESS.startsWith('http')
+        ? result.WEB_ADDRESS
+        : `https://${result.WEB_ADDRESS}`;
 
-    webLink.href = webAddress;
-    webLink.target = '_blank';
-    webLink.textContent = result.WEB_ADDRESS_LINK_TEXT || result.WEB_ADDRESS;
-    webWrapper.append(webLink);
+      webLink.href = webAddress;
+      webLink.target = '_blank';
+      webLink.textContent = result.WEB_ADDRESS_LINK_TEXT || result.WEB_ADDRESS;
+      webWrapper.append(webLink);
 
-    li.append(webWrapper);
-  }
+      li.append(webWrapper);
+    }
 
     return li;
   };
@@ -555,7 +547,12 @@ export default function decorate(widget) {
 
     if (data.productType === 'COMM') {
       if (location) {
-        const results = findCommResults(window.locatorData.COMM, location, country?.short, region?.short);
+        const results = findCommResults(
+          window.locatorData.COMM,
+          location,
+          country?.short,
+          region?.short,
+        );
         displayCommResults(results, location);
       } else {
         displayCommResults({});
