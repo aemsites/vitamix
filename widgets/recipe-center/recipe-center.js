@@ -1,5 +1,7 @@
 /* eslint-disable max-len */
 
+import { loadCSS } from '../../scripts/aem.js';
+
 /**
  * Parses raw recipe data from index and transforms values.
  * @param {Object} data - Raw recipe data object from the recipe index
@@ -507,6 +509,7 @@ function init() {
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', init);
 } else {
+  loadCSS('/widgets/recipe-center/recipe-center.css');
   init();
 }
 
