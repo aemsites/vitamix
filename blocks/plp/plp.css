@@ -412,9 +412,49 @@ main .plp-product-card p {
   text-decoration: none;
 }
 
-.plp.carousel ul {
-  justify-content: safe center;
+.plp.carousel > ul {
+  display: grid;
+  grid-template-columns: 1fr;
+  overflow: visible;
+  scroll-snap-type: none;
 }
+
+.plp.carousel nav {
+  display: none;
+}
+
+.plp.carousel nav button.nav-arrow {
+  top: calc((100dvw - (2 * var(--carousel-gap))) / 2);
+}
+
+@media (width >= 600px) {
+  .plp.carousel > ul {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .plp.carousel nav button.nav-arrow {
+    top: calc((100dvw - (2 * var(--carousel-gap))) / 4);
+  }
+}
+
+@media (width >= 800px) {
+  .plp.carousel > ul {
+    display: flex;
+    justify-content: safe center;
+    overflow: scroll clip;
+    scroll-behavior: auto;
+    scroll-snap-type: x mandatory;
+  }
+
+  .plp.carousel nav {
+    display: block;
+  }
+
+  .plp.carousel nav button.nav-arrow {
+    top: calc((100dvw - (2 * var(--carousel-gap))) / 6);
+  }
+}
+
 
 .plp.carousel li.carousel-slide {
   cursor: pointer;
@@ -461,20 +501,4 @@ main .plp-product-card p {
 
 .plp.carousel .eyebrow + p {
   margin-top: 0;
-}
-
-.plp.carousel nav button.nav-arrow {
-  top: calc((100dvw - (2 * var(--carousel-gap))) / 2);
-}
-
-@media (width >= 600px) {
-  .plp.carousel nav button.nav-arrow {
-    top: calc((100dvw - (2 * var(--carousel-gap))) / 4);
-  }
-}
-
-@media (width >= 800px) {
-  .plp.carousel nav button.nav-arrow {
-    top: calc((100dvw - (2 * var(--carousel-gap))) / 6);
-  }
 }
