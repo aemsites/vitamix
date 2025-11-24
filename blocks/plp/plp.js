@@ -433,6 +433,10 @@ async function styleRowAsSlide(content, ph) {
     body.insertBefore(colors, colorOptions.nextSibling);
   }
 
+  // footer
+  const footer = document.createElement('div');
+  footer.className = 'slide-footer';
+
   // starting at price
   if (product.price) {
     const startingAt = document.createElement('p');
@@ -450,12 +454,13 @@ async function styleRowAsSlide(content, ph) {
       price.append(saleInfo);
     }
 
-    body.append(startingAt, price);
+    footer.append(startingAt, price);
   }
 
   // "Shop Now" button
   const shopNow = createProductButton(product, ph, 'Shop Now');
-  body.append(shopNow);
+  footer.append(shopNow);
+  body.append(footer);
 }
 
 /**
