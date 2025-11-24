@@ -280,10 +280,52 @@ function createProductPrice(product) {
  * @returns {HTMLDivElement} Container element with color swatches
  */
 function createProductColors(product) {
+  const COLOR_ORDER = {
+    /* black */
+    black: 1,
+    'shadow-black': 1,
+    1100001: 1,
+    1100002: 1,
+    'black-stainless-metal-finish': 1,
+    /* red */
+    red: 2,
+    'candy-apple': 2,
+    'candy-apple-red': 2,
+    ruby: 2,
+    /* white */
+    white: 3,
+    'polar-white': 3,
+    /* gray */
+    onyx: 4,
+    'abalone-grey': 4,
+    graphite: 4,
+    'nano-gray': 4,
+    'graphite-metal-finish': 4,
+    slate: 4,
+    'pearl-gray': 4,
+    'black-diamond': 4,
+    'brushed-stainless': 4,
+    grey: 4,
+    platinum: 4,
+    /* tan */
+    espresso: 5,
+    'copper-metal-finish': 5,
+    reflection: 5,
+    'brushed-stainless-metal-finish': 5,
+    'brushed-gold': 5,
+    cream: 5,
+  };
+
   const colors = document.createElement('div');
   colors.className = 'plp-colors';
   if (hasVariants(product)) {
-    product.variants.forEach((variant) => {
+    const sortedVariants = [...product.variants].sort((a, b) => {
+      const colorA = COLOR_ORDER[toClassName(a.color)] ?? 9;
+      const colorB = COLOR_ORDER[toClassName(b.color)] ?? 9;
+      return colorA - colorB;
+    });
+
+    sortedVariants.forEach((variant) => {
       const { color, availability } = variant;
       if (color) {
         const colorSwatch = document.createElement('div');
@@ -445,7 +487,7 @@ async function buildProductCarousel(block, ph) {
         const url = new URL(link.href, window.location.origin);
         url.searchParams.set('color', color.dataset.color);
         window.location.href = url.href;
-      } else {
+      } else if (link) {
         link.click();
       }
     }
