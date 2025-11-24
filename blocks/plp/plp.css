@@ -462,3 +462,19 @@ main .plp-product-card p {
 .plp.carousel .eyebrow + p {
   margin-top: 0;
 }
+
+.plp.carousel nav button.nav-arrow {
+  top: calc((100dvw - (2 * var(--carousel-gap))) / 2);
+}
+
+@media (width >= 600px) {
+  .plp.carousel nav button.nav-arrow {
+    top: calc((100dvw - (2 * var(--carousel-gap))) / 4);
+  }
+}
+
+@media (width >= 800px) {
+  .plp.carousel nav button.nav-arrow {
+    top: calc((100dvw - (2 * var(--carousel-gap))) / 6);
+  }
+}
