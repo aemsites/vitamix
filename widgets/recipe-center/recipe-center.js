@@ -38,8 +38,13 @@ async function lookupRecipes(config = {}, facets = {}) {
     const resp = await fetch('/us/en_us/recipes/data/query-index.json');
     const { data } = await resp.json();
 
-    // parse and store all recipes
-    const recipes = data.map((d) => parseRecipeData(d));
+    // parse and filter recipes - only include Updated or New status, exclude Deleted
+    const recipes = data
+      .map((d) => parseRecipeData(d))
+      .filter((recipe) => {
+        const status = recipe.status ? recipe.status.toLowerCase() : '';
+        return status === 'updated' || status === 'new';
+      });
 
     window.recipeIndex = {
       data: recipes,
