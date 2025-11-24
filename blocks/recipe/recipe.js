@@ -185,4 +185,62 @@ export default async function decorate(block) {
       });
     });
   }
+
+  // Add compatible containers section above ingredients
+  const recipeTitle = h1 ? h1.textContent.trim() : '';
+  const ingredientsSection = block.querySelector('.recipe-ingredients');
+  if (recipeTitle && ingredientsSection) {
+    try {
+      const response = await fetch('/us/en_us/recipes/data/query-index.json');
+      const data = await response.json();
+
+      // Find all recipes with the same title
+      const sameRecipes = data.data.filter((recipe) => recipe.title === recipeTitle);
+
+      // Create a map of containers to recipe paths
+      const containerMap = new Map();
+      sameRecipes.forEach((recipe) => {
+        if (recipe['compatible-containers']) {
+          const containers = recipe['compatible-containers'].split(',').map((c) => c.trim());
+          containers.forEach((container) => {
+            if (!containerMap.has(container)) {
+              containerMap.set(container, recipe.path);
+            }
+          });
+        }
+      });
+
+      // Only create the section if we have containers
+      if (containerMap.size > 0) {
+        const containersDiv = document.createElement('div');
+        containersDiv.className = 'recipe-compatible-containers';
+
+        const heading = document.createElement('h2');
+        heading.textContent = 'Compatible Containers';
+
+        const containersWrapper = document.createElement('div');
+        containersWrapper.className = 'recipe-containers-list';
+
+        // Sort containers alphabetically
+        const sortedContainers = Array.from(containerMap.entries())
+          .sort((a, b) => a[0].localeCompare(b[0]));
+
+        sortedContainers.forEach(([container, path]) => {
+          const tag = document.createElement('a');
+          tag.className = 'recipe-container-tag';
+          tag.href = path;
+          tag.textContent = container;
+          containersWrapper.appendChild(tag);
+        });
+
+        containersDiv.appendChild(heading);
+        containersDiv.appendChild(containersWrapper);
+
+        ingredientsSection.parentElement.insertBefore(containersDiv, ingredientsSection);
+      }
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Error loading recipe containers:', error);
+    }
+  }
 }
