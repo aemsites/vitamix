@@ -66,11 +66,24 @@ async function lookupRecipes(config = {}, facets = {}) {
     const filterMatches = {};
 
     // check if this recipe matches ALL the filter criteria
-    const matchedAll = filterKeys.every((filterKey) => {
+    // IMPORTANT: Use forEach instead of every() to avoid short-circuiting
+    // We need to evaluate ALL filters and store them in filterMatches for facet counting
+    filterKeys.forEach((filterKey) => {
       let matched = false;
 
-      // array-based filter matching (dietary-interests, compatible-containers, etc.)
-      if (recipe[filterKey]) {
+      // special case: full-text search on recipe title
+      if (filterKey === 'fulltext') {
+        // Only apply fulltext filter if it has actual content
+        if (config.fulltext && config.fulltext.trim().length > 0) {
+          const titleLower = recipe.title.toLowerCase();
+          const searchTerm = config.fulltext.toLowerCase().trim();
+          matched = titleLower.includes(searchTerm);
+        } else {
+          // Empty fulltext matches everything
+          matched = true;
+        }
+      } else if (recipe[filterKey]) {
+        // array-based filter matching (dietary-interests, compatible-containers, etc.)
         if (Array.isArray(recipe[filterKey])) {
           // recipe matches if ANY of its values match ANY of the filter tokens
           matched = tokens[filterKey].some((t) => recipe[filterKey].includes(t));
@@ -80,19 +93,15 @@ async function lookupRecipes(config = {}, facets = {}) {
         }
       }
 
-      // special case: full-text search on recipe title
-      if (filterKey === 'fulltext') {
-        const fulltext = recipe.title.toLowerCase();
-        matched = fulltext.includes(config.fulltext.toLowerCase());
-      }
-
-      // store whether this specific filter matched for facet counting
+      // ALWAYS store whether this filter matched (for facet counting)
       filterMatches[filterKey] = matched;
-
-      return matched || !config[filterKey]; // if no filter set for this key, consider it matched
     });
 
-    // calculate facet counts for the filter UI (e.g., "Easy (5)", "Medium (3)")
+    // Now check if ALL filters matched
+    const matchedAll = filterKeys.every((filterKey) => filterMatches[filterKey] || !config[filterKey]);
+
+    // NOW calculate facet counts AFTER all filterMatches have been collected
+    // This ensures we have the complete picture of which filters matched
     facetKeys.forEach((facetKey) => {
       // intelligent facet counting: include recipes that match ALL OTHER filters
       let includeInFacet = true;
@@ -187,6 +196,88 @@ function formatYield(yieldString) {
 }
 
 /**
+ * Extracts the numeric value from a yield string.
+ * @param {string} yieldString - Yield string like "8.00 servings"
+ * @returns {number} Numeric yield value
+ */
+function parseYieldNumber(yieldString) {
+  if (!yieldString) return 0;
+  const match = yieldString.match(/^([\d.]+)/);
+  return match ? parseFloat(match[1]) : 0;
+}
+
+/**
+ * Collapses recipes with the same title, aggregating yields and compatible-containers.
+ * @param {Array<Object>} recipes - Array of recipe objects
+ * @returns {Array<Object>} Array of collapsed recipe objects
+ */
+function collapseRecipesByTitle(recipes) {
+  const recipesByTitle = {};
+
+  recipes.forEach((recipe) => {
+    const { title } = recipe;
+    if (!title) return;
+
+    if (!recipesByTitle[title]) {
+      // First occurrence - create the base recipe
+      recipesByTitle[title] = {
+        ...recipe,
+        yields: [recipe.yield],
+        allContainers: recipe['compatible-containers'] ? [...recipe['compatible-containers']] : [],
+      };
+    } else {
+      // Duplicate - aggregate data
+      const existing = recipesByTitle[title];
+
+      // Add yield to the list
+      if (recipe.yield) {
+        existing.yields.push(recipe.yield);
+      }
+
+      // Add compatible containers
+      if (recipe['compatible-containers']) {
+        recipe['compatible-containers'].forEach((container) => {
+          if (!existing.allContainers.includes(container)) {
+            existing.allContainers.push(container);
+          }
+        });
+      }
+    }
+  });
+
+  // Process the collapsed recipes to create yield ranges
+  return Object.values(recipesByTitle).map((recipe) => {
+    if (recipe.yields && recipe.yields.length > 1) {
+      // Find min and max yields
+      const yieldNumbers = recipe.yields
+        .map(parseYieldNumber)
+        .filter((n) => n > 0);
+
+      if (yieldNumbers.length > 0) {
+        const minYield = Math.min(...yieldNumbers);
+        const maxYield = Math.max(...yieldNumbers);
+
+        // Extract unit from first yield (same pattern as formatYield)
+        const match = recipe.yields[0].match(/^([\d.]+)\s*(.*)$/);
+        const unit = match ? match[2].trim() : '';
+
+        // Create range string
+        recipe.yieldRange = minYield !== maxYield
+          ? `${Math.round(minYield)} - ${Math.round(maxYield)} ${unit}`
+          : formatYield(recipe.yields[0]);
+      }
+    } else {
+      recipe.yieldRange = recipe.yield ? formatYield(recipe.yield) : '';
+    }
+
+    // Update compatible-containers with aggregated list
+    recipe['compatible-containers'] = recipe.allContainers;
+
+    return recipe;
+  });
+}
+
+/**
  * Creates a recipe card DOM element for display in the recipe listing.
  * @param {Object} recipe - Recipe data object with title, image, time, etc.
  * @returns {HTMLElement} Recipe card element
@@ -239,10 +330,10 @@ function createRecipeCard(recipe) {
     meta.appendChild(difficulty);
   }
 
-  if (recipe.yield) {
+  if (recipe.yieldRange || recipe.yield) {
     const yieldSpan = document.createElement('span');
     yieldSpan.className = 'recipe-center-card-yield';
-    yieldSpan.textContent = formatYield(recipe.yield);
+    yieldSpan.textContent = recipe.yieldRange || formatYield(recipe.yield);
     meta.appendChild(yieldSpan);
   }
 
@@ -481,7 +572,11 @@ function buildRecipeFiltering(container, config = {}) {
       featured: (a, b) => a.title.localeCompare(b.title),
     };
 
-    const results = await lookupRecipes(filterConfig, facets);
+    let results = await lookupRecipes(filterConfig, facets);
+
+    // Collapse recipes with the same title
+    results = collapseRecipesByTitle(results);
+
     const sortBy = document.getElementById('recipe-center-sortby') ? document.getElementById('recipe-center-sortby').dataset.sort : 'featured';
     results.sort(sorts[sortBy]);
     container.querySelector('#recipe-center-results-count').textContent = results.length;
