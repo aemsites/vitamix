@@ -510,7 +510,8 @@ function buildAutoBlocks(main) {
     // wrap recipes in block
     if (document.querySelector('main') === main) {
       const template = getMetadata('template');
-      if (template === 'recipe') {
+      const recipeType = getMetadata('recipe-type');
+      if (template === 'recipe' && recipeType) {
         const block = document.createElement('div');
         block.classList.add('recipe');
         block.append(...main.firstElementChild.children);
