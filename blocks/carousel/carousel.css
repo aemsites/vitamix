@@ -271,7 +271,6 @@
 
   .carousel.quote > ul > li.slide-quote[data-q] .slide-body {
     place-self: center;
-    padding: 0 calc(52px + var(--spacing-400)) 0 var(--spacing-400);
     max-width: 75ch;
   }
 
@@ -299,6 +298,7 @@
   height: 250px;
 }
   
+/* stylelint-disable-next-line no-descending-specificity */
 .carousel-wrapper.testimonial-wrapper .carousel-static img {
   width: 100%;
   height: 100%;
