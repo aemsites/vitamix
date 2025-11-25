@@ -350,6 +350,7 @@ function decorateTemplateAndTheme() {
 function wrapTextNodes(block) {
   const validWrappers = [
     'P',
+    'BLOCKQUOTE',
     'PRE',
     'UL',
     'OL',
