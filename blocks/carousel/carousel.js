@@ -143,15 +143,21 @@ export default function decorate(block) {
           } else {
             slide.dataset.q = (qs % 3) + 1;
           }
-          const quotes = cell.querySelectorAll('blockquote');
-          const quoteWrapper = quotes[0].parentElement;
+          const children = [...cell.children];
+          const firstQuoteIndex = children.findIndex((c) => c.tagName === 'BLOCKQUOTE');
+          const lastQuoteIndex = children.findLastIndex((c) => c.tagName === 'BLOCKQUOTE');
+
+          const beforeQuotes = children.slice(0, firstQuoteIndex);
+          const quotes = children.slice(firstQuoteIndex, lastQuoteIndex + 1);
+          const afterQuotes = children.slice(lastQuoteIndex + 1);
+
           const cite = document.createElement('cite');
-          const attr = [...quoteWrapper.children].filter((c) => c.tagName !== 'BLOCKQUOTE' && !c.querySelector('blockquote'));
-          cite.append(...attr);
-          cell.replaceChildren(...quotes, cite);
+          cite.append(...afterQuotes);
+
+          cell.replaceChildren(...beforeQuotes, ...quotes, cite);
         }
         [...cell.querySelectorAll('p')].forEach((p) => {
-          if (p.textContent.includes('$')) p.classList.add('slide-body-price');
+          if (p.textContent.startsWith('$')) p.classList.add('slide-body-price');
         });
       }
       slide.append(cell);
