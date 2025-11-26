@@ -511,7 +511,8 @@ function buildAutoBlocks(main) {
     if (document.querySelector('main') === main) {
       const template = getMetadata('template');
       const recipeType = getMetadata('recipe-type');
-      if (template === 'recipe' && recipeType) {
+      const totalTime = getMetadata('total-time');
+      if (template === 'recipe' && (recipeType || totalTime)) {
         const block = document.createElement('div');
         block.classList.add('recipe');
         block.append(...main.firstElementChild.children);
