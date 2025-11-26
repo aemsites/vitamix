@@ -248,6 +248,7 @@
 
 .carousel.quote > ul > li.slide-quote[data-q] blockquote {
   font-family: var(--body-font-family);
+  font-size: var(--body-size-m);
 }
 
 .carousel.quote > ul > li.slide-quote[data-q] .slide-image img {
@@ -256,6 +257,7 @@
 
 .carousel.quote > ul > li.slide-quote[data-q] cite > * {
   margin: 0;
+  font-size: var(--body-size-m);
 }
 
 @media (width >= 800px) {
