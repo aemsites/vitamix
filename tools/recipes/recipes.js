@@ -489,6 +489,44 @@ ${recipeHtml}
   return { htmlContent, kebabName };
 }
 
+// Preview recipe on admin.hlx.page
+export async function previewRecipe(kebabName, token) {
+  const path = `us/en_us/recipes/data/${kebabName}`;
+  const previewUrl = `https://admin.hlx.page/preview/aemsites/vitamix/main/${path}`;
+
+  const opts = {
+    headers: { Authorization: `Bearer ${token}` },
+    method: 'POST',
+  };
+
+  const resp = await fetch(previewUrl, opts);
+
+  if (!resp.ok) {
+    throw new Error(`Preview failed: ${resp.status} ${resp.statusText}`);
+  }
+
+  return previewUrl;
+}
+
+// Publish recipe on admin.hlx.page
+export async function publishRecipe(kebabName, token) {
+  const path = `us/en_us/recipes/data/${kebabName}`;
+  const publishUrl = `https://admin.hlx.page/live/aemsites/vitamix/main/${path}`;
+
+  const opts = {
+    headers: { Authorization: `Bearer ${token}` },
+    method: 'POST',
+  };
+
+  const resp = await fetch(publishUrl, opts);
+
+  if (!resp.ok) {
+    throw new Error(`Publish failed: ${resp.status} ${resp.statusText}`);
+  }
+
+  return publishUrl;
+}
+
 // Bulk sync selected recipes with DA
 export async function bulkSyncWithDA() {
   const checkboxes = document.querySelectorAll('.recipe-checkbox:checked');
@@ -507,6 +545,10 @@ export async function bulkSyncWithDA() {
     return;
   }
 
+  // Check if preview and publish options are enabled
+  const enablePreview = document.getElementById('enablePreview')?.checked || false;
+  const enablePublish = document.getElementById('enablePublish')?.checked || false;
+
   const syncProgress = document.getElementById('syncProgress');
   const syncLog = document.getElementById('syncLog');
   const bulkSyncBtn = document.getElementById('bulkSyncBtn');
@@ -518,6 +560,8 @@ export async function bulkSyncWithDA() {
   bulkSyncBtn.textContent = 'Syncing...';
 
   addLogEntry(`Starting bulk sync of ${checkboxes.length} recipe(s)`, 'info');
+  if (enablePreview) addLogEntry('Preview enabled', 'info');
+  if (enablePublish) addLogEntry('Publish enabled', 'info');
   addLogEntry('─────────────────────────────────────', 'info');
 
   let successCount = 0;
@@ -574,6 +618,31 @@ export async function bulkSyncWithDA() {
       }
 
       addLogEntry(`  ✓ Successfully synced: ${filename}`, 'success');
+
+      // Preview if enabled
+      if (enablePreview) {
+        try {
+          addLogEntry('  Running preview...', 'info');
+          // eslint-disable-next-line no-await-in-loop
+          await previewRecipe(filename, token);
+          addLogEntry('  ✓ Preview complete', 'success');
+        } catch (previewError) {
+          addLogEntry(`  ⚠ Preview failed: ${previewError.message}`, 'warning');
+        }
+      }
+
+      // Publish if enabled
+      if (enablePublish) {
+        try {
+          addLogEntry('  Publishing...', 'info');
+          // eslint-disable-next-line no-await-in-loop
+          await publishRecipe(filename, token);
+          addLogEntry('  ✓ Publish complete', 'success');
+        } catch (publishError) {
+          addLogEntry(`  ⚠ Publish failed: ${publishError.message}`, 'warning');
+        }
+      }
+
       // eslint-disable-next-line no-plusplus
       successCount++;
 
@@ -725,8 +794,26 @@ export async function displayRecipeDetails(recipeNumber) {
     const recipePageUrl = `https://www.vitamix.com/us/en_us/recipes/${kebabName}`;
     viewOnVitamixBtn.href = recipePageUrl;
 
-    // Add "Sync with DA" button to detail header
+    // Add "Sync with DA" button and options to detail header
     let syncWithDABtn = detailHeader.querySelector('.btn-sync-with-da');
+    let detailSyncOptions = detailHeader.querySelector('.detail-sync-options');
+
+    if (!detailSyncOptions) {
+      detailSyncOptions = document.createElement('div');
+      detailSyncOptions.className = 'detail-sync-options';
+      detailSyncOptions.innerHTML = `
+        <label class="sync-option">
+          <input type="checkbox" id="detailEnablePreview" />
+          <span>Preview</span>
+        </label>
+        <label class="sync-option">
+          <input type="checkbox" id="detailEnablePublish" />
+          <span>Publish</span>
+        </label>
+      `;
+      detailHeader.appendChild(detailSyncOptions);
+    }
+
     if (!syncWithDABtn) {
       syncWithDABtn = document.createElement('button');
       syncWithDABtn.className = 'btn-sync-with-da';
@@ -735,11 +822,41 @@ export async function displayRecipeDetails(recipeNumber) {
 
       syncWithDABtn.addEventListener('click', async () => {
         const originalText = syncWithDABtn.textContent;
+        const enablePreview = document.getElementById('detailEnablePreview')?.checked || false;
+        const enablePublish = document.getElementById('detailEnablePublish')?.checked || false;
+
         try {
           syncWithDABtn.disabled = true;
           syncWithDABtn.textContent = 'Syncing...';
 
           const result = await syncWithDA(recipeName, recipeNumber);
+
+          // Get token for preview/publish
+          const token = window.sessionStorage.getItem('da-token');
+
+          // Preview if enabled
+          if (enablePreview && token) {
+            try {
+              await previewRecipe(result.filename, token);
+              // eslint-disable-next-line no-console
+              console.log('Preview complete');
+            } catch (previewError) {
+              // eslint-disable-next-line no-console
+              console.error('Preview failed:', previewError);
+            }
+          }
+
+          // Publish if enabled
+          if (enablePublish && token) {
+            try {
+              await publishRecipe(result.filename, token);
+              // eslint-disable-next-line no-console
+              console.log('Publish complete');
+            } catch (publishError) {
+              // eslint-disable-next-line no-console
+              console.error('Publish failed:', publishError);
+            }
+          }
 
           syncWithDABtn.textContent = '✓ Synced!';
           syncWithDABtn.style.backgroundColor = '#28a745';
