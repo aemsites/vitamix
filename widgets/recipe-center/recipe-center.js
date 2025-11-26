@@ -67,6 +67,12 @@ async function lookupRecipes(config = {}, facets = {}) {
     return config[key]; // exclude any other empty values
   });
 
+  // Track which recipe titles have been counted for each facet value to avoid duplicates
+  const facetTitleTracking = {};
+  facetKeys.forEach((facetKey) => {
+    facetTitleTracking[facetKey] = {};
+  });
+
   // parse comma-separated filter values into trimmed token arrays for matching
   const tokens = {};
   filterKeys.forEach((key) => {
@@ -137,12 +143,22 @@ async function lookupRecipes(config = {}, facets = {}) {
           const values = Array.isArray(recipe[facetKey]) ? recipe[facetKey] : [recipe[facetKey]];
           values.forEach((val) => {
             if (val) {
-              if (facets[facetKey][val]) {
-                // increment existing count
-                facets[facetKey][val] += 1;
-              } else {
-                // initialize count for a new facet value
-                facets[facetKey][val] = 1;
+              // Track by recipe title to avoid counting duplicate recipes with same name
+              if (!facetTitleTracking[facetKey][val]) {
+                facetTitleTracking[facetKey][val] = new Set();
+              }
+
+              // Only count this recipe if we haven't seen this title for this facet value yet
+              if (!facetTitleTracking[facetKey][val].has(recipe.title)) {
+                facetTitleTracking[facetKey][val].add(recipe.title);
+
+                if (facets[facetKey][val]) {
+                  // increment existing count
+                  facets[facetKey][val] += 1;
+                } else {
+                  // initialize count for a new facet value
+                  facets[facetKey][val] = 1;
+                }
               }
             }
           });
