@@ -491,7 +491,9 @@ ${recipeHtml}
 
 // Preview recipe on admin.hlx.page
 export async function previewRecipe(kebabName, token) {
-  const path = `us/en_us/recipes/data/${kebabName}`;
+  // Remove .html extension if present
+  const cleanName = kebabName.endsWith('.html') ? kebabName.slice(0, -5) : kebabName;
+  const path = `us/en_us/recipes/data/${cleanName}`;
   const previewUrl = `https://admin.hlx.page/preview/aemsites/vitamix/main/${path}`;
 
   const opts = {
@@ -510,7 +512,9 @@ export async function previewRecipe(kebabName, token) {
 
 // Publish recipe on admin.hlx.page
 export async function publishRecipe(kebabName, token) {
-  const path = `us/en_us/recipes/data/${kebabName}`;
+  // Remove .html extension if present
+  const cleanName = kebabName.endsWith('.html') ? kebabName.slice(0, -5) : kebabName;
+  const path = `us/en_us/recipes/data/${cleanName}`;
   const publishUrl = `https://admin.hlx.page/live/aemsites/vitamix/main/${path}`;
 
   const opts = {
