@@ -163,6 +163,20 @@ export async function fetchRecipeDetailsForSync(
     throw new Error('Invalid XML response from API');
   }
 
+  // Check for SOAP/XML errors in the response
+  const soapFault = xmlDoc.querySelector('soap\\:Fault, Fault, soapenv\\:Fault');
+  if (soapFault) {
+    const faultString = soapFault.querySelector('faultstring, soap\\:faultstring, soapenv\\:faultstring')?.textContent.trim() || 'Unknown SOAP error';
+    throw new Error(`API SOAP Error: ${faultString}`);
+  }
+
+  // Check for generic error elements
+  const errorElement = xmlDoc.querySelector('Error, error, ErrorMessage, errorMessage');
+  if (errorElement) {
+    const errorText = errorElement.textContent.trim() || 'Unknown error';
+    throw new Error(`API Error: ${errorText}`);
+  }
+
   // Get recipe name and description from XML
   const xmlRecipeName = xmlDoc.querySelector('RecipeName, Name, recipeName, name')?.textContent.trim() || recipeName;
   const recipeDescription = xmlDoc.querySelector('RecipeDescription, Description, recipeDescription, description')?.textContent.trim() || '';
@@ -170,6 +184,13 @@ export async function fetchRecipeDetailsForSync(
   // Validate we have at least a recipe name
   if (!xmlRecipeName || xmlRecipeName.length === 0) {
     throw new Error('No recipe name found in API response');
+  }
+
+  // Check if we have any actual recipe data (ingredients or procedure)
+  const hasIngredients = xmlDoc.querySelector('Ingredients > Ingredient');
+  const hasProcedure = xmlDoc.querySelector('Procedure > Step');
+  if (!hasIngredients && !hasProcedure) {
+    throw new Error('Recipe has no ingredients or procedure steps - API may have returned incomplete data');
   }
 
   // Convert recipe name to kebab-case
@@ -570,6 +591,9 @@ export async function bulkSyncWithDA() {
 
   let successCount = 0;
   let failCount = 0;
+  let consecutiveErrors = 0;
+  const maxConsecutiveErrors = 5;
+  let stoppedEarly = false;
 
   // eslint-disable-next-line no-plusplus
   for (let i = 0; i < checkboxes.length; i++) {
@@ -649,20 +673,36 @@ export async function bulkSyncWithDA() {
 
       // eslint-disable-next-line no-plusplus
       successCount++;
+      consecutiveErrors = 0; // Reset consecutive error counter on success
 
-      // Uncheck the checkbox
+      // Uncheck the checkbox on success
       checkbox.checked = false;
     } catch (error) {
       addLogEntry(`  ✗ Failed: ${error.message}`, 'error');
       // eslint-disable-next-line no-plusplus
       failCount++;
+      // eslint-disable-next-line no-plusplus
+      consecutiveErrors++;
+      // Keep checkbox checked so user can retry later
+
+      // Stop if we hit too many consecutive errors
+      if (consecutiveErrors >= maxConsecutiveErrors) {
+        addLogEntry(`\n⚠ Stopping sync: ${maxConsecutiveErrors} consecutive errors detected`, 'error');
+        addLogEntry('This may indicate an API or network issue. Please check and try again.', 'error');
+        stoppedEarly = true;
+        break;
+      }
     }
 
     addLogEntry('─────────────────────────────────────', 'info');
   }
 
   // Final summary
-  addLogEntry('\n✓ Sync complete!', 'success');
+  if (stoppedEarly) {
+    addLogEntry('\n⚠ Sync stopped early due to errors', 'warning');
+  } else {
+    addLogEntry('\n✓ Sync complete!', 'success');
+  }
   addLogEntry(`  Success: ${successCount}`, successCount > 0 ? 'success' : 'info');
   if (failCount > 0) {
     addLogEntry(`  Failed: ${failCount}`, 'error');
@@ -767,6 +807,20 @@ export async function displayRecipeDetails(recipeNumber) {
       throw new Error('Invalid XML response from API');
     }
 
+    // Check for SOAP/XML errors in the response
+    const soapFault = xmlDoc.querySelector('soap\\:Fault, Fault, soapenv\\:Fault');
+    if (soapFault) {
+      const faultString = soapFault.querySelector('faultstring, soap\\:faultstring, soapenv\\:faultstring')?.textContent.trim() || 'Unknown SOAP error';
+      throw new Error(`API SOAP Error: ${faultString}`);
+    }
+
+    // Check for generic error elements
+    const errorElement = xmlDoc.querySelector('Error, error, ErrorMessage, errorMessage');
+    if (errorElement) {
+      const errorText = errorElement.textContent.trim() || 'Unknown error';
+      throw new Error(`API Error: ${errorText}`);
+    }
+
     // Try to find recipe name and description
     const recipeName = xmlDoc.querySelector('RecipeName, Name, recipeName, name')?.textContent.trim() || 'Recipe Details';
     const recipeDescription = xmlDoc.querySelector('RecipeDescription, Description, recipeDescription, description')?.textContent.trim() || '';
@@ -774,6 +828,13 @@ export async function displayRecipeDetails(recipeNumber) {
     // Validate we have at least a recipe name
     if (!recipeName || recipeName === 'Recipe Details') {
       throw new Error('No recipe name found in API response');
+    }
+
+    // Check if we have any actual recipe data (ingredients or procedure)
+    const hasIngredients = xmlDoc.querySelector('Ingredients > Ingredient');
+    const hasProcedure = xmlDoc.querySelector('Procedure > Step');
+    if (!hasIngredients && !hasProcedure) {
+      throw new Error('Recipe has no ingredients or procedure steps - API may have returned incomplete data');
     }
 
     // Convert recipe name to kebab-case
