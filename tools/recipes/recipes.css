@@ -233,6 +233,22 @@ pre {
   padding: 0 10px;
 }
 
+.btn-select-unimported {
+  background-color: #17a2b8;
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-select-unimported:hover {
+  background-color: #138496;
+}
+
 .btn-bulk-sync {
   background-color: #28a745;
   color: white;
@@ -353,6 +369,13 @@ pre {
   margin: 0;
 }
 
+.recipe-badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
 .recipe-status {
   display: inline-block;
   padding: 4px 10px;
@@ -375,6 +398,12 @@ pre {
 .recipe-status.new {
   background-color: #d1ecf1;
   color: #0c5460;
+}
+
+.recipe-status.imported {
+  background-color: #e7f3ff;
+  color: #004085;
+  border: 1px solid #b8daff;
 }
 
 .recipe-meta {

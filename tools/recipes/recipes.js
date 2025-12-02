@@ -26,6 +26,9 @@ export function formatDate(dateString) {
 // Store CalcMenu cookies for session management
 let calcMenuCookies = '';
 
+// Store imported recipes for selection filtering
+let importedRecipesSet = new Set();
+
 // Parse cookies from set-cookie header
 function parseCookies(setCookieHeader) {
   // The set-cookie header contains multiple cookies separated by commas
@@ -668,8 +671,7 @@ export async function bulkSyncWithDA() {
     return;
   }
 
-  // Check if preview and publish options are enabled
-  const enablePreview = document.getElementById('enablePreview')?.checked || false;
+  // Check if publish option is enabled
   const enablePublish = document.getElementById('enablePublish')?.checked || false;
 
   const syncProgress = document.getElementById('syncProgress');
@@ -683,8 +685,7 @@ export async function bulkSyncWithDA() {
   bulkSyncBtn.textContent = 'Syncing...';
 
   addLogEntry(`Starting bulk sync of ${checkboxes.length} recipe(s)`, 'info');
-  if (enablePreview) addLogEntry('Preview enabled', 'info');
-  if (enablePublish) addLogEntry('Publish enabled', 'info');
+  if (enablePublish) addLogEntry('Publish enabled (includes preview)', 'info');
 
   // Initialize CalcMenu session
   addLogEntry('Initializing CalcMenu session...', 'info');
@@ -751,8 +752,8 @@ export async function bulkSyncWithDA() {
 
       addLogEntry(`  ✓ Successfully synced: ${filename}`, 'success');
 
-      // Preview if enabled
-      if (enablePreview) {
+      // Preview and Publish if enabled
+      if (enablePublish) {
         try {
           addLogEntry('  Running preview...', 'info');
           // eslint-disable-next-line no-await-in-loop
@@ -761,10 +762,7 @@ export async function bulkSyncWithDA() {
         } catch (previewError) {
           addLogEntry(`  ⚠ Preview failed: ${previewError.message}`, 'warning');
         }
-      }
 
-      // Publish if enabled
-      if (enablePublish) {
         try {
           addLogEntry('  Publishing...', 'info');
           // eslint-disable-next-line no-await-in-loop
@@ -973,11 +971,7 @@ export async function displayRecipeDetails(recipeNumber) {
       detailSyncOptions.className = 'detail-sync-options';
       detailSyncOptions.innerHTML = `
         <label class="sync-option">
-          <input type="checkbox" id="detailEnablePreview" />
-          <span>Preview</span>
-        </label>
-        <label class="sync-option">
-          <input type="checkbox" id="detailEnablePublish" />
+          <input type="checkbox" id="detailEnablePublish" checked />
           <span>Publish</span>
         </label>
       `;
@@ -992,7 +986,6 @@ export async function displayRecipeDetails(recipeNumber) {
 
       syncWithDABtn.addEventListener('click', async () => {
         const originalText = syncWithDABtn.textContent;
-        const enablePreview = document.getElementById('detailEnablePreview')?.checked || false;
         const enablePublish = document.getElementById('detailEnablePublish')?.checked || false;
 
         try {
@@ -1004,8 +997,8 @@ export async function displayRecipeDetails(recipeNumber) {
           // Get token for preview/publish
           const token = window.sessionStorage.getItem('da-token');
 
-          // Preview if enabled
-          if (enablePreview && token) {
+          // Preview and Publish if enabled
+          if (enablePublish && token) {
             try {
               await previewRecipe(result.filename, token);
               // eslint-disable-next-line no-console
@@ -1014,10 +1007,7 @@ export async function displayRecipeDetails(recipeNumber) {
               // eslint-disable-next-line no-console
               console.error('Preview failed:', previewError);
             }
-          }
 
-          // Publish if enabled
-          if (enablePublish && token) {
             try {
               await publishRecipe(result.filename, token);
               // eslint-disable-next-line no-console
@@ -1382,12 +1372,51 @@ export async function displayRecipeDetails(recipeNumber) {
   }
 }
 
+// Fetch imported recipes from AEM
+export async function fetchImportedRecipes() {
+  try {
+    const corsProxy = 'https://little-forest-58aa.david8603.workers.dev/?url=';
+    const queryIndexUrl = 'https://main--vitamix--aemsites.aem.live/us/en_us/recipes/data/query-index.json?limit=10000';
+
+    const response = await fetch(corsProxy + encodeURIComponent(queryIndexUrl), {
+      method: 'GET',
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+
+    // Extract recipe numbers from paths
+    // Path format: /us/en_us/recipes/data/recipe-name-r00401
+    const importedRecipeNumbers = new Set();
+    data.data.forEach((recipe) => {
+      const pathParts = recipe.path.split('-');
+      const lastPart = pathParts[pathParts.length - 1]; // e.g., "r00401"
+      if (lastPart && lastPart.toLowerCase().startsWith('r')) {
+        importedRecipeNumbers.add(lastPart.toUpperCase());
+      }
+    });
+
+    return importedRecipeNumbers;
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error fetching imported recipes:', error);
+    return new Set(); // Return empty set on error
+  }
+}
+
 // Display results
-export function displayResults(data, rawXml) {
+export async function displayResults(data, rawXml) {
   const resultsDiv = document.getElementById('results');
   const recipeCount = document.getElementById('recipeCount');
   const recipeList = document.getElementById('recipeList');
   const params = getQueryParams();
+
+  // Fetch imported recipes
+  const importedRecipes = await fetchImportedRecipes();
+  importedRecipesSet = importedRecipes; // Store globally for selection filtering
 
   // Parse XML and display recipes
   try {
@@ -1395,7 +1424,16 @@ export function displayResults(data, rawXml) {
     const xmlDoc = parser.parseFromString(rawXml, 'text/xml');
     const recipes = xmlDoc.querySelectorAll('Recipes');
 
-    recipeCount.textContent = `Recipes found: ${recipes.length}`;
+    // Count imported recipes
+    let importedCount = 0;
+    recipes.forEach((recipe) => {
+      const number = recipe.getAttribute('Number');
+      if (importedRecipes.has(number.toUpperCase())) {
+        importedCount += 1;
+      }
+    });
+
+    recipeCount.textContent = `Recipes found: ${recipes.length} (${importedCount} already imported)`;
 
     // Clear previous results
     recipeList.innerHTML = '';
@@ -1419,12 +1457,18 @@ export function displayResults(data, rawXml) {
       // Status class
       const statusClass = status.toLowerCase();
 
+      // Check if recipe is already imported
+      const isImported = importedRecipes.has(number.toUpperCase());
+
       recipeItem.innerHTML = `
         <input type="checkbox" class="recipe-checkbox" data-recipe-number="${number}" data-recipe-name="${name.replace(/"/g, '&quot;')}" data-recipe-status="${status}" data-date-created="${dateCreated}" data-date-updated="${dateUpdated}" />
         <div class="recipe-content">
           <div class="recipe-header">
             <h3 class="recipe-title">${name}</h3>
-            <span class="recipe-status ${statusClass}">${status}</span>
+            <div class="recipe-badges">
+              <span class="recipe-status ${statusClass}">${status}</span>
+              ${isImported ? '<span class="recipe-status imported">Imported</span>' : ''}
+            </div>
           </div>
           <div class="recipe-meta">
             <span><strong>Code:</strong> ${code}</span>
@@ -1505,7 +1549,7 @@ export async function makeApiCallFromParams() {
 
   try {
     const xmlResponse = await fetchRecipes(params.user, params.pw, params.date);
-    displayResults(null, xmlResponse);
+    await displayResults(null, xmlResponse);
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Error:', error);
@@ -1531,6 +1575,28 @@ export async function init() {
         saveCheckboxState(recipeNumber, e.target.checked);
       });
       updateBulkSyncButton();
+    });
+  }
+
+  // Add select unimported button listener
+  const selectUnimportedBtn = document.getElementById('selectUnimportedBtn');
+  if (selectUnimportedBtn) {
+    selectUnimportedBtn.addEventListener('click', () => {
+      const checkboxes = document.querySelectorAll('.recipe-checkbox');
+      checkboxes.forEach((cb) => {
+        const { recipeNumber, recipeStatus } = cb.dataset;
+        // Select if not imported and not deleted
+        const isImported = importedRecipesSet.has(recipeNumber.toUpperCase());
+        const isDeleted = recipeStatus.toLowerCase() === 'deleted';
+        const shouldSelect = !isImported && !isDeleted;
+
+        cb.checked = shouldSelect;
+        saveCheckboxState(recipeNumber, shouldSelect);
+      });
+      updateBulkSyncButton();
+      // Uncheck select all
+      const selectAll = document.getElementById('selectAll');
+      if (selectAll) selectAll.checked = false;
     });
   }
 
