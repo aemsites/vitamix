@@ -458,14 +458,15 @@ export default async function decorate(block) {
     cartLink.lastChild.textContent = `Cart (${e.detail.cart.itemCount})`;
   });
 
+  // change to edge cart link
+  if (window.cartMode === 'edge') {
+    cartLink.href = EDGE_CART_PATH;
+  }
+
   // handle cart click
   cartLink.addEventListener('click', async (e) => {
     // if on mobile or using legacy cart, redirect to cart page
     if (window.cartMode === 'legacy' || window.innerWidth < 900) {
-      // redirect to edge cart page in edge mode
-      if (window.cartMode === 'edge') {
-        window.location.href = EDGE_CART_PATH;
-      }
       return;
     }
 

@@ -512,6 +512,11 @@ function buildAutoBlocks(main) {
     if (metaSku || pdpBlock) {
       document.body.classList.add('pdp-template');
     }
+
+    // setup cart page
+    if (getMetadata('template') === 'cart') {
+      document.body.classList.add('cart-template');
+    }
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Auto Blocking failed', error);
