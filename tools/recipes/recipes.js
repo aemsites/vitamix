@@ -23,6 +23,32 @@ export function formatDate(dateString) {
   return `${month}/${day}/${year}`;
 }
 
+// Store CalcMenu cookies for session management
+let calcMenuCookies = '';
+
+// Parse cookies from set-cookie header
+function parseCookies(setCookieHeader) {
+  // The set-cookie header contains multiple cookies separated by commas
+  // Each cookie has format: name=value; expires=...; path=/; HttpOnly; etc
+  const cookies = [];
+  const cookieParts = setCookieHeader.split(', ');
+
+  cookieParts.forEach((part) => {
+    // Extract just the name=value part (before first semicolon)
+    const match = part.match(/^([^=]+=[^;]+)/);
+    if (match) {
+      cookies.push(match[1]);
+    }
+  });
+
+  return cookies.join('; ');
+}
+
+// Get current CalcMenu cookies
+export function getCalcMenuCookies() {
+  return calcMenuCookies;
+}
+
 // Make GET request with query params
 export async function fetchRecipes(userId, password, dateUpdated) {
   // Create query parameters
@@ -38,9 +64,16 @@ export async function fetchRecipes(userId, password, dateUpdated) {
   const apiUrl = `https://vitamix.calcmenuweb.com/ws/service.asmx/GetUpdatedRecipes?${queryParams.toString()}`;
   const corsProxy = 'https://little-forest-58aa.david8603.workers.dev/?url=';
 
+  const headers = {};
+  const cookies = getCalcMenuCookies();
+  if (cookies) {
+    headers.Cookie = cookies;
+  }
+
   const response = await fetch(corsProxy + encodeURIComponent(apiUrl), {
     method: 'GET',
     credentials: 'include',
+    headers,
   });
 
   if (!response.ok) {
@@ -67,9 +100,16 @@ export async function fetchRecipeDetails(userId, password, recipeNumber) {
   const apiUrl = `https://vitamix.calcmenuweb.com/ws/service.asmx/GetRecipeDetails?${queryParams.toString()}`;
   const corsProxy = 'https://little-forest-58aa.david8603.workers.dev/?url=';
 
+  const headers = {};
+  const cookies = getCalcMenuCookies();
+  if (cookies) {
+    headers.Cookie = cookies;
+  }
+
   const response = await fetch(corsProxy + encodeURIComponent(apiUrl), {
     method: 'GET',
     credentials: 'include',
+    headers,
   });
 
   if (!response.ok) {
@@ -586,11 +626,23 @@ export async function initCalcMenuSession() {
   const calcMenuUrl = 'https://vitamix.calcmenuweb.com/Default.aspx';
 
   try {
-    await fetch(corsProxy + encodeURIComponent(calcMenuUrl), {
+    // Use status=reveal to get response headers including cookies
+    const response = await fetch(`${corsProxy}${encodeURIComponent(calcMenuUrl)}&status=reveal`, {
       method: 'GET',
-      credentials: 'include',
     });
-    // We don't need to process the response, just establish the session
+
+    if (response.ok) {
+      const data = await response.json();
+
+      // Find the set-cookie header
+      const setCookieHeader = data.headers?.find((h) => h.name.toLowerCase() === 'set-cookie');
+
+      if (setCookieHeader) {
+        calcMenuCookies = parseCookies(setCookieHeader.value);
+        // eslint-disable-next-line no-console
+        console.log('CalcMenu session cookies established:', calcMenuCookies);
+      }
+    }
   } catch (error) {
     // Log but don't fail - this is a nice-to-have for session management
     // eslint-disable-next-line no-console
