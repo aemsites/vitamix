@@ -129,7 +129,13 @@ export default async function decorate(block, parent) {
 
       const productLinkEl = document.createElement('a');
       productLinkEl.textContent = item.name;
-      productLinkEl.setAttribute('href', new URL(item.url).pathname);
+      let path;
+      try {
+        path = new URL(item.url).pathname;
+      } catch (error) {
+        path = item.url;
+      }
+      productLinkEl.setAttribute('href', path);
 
       const productPriceEl = document.createElement('span');
       productPriceEl.classList.add('price');
