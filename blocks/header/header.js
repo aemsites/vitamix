@@ -442,9 +442,70 @@ export default async function decorate(block) {
   }
 
   const cartItems = cookies.cart_items_count;
+  const cartLink = block.querySelector('.icon-cart').parentElement;
+
   if (cartItems && +cartItems > 0) {
-    const cart = block.querySelector('.icon-cart').parentElement;
-    cart.dataset.cartItems = cartItems;
-    cart.lastChild.textContent = `Cart (${cartItems})`;
+    cartLink.dataset.cartItems = cartItems;
+    cartLink.lastChild.textContent = `Cart (${cartItems})`;
   }
+
+  // update cart qty bubble on change
+  document.addEventListener('cart:change', (e) => {
+    cartLink.dataset.cartItems = e.detail.cart.itemCount;
+    cartLink.lastChild.textContent = `Cart (${e.detail.cart.itemCount})`;
+  });
+
+  // handle cart click
+  cartLink.addEventListener('click', async (e) => {
+    // if on mobile or using legacy cart, redirect to cart page
+    if (window.cartMode === 'legacy' || window.innerWidth < 900) {
+      // redirect to edge cart page in edge mode
+      if (window.cartMode === 'edge') {
+        window.location.href = '/us/en_us/checkout/cart';
+      }
+      return;
+    }
+
+    // on desktop, open minicart popover
+    e.preventDefault();
+    let minicart = document.querySelector('#minicart');
+
+    if (minicart) {
+      minicart.setAttribute('aria-hidden', false);
+      return;
+    }
+
+    try {
+      const { default: decorateCart } = await import('../cart/cart.js');
+      minicart = document.createElement('div');
+      minicart.id = 'minicart';
+      minicart.className = 'minicart';
+      minicart.setAttribute('aria-hidden', true);
+      block.append(minicart);
+
+      const cartTitle = document.createElement('h2');
+      cartTitle.textContent = 'Cart';
+      minicart.append(cartTitle);
+
+      const cartClose = document.createElement('button');
+      cartClose.className = 'close';
+      cartClose.textContent = 'X';
+      cartClose.addEventListener('click', () => {
+        minicart.setAttribute('aria-hidden', true);
+      });
+      minicart.append(cartClose);
+
+      const cartBlock = document.createElement('div');
+      minicart.append(cartBlock);
+
+      decorateCart(cartBlock, cartLink);
+      minicart.setAttribute('aria-hidden', false);
+    } catch (error) {
+      console.error('Error importing cart:', error);
+      setTimeout(() => {
+        // redirect to cart page
+        window.location.href = '/us/en_us/checkout/cart';
+      }, 1000);
+    }
+  });
 }

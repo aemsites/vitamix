@@ -18,6 +18,12 @@ import {
   getMetadata,
 } from './aem.js';
 
+const { hostname } = window.location;
+window.cartMode = hostname.includes('localhost') || hostname.includes('edge-orders--') ? 'edge' : 'legacy';
+if (['edge', 'legacy'].includes(localStorage.getItem('cartMode'))) {
+  window.cartMode = localStorage.getItem('cartMode');
+}
+
 /**
  * Load fonts.css and set a session storage flag.
  */
@@ -1082,7 +1088,7 @@ async function loadLazy(doc) {
   } else {
     // wait for sidekick to be loaded
     document.addEventListener('sidekick-ready', () => {
-    // sidekick now loaded
+      // sidekick now loaded
       document.querySelector('aem-sidekick')
         .addEventListener('custom:sync', syncSku);
     }, { once: true });

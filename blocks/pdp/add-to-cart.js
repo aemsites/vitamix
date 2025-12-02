@@ -173,16 +173,6 @@ export default function renderAddToCart(block, parent) {
     addToCartButton.textContent = 'Adding...';
     addToCartButton.setAttribute('aria-disabled', 'true');
 
-    // import required modules for cart functionality
-    const { cartApi } = await import('../../scripts/minicart/api.js');
-    const { updateMagentoCacheSections, getMagentoCache } = await import('../../scripts/storage/util.js');
-
-    // cCheck and update customer cache if needed
-    const currentCache = getMagentoCache();
-    if (!currentCache?.customer) {
-      await updateMagentoCacheSections(['customer']);
-    }
-
     // get selected quantity and product SKU
     const quantity = document.querySelector('.quantity-container select')?.value || 1;
     const sku = getMetadata('sku');
@@ -206,6 +196,37 @@ export default function renderAddToCart(block, parent) {
     }
 
     try {
+      if (window.cartMode === 'edge') {
+        const cartApi = (await import('../../scripts/cart.js')).default;
+
+        const { sku: variantSku, price, name } = selectedVariant;
+        await cartApi.addItem({
+          sku,
+          variantSku,
+          quantity: parseInt(quantity, 10),
+          price,
+          name,
+          urlKey: custom.urlKey,
+          image: selectedVariant.image[0],
+          selectedOptions,
+        });
+
+        // reenable button
+        addToCartButton.textContent = 'Add to Cart';
+        addToCartButton.removeAttribute('aria-disabled');
+        return;
+      }
+
+      // import required modules for cart functionality
+      const { cartApi } = await import('../../scripts/minicart/api.js');
+      const { updateMagentoCacheSections, getMagentoCache } = await import('../../scripts/storage/util.js');
+
+      // cCheck and update customer cache if needed
+      const currentCache = getMagentoCache();
+      if (!currentCache?.customer) {
+        await updateMagentoCacheSections(['customer']);
+      }
+
       // add product to cart with selected options and quantity
       await cartApi.addToCart(sku, selectedOptions, quantity);
 
