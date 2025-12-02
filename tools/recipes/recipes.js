@@ -125,6 +125,30 @@ export function addLogEntry(message, type = 'info') {
   syncLog.scrollTop = syncLog.scrollHeight;
 }
 
+// LocalStorage key for checkbox state
+const CHECKBOX_STATE_KEY = 'vitamix-recipe-selections';
+
+// Save checkbox state to localStorage
+export function saveCheckboxState(recipeNumber, isChecked) {
+  const state = JSON.parse(localStorage.getItem(CHECKBOX_STATE_KEY) || '{}');
+  if (isChecked) {
+    state[recipeNumber] = true;
+  } else {
+    delete state[recipeNumber];
+  }
+  localStorage.setItem(CHECKBOX_STATE_KEY, JSON.stringify(state));
+}
+
+// Load checkbox state from localStorage
+export function loadCheckboxState() {
+  return JSON.parse(localStorage.getItem(CHECKBOX_STATE_KEY) || '{}');
+}
+
+// Clear all checkbox state
+export function clearCheckboxState() {
+  localStorage.removeItem(CHECKBOX_STATE_KEY);
+}
+
 // Update bulk sync button state
 export function updateBulkSyncButton() {
   const checkboxes = document.querySelectorAll('.recipe-checkbox:checked');
@@ -552,6 +576,23 @@ export async function publishRecipe(kebabName, token) {
   return publishUrl;
 }
 
+// Initialize session with CalcMenu to get session cookie
+export async function initCalcMenuSession() {
+  const corsProxy = 'https://little-forest-58aa.david8603.workers.dev/?url=';
+  const calcMenuUrl = 'https://vitamix.calcmenuweb.com/Default.aspx';
+
+  try {
+    await fetch(corsProxy + encodeURIComponent(calcMenuUrl), {
+      method: 'GET',
+    });
+    // We don't need to process the response, just establish the session
+  } catch (error) {
+    // Log but don't fail - this is a nice-to-have for session management
+    // eslint-disable-next-line no-console
+    console.warn('Failed to initialize CalcMenu session:', error);
+  }
+}
+
 // Bulk sync selected recipes with DA
 export async function bulkSyncWithDA() {
   const checkboxes = document.querySelectorAll('.recipe-checkbox:checked');
@@ -587,6 +628,12 @@ export async function bulkSyncWithDA() {
   addLogEntry(`Starting bulk sync of ${checkboxes.length} recipe(s)`, 'info');
   if (enablePreview) addLogEntry('Preview enabled', 'info');
   if (enablePublish) addLogEntry('Publish enabled', 'info');
+
+  // Initialize CalcMenu session
+  addLogEntry('Initializing CalcMenu session...', 'info');
+  await initCalcMenuSession();
+  addLogEntry('✓ Session initialized', 'success');
+
   addLogEntry('─────────────────────────────────────', 'info');
 
   let successCount = 0;
@@ -675,8 +722,9 @@ export async function bulkSyncWithDA() {
       successCount++;
       consecutiveErrors = 0; // Reset consecutive error counter on success
 
-      // Uncheck the checkbox on success
+      // Uncheck the checkbox on success and remove from localStorage
       checkbox.checked = false;
+      saveCheckboxState(recipeNumber, false);
     } catch (error) {
       addLogEntry(`  ✗ Failed: ${error.message}`, 'error');
       // eslint-disable-next-line no-plusplus
@@ -1350,12 +1398,24 @@ export function displayResults(data, rawXml) {
 
       // Handle checkbox change
       const checkbox = recipeItem.querySelector('.recipe-checkbox');
-      checkbox.addEventListener('change', updateBulkSyncButton);
+      checkbox.addEventListener('change', (e) => {
+        saveCheckboxState(number, e.target.checked);
+        updateBulkSyncButton();
+      });
+
+      // Restore checkbox state from localStorage
+      const savedState = loadCheckboxState();
+      if (savedState[number]) {
+        checkbox.checked = true;
+      }
 
       recipeList.appendChild(recipeItem);
     });
 
     resultsDiv.classList.add('active');
+
+    // Update bulk sync button to reflect restored state
+    updateBulkSyncButton();
   } catch (e) {
     // eslint-disable-next-line no-console
     console.error('Error parsing recipes:', e);
@@ -1408,6 +1468,8 @@ export async function init() {
       const checkboxes = document.querySelectorAll('.recipe-checkbox');
       checkboxes.forEach((cb) => {
         cb.checked = e.target.checked;
+        const { recipeNumber } = cb.dataset;
+        saveCheckboxState(recipeNumber, e.target.checked);
       });
       updateBulkSyncButton();
     });
