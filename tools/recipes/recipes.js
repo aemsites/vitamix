@@ -64,16 +64,9 @@ export async function fetchRecipes(userId, password, dateUpdated) {
   const apiUrl = `https://vitamix.calcmenuweb.com/ws/service.asmx/GetUpdatedRecipes?${queryParams.toString()}`;
   const corsProxy = 'https://little-forest-58aa.david8603.workers.dev/?url=';
 
-  const headers = {};
-  const cookies = getCalcMenuCookies();
-  if (cookies) {
-    headers.Cookie = cookies;
-  }
-
   const response = await fetch(corsProxy + encodeURIComponent(apiUrl), {
     method: 'GET',
     credentials: 'include',
-    headers,
   });
 
   if (!response.ok) {
@@ -100,16 +93,9 @@ export async function fetchRecipeDetails(userId, password, recipeNumber) {
   const apiUrl = `https://vitamix.calcmenuweb.com/ws/service.asmx/GetRecipeDetails?${queryParams.toString()}`;
   const corsProxy = 'https://little-forest-58aa.david8603.workers.dev/?url=';
 
-  const headers = {};
-  const cookies = getCalcMenuCookies();
-  if (cookies) {
-    headers.Cookie = cookies;
-  }
-
   const response = await fetch(corsProxy + encodeURIComponent(apiUrl), {
     method: 'GET',
     credentials: 'include',
-    headers,
   });
 
   if (!response.ok) {
@@ -626,21 +612,29 @@ export async function initCalcMenuSession() {
   const calcMenuUrl = 'https://vitamix.calcmenuweb.com/Default.aspx';
 
   try {
-    // Use status=reveal to get response headers including cookies
-    const response = await fetch(`${corsProxy}${encodeURIComponent(calcMenuUrl)}&status=reveal`, {
+    // Fetch the actual page (not status=reveal) so browser sets cookies automatically
+    const response = await fetch(corsProxy + encodeURIComponent(calcMenuUrl), {
       method: 'GET',
+      credentials: 'include',
     });
 
     if (response.ok) {
-      const data = await response.json();
+      // eslint-disable-next-line no-console
+      console.log('CalcMenu session initialized - cookies set by browser');
 
-      // Find the set-cookie header
-      const setCookieHeader = data.headers?.find((h) => h.name.toLowerCase() === 'set-cookie');
+      // Optional: verify cookies were set by checking with status=reveal
+      const verifyResponse = await fetch(`${corsProxy}${encodeURIComponent(calcMenuUrl)}&status=reveal`, {
+        method: 'GET',
+      });
 
-      if (setCookieHeader) {
-        calcMenuCookies = parseCookies(setCookieHeader.value);
-        // eslint-disable-next-line no-console
-        console.log('CalcMenu session cookies established:', calcMenuCookies);
+      if (verifyResponse.ok) {
+        const data = await verifyResponse.json();
+        const setCookieHeader = data.headers?.find((h) => h.name.toLowerCase() === 'set-cookie');
+        if (setCookieHeader) {
+          calcMenuCookies = parseCookies(setCookieHeader.value);
+          // eslint-disable-next-line no-console
+          console.log('Session cookies:', calcMenuCookies);
+        }
       }
     }
   } catch (error) {
