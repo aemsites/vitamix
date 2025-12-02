@@ -2,6 +2,9 @@ import { getMetadata, toClassName } from '../../scripts/aem.js';
 import { swapIcons, getCookies } from '../../scripts/scripts.js';
 import { loadFragment } from '../fragment/fragment.js';
 
+const EDGE_CART_PATH = '/drafts/maxed/checkout/cart';
+// const EDGE_CART_PATH = '/checkout/cart';
+
 // media query match that indicates desktop width
 const isDesktop = window.matchMedia('(width >= 1000px)');
 
@@ -461,7 +464,7 @@ export default async function decorate(block) {
     if (window.cartMode === 'legacy' || window.innerWidth < 900) {
       // redirect to edge cart page in edge mode
       if (window.cartMode === 'edge') {
-        window.location.href = '/us/en_us/checkout/cart';
+        window.location.href = EDGE_CART_PATH;
       }
       return;
     }
@@ -504,7 +507,7 @@ export default async function decorate(block) {
       console.error('Error importing cart:', error);
       setTimeout(() => {
         // redirect to cart page
-        window.location.href = '/us/en_us/checkout/cart';
+        window.location.href = EDGE_CART_PATH;
       }, 1000);
     }
   });
