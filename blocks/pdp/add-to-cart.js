@@ -201,12 +201,12 @@ export default function renderAddToCart(block, parent) {
 
         const { sku: variantSku, price, name } = selectedVariant;
         await cartApi.addItem({
-          sku,
-          variantSku,
+          sku: variantSku ?? sku,
+          parentSku: variantSku ? sku : undefined,
           quantity: parseInt(quantity, 10),
           price,
           name,
-          urlKey: custom.urlKey,
+          url: selectedVariant.url,
           image: selectedVariant.image[0],
           selectedOptions,
         });

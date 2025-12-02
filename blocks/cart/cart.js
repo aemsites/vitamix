@@ -109,38 +109,45 @@ export default async function decorate(block, parent) {
   block.innerHTML = template;
   const itemList = block.querySelector('.cart-items-list');
 
-  // add each item to the list
-  cart.items.forEach((item) => {
-    const itemElement = document.createElement('span');
-    itemElement.innerHTML = itemTemplate;
-    itemList.appendChild(itemElement);
+  const populatelist = () => {
+    itemList.innerHTML = '';
 
-    // product element
-    const productEl = itemElement.querySelector('.cart-item-product');
-    const productImgEl = document.createElement('img');
-    productImgEl.src = item.image;
-    productImgEl.alt = item.name;
-    const productImgWrapper = document.createElement('span');
-    productImgWrapper.appendChild(productImgEl);
-    productImgWrapper.classList.add('image');
+    // add each item to the list
+    cart.items.forEach((item) => {
+      const itemElement = document.createElement('span');
+      itemElement.innerHTML = itemTemplate;
+      itemList.appendChild(itemElement);
 
-    const productLinkEl = document.createElement('a');
-    productLinkEl.textContent = item.name;
-    productLinkEl.setAttribute('href', `/products/${item.urlKey}`);
+      // product element
+      const productEl = itemElement.querySelector('.cart-item-product');
+      const productImgEl = document.createElement('img');
+      productImgEl.src = item.image;
+      productImgEl.alt = item.name;
+      const productImgWrapper = document.createElement('span');
+      productImgWrapper.appendChild(productImgEl);
+      productImgWrapper.classList.add('image');
 
-    const productPriceEl = document.createElement('span');
-    productPriceEl.classList.add('price');
-    productPriceEl.textContent = `$${item.price}`;
-    productPriceEl.setAttribute('data-price', item.price);
-    productEl.append(productImgWrapper, productLinkEl, productPriceEl);
+      const productLinkEl = document.createElement('a');
+      productLinkEl.textContent = item.name;
+      productLinkEl.setAttribute('href', new URL(item.url).pathname);
 
-    // total (qty*unit price)
-    const totalElement = itemElement.querySelector('.cart-item-total');
+      const productPriceEl = document.createElement('span');
+      productPriceEl.classList.add('price');
+      productPriceEl.textContent = `$${item.price}`;
+      productPriceEl.setAttribute('data-price', item.price);
+      productEl.append(productImgWrapper, productLinkEl, productPriceEl);
 
-    // quantity picker
-    const qtyElement = itemElement.querySelector('.cart-item-quantity');
-    renderQuantityPicker(item, qtyElement, totalElement);
-  });
+      // total (qty*unit price)
+      const totalElement = itemElement.querySelector('.cart-item-total');
+
+      // quantity picker
+      const qtyElement = itemElement.querySelector('.cart-item-quantity');
+      renderQuantityPicker(item, qtyElement, totalElement);
+    });
+  };
+
+  populatelist();
+  document.addEventListener('cart:change', populatelist);
 
   // footer subtotal
   const subtotalEl = block.querySelector('.cart-footer-total');
