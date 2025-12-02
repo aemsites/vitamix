@@ -40,6 +40,7 @@ export async function fetchRecipes(userId, password, dateUpdated) {
 
   const response = await fetch(corsProxy + encodeURIComponent(apiUrl), {
     method: 'GET',
+    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -68,6 +69,7 @@ export async function fetchRecipeDetails(userId, password, recipeNumber) {
 
   const response = await fetch(corsProxy + encodeURIComponent(apiUrl), {
     method: 'GET',
+    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -232,7 +234,9 @@ export async function fetchRecipeDetailsForSync(
   try {
     addLogEntry(`  Fetching image from ${recipePageUrl}`, 'info');
     const corsProxy = 'https://little-forest-58aa.david8603.workers.dev/?url=';
-    const pageResponse = await fetch(corsProxy + encodeURIComponent(recipePageUrl));
+    const pageResponse = await fetch(corsProxy + encodeURIComponent(recipePageUrl), {
+      credentials: 'include',
+    });
 
     if (pageResponse.ok) {
       const htmlText = await pageResponse.text();
@@ -584,6 +588,7 @@ export async function initCalcMenuSession() {
   try {
     await fetch(corsProxy + encodeURIComponent(calcMenuUrl), {
       method: 'GET',
+      credentials: 'include',
     });
     // We don't need to process the response, just establish the session
   } catch (error) {
@@ -1006,7 +1011,9 @@ export async function displayRecipeDetails(recipeNumber) {
     try {
       // Fetch the recipe page through CORS proxy
       const corsProxy = 'https://little-forest-58aa.david8603.workers.dev/?url=';
-      const pageResponse = await fetch(corsProxy + encodeURIComponent(recipePageUrl));
+      const pageResponse = await fetch(corsProxy + encodeURIComponent(recipePageUrl), {
+        credentials: 'include',
+      });
 
       if (pageResponse.ok) {
         const htmlText = await pageResponse.text();
