@@ -569,25 +569,22 @@ header .nav-cart [data-cart-items]::after {
 /* minicart */
 
 header .minicart {
-  position: fixed;
-  z-index: 9;
-  top: 0;
-  right: 0;
-  bottom: 0;
   width: clamp(400px, 50vw, min(800px, 100vw));
+  min-height: 100vh;
   background: var(--layer-elevated);
   padding: 2em;
   box-shadow: -4px 4px 18px rgb(0 0 0 / 20%);
+  margin: 0 0 0 100%;
+  border: none;
+  transition: transform 0.3s ease-in-out;
 }
 
-header .minicart[aria-hidden="true"] {
-  right: calc(0px - clamp(400px, 50vw, min(800px, 100vw)));
-  transition: right 0.3s ease-in-out;
-  display: block;
+header .minicart[aria-expanded="false"] {
+  transform: translateX(0);
 }
 
-header .minicart[aria-hidden="false"] {
-  right: 0;
+header .minicart[aria-expanded="true"] {
+  transform: translateX(-100%);
 }
 
 header .minicart button.close {

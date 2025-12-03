@@ -57,8 +57,8 @@ div.section.cart-section .cart-wrapper {
 }
 
 .minicart .cart-items-list {
-    min-height: calc(100vh - var(--header-height) - 14em);
-    max-height: calc(100vh - var(--header-height) - 14em);
+    min-height: calc(100vh - var(--header-height) - 16em);
+    max-height: calc(100vh - var(--header-height) - 16em);
     overflow-y: scroll;
 }
 
@@ -222,5 +222,5 @@ div.section.cart-section .cart-wrapper {
     display: flex;
     flex-direction: row;
     justify-content: flex-end;
-    margin: 2em 0;
+    margin: 2em 0 0;
 }

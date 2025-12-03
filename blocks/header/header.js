@@ -463,28 +463,35 @@ export default async function decorate(block) {
     cartLink.href = EDGE_CART_PATH;
   }
 
-  // handle cart click
-  cartLink.addEventListener('click', async (e) => {
+  const openOrRedirect = async (e) => {
+    // if already on cart page, do nothing
+    if (window.location.pathname.includes(EDGE_CART_PATH)) {
+      return;
+    }
+
     // if on mobile or using legacy cart, redirect to cart page
     if (window.cartMode === 'legacy' || window.innerWidth < 900) {
       return;
     }
 
     // on desktop, open minicart popover
-    e.preventDefault();
+    if (e) {
+      e.preventDefault();
+    }
+    /** @type {HTMLDialogElement} */
     let minicart = document.querySelector('#minicart');
 
     if (minicart) {
-      minicart.setAttribute('aria-hidden', false);
+      minicart.openModal();
       return;
     }
 
     try {
       const { default: decorateCart } = await import('../cart/cart.js');
-      minicart = document.createElement('div');
+      minicart = document.createElement('dialog');
       minicart.id = 'minicart';
       minicart.className = 'minicart';
-      minicart.setAttribute('aria-hidden', true);
+      minicart.setAttribute('aria-expanded', false);
       block.append(minicart);
 
       const cartTitle = document.createElement('h2');
@@ -495,15 +502,41 @@ export default async function decorate(block) {
       cartClose.className = 'close';
       cartClose.textContent = 'X';
       cartClose.addEventListener('click', () => {
-        minicart.setAttribute('aria-hidden', true);
+        minicart.closeModal();
       });
       minicart.append(cartClose);
 
       const cartBlock = document.createElement('div');
       minicart.append(cartBlock);
-
       decorateCart(cartBlock, cartLink);
-      minicart.setAttribute('aria-hidden', false);
+
+      minicart.addEventListener('click', (event) => {
+        const rect = minicart.getBoundingClientRect();
+        const isInDialog = (rect.top <= event.clientY
+          && event.clientY <= rect.top + rect.height
+          && rect.left <= event.clientX
+          && event.clientX <= rect.left + rect.width);
+        if (!isInDialog) {
+          minicart.closeModal();
+        }
+      });
+
+      // open/close methods to account for transitions
+      const open = () => {
+        minicart.showModal();
+        minicart.setAttribute('aria-expanded', true);
+      };
+      minicart.openModal = open;
+
+      const close = () => {
+        minicart.setAttribute('aria-expanded', false);
+        setTimeout(() => {
+          minicart.close();
+        }, 300);
+      };
+      minicart.closeModal = close;
+
+      minicart.openModal();
     } catch (error) {
       console.error('Error importing cart:', error);
       setTimeout(() => {
@@ -511,5 +544,11 @@ export default async function decorate(block) {
         window.location.href = EDGE_CART_PATH;
       }, 1000);
     }
-  });
+  };
+
+  // handle cart click
+  cartLink.addEventListener('click', openOrRedirect);
+
+  // and when adding to cart from PDP
+  document.addEventListener('pdp:add-to-cart', openOrRedirect);
 }

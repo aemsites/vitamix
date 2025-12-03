@@ -214,6 +214,7 @@ export default function renderAddToCart(block, parent) {
         // reenable button
         addToCartButton.textContent = 'Add to Cart';
         addToCartButton.removeAttribute('aria-disabled');
+        document.dispatchEvent(new CustomEvent('pdp:add-to-cart'));
         return;
       }
 
