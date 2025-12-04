@@ -88,6 +88,11 @@ async function lookupRecipes(config = {}, facets = {}) {
 
   // filter recipes based on all configured criteria (must match ALL filters)
   const results = window.recipeIndex.data.filter((recipe) => {
+    // Exclude recipes without a difficulty rating
+    if (!recipe.difficulty || recipe.difficulty.trim() === '') {
+      return false;
+    }
+
     // track which individual filters matched for this recipe
     const filterMatches = {};
 
@@ -872,7 +877,21 @@ function buildRecipeFiltering(container, config = {}) {
       'name-desc': (a, b) => b.title.localeCompare(a.title),
       'time-asc': (a, b) => getTimeInMinutes(a['total-time']) - getTimeInMinutes(b['total-time']),
       'time-desc': (a, b) => getTimeInMinutes(b['total-time']) - getTimeInMinutes(a['total-time']),
-      featured: (a, b) => a.title.localeCompare(b.title),
+      featured: (a, b) => {
+        // Check if recipes have default images
+        const aImagePath = new URL(a.image).pathname || '';
+        const bImagePath = new URL(b.image).pathname || '';
+        const aIsDefault = aImagePath.includes('default-meta-image');
+        const bIsDefault = bImagePath.includes('default-meta-image');
+
+        // If both have or don't have default images, sort alphabetically
+        if (aIsDefault === bIsDefault) {
+          return a.title.localeCompare(b.title);
+        }
+
+        // Push recipes with default images to the end
+        return aIsDefault ? 1 : -1;
+      },
     };
 
     let results = await lookupRecipes(filterConfig, facets);
