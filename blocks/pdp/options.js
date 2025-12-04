@@ -1,16 +1,52 @@
 import { buildSlide, buildThumbnails } from './gallery.js';
-import { rebuildIndices, checkOutOfStock } from '../../scripts/scripts.js';
+import { rebuildIndices, checkVariantOutOfStock } from '../../scripts/scripts.js';
 import { toClassName } from '../../scripts/aem.js';
 import renderPricing from './pricing.js';
 import renderAddToCart from './add-to-cart.js';
+
+/**
+ * Updates the OOS message text based on whether parent or variant is out of stock.
+ * @param {Element} oosMessage - The OOS message element
+ * @param {boolean} isParentOutOfStock - Whether the parent product is out of stock
+ */
+function updateOOSMessage(oosMessage, isParentOutOfStock) {
+  if (!oosMessage) return;
+
+  if (isParentOutOfStock) {
+    oosMessage.textContent = 'This item is temporarily out of stock.';
+  } else {
+    oosMessage.textContent = 'This color is temporarily out of stock.';
+  }
+}
+
+/**
+ * Updates the visibility of the free gift container based on stock availability.
+ * @param {Element} freeGiftContainer - The free gift container element
+ * @param {boolean} isParentOutOfStock - Whether the parent product is out of stock
+ * @param {boolean} isVariantOutOfStock - Whether the variant is out of stock
+ */
+export function updateFreeGiftVisibility(
+  freeGiftContainer,
+  isParentOutOfStock,
+  isVariantOutOfStock,
+) {
+  if (!freeGiftContainer) return;
+
+  if (isParentOutOfStock || isVariantOutOfStock) {
+    freeGiftContainer.classList.add('hidden');
+  } else {
+    freeGiftContainer.classList.remove('hidden');
+  }
+}
 
 /**
  * Handles the change of an option.
  * @param {Element} block - The PDP block element
  * @param {Array} variants - The variants of the product
  * @param {string} color - The color of the selected option
+ * @param {boolean} isParentOutOfStock - Whether the parent product is out of stock
  */
-export function onOptionChange(block, variants, color) {
+export function onOptionChange(block, variants, color, isParentOutOfStock = false) {
   if (variants[0].options.color.replace(/\s+/g, '-').toLowerCase() !== color) {
     // eslint-disable-next-line no-restricted-globals
     history.replaceState(null, '', `?color=${color}`);
@@ -23,10 +59,19 @@ export function onOptionChange(block, variants, color) {
   const variant = variants.find((colorVariant) => colorVariant.options.color.replace(/\s+/g, '-').toLowerCase() === color);
 
   const { sku } = variant;
-  const oos = checkOutOfStock(sku);
+  const oos = checkVariantOutOfStock(sku);
   const buyBox = block.querySelector('.pdp-buy-box');
-  buyBox.dataset.oos = oos;
+  // Set OOS to true if either parent or variant is out of stock
+  buyBox.dataset.oos = isParentOutOfStock || oos;
   buyBox.dataset.sku = sku;
+
+  // Update the OOS message text based on parent vs variant
+  const oosMessage = block.querySelector('.pdp-oos-message');
+  updateOOSMessage(oosMessage, isParentOutOfStock);
+
+  // Hide/show free gift container based on availability
+  const freeGiftContainer = block.querySelector('.pdp-free-gift-container');
+  updateFreeGiftVisibility(freeGiftContainer, isParentOutOfStock, oos);
 
   // update pricing
   const pricingContainer = renderPricing(block, variant);
@@ -103,7 +148,7 @@ export function onOptionChange(block, variants, color) {
  * @param {Record<string, any>} custom - The custom data for the product
  * @returns {Element} The options container element
  */
-export function renderOptions(block, variants, custom) {
+export function renderOptions(block, variants, custom, isParentOutOfStock) {
   const { options } = custom;
   // if there are no variants, don't render anything
   if (!variants || variants.length === 0) {
@@ -131,13 +176,13 @@ export function renderOptions(block, variants, custom) {
     const colorSwatch = document.createElement('div');
     colorSwatch.classList.add('pdp-color-inner');
     colorSwatch.style.backgroundColor = `var(--color-${color})`;
-    if (checkOutOfStock(sku)) {
+    if (checkVariantOutOfStock(sku)) {
       colorSwatch.classList.add('pdp-color-swatch-oos');
     }
     colorOption.append(colorSwatch);
 
     colorOption.addEventListener('click', () => {
-      onOptionChange(block, variants, color);
+      onOptionChange(block, variants, color, isParentOutOfStock);
     });
 
     return colorOption;
@@ -151,7 +196,7 @@ export function renderOptions(block, variants, custom) {
   optionsContainer.append(selectionContainer);
   const oosMessage = document.createElement('div');
   oosMessage.classList.add('pdp-oos-message');
-  oosMessage.textContent = 'This color is temporarily out of stock.';
+  updateOOSMessage(oosMessage, isParentOutOfStock);
   optionsContainer.append(oosMessage);
 
   if (options && options.length > 0) {

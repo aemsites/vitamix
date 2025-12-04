@@ -4,9 +4,9 @@ import renderGallery from './gallery.js';
 import renderSpecs from './specification-tabs.js';
 import renderPricing, { extractPricing } from './pricing.js';
 // eslint-disable-next-line import/no-cycle
-import { renderOptions, onOptionChange } from './options.js';
+import { renderOptions, onOptionChange, updateFreeGiftVisibility } from './options.js';
 import { loadFragment } from '../fragment/fragment.js';
-import { checkOutOfStock, isNextPipeline } from '../../scripts/scripts.js';
+import { checkVariantOutOfStock, isProductOutOfStock, isNextPipeline } from '../../scripts/scripts.js';
 import { openModal } from '../modal/modal.js';
 
 /**
@@ -394,13 +394,20 @@ export default async function decorate(block) {
   const buyBox = document.createElement('div');
   buyBox.classList.add('pdp-buy-box');
 
+  // Check if parent product is out of stock (all variants are out of stock)
+  const isParentOutOfStock = isProductOutOfStock();
+
   const pricingContainer = renderPricing(block);
-  const optionsContainer = renderOptions(block, variants, custom);
+  const optionsContainer = renderOptions(block, variants, custom, isParentOutOfStock);
   const addToCartContainer = renderAddToCart(block, jsonLdData);
   const compareContainer = renderCompare(custom);
   const freeGiftContainer = await renderFreeGift();
   const freeShippingContainer = renderFreeShipping(offers);
   const shareContainer = renderShare();
+
+  // Hide free gift container if parent is out of stock
+  updateFreeGiftVisibility(freeGiftContainer, isParentOutOfStock, false);
+
   buyBox.append(
     pricingContainer,
     optionsContainer || '',
@@ -436,15 +443,20 @@ export default async function decorate(block) {
   const color = queryParams.get('color');
 
   if (color) {
-    onOptionChange(block, variants, color);
+    onOptionChange(block, variants, color, isParentOutOfStock);
   } else if (variants.length > 0) {
     [window.selectedVariant] = variants;
   }
 
   buyBox.dataset.sku = window.selectedVariant?.sku || offers[0].sku;
-  buyBox.dataset.oos = checkOutOfStock(
+  const variantOos = checkVariantOutOfStock(
     window.selectedVariant
       ? offers.find((offer) => offer.sku === window.selectedVariant.sku).sku
       : offers[0].sku,
   );
+  // Set OOS to true if either parent or variant is out of stock
+  buyBox.dataset.oos = isParentOutOfStock || variantOos;
+
+  // Hide free gift container if variant is also out of stock
+  updateFreeGiftVisibility(freeGiftContainer, isParentOutOfStock, variantOos);
 }
