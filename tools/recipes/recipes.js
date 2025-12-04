@@ -626,11 +626,11 @@ export async function publishRecipe(kebabName, token) {
 // Initialize session with CalcMenu to get session cookie
 export async function initCalcMenuSession() {
   const corsProxy = 'https://fcors.org/?url=';
-  const calcMenuUrl = 'https://vitamix.calcmenuweb.com/Default.aspx?reveal=headers';
+  const calcMenuUrl = 'https://vitamix.calcmenuweb.com/Default.aspx';
 
   try {
     // Use reveal=headers to get response headers including cookies
-    const response = await fetch(corsProxy + encodeURIComponent(calcMenuUrl), {
+    const response = await fetch(`${corsProxy}${encodeURIComponent(calcMenuUrl)}&reveal=headers`, {
       method: 'GET',
     });
 
