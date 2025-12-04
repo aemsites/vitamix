@@ -65,7 +65,7 @@ export async function fetchRecipes(userId, password, dateUpdated) {
 
   // Use CORS proxy
   const apiUrl = `https://vitamix.calcmenuweb.com/ws/service.asmx/GetUpdatedRecipes?${queryParams.toString()}`;
-  const corsProxy = 'https://little-forest-58aa.david8603.workers.dev/?url=';
+  const corsProxy = 'https://fcors.org/?url=';
 
   const headers = {};
   const cookies = getCalcMenuCookies();
@@ -101,7 +101,7 @@ export async function fetchRecipeDetails(userId, password, recipeNumber) {
 
   // Use CORS proxy
   const apiUrl = `https://vitamix.calcmenuweb.com/ws/service.asmx/GetRecipeDetails?${queryParams.toString()}`;
-  const corsProxy = 'https://little-forest-58aa.david8603.workers.dev/?url=';
+  const corsProxy = 'https://fcors.org/?url=';
 
   const headers = {};
   const cookies = getCalcMenuCookies();
@@ -276,7 +276,7 @@ export async function fetchRecipeDetailsForSync(
   let recipeImageSrc = '';
   try {
     addLogEntry(`  Fetching image from ${recipePageUrl}`, 'info');
-    const corsProxy = 'https://little-forest-58aa.david8603.workers.dev/?url=';
+    const corsProxy = 'https://fcors.org/?url=';
     const pageResponse = await fetch(corsProxy + encodeURIComponent(recipePageUrl), {
       credentials: 'include',
     });
@@ -625,12 +625,12 @@ export async function publishRecipe(kebabName, token) {
 
 // Initialize session with CalcMenu to get session cookie
 export async function initCalcMenuSession() {
-  const corsProxy = 'https://little-forest-58aa.david8603.workers.dev/?url=';
-  const calcMenuUrl = 'https://vitamix.calcmenuweb.com/Default.aspx';
+  const corsProxy = 'https://fcors.org/?url=';
+  const calcMenuUrl = 'https://vitamix.calcmenuweb.com/Default.aspx?reveal=headers';
 
   try {
-    // Use status=reveal to get response headers including cookies
-    const response = await fetch(`${corsProxy}${encodeURIComponent(calcMenuUrl)}&status=reveal`, {
+    // Use reveal=headers to get response headers including cookies
+    const response = await fetch(corsProxy + encodeURIComponent(calcMenuUrl), {
       method: 'GET',
     });
 
@@ -1052,7 +1052,7 @@ export async function displayRecipeDetails(recipeNumber) {
     let recipeImageSrc = '';
     try {
       // Fetch the recipe page through CORS proxy
-      const corsProxy = 'https://little-forest-58aa.david8603.workers.dev/?url=';
+      const corsProxy = 'https://fcors.org/?url=';
       const pageResponse = await fetch(corsProxy + encodeURIComponent(recipePageUrl), {
         credentials: 'include',
       });
@@ -1375,7 +1375,7 @@ export async function displayRecipeDetails(recipeNumber) {
 // Fetch imported recipes from AEM
 export async function fetchImportedRecipes() {
   try {
-    const corsProxy = 'https://little-forest-58aa.david8603.workers.dev/?url=';
+    const corsProxy = 'https://fcors.org/?url=';
     const queryIndexUrl = 'https://main--vitamix--aemsites.aem.live/us/en_us/recipes/data/query-index.json?limit=10000';
 
     const response = await fetch(corsProxy + encodeURIComponent(queryIndexUrl), {
