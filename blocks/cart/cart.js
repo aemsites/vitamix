@@ -1,4 +1,4 @@
-import { loadCSS } from '../../scripts/aem.js';
+import { loadCSS, createOptimizedPicture } from '../../scripts/aem.js';
 import cart from '../../scripts/cart.js';
 
 const itemTemplate = /* html */`
@@ -120,11 +120,9 @@ export default async function decorate(block, parent) {
 
       // product element
       const productEl = itemElement.querySelector('.cart-item-product');
-      const productImgEl = document.createElement('img');
-      productImgEl.src = item.image;
-      productImgEl.alt = item.name;
+      const productPictureEl = createOptimizedPicture(item.image, '', true);
       const productImgWrapper = document.createElement('span');
-      productImgWrapper.appendChild(productImgEl);
+      productImgWrapper.appendChild(productPictureEl);
       productImgWrapper.classList.add('image');
 
       const productLinkEl = document.createElement('a');
