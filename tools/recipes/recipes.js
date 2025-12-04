@@ -29,16 +29,16 @@ let calcMenuCookies = '';
 // Store imported recipes for selection filtering
 let importedRecipesSet = new Set();
 
-// Parse cookies from set-cookie header
-function parseCookies(setCookieHeader) {
-  // The set-cookie header contains multiple cookies separated by commas
-  // Each cookie has format: name=value; expires=...; path=/; HttpOnly; etc
+// Parse cookies from set-cookie headers (can be an array or a single header)
+function parseCookies(setCookieHeaders) {
   const cookies = [];
-  const cookieParts = setCookieHeader.split(', ');
 
-  cookieParts.forEach((part) => {
+  // Handle both single header (string) and multiple headers (array)
+  const headersArray = Array.isArray(setCookieHeaders) ? setCookieHeaders : [setCookieHeaders];
+
+  headersArray.forEach((header) => {
     // Extract just the name=value part (before first semicolon)
-    const match = part.match(/^([^=]+=[^;]+)/);
+    const match = header.match(/^([^=]+=[^;]+)/);
     if (match) {
       cookies.push(match[1]);
     }
@@ -637,13 +637,17 @@ export async function initCalcMenuSession() {
     if (response.ok) {
       const data = await response.json();
 
-      // Find the set-cookie header
-      const setCookieHeader = data.headers?.find((h) => h.name.toLowerCase() === 'set-cookie');
+      // Find all set-cookie headers (there may be multiple)
+      const setCookieHeaders = data.headers
+        ?.filter((h) => h.name.toLowerCase() === 'set-cookie')
+        .map((h) => h.value);
 
-      if (setCookieHeader) {
-        calcMenuCookies = parseCookies(setCookieHeader.value);
+      if (setCookieHeaders && setCookieHeaders.length > 0) {
+        calcMenuCookies = parseCookies(setCookieHeaders);
         // eslint-disable-next-line no-console
         console.log('CalcMenu session cookies established:', calcMenuCookies);
+        // eslint-disable-next-line no-console
+        console.log(`Found ${setCookieHeaders.length} set-cookie header(s)`);
       }
     }
   } catch (error) {
