@@ -363,9 +363,16 @@ function parseVariantsNext(sections) {
 }
 
 // eslint-disable-next-line no-unused-vars
-export function checkOutOfStock(sku) {
+export function checkVariantOutOfStock(sku) {
   const { availability } = window.jsonLdData.offers.find((offer) => offer.sku === sku);
   return availability === 'https://schema.org/OutOfStock';
+}
+
+export function isProductOutOfStock() {
+  // Check if all variants are out of stock, if any are in stock, return false
+  const { offers } = window.jsonLdData;
+  if (!offers || offers.length === 0) return true; // Treat as OOS if no offers
+  return !offers.some((offer) => offer.availability === 'https://schema.org/InStock');
 }
 
 /**

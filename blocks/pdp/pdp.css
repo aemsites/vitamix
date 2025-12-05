@@ -687,6 +687,10 @@ main .section > div.pdp-wrapper {
   max-width: 32em;
 }
 
+.pdp-free-gift-container.hidden {
+  display: none;
+}
+
 .pdp-free-gift-heading {
   font-size: var(--body-size-s);
   font-weight: var(--weight-medium);

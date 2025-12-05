@@ -1,5 +1,5 @@
 import { getMetadata } from '../../scripts/aem.js';
-import { checkOutOfStock } from '../../scripts/scripts.js';
+import { checkVariantOutOfStock } from '../../scripts/scripts.js';
 
 /**
  * Renders "Find Locally" button container.
@@ -80,7 +80,7 @@ export function isVariantAvailableForSale(variant) {
     return true;
   }
 
-  return !checkOutOfStock(variant.sku);
+  return !checkVariantOutOfStock(variant.sku);
 }
 
 /**
