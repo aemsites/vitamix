@@ -1,0 +1,89 @@
+.checkout-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0;
+}
+
+/* Mobile: cart summary on top, form below */
+@media (width < 1000px) {
+  .checkout-container {
+    flex-direction: column;
+  }
+
+  .checkout-summary-column {
+    order: -1; /* Cart summary appears first on mobile */
+  }
+
+  .checkout-form-column {
+    order: 1;
+  }
+}
+
+/* Desktop: form on left, cart summary on right */
+@media (width >= 1000px) {
+  .checkout-container {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 40px;
+  }
+
+  .checkout-form-column {
+    flex: 1;
+    max-width: 600px;
+  }
+
+  .checkout-summary-column {
+    flex: 0 0 450px;
+    position: sticky;
+    top: 100px; /* Keeps it visible while scrolling */
+  }
+}
+
+/* Remove default block wrapper margins */
+.checkout .form-wrapper,
+.checkout .cart-summary-wrapper {
+  margin: 0;
+}
+
+/* Form styling adjustments for checkout context */
+.checkout-form-column .form {
+  background: transparent;
+}
+
+.checkout-form-column form {
+  display: grid;
+  gap: var(--spacing-80);
+}
+
+.checkout-form-column form input {
+  font-weight: normal;
+  font-family: var(--sans-serif-font-family);
+  font-size: 16px;
+}
+
+.checkout-form-column .button-wrapper {
+  margin-top: var(--spacing-80);
+}
+
+.checkout-form-column .button {
+  width: 100%;
+}
+
+.checkout-form-column form .field-help-text {
+  font-size: var(--body-size-xs);
+}
+
+.checkout-form-column .form form fieldset[data-name="optIn"] {
+  margin-top: 0;
+}
+
+.checkout-form-column form fieldset[data-name="optIn"] legend {
+  display: none;
+}
+
+.checkout-form-column .form form .form-field[data-name="street-1"] {
+  margin-top: -6px;
+}

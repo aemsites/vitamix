@@ -90,6 +90,69 @@ function buildTextArea(field) {
   return textarea;
 }
 
+async function appendSelectOptions(select, url) {
+  try {
+    // fetch options as JSON sheet
+    const { pathname } = new URL(url);
+    const resp = await fetch(pathname);
+    if (!resp.ok) {
+      console.error('Failed to fetch select options', resp.status);
+      return select;
+    }
+    const { data } = await resp.json();
+    if (!data || !Array.isArray(data)) {
+      console.error('Invalid select options JSON', data);
+      return select;
+    }
+
+    data.forEach((option) => {
+      const optionEl = createElement('option');
+      optionEl.value = option.value;
+      optionEl.textContent = option.label;
+      select.append(optionEl);
+    });
+    return select;
+  } catch (error) {
+    console.error('Failed to parse select options', error);
+    return select;
+  }
+}
+
+function buildSelect(field) {
+  const {
+    field: fieldName, required, default: defaultValue, placeholder, options,
+  } = field;
+  const select = createElement('select');
+  select.id = generateId(fieldName);
+  select.name = select.id;
+  select.required = required === 'true';
+  if (typeof options !== 'string') {
+    return select;
+  }
+
+  if (/^https?:\/\//.test(options)) {
+    if (placeholder) {
+      const optionEl = createElement('option');
+      if (defaultValue != null) {
+        optionEl.value = defaultValue;
+      }
+      optionEl.textContent = placeholder;
+      optionEl.setAttribute('disabled', 'true');
+      select.append(optionEl);
+    }
+    appendSelectOptions(select, options); // async
+  } else {
+    options.split(';').forEach((o) => {
+      const option = o.trim();
+      const optionEl = createElement('option');
+      optionEl.value = option;
+      optionEl.textContent = option;
+      select.append(optionEl);
+    });
+  }
+  return select;
+}
+
 /**
  * Creates a radio/checkbox input for an option
  * @param {Object} field - Field configuration object
@@ -440,12 +503,19 @@ function buildField(field) {
     wrapper.append(helpText);
   }
 
-  const input = type === 'textarea' ? buildTextArea(field) : buildInput(field);
-
-  if (type === 'textarea') {
-    wrapper.append(input);
-  } else {
-    wrapper.insertBefore(input, wrapper.firstChild.nextSibling);
+  let input;
+  switch (type) {
+    case 'textarea':
+      input = buildTextArea(field);
+      wrapper.append(input);
+      break;
+    case 'select':
+      input = buildSelect(field);
+      wrapper.append(input);
+      break;
+    default:
+      input = buildInput(field);
+      wrapper.insertBefore(input, wrapper.firstChild.nextSibling);
   }
 
   if (help) input.setAttribute('aria-describedby', helpText.id);

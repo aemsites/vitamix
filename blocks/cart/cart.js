@@ -26,7 +26,7 @@ const template = /* html */`
         </div>
     </div>
     <div class="cart-controls">
-        <button class="button emphasis cart-checkout">Checkout</button>
+        <a href="/drafts/maxed/checkout/start" class="button emphasis cart-checkout">Checkout</a>
     </div>
 </div>`;
 

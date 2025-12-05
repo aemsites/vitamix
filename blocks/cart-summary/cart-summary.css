@@ -1,0 +1,228 @@
+.cart-summary {
+  background-color: var(--color-gray-100, #f5f5f5);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.cart-summary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  background: transparent;
+  border: none;
+  width: 100%;
+  cursor: pointer;
+  border-bottom: 1px solid var(--color-gray-300, #ddd);
+}
+
+.cart-summary-header h3 {
+  margin: 0;
+  font-size: var(--heading-size-l);
+}
+
+.cart-summary-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cart-summary-total {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.cart-summary-header .chevron {
+  transition: transform 0.3s ease;
+}
+
+.cart-summary-header[aria-expanded="true"] .chevron {
+  transform: rotate(180deg);
+}
+
+.cart-summary-content {
+  display: none;
+  padding: 24px;
+}
+
+.cart-summary-header[aria-expanded="true"] ~ .cart-summary-content {
+  display: block;
+}
+
+/* Mobile: collapsed by default */
+@media (width < 1000px) {
+  .cart-summary-header {
+    cursor: pointer;
+  }
+}
+
+/* Desktop: always expanded, no chevron */
+@media (width >= 1000px) {
+  .cart-summary-header {
+    cursor: default;
+    border-bottom: none;
+    padding-bottom: 12px;
+  }
+
+  .cart-summary-header .chevron,
+  .cart-summary-header .cart-summary-total {
+    display: none;
+  }
+
+  .cart-summary-content {
+    display: block;
+    padding-top: 0;
+  }
+
+  .cart-summary-header[aria-expanded="false"] ~ .cart-summary-content {
+    display: block;
+  }
+}
+
+/* Cart Items */
+.cart-summary-items {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.cart-summary-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.cart-summary-item-image-wrapper {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border: 1px solid var(--color-gray-300, #ddd);
+  border-radius: 8px;
+  overflow: visible;
+  background: white;
+}
+
+.cart-summary-item-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.cart-summary-item-quantity {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: var(--color-black, #333);
+  color: white;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.cart-summary-item-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.cart-summary-item-name {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.cart-summary-item-variant {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-gray-600, #666);
+}
+
+.cart-summary-item-price {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Discount */
+.cart-summary-discount {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--color-gray-300, #ddd);
+}
+
+.discount-input {
+  flex: 1;
+  padding: 12px 16px;
+  border: 1px solid var(--color-gray-400, #ccc);
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.discount-input:focus {
+  outline: none;
+  border-color: var(--color-primary, #000);
+}
+
+.discount-apply {
+  padding: 12px 24px;
+  background: var(--color-gray-500, #999);
+  color: var(--color-gray-200, #eee);
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.discount-apply:hover {
+  background: var(--color-gray-600, #777);
+}
+
+/* Totals */
+.cart-summary-totals {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cart-summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+
+.cart-summary-row.cart-summary-final {
+  margin-top: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-gray-300, #ddd);
+  font-size: 18px;
+}
+
+.cart-summary-final-amount {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cart-summary-final-amount .currency {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--color-gray-600, #666);
+}
+
+.cart-summary-final-amount strong {
+  font-size: 20px;
+}
+
