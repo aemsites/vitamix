@@ -162,3 +162,7 @@
     padding: 0 var(--spacing-300);
   }
 }
+
+fieldset.form-section h3 {
+  margin: 1em 0 0.5em;
+}

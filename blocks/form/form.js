@@ -51,13 +51,32 @@ function buildLabel(text, type = 'label', id = null) {
 }
 
 /**
+ * @param {Object} field
+ * @returns {HTMLDivElement} Section element
+ */
+function buildSection(field) {
+  const {
+    label, field: fieldName, autocomplete,
+  } = field;
+  const section = createElement('fieldset', `form-section section-${fieldName}`);
+  // section.append(buildLabel(label, 'legend'));
+  if (label) {
+    const h3 = createElement('h3');
+    h3.textContent = label;
+    section.append(h3);
+  }
+  if (autocomplete) section.autocomplete = `section-${autocomplete}`;
+  return section;
+}
+
+/**
  * Creates an input element with specified attributes
  * @param {Object} field - Field configuration object
  * @returns {HTMLInputElement} Input element
  */
 function buildInput(field) {
   const {
-    type, field: fieldName, required, default: defaultValue, placeholder,
+    type, field: fieldName, required, default: defaultValue, placeholder, autocomplete,
   } = field;
 
   const input = createElement('input');
@@ -67,6 +86,7 @@ function buildInput(field) {
   input.required = required === 'true';
   if (defaultValue) input.value = defaultValue;
   if (placeholder) input.placeholder = placeholder;
+  if (autocomplete) input.autocomplete = autocomplete;
   return input;
 }
 
@@ -77,7 +97,7 @@ function buildInput(field) {
  */
 function buildTextArea(field) {
   const {
-    field: fieldName, required, default: defaultValue, placeholder,
+    field: fieldName, required, default: defaultValue, placeholder, autocomplete,
   } = field;
 
   const textarea = createElement('textarea');
@@ -87,6 +107,7 @@ function buildTextArea(field) {
   textarea.rows = 5;
   if (defaultValue) textarea.value = defaultValue;
   if (placeholder) textarea.placeholder = placeholder;
+  if (autocomplete) textarea.autocomplete = autocomplete;
   return textarea;
 }
 
@@ -107,8 +128,8 @@ async function appendSelectOptions(select, url) {
 
     data.forEach((option) => {
       const optionEl = createElement('option');
-      optionEl.value = option.value;
-      optionEl.textContent = option.label;
+      optionEl.value = option.Value || option.value;
+      optionEl.textContent = option.Label || option.label;
       select.append(optionEl);
     });
     return select;
@@ -534,11 +555,15 @@ function buildForm(fields, path) {
   // group buttons at the end
   const buttons = [];
 
+  let section = form;
   fields.forEach((field) => {
     if (field.type === 'submit' || field.type === 'reset') {
       buttons.push(field);
+    } else if (field.type === 'section') {
+      section = buildSection(field, form);
+      form.append(section);
     } else {
-      form.append(buildField(field));
+      section.append(buildField(field));
     }
   });
 

@@ -146,6 +146,55 @@ export class Cart {
     this.#persist();
   }
 
+  /**
+   * @param {string} firstName
+   * @param {string} lastName
+   * @param {string} email
+   * @param {string} phone
+   * @param {{
+   *   name: string;
+   *   company: string;
+   *   address1: string;
+   *   address2: string;
+   *   city: string;
+   *   state: string;
+   *   zip: string;
+   *   country: string;
+   *   phone: string;
+   *   email: string;
+   * }} shipping
+   * @returns {Object}
+   */
+  getOrderJSON(email, firstName, lastName, phone, shippingAddr) {
+    // remove empty string values
+    const shipping = Object.fromEntries(
+      // eslint-disable-next-line no-unused-vars
+      Object.entries(shippingAddr).filter(([_, value]) => value !== ''),
+    );
+    const order = {
+      storeCode: 'main',
+      storeViewCode: 'default',
+      customer: {
+        firstName,
+        lastName,
+        email,
+        phone,
+      },
+      shipping,
+      items: this.items.map((item) => ({
+        sku: item.sku,
+        urlKey: (item.url || '').split('/').pop() || '',
+        name: item.name,
+        quantity: item.quantity,
+        price: {
+          currency: 'USD',
+          final: item.price,
+        },
+      })),
+    };
+    return order;
+  }
+
   toJSON() {
     return {
       version: Cart.STORAGE_VERSION,

@@ -19,6 +19,9 @@ import {
 } from './aem.js';
 
 const { hostname } = window.location;
+
+export const ORDERS_API_ORIGIN = 'https://vitamix-api.adobeaem.workers.dev';
+
 window.cartMode = hostname.includes('localhost') || hostname.includes('edge-orders--') ? 'edge' : 'legacy';
 if (['edge', 'legacy'].includes(localStorage.getItem('cartMode'))) {
   window.cartMode = localStorage.getItem('cartMode');
@@ -514,8 +517,8 @@ function buildAutoBlocks(main) {
     }
 
     // setup cart page
-    if (getMetadata('template') === 'cart') {
-      document.body.classList.add('cart-template');
+    if (getMetadata('template')) {
+      document.body.classList.add(`${getMetadata('template').toLowerCase()}-template`);
     }
   } catch (error) {
     // eslint-disable-next-line no-console
