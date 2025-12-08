@@ -520,31 +520,32 @@ export default async function decorate(block) {
 
       minicart.addEventListener('click', (event) => {
         const rect = minicart.getBoundingClientRect();
-        console.log('rect: ', rect);
-        console.log('rect.top <= event.clientY: ', rect.top <= event.clientY);
-        console.log('event.clientY <= rect.top + rect.height: ', event.clientY <= rect.top + rect.height);
-        console.log('rect.left <= event.clientX: ', rect.left <= event.clientX);
-        console.log('event.clientX <= rect.left + rect.width: ', event.clientX <= rect.left + rect.width);
-
         const isInDialog = (rect.top <= event.clientY
           && event.clientY <= rect.top + rect.height
           && rect.left <= event.clientX
           && event.clientX <= rect.left + rect.width);
         if (!isInDialog) {
-          console.log('not in dialog, closing');
           minicart.closeModal();
         }
       });
+
+      const closeOnEmpty = (ev) => {
+        if (ev.detail.action === 'empty') {
+          minicart.closeModal();
+        }
+      };
 
       // open/close methods to account for transitions
       const open = () => {
         minicart.showModal();
         minicart.setAttribute('aria-expanded', true);
+        document.addEventListener('cart:change', closeOnEmpty);
       };
       minicart.openModal = open;
 
       const close = () => {
         minicart.setAttribute('aria-expanded', false);
+        document.removeEventListener('cart:change', closeOnEmpty);
         setTimeout(() => {
           minicart.close();
         }, 300);

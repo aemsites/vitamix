@@ -53,6 +53,19 @@ export class Cart {
     this.#persistNow();
   }, 300);
 
+  #maybeSendEmptyEvent() {
+    if (this.itemCount === 0) {
+      document.dispatchEvent(
+        new CustomEvent('cart:change', {
+          detail: {
+            cart: this,
+            action: 'empty',
+          },
+        }),
+      );
+    }
+  }
+
   get items() {
     return Object.values(this.#items);
   }
@@ -88,6 +101,7 @@ export class Cart {
         },
       }),
     );
+    this.#maybeSendEmptyEvent();
   }
 
   /**
@@ -130,6 +144,7 @@ export class Cart {
         },
       }),
     );
+    this.#maybeSendEmptyEvent();
     this.#persist();
   }
 
@@ -147,6 +162,7 @@ export class Cart {
         },
       }),
     );
+    this.#maybeSendEmptyEvent();
     this.#persist();
   }
 
