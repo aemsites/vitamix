@@ -200,7 +200,7 @@ export default function renderAddToCart(block, parent) {
         const cartApi = (await import('../../scripts/cart.js')).default;
 
         const { sku: variantSku, price, name } = selectedVariant;
-        await cartApi.addItem({
+        const item = {
           sku: variantSku ?? sku,
           parentSku: variantSku ? sku : undefined,
           quantity: parseInt(quantity, 10),
@@ -209,12 +209,13 @@ export default function renderAddToCart(block, parent) {
           url: selectedVariant.url,
           image: selectedVariant.image[0],
           selectedOptions,
-        });
+        };
+        await cartApi.addItem(item);
 
         // reenable button
         addToCartButton.textContent = 'Add to Cart';
         addToCartButton.removeAttribute('aria-disabled');
-        document.dispatchEvent(new CustomEvent('pdp:add-to-cart'));
+        document.dispatchEvent(new CustomEvent('pdp:add-to-cart', { detail: { item } }));
         return;
       }
 

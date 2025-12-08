@@ -481,8 +481,16 @@ export default async function decorate(block) {
     /** @type {HTMLDialogElement} */
     let minicart = document.querySelector('#minicart');
 
+    const scrollToItem = () => {
+      setTimeout(() => {
+        const addedItem = minicart.querySelector(`.cart-item-${e.detail.item.sku}`);
+        addedItem.scrollIntoView({ behavior: 'smooth' });
+      }, 300);
+    };
+
     if (minicart) {
       minicart.openModal();
+      scrollToItem();
       return;
     }
 
@@ -512,11 +520,18 @@ export default async function decorate(block) {
 
       minicart.addEventListener('click', (event) => {
         const rect = minicart.getBoundingClientRect();
+        console.log('rect: ', rect);
+        console.log('rect.top <= event.clientY: ', rect.top <= event.clientY);
+        console.log('event.clientY <= rect.top + rect.height: ', event.clientY <= rect.top + rect.height);
+        console.log('rect.left <= event.clientX: ', rect.left <= event.clientX);
+        console.log('event.clientX <= rect.left + rect.width: ', event.clientX <= rect.left + rect.width);
+
         const isInDialog = (rect.top <= event.clientY
           && event.clientY <= rect.top + rect.height
           && rect.left <= event.clientX
           && event.clientX <= rect.left + rect.width);
         if (!isInDialog) {
+          console.log('not in dialog, closing');
           minicart.closeModal();
         }
       });
@@ -537,6 +552,9 @@ export default async function decorate(block) {
       minicart.closeModal = close;
 
       minicart.openModal();
+
+      // scroll item into view
+      scrollToItem();
     } catch (error) {
       console.error('Error importing cart:', error);
       setTimeout(() => {
@@ -550,5 +568,7 @@ export default async function decorate(block) {
   cartLink.addEventListener('click', openOrRedirect);
 
   // and when adding to cart from PDP
-  document.addEventListener('pdp:add-to-cart', openOrRedirect);
+  document.addEventListener('pdp:add-to-cart', (ev) => {
+    openOrRedirect(ev);
+  });
 }

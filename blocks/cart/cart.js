@@ -44,7 +44,9 @@ function renderQuantityPicker(item, container, totalEl) {
   const removeButton = document.createElement('button');
   removeButton.textContent = 'Remove';
   removeButton.classList.add('remove-button');
-  removeButton.addEventListener('click', () => {
+  removeButton.addEventListener('click', (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
     cart.removeItem(item.sku);
     container.closest('span .cart-item').remove();
   });
@@ -117,6 +119,8 @@ export default async function decorate(block, parent) {
       const itemElement = document.createElement('span');
       itemElement.innerHTML = itemTemplate;
       itemList.appendChild(itemElement);
+      const cartItem = itemElement.querySelector('.cart-item');
+      cartItem.classList.add(`cart-item-${item.sku}`);
 
       // product element
       const productEl = itemElement.querySelector('.cart-item-product');
