@@ -43,10 +43,14 @@ export class Cart {
     }
   }
 
-  #persist = debounce(() => {
+  #persistNow() {
     const expires = new Date(Date.now() + 30 * 864e5).toUTCString();
     document.cookie = `cart_items_count=${this.itemCount}; expires=${expires}; path=/`;
     localStorage.setItem(Cart.STORAGE_KEY, JSON.stringify(this));
+  }
+
+  #persist = debounce(() => {
+    this.#persistNow();
   }, 300);
 
   get items() {
@@ -75,7 +79,7 @@ export class Cart {
 
   clear() {
     this.#items = {};
-    this.#persist();
+    this.#persistNow();
     document.dispatchEvent(
       new CustomEvent('cart:change', {
         detail: {
