@@ -30,7 +30,7 @@ const chatbot = document.createElement('div');
 chatbot.id = 'chatbot-container';
 document.body.appendChild(chatbot);
 
-loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-chatbot.lc-d95b877a5e0c2ce39cd26f0aa190faef-lc.min.js');
+loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-chatbot.lc-dd65664b07118365206104c205ccc20e-lc.min.js');
 loadScript('https://www.vitamix.com/etc.clientlibs/core/wcm/components/commons/site/clientlibs/container.lc-0a6aff292f5cc42142779cde92054524-lc.min.js');
 
 await loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-library.lc-259cf15444c5fe1f89e5c54df7b6e1e9-lc.min.js');
