@@ -373,7 +373,7 @@ export function isProductOutOfStock() {
   const { offers, custom } = window.jsonLdData;
 
   // If the product is a bundle and parent is out of stock, return true
-  if (custom.type === 'bundle' && custom.availability === 'OutOfStock') {
+  if (custom.type === 'bundle' && custom.parentAvailability === 'OutOfStock') {
     return true;
   }
 
