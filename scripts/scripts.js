@@ -370,8 +370,17 @@ export function checkVariantOutOfStock(sku) {
 
 export function isProductOutOfStock() {
   // Check if all variants are out of stock, if any are in stock, return false
-  const { offers } = window.jsonLdData;
-  if (!offers || offers.length === 0) return true; // Treat as OOS if no offers
+  const { offers, custom } = window.jsonLdData;
+
+  // If the product is a bundle and parent is out of stock, return true
+  if (custom.type === 'bundle' && custom.availability === 'OutOfStock') {
+    return true;
+  }
+
+  // If the product is not a bundle and no offers are available, return true
+  if (!offers || offers.length === 0) return true;
+
+  // If the product is not a bundle and any offers are in stock, return false
   return !offers.some((offer) => offer.availability === 'https://schema.org/InStock');
 }
 
