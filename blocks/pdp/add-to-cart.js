@@ -110,7 +110,7 @@ export default function renderAddToCart(block, parent) {
   const isAvailableForSale = isVariantAvailableForSale(selectedVariant);
 
   // If the parent product is a bundle and is out of stock, return an empty string
-  if (parent.custom.type === 'bundle' && parent.custom.availability === 'OutOfStock') {
+  if (parent.custom.type === 'bundle' && parent.custom.parentAvailability === 'OutOfStock') {
     return '';
   }
 
