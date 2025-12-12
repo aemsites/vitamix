@@ -141,6 +141,13 @@ export function onOptionChange(block, variants, color, isParentOutOfStock = fals
   }
 }
 
+function renderOOSMessage(element, isParentOutOfStock) {
+  const oosMessage = document.createElement('div');
+  oosMessage.classList.add('pdp-oos-message');
+  updateOOSMessage(oosMessage, isParentOutOfStock);
+  element.append(oosMessage);
+}
+
 /**
  * Renders the options section of the PDP block.
  * @param {Element} block - The PDP block element
@@ -149,14 +156,21 @@ export function onOptionChange(block, variants, color, isParentOutOfStock = fals
  * @returns {Element} The options container element
  */
 export function renderOptions(block, variants, custom, isParentOutOfStock) {
-  const { options } = custom;
-  // if there are no variants, don't render anything
-  if (!variants || variants.length === 0) {
-    return;
-  }
-
   const optionsContainer = document.createElement('div');
   optionsContainer.classList.add('options');
+  const { options } = custom;
+
+  // If we are dealing with an out of stock simple product,
+  // render the OOS message and return
+  if (isParentOutOfStock && custom.type === 'simple') {
+    renderOOSMessage(optionsContainer, isParentOutOfStock);
+    return optionsContainer;
+  }
+
+  // if there are no variants, don't render anything
+  if (!variants?.length) {
+    return optionsContainer;
+  }
 
   const selectionContainer = document.createElement('div');
   selectionContainer.classList.add('selection');
@@ -194,10 +208,7 @@ export function renderOptions(block, variants, custom, isParentOutOfStock) {
   selectionContainer.append(colorOptionsContainer);
 
   optionsContainer.append(selectionContainer);
-  const oosMessage = document.createElement('div');
-  oosMessage.classList.add('pdp-oos-message');
-  updateOOSMessage(oosMessage, isParentOutOfStock);
-  optionsContainer.append(oosMessage);
+  renderOOSMessage(optionsContainer, isParentOutOfStock);
 
   if (options && options.length > 0) {
     const warrantyContainer = document.createElement('div');
