@@ -522,6 +522,19 @@ function buildAutoBlocks(main) {
     if (metaSku || pdpBlock) {
       document.body.classList.add('pdp-template');
     }
+
+    // wrap recipes in block
+    if (document.querySelector('main') === main) {
+      const template = getMetadata('template');
+      const recipeType = getMetadata('recipe-type');
+      const totalTime = getMetadata('total-time');
+      if (template === 'recipe' && (recipeType || totalTime)) {
+        const block = document.createElement('div');
+        block.classList.add('recipe');
+        block.append(...main.firstElementChild.children);
+        main.firstElementChild.append(block);
+      }
+    }
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Auto Blocking failed', error);
