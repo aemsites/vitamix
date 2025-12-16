@@ -37,7 +37,8 @@ main > .recipe-container.section > .recipe-wrapper {
   }
 
   .recipe .recipe-header.no-image {
-    grid-template-areas: 'details' 'additional-info';
+    display: flex;
+    flex-direction: column;
   }
 }
 
