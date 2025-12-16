@@ -967,7 +967,7 @@ export function findBestAlertBanner(banners, date = new Date()) {
  * Gets the locale and language from the window.location.pathname.
  * @returns {Object} Object with locale and language.
  */
-export async function getLocaleAndLanguage() {
+export function getLocaleAndLanguage() {
   const pathSegments = window.location.pathname.split('/').filter(Boolean);
   const locale = pathSegments[0] || 'us'; // fallback to 'us' if not found
   const language = pathSegments[1] || 'en_us'; // fallback to 'en_us' if not found
