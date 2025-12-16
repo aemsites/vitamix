@@ -517,6 +517,14 @@ function buildAutoBlocks(main) {
         block.classList.add('recipe');
         block.append(...main.firstElementChild.children);
         main.firstElementChild.append(block);
+        // eslint-disable-next-line no-use-before-define
+        const { locale, language } = getLocaleAndLanguage();
+        const footerPath = new URL(`/${locale}/${language}/recipes/fragments/footer`, window.location.origin);
+        const footerLink = document.createElement('a');
+        footerLink.href = footerPath.pathname;
+        footerLink.textContent = footerPath.pathname;
+        const footer = buildBlock('fragment', footerLink);
+        main.firstElementChild.append(footer);
       }
     }
   } catch (error) {
