@@ -1,4 +1,5 @@
-import { getMetadata } from '../../scripts/aem.js';
+import { getMetadata, toClassName } from '../../scripts/aem.js';
+import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 function wrapInDiv(element, className) {
   if (!element) return;
@@ -65,19 +66,24 @@ function formatServings(servingsString) {
   return unit ? `${formattedNumber} ${unit}` : `${formattedNumber}`;
 }
 
+function writeDietaryInterests(data, locale, language) {
+  const dietaryInterests = data.split(',').map((i) => i.trim());
+  return dietaryInterests.map((interest) => {
+    const a = document.createElement('a');
+    a.href = `/${locale}/${language}/search?refineby=${toClassName(interest)}`;
+    a.textContent = interest;
+    return a;
+  });
+}
+
 export default async function decorate(block) {
+  const { locale, language } = getLocaleAndLanguage();
+
   const totalTime = getMetadata('total-time');
   const yields = getMetadata('yield');
   const difficulty = getMetadata('difficulty');
-  /*
-  const compatibleContainers = getMetadata('compatible-containers');
-  const course = getMetadata('course');
-  const recipeType = getMetadata('recipe-type');
-  const status = getMetadata('status');
-  const dateCreated = getMetadata('date-created');
-  const dateUpdated = getMetadata('date-updated');
-  */
-  const dietaryInterests = getMetadata('dietary-interests');
+
+  const dietaryInterests = writeDietaryInterests(getMetadata('dietary-interests'), locale, language);
   const h1 = block.querySelector('h1');
   const description = block.querySelector('h1 + p');
   const picture = block.querySelector('picture');
@@ -94,96 +100,120 @@ export default async function decorate(block) {
 
   recipeHeader.innerHTML = `<div class="recipe-details">
     <h1>${h1 ? h1.textContent : ''}</h1>
-    <div class="recipe-rating">
-      <div class="recipe-stars">
-        <span class="star">★</span>
-        <span class="star">★</span>
-        <span class="star">★</span>
-        <span class="star">★</span> 
-        <span class="star">★</span>
-      </div>
-      <span class="review-count">100 reviews</span>
-      <a href="#" class="write-review">Write a review</a>
-    </div>
+    <div class="recipe-rating"></div>
     <p>${description ? description.textContent : ''}</p>
     <div class="recipe-stats">
      <div class="recipe-stat recipe-stat-total-time">
-      <span class="recipe-stat-label">Total Time</span>
-      <span class="recipe-stat-value">${formattedTime}</span>
+      <p class="eyebrow">Total Time</p>
+      <p>${formattedTime}</p>
      </div>
      <div class="recipe-stat recipe-stat-yields">
-      <span class="recipe-stat-label">Yields</span>
-      <span class="recipe-stat-value">${formattedYields}</span>
+      <p class="eyebrow">Yields</p>
+      <p>${formattedYields}</p>
      </div>
      <div class="recipe-stat recipe-stat-difficulty">
-      <span class="recipe-stat-label">Difficulty</span>
-      <span class="recipe-stat-value">${difficulty}</span>
+      <p class="eyebrow">Difficulty</p>
+      <p>${difficulty}</p>
      </div>
     </div>
   </div>
   ${picture ? `<div class="recipe-image">${picture.outerHTML}</div>` : ''}
   <div class="recipe-additional-info">
-    <div class="recipe-additional-info-item">
-      <span class="recipe-dietary-interests">
-        <span class="recipe-dietary-interest-label">Dietary Interests</span>
-        <span class="recipe-dietary-interest-value">${dietaryInterests}</span>
-      </span>
+    <div class="recipe-additional-info-item recipe-dietary-interests">
+      <p class="eyebrow">Dietary Interests</p>
+      <p>${dietaryInterests.map((i) => i.outerHTML).join(', ')}</p>
     </div>
-    <div class="recipe-additional-info-item">
-      <span class="recipe-submitted-by">
-        <span class="recipe-submitted-by-label">Submitted By</span>
-        <span class="recipe-submitted-by-value">Vitamix</span>
-      </span>        
+    <div class="recipe-additional-info-item recipe-submitted-by">
+      <p class="eyebrow">Submitted By</p>
+      <p>Vitamix</p>
     </div>
-    <div class="recipe-additional-info-item">
-      <span class="recipe-manage-preferences">
-        <span class="recipe-manage-preferences-label">Manage Preferences</span>
-      </span>
+    <div class="recipe-additional-info-item recipe-manage-preferences">
+      <p>
+        <a href="/${locale}/${language}/customer/account/login">Manage Preferences</a>
+      </p>
     </div>
   </div>`;
 
   if (h1) h1.remove();
   if (description) description.remove();
-  if (picture) picture.remove();
+  if (picture) {
+    const wrapper = picture.closest('.img-wrapper');
+    if (wrapper) wrapper.remove();
+    else picture.remove();
+  }
+
+  // Create recipe toolbar
+  const recipeToolbar = document.createElement('div');
+  recipeToolbar.classList.add('recipe-toolbar');
+  recipeToolbar.innerHTML = `
+    <button type="button"><img src="/blocks/recipe/save.svg" alt=""> Save</button>
+    <button type="button"><img src="/blocks/recipe/print.svg" alt=""> Print</button>
+    <button type="button"><img src="/blocks/recipe/share.svg" alt=""> Share</button>
+  `;
 
   const recipeContainer = document.createElement('div');
   recipeContainer.classList.add('recipe-body');
   recipeContainer.append(...block.children);
   block.prepend(recipeHeader);
   block.append(recipeContainer);
+  recipeContainer.prepend(recipeToolbar);
 
-  wrapInDiv(block.querySelector('#ingredients'), 'recipe-ingredients');
-  wrapInDiv(block.querySelector('#directions'), 'recipe-directions');
-  wrapInDiv(block.querySelector('#notes'), 'recipe-notes');
-  wrapInDiv(block.querySelector('#nutrition'), 'recipe-nutrition');
+  // Wrap content sections
+  ['ingredients', 'directions', 'notes', 'nutrition'].forEach((id) => {
+    wrapInDiv(block.querySelector(`#${id}`), `recipe-${id}`);
+  });
 
-  // Process nutrition items to split label and value
+  // Group ingredients + directions in shared container
+  const ingredients = block.querySelector('.recipe-ingredients');
+  const directions = block.querySelector('.recipe-directions');
+  if (ingredients && directions) {
+    const instructions = document.createElement('div');
+    instructions.className = 'recipe-instructions';
+    ingredients.before(instructions);
+    instructions.append(ingredients, directions);
+  }
+
+  // Move notes to end of recipe-body
+  const notes = block.querySelector('.recipe-notes');
+  if (notes) recipeContainer.append(notes);
+
+  // Convert nutrition ul to table
   const nutritionSection = block.querySelector('.recipe-nutrition');
   if (nutritionSection) {
-    const nutritionItems = nutritionSection.querySelectorAll('ul > li');
-    nutritionItems.forEach((item) => {
-      const paragraph = item.querySelector('p');
-      if (paragraph) {
-        const text = paragraph.textContent.trim();
-        const colonIndex = text.indexOf(':');
-        if (colonIndex > -1) {
-          const label = text.substring(0, colonIndex).trim();
-          const value = text.substring(colonIndex + 1).trim();
-          paragraph.innerHTML = `<span class="nutrition-label">${label}</span><span class="nutrition-value">${value}</span>`;
+    const ul = nutritionSection.querySelector('ul');
+    if (ul) {
+      const table = document.createElement('table');
+      const tbody = document.createElement('tbody');
+
+      ul.querySelectorAll(':scope > li').forEach((li) => {
+        const p = li.querySelector(':scope > p');
+        const nestedUl = li.querySelector(':scope > ul');
+        const text = p ? p.textContent : '';
+
+        if (text && text.includes(':')) {
+          const [label, value] = text.split(':').map((s) => s.trim());
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${label}</td><td>${value}</td>`;
+          tbody.append(tr);
         }
-      }
-      // Process nested items (like Dietary Fiber, Sugars)
-      const nestedItems = item.querySelectorAll('ul > li');
-      nestedItems.forEach((nestedItem) => {
-        const text = nestedItem.textContent.trim();
-        const colonIndex = text.indexOf(':');
-        if (colonIndex > -1) {
-          const label = text.substring(0, colonIndex).trim();
-          const value = text.substring(colonIndex + 1).trim();
-          nestedItem.innerHTML = `<span class="nutrition-label">${label}</span><span class="nutrition-value">${value}</span>`;
+
+        if (nestedUl) {
+          nestedUl.querySelectorAll('li').forEach((nestedLi) => {
+            const nestedText = nestedLi.textContent;
+            if (nestedText && nestedText.includes(':')) {
+              const [label, value] = nestedText.split(':').map((s) => s.trim());
+              const tr = document.createElement('tr');
+              tr.classList.add('nested');
+              tr.innerHTML = `<td>${label}</td><td>${value}</td>`;
+              tbody.append(tr);
+            }
+          });
         }
       });
-    });
+
+      table.append(tbody);
+      ul.replaceWith(table);
+    }
   }
 
   // Add compatible containers section above ingredients
@@ -191,7 +221,7 @@ export default async function decorate(block) {
   const ingredientsSection = block.querySelector('.recipe-ingredients');
   if (recipeTitle && ingredientsSection) {
     try {
-      const response = await fetch('/us/en_us/recipes/data/query-index.json');
+      const response = await fetch(`/${locale}/${language}/recipes/data/query-index.json`);
       const data = await response.json();
 
       // Find all recipes with the same title
@@ -212,31 +242,41 @@ export default async function decorate(block) {
 
       // Only create the section if we have containers
       if (containerMap.size > 0) {
-        const containersDiv = document.createElement('div');
-        containersDiv.className = 'recipe-compatible-containers';
+        const currentPath = window.location.pathname;
+        const sortedContainers = Array.from(containerMap.entries())
+          .sort((a, b) => b[0].localeCompare(a[0]));
+
+        const containerSection = document.createElement('div');
+        containerSection.className = 'recipe-refine';
 
         const heading = document.createElement('h2');
-        heading.textContent = 'Compatible Containers';
+        heading.textContent = 'Refine Your Recipe';
 
-        const containersWrapper = document.createElement('div');
-        containersWrapper.className = 'recipe-containers-list';
+        const details = document.createElement('details');
+        details.open = true;
 
-        // Sort containers alphabetically
-        const sortedContainers = Array.from(containerMap.entries())
-          .sort((a, b) => a[0].localeCompare(b[0]));
+        const summary = document.createElement('summary');
+        summary.textContent = 'Container Size';
 
+        const ul = document.createElement('ul');
         sortedContainers.forEach(([container, path]) => {
-          const tag = document.createElement('a');
-          tag.className = 'recipe-container-tag';
-          tag.href = path;
-          tag.textContent = container;
-          containersWrapper.appendChild(tag);
+          const li = document.createElement('li');
+          const a = document.createElement('a');
+          a.href = path;
+          a.textContent = container;
+          if (path === currentPath) {
+            a.setAttribute('aria-current', 'page');
+          }
+          li.append(a);
+          ul.append(li);
         });
 
-        containersDiv.appendChild(heading);
-        containersDiv.appendChild(containersWrapper);
+        details.append(summary, ul);
+        containerSection.append(heading, details);
 
-        ingredientsSection.parentElement.insertBefore(containersDiv, ingredientsSection);
+        if (nutritionSection) {
+          nutritionSection.parentElement.insertBefore(containerSection, nutritionSection);
+        }
       }
     } catch (error) {
       // eslint-disable-next-line no-console
