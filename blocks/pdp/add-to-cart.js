@@ -1,5 +1,5 @@
 import { getMetadata } from '../../scripts/aem.js';
-import { checkOutOfStock } from '../../scripts/scripts.js';
+import { checkVariantOutOfStock } from '../../scripts/scripts.js';
 
 /**
  * Renders "Find Locally" button container.
@@ -80,7 +80,7 @@ export function isVariantAvailableForSale(variant) {
     return true;
   }
 
-  return !checkOutOfStock(variant.sku);
+  return !checkVariantOutOfStock(variant.sku);
 }
 
 /**
@@ -108,6 +108,11 @@ export default function renderAddToCart(block, parent) {
 
   // Figure out if the selected variant is available for sale
   const isAvailableForSale = isVariantAvailableForSale(selectedVariant);
+
+  // If the parent product is a bundle and is out of stock, return an empty string
+  if (parent.custom.type === 'bundle' && parent.custom.parentAvailability === 'OutOfStock') {
+    return '';
+  }
 
   // If we have a selected variant, use it's custom object,
   // otherwise use the parent product's custom object
