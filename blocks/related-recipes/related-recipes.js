@@ -122,6 +122,8 @@ function findRelatedRecipes(target, allRecipes, max = 3) {
     recipe.path !== target.path
     && recipe.title !== target.title
     && recipe.status !== 'Deleted'
+    && recipe.image
+    && !recipe.image.includes('default-meta-image')
     && hasAnyOverlap(target, recipe)
   ));
 
@@ -189,21 +191,12 @@ export default async function decorate(block) {
   // Build the related recipes UI
   const list = document.createElement('ul');
 
-  const PLACEHOLDER_IMAGE = '/blocks/recipe/save.svg';
-
   relatedRecipes.forEach((recipe) => {
     const li = document.createElement('li');
-    let image;
-    let placeholder = false;
-    if (recipe.image && !recipe.image.includes('default-meta-image')) {
-      image = recipe.image.replace('/recipes/data/media_', '/media_');
-    } else {
-      image = PLACEHOLDER_IMAGE;
-      placeholder = true;
-    }
+    const image = recipe.image.replace('/recipes/data/media_', '/media_');
     li.innerHTML = `
       <a href="${recipe.path}">
-        <img ${placeholder ? 'class="placeholder"' : ''} src="${image}" alt="" loading="lazy" />
+        <img src="${image}" alt="" loading="lazy" />
         <span>${recipe.title}</span>
       </a>
     `;

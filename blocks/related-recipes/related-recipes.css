@@ -29,11 +29,6 @@
   object-fit: cover;
 }
 
-.related-recipes li img.placeholder {
-  padding: var(--horizontal-spacing);
-  background-color: var(--color-charcoal);
-}
-
 .related-recipes nav {
   position: static;
   display: flex;
