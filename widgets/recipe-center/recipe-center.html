@@ -1,2 +1,41 @@
 <script type="module" src="/widgets/recipe-center/recipe-center.js"></script>
-<div class="recipe-center"></div>
+<div class="recipe-center">
+  <form class="controls" aria-label="Recipe filters">
+    <fieldset class="filters">
+      <legend>Refine Your Search</legend>
+      <select id="dietary-interests" aria-label="Dietary interests"><option value="">Dietary</option></select>
+      <select id="course" aria-label="Course"><option value="">Course</option></select>
+      <select id="recipe-type" aria-label="Recipe type"><option value="">Recipe Type</option></select>
+      <button type="button" class="go">Go</button>
+    </fieldset>
+    <div class="search">
+      <input id="fulltext" type="search" aria-label="Search recipes" placeholder="Type to search recipes">
+      <button type="submit" class="search-btn" aria-label="Search">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"/>
+        </svg>
+      </button>
+    </div>
+  </form>
+  <div class="info">
+    <p>Items <span id="results-start">1</span> - <span id="results-end">12</span> of <span id="results-count">0</span></p>
+    <details class="sort">
+      <summary>Sort By: <span id="sortby" data-sort="featured">Featured</span></summary>
+      <menu>
+        <li><button type="button" data-sort="featured">Featured</button></li>
+        <li><button type="button" data-sort="name-asc">Name (A-Z)</button></li>
+        <li><button type="button" data-sort="name-desc">Name (Z-A)</button></li>
+        <li><button type="button" data-sort="time-asc">Time (Low to High)</button></li>
+        <li><button type="button" data-sort="time-desc">Time (High to Low)</button></li>
+      </menu>
+    </details>
+  </div>
+  <div class="facets">
+    <h2>Refine Your Recipe</h2>
+    <div class="selected"></div>
+    <div class="list"></div>
+    <button type="button" class="apply">See Results</button>
+  </div>
+  <ul class="results"></ul>
+  <nav class="pagination"></nav>
+</div>

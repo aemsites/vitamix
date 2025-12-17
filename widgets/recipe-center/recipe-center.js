@@ -326,12 +326,11 @@ function collapseRecipesByTitle(recipes) {
  * @returns {HTMLElement} Recipe card element
  */
 function createRecipeCard(recipe) {
-  const card = document.createElement('div');
-  card.className = 'recipe-center-card';
+  const li = document.createElement('li');
+  li.className = 'card';
 
   const link = document.createElement('a');
   link.href = recipe.path || '#';
-  link.className = 'recipe-center-card-link';
 
   // Check if image is the default-meta-image and use placeholder instead
   const imagePath = new URL(recipe.image).pathname || '';
@@ -340,67 +339,41 @@ function createRecipeCard(recipe) {
   let image;
   if (isDefaultImage) {
     image = document.createElement('div');
-    image.className = 'recipe-center-card-image recipe-center-card-image-placeholder';
+    image.className = 'img placeholder';
   } else {
     image = document.createElement('img');
     image.src = imagePath;
-    image.alt = recipe.title || '';
+    image.alt = '';
     image.loading = 'lazy';
-    image.className = 'recipe-center-card-image';
   }
 
-  const content = document.createElement('div');
-  content.className = 'recipe-center-card-content';
-
   const title = document.createElement('h3');
-  title.className = 'recipe-center-card-title';
   title.textContent = recipe.title || '';
 
-  // Add star rating
+  // Star rating
   const rating = document.createElement('div');
-  rating.className = 'recipe-center-card-rating';
+  rating.className = 'rating';
+  rating.setAttribute('aria-label', '0 of 5 stars');
   for (let i = 0; i < 5; i += 1) {
     const star = document.createElement('span');
-    star.className = 'recipe-center-card-rating-star';
     star.textContent = '☆';
     rating.appendChild(star);
   }
 
-  const meta = document.createElement('div');
-  meta.className = 'recipe-center-card-meta';
+  const meta = document.createElement('p');
+  meta.className = 'meta';
 
   const metaParts = [];
+  if (recipe['total-time']) metaParts.push(formatTime(recipe['total-time']));
+  if (recipe.difficulty) metaParts.push(recipe.difficulty);
+  if (recipe.yieldRange || recipe.yield) metaParts.push(recipe.yieldRange || formatYield(recipe.yield));
 
-  if (recipe['total-time']) {
-    metaParts.push(formatTime(recipe['total-time']));
-  }
+  meta.textContent = metaParts.join(' • ');
 
-  if (recipe.difficulty) {
-    metaParts.push(recipe.difficulty);
-  }
+  link.append(image, title, rating, meta);
+  li.appendChild(link);
 
-  if (recipe.yieldRange || recipe.yield) {
-    metaParts.push(recipe.yieldRange || formatYield(recipe.yield));
-  }
-
-  // Join meta parts with separators
-  metaParts.forEach((part, index) => {
-    if (index > 0) {
-      const separator = document.createElement('span');
-      separator.className = 'recipe-center-card-meta-separator';
-      separator.textContent = '•';
-      meta.appendChild(separator);
-    }
-    const span = document.createElement('span');
-    span.textContent = part;
-    meta.appendChild(span);
-  });
-
-  content.append(title, rating, meta);
-  link.append(image, content);
-  card.appendChild(link);
-
-  return card;
+  return li;
 }
 
 /**
@@ -460,18 +433,6 @@ function buildRecipeFiltering(container, config = {}) {
   let currentPage = 1;
 
   const placeholders = {
-    typeToSearch: 'Type to search recipes',
-    results: 'Results',
-    filter: 'Filter',
-    sort: 'Sort',
-    sortBy: 'Sort By',
-    featured: 'Featured',
-    nameAsc: 'Name (A-Z)',
-    nameDesc: 'Name (Z-A)',
-    timeAsc: 'Time (Low to High)',
-    timeDesc: 'Time (High to Low)',
-    filters: 'Filters',
-    clearAll: 'Clear All',
     difficulty: 'Difficulty',
     'compatible-containers': 'Compatible Containers',
     'dietary-interests': 'Dietary Interests',
@@ -479,87 +440,51 @@ function buildRecipeFiltering(container, config = {}) {
     'recipe-type': 'Recipe Type',
   };
 
-  container.innerHTML = `<div class="recipe-center-controls">
-      <div class="recipe-center-controls-top">
-        <span class="recipe-center-refine-label">Refine Your Search</span>
-        <select id="dietary-interests-select" class="recipe-center-dropdown">
-          <option value="">Dietary</option>
-        </select>
-        <select id="course-select" class="recipe-center-dropdown">
-          <option value="">Course</option>
-        </select>
-        <select id="recipe-type-select" class="recipe-center-dropdown">
-          <option value="">Recipe Type</option>
-        </select>
-        <button id="recipe-center-go-button" class="recipe-center-go-button">GO</button>
-      </div>
-      <div class="recipe-center-controls-bottom">
-        <input id="fulltext" placeholder="${placeholders.typeToSearch}">
-        <button class="recipe-center-search-button">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"/>
-          </svg>
-        </button>
-      </div>
-    </div>
-    <div class="recipe-center-results-info">
-      <div class="recipe-center-results-info-left">
-        Items <span id="recipe-center-results-start">1</span> - <span id="recipe-center-results-end">12</span> of <span id="recipe-center-results-count">0</span>
-      </div>
-      <div class="recipe-center-sortby">
-        <p>Sort By: <span data-sort="featured" id="recipe-center-sortby">${placeholders.featured}</span></p>
-        <ul>
-          <li data-sort="featured">${placeholders.featured}</li>
-          <li data-sort="name-asc">${placeholders.nameAsc}</li>
-          <li data-sort="name-desc">${placeholders.nameDesc}</li>
-          <li data-sort="time-asc">${placeholders.timeAsc}</li>
-          <li data-sort="time-desc">${placeholders.timeDesc}</li>
-        </ul>
-      </div>
-    </div>
-    <div class="recipe-center-facets"></div>
-    <div class="recipe-center-results"></div>
-    <div class="recipe-center-pagination"></div>`;
+  // Reference existing DOM elements from static HTML
+  const resultsElement = container.querySelector('.results');
+  const facetsElement = container.querySelector('.facets');
 
-  const resultsElement = container.querySelector('.recipe-center-results');
-  const facetsElement = container.querySelector('.recipe-center-facets');
-
-  // Get dropdown elements
-  const dietarySelect = container.querySelector('#dietary-interests-select');
-  const courseSelect = container.querySelector('#course-select');
-  const recipeTypeSelect = container.querySelector('#recipe-type-select');
-  const goButton = container.querySelector('#recipe-center-go-button');
-
-  // utility function to add the same event listener to multiple elements
-  const addEventListeners = (elements, event, callback) => {
-    elements.forEach((e) => {
-      e.addEventListener(event, callback);
+  // Set up facet panel event listeners
+  const applyButton = facetsElement.querySelector('.apply');
+  if (applyButton) {
+    applyButton.addEventListener('click', () => {
+      facetsElement.classList.remove('visible');
     });
-  };
+  }
 
-  addEventListeners([
-    container.querySelector('.recipe-center-sortby p'),
-  ], 'click', () => {
-    container.querySelector('.recipe-center-sortby ul').classList.toggle('visible');
+  facetsElement.addEventListener('click', (event) => {
+    if (event.currentTarget === event.target) {
+      facetsElement.classList.remove('visible');
+    }
   });
 
-  const sortList = container.querySelector('.recipe-center-sortby ul');
-  const selectSort = (selected) => {
-    [...sortList.children].forEach((li) => li.classList.remove('selected'));
-    selected.classList.add('selected');
-    const sortBy = document.getElementById('recipe-center-sortby');
-    sortBy.textContent = selected.textContent;
-    sortBy.dataset.sort = selected.dataset.sort;
-    container.querySelector('.recipe-center-sortby ul').classList.remove('visible');
+  // Get dropdown elements
+  const dietarySelect = container.querySelector('#dietary-interests');
+  const courseSelect = container.querySelector('#course');
+  const recipeTypeSelect = container.querySelector('#recipe-type');
+  const goButton = container.querySelector('.go');
+
+  // Sort dropdown uses native <details> element
+  const sortDetails = container.querySelector('.sort');
+  const sortMenu = container.querySelector('.sort menu');
+  const sortLabel = container.querySelector('#sortby');
+
+  const selectSort = (btn) => {
+    sortMenu.querySelectorAll('button').forEach((b) => b.removeAttribute('aria-pressed'));
+    btn.setAttribute('aria-pressed', true);
+    sortLabel.textContent = btn.textContent;
+    sortLabel.dataset.sort = btn.dataset.sort;
+    sortDetails.open = false;
     // eslint-disable-next-line no-use-before-define
     const filterConfig = createFilterConfig();
-    filterConfig.sort = selected.dataset.sort;
+    filterConfig.sort = btn.dataset.sort;
     // eslint-disable-next-line no-use-before-define
     runSearch(filterConfig);
   };
 
-  sortList.addEventListener('click', (event) => {
-    selectSort(event.target);
+  sortMenu.addEventListener('click', (event) => {
+    const btn = event.target.closest('button[data-sort]');
+    if (btn) selectSort(btn);
   });
 
   // highlights search terms in recipe titles by wrapping matches in a span.
@@ -598,67 +523,67 @@ function buildRecipeFiltering(container, config = {}) {
 
   // renders pagination controls
   const displayPagination = (totalResults, page = 1) => {
-    const paginationElement = container.querySelector('.recipe-center-pagination');
+    const paginationElement = container.querySelector('.pagination');
     if (!paginationElement) return;
 
     const totalPages = Math.ceil(totalResults / ITEMS_PER_PAGE);
+    paginationElement.innerHTML = '';
 
-    if (totalPages <= 1) {
-      paginationElement.innerHTML = '';
-      return;
-    }
+    if (totalPages <= 1) return;
 
-    let paginationHTML = '<div class="recipe-center-pagination-controls">';
+    const prevBtn = document.createElement('button');
+    prevBtn.textContent = 'Previous';
+    prevBtn.disabled = page <= 1;
+    if (page > 1) prevBtn.dataset.page = page - 1;
+    paginationElement.appendChild(prevBtn);
 
-    // Previous button
-    if (page > 1) {
-      paginationHTML += `<button class="recipe-center-pagination-btn recipe-center-pagination-prev" data-page="${page - 1}">Previous</button>`;
-    } else {
-      paginationHTML += '<button class="recipe-center-pagination-btn recipe-center-pagination-prev" disabled>Previous</button>';
-    }
+    const pages = document.createElement('span');
+    pages.className = 'pages';
 
-    // Page numbers
-    paginationHTML += '<div class="recipe-center-pagination-numbers">';
+    const ellipsis = () => {
+      const span = document.createElement('span');
+      span.textContent = '…';
+      span.setAttribute('aria-hidden', 'true');
+      return span;
+    };
 
-    // Always show first page
+    // First page
     if (page > 3) {
-      paginationHTML += '<button class="recipe-center-pagination-btn recipe-center-pagination-page" data-page="1">1</button>';
-      if (page > 4) {
-        paginationHTML += '<span class="recipe-center-pagination-ellipsis">...</span>';
-      }
+      const btn = document.createElement('button');
+      btn.textContent = '1';
+      btn.dataset.page = '1';
+      pages.appendChild(btn);
+      if (page > 4) pages.appendChild(ellipsis());
     }
 
-    // Show pages around current page
+    // Pages around current
     for (let i = Math.max(1, page - 2); i <= Math.min(totalPages, page + 2); i += 1) {
-      if (i === page) {
-        paginationHTML += `<button class="recipe-center-pagination-btn recipe-center-pagination-page active" data-page="${i}">${i}</button>`;
-      } else {
-        paginationHTML += `<button class="recipe-center-pagination-btn recipe-center-pagination-page" data-page="${i}">${i}</button>`;
-      }
+      const btn = document.createElement('button');
+      btn.textContent = i;
+      btn.dataset.page = i;
+      if (i === page) btn.setAttribute('aria-current', 'page');
+      pages.appendChild(btn);
     }
 
-    // Always show last page
+    // Last page
     if (page < totalPages - 2) {
-      if (page < totalPages - 3) {
-        paginationHTML += '<span class="recipe-center-pagination-ellipsis">...</span>';
-      }
-      paginationHTML += `<button class="recipe-center-pagination-btn recipe-center-pagination-page" data-page="${totalPages}">${totalPages}</button>`;
+      if (page < totalPages - 3) pages.appendChild(ellipsis());
+      const btn = document.createElement('button');
+      btn.textContent = totalPages;
+      btn.dataset.page = totalPages;
+      pages.appendChild(btn);
     }
 
-    paginationHTML += '</div>';
+    paginationElement.appendChild(pages);
 
-    // Next button
-    if (page < totalPages) {
-      paginationHTML += `<button class="recipe-center-pagination-btn recipe-center-pagination-next" data-page="${page + 1}">Next</button>`;
-    } else {
-      paginationHTML += '<button class="recipe-center-pagination-btn recipe-center-pagination-next" disabled>Next</button>';
-    }
+    const nextBtn = document.createElement('button');
+    nextBtn.textContent = 'Next';
+    nextBtn.disabled = page >= totalPages;
+    if (page < totalPages) nextBtn.dataset.page = page + 1;
+    paginationElement.appendChild(nextBtn);
 
-    paginationHTML += '</div>';
-    paginationElement.innerHTML = paginationHTML;
-
-    // Add event listeners to pagination buttons
-    paginationElement.querySelectorAll('.recipe-center-pagination-btn[data-page]').forEach((btn) => {
+    // Add event listeners
+    paginationElement.querySelectorAll('button[data-page]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const newPage = parseInt(btn.dataset.page, 10);
         currentPage = newPage;
@@ -713,49 +638,20 @@ function buildRecipeFiltering(container, config = {}) {
   // renders the filter facets UI with checkboxes, selected filter tags, and counts
   const displayFacets = (facets, filters) => {
     const selected = getSelectedFilters().map((check) => check.value);
-    facetsElement.innerHTML = `<div>
-        <div class="recipe-center-filters">
-          <h2>Refine Your Recipe</h2>
-          <div class="recipe-center-filters-selected"></div>
-          <div class="recipe-center-filters-clear-wrapper"></div>
-          <div class="recipe-center-filters-facetlist"></div>
-        </div>
-        <div class="recipe-center-apply-filters">
-          <button>See Results</button>
-        </div>
-      </div>`;
 
-    // Mobile "See Results" button
-    const applyButton = facetsElement.querySelector('.recipe-center-apply-filters button');
-    if (applyButton) {
-      applyButton.addEventListener('click', () => {
-        container.querySelector('.recipe-center-facets').classList.remove('visible');
-      });
-    }
+    // Clear dynamic content areas
+    const selectedFilters = container.querySelector('.selected');
+    const facetsList = container.querySelector('.list');
 
-    // Mobile overlay close
-    const facetOverlay = facetsElement.querySelector(':scope > div');
-    if (facetOverlay) {
-      facetOverlay.addEventListener('click', (event) => {
-        if (event.currentTarget === event.target) {
-          container.querySelector('.recipe-center-facets').classList.remove('visible');
-        }
-      });
-    }
+    selectedFilters.innerHTML = '';
+    facetsList.innerHTML = '';
 
-    facetsElement.addEventListener('click', (event) => {
-      if (event.currentTarget === event.target) {
-        container.querySelector('.recipe-center-facets').classList.remove('visible');
-      }
-    });
-
-    const selectedFilters = container.querySelector('.recipe-center-filters-selected');
     selected.forEach((tag) => {
       const span = document.createElement('span');
-      span.className = 'recipe-center-filters-tag';
+      span.className = 'tag';
       span.textContent = tag;
       span.addEventListener('click', () => {
-        document.getElementById(`recipe-center-filter-${tag}`).checked = false;
+        document.getElementById(`filter-${tag}`).checked = false;
         const filterConfig = createFilterConfig(true);
         // eslint-disable-next-line no-use-before-define
         runSearch(filterConfig);
@@ -763,45 +659,38 @@ function buildRecipeFiltering(container, config = {}) {
       selectedFilters.append(span);
     });
 
-    const clearWrapper = container.querySelector('.recipe-center-filters-clear-wrapper');
     if (selected.length > 0) {
       const clearButton = document.createElement('button');
-      clearButton.className = 'recipe-center-filters-clear';
+      clearButton.className = 'clear';
       clearButton.textContent = 'Clear All';
       clearButton.addEventListener('click', () => {
         selected.forEach((tag) => {
-          document.getElementById(`recipe-center-filter-${tag}`).checked = false;
+          document.getElementById(`filter-${tag}`).checked = false;
         });
         const filterConfig = createFilterConfig(true);
         // eslint-disable-next-line no-use-before-define
         runSearch(filterConfig);
       });
-      clearWrapper.appendChild(clearButton);
+      selectedFilters.appendChild(clearButton);
     }
 
     // build facet filter lists with accordion (excluding the top dropdown facets)
-    const facetsList = container.querySelector('.recipe-center-filters-facetlist');
     const excludedFacets = ['dietary-interests', 'course', 'recipe-type'];
     const facetKeys = Object.keys(facets).filter((key) => !excludedFacets.includes(key));
     facetKeys.forEach((facetKey, index) => {
       const filter = filters[facetKey];
       const filterValues = filter ? filter.split(',').map((t) => t.trim()) : [];
-      const div = document.createElement('div');
-      div.className = 'recipe-center-facet';
-      // First facet (dietary-interests) is expanded by default
+
+      const details = document.createElement('details');
+      details.className = 'facet';
+      // First facet is expanded by default
       if (index === 0 || filterValues.length > 0) {
-        div.classList.add('expanded');
+        details.open = true;
       }
 
-      const h3 = document.createElement('h3');
-      h3.textContent = placeholders[facetKey] || facetKey;
-      h3.addEventListener('click', () => {
-        div.classList.toggle('expanded');
-      });
-      div.append(h3);
-
-      const content = document.createElement('div');
-      content.className = 'recipe-center-facet-content';
+      const summary = document.createElement('summary');
+      summary.textContent = placeholders[facetKey] || facetKey;
+      details.append(summary);
 
       const facetValues = Object.keys(facets[facetKey]).sort((a, b) => a.localeCompare(b));
       facetValues.forEach((facetValue) => {
@@ -809,20 +698,19 @@ function buildRecipeFiltering(container, config = {}) {
         input.type = 'checkbox';
         input.value = facetValue;
         input.checked = filterValues.includes(facetValue);
-        input.id = `recipe-center-filter-${facetValue}`;
+        input.id = `filter-${facetValue}`;
         input.name = facetKey;
         const label = document.createElement('label');
         label.setAttribute('for', input.id);
         label.textContent = `${facetValue} (${facets[facetKey][facetValue]})`;
-        content.append(input, label);
+        details.append(input, label);
         input.addEventListener('change', () => {
           const filterConfig = createFilterConfig(true);
           // eslint-disable-next-line no-use-before-define
           runSearch(filterConfig);
         });
       });
-      div.append(content);
-      facetsList.append(div);
+      facetsList.append(details);
     });
   };
 
@@ -903,8 +791,8 @@ function buildRecipeFiltering(container, config = {}) {
 
     // Check for sort in filterConfig first, then fall back to UI element
     let sortBy = filterConfig.sort || 'featured';
-    if (!filterConfig.sort && document.getElementById('recipe-center-sortby')) {
-      sortBy = document.getElementById('recipe-center-sortby').dataset.sort;
+    if (!filterConfig.sort && sortLabel) {
+      sortBy = sortLabel.dataset.sort;
     }
     results.sort(sorts[sortBy]);
 
@@ -917,9 +805,9 @@ function buildRecipeFiltering(container, config = {}) {
     const startNum = totalResults > 0 ? ((page - 1) * ITEMS_PER_PAGE) + 1 : 0;
     const endNum = Math.min(page * ITEMS_PER_PAGE, totalResults);
 
-    container.querySelector('#recipe-center-results-count').textContent = totalResults;
-    container.querySelector('#recipe-center-results-start').textContent = startNum;
-    container.querySelector('#recipe-center-results-end').textContent = endNum;
+    container.querySelector('#results-count').textContent = totalResults;
+    container.querySelector('#results-start').textContent = startNum;
+    container.querySelector('#results-end').textContent = endNum;
 
     // Populate top dropdowns
     populateDropdown(dietarySelect, facets['dietary-interests'], 'dietary-interests', filterConfig);
@@ -958,11 +846,12 @@ function buildRecipeFiltering(container, config = {}) {
     runSearch(createFilterConfig(true)); // Reset to page 1 on filter change
   });
 
-  // Search button click
-  const searchButton = container.querySelector('.recipe-center-search-button');
-  if (searchButton) {
-    searchButton.addEventListener('click', () => {
-      runSearch(createFilterConfig(true)); // Reset to page 1 on search
+  // Search button click (form submit)
+  const form = container.querySelector('form.controls');
+  if (form) {
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      runSearch(createFilterConfig(true));
     });
   }
 
@@ -988,9 +877,8 @@ function buildRecipeFiltering(container, config = {}) {
   }
 
   if (urlConfig.sort) {
-    const sortByElement = document.getElementById('recipe-center-sortby');
-    if (sortByElement) {
-      sortByElement.dataset.sort = urlConfig.sort;
+    if (sortLabel) {
+      sortLabel.dataset.sort = urlConfig.sort;
     }
   }
 
@@ -1030,12 +918,11 @@ function buildRecipeFiltering(container, config = {}) {
 
       // Update sort
       if (savedConfig.sort) {
-        const sortByElement = document.getElementById('recipe-center-sortby');
-        if (sortByElement) {
-          sortByElement.dataset.sort = savedConfig.sort;
-          const sortOption = sortList.querySelector(`[data-sort="${savedConfig.sort}"]`);
-          if (sortOption) {
-            sortByElement.textContent = sortOption.textContent;
+        if (sortLabel) {
+          sortLabel.dataset.sort = savedConfig.sort;
+          const sortBtn = sortMenu.querySelector(`button[data-sort="${savedConfig.sort}"]`);
+          if (sortBtn) {
+            sortLabel.textContent = sortBtn.textContent;
           }
         }
       }
