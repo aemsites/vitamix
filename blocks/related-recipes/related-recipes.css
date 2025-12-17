@@ -9,7 +9,7 @@
 
 @media (width >= 600px) {
   .related-recipes li {
-    flex: 0 0 calc((100% / 3) - (var(--spacing-100) / 3));
+    flex: 0 0 calc((100% / 3) - (var(--spacing-100) / 1.5));
   }
 }
 
