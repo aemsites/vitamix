@@ -289,12 +289,17 @@ main > .recipe-container.section > .recipe-wrapper {
 /* Desktop: sidebar layout */
 @media (width >= 1000px) {
   .recipe .recipe-body {
-    grid-template-columns: 1fr minmax(0, 2fr);
-    grid-template-areas:
-      "toolbar instructions"
-      "refine instructions"
-      "nutrition instructions"
-      "notes notes";
+    grid-template:
+      "toolbar instructions" auto
+      "refine instructions" auto
+      "nutrition instructions" 1fr
+      "notes notes" auto
+      / 1fr minmax(0, 2fr);
+  }
+
+  .recipe .recipe-body .recipe-toolbar,
+  .recipe .recipe-body .recipe-refine {
+    align-self: start;
   }
 }
 
