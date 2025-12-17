@@ -1,6 +1,7 @@
 /* eslint-disable max-len */
 
 import { loadCSS } from '../../scripts/aem.js';
+import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 /**
  * Parses raw recipe data from index and transforms values.
@@ -33,9 +34,10 @@ function parseRecipeData(data) {
  * @returns {Promise<Array<Object>>} Array of filtered recipe objects
  */
 async function lookupRecipes(config = {}, facets = {}) {
+  const { locale, language } = getLocaleAndLanguage();
   if (!window.recipeIndex) {
     // fetch the main recipe index
-    const resp = await fetch('/us/en_us/recipes/data/query-index.json');
+    const resp = await fetch(`/${locale}/${language}/recipes/data/query-index.json`);
     const { data } = await resp.json();
 
     // parse and filter recipes - only include Updated or New status, exclude Deleted
