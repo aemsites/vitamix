@@ -9,6 +9,130 @@ import { loadFragment } from '../fragment/fragment.js';
 import { checkVariantOutOfStock, isProductOutOfStock, isNextPipeline } from '../../scripts/scripts.js';
 import { openModal } from '../modal/modal.js';
 
+// Bazaarvoice API configuration
+const BV_API_CONFIG = {
+  // TODO: Switch to production endpoint and passkey when ready
+  endpoint: 'https://stg.api.bazaarvoice.com/data',
+  passkey: 'caB45h2jBqXFw1OE043qoMBD1gJC8EwFNCjktzgwncXY4',
+  apiVersion: '5.4',
+};
+
+// Check if running on localhost (BV API has CORS restrictions on localhost)
+const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+/**
+ * Fetches review statistics from Bazaarvoice API
+ * @param {string} productId - The product's review ID
+ * @returns {Promise<Object|null>} Review statistics or null on error
+ */
+async function fetchReviewStats(productId) {
+  try {
+    const params = new URLSearchParams({
+      apiversion: BV_API_CONFIG.apiVersion,
+      passkey: BV_API_CONFIG.passkey,
+      Filter: `ProductId:${productId}`,
+      Stats: 'Reviews',
+    });
+
+    const response = await fetch(`${BV_API_CONFIG.endpoint}/products.json?${params}`);
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    if (data.HasErrors || !data.Results?.length) return null;
+
+    const product = data.Results[0];
+    return product.ReviewStatistics || null;
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error fetching review stats:', error);
+    return null;
+  }
+}
+
+/**
+ * SVG star paths
+ */
+const STAR_SVG = {
+  full: `<svg class="bv-star bv-star-full" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+  </svg>`,
+  half: `<svg class="bv-star bv-star-half" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="halfGrad">
+        <stop offset="50%" stop-color="currentColor"/>
+        <stop offset="50%" stop-color="#c4cdd5"/>
+      </linearGradient>
+    </defs>
+    <path fill="url(#halfGrad)" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+  </svg>`,
+  empty: `<svg class="bv-star bv-star-empty" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+  </svg>`,
+};
+
+/**
+ * Renders star rating HTML
+ * @param {number} rating - Average rating (0-5)
+ * @returns {string} HTML string for stars
+ */
+function renderStars(rating) {
+  const fullStars = Math.floor(rating);
+  const hasHalfStar = rating % 1 >= 0.25;
+  const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+
+  return `
+    <span class="bv-stars" aria-label="${rating.toFixed(1)} out of 5 stars">
+      ${STAR_SVG.full.repeat(fullStars)}${hasHalfStar ? STAR_SVG.half : ''}${STAR_SVG.empty.repeat(emptyStars)}
+    </span>
+  `;
+}
+
+/**
+ * Renders the rating summary HTML
+ * @param {number} avgRating - Average rating
+ * @param {number} totalReviews - Total review count
+ * @returns {string} HTML string
+ */
+function renderRatingSummaryHTML(avgRating, totalReviews) {
+  return `
+    <div class="bv-rating-summary-container">
+      <a href="#pdp-reviews-container" class="bv-rating-summary">
+        ${renderStars(avgRating)}
+        <span class="bv-rating-value">${avgRating.toFixed(1)}</span>
+        <span class="bv-review-count">(${totalReviews})</span>
+      </a>
+      <a href="#pdp-reviews-container" class="bv-write-review">Write a review</a>
+    </div>
+  `;
+}
+
+/**
+ * Loads and renders review summary asynchronously (does not block LCP)
+ * @param {Element} placeholder - The placeholder element to fill
+ * @param {string} reviewsId - The product's review ID
+ */
+async function loadRatingSummary(placeholder, reviewsId) {
+  // On localhost, BV API has CORS restrictions - show mock data for development
+  if (isLocalDev) {
+    // eslint-disable-next-line no-console
+    console.info('[BV Reviews] Using mock data on localhost (CORS restriction)');
+    placeholder.innerHTML = renderRatingSummaryHTML(4.5, 127);
+    return;
+  }
+
+  const stats = await fetchReviewStats(reviewsId);
+
+  if (!stats || stats.TotalReviewCount === 0) {
+    placeholder.innerHTML = '';
+    return;
+  }
+
+  const avgRating = stats.AverageOverallRating || 0;
+  const totalReviews = stats.TotalReviewCount || 0;
+
+  placeholder.innerHTML = renderRatingSummaryHTML(avgRating, totalReviews);
+}
+
 /**
  * Renders the title section of the PDP block.
  * @param {Element} block - The PDP block element
@@ -20,7 +144,11 @@ function renderTitle(block, custom, reviewsId) {
 
   const reviewsPlaceholder = document.createElement('div');
   reviewsPlaceholder.classList.add('pdp-reviews-summary-placeholder');
-  reviewsPlaceholder.innerHTML = `<div data-bv-show="rating_summary" data-bv-product-id="${reviewsId}">`;
+
+  // Load rating summary asynchronously to avoid blocking LCP
+  setTimeout(() => {
+    loadRatingSummary(reviewsPlaceholder, reviewsId);
+  }, 100);
 
   const { collection } = custom;
   const collectionContainer = document.createElement('p');
@@ -57,8 +185,8 @@ function renderDetails(features) {
  */
 // eslint-disable-next-line no-unused-vars
 async function renderReviews(block, reviewsId) {
-  // TODO: Add Bazaarvoice reviews
   const bazaarvoiceContainer = document.createElement('div');
+  bazaarvoiceContainer.id = 'pdp-reviews-container';
   bazaarvoiceContainer.classList.add('pdp-reviews-container');
   bazaarvoiceContainer.innerHTML = `<div data-bv-show="reviews" data-bv-product-id="${reviewsId}"></div>`;
 
