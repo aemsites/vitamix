@@ -66,6 +66,114 @@ function formatServings(servingsString) {
   return unit ? `${formattedNumber} ${unit}` : `${formattedNumber}`;
 }
 
+function buildToolbar() {
+  const toolbar = document.createElement('div');
+  toolbar.classList.add('recipe-toolbar');
+  toolbar.innerHTML = `
+    <button type="button" class="recipe-save"><img src="/blocks/recipe/save.svg" alt=""> Save</button>
+    <button type="button" class="recipe-print"><img src="/blocks/recipe/print.svg" alt=""> Print</button>
+    <div class="recipe-share-wrapper">
+      <button type="button" class="recipe-share"><img src="/blocks/recipe/share.svg" alt=""> Share</button>
+      <div class="recipe-share-popup" hidden>
+        <button type="button" class="share-facebook" aria-label="Share on Facebook" title="Share on Facebook">
+          <img src="/icons/social-facebook.svg" alt="">
+        </button>
+        <button type="button" class="share-twitter" aria-label="Share on X" title="Share on X">
+          <img src="/icons/x.svg" alt="">
+        </button>
+        <button type="button" class="share-pinterest" aria-label="Share on Pinterest" title="Share on Pinterest">
+          <img src="/icons/social-pinterest.svg" alt="">
+        </button>
+        <button type="button" class="share-email" aria-label="Share via Email" title="Share via Email">
+          <img src="/icons/email.svg" alt="">
+        </button>
+      </div>
+    </div>
+  `;
+
+  // Save button
+  const saveButton = toolbar.querySelector('.recipe-save');
+  saveButton.addEventListener('click', () => {
+    const { locale, language } = getLocaleAndLanguage();
+    const title = document.querySelector('h1').textContent.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    const recipeId = `rcp${title}recipe`;
+    const returnUrl = `https://www.vitamix.com/${locale}/${language}/recipebook?recipe_id=${recipeId}`;
+    const encodedReturn = btoa(returnUrl);
+    window.location.href = `https://www.vitamix.com/${locale}/${language}/customer/account/login/referer/${encodeURIComponent(encodedReturn)}/`;
+  });
+
+  // Print button
+  const printButton = toolbar.querySelector('.recipe-print');
+  printButton.addEventListener('click', () => {
+    printButton.setAttribute('aria-pressed', true);
+    window.print();
+  });
+
+  // Share popup toggle
+  const shareButton = toolbar.querySelector('.recipe-share');
+  const sharePopup = toolbar.querySelector('.recipe-share-popup');
+  shareButton.addEventListener('click', () => {
+    sharePopup.toggleAttribute('hidden');
+  });
+
+  // Close share popup when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.recipe-share-wrapper')) {
+      sharePopup.setAttribute('hidden', '');
+    }
+  });
+
+  // Share button handlers
+  const getShareData = () => {
+    const url = window.location.href;
+    const { title } = document;
+    const recipeTitle = document.querySelector('h1').textContent.trim();
+    const image = document.querySelector('.recipe-image img')?.src || '';
+    return {
+      url, title, recipeTitle, image,
+    };
+  };
+
+  const shareHandlers = {
+    facebook: () => {
+      const { url } = getShareData();
+      window.open(
+        `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
+        '_blank',
+        'width=600,height=400',
+      );
+    },
+    twitter: () => {
+      const { url, title } = getShareData();
+      window.open(
+        `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(title)}`,
+        '_blank',
+        'width=600,height=400',
+      );
+    },
+    pinterest: () => {
+      const { url, title, image } = getShareData();
+      window.open(
+        `https://pinterest.com/pin/create/button/?url=${encodeURIComponent(url)}&media=${encodeURIComponent(image)}&description=${encodeURIComponent(title)}`,
+        '_blank',
+        'width=600,height=400',
+      );
+    },
+    email: () => {
+      const { url, recipeTitle } = getShareData();
+      const subject = encodeURIComponent(`${recipeTitle} Recipe`);
+      const body = encodeURIComponent(`${recipeTitle} Recipe: ${url}`);
+      window.location.href = `mailto:?subject=${subject}&body=${body}`;
+    },
+  };
+
+  Object.entries(shareHandlers).forEach(([platform, handler]) => {
+    toolbar.querySelector(`.share-${platform}`).addEventListener('click', handler);
+  });
+
+  return toolbar;
+}
+
 function writeDietaryInterests(data, locale, language) {
   const dietaryInterests = data.split(',').map((i) => i.trim());
   return dietaryInterests.map((interest) => {
@@ -142,21 +250,13 @@ export default async function decorate(block) {
     else picture.remove();
   }
 
-  // Create recipe toolbar
-  const recipeToolbar = document.createElement('div');
-  recipeToolbar.classList.add('recipe-toolbar');
-  recipeToolbar.innerHTML = `
-    <button type="button"><img src="/blocks/recipe/save.svg" alt=""> Save</button>
-    <button type="button"><img src="/blocks/recipe/print.svg" alt=""> Print</button>
-    <button type="button"><img src="/blocks/recipe/share.svg" alt=""> Share</button>
-  `;
-
   const recipeContainer = document.createElement('div');
   recipeContainer.classList.add('recipe-body');
+  const recipeToolbar = buildToolbar();
+  recipeContainer.prepend(recipeToolbar);
   recipeContainer.append(...block.children);
   block.prepend(recipeHeader);
   block.append(recipeContainer);
-  recipeContainer.prepend(recipeToolbar);
 
   // Wrap content sections
   ['ingredients', 'directions', 'notes', 'nutrition'].forEach((id) => {

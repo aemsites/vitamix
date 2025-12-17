@@ -340,7 +340,8 @@ main > .recipe-container.section > .recipe-wrapper {
     padding: var(--spacing-60) var(--spacing-80);
   }
 
-  .recipe .recipe-toolbar button + button::before {
+  .recipe .recipe-toolbar > button + button::before,
+  .recipe .recipe-toolbar > button + .recipe-share-wrapper::before {
     content: '';
     position: absolute;
     top: 0;
@@ -349,6 +350,53 @@ main > .recipe-container.section > .recipe-wrapper {
     height: 100%;
     background-color: var(--color-steel);
   }
+}
+
+/* Share Popup */
+.recipe .recipe-share-wrapper {
+  position: relative;
+}
+
+.recipe .recipe-share-popup {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: var(--spacing-60);
+  border-radius: var(--rounding-m);
+  padding: var(--spacing-100);
+  background-color: var(--color-gray-400);
+}
+
+.recipe .recipe-share-popup::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 8px solid transparent;
+  border-top-color: var(--color-gray-400);
+}
+
+.recipe .recipe-share-popup[hidden] {
+  display: none;
+}
+
+.recipe .recipe-share-popup button {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  padding: 0;
+  background-color: var(--color-charcoal);
+  color: var(--color-white);
+}
+
+.recipe .recipe-share-popup button img {
+  width: 20px;
+  height: 20px;
+  margin: 0 auto;
+  filter: brightness(0) invert(1);
 }
 
 /* Recipe Instructions */
