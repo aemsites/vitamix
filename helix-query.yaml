@@ -12,6 +12,10 @@ indices:
         select: head > meta[property="og:image"]
         value: |
           attribute(el, 'content')
+      description:
+        select: head > meta[property="og:description"]
+        value: |
+          attribute(el, 'content')
       total-time:
         select: head > meta[name="total-time"]
         value: |
