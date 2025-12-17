@@ -54,6 +54,8 @@ export default function decorate(block) {
   if (!variants.length) {
     // default card styling
     ul.querySelectorAll('li .card-body').forEach((body) => {
+      const li = body.closest('li');
+      li.classList.add('card-filled');
       const link = body.querySelector('a[href]');
       if (link) {
         const content = body.textContent.trim();

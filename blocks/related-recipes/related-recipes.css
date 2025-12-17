@@ -1,0 +1,43 @@
+.related-recipes > ul {
+  gap: var(--spacing-100);
+  align-items: flex-start;
+}
+
+.related-recipes li {
+  flex: 0 0 calc(50% - (var(--spacing-100) / 2));
+}
+
+@media (width >= 600px) {
+  .related-recipes li {
+    flex: 0 0 calc((100% / 3) - (var(--spacing-100) / 1.5));
+  }
+}
+
+.related-recipes li a {
+  display: block;
+  width: 100%;
+  color: var(--text-color);
+  font-family: var(--heading-font-family);
+  font-size: var(--body-size-l);
+  text-decoration: none;
+}
+
+.related-recipes li img {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: var(--rounding-m);
+  object-fit: cover;
+}
+
+.related-recipes nav {
+  position: static;
+  display: flex;
+  justify-content: center;
+  gap: var(--spacing-100);
+  margin-top: var(--spacing-100);
+}
+
+.related-recipes nav button.nav-arrow {
+  position: relative;
+  transform: none;
+}

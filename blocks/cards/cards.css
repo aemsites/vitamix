@@ -25,6 +25,37 @@
   overflow: hidden;
 }
 
+.cards .card-filled {
+  padding: var(--horizontal-spacing);
+  background-color: var(--color-charcoal);
+  color: var(--color-white);
+  border-radius: var(--rounding-m);
+}
+
+.cards .card-filled a:any-link {
+  color: inherit;
+}
+
+.cards .card-filled .eyebrow {
+  color: var(--color-steel);
+}
+
+.cards .card-filled .button-wrapper {
+  margin-bottom: 0;
+}
+
+@media (width >= 1000px) {
+  .cards ul.rows-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (width >= 1000px) {
+  .cards ul.rows-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 /* stylelint-disable no-descending-specificity */
 
 /* articles variant */
