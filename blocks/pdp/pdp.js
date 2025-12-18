@@ -6,7 +6,12 @@ import renderPricing, { extractPricing } from './pricing.js';
 // eslint-disable-next-line import/no-cycle
 import { renderOptions, onOptionChange, updateFreeGiftVisibility } from './options.js';
 import { loadFragment } from '../fragment/fragment.js';
-import { checkVariantOutOfStock, isProductOutOfStock, isNextPipeline, parseEasternDateTime } from '../../scripts/scripts.js';
+import {
+  checkVariantOutOfStock,
+  isProductOutOfStock,
+  isNextPipeline,
+  parseEasternDateTime,
+} from '../../scripts/scripts.js';
 import { openModal } from '../modal/modal.js';
 
 /**
