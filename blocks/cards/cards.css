@@ -25,6 +25,13 @@
   overflow: hidden;
 }
 
+@media (width >= 800px) {
+  .cards ul.rows-5 {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: var(--spacing-400);
+  }
+}
+
 /* stylelint-disable no-descending-specificity */
 
 /* articles variant */

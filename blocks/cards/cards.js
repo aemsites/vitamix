@@ -18,8 +18,15 @@ function getLargestFactor(n) {
 export default function decorate(block) {
   // replace default div structure with ordered list
   const ul = document.createElement('ul');
-  const cardsPerRow = getLargestFactor(block.children.length);
-  ul.classList.add(`rows-${cardsPerRow}`);
+
+  const variants = [...block.classList].filter((c) => c !== 'block' && c !== 'cards');
+  const definedRows = variants.find((v) => v.startsWith('rows-'));
+  if (!definedRows) {
+    const cardsPerRow = getLargestFactor(block.children.length);
+    ul.classList.add(`rows-${cardsPerRow}`);
+  } else {
+    ul.classList.add(definedRows);
+  }
 
   [...block.children].forEach((row) => {
     // move all children from row into list item
@@ -50,7 +57,6 @@ export default function decorate(block) {
 
   // decorate variant specifics
   const clickable = ['knockout', 'articles', 'linked', 'overlay'];
-  const variants = [...block.classList].filter((c) => c !== 'block' && c !== 'cards');
   if (!variants.length) {
     // default card styling
     ul.querySelectorAll('li .card-body').forEach((body) => {
