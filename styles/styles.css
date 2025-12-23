@@ -156,9 +156,17 @@ main > .section {
   scroll-margin: 100px 0;
 }
 
+main > .section:first-of-type[class*='-container'] {
+  margin-top: 0;
+}
+
 main > .section > div {
   margin: var(--horizontal-spacing) auto;
   padding: 0 var(--horizontal-spacing);
+}
+
+main > .section:first-of-type[class*='-container'] > div:first-child:not(.default-content-wrapper) {
+  margin-top: 0;
 }
 
 main > .section > div.full-width {
