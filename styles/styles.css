@@ -156,9 +156,17 @@ main > .section {
   scroll-margin: 100px 0;
 }
 
+main > .section:first-of-type[class*='-container'] {
+  margin-top: 0;
+}
+
 main > .section > div {
   margin: var(--horizontal-spacing) auto;
   padding: 0 var(--horizontal-spacing);
+}
+
+main > .section:first-of-type[class*='-container'] > div:first-child:not(.default-content-wrapper) {
+  margin-top: 0;
 }
 
 main > .section > div.full-width {
@@ -172,11 +180,6 @@ main > .section > div.full-width {
 
 .text-center main .default-content-wrapper .button-wrapper {
   justify-content: center;
-}
-
-main > .section:first-of-type,
-main > .section:first-of-type > div:first-child {
-  margin-top: 0;
 }
 
 /* section templates */
