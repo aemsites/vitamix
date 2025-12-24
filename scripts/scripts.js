@@ -1117,7 +1117,10 @@ async function loadEager(doc) {
     decorateMain(main);
     await loadNavBanner(main);
     document.body.classList.add('appear');
-    await loadSection(main.querySelector('.section'), waitForFirstImage);
+    await loadSection(main.querySelector('.section'), () => {
+      if ((new URLSearchParams(window.location.search)).has('quick-edit')) return;
+      return waitForFirstImage();
+    });
   }
 
   sampleRUM.enhance();
@@ -1204,12 +1207,25 @@ async function loadDelayed() {
       });
     }
   }
+  if ((new URLSearchParams(window.location.search)).has('quick-edit')) {
+    const { default: loadQuickEdit } = await import('/tools/quick-edit/quick-edit.js');
+    loadQuickEdit({
+      detail: {
+        config: {
+          mountpoint: 'https://content.da.live/aemsites/vitamix/'
+        },
+        location: {
+          pathname: window.location.pathname,
+        },
+      }
+    });
+  }
 }
 
 /**
  * Loads the page in eager, lazy, and delayed phases.
  */
-async function loadPage() {
+export async function loadPage() {
   await loadEager(document);
   await loadLazy(document);
   loadDelayed();
