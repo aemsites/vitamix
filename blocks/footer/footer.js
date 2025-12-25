@@ -27,6 +27,17 @@ export default async function decorate(block) {
     }
   });
 
+  const formSection = footer.querySelector('.footer-form');
+  if (formSection.textContent.trim() === '.') {
+    formSection.style.display = 'none';
+    formSection.closest('section').setAttribute('style', `
+      grid-template:
+        "links social" auto
+        "links social" auto
+        "copyright copyright" auto / 2fr 1fr;
+    `);
+  }
+
   // decorate social
   const social = footer.querySelector('.footer-social');
   if (social) {
