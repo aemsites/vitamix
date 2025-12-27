@@ -31,6 +31,29 @@ function formatShortDateTime(date) {
 }
 
 /**
+ * Formats a duration in milliseconds into a human-readable string.
+ * @param {number} ms - Duration in milliseconds
+ * @returns {string} Formatted duration string (e.g., "3d 2h 15m" or "-1d 5h 30m")
+ */
+function formatDuration(ms) {
+  const negative = ms < 0;
+  const absMs = Math.abs(ms);
+
+  const totalMinutes = Math.floor(absMs / (1000 * 60));
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+  const minutes = totalMinutes % 60;
+
+  const parts = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`);
+
+  const result = parts.join(' ');
+  return negative ? `-${result}` : result;
+}
+
+/**
  * Creates a structured list of parsed banner elements with appropriate CSS classes and content.
  * @param {Array<Object>} banners - Array of banner objects
  * @param {Object|null} [bestBanner=null] - The optimal banner to highlight with special styling
@@ -44,7 +67,12 @@ function createParsedBanners(banners, bestBanner = null, date = new Date()) {
     if (bestBanner === banner) {
       row.classList.add('alert-banners-selected');
     }
-    if (banner.valid) {
+
+    // Calculate duration and check if it's negative
+    const duration = banner.end - banner.start;
+    const isNegativeDuration = duration < 0;
+
+    if (banner.valid && !isNegativeDuration) {
       row.classList.add('alert-banners-valid');
     } else {
       row.classList.add('alert-banners-invalid');
@@ -53,7 +81,7 @@ function createParsedBanners(banners, bestBanner = null, date = new Date()) {
 
     list.appendChild(row);
     row.innerHTML = `
-      <div class="alert-banners-date">${formatShortDateTime(banner.start)} - ${formatShortDateTime(banner.end)}</div>
+      <div class="alert-banners-date">${formatShortDateTime(banner.start)} - ${formatShortDateTime(banner.end)} [${formatDuration(duration)}]</div>
       <div class="alert-banners-content">${banner.content.innerHTML}</div>
       <div class="alert-banners-color">${banner.color}</div>
       `;
