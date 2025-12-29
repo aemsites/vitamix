@@ -77,3 +77,215 @@ main > .section > div.alert-banners-wrapper {
 .alert-banners-datetime input {
   max-width: 300px;
 }
+
+/* Timeline styles */
+.alert-banners-timeline-container {
+  margin-bottom: 16px;
+}
+
+.alert-banners-timeline {
+  position: relative;
+  background: #fafafa;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 12px;
+  overflow: hidden;
+}
+
+.timeline-header {
+  margin-bottom: 8px;
+}
+
+.timeline-year {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.timeline-months {
+  display: flex;
+}
+
+.timeline-month {
+  flex: 1;
+  text-align: center;
+  font-size: 0.75rem;
+  color: #666;
+  border-left: 1px solid #e0e0e0;
+  padding: 4px 0;
+}
+
+.timeline-month:last-child {
+  border-right: 1px solid #e0e0e0;
+}
+
+.timeline-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.timeline-row {
+  display: flex;
+  align-items: center;
+  height: 20px;
+}
+
+/* 7-month gridlines (100/7 ≈ 14.28%) */
+.timeline-track {
+  flex: 1;
+  position: relative;
+  height: 100%;
+  background: linear-gradient(to right,
+    #e0e0e0 0, #e0e0e0 1px, transparent 1px, transparent 14.28%,
+    #e0e0e0 14.28%, #e0e0e0 calc(14.28% + 1px), transparent calc(14.28% + 1px), transparent 28.57%,
+    #e0e0e0 28.57%, #e0e0e0 calc(28.57% + 1px), transparent calc(28.57% + 1px), transparent 42.85%,
+    #e0e0e0 42.85%, #e0e0e0 calc(42.85% + 1px), transparent calc(42.85% + 1px), transparent 57.14%,
+    #e0e0e0 57.14%, #e0e0e0 calc(57.14% + 1px), transparent calc(57.14% + 1px), transparent 71.42%,
+    #e0e0e0 71.42%, #e0e0e0 calc(71.42% + 1px), transparent calc(71.42% + 1px), transparent 85.71%,
+    #e0e0e0 85.71%, #e0e0e0 calc(85.71% + 1px), transparent calc(85.71% + 1px), transparent 100%
+  );
+}
+
+.timeline-bar {
+  position: absolute;
+  height: 16px;
+  top: 2px;
+  border-radius: 4px;
+  min-width: 4px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.timeline-bar:hover {
+  opacity: 0.8;
+}
+
+/* Bar states matching list states */
+.timeline-bar-past {
+  background-color: #bdbdbd;
+}
+
+.timeline-bar-future {
+  background-color: #64b5f6;
+}
+
+.timeline-bar-current {
+  background-color: #81c784;
+}
+
+.timeline-bar-selected {
+  box-shadow: 0 0 0 2px #333;
+}
+
+/* Open-ended indicators */
+.timeline-bar-open-start {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.timeline-bar-open-start::before {
+  content: '◀';
+  position: absolute;
+  left: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  color: inherit;
+  opacity: 0.7;
+}
+
+.timeline-bar-open-end {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.timeline-bar-open-end::after {
+  content: '▶';
+  position: absolute;
+  right: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  color: inherit;
+  opacity: 0.7;
+}
+
+/* Now marker */
+.timeline-now {
+  position: absolute;
+  top: 48px;
+  bottom: 12px;
+  width: 2px;
+  background: #d32f2f;
+  z-index: 10;
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+/* Date label (M/D format) */
+.timeline-now-label {
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-weight: 600;
+  color: #d32f2f;
+  white-space: nowrap;
+  pointer-events: none;
+  background: #fff;
+  padding: 1px 4px;
+  border-radius: 3px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 15%);
+}
+
+/* Drag handle */
+.timeline-now-handle {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 16px;
+  height: 16px;
+  background: #d32f2f;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgb(0 0 0 / 30%);
+  cursor: grab;
+}
+
+.timeline-now-handle::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 4px;
+  height: 4px;
+  background: #fff;
+  border-radius: 50%;
+}
+
+.timeline-now-dragging {
+  background: #b71c1c;
+}
+
+.timeline-now-dragging .timeline-now-handle {
+  transform: translateX(-50%) scale(1.2);
+  background: #b71c1c;
+  cursor: grabbing;
+}
+
+.timeline-now:hover .timeline-now-handle {
+  transform: translateX(-50%) scale(1.2);
+  background: #b71c1c;
+}
+
+/* Expand hit area for easier grabbing */
+.timeline-now::after {
+  content: '';
+  position: absolute;
+  inset: 0 -8px;
+}
