@@ -65,7 +65,7 @@ export async function fetchRecipes(userId, password, dateUpdated) {
 
   // Use CORS proxy
   const apiUrl = `https://vitamix.calcmenuweb.com/ws/service.asmx/GetUpdatedRecipes?${queryParams.toString()}`;
-  const corsProxy = 'https://fcors.org/?url=';
+  const corsProxy = 'https://fcors.org/?url=', corsKey = '&key=Mg23N96GgR8O3NjU';
 
   const headers = {};
   const cookies = getCalcMenuCookies();
@@ -73,7 +73,7 @@ export async function fetchRecipes(userId, password, dateUpdated) {
     headers['X-Cookie'] = cookies;
   }
 
-  const response = await fetch(corsProxy + encodeURIComponent(apiUrl), {
+  const response = await fetch(corsProxy + encodeURIComponent(apiUrl) + corsKey, {
     method: 'GET',
     credentials: 'include',
     headers,
@@ -101,7 +101,7 @@ export async function fetchRecipeDetails(userId, password, recipeNumber) {
 
   // Use CORS proxy
   const apiUrl = `https://vitamix.calcmenuweb.com/ws/service.asmx/GetRecipeDetails?${queryParams.toString()}`;
-  const corsProxy = 'https://fcors.org/?url=';
+  const corsProxy = 'https://fcors.org/?url=', corsKey = '&key=Mg23N96GgR8O3NjU';
 
   const headers = {};
   const cookies = getCalcMenuCookies();
@@ -109,7 +109,7 @@ export async function fetchRecipeDetails(userId, password, recipeNumber) {
     headers['X-Cookie'] = cookies;
   }
 
-  const response = await fetch(corsProxy + encodeURIComponent(apiUrl), {
+  const response = await fetch(corsProxy + encodeURIComponent(apiUrl) + corsKey, {
     method: 'GET',
     credentials: 'include',
     headers,
@@ -276,8 +276,8 @@ export async function fetchRecipeDetailsForSync(
   let recipeImageSrc = '';
   try {
     addLogEntry(`  Fetching image from ${recipePageUrl}`, 'info');
-    const corsProxy = 'https://fcors.org/?url=';
-    const pageResponse = await fetch(corsProxy + encodeURIComponent(recipePageUrl), {
+    const corsProxy = 'https://fcors.org/?url=', corsKey = '&key=Mg23N96GgR8O3NjU';
+    const pageResponse = await fetch(corsProxy + encodeURIComponent(recipePageUrl) + corsKey, {
       credentials: 'include',
     });
 
@@ -625,12 +625,12 @@ export async function publishRecipe(kebabName, token) {
 
 // Initialize session with CalcMenu to get session cookie
 export async function initCalcMenuSession() {
-  const corsProxy = 'https://fcors.org/?url=';
+  const corsProxy = 'https://fcors.org/?url=', corsKey = '&key=Mg23N96GgR8O3NjU';
   const calcMenuUrl = 'https://vitamix.calcmenuweb.com/Default.aspx';
 
   try {
     // Use reveal=headers to get response headers including cookies
-    const response = await fetch(`${corsProxy}${encodeURIComponent(calcMenuUrl)}&reveal=headers`, {
+    const response = await fetch(`${corsProxy}${encodeURIComponent(calcMenuUrl)}${corsKey}&reveal=headers`, {
       method: 'GET',
     });
 
@@ -1056,8 +1056,8 @@ export async function displayRecipeDetails(recipeNumber) {
     let recipeImageSrc = '';
     try {
       // Fetch the recipe page through CORS proxy
-      const corsProxy = 'https://fcors.org/?url=';
-      const pageResponse = await fetch(corsProxy + encodeURIComponent(recipePageUrl), {
+      const corsProxy = 'https://fcors.org/?url=', corsKey = '&key=Mg23N96GgR8O3NjU';
+      const pageResponse = await fetch(corsProxy + encodeURIComponent(recipePageUrl) + corsKey, {
         credentials: 'include',
       });
 
@@ -1379,10 +1379,10 @@ export async function displayRecipeDetails(recipeNumber) {
 // Fetch imported recipes from AEM
 export async function fetchImportedRecipes() {
   try {
-    const corsProxy = 'https://fcors.org/?url=';
+    const corsProxy = 'https://fcors.org/?url=', corsKey = '&key=Mg23N96GgR8O3NjU';
     const queryIndexUrl = 'https://main--vitamix--aemsites.aem.live/us/en_us/recipes/data/query-index.json?limit=10000';
 
-    const response = await fetch(corsProxy + encodeURIComponent(queryIndexUrl), {
+    const response = await fetch(corsProxy + encodeURIComponent(queryIndexUrl) + corsKey, {
       method: 'GET',
       credentials: 'include',
     });
