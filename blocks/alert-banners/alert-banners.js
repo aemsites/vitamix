@@ -1,4 +1,8 @@
-import { parseAlertBanners, findBestAlertBanner, currentPastFuture } from '../../scripts/scripts.js';
+import {
+  parseAlertBanners,
+  findBestAlertBanner,
+  currentPastFuture,
+} from '../../scripts/scripts.js';
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -37,24 +41,42 @@ function formatShortDateTime(date) {
 
 /**
  * Formats a duration in milliseconds into a human-readable string.
+ * Shows only the largest rounded unit (weeks for 21+ days, days for 1+ days, etc.)
  * @param {number} ms - Duration in milliseconds
- * @returns {string} Formatted duration string (e.g., "3d 2h 15m" or "-1d 5h 30m")
+ * @returns {string} Formatted duration string (e.g., "3d", "2w", "5h")
  */
 function formatDuration(ms) {
+  if (ms === null || Number.isNaN(ms)) return '';
+
   const negative = ms < 0;
   const absMs = Math.abs(ms);
 
-  const totalMinutes = Math.floor(absMs / (1000 * 60));
-  const days = Math.floor(totalMinutes / (60 * 24));
-  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
-  const minutes = totalMinutes % 60;
+  const totalMinutes = Math.round(absMs / (1000 * 60));
+  const totalHours = totalMinutes / 60;
+  const totalDays = totalHours / 24;
+  const totalWeeks = totalDays / 7;
 
-  const parts = [];
-  if (days > 0) parts.push(`${days}d`);
-  if (hours > 0) parts.push(`${hours}h`);
-  if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`);
+  let value;
+  let unit;
+  if (totalDays >= 21) {
+    // 3+ weeks: show weeks
+    value = Math.round(totalWeeks);
+    unit = value === 1 ? 'week' : 'weeks';
+  } else if (totalDays >= 1) {
+    // 1+ days: show days
+    value = Math.round(totalDays);
+    unit = value === 1 ? 'day' : 'days';
+  } else if (totalHours >= 1) {
+    // 1+ hours: show hours
+    value = Math.round(totalHours);
+    unit = value === 1 ? 'hour' : 'hours';
+  } else {
+    // Less than 1 hour: show minutes
+    value = Math.round(totalMinutes);
+    unit = value === 1 ? 'minute' : 'minutes';
+  }
 
-  const result = parts.join(' ');
+  const result = `${value} ${unit}`;
   return negative ? `-${result}` : result;
 }
 
@@ -64,10 +86,17 @@ function formatDuration(ms) {
  * @param {Array<Object>} banners - Array of banner objects
  * @param {Object|null} [bestBanner=null] - The optimal banner to highlight
  * @param {Date} [date=new Date()] - Reference date for the "now" marker
- * @param {Function} [onDateChange=null] - Callback when date is changed via drag
+ * @param {Function} [onDateChange=null] - Callback when date is changed via drag (receives newDate)
+ * @param {Function} [onPreviewChange=null] - Callback when selected banner changes
  * @returns {HTMLElement} Timeline container element
  */
-function createTimeline(banners, bestBanner = null, date = new Date(), onDateChange = null) {
+function createTimeline(
+  banners,
+  bestBanner = null,
+  date = new Date(),
+  onDateChange = null,
+  onPreviewChange = null,
+) {
   const container = document.createElement('div');
   container.classList.add('alert-banners-timeline');
 
@@ -228,6 +257,10 @@ function createTimeline(banners, bestBanner = null, date = new Date(), onDateCha
       let isDragging = false;
       let trackBoundsCache = null;
 
+      // Cache bars and track for performance
+      let barsCache = null;
+      let lastBestIdx = -1;
+
       const cacheTrackBounds = () => {
         const track = container.querySelector('.timeline-track');
         if (track) {
@@ -236,34 +269,49 @@ function createTimeline(banners, bestBanner = null, date = new Date(), onDateCha
           const months = container.querySelector('.timeline-months');
           trackBoundsCache = months ? months.getBoundingClientRect() : null;
         }
+        // Also cache bars
+        barsCache = [...container.querySelectorAll('.timeline-bar')];
       };
 
       // Update banner bar colors and selection based on the new date
       const updateBarColors = (newDate) => {
-        const bars = container.querySelectorAll('.timeline-bar');
-        const newBestBanner = findBestAlertBanner(banners, newDate);
+        if (!barsCache) return;
 
-        bars.forEach((bar, index) => {
-          const banner = visibleBanners[index];
-          if (!banner) return;
+        let newBestIdx = -1;
 
-          // Remove old state classes
-          bar.classList.remove(
-            'timeline-bar-past',
-            'timeline-bar-current',
-            'timeline-bar-future',
-            'timeline-bar-selected',
-          );
+        // Update bar classes
+        for (let i = 0; i < barsCache.length; i += 1) {
+          const bar = barsCache[i];
+          const banner = visibleBanners[i];
+          if (!banner) continue; // eslint-disable-line no-continue
 
-          // Add new state class
           const state = currentPastFuture(banner.start, banner.end, newDate);
-          bar.classList.add(`timeline-bar-${state}`);
 
-          // Add selected class if this is the best banner
-          if (banner === newBestBanner) {
-            bar.classList.add('timeline-bar-selected');
+          // Update state class (toggle instead of remove all + add)
+          bar.classList.toggle('timeline-bar-past', state === 'past');
+          bar.classList.toggle('timeline-bar-current', state === 'current');
+          bar.classList.toggle('timeline-bar-future', state === 'future');
+
+          if (state === 'current') {
+            newBestIdx = i;
           }
-        });
+        }
+
+        // Update selected class only if changed
+        if (newBestIdx !== lastBestIdx) {
+          if (lastBestIdx >= 0 && barsCache[lastBestIdx]) {
+            barsCache[lastBestIdx].classList.remove('timeline-bar-selected');
+          }
+          if (newBestIdx >= 0 && barsCache[newBestIdx]) {
+            barsCache[newBestIdx].classList.add('timeline-bar-selected');
+          }
+          lastBestIdx = newBestIdx;
+
+          // Only notify preview change when selection changes
+          if (onPreviewChange) {
+            onPreviewChange(newBestIdx >= 0 ? visibleBanners[newBestIdx] : null);
+          }
+        }
       };
 
       const updateMarkerFromX = (clientX) => {
@@ -414,6 +462,10 @@ export default async function decorateAlertBanners(block) {
   const banners = parseAlertBanners(block);
   block.innerHTML = '';
 
+  // Preview banner element (reused, updated by timeline during drag)
+  const preview = document.createElement('aside');
+  preview.classList.add('nav-banner', 'alert-banners-preview');
+
   // Timeline view
   const timelineContainer = document.createElement('div');
   timelineContainer.classList.add('alert-banners-timeline-container');
@@ -431,20 +483,54 @@ export default async function decorateAlertBanners(block) {
   dtl.id = 'alert-banners-party-time';
   div.append(dtl);
 
-  // Shared update function
-  // When dragging=true, only update input and list (not timeline)
-  const updateViews = (simDate, dragging = false) => {
+  // Callback for drag - only updates input, timeline handles bar colors and preview
+  const onDrag = (newDate) => {
+    dtl.value = newDate.toISOString().slice(0, 16);
+  };
+
+  // Track current preview banner to avoid unnecessary DOM updates
+  let currentPreviewBanner = null;
+
+  // Helper to update preview (skips if banner hasn't changed)
+  const setPreview = (selectedBanner) => {
+    if (selectedBanner === currentPreviewBanner) return;
+    currentPreviewBanner = selectedBanner;
+
+    preview.className = 'nav-banner alert-banners-preview';
+    preview.style.backgroundColor = '';
+    preview.textContent = '';
+
+    if (selectedBanner && selectedBanner.content) {
+      const p = document.createElement('p');
+      const contentClone = selectedBanner.content.cloneNode(true);
+      p.append(...contentClone.childNodes);
+      preview.append(p);
+
+      if (selectedBanner.color) {
+        preview.style.backgroundColor = `var(--color-${selectedBanner.color})`;
+        const darkColors = ['charcoal', 'black', 'dark', 'red', 'blue', 'green'];
+        const textClass = darkColors.some((c) => selectedBanner.color.includes(c)) ? 'light' : 'dark';
+        preview.classList.add(`nav-banner-${textClass}`);
+      }
+    } else {
+      preview.classList.add('alert-banners-preview-empty');
+      preview.textContent = 'No banner selected for this date';
+    }
+  };
+
+  // Full update function (used on initial load and when input changes)
+  const updateViews = (simDate) => {
     const simBestBanner = findBestAlertBanner(banners, simDate);
 
     // Update datetime input
     dtl.value = simDate.toISOString().slice(0, 16);
 
-    // Update timeline (skip during drag to avoid destroying the element being dragged)
-    if (!dragging) {
-      timelineContainer.textContent = '';
-      const onDrag = (newDate, isDragging) => updateViews(newDate, isDragging);
-      timelineContainer.append(createTimeline(banners, simBestBanner, simDate, onDrag));
-    }
+    // Update preview
+    setPreview(simBestBanner);
+
+    // Update timeline (passes setPreview so it can update during drag)
+    timelineContainer.textContent = '';
+    timelineContainer.append(createTimeline(banners, simBestBanner, simDate, onDrag, setPreview));
 
     // Update list
     bannersContainer.textContent = '';
@@ -454,20 +540,12 @@ export default async function decorateAlertBanners(block) {
   // Initial render
   updateViews(new Date());
 
-  // Listen for manual input changes
+  // Listen for manual input changes - just call updateViews
   dtl.addEventListener('input', (e) => {
-    const newDate = new Date(e.target.value);
-    const simBestBanner = findBestAlertBanner(banners, newDate);
-
-    // Full re-render when manually changing input
-    timelineContainer.textContent = '';
-    const onDrag = (dragDate, isDragging) => updateViews(dragDate, isDragging);
-    timelineContainer.append(createTimeline(banners, simBestBanner, newDate, onDrag));
-
-    bannersContainer.textContent = '';
-    bannersContainer.append(createParsedBanners(banners, simBestBanner, newDate));
+    updateViews(new Date(e.target.value));
   });
 
+  block.append(preview);
   block.append(timelineContainer);
   block.append(bannersContainer);
   block.append(div);
