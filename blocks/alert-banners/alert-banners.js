@@ -175,14 +175,6 @@ function createTimeline(
     // Skip banners with negative duration (end before start)
     if (banner.start && banner.end && banner.end < banner.start) return;
 
-    const row = document.createElement('div');
-    row.classList.add('timeline-row');
-
-    // Track for the bar
-    const track = document.createElement('div');
-    track.classList.add('timeline-track');
-    track.title = banner.content?.textContent?.trim() || '';
-
     // Calculate bar position
     const startTime = banner.start ? banner.start.getTime() : rangeStart.getTime();
     const endTime = banner.end ? banner.end.getTime() : rangeEnd.getTime();
@@ -191,38 +183,46 @@ function createTimeline(
     const visibleStart = Math.max(startTime, rangeStart.getTime());
     const visibleEnd = Math.min(endTime, rangeEnd.getTime());
 
-    // Only show bar if it overlaps with the visible range
-    if (visibleEnd >= rangeStart.getTime() && visibleStart <= rangeEnd.getTime()) {
-      const leftPercent = ((visibleStart - rangeStart.getTime()) / rangeDuration) * 100;
-      const widthPercent = ((visibleEnd - visibleStart) / rangeDuration) * 100;
+    // Only show row if banner overlaps with the visible range
+    if (visibleEnd < rangeStart.getTime() || visibleStart > rangeEnd.getTime()) return;
 
-      const bar = document.createElement('div');
-      bar.classList.add('timeline-bar');
-      bar.classList.add(`timeline-bar-${currentPastFuture(banner.start, banner.end, date)}`);
+    const row = document.createElement('div');
+    row.classList.add('timeline-row');
 
-      if (bestBanner === banner) {
-        bar.classList.add('timeline-bar-selected');
-      }
+    // Track for the bar
+    const track = document.createElement('div');
+    track.classList.add('timeline-track');
+    track.title = banner.content?.textContent?.trim() || '';
 
-      // Show arrows for open-ended dates
-      if (!banner.start || banner.start.getTime() < rangeStart.getTime()) {
-        bar.classList.add('timeline-bar-open-start');
-      }
-      if (!banner.end || banner.end.getTime() > rangeEnd.getTime()) {
-        bar.classList.add('timeline-bar-open-end');
-      }
+    const leftPercent = ((visibleStart - rangeStart.getTime()) / rangeDuration) * 100;
+    const widthPercent = ((visibleEnd - visibleStart) / rangeDuration) * 100;
 
-      bar.style.left = `${Math.max(0, leftPercent)}%`;
-      bar.style.width = `${Math.min(100, widthPercent)}%`;
+    const bar = document.createElement('div');
+    bar.classList.add('timeline-bar');
+    bar.classList.add(`timeline-bar-${currentPastFuture(banner.start, banner.end, date)}`);
 
-      // Tooltip
-      const startStr = banner.start ? formatShortDateTime(banner.start) : '∞';
-      const endStr = banner.end ? formatShortDateTime(banner.end) : '∞';
-      bar.title = `${startStr} → ${endStr}`;
-
-      track.appendChild(bar);
-      visibleBanners.push(banner); // Track this banner has a visible bar
+    if (bestBanner === banner) {
+      bar.classList.add('timeline-bar-selected');
     }
+
+    // Show arrows for open-ended dates
+    if (!banner.start || banner.start.getTime() < rangeStart.getTime()) {
+      bar.classList.add('timeline-bar-open-start');
+    }
+    if (!banner.end || banner.end.getTime() > rangeEnd.getTime()) {
+      bar.classList.add('timeline-bar-open-end');
+    }
+
+    bar.style.left = `${Math.max(0, leftPercent)}%`;
+    bar.style.width = `${Math.min(100, widthPercent)}%`;
+
+    // Tooltip
+    const startStr = banner.start ? formatShortDateTime(banner.start) : '∞';
+    const endStr = banner.end ? formatShortDateTime(banner.end) : '∞';
+    bar.title = `${startStr} → ${endStr}`;
+
+    track.appendChild(bar);
+    visibleBanners.push(banner); // Track this banner has a visible bar
 
     row.appendChild(track);
     rowsContainer.appendChild(row);
@@ -274,8 +274,9 @@ function createTimeline(
       };
 
       // Update banner bar colors and selection based on the new date
+      // Returns the current best banner (for passing to onDateChange)
       const updateBarColors = (newDate) => {
-        if (!barsCache) return;
+        if (!barsCache) return null;
 
         let newBestIdx = -1;
 
@@ -312,6 +313,8 @@ function createTimeline(
             onPreviewChange(newBestIdx >= 0 ? visibleBanners[newBestIdx] : null);
           }
         }
+
+        return newBestIdx >= 0 ? visibleBanners[newBestIdx] : null;
       };
 
       const updateMarkerFromX = (clientX) => {
@@ -333,19 +336,18 @@ function createTimeline(
         // Update the date label
         dateLabel.textContent = `${newDate.getMonth() + 1}/${newDate.getDate()}`;
 
-        // Update bar colors
-        updateBarColors(newDate);
+        // Update bar colors and get current best banner
+        const currentBest = updateBarColors(newDate);
 
-        return newDate;
+        return { newDate, bestBanner: currentBest };
       };
 
       const onMouseMove = (e) => {
         if (!isDragging) return;
         e.preventDefault();
-        const newDate = updateMarkerFromX(e.clientX);
-        if (newDate) {
-          // Only update the input and list, not the timeline
-          onDateChange(newDate, true); // true = dragging
+        const result = updateMarkerFromX(e.clientX);
+        if (result) {
+          onDateChange(result.newDate, result.bestBanner);
         }
       };
 
@@ -372,9 +374,9 @@ function createTimeline(
         if (!isDragging) return;
         e.preventDefault();
         const touch = e.touches[0];
-        const newDate = updateMarkerFromX(touch.clientX);
-        if (newDate) {
-          onDateChange(newDate, true);
+        const result = updateMarkerFromX(touch.clientX);
+        if (result) {
+          onDateChange(result.newDate, result.bestBanner);
         }
       };
 
@@ -483,11 +485,6 @@ export default async function decorateAlertBanners(block) {
   dtl.id = 'alert-banners-party-time';
   div.append(dtl);
 
-  // Callback for drag - only updates input, timeline handles bar colors and preview
-  const onDrag = (newDate) => {
-    dtl.value = newDate.toISOString().slice(0, 16);
-  };
-
   // Track current preview banner to avoid unnecessary DOM updates
   let currentPreviewBanner = null;
 
@@ -518,6 +515,29 @@ export default async function decorateAlertBanners(block) {
     }
   };
 
+  // Cache list items for fast updates during drag
+  let listItems = [];
+
+  // Update list item classes during drag
+  const updateListColors = (newDate, newBestBanner) => {
+    listItems.forEach((item, index) => {
+      const banner = banners[index];
+      if (!banner) return;
+
+      const state = currentPastFuture(banner.start, banner.end, newDate);
+      item.classList.toggle('alert-banners-past', state === 'past');
+      item.classList.toggle('alert-banners-current', state === 'current');
+      item.classList.toggle('alert-banners-future', state === 'future');
+      item.classList.toggle('alert-banners-selected', banner === newBestBanner);
+    });
+  };
+
+  // Callback for drag - updates input and list
+  const onDrag = (newDate, newBestBanner) => {
+    dtl.value = newDate.toISOString().slice(0, 16);
+    updateListColors(newDate, newBestBanner);
+  };
+
   // Full update function (used on initial load and when input changes)
   const updateViews = (simDate) => {
     const simBestBanner = findBestAlertBanner(banners, simDate);
@@ -528,13 +548,14 @@ export default async function decorateAlertBanners(block) {
     // Update preview
     setPreview(simBestBanner);
 
-    // Update timeline (passes setPreview so it can update during drag)
+    // Update timeline
     timelineContainer.textContent = '';
     timelineContainer.append(createTimeline(banners, simBestBanner, simDate, onDrag, setPreview));
 
-    // Update list
+    // Update list and cache items
     bannersContainer.textContent = '';
     bannersContainer.append(createParsedBanners(banners, simBestBanner, simDate));
+    listItems = [...bannersContainer.querySelectorAll('li')];
   };
 
   // Initial render
