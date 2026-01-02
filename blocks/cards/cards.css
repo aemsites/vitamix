@@ -32,6 +32,10 @@
   border-radius: var(--rounding-m);
 }
 
+.cards .card-filled h2 {
+  font-size: var(--body-size-l);
+}
+
 .cards .card-filled a:any-link {
   color: inherit;
 }
