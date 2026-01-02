@@ -657,3 +657,67 @@ main > .recipe-container.section > .recipe-wrapper {
     padding: var(--spacing-200) var(--spacing-500);
   }
 }
+
+@media print {
+  .header-wrapper,
+  .footer-wrapper,
+  .fragment-wrapper,
+  .cards-wrapper,
+  .related-recipes-wrapper,
+  .recipe .recipe-rating,
+  .recipe .recipe-toolbar,
+  .recipe .recipe-refine,
+  .recipe .recipe-notes,
+  .recipe .recipe-additional-info {
+    display: none !important;
+  }
+
+  .recipe .recipe-header {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas: 'details image';
+    gap: var(--horizontal-spacing);
+    padding-bottom: 0;
+    background-color: white;
+    color: var(--color-charcoal);
+    page-break-after: avoid;
+  }
+
+  .recipe .recipe-body {
+    display: block;
+  }
+
+  .recipe .recipe-body > div {
+    margin: 0;
+  }
+
+  .recipe .recipe-header .eyebrow {
+    color: var(--color-red);
+  }
+
+  .recipe .recipe-header a:any-link {
+    color: var(--color-charcoal);
+  }
+
+  .recipe .recipe-header h1,
+  .recipe .recipe-body h2 {
+    font-size: var(--body-size-xxxl) !important;
+  }
+
+  .recipe .recipe-stats {
+    flex-wrap: wrap;
+  }
+
+  .recipe .recipe-details,
+  .recipe .recipe-image {
+    padding: 0 !important;
+  }
+
+  .recipe .recipe-instructions,
+  .recipe .recipe-nutrition {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    background-color: white !important;
+    page-break-inside: avoid;
+  }
+}
