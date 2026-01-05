@@ -328,12 +328,22 @@ export async function fetchRecipeDetailsForSync(
   const mainElement = xmlDoc.querySelector('Main');
   let recipeYield = '';
   if (mainElement) {
-    const yield1 = mainElement.querySelector('Yield1')?.textContent.trim() || '';
-    const yield1Unit = mainElement.querySelector('Yield1_Unit')?.textContent.trim() || '';
-    if (yield1 && yield1Unit) {
-      recipeYield = `${yield1} ${yield1Unit}`;
-    } else if (yield1) {
-      recipeYield = yield1;
+    // Collect all yields
+    const yields = [];
+    for (let i = 1; i <= 5; i += 1) {
+      const yieldVal = mainElement.querySelector(`Yield${i}`)?.textContent.trim() || '';
+      const yieldUnit = mainElement.querySelector(`Yield${i}_Unit`)?.textContent.trim() || '';
+      if (yieldVal) {
+        yields.push({ value: yieldVal, unit: yieldUnit });
+      }
+    }
+    // Prefer yield with "serving" or "servings" unit
+    const servingsYield = yields.find((y) => /^servings?$/i.test(y.unit));
+    const selectedYield = servingsYield || yields[0];
+    if (selectedYield) {
+      recipeYield = selectedYield.unit
+        ? `${selectedYield.value} ${selectedYield.unit}`
+        : selectedYield.value;
     }
   }
 
@@ -1110,16 +1120,26 @@ export async function displayRecipeDetails(recipeNumber) {
       }
     });
 
-    // Extract Yield from Main > Yield1 and Yield1_Unit
+    // Extract Yield from Main - prefer servings unit if multiple yields exist
     const mainElement = xmlDoc.querySelector('Main');
     let recipeYield = '';
     if (mainElement) {
-      const yield1 = mainElement.querySelector('Yield1')?.textContent.trim() || '';
-      const yield1Unit = mainElement.querySelector('Yield1_Unit')?.textContent.trim() || '';
-      if (yield1 && yield1Unit) {
-        recipeYield = `${yield1} ${yield1Unit}`;
-      } else if (yield1) {
-        recipeYield = yield1;
+      // Collect all yields
+      const yields = [];
+      for (let i = 1; i <= 5; i += 1) {
+        const yieldVal = mainElement.querySelector(`Yield${i}`)?.textContent.trim() || '';
+        const yieldUnit = mainElement.querySelector(`Yield${i}_Unit`)?.textContent.trim() || '';
+        if (yieldVal) {
+          yields.push({ value: yieldVal, unit: yieldUnit });
+        }
+      }
+      // Prefer yield with "serving" or "servings" unit
+      const servingsYield = yields.find((y) => /^servings?$/i.test(y.unit));
+      const selectedYield = servingsYield || yields[0];
+      if (selectedYield) {
+        recipeYield = selectedYield.unit
+          ? `${selectedYield.value} ${selectedYield.unit}`
+          : selectedYield.value;
       }
     }
 
