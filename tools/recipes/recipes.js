@@ -1575,6 +1575,106 @@ function highlightText(text, term) {
   return text.replace(regex, '<mark class="highlight">$1</mark>');
 }
 
+// Parse recipe numbers from URLs or text
+function parseRecipeNumbers(input) {
+  const lines = input.split('\n').map((line) => line.trim()).filter((line) => line);
+  const recipeNumbers = [];
+
+  lines.forEach((line) => {
+    // Try to extract recipe number from URL (last segment after last /)
+    // URL format: .../recipes/data/recipe-name-r00123
+    const urlMatch = line.match(/\/([^/]+)$/);
+    if (urlMatch) {
+      // Extract recipe code from the last segment (e.g., "almond-milk-r00013" -> "R00013")
+      const segment = urlMatch[1];
+      const recipeCodeMatch = segment.match(/r(\d+)/i);
+      if (recipeCodeMatch) {
+        recipeNumbers.push(`R${recipeCodeMatch[1]}`.toUpperCase());
+        return;
+      }
+    }
+
+    // Try to extract recipe number directly from text (e.g., "R01234" or "r01234")
+    const directMatch = line.match(/r(\d+)/i);
+    if (directMatch) {
+      recipeNumbers.push(`R${directMatch[1]}`.toUpperCase());
+    }
+  });
+
+  // Remove duplicates
+  return [...new Set(recipeNumbers)];
+}
+
+// Update bulk select preview
+function updateBulkSelectPreview(recipeNumbers, previewEl, applyBtn) {
+  if (recipeNumbers.length === 0) {
+    previewEl.classList.remove('active');
+    previewEl.innerHTML = '';
+    applyBtn.disabled = true;
+    return;
+  }
+
+  // Get all recipe checkboxes and their numbers
+  const checkboxes = document.querySelectorAll('.recipe-checkbox');
+  const availableNumbers = new Set();
+  checkboxes.forEach((cb) => {
+    availableNumbers.add(cb.dataset.recipeNumber.toUpperCase());
+  });
+
+  // Count matches
+  const matches = recipeNumbers.filter((num) => availableNumbers.has(num));
+  const noMatches = recipeNumbers.filter((num) => !availableNumbers.has(num));
+
+  let html = `<div class="preview-count">Found ${matches.length} of ${recipeNumbers.length} recipes in current list</div>`;
+
+  if (matches.length > 0) {
+    html += '<div class="preview-list"><strong>Will select:</strong> ';
+    html += matches.slice(0, 10).map((num) => `<span class="preview-match">${num}</span>`).join(', ');
+    if (matches.length > 10) {
+      html += `, ... and ${matches.length - 10} more`;
+    }
+    html += '</div>';
+  }
+
+  if (noMatches.length > 0) {
+    html += '<div class="preview-list"><strong>Not found:</strong> ';
+    html += noMatches.slice(0, 5).map((num) => `<span class="preview-no-match">${num}</span>`).join(', ');
+    if (noMatches.length > 5) {
+      html += `, ... and ${noMatches.length - 5} more`;
+    }
+    html += '</div>';
+  }
+
+  previewEl.innerHTML = html;
+  previewEl.classList.add('active');
+  applyBtn.disabled = matches.length === 0;
+}
+
+// Apply bulk selection to checkboxes
+function applyBulkSelection(recipeNumbers) {
+  const recipeNumberSet = new Set(recipeNumbers);
+  const checkboxes = document.querySelectorAll('.recipe-checkbox');
+  let selectedCount = 0;
+
+  checkboxes.forEach((cb) => {
+    const number = cb.dataset.recipeNumber.toUpperCase();
+    if (recipeNumberSet.has(number)) {
+      cb.checked = true;
+      saveCheckboxState(cb.dataset.recipeNumber, true);
+      selectedCount += 1;
+    }
+  });
+
+  updateBulkSyncButton();
+
+  // Uncheck select all since we're doing partial selection
+  const selectAll = document.getElementById('selectAll');
+  if (selectAll) selectAll.checked = false;
+
+  // eslint-disable-next-line no-console
+  console.log(`Bulk selected ${selectedCount} recipes`);
+}
+
 // Filter recipes by search term with highlighting
 function filterRecipes(searchTerm) {
   const recipeItems = document.querySelectorAll('.recipe-item');
@@ -1711,6 +1811,50 @@ export async function init() {
   if (recipeFilter) {
     recipeFilter.addEventListener('input', (e) => {
       filterRecipes(e.target.value);
+    });
+  }
+
+  // Add bulk select modal listeners
+  const bulkSelectBtn = document.getElementById('bulkSelectBtn');
+  const bulkSelectModal = document.getElementById('bulkSelectModal');
+  const bulkSelectInput = document.getElementById('bulkSelectInput');
+  const bulkSelectPreview = document.getElementById('bulkSelectPreview');
+  const bulkSelectApply = document.getElementById('bulkSelectApply');
+  const closeBulkSelectModal = document.getElementById('closeBulkSelectModal');
+  const bulkSelectCancel = document.getElementById('bulkSelectCancel');
+
+  if (bulkSelectBtn && bulkSelectModal) {
+    // Open modal
+    bulkSelectBtn.addEventListener('click', () => {
+      bulkSelectModal.style.display = 'flex';
+      bulkSelectInput.value = '';
+      bulkSelectPreview.classList.remove('active');
+      bulkSelectPreview.innerHTML = '';
+      bulkSelectInput.focus();
+    });
+
+    // Close modal handlers
+    const closeModal = () => {
+      bulkSelectModal.style.display = 'none';
+    };
+
+    closeBulkSelectModal.addEventListener('click', closeModal);
+    bulkSelectCancel.addEventListener('click', closeModal);
+    bulkSelectModal.addEventListener('click', (e) => {
+      if (e.target === bulkSelectModal) closeModal();
+    });
+
+    // Parse input and show preview
+    bulkSelectInput.addEventListener('input', () => {
+      const recipeNumbers = parseRecipeNumbers(bulkSelectInput.value);
+      updateBulkSelectPreview(recipeNumbers, bulkSelectPreview, bulkSelectApply);
+    });
+
+    // Apply selection
+    bulkSelectApply.addEventListener('click', () => {
+      const recipeNumbers = parseRecipeNumbers(bulkSelectInput.value);
+      applyBulkSelection(recipeNumbers);
+      closeModal();
     });
   }
 

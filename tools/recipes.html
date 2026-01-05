@@ -67,6 +67,7 @@
             <span>Select All</span>
           </label>
           <button id="selectUnimportedBtn" class="btn-select-unimported">Select Unimported</button>
+          <button id="bulkSelectBtn" class="btn-bulk-select">Bulk Select...</button>
           <div class="sync-options">
             <label class="sync-option">
               <input type="checkbox" id="enablePublish" checked />
@@ -79,6 +80,25 @@
         <div id="syncProgress" class="sync-progress" style="display: none;">
           <h3>Sync Progress</h3>
           <div id="syncLog" class="sync-log"></div>
+        </div>
+      </div>
+
+      <!-- Bulk Select Modal -->
+      <div id="bulkSelectModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3>Bulk Select Recipes</h3>
+            <button id="closeBulkSelectModal" class="modal-close">&times;</button>
+          </div>
+          <div class="modal-body">
+            <p class="modal-help">Paste URLs or recipe titles (one per line). Recipe numbers will be extracted from the last segment of URLs or from text containing recipe codes like <code>r00123</code>.</p>
+            <textarea id="bulkSelectInput" class="bulk-select-textarea" placeholder="https://main--vitamix--aemsites.aem.page/us/en_us/recipes/data/almond-milk-r00013&#10;peanut-butter-cup-shake-r00888&#10;R01234"></textarea>
+            <div id="bulkSelectPreview" class="bulk-select-preview"></div>
+          </div>
+          <div class="modal-footer">
+            <button id="bulkSelectCancel" class="btn-modal-cancel">Cancel</button>
+            <button id="bulkSelectApply" class="btn-modal-apply">Select Recipes</button>
+          </div>
         </div>
       </div>
 
