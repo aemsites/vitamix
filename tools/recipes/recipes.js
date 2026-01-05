@@ -851,12 +851,18 @@ export async function syncWithDA(recipeName, recipeNumber) {
     throw new Error('Recipe content not found');
   }
 
-  // Create the HTML document
-  const htmlContent = `<html>
+  // Create the HTML document (same structure as bulk sync)
+  const htmlContent = `<!DOCTYPE html>
+<html>
+<head></head>
 <body>
+<header></header>
 <main>
+<div>
 ${recipeElement.innerHTML}
+</div>
 </main>
+<footer></footer>
 </body>
 </html>`;
 
@@ -1556,6 +1562,70 @@ export async function displayResults(data, rawXml) {
   }
 }
 
+// Escape special regex characters
+function escapeRegExp(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Highlight matching text
+function highlightText(text, term) {
+  if (!term) return text;
+
+  const regex = new RegExp(`(${escapeRegExp(term)})`, 'gi');
+  return text.replace(regex, '<mark class="highlight">$1</mark>');
+}
+
+// Filter recipes by search term with highlighting
+function filterRecipes(searchTerm) {
+  const recipeItems = document.querySelectorAll('.recipe-item');
+  const filterCount = document.getElementById('filterCount');
+  const term = searchTerm.trim().toLowerCase();
+
+  let visibleCount = 0;
+  const totalCount = recipeItems.length;
+
+  recipeItems.forEach((item) => {
+    const checkbox = item.querySelector('.recipe-checkbox');
+    const titleEl = item.querySelector('.recipe-title');
+    const metaEl = item.querySelector('.recipe-meta');
+    const brandEls = item.querySelectorAll('.brand-tag');
+
+    // Get original text (store it on first run)
+    if (!checkbox.dataset.originalName) {
+      checkbox.dataset.originalName = titleEl.textContent;
+    }
+    const { originalName } = checkbox.dataset;
+
+    // Collect all searchable text
+    const metaText = metaEl ? metaEl.textContent : '';
+    const brandText = Array.from(brandEls).map((b) => b.textContent).join(' ');
+    const searchableText = `${originalName} ${metaText} ${brandText}`.toLowerCase();
+
+    if (!term || searchableText.includes(term)) {
+      item.classList.remove('hidden');
+      visibleCount += 1;
+
+      // Apply highlighting if there's a search term
+      if (term) {
+        titleEl.innerHTML = highlightText(originalName, term);
+      } else {
+        titleEl.textContent = originalName;
+      }
+    } else {
+      item.classList.add('hidden');
+      // Reset highlighting when hidden
+      titleEl.textContent = originalName;
+    }
+  });
+
+  // Update filter count
+  if (term) {
+    filterCount.textContent = `Showing ${visibleCount} of ${totalCount}`;
+  } else {
+    filterCount.textContent = '';
+  }
+}
+
 // Make API call if query params are present
 export async function makeApiCallFromParams() {
   const params = getQueryParams();
@@ -1634,6 +1704,14 @@ export async function init() {
   const bulkSyncBtn = document.getElementById('bulkSyncBtn');
   if (bulkSyncBtn) {
     bulkSyncBtn.addEventListener('click', bulkSyncWithDA);
+  }
+
+  // Add recipe filter listener
+  const recipeFilter = document.getElementById('recipeFilter');
+  if (recipeFilter) {
+    recipeFilter.addEventListener('input', (e) => {
+      filterRecipes(e.target.value);
+    });
   }
 
   // Add back button listener
