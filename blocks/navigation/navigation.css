@@ -18,6 +18,7 @@ main > .navigation-container.section {
   background-color: var(--color-charcoal);
   color: var(--color-white);
   font-size: 0.875rem;
+  background: red;
 }
 
 @media (width >= 800px) {
