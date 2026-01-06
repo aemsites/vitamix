@@ -662,11 +662,26 @@
   background-color: var(--color-gray-300);
 }
 
+.cards.horizontal.dark > ul > li {
+  background-color: var(--color-charcoal);
+  color: var(--color-white);
+}
+
+.cards.horizontal.dark .eyebrow {
+  color: var(--color-steel);
+}
+
 .cards.horizontal .card-body blockquote {
   margin: 0;
+  border-left: 4px solid var(--color-red);
   background-color: var(--color-gray-100);
   padding: var(--spacing-60) var(--spacing-200);
-  border-left: 4px solid var(--color-red);
+}
+
+.cards.horizontal.dark .card-body blockquote {
+  border-left-color: var(--color-steel);
+  background-color: var(--color-dark-charcoal);
+  color: var(--color-white);
 }
 
 .cards.horizontal .card-image {
