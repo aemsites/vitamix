@@ -594,3 +594,14 @@
   height: 50px;
   object-fit: contain;
 }
+
+.cards.captioned-dark li {
+  color: var(--color-white);
+  background-color: var(--color-charcoal);
+  text-align: center;
+}
+
+.cards.captioned-dark li a:any-link {
+  color: var(--color-white);
+  text-decoration: none;
+}
