@@ -1,6 +1,8 @@
+// eslint-disable-next-line import/no-cycle
 import { loadPage } from '../../scripts/scripts.js';
 
 async function loadMoudle(origin, payload) {
+  document.body.classList.add('quick-edit');
   const { default: loadQuickEdit } = await import(`${origin}/nx/public/plugins/quick-edit/quick-edit.js`);
   loadQuickEdit(payload, loadPage);
 }

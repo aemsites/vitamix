@@ -1117,9 +1117,9 @@ async function loadEager(doc) {
     decorateMain(main);
     await loadNavBanner(main);
     document.body.classList.add('appear');
-    await loadSection(main.querySelector('.section'), () => {
-      if ((new URLSearchParams(window.location.search)).has('quick-edit')) return;
-      return waitForFirstImage();
+    await loadSection(main.querySelector('.section'), (s) => {
+      if (document.body.classList.contains('quick-edit')) return Promise.resolve();
+      return waitForFirstImage(s);
     });
   }
 
@@ -1208,16 +1208,17 @@ async function loadDelayed() {
     }
   }
   if ((new URLSearchParams(window.location.search)).has('quick-edit')) {
-    const { default: loadQuickEdit } = await import('/tools/quick-edit/quick-edit.js');
+    // eslint-disable-next-line import/no-cycle
+    const { default: loadQuickEdit } = await import('../tools/quick-edit/quick-edit.js');
     loadQuickEdit({
       detail: {
         config: {
-          mountpoint: 'https://content.da.live/aemsites/vitamix/'
+          mountpoint: 'https://content.da.live/aemsites/vitamix/',
         },
         location: {
           pathname: window.location.pathname,
         },
-      }
+      },
     });
   }
 }
