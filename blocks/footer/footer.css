@@ -44,19 +44,16 @@ footer section.ribbon {
       "links form" auto
       "links social" auto
       "copyright copyright" auto / 2fr 1fr;
-    max-width: var(--site-width);
+    max-width: 1000px;
     margin: 0 auto;
   }
 
   footer section.ribbon {
-    display: grid;
     grid-template:
       "ribbon ribbon" auto
       "links form" auto
       "links social" auto
       "copyright copyright" auto / 2fr 1fr;
-    max-width: var(--site-width);
-    margin: 0 auto;
   }
 }
 
@@ -71,11 +68,11 @@ footer section > div:last-child {
 /* ribbon */
 footer .footer-ribbon {
   grid-area: ribbon;
+  margin-left: calc(-50vw + 50%);
+  margin-right: calc(-50vw + 50%);
   padding: var(--spacing-m) 0;
   background-color: var(--color-charcoal);
   color: var(--color-white);
-  margin-left: calc(-50vw + 50%);
-  margin-right: calc(-50vw + 50%);
 }
 
 footer .footer-ribbon strong {
