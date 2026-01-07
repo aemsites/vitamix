@@ -1,9 +1,8 @@
 footer {
-  padding: var(--spacing-m) var(--horizontal-spacing);
   background-color: var(--color-gray-300);
   color: var(--color-gray-900);
-  max-width: var(--site-width);
   margin: 0 auto;
+  overflow-x: clip;
 }
 
 footer a:any-link {
@@ -31,7 +30,11 @@ footer section {
   flex-direction: column;
   gap: var(--spacing-600);
   margin: auto;
-  max-width: 1000px;
+  padding-top: var(--spacing-m);
+}
+
+footer section.ribbon {
+  padding-top: 0;
 }
 
 @media (width >= 800px) {
@@ -41,6 +44,79 @@ footer section {
       "links form" auto
       "links social" auto
       "copyright copyright" auto / 2fr 1fr;
+    max-width: var(--site-width);
+    margin: 0 auto;
+  }
+
+  footer section.ribbon {
+    display: grid;
+    grid-template:
+      "ribbon ribbon" auto
+      "links form" auto
+      "links social" auto
+      "copyright copyright" auto / 2fr 1fr;
+    max-width: var(--site-width);
+    margin: 0 auto;
+  }
+}
+
+footer section > div {
+  padding: var(--spacing-xxs) var(--horizontal-spacing);
+}
+
+footer section > div:last-child {
+  margin-bottom: var(--spacing-m);
+}
+
+/* ribbon */
+footer .footer-ribbon {
+  grid-area: ribbon;
+  padding: var(--spacing-m) 0;
+  background-color: var(--color-charcoal);
+  color: var(--color-white);
+  margin-left: calc(-50vw + 50%);
+  margin-right: calc(-50vw + 50%);
+}
+
+footer .footer-ribbon strong {
+  display: block;
+  margin-bottom: 0.2em;
+  font-size: var(--body-size-l);
+  font-weight: bold;
+}
+
+footer .footer-ribbon br {
+  display: none;
+}
+
+footer .footer-ribbon img,
+footer .footer-ribbon svg {
+  display: block;
+  width: 64px;
+  height: auto;
+}
+
+footer .footer-ribbon ul {
+  margin: 0 auto;
+  max-width: var(--site-width);
+  padding: 0 var(--horizontal-spacing);
+  display: grid;
+  gap: var(--spacing-m) var(--horizontal-spacing);
+  justify-content: center;
+}
+
+footer .footer-ribbon ul > li {
+  max-width: max-content;
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: var(--spacing-m);
+  align-items: center;
+}
+
+@media (width >= 700px) {
+  footer .footer-ribbon ul {
+    display: flex;
+    flex-wrap: wrap;
   }
 }
 
@@ -111,6 +187,7 @@ footer .footer-links > div > ul {
   gap: var(--spacing-200);
 }
 
+/* stylelint-disable-next-line no-descending-specificity */
 footer .footer-links li {
   flex-basis: 100%;
 }
