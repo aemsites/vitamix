@@ -26,17 +26,6 @@
   }
 }
 
-.cards .card-click {
-  cursor: pointer;
-}
-
-.cards .card-captioned {
-  font-size: 0.875em;
-  font-weight: 500;
-  letter-spacing: var(--letter-spacing-m);
-  text-transform: uppercase;
-}
-
 .cards .card-image {
   position: relative;
   line-height: 0;
@@ -59,6 +48,17 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.cards .card-captioned {
+  font-size: 0.875em;
+  font-weight: 500;
+  letter-spacing: var(--letter-spacing-m);
+  text-transform: uppercase;
+}
+
+.cards .card-click {
+  cursor: pointer;
 }
 
 /* default filled */
@@ -113,27 +113,8 @@
   text-decoration: none;
 }
 
-.cards.articles > ul li {
-  margin: 0 auto;
-  width: 100%;
-  max-width: 400px;
-}
-
-.cards.articles > ul li:hover .card-image img,
-.cards.articles > ul li:hover .card-image video {
-  transform: scale(1.04);
-}
-
 .cards.articles .card-image {
   border-radius: var(--rounding-m);
-}
-
-.cards.articles .card-image img,
-.cards.articles .card-image video {
-  width: 100%;
-  height: 208px;
-  object-fit: cover;
-  transition: transform 0.4s;
 }
 
 .cards.articles .card-body {
@@ -146,6 +127,25 @@
   -webkit-line-clamp: 2;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.cards.articles > ul li {
+  margin: 0 auto;
+  width: 100%;
+  max-width: 400px;
+}
+
+.cards.articles .card-image img,
+.cards.articles .card-image video {
+  width: 100%;
+  height: 208px;
+  object-fit: cover;
+  transition: transform 0.4s;
+}
+
+.cards.articles > ul li:hover .card-image img,
+.cards.articles > ul li:hover .card-image video {
+  transform: scale(1.04);
 }
 
 @media (width >= 800px) {
@@ -263,6 +263,7 @@
 @media (width >= 1000px) {
   .cards.grid ul {
     max-width: unset;
+    gap: 0;
   }
 
   .cards.grid ul.rows-4 {
@@ -280,10 +281,9 @@
     cursor: context-menu;
   }
 
-  .cards.grid ul.rows-2,
-  .cards.grid ul.rows-3,
-  .cards.grid ul.rows-4 {
-    gap: 0;
+  .cards.grid ul.rows-2 > li,
+  .cards.grid ul.rows-4 > li {
+    max-width: unset;
   }
 
   .cards.grid ul.rows-2 > li + li,
@@ -328,6 +328,11 @@
   font-size: var(--detail-size-s);
 }
 
+.cards.knockout a {
+  color: var(--color-charcoal);
+  text-decoration: none;
+}
+
 .cards.knockout picture {
   display: block;
   border-radius: var(--rounding-m);
@@ -342,11 +347,6 @@
   transition: transform 0.4s;
 }
 
-.cards.knockout a {
-  color: var(--color-charcoal);
-  text-decoration: none;
-}
-
 .cards.knockout > ul {
   gap: 0;
 }
@@ -354,6 +354,17 @@
 .cards.knockout > ul.rows-2,
 .cards.knockout > ul.rows-4 {
   --grid-cols: 2;
+}
+
+.cards.knockout > ul li {
+  position: relative;
+  width: 100%;
+  max-width: 200px;
+  border: 1px solid var(--color-gray-300);
+  padding: var(--spacing-100);
+  background-color: var(--color-background);
+  transition: border-color 0.2s;
+  z-index: 1;
 }
 
 .cards.knockout > ul.rows-2 > li:nth-child(2n),
@@ -366,17 +377,6 @@
 .cards.knockout > ul.rows-1 > li + li,
 .cards.knockout > ul.rows-3 > li + li {
   border-top-color: transparent;
-}
-
-.cards.knockout > ul li {
-  position: relative;
-  width: 100%;
-  max-width: 200px;
-  border: 1px solid var(--color-gray-300);
-  padding: var(--spacing-100);
-  background-color: var(--color-background);
-  transition: border-color 0.2s;
-  z-index: 1;
 }
 
 .cards.knockout > ul li::after {
@@ -548,12 +548,12 @@
   text-decoration: none;
 }
 
-.cards.overlay .eyebrow {
-  color: var(--color-gray-600);
-}
-
 .cards.overlay h2 {
   font-family: var(--body-font-family);
+}
+
+.cards.overlay .eyebrow {
+  color: var(--color-gray-600);
 }
 
 .cards.overlay > ul {
@@ -580,16 +580,6 @@
   transition: background 0.3s;
 }
 
-.cards.overlay > ul > li.card-click:hover::after {
-  background-color: var(--shadow-300);
-}
-
-.cards.overlay > ul > li.card-click a::after {
-  content: '▸';
-  margin-left: var(--spacing-40);
-  font-size: 0.75em;
-}
-
 .cards.overlay > ul > li .card-image {
   position: absolute;
   inset: 0;
@@ -609,6 +599,16 @@
   padding-bottom: var(--spacing-600);
   text-align: center;
   z-index: 1;
+}
+
+.cards.overlay > ul > li.card-click a::after {
+  content: '▸';
+  margin-left: var(--spacing-40);
+  font-size: 0.75em;
+}
+
+.cards.overlay > ul > li.card-click:hover::after {
+  background-color: var(--shadow-300);
 }
 
 @media (width >= 800px) {
