@@ -1117,7 +1117,10 @@ async function loadEager(doc) {
     decorateMain(main);
     await loadNavBanner(main);
     document.body.classList.add('appear');
-    await loadSection(main.querySelector('.section'), waitForFirstImage);
+    await loadSection(main.querySelector('.section'), (section) => {
+      if (document.body.classList.contains('quick-edit')) return Promise.resolve();
+      return waitForFirstImage(section);
+    });
   }
 
   sampleRUM.enhance();
@@ -1158,15 +1161,25 @@ async function loadLazy(doc) {
     await openSyncModal();
   };
 
+  const loadQuickEdit = async (...args) => {
+    // eslint-disable-next-line import/no-cycle
+    const { default: initQuickEdit } = await import('../tools/quick-edit/quick-edit.js');
+    initQuickEdit(...args);
+  };
+
+  const addSidekickListeners = (sk) => {
+    sk.addEventListener('custom:sync', syncSku);
+    sk.addEventListener('custom:quick-edit', loadQuickEdit);
+  };
+
   const sk = document.querySelector('aem-sidekick');
   if (sk) {
-    sk.addEventListener('custom:sync', syncSku);
+    addSidekickListeners(sk);
   } else {
     // wait for sidekick to be loaded
     document.addEventListener('sidekick-ready', () => {
     // sidekick now loaded
-      document.querySelector('aem-sidekick')
-        .addEventListener('custom:sync', syncSku);
+      addSidekickListeners(document.querySelector('aem-sidekick'));
     }, { once: true });
   }
 }
@@ -1209,7 +1222,7 @@ async function loadDelayed() {
 /**
  * Loads the page in eager, lazy, and delayed phases.
  */
-async function loadPage() {
+export async function loadPage() {
   await loadEager(document);
   await loadLazy(document);
   loadDelayed();
