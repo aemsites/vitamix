@@ -1184,6 +1184,16 @@ async function loadLazy(doc) {
   }
 }
 
+function decorateExternalLinks() {
+  const externalLinks = document.querySelectorAll('a[href^="https://"]');
+  externalLinks.forEach((link) => {
+    const { hostname } = new URL(link.href);
+    if (!link.href.includes('vitamix') || hostname === 'localhost') {
+      link.setAttribute('target', '_blank');
+      link.setAttribute('rel', 'noopener');
+    }
+  });
+}
 /**
  * Loads everything that happens a lot later,
  * without impacting the user experience.
@@ -1217,6 +1227,7 @@ async function loadDelayed() {
       });
     }
   }
+  setTimeout(decorateExternalLinks, 1000);
 }
 
 /**
