@@ -69,10 +69,18 @@ function parseData(data, locale, language) {
  */
 export async function lookupProducts(config, facets = {}) {
   const { locale, language } = await getLocaleAndLanguage();
+  const corsProxyFetch = async (url) => {
+    const corsProxy = 'https://fcors.org/?url=';
+    const corsKey = '&key=Mg23N96GgR8O3NjU';
+    const fullUrl = `https://main--vitamix--aemsites.aem.network${url}`;
+    return fetch(`${corsProxy}${encodeURIComponent(fullUrl)}${corsKey}`);
+  };
 
   if (!window.productIndex) {
     // fetch the main product index
-    const resp = await fetch(`/${locale}/${language}/products/index.json?include=all`);
+    const isProd = window.location.hostname.includes('vitamix.com') || window.location.hostname.includes('.aem.network');
+    const pathname = `/${locale}/${language}/products/index.json?include=all`;
+    const resp = await (isProd ? fetch(pathname) : corsProxyFetch(pathname));
     const { data } = await resp.json();
 
     // separate products into parents (standalone products) and variants (color/style options)
