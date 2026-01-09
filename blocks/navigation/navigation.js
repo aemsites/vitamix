@@ -68,6 +68,18 @@ export default function decorate(block) {
 
     // set scroll state
     ul.dispatchEvent(new Event('scroll'));
+
+    // handle switch from mobile to desktop
+    const mediaQuery = window.matchMedia('(width >= 800px)');
+    const handleResize = (e) => {
+      if (e.matches) {
+        popover.hidden = true;
+        block.querySelectorAll('[aria-expanded]').forEach((el) => el.removeAttribute('aria-expanded'));
+        ul.dispatchEvent(new Event('scroll'));
+      }
+    };
+    mediaQuery.addEventListener('change', handleResize);
+
     const sectionsToObserve = [];
 
     const links = ul.querySelectorAll('a[href*="#"]');
