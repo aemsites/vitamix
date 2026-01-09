@@ -1,6 +1,5 @@
 import { loadScript } from './aem.js';
 
-/*
 if (localStorage.getItem('newsletter-popped-up') !== 'true') {
   localStorage.setItem('newsletter-popped-up', 'true');
   const newsletterLink = document.querySelector('a[href*="/modals/sign-up"]');
@@ -10,7 +9,6 @@ if (localStorage.getItem('newsletter-popped-up') !== 'true') {
     }, 5000);
   }
 }
-*/
 
 // add delayed functionality here
 window.config = {
