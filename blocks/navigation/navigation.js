@@ -114,7 +114,7 @@ export default function decorate(block) {
 
             // scroll nav into view if sticky on desktop
             const mobile = !window.matchMedia('(width >= 800px)').matches;
-            const sticky = block.getBoundingClientRect().top === 0;
+            const sticky = Math.abs(block.getBoundingClientRect().top) < 1;
             if (!mobile && sticky) link.scrollIntoView({ behavior: 'smooth', inline: 'center' });
           }
         }
