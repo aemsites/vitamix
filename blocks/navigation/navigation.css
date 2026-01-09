@@ -44,13 +44,13 @@ main > .navigation-container.section {
   list-style: none;
   margin: 0;
   padding: 0;
-  cursor: pointer;
 }
 
 .navigation ul a:any-link {
   color: var(--color-white);
   text-decoration: none;
   font-weight: normal;
+  cursor: pointer;
 }
 
 .navigation nav ul a:any-link {
@@ -82,7 +82,6 @@ main > .navigation-container.section {
     overflow-x: auto;
     scroll-snap-type: x mandatory;
     max-width: 100%;
-    cursor: unset;
   }
 
   .navigation nav .navigation-list-wrapper {
