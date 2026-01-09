@@ -199,6 +199,12 @@ main > .navigation-container.section {
   padding: var(--spacing-100) var(--spacing-400);
 }
 
+.navigation .navigation-popover a:focus-visible {
+  outline: 2px solid var(--color-gray);
+  outline-offset: -2px;
+  background-color: rgb(255 255 255 / 10%);
+}
+
 .navigation .navigation-popover a:hover {
   color: var(--color-gray);
   text-decoration: underline;
