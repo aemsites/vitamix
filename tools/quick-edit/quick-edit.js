@@ -4,13 +4,13 @@ import { loadPage } from '../../scripts/scripts.js';
 const importMap = {
   imports: {
     'da-lit': 'https://da.live/deps/lit/dist/index.js',
-    'da-y-wrapper': 'https://da.live/deps/da-y-wrapper/dist/index.js'
-  }
+    'da-y-wrapper': 'https://da.live/deps/da-y-wrapper/dist/index.js',
+  },
 };
 
 function addImportmap() {
-  const importmapEl = document.createElement("script");
-  importmapEl.type = "importmap";
+  const importmapEl = document.createElement('script');
+  importmapEl.type = 'importmap';
   importmapEl.textContent = JSON.stringify(importMap);
   document.head.appendChild(importmapEl);
 }
