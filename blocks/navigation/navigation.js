@@ -31,6 +31,8 @@ export default function decorate(block) {
     const popover = document.createElement('div');
     popover.className = 'navigation-popover';
     popover.hidden = true;
+    popover.setAttribute('role', 'region');
+    popover.setAttribute('aria-label', 'Navigation menu');
 
     block.addEventListener('click', () => buildPopover(block, ul, popover), { once: true });
 
