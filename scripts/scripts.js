@@ -1086,6 +1086,37 @@ async function loadNavBanner(main) {
 }
 
 /**
+ * Simulates a PDP preview on localhost, aem.page and aem.live.
+ */
+
+async function simulatePDPPreview() {
+  const corsProxyFetch = async (url) => {
+    const corsProxy = 'https://fcors.org/?url=';
+    const corsKey = '&key=Mg23N96GgR8O3NjU';
+    const fullUrl = `https://main--vitamix--aemsites.aem.network${url}`;
+    return fetch(`${corsProxy}${encodeURIComponent(fullUrl)}${corsKey}`);
+  };
+  const { pathname } = new URL(window.location.href);
+  const resp = await corsProxyFetch(pathname);
+  const html = await resp.text();
+  const dom = new DOMParser().parseFromString(html, 'text/html');
+  const stashedMain = document.querySelector('main');
+  const mainProductInfo = dom.querySelector('main div');
+  while (mainProductInfo.nextElementSibling) {
+    mainProductInfo.nextElementSibling.remove();
+  }
+  mainProductInfo.after(...stashedMain.children);
+  dom.querySelector('main').querySelectorAll('img[src^="./media_"]').forEach((el) => {
+    el.setAttribute('src', el.getAttribute('src').replace('./media_', 'https://main--vitamix--aemsites.aem.network/us/en_us/products/media_'));
+  });
+  dom.querySelector('main').querySelectorAll('source[srcset^="./media_"]').forEach((el) => {
+    el.setAttribute('srcset', el.getAttribute('srcset').replace('./media_', 'https://main--vitamix--aemsites.aem.network/us/en_us/products/media_'));
+  });
+  document.body.innerHTML = dom.body.innerHTML;
+  document.head.innerHTML = dom.head.innerHTML;
+}
+
+/**
  * Loads everything needed to get to LCP.
  * @param {Element} doc The container element
  */
@@ -1094,11 +1125,13 @@ async function loadEager(doc) {
   const language = locale ? locale.split('_')[0] : 'en';
   document.documentElement.lang = language;
 
+  /* simulation date */
   const params = new URLSearchParams(window.location.search);
   if (params.get('simulateDate')) {
     window.simulateDate = params.get('simulateDate');
   }
 
+  /* adjust shop images to locale root path, util all of shop is mapped */
   if (window.location.pathname.includes('/shop/')) {
     const images = doc.querySelectorAll('img[src^="./media_"]');
     images.forEach((img) => {
@@ -1108,6 +1141,18 @@ async function loadEager(doc) {
     sources.forEach((source) => {
       source.setAttribute('srcset', source.getAttribute('srcset').replace('./media_', '/us/en_us/media_'));
     });
+  }
+
+  /* pdp simulation on localhost, aem.page and aem.live */
+  const isProd = window.location.hostname.includes('vitamix.com') || window.location.hostname.includes('.aem.network');
+  if (!isProd && window.location.pathname.includes('/products/')) {
+    const metaSku = document.querySelector('meta[name="sku"]');
+    const pdpBlock = document.querySelector('.pdp');
+    if (!metaSku && !pdpBlock) {
+      /* eslint-disable-next-line no-console */
+      console.log('PDP simulation on localhost, aem.page and aem.live');
+      await simulatePDPPreview();
+    }
   }
 
   decorateTemplateAndTheme();
