@@ -540,40 +540,36 @@ export function buildVideo(el) {
     if (imgWrapper) imgWrapper.classList.add('vid-wrapper');
     // create video element
     const video = document.createElement('video');
-    video.loop = true;
-    video.muted = true;
-    video.autoplay = true;
-    video.setAttribute('autoplay', '');
+    video.setAttribute('loop', '');
     video.setAttribute('muted', '');
+    video.setAttribute('autoplay', '');
     video.setAttribute('playsinline', '');
-    video.setAttribute('preload', 'none');
+    video.muted = true; // required for autoplay on iOS
     // create source element
     const source = document.createElement('source');
-    source.type = 'video/mp4';
+    source.setAttribute('type', 'video/mp4');
     source.dataset.src = vid.href;
     video.append(source);
+
+    // replace link with video element first so it has layout
+    vid.parentElement.replaceWith(video);
+
     // load and play video on observation
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting && !source.dataset.loaded) {
-          source.src = source.dataset.src;
+          source.dataset.loaded = 'true';
+          source.setAttribute('src', source.dataset.src);
           video.load();
-          // handle play promise to catch autoplay blocks
-          const playPromise = video.play();
-          if (playPromise !== undefined) {
-            playPromise.catch((error) => {
-              // eslint-disable-next-line no-console
-              console.log('video autoplay prevented:', error);
-            });
-          }
-          source.dataset.loaded = true;
+          video.play().catch(() => {
+            // autoplay was prevented, silent fail
+          });
           observer.disconnect();
         }
       });
     }, { threshold: 0 });
     observer.observe(video);
 
-    vid.parentElement.replaceWith(video);
     return video;
   }
   return null;

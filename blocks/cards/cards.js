@@ -103,9 +103,13 @@ export default function decorate(block) {
 
     // assign classes based on content
     [...li.children].forEach((child, i) => {
-      if (child.children.length === 1 && child.querySelector('picture')) { // picture only
+      const hasPicture = child.querySelector('picture');
+      const hasVideo = child.querySelector('video') || child.tagName === 'VIDEO';
+      if (child.children.length === 1 && hasPicture) { // picture only
         child.className = 'card-image';
-      } else if (i === 0 && !!child.querySelector('picture')) { // first child with picture
+      } else if (hasVideo && !hasPicture) { // video only (no fallback image)
+        child.className = 'card-image';
+      } else if (i === 0 && hasPicture) { // first child with picture
         const textContent = child.textContent.trim();
         child.className = textContent ? 'card-captioned' : 'card-image';
         stripButtonClasses(child);
