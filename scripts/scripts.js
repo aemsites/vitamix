@@ -535,7 +535,7 @@ function buildAutoBlocks(main) {
  */
 export function buildVideo(el) {
   // eslint-disable-next-line no-console
-  console.log('[buildVideo] VERSION: 2026-01-12-v4');
+  console.log('[buildVideo] VERSION: 2026-01-12-v5');
   const vid = el.querySelector('a[href*=".mp4"]');
   // eslint-disable-next-line no-console
   console.log('[buildVideo] Found video link:', vid?.href);
@@ -554,6 +554,7 @@ export function buildVideo(el) {
     // (CSS may not apply if element is in detached DOM fragment)
     video.style.display = 'block';
     video.style.width = '100%';
+    video.style.minWidth = '100px'; // fallback if parent has 0 width
     video.style.aspectRatio = '1 / 1';
     video.style.objectFit = 'cover';
 
@@ -578,7 +579,13 @@ export function buildVideo(el) {
     });
 
     // replace link with video element
-    vid.parentElement.replaceWith(video);
+    const parent = vid.parentElement;
+    parent.replaceWith(video);
+
+    // Ensure video's new parent has min-width (grid might collapse it)
+    if (video.parentElement) {
+      video.parentElement.style.minWidth = '100px';
+    }
 
     // load and play video
     const loadAndPlay = () => {
