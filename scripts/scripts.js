@@ -534,6 +534,8 @@ function buildAutoBlocks(main) {
  * @returns {HTMLVideoElement|null} Created <video> element (or `null` if no video link found)
  */
 export function buildVideo(el) {
+  // eslint-disable-next-line no-console
+  console.log('[buildVideo] VERSION: 2026-01-12-v2');
   const vid = el.querySelector('a[href*=".mp4"]');
   // eslint-disable-next-line no-console
   console.log('[buildVideo] Found video link:', vid?.href);
