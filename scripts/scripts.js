@@ -535,7 +535,7 @@ function buildAutoBlocks(main) {
  */
 export function buildVideo(el) {
   // eslint-disable-next-line no-console
-  console.log('[buildVideo] VERSION: 2026-01-12-v3');
+  console.log('[buildVideo] VERSION: 2026-01-12-v4');
   const vid = el.querySelector('a[href*=".mp4"]');
   // eslint-disable-next-line no-console
   console.log('[buildVideo] Found video link:', vid?.href);
@@ -577,12 +577,10 @@ export function buildVideo(el) {
       console.log('[buildVideo] video error:', e, video.error);
     });
 
-    // replace link with video element first so it has layout
+    // replace link with video element
     vid.parentElement.replaceWith(video);
-    // eslint-disable-next-line no-console
-    console.log('[buildVideo] Video element inserted, dimensions:', video.offsetWidth, 'x', video.offsetHeight);
 
-    // load and play video on observation
+    // load and play video
     const loadAndPlay = () => {
       if (source.dataset.loaded) return;
       // eslint-disable-next-line no-console
@@ -599,35 +597,19 @@ export function buildVideo(el) {
       });
     };
 
-    // Find a parent with dimensions to observe (video itself may be 0x0 on iOS)
-    // Use requestAnimationFrame to ensure video is in DOM and has a parent
-    requestAnimationFrame(() => {
-      const observeTarget = video.parentElement || video;
-      // eslint-disable-next-line no-console
-      console.log('[buildVideo] Observing:', observeTarget?.tagName, observeTarget?.offsetWidth, 'x', observeTarget?.offsetHeight);
-
-      // If parent also has no dimensions, load immediately as fallback
-      const { offsetWidth, offsetHeight } = observeTarget;
-      const noTargetDimensions = offsetWidth === 0 && offsetHeight === 0;
-      if (observeTarget === video || noTargetDimensions) {
+    // Wait for element to be in DOM before setting up observer
+    // Use IntersectionObserver which only fires when element is in DOM and visible
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
         // eslint-disable-next-line no-console
-        console.log('[buildVideo] No observable target with dimensions, loading immediately');
-        loadAndPlay();
-        return;
-      }
-
-      const observer = new IntersectionObserver((entries) => {
-        entries.forEach((entry) => {
-          // eslint-disable-next-line no-console
-          console.log('[buildVideo] IntersectionObserver:', entry.isIntersecting, 'target:', entry.target.tagName);
-          if (entry.isIntersecting) {
-            loadAndPlay();
-            observer.disconnect();
-          }
-        });
-      }, { threshold: 0 });
-      observer.observe(observeTarget);
-    });
+        console.log('[buildVideo] IntersectionObserver:', entry.isIntersecting, 'bounds:', entry.boundingClientRect.width, 'x', entry.boundingClientRect.height);
+        if (entry.isIntersecting) {
+          loadAndPlay();
+          observer.disconnect();
+        }
+      });
+    }, { threshold: 0 });
+    observer.observe(video);
 
     return video;
   }
