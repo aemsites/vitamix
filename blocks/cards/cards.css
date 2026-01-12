@@ -37,12 +37,9 @@
   position: relative;
 }
 
-/* Debug: red border to verify CSS is loaded */
-.cards video {
-  outline: 5px solid red !important;
-}
-
-.cards .card-image > video {
+/* Video styles - handle both wrapped and unwrapped cases */
+.cards video,
+.cards video.card-image {
   display: block;
   width: 100%;
   min-height: 200px; /* fallback height for iOS Safari */
