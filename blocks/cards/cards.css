@@ -37,9 +37,16 @@
   position: relative;
 }
 
+/* Debug: red border to verify CSS is loaded */
+.cards video {
+  outline: 5px solid red !important;
+}
+
 .cards .card-image > video {
+  display: block;
   width: 100%;
-  aspect-ratio: 1 / 1; /* ensures video has dimensions on iOS Safari */
+  min-height: 200px; /* fallback height for iOS Safari */
+  aspect-ratio: 1 / 1;
   object-fit: cover;
 }
 
