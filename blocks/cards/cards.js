@@ -99,7 +99,6 @@ export default function decorate(block) {
       createOptimizedPicture(img.src, img.alt, false, [{ width: '900' }]),
     ));
     ul.append(li);
-    buildVideo(li);
 
     // assign classes based on content
     [...li.children].forEach((child, i) => {
@@ -130,4 +129,7 @@ export default function decorate(block) {
 
   // replace content with new list structure
   block.replaceChildren(ul);
+
+  // Build videos after DOM attachment so CSS applies properly
+  ul.querySelectorAll('li').forEach((li) => buildVideo(li));
 }
