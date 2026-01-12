@@ -30,6 +30,7 @@
   position: relative;
   line-height: 0;
   overflow: hidden;
+  min-width: 0; /* allow shrinking in grid */
 }
 
 .cards .card-image .img-wrapper {
@@ -38,7 +39,8 @@
 
 .cards .card-image > video {
   width: 100%;
-  height: auto;
+  aspect-ratio: 1 / 1; /* ensures video has dimensions on iOS Safari */
+  object-fit: cover;
 }
 
 .cards .card-image .img-wrapper + video {
