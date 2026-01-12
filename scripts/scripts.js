@@ -1101,11 +1101,9 @@ async function simulatePDPPreview() {
   const html = await resp.text();
   const dom = new DOMParser().parseFromString(html, 'text/html');
   const stashedMain = document.querySelector('main');
-  const mainProductInfo = dom.querySelector('main div');
-  while (mainProductInfo.nextElementSibling) {
-    mainProductInfo.nextElementSibling.remove();
-  }
-  mainProductInfo.after(...stashedMain.children);
+  const mainProductInfoDivs = dom.querySelectorAll('main div');
+  const lastDiv = mainProductInfoDivs[mainProductInfoDivs.length - 1];
+  lastDiv.after(...stashedMain.children);
   dom.querySelector('main').querySelectorAll('img[src^="./media_"]').forEach((el) => {
     el.setAttribute('src', el.getAttribute('src').replace('./media_', 'https://main--vitamix--aemsites.aem.network/us/en_us/products/media_'));
   });
