@@ -535,7 +535,7 @@ function buildAutoBlocks(main) {
  */
 export function buildVideo(el) {
   // eslint-disable-next-line no-console
-  console.log('[buildVideo] VERSION: 2026-01-12-v6');
+  console.log('[buildVideo] VERSION: 2026-01-12-v7');
   const vid = el.querySelector('a[href*=".mp4"]');
   // eslint-disable-next-line no-console
   console.log('[buildVideo] Found video link:', vid?.href);

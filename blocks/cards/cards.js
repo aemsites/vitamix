@@ -103,7 +103,10 @@ export default function decorate(block) {
     // assign classes based on content
     [...li.children].forEach((child, i) => {
       const hasPicture = child.querySelector('picture');
-      const hasVideo = child.querySelector('video') || child.tagName === 'VIDEO';
+      // Check for video elements OR video links (before buildVideo transforms them)
+      const hasVideo = child.querySelector('video')
+        || child.tagName === 'VIDEO'
+        || child.querySelector('a[href*=".mp4"]');
       if (child.children.length === 1 && hasPicture) { // picture only
         child.className = 'card-image';
       } else if (hasVideo && !hasPicture) { // video only (no fallback image)
