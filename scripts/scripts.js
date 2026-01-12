@@ -535,7 +535,7 @@ function buildAutoBlocks(main) {
  */
 export function buildVideo(el) {
   // eslint-disable-next-line no-console
-  console.log('[buildVideo] VERSION: 2026-01-12-v2');
+  console.log('[buildVideo] VERSION: 2026-01-12-v3');
   const vid = el.querySelector('a[href*=".mp4"]');
   // eslint-disable-next-line no-console
   console.log('[buildVideo] Found video link:', vid?.href);
@@ -549,6 +549,14 @@ export function buildVideo(el) {
     video.setAttribute('autoplay', '');
     video.setAttribute('playsinline', '');
     video.muted = true; // required for autoplay on iOS
+
+    // Inline styles to ensure video has dimensions on iOS Safari
+    // (CSS may not apply if element is in detached DOM fragment)
+    video.style.display = 'block';
+    video.style.width = '100%';
+    video.style.aspectRatio = '1 / 1';
+    video.style.objectFit = 'cover';
+
     // create source element
     const source = document.createElement('source');
     source.setAttribute('type', 'video/mp4');
