@@ -535,6 +535,8 @@ function buildAutoBlocks(main) {
  */
 export function buildVideo(el) {
   const vid = el.querySelector('a[href*=".mp4"]');
+  // eslint-disable-next-line no-console
+  console.log('[buildVideo] Found video link:', vid?.href);
   if (vid) {
     const imgWrapper = vid.closest('.img-wrapper');
     if (imgWrapper) imgWrapper.classList.add('vid-wrapper');
@@ -551,18 +553,42 @@ export function buildVideo(el) {
     source.dataset.src = vid.href;
     video.append(source);
 
+    // Debug: log video element state
+    video.addEventListener('loadedmetadata', () => {
+      // eslint-disable-next-line no-console
+      console.log('[buildVideo] loadedmetadata:', video.videoWidth, 'x', video.videoHeight);
+    });
+    video.addEventListener('canplay', () => {
+      // eslint-disable-next-line no-console
+      console.log('[buildVideo] canplay event fired');
+    });
+    video.addEventListener('error', (e) => {
+      // eslint-disable-next-line no-console
+      console.log('[buildVideo] video error:', e, video.error);
+    });
+
     // replace link with video element first so it has layout
     vid.parentElement.replaceWith(video);
+    // eslint-disable-next-line no-console
+    console.log('[buildVideo] Video element inserted, dimensions:', video.offsetWidth, 'x', video.offsetHeight);
 
     // load and play video on observation
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
+        // eslint-disable-next-line no-console
+        console.log('[buildVideo] IntersectionObserver:', entry.isIntersecting, 'loaded:', source.dataset.loaded);
         if (entry.isIntersecting && !source.dataset.loaded) {
+          // eslint-disable-next-line no-console
+          console.log('[buildVideo] Loading video src:', source.dataset.src);
           source.dataset.loaded = 'true';
           source.setAttribute('src', source.dataset.src);
           video.load();
-          video.play().catch(() => {
-            // autoplay was prevented, silent fail
+          video.play().then(() => {
+            // eslint-disable-next-line no-console
+            console.log('[buildVideo] play() succeeded');
+          }).catch((error) => {
+            // eslint-disable-next-line no-console
+            console.log('[buildVideo] play() rejected:', error.name, error.message);
           });
           observer.disconnect();
         }
