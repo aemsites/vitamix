@@ -543,6 +543,7 @@ export function buildVideo(el) {
     video.loop = true;
     video.muted = true;
     video.autoplay = true;
+    video.setAttribute('autoplay', '');
     video.setAttribute('muted', '');
     video.setAttribute('playsinline', '');
     video.setAttribute('preload', 'none');
