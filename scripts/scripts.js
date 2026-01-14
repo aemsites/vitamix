@@ -543,19 +543,21 @@ export function buildVideo(el) {
     video.loop = true;
     video.muted = true;
     video.autoplay = true;
+    video.playsInline = true;
     video.setAttribute('autoplay', '');
     video.setAttribute('muted', '');
-    video.setAttribute('playsinline', '');
-    video.setAttribute('preload', 'metadata');
+    video.setAttribute('preload', 'none');
     // create source element
     const source = document.createElement('source');
     source.type = 'video/mp4';
-    source.src = vid.href;
+    source.dataset.src = vid.href;
     video.append(source);
     // load and play video on observation
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
-        if (entry.isIntersecting && !video.dataset.loaded) {
+        if (entry.isIntersecting && !source.dataset.loaded) {
+          source.src = source.dataset.src;
+          video.load();
           // handle play promise to catch autoplay blocks
           const playPromise = video.play();
           if (playPromise !== undefined) {
@@ -564,7 +566,7 @@ export function buildVideo(el) {
               console.log('video autoplay prevented:', error);
             });
           }
-          video.dataset.loaded = true;
+          source.dataset.loaded = true;
           observer.disconnect();
         }
       });
