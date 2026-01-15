@@ -542,8 +542,10 @@ export function buildVideo(el) {
     const video = document.createElement('video');
     video.loop = true;
     video.muted = true;
+    video.autoplay = true;
+    video.playsInline = true;
+    video.setAttribute('autoplay', '');
     video.setAttribute('muted', '');
-    video.setAttribute('playsinline', '');
     video.setAttribute('preload', 'none');
     // create source element
     const source = document.createElement('source');
@@ -555,9 +557,15 @@ export function buildVideo(el) {
       entries.forEach((entry) => {
         if (entry.isIntersecting && !source.dataset.loaded) {
           source.src = source.dataset.src;
-          video.autoplay = true;
           video.load();
-          video.addEventListener('canplay', () => video.play());
+          // handle play promise to catch autoplay blocks
+          const playPromise = video.play();
+          if (playPromise !== undefined) {
+            playPromise.catch((error) => {
+              // eslint-disable-next-line no-console
+              console.log('video autoplay prevented:', error);
+            });
+          }
           source.dataset.loaded = true;
           observer.disconnect();
         }

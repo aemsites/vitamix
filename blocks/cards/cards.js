@@ -102,14 +102,23 @@ export default function decorate(block) {
     buildVideo(li);
 
     // assign classes based on content
-    [...li.children].forEach((child, i) => {
-      if (child.children.length === 1 && child.querySelector('picture')) { // picture only
-        child.className = 'card-image';
-      } else if (i === 0 && !!child.querySelector('picture')) { // first child with picture
+    [...li.children].forEach((child) => {
+      const picture = child.querySelector('picture');
+      const video = child.querySelector('video');
+      const hasMedia = picture || video;
+
+      if (hasMedia) {
         const textContent = child.textContent.trim();
-        child.className = textContent ? 'card-captioned' : 'card-image';
-        stripButtonClasses(child);
-      } else child.className = 'card-body';
+        if (textContent) {
+          child.className = 'card-captioned';
+          stripButtonClasses(child);
+        } else {
+          child.className = 'card-image';
+        }
+        if (video) child.classList.add('vid-wrapper');
+      } else {
+        child.className = 'card-body';
+      }
     });
   });
 
