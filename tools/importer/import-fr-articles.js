@@ -63,6 +63,65 @@ const addAuthorAndDateToMetadata = (main, metadataTable, src, dst, document) => 
   metadataTable.appendChild(newRow2);
 };
 
+const getContentType = (src) => {
+  const ext = src.split('.').pop();
+  switch (ext) {
+    case 'jpg':
+      return 'image/jpeg';
+    case 'jpeg':
+      return 'image/jpeg';
+    case 'png':
+      return 'image/png';
+    case 'gif':
+      return 'image/gif';
+    case 'webp':
+      return 'image/webp';
+    case 'svg':
+      return 'image/svg+xml';
+    case 'mp4':
+      return 'video/mp4';
+    default:
+      return null;
+  }
+};
+
+const uploadAssets = async (main, localhost, origin, org, repo) => {
+  const token = localStorage.getItem('AEM_ADMIN_MEDIA_API_KEY');
+  if (!token) {
+    console.error('No API key found in localStorage (AEM_ADMIN_MEDIA_API_KEY)');
+    return;
+  }
+
+  const assets = [...main.querySelectorAll('img')];
+  for (const asset of assets) {
+    const src = asset.src;
+    const contentType = getContentType(src);
+    if (!contentType) {
+      console.error('Unsupported asset type for upload', src);
+      continue;
+    }
+    if (src.startsWith(localhost) || src.startsWith(origin) || src.startsWith('/')) {
+      const url = new URL(src.replace(localhost, origin), origin).toString();
+      console.log('Asset to upload', url);
+      const response = await fetch(`https://admin.hlx.page/media/${org}/${repo}/main`, {
+        method: 'POST',
+        body: JSON.stringify({ url }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `token ${token}`,
+        },
+      });
+      if (!response.ok) {
+        console.error('Error uploading asset - did you provide the correct API key ?', response.statusText);
+      } else {
+        const data = await response.json();
+        console.log('Asset uploaded', data);
+        asset.src = data.uri;
+      }
+    }
+  }
+};
+
 export default {
   /**
    * Apply DOM operations to the provided document and return
@@ -73,10 +132,19 @@ export default {
    * @param {object} params Object containing some parameters given by the import process.
    * @returns {HTMLElement} The root element to be transformed
    */
-  transformDOM: ({
+  transformDOM: async ({
     // eslint-disable-next-line no-unused-vars
     document, url, html, params,
   }) => {
+
+    const CONFIG = {
+      org: 'aemsites',
+      repo: 'vitamix',
+      domain: 'vitamix.com',
+      source: new URL(url).origin, // localhost:3001
+      origin: 'https://www.vitamix.com',
+    };
+
     // define the main element: the one that will be transformed to Markdown
     const main = document.querySelector('article');
 
@@ -95,21 +163,18 @@ export default {
 
     WebImporter.rules.createMetadata(main, document);
     
-    const u = new URL(url);
-    const src = u.origin;
-    const dst = 'https://www.vitamix.com';
     const metadataTable = [...document.querySelectorAll('table')].find((table) => table.querySelector('tr th[colspan="2"]')?.textContent.trim() === 'Metadata');
     if (metadataTable) {
-      addAuthorAndDateToMetadata(main, metadataTable, src, dst, document);
-      addTagsToMetadata(main, metadataTable, src, dst, document);
+      addAuthorAndDateToMetadata(main, metadataTable, CONFIG.source, CONFIG.origin, document);
+      addTagsToMetadata(main, metadataTable, CONFIG.source, CONFIG.origin, document);
+      document.querySelector('.article-category-tags')?.parentElement?.remove();
     }
     
     WebImporter.rules.transformBackgroundImages(main, document);
-    WebImporter.rules.adjustImageUrls(main, url, params.originalURL);
     WebImporter.rules.convertIcons(main, document);
 
-    // final clean up
-    document.querySelector('.article-category-tags')?.parentElement?.remove();
+    // WebImporter.rules.adjustImageUrls(main, url, params.originalURL);
+    await uploadAssets(main, CONFIG.source, CONFIG.origin, CONFIG.org, CONFIG.repo);
 
     return main;
   },
