@@ -52,7 +52,9 @@ const addAuthorAndDateToMetadata = (main, metadataTable, src, dst, document) => 
   newCell.textContent = 'Author';
   newRow.appendChild(newCell);
   const newCell2 = document.createElement('td');
-  newCell2.innerHTML = `<a href="${author.href.replace(src, dst)}">${author.textContent.trim()}</a>`;
+  if (author) {
+    newCell2.innerHTML = `<a href="${author.href.replace(src, dst)}">${author.textContent.trim()}</a>`;
+  }
   newRow.appendChild(newCell2);
   metadataTable.appendChild(newRow);
 
