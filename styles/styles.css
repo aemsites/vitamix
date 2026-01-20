@@ -185,8 +185,8 @@ main > .section > div.full-width {
 .article main .default-content-wrapper h4,
 .article main .default-content-wrapper h5,
 .article main .default-content-wrapper h6 {
-  font-family: var(--body-font-family);
   color: var(--color-charcoal);
+  font-family: var(--body-font-family);
 }
 
 .article main .default-content-wrapper p {
