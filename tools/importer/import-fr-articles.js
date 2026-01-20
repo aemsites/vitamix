@@ -45,7 +45,15 @@ const addAuthorAndDateToMetadata = (main, metadataTable, src, dst, document) => 
 
   const author = container.querySelector('a');
   const txt = container.textContent.trim();
-  const date = txt?.split('|')[1];
+  let date = txt?.split('|')[1];
+
+  if (!author && !date && txt) {
+    try {
+      // might be a data like 25.02.2026
+      Date.parse(txt);
+      date = txt;
+    } catch (error) {}
+  }
 
   const newRow = document.createElement('tr');
   const newCell = document.createElement('td');
@@ -208,7 +216,7 @@ export default {
       addTagsToMetadata(main, metadataTable, CONFIG.source, CONFIG.origin, document);
 
       if (hasAuthorAndDate) {
-        document.querySelector('section[itemprop="articleBody"]')?.firstElementChild?.remove();
+        // document.querySelector('section[itemprop="articleBody"]')?.firstElementChild?.remove();
       }
     }
     
