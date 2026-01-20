@@ -563,8 +563,10 @@ export function buildVideo(el) {
     const video = document.createElement('video');
     video.loop = true;
     video.muted = true;
+    video.autoplay = true;
+    video.playsInline = true;
+    video.setAttribute('autoplay', '');
     video.setAttribute('muted', '');
-    video.setAttribute('playsinline', '');
     video.setAttribute('preload', 'none');
     // create source element
     const source = document.createElement('source');
@@ -576,9 +578,15 @@ export function buildVideo(el) {
       entries.forEach((entry) => {
         if (entry.isIntersecting && !source.dataset.loaded) {
           source.src = source.dataset.src;
-          video.autoplay = true;
           video.load();
-          video.addEventListener('canplay', () => video.play());
+          // handle play promise to catch autoplay blocks
+          const playPromise = video.play();
+          if (playPromise !== undefined) {
+            playPromise.catch((error) => {
+              // eslint-disable-next-line no-console
+              console.log('video autoplay prevented:', error);
+            });
+          }
           source.dataset.loaded = true;
           observer.disconnect();
         }
@@ -856,85 +864,146 @@ export function applyImgColor(block) {
 }
 
 /**
+ * Determines if a given date falls within US Eastern Daylight Saving Time.
+ * DST starts: 2nd Sunday of March at 2:00 AM
+ * DST ends: 1st Sunday of November at 2:00 AM
+ * @param {number} year - The year
+ * @param {number} month - The month (1-12)
+ * @param {number} day - The day of month
+ * @returns {boolean} True if the date is in DST (EDT), false if in standard time (EST)
+ */
+function isEasternDST(year, month, day) {
+  // DST doesn't apply in Jan, Feb, or Dec
+  if (month < 3 || month > 11) return false;
+  // DST always applies Apr-Oct
+  if (month > 3 && month < 11) return true;
+
+  // For March: DST starts 2nd Sunday at 2am
+  if (month === 3) {
+    // Find the 2nd Sunday of March
+    const firstOfMonth = new Date(year, 2, 1); // March 1st (month is 0-indexed)
+    const firstSunday = 1 + ((7 - firstOfMonth.getDay()) % 7);
+    const secondSunday = firstSunday + 7;
+    // On or after the second Sunday means DST
+    return day >= secondSunday;
+  }
+
+  // For November: DST ends 1st Sunday at 2am
+  if (month === 11) {
+    // Find the 1st Sunday of November
+    const firstOfMonth = new Date(year, 10, 1); // November 1st (month is 0-indexed)
+    const firstSunday = 1 + ((7 - firstOfMonth.getDay()) % 7);
+    // Before the first Sunday means still in DST
+    return day < firstSunday;
+  }
+
+  return false;
+}
+
+/**
+ * Parses a datetime string and returns a Date object.
+ * Supports formats like "9/12/2025 9am", "9/19/2025 3pm", or "9/12/2025 9:30am"
+ * Defaults to Eastern time (EST/EDT based on daylight savings) when no timezone specified.
+ * @param {string} dateStr - The datetime string to parse (e.g., "6/23/2025 9am")
+ * @returns {Date} The parsed Date object
+ * @throws {Error} If the datetime format is invalid
+ */
+export function parseEasternDateTime(dateStr) {
+  if (!dateStr) {
+    throw new Error('DateTime string is required');
+  }
+
+  // Handle formats like "9/12/2025 9am" or "9/12/2025 9:30am"
+  // Timezone is optional, defaults to Eastern (EST/EDT)
+  const regex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2})(?::(\d{2}))?(am|pm)(?:\s+([A-Z]{3,4}))?$/i;
+  const match = dateStr.trim().match(regex);
+
+  if (!match) {
+    throw new Error(`Invalid datetime format: ${dateStr}. Expected format: M/D/YYYY HHam/pm`);
+  }
+
+  const month = parseInt(match[1], 10);
+  const day = parseInt(match[2], 10);
+  const year = parseInt(match[3], 10);
+  let hours = parseInt(match[4], 10);
+  const minutesValue = match[5] ? parseInt(match[5], 10) : 0;
+  const ampm = match[6].toLowerCase();
+  const timezone = match[7];
+
+  // Convert 12-hour to 24-hour format
+  if (ampm === 'am' && hours === 12) {
+    hours = 0; // 12am = 00:00
+  } else if (ampm === 'pm' && hours !== 12) {
+    hours += 12; // 1pm-11pm = 13:00-23:00, 12pm stays 12:00
+  }
+
+  // Timezone offsets from UTC
+  const timezoneOffsets = {
+    EDT: -4,
+    EST: -5,
+    CDT: -5,
+    CST: -6,
+    MDT: -6,
+    MST: -7,
+    PDT: -7,
+    PST: -8,
+  };
+
+  let offsetHours;
+  if (timezone) {
+    // Use explicitly specified timezone
+    offsetHours = timezoneOffsets[timezone.toUpperCase()];
+    if (offsetHours === undefined) {
+      throw new Error(`Unsupported timezone: ${timezone}`);
+    }
+  } else {
+    // Default to Eastern time - auto-detect EST/EDT based on date
+    const isDST = isEasternDST(year, month, day);
+    offsetHours = isDST ? -4 : -5; // EDT = -4, EST = -5
+  }
+
+  // Convert the local time to UTC by subtracting the offset
+  // If EDT is UTC-4, then 9am EDT = 1pm UTC (9 - (-4) = 13)
+  const utcHour = hours - offsetHours;
+
+  // Create UTC date object
+  return new Date(Date.UTC(year, month - 1, day, utcHour, minutesValue, 0));
+}
+
+/**
  * Parses alert banner rows from a block element and returns an array of banner objects.
+ * Expected row format:
+ *   Column 1: Start datetime (e.g., "6/23/2025 9am")
+ *   Column 2: End datetime (e.g., "12/31/2025 11:59pm")
+ *   Column 3: Content
+ *   Column 4: Color
+ * Defaults to Eastern time (EST/EDT based on whether DST is in effect for that date).
  * @param {HTMLElement} block - The DOM element containing alert banner rows as children.
  * @returns {Array<Object>} Array of parsed banner objects with properties:
  */
 export function parseAlertBanners(block) {
-  // Timezone offset lookup table (offsets from UTC in hours)
-  const convertToISODate = (date, time) => {
-    const TIMEZONE_OFFSETS = {
-      // Eastern Time
-      EST: -5, // Eastern Standard Time
-      EDT: -4, // Eastern Daylight Time
-      // Central Time
-      CST: -6, // Central Standard Time
-      CDT: -5, // Central Daylight Time
-      // Mountain Time
-      MST: -7, // Mountain Standard Time
-      MDT: -6, // Mountain Daylight Time
-      // Pacific Time
-      PST: -8, // Pacific Standard Time
-      PDT: -7, // Pacific Daylight Time
-      // Other common timezones
-      UTC: 0, // Coordinated Universal Time
-      GMT: 0, // Greenwich Mean Time
-    };
-
-    // Parse date as month/day format
-    const [month, day] = date.split('/');
-    const year = new Date().getFullYear();
-
-    // Extract time and timezone from strings like "12am EDT", "11:59pm EST", "2:30pm", etc.
-    const timeMatch = time.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)(?:\s+([A-Z]{2,4}))?/i);
-    if (!timeMatch) {
-      throw new Error(`Invalid time format: ${time}`);
+  /**
+   * Parses a datetime string, returning null for empty values (open-ended).
+   * @param {string} dateStr - The datetime string to parse
+   * @returns {Date|null} The parsed Date or null if empty
+   */
+  const parseDateOrNull = (dateStr) => {
+    const trimmed = dateStr?.trim();
+    if (!trimmed) {
+      return null; // Empty = open-ended
     }
-
-    let hours = parseInt(timeMatch[1], 10);
-    const minutes = timeMatch[2] || '00';
-    const ampm = timeMatch[3].toLowerCase();
-    const timezone = timeMatch[4] || 'UTC'; // Default to UTC if no timezone specified
-
-    // Convert 12-hour to 24-hour format
-    if (ampm === 'am' && hours === 12) {
-      hours = 0; // 12am = 00:00
-    } else if (ampm === 'pm' && hours !== 12) {
-      hours += 12; // 1pm-11pm = 13:00-23:00, 12pm stays 12:00
-    }
-
-    // Get timezone offset
-    const timezoneOffset = TIMEZONE_OFFSETS[timezone.toUpperCase()];
-    if (timezoneOffset === undefined) {
-      throw new Error(`Unsupported timezone: ${timezone}`);
-    }
-
-    // Pad with zeros
-    const paddedMonth = month.padStart(2, '0');
-    const paddedDay = day.padStart(2, '0');
-    const paddedHours = hours.toString().padStart(2, '0');
-    const paddedMinutes = minutes.padStart(2, '0');
-
-    // Return ISO string with timezone offset
-    if (timezoneOffset === 0) {
-      return `${year}-${paddedMonth}-${paddedDay}T${paddedHours}:${paddedMinutes}:00Z`;
-    }
-    const offsetSign = timezoneOffset >= 0 ? '+' : '-';
-    const offsetHours = Math.abs(timezoneOffset).toString().padStart(2, '0');
-    return `${year}-${paddedMonth}-${paddedDay}T${paddedHours}:${paddedMinutes}:00${offsetSign}${offsetHours}:00`;
+    return parseEasternDateTime(trimmed);
   };
 
   const rows = [...block.children];
   const banners = rows.map((row) => {
-    const [dates, times, content, colorEl] = [...row.children];
+    const [startEl, endEl, content, colorEl] = [...row.children];
     const color = colorEl.textContent.trim();
     try {
-      const [startDate, endDate] = dates.textContent.split('-');
-      const [startTime, endTime] = times.textContent.split('-');
       return ({
         valid: true,
-        start: new Date(convertToISODate(startDate, startTime)),
-        end: new Date(convertToISODate(endDate, endTime)),
+        start: parseDateOrNull(startEl.textContent),
+        end: parseDateOrNull(endEl.textContent),
         content,
         color,
       });
@@ -954,16 +1023,21 @@ export function parseAlertBanners(block) {
 
 /**
  * Determines whether the current date is before, during, or after the given start/end range.
- * @param {Date} start - The start date/time of the range.
- * @param {Date} end - The end date/time of the range.
+ * Null start means open-ended in the past (always started).
+ * Null end means open-ended in the future (never expires).
+ * @param {Date|null} start - The start date/time of the range (null = open-ended past).
+ * @param {Date|null} end - The end date/time of the range (null = open-ended future).
  * @param {Date} [date=new Date()] - The reference date/time to compare (defaults to now).
  * @returns {string} String indicating the status relative to the range.
  */
 export function currentPastFuture(start, end, date = new Date()) {
-  if (start <= date && end >= date) {
+  const afterStart = !start || start <= date;
+  const beforeEnd = !end || end >= date;
+
+  if (afterStart && beforeEnd) {
     return 'current';
   }
-  if (start > date) {
+  if (start && start > date) {
     return 'future';
   }
   return 'past';
@@ -1072,7 +1146,10 @@ async function loadEager(doc) {
     decorateMain(main);
     await loadNavBanner(main);
     document.body.classList.add('appear');
-    await loadSection(main.querySelector('.section'), waitForFirstImage);
+    await loadSection(main.querySelector('.section'), (section) => {
+      if (document.body.classList.contains('quick-edit')) return Promise.resolve();
+      return waitForFirstImage(section);
+    });
   }
 
   sampleRUM.enhance();
@@ -1113,19 +1190,39 @@ async function loadLazy(doc) {
     await openSyncModal();
   };
 
+  const loadQuickEdit = async (...args) => {
+    // eslint-disable-next-line import/no-cycle
+    const { default: initQuickEdit } = await import('../tools/quick-edit/quick-edit.js');
+    initQuickEdit(...args);
+  };
+
+  const addSidekickListeners = (sk) => {
+    sk.addEventListener('custom:sync', syncSku);
+    sk.addEventListener('custom:quick-edit', loadQuickEdit);
+  };
+
   const sk = document.querySelector('aem-sidekick');
   if (sk) {
-    sk.addEventListener('custom:sync', syncSku);
+    addSidekickListeners(sk);
   } else {
     // wait for sidekick to be loaded
     document.addEventListener('sidekick-ready', () => {
     // sidekick now loaded
-      document.querySelector('aem-sidekick')
-        .addEventListener('custom:sync', syncSku);
+      addSidekickListeners(document.querySelector('aem-sidekick'));
     }, { once: true });
   }
 }
 
+function decorateExternalLinks() {
+  const externalLinks = document.querySelectorAll('a[href^="https://"]');
+  externalLinks.forEach((link) => {
+    const { hostname } = new URL(link.href);
+    if (!link.href.includes('vitamix') || hostname === 'localhost') {
+      link.setAttribute('target', '_blank');
+      link.setAttribute('rel', 'noopener');
+    }
+  });
+}
 /**
  * Loads everything that happens a lot later,
  * without impacting the user experience.
@@ -1159,12 +1256,13 @@ async function loadDelayed() {
       });
     }
   }
+  setTimeout(decorateExternalLinks, 1000);
 }
 
 /**
  * Loads the page in eager, lazy, and delayed phases.
  */
-async function loadPage() {
+export async function loadPage() {
   await loadEager(document);
   await loadLazy(document);
   loadDelayed();

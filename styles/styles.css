@@ -156,9 +156,17 @@ main > .section {
   scroll-margin: 100px 0;
 }
 
+main > .section:first-of-type[class*='-container'] {
+  margin-top: 0;
+}
+
 main > .section > div {
   margin: var(--horizontal-spacing) auto;
   padding: 0 var(--horizontal-spacing);
+}
+
+main > .section:first-of-type[class*='-container'] > div:first-child:not(.default-content-wrapper) {
+  margin-top: 0;
 }
 
 main > .section > div.full-width {
@@ -274,6 +282,8 @@ main .section.banner.overlay.dark::before {
   opacity: 0.6;
 }
 
+/* stylelint-disable no-descending-specificity */
+
 main > .section.banner > div {
   padding: 0;
 }
@@ -295,6 +305,8 @@ main .section.banner > div {
   z-index: 1;
   max-width: 70vw;
 }
+
+/* stylelint-enable no-descending-specificity */
 
 @media (width >= 800px) {
   main .section.banner > div {

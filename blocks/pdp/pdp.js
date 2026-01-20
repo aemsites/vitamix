@@ -6,7 +6,12 @@ import renderPricing, { extractPricing } from './pricing.js';
 // eslint-disable-next-line import/no-cycle
 import { renderOptions, onOptionChange, updateFreeGiftVisibility } from './options.js';
 import { loadFragment } from '../fragment/fragment.js';
-import { checkVariantOutOfStock, isProductOutOfStock, isNextPipeline } from '../../scripts/scripts.js';
+import {
+  checkVariantOutOfStock,
+  isProductOutOfStock,
+  isNextPipeline,
+  parseEasternDateTime,
+} from '../../scripts/scripts.js';
 import { openModal } from '../modal/modal.js';
 
 /**
@@ -273,6 +278,19 @@ function renderShare() {
 
 async function renderFreeGift() {
   try {
+    /**
+     * Parses a datetime string, returning null for empty values (open-ended).
+     * @param {string} dateStr - The datetime string to parse
+     * @returns {Date|null} The parsed Date or null if empty
+     */
+    const parseDateOrNull = (dateStr) => {
+      const trimmed = dateStr?.trim();
+      if (!trimmed) {
+        return null; // Empty = open-ended
+      }
+      return parseEasternDateTime(trimmed);
+    };
+
     const fetchGifts = async () => {
       const resp = await fetch('/us/en_us/products/config/free-gifts.plain.html');
       if (!resp.ok) return null;
@@ -280,82 +298,36 @@ async function renderFreeGift() {
       const doc = new DOMParser().parseFromString(text, 'text/html');
       const gifts = doc.querySelector('.free-gifts');
       return [...gifts.children].map((gift) => {
-        const [dates, minPrice, label, body] = gift.children;
-        const datesText = dates.textContent;
-        const minPriceText = minPrice.textContent.startsWith('$') ? minPrice.textContent.slice(1) : minPrice.textContent;
-        const labelText = label.textContent;
-        const bodyText = body.innerHTML.replaceAll('./media_', './config/media_');
-        return {
-          dates: datesText,
-          minPrice: minPriceText,
-          label: labelText,
-          body: bodyText,
-        };
-      });
+        const [startDateEl, endDateEl, minPrice, label, body] = gift.children;
+        try {
+          const minPriceText = minPrice.textContent.startsWith('$')
+            ? minPrice.textContent.slice(1)
+            : minPrice.textContent;
+          const labelText = label.textContent;
+          const bodyText = body.innerHTML.replaceAll('./media_', './config/media_');
+          return {
+            valid: true,
+            startDate: parseDateOrNull(startDateEl.textContent),
+            endDate: parseDateOrNull(endDateEl.textContent),
+            minPrice: minPriceText,
+            label: labelText,
+            body: bodyText,
+          };
+        } catch {
+          // Skip rows with malformed dates
+          return { valid: false };
+        }
+      }).filter((gift) => gift.valid);
     };
 
     const gifts = await fetchGifts();
-    const parseDateRange = (dates) => {
-      const [startDateStr, endDateStr] = dates.split(' - ');
-
-      // Helper function to parse individual date strings with time and timezone
-      const parseDateWithTime = (dateStr) => {
-        // Handle formats like "9/12/2025 9am EDT", "9/19/2025 3pm EDT", or "9/12/2025 9:30am EDT"
-        const timeMatch = dateStr.match(/^(\d{1,2}\/\d{1,2}\/\d{4})\s+(\d{1,2})(?::(\d{2}))?(am|pm)\s+([A-Z]{3,4})$/);
-
-        if (timeMatch) {
-          const [, datePart, hour, minutes, ampm, timezone] = timeMatch;
-
-          // Parse the date part (M/D/YYYY)
-          const [month, day, year] = datePart.split('/').map((num) => parseInt(num, 10));
-
-          // Convert hour to 24-hour format
-          let hour24 = parseInt(hour, 10);
-          if (ampm.toLowerCase() === 'pm' && hour24 !== 12) {
-            hour24 += 12;
-          } else if (ampm.toLowerCase() === 'am' && hour24 === 12) {
-            hour24 = 0;
-          }
-
-          // Parse minutes (default to 0 if not provided)
-          const minute = minutes ? parseInt(minutes, 10) : 0;
-
-          // Handle timezone offset (simplified - you might want to use a proper timezone library)
-          // For now, we'll assume EDT is UTC-4 (Eastern Daylight Time)
-          const timezoneOffsets = {
-            EDT: -4, // UTC-4 hours
-            EST: -5, // UTC-5 hours
-            CDT: -5, // UTC-5 hours
-            CST: -6, // UTC-6 hours
-            MDT: -6, // UTC-6 hours
-            MST: -7, // UTC-7 hours
-            PDT: -7, // UTC-7 hours
-            PST: -8, // UTC-8 hours
-          };
-
-          const offsetHours = timezoneOffsets[timezone] || 0;
-
-          // Convert the local time to UTC by adding the offset
-          // If EDT is UTC-4, then 9am EDT = 1pm UTC (9 + 4 = 13)
-          const utcHour = hour24 - offsetHours;
-
-          // Create UTC date object directly
-          const utcDate = new Date(Date.UTC(year, month - 1, day, utcHour, minute, 0));
-
-          return utcDate;
-        }
-
-        // Fallback to simple date parsing for formats without time/timezone
-        return new Date(dateStr);
-      };
-
-      return [parseDateWithTime(startDateStr), parseDateWithTime(endDateStr)];
-    };
 
     const findGift = (giftList) => giftList.find((gift) => {
-      const [startDate, endDate] = parseDateRange(gift.dates);
       const today = new Date();
-      return today >= startDate && today <= endDate;
+      // Null start = open-ended past, null end = open-ended future
+      const afterStart = !gift.startDate || today >= gift.startDate;
+      const beforeEnd = !gift.endDate || today <= gift.endDate;
+      return afterStart && beforeEnd;
     });
     const gift = findGift(gifts);
     if (gift) {
