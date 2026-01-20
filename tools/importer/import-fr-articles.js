@@ -34,15 +34,18 @@ const addTagsToMetadata = (main, metadataTable, src, dst, document) => {
 
 const addAuthorAndDateToMetadata = (main, metadataTable, src, dst, document) => {
   // next sibling is the author
-  const container = main.querySelector('.article-category-tags')?.nextElementSibling;
+  let container = main.querySelector('.article-category-tags')?.nextElementSibling;
   if (!container) {
-    console.log('No author and date container found');
-    return;
+    container = main.querySelector('section[itemprop="articleBody"]')?.firstElementChild;
+    if (!container) {
+      console.log('No author and date container found');
+      return false;
+    }
   };
 
   const author = container.querySelector('a');
   const txt = container.textContent.trim();
-  const date = txt.split('|')[1];
+  const date = txt?.split('|')[1];
 
   const newRow = document.createElement('tr');
   const newCell = document.createElement('td');
@@ -58,9 +61,11 @@ const addAuthorAndDateToMetadata = (main, metadataTable, src, dst, document) => 
   newCell3.textContent = 'Publication Date';
   newRow2.appendChild(newCell3);
   const newCell4 = document.createElement('td');
-  newCell4.textContent = date.trim();
+  newCell4.textContent = date?.trim() || '';
   newRow2.appendChild(newCell4);
   metadataTable.appendChild(newRow2);
+
+  return true;
 };
 
 const getContentType = (src) => {
@@ -165,9 +170,13 @@ export default {
     
     const metadataTable = [...document.querySelectorAll('table')].find((table) => table.querySelector('tr th[colspan="2"]')?.textContent.trim() === 'Metadata');
     if (metadataTable) {
-      addAuthorAndDateToMetadata(main, metadataTable, CONFIG.source, CONFIG.origin, document);
+      const hasAuthorAndDate = addAuthorAndDateToMetadata(main, metadataTable, CONFIG.source, CONFIG.origin, document);
       addTagsToMetadata(main, metadataTable, CONFIG.source, CONFIG.origin, document);
-      document.querySelector('.article-category-tags')?.parentElement?.remove();
+
+      if (hasAuthorAndDate) {
+        document.querySelector('.article-category-tags')?.parentElement?.remove();
+        document.querySelector('section[itemprop="articleBody"]')?.firstElementChild?.remove();
+      }
     }
     
     WebImporter.rules.transformBackgroundImages(main, document);
