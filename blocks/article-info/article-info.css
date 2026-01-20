@@ -1,4 +1,6 @@
 .article-info  {
+  max-width: calc(800px - (2 * var(--horizontal-spacing)));
+  margin: 0 auto;
   text-align: center;
 }
 
