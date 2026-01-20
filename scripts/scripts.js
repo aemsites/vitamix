@@ -675,6 +675,10 @@ function decorateEyebrows(main) {
       // ignore p tags with images or links
       const disqualifiers = beforeH.querySelector('img, a[href]');
       if (disqualifiers) return;
+      // ignore really long p tags
+      const words = beforeH.textContent.trim().split(' ');
+      if (words.length > 12) return;
+
       beforeH.classList.add('eyebrow');
       h.dataset.eyebrow = beforeH.textContent.trim();
     }
