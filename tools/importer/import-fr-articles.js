@@ -132,6 +132,22 @@ const uploadAssets = async (main, localhost, origin, org, repo) => {
   }
 };
 
+const createRelatedArticles = (main, origin, document) => {
+  const relatedArticles = new Set([...document.querySelectorAll('.related-recipes-section a')].map(a => a.href));
+  const block = WebImporter.Blocks.createBlock(document, {
+    name: 'Related Articles',
+    cells: [...relatedArticles].map(href => {
+      const a = document.createElement('a');
+
+      const u = new URL(href);
+      a.href = new URL(u.pathname, origin).toString();
+      a.textContent = a.href;
+      return [a];
+    }),
+  });
+  main.appendChild(block);
+};
+
 export default {
   /**
    * Apply DOM operations to the provided document and return
@@ -169,6 +185,14 @@ export default {
       'iframe',
       'noscript',
       '#SocialMediaButtons',
+      '.ognm-cardlist-recipe-programs__caption', // search in related receipts
+    ]);
+
+    createRelatedArticles(main, CONFIG.origin, document);
+
+    WebImporter.DOMUtils.remove(main, [
+      '.related-recipes-section',
+      '.list-component-item',
     ]);
 
     WebImporter.rules.createMetadata(main, document);
@@ -186,7 +210,6 @@ export default {
     WebImporter.rules.transformBackgroundImages(main, document);
     WebImporter.rules.convertIcons(main, document);
 
-    // WebImporter.rules.adjustImageUrls(main, url, params.originalURL);
     await uploadAssets(main, CONFIG.source, CONFIG.origin, CONFIG.org, CONFIG.repo);
 
     return main;
