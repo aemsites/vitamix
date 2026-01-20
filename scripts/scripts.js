@@ -522,6 +522,27 @@ function buildAutoBlocks(main) {
     if (metaSku || pdpBlock) {
       document.body.classList.add('pdp-template');
     }
+
+    // wrap recipes in block
+    if (document.querySelector('main') === main) {
+      const template = getMetadata('template');
+      const recipeType = getMetadata('recipe-type');
+      const totalTime = getMetadata('total-time');
+      if (template === 'recipe' && (recipeType || totalTime)) {
+        const block = document.createElement('div');
+        block.classList.add('recipe');
+        block.append(...main.firstElementChild.children);
+        main.firstElementChild.append(block);
+        // eslint-disable-next-line no-use-before-define
+        const { locale, language } = getLocaleAndLanguage();
+        const footerPath = new URL(`/${locale}/${language}/recipes/fragments/footer`, window.location.origin);
+        const footerLink = document.createElement('a');
+        footerLink.href = footerPath.pathname;
+        footerLink.textContent = footerPath.pathname;
+        const footer = buildBlock('fragment', footerLink);
+        main.firstElementChild.append(footer);
+      }
+    }
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Auto Blocking failed', error);
@@ -1044,7 +1065,7 @@ export function findBestAlertBanner(banners, date = new Date()) {
  * Gets the locale and language from the window.location.pathname.
  * @returns {Object} Object with locale and language.
  */
-export async function getLocaleAndLanguage() {
+export function getLocaleAndLanguage() {
   const pathSegments = window.location.pathname.split('/').filter(Boolean);
   const locale = pathSegments[0] || 'us'; // fallback to 'us' if not found
   const language = pathSegments[1] || 'en_us'; // fallback to 'en_us' if not found

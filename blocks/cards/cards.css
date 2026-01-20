@@ -101,6 +101,29 @@
   margin: 1ch;
 }
 
+.cards .card-filled {
+  padding: var(--horizontal-spacing);
+  background-color: var(--color-charcoal);
+  color: var(--color-white);
+  border-radius: var(--rounding-m);
+}
+
+.cards .card-filled h2 {
+  font-size: var(--body-size-l);
+}
+
+.cards .card-filled a:any-link {
+  color: inherit;
+}
+
+.cards .card-filled .eyebrow {
+  color: var(--color-steel);
+}
+
+.cards .card-filled .button-wrapper {
+  margin-bottom: 0;
+}
+
 /* stylelint-disable no-descending-specificity */
 
 /* articles variant */
