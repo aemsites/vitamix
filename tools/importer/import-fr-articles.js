@@ -216,7 +216,7 @@ export default {
       addTagsToMetadata(main, metadataTable, CONFIG.source, CONFIG.origin, document);
 
       if (hasAuthorAndDate) {
-        // document.querySelector('section[itemprop="articleBody"]')?.firstElementChild?.remove();
+        document.querySelector('section[itemprop="articleBody"]')?.firstElementChild?.remove();
       }
     }
     
