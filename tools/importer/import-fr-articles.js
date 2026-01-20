@@ -136,6 +136,9 @@ const uploadAssets = async (main, localhost, origin, org, repo) => {
 
 const createRelatedArticles = (main, origin, document) => {
   const relatedArticles = new Set([...document.querySelectorAll('.related-recipes-section a')].map(a => a.href));
+  if (relatedArticles.size === 0) {
+    return;
+  }
   const block = WebImporter.Blocks.createBlock(document, {
     name: 'Related Articles',
     cells: [...relatedArticles].map(href => {
