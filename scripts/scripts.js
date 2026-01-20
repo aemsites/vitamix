@@ -523,6 +523,20 @@ function buildAutoBlocks(main) {
       document.body.classList.add('pdp-template');
     }
 
+    // build hero for articles pages
+    if (getMetadata('template') === 'article') {
+      const hero = main.querySelector('.hero');
+      if (!hero) {
+        const picture = main.querySelector('picture');
+        const h1 = main.querySelector('h1');
+        if (picture && h1) {
+          const section = document.createElement('div');
+          section.append(buildBlock('hero', { elems: [picture, h1] }));
+          main.prepend(section);
+        }
+      }
+    }
+
     // wrap recipes in block
     if (document.querySelector('main') === main) {
       const template = getMetadata('template');
