@@ -117,7 +117,12 @@ const uploadAssets = async (main, localhost, origin, org, repo) => {
         },
       });
       if (!response.ok) {
-        console.error('Error uploading asset - did you provide the correct API key ?', response.statusText);
+        if (response.status === 415) {
+          console.error('Error uploading asset - unsupported content type', response.statusText);
+        } else {
+          console.error('Error uploading asset', response.statusText);
+        }
+        asset.remove();
       } else {
         const data = await response.json();
         console.log('Asset uploaded', data);
