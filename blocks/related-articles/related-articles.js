@@ -2,6 +2,18 @@ import { createOptimizedPicture } from '../../scripts/aem.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 /**
+ * Returns the largest factor of given n among between 1 and 4.
+ * @param {number} n - Number to find largest factor for
+ * @returns {number} Largest factor
+ */
+function getLargestFactor(n) {
+  const factor = [4, 3, 2].find((f) => n % f === 0);
+  if (factor) return factor;
+  if (n > 4) return n % 2 === 0 ? 4 : 3;
+  return 1;
+}
+
+/**
  * Builds an article card element.
  * @param {Object} article - Article data
  * @returns {HTMLLIElement} Card list item
@@ -16,7 +28,8 @@ function buildArticleCard(article) {
 
   const cardImage = document.createElement('div');
   cardImage.className = 'article-image';
-  cardImage.append(createOptimizedPicture(image, '', false, [{ width: '900' }]));
+  const imagePath = new URL(image, window.location.origin).pathname;
+  cardImage.append(createOptimizedPicture(imagePath, '', false, [{ width: '900' }]));
 
   const cardBody = document.createElement('div');
   cardBody.className = 'article-body';
@@ -24,7 +37,7 @@ function buildArticleCard(article) {
   const h3 = document.createElement('h3');
   const titleLink = document.createElement('a');
   titleLink.href = path;
-  titleLink.textContent = title;
+  titleLink.textContent = title.split('|')[0].trim();
   h3.append(titleLink);
 
   const desc = document.createElement('p');
@@ -64,6 +77,8 @@ export default async function decorate(block) {
   }
 
   const ul = document.createElement('ul');
+  const articlesPerRow = getLargestFactor(matchingArticles.length);
+  block.classList.add(`rows-${articlesPerRow}`);
   matchingArticles.forEach((article) => {
     ul.append(buildArticleCard(article));
   });
