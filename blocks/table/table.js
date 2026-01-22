@@ -1,36 +1,30 @@
-/*
- * Table Block
- * Recreate a table
- * https://www.hlx.live/developer/block-collection/table
- */
-
-function buildCell(rowIndex) {
-  const cell = rowIndex ? document.createElement('td') : document.createElement('th');
-  if (!rowIndex) cell.setAttribute('scope', 'col');
-  return cell;
+function buildRow(row, cellType = 'td') {
+  const tr = document.createElement('tr');
+  [...row.children].forEach((col) => {
+    const cell = document.createElement(cellType);
+    cell.innerHTML = col.innerHTML;
+    if (cellType === 'th') cell.setAttribute('scope', 'col');
+    tr.appendChild(cell);
+  });
+  return tr;
 }
 
-export default async function decorate(block) {
+export default function decorate(block) {
   const table = document.createElement('table');
+  const rows = [...block.children];
+
+  // build table head
   const thead = document.createElement('thead');
-  const tbody = document.createElement('tbody');
-
-  const header = !block.classList.contains('no-header');
-  if (header) {
-    table.append(thead);
+  if (rows.length > 0) {
+    thead.appendChild(buildRow(rows[0], 'th'));
   }
-  table.append(tbody);
 
-  [...block.children].forEach((child, i) => {
-    const row = document.createElement('tr');
-    if (header && i === 0) thead.append(row);
-    else tbody.append(row);
-    [...child.children].forEach((col) => {
-      const cell = buildCell(header ? i : i + 1);
-      cell.innerHTML = col.innerHTML;
-      row.append(cell);
-    });
+  // build table body
+  const tbody = document.createElement('tbody');
+  rows.slice(1).forEach((row) => {
+    tbody.appendChild(buildRow(row, 'td'));
   });
-  block.innerHTML = '';
-  block.append(table);
+
+  table.append(thead, tbody);
+  block.replaceChildren(table);
 }

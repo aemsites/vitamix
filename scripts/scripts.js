@@ -523,6 +523,25 @@ function buildAutoBlocks(main) {
       document.body.classList.add('pdp-template');
     }
 
+    // setup articles pages
+    if (getMetadata('template') === 'article') {
+      let hero = main.querySelector('.hero');
+      if (!hero) {
+        const picture = main.querySelector('picture');
+        const h1 = main.querySelector('h1');
+        if (picture && h1) {
+          const section = document.createElement('div');
+          hero = buildBlock('hero', { elems: [picture, h1] });
+          section.append(hero);
+          main.prepend(section);
+        }
+      }
+      // add article-info block after hero
+      if (hero) {
+        hero.after(buildBlock('article-info', { elems: [] }));
+      }
+    }
+
     // wrap recipes in block
     if (document.querySelector('main') === main) {
       const template = getMetadata('template');
@@ -685,6 +704,10 @@ function decorateEyebrows(main) {
       // ignore p tags with images or links
       const disqualifiers = beforeH.querySelector('img, a[href]');
       if (disqualifiers) return;
+      // ignore really long p tags
+      const words = beforeH.textContent.trim().split(' ');
+      if (words.length > 12) return;
+
       beforeH.classList.add('eyebrow');
       h.dataset.eyebrow = beforeH.textContent.trim();
     }
