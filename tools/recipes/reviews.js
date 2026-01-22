@@ -5,7 +5,7 @@
 
 import { createOptimizedPicture } from '../../scripts/aem.js';
 
-const RECIPES_ENDPOINT = '/us/en_us/recipes/data/query-index.json';
+const RECIPES_ENDPOINT = '/us/en_us/recipes/query-index.json';
 const AEM_ORIGIN = 'https://main--vitamix--aemsites.aem.live';
 
 /**

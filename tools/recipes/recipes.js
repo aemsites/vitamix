@@ -598,7 +598,7 @@ ${recipeHtml}
 export async function previewRecipe(kebabName, token) {
   // Remove .html extension if present
   const cleanName = kebabName.endsWith('.html') ? kebabName.slice(0, -5) : kebabName;
-  const path = `us/en_us/recipes/data/${cleanName}`;
+  const path = `us/en_us/recipes/${cleanName}`;
   const previewUrl = `https://admin.hlx.page/preview/aemsites/vitamix/main/${path}`;
 
   const opts = {
@@ -619,7 +619,7 @@ export async function previewRecipe(kebabName, token) {
 export async function publishRecipe(kebabName, token) {
   // Remove .html extension if present
   const cleanName = kebabName.endsWith('.html') ? kebabName.slice(0, -5) : kebabName;
-  const path = `us/en_us/recipes/data/${cleanName}`;
+  const path = `us/en_us/recipes/${cleanName}`;
   const publishUrl = `https://admin.hlx.page/live/aemsites/vitamix/main/${path}`;
 
   const opts = {
@@ -760,7 +760,7 @@ export async function bulkSyncWithDA() {
         body,
       };
 
-      const fullpath = `https://admin.da.live/source/aemsites/vitamix/us/en_us/recipes/data/${filename}`;
+      const fullpath = `https://admin.da.live/source/aemsites/vitamix/us/en_us/recipes/${filename}`;
       // eslint-disable-next-line no-await-in-loop
       const resp = await fetch(fullpath, opts);
 
@@ -883,7 +883,7 @@ ${recipeElement.innerHTML}
     body,
   };
 
-  const fullpath = `https://admin.da.live/source/aemsites/vitamix/us/en_us/recipes/data/${filename}`;
+  const fullpath = `https://admin.da.live/source/aemsites/vitamix/us/en_us/recipes/${filename}`;
 
   const resp = await fetch(fullpath, opts);
 
@@ -1412,7 +1412,7 @@ export async function fetchImportedRecipes() {
   try {
     const corsProxy = 'https://fcors.org/?url=';
     const corsKey = '&key=Mg23N96GgR8O3NjU';
-    const queryIndexUrl = 'https://main--vitamix--aemsites.aem.live/us/en_us/recipes/data/query-index.json?limit=10000';
+    const queryIndexUrl = 'https://main--vitamix--aemsites.aem.live/us/en_us/recipes/query-index.json?limit=10000';
 
     const response = await fetch(corsProxy + encodeURIComponent(queryIndexUrl) + corsKey, {
       method: 'GET',
@@ -1425,7 +1425,7 @@ export async function fetchImportedRecipes() {
     const data = await response.json();
 
     // Extract recipe numbers from paths
-    // Path format: /us/en_us/recipes/data/recipe-name-r00401
+    // Path format: /us/en_us/recipes/recipe-name-r00401
     const importedRecipeNumbers = new Set();
     data.data.forEach((recipe) => {
       const pathParts = recipe.path.split('-');
@@ -1582,7 +1582,7 @@ function parseRecipeNumbers(input) {
 
   lines.forEach((line) => {
     // Try to extract recipe number from URL (last segment after last /)
-    // URL format: .../recipes/data/recipe-name-r00123
+    // URL format: .../recipes/recipe-name-r00123
     const urlMatch = line.match(/\/([^/]+)$/);
     if (urlMatch) {
       // Extract recipe code from the last segment (e.g., "almond-milk-r00013" -> "R00013")
