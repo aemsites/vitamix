@@ -562,6 +562,16 @@ function buildAutoBlocks(main) {
         main.firstElementChild.append(footer);
       }
     }
+
+    // setup toc
+    const tocRef = getMetadata('toc');
+    if (tocRef && !document.querySelector('.toc')) {
+      const toc = buildBlock('toc', [[`<a href="${tocRef}">${tocRef}</a>`]]);
+      const section = document.createElement('div');
+      section.classList.add('section');
+      section.append(toc);
+      main.prepend(section);
+    }
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Auto Blocking failed', error);
