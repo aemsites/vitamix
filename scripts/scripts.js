@@ -547,7 +547,6 @@ function buildAutoBlocks(main) {
     // setup toc
     const tocRef = getMetadata('toc');
     if (tocRef && !document.querySelector('.toc')) {
-      console.log('tocRef', tocRef);
       const toc = buildBlock('toc', [[`<a href="${tocRef}">${tocRef}</a>`]]);
       const section = document.createElement('div');
       section.classList.add('section');
