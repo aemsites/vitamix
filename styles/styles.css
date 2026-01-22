@@ -825,3 +825,18 @@ body.hide-consent-banner-for-us #CybotCookiebotDialog {
 #CybotCookiebotDialogNav ul li:has(#CybotCookiebotDialogNavAbout) {
   display: none;
 }
+
+/* corp template */
+
+body.corp main .default-content-wrapper {
+  --heading-font-family: var(--sans-serif-font-family);
+  --body-font-family: var(--sans-serif-font-family);
+}
+
+body.corp main .default-content-wrapper h1 {
+  font-size: var(--font-size-700);
+}
+
+body.corp main .default-content-wrapper h2 {
+  font-size: var(--font-size-500);
+}
