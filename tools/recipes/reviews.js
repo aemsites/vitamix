@@ -35,7 +35,7 @@ function getImagePathname(urlString) {
  * Fetches the recipe index and extracts titles and images, grouped by unique title
  * @returns {Promise<Array<{title: string, image: string, paths: string[]}>>}
  */
-export async function fetchRecipes() {
+export default async function fetchRecipes() {
   const response = await fetch(RECIPES_ENDPOINT);
 
   if (!response.ok) {
@@ -86,6 +86,17 @@ export async function fetchRecipes() {
  */
 function generateReviewsId(title) {
   return `rcp${title.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+}
+
+/**
+ * Creates a placeholder element for missing images
+ * @returns {HTMLElement}
+ */
+function createPlaceholder() {
+  const placeholder = document.createElement('div');
+  placeholder.className = 'recipe-image placeholder';
+  placeholder.textContent = '🍽️';
+  return placeholder;
 }
 
 /**
@@ -186,17 +197,6 @@ function createRecipeCard(recipe, index) {
 }
 
 /**
- * Creates a placeholder element for missing images
- * @returns {HTMLElement}
- */
-function createPlaceholder() {
-  const placeholder = document.createElement('div');
-  placeholder.className = 'recipe-image placeholder';
-  placeholder.textContent = '🍽️';
-  return placeholder;
-}
-
-/**
  * Updates the visible count display
  */
 function updateVisibleCount() {
@@ -276,6 +276,7 @@ async function exportToTSV() {
   const visibleCards = document.querySelectorAll('.recipe-card:not(.hidden)');
 
   if (visibleCards.length === 0) {
+    // eslint-disable-next-line no-alert
     alert('No recipes to export. Adjust your filters to show some recipes.');
     return;
   }
@@ -306,8 +307,9 @@ async function exportToTSV() {
 
   try {
     await navigator.clipboard.writeText(tsv);
+    // eslint-disable-next-line no-alert
     alert(`Copied ${visibleCards.length} recipes to clipboard!\n\nPaste into a spreadsheet.`);
-  } catch (err) {
+  } catch {
     // Fallback: create a download
     const blob = new Blob([tsv], { type: 'text/tab-separated-values' });
     const url = URL.createObjectURL(blob);
@@ -447,6 +449,7 @@ async function init() {
     // Watch for Bazaarvoice data to load
     watchForBvReady();
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('Failed to load recipes:', error);
     showError(`Failed to load recipes: ${error.message}`);
   }
@@ -454,4 +457,3 @@ async function init() {
 
 // Start the app
 init();
-
