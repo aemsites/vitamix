@@ -128,7 +128,7 @@ const uploadAssets = async (main, localhost, origin, org, repo) => {
       });
       if (!response.ok) {
         if (response.status === 415) {
-          console.error('Error uploading asset - unsupported content type', response.statusText);
+          console.error(`Error uploading asset - unsupported content type: ${contentType}`, response.statusText);
         } else {
           console.error('Error uploading asset', response.statusText);
         }
