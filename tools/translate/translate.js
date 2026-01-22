@@ -33,12 +33,7 @@ const removeDnt = (text, context) => {
 };
 
 const translate = async (text, language, context) => {
-
-  console.log('input text', text);
-  
   const html = addDnt(text);
-
-  console.log('html with dnt', html);
 
   const body = new FormData();
   body.append('data', html);
@@ -51,12 +46,10 @@ const translate = async (text, language, context) => {
   if (!resp.ok) return;
 
   const json = await resp.json();
-  console.log('translated response', json);
-
-  console.log('translated response', json.translated);
+  
   const translated = removeDnt(json.translated, context);
-  console.log('translated without dnt', translated);
-  return translated;
+    // remove start tag <html><head></head><body> and end tag </body></html>
+  return translated.replace(/^<html><head><\/head><body>/, '').replace(/<\/body><\/html>$/, '');
 };
 
 (async function init() {
@@ -68,7 +61,6 @@ const translate = async (text, language, context) => {
   let selection = 'No text selected.';
   try {
     selection = await actions.readSelection();
-    console.log('received selection', selection);
      } catch (error) {}
   
   const inputTextarea = document.querySelector('textarea[name="input"]');
@@ -100,5 +92,3 @@ const translate = async (text, language, context) => {
     actions.closeLibrary();
   });
 }());
-
-console.log('translate.js loaded');
