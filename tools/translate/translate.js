@@ -3,7 +3,7 @@ import DA_SDK from './sdk.js';
 const addDnt = (text) => {
   // parse text into html
   const html = new DOMParser().parseFromString(text, 'text/html');
-  
+
   // 1. first row of any table should be not translated
   const tables = html.querySelectorAll('table');
   tables.forEach((table) => {
@@ -24,7 +24,7 @@ const addDnt = (text) => {
   return html.documentElement.outerHTML;
 };
 
-const removeDnt = (text, context) => {
+const removeDnt = (text) => {
   const html = new DOMParser().parseFromString(text, 'text/html');
   html.querySelectorAll('[translate="no"]').forEach((element) => {
     element.removeAttribute('translate');
@@ -43,12 +43,12 @@ const translate = async (text, language, context) => {
   const opts = { method: 'POST', body };
 
   const resp = await fetch('https://translate.da.live/google', opts);
-  if (!resp.ok) return;
+  if (!resp.ok) return null;
 
   const json = await resp.json();
-  
+
   const translated = removeDnt(json.translated, context);
-    // remove start tag <html><head></head><body> and end tag </body></html>
+  // remove start tag <html><head></head><body> and end tag </body></html>
   return translated.replace(/^<html><head><\/head><body>/, '').replace(/<\/body><\/html>$/, '');
 };
 
@@ -61,8 +61,10 @@ const translate = async (text, language, context) => {
   let selection = 'No text selected.';
   try {
     selection = await actions.readSelection();
-     } catch (error) {}
-  
+  } catch (error) {
+    // ignore
+  }
+
   const inputTextarea = document.querySelector('textarea[name="input"]');
   inputTextarea.value = selection;
 
