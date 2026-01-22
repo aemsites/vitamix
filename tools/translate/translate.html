@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>DA App SDK Sample</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="/styles.css">
+    <!-- Project App Logic -->
+    <script src="/translate.js" type="module"></script>
+  </head>
+  <body>
+    <div class="translate-container">
+      <form class="translate-form">
+        <div class="translate-input">
+          <textarea name="input"></textarea>
+          <select name="language">
+            <option value="en">English</option>
+            <option value="es">Spanish</option>
+            <option value="fr">French</option>
+            <option value="de">German</option>
+            <option value="it">Italian</option>
+          </select>
+        </div>
+        <button name="translate">Translate</button>
+        <div class="translate-output">
+          <textarea name="output"></textarea>
+        </div>
+        <button name="replace">Replace</button>
+      </form>
+    </div>
+  </body>
+</html>
