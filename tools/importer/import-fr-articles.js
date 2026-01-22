@@ -41,7 +41,7 @@ const addAuthorAndDateToMetadata = (main, metadataTable, src, dst, document) => 
       console.log('No author and date container found');
       return false;
     }
-  };
+  }
 
   const author = container.querySelector('a');
   const txt = container.textContent.trim();
@@ -52,7 +52,9 @@ const addAuthorAndDateToMetadata = (main, metadataTable, src, dst, document) => 
       // might be a data like 25.02.2026
       Date.parse(txt);
       date = txt;
-    } catch (error) {}
+    } catch (error) {
+      // ignore parsing errors
+    }
   }
 
   const newRow = document.createElement('tr');
@@ -143,13 +145,15 @@ const uploadAssets = async (main, localhost, origin, org, repo) => {
 };
 
 const createRelatedArticles = (main, origin, document) => {
-  const relatedArticles = new Set([...document.querySelectorAll('.related-recipes-section a')].map(a => a.href));
+  const relatedArticles = new Set(
+    [...document.querySelectorAll('.related-recipes-section a')].map((a) => a.href),
+  );
   if (relatedArticles.size === 0) {
     return;
   }
   const block = WebImporter.Blocks.createBlock(document, {
     name: 'Related Articles',
-    cells: [...relatedArticles].map(href => {
+    cells: [...relatedArticles].map((href) => {
       const a = document.createElement('a');
 
       const u = new URL(href);
@@ -159,6 +163,52 @@ const createRelatedArticles = (main, origin, document) => {
     }),
   });
   main.appendChild(block);
+};
+
+const createRelatedRecipes = (main, origin, document) => {
+  const cardsets = [...main.querySelectorAll('.temp-cardset')];
+  const processed = new Set();
+
+  cardsets.forEach((cardset) => {
+    if (processed.has(cardset)) return;
+
+    // Collect this cardset and any adjacent ones
+    const group = [cardset];
+    processed.add(cardset);
+
+    let next = cardset.nextElementSibling;
+    while (next && next.classList.contains('temp-cardset')) {
+      group.push(next);
+      processed.add(next);
+      next = next.nextElementSibling;
+    }
+
+    // Collect all recipe links from the group
+    const recipeLinks = group.flatMap((cs) =>
+      [...cs.querySelectorAll('a.temp-card[href*="/recipes/"]')].map((a) => a.href),
+    );
+
+    // Remove all cardsets in the group except the first
+    group.slice(1).forEach((cs) => cs.remove());
+
+    if (recipeLinks.length === 0) {
+      cardset.remove();
+      return;
+    }
+
+    const block = WebImporter.Blocks.createBlock(document, {
+      name: 'Related Recipes',
+      cells: recipeLinks.map((href) => {
+        const a = document.createElement('a');
+        const u = new URL(href);
+        a.href = new URL(u.pathname, origin).toString();
+        a.textContent = a.href;
+        return [a];
+      }),
+    });
+
+    cardset.replaceWith(block);
+  });
 };
 
 export default {
@@ -175,7 +225,6 @@ export default {
     // eslint-disable-next-line no-unused-vars
     document, url, html, params,
   }) => {
-
     const CONFIG = {
       org: 'aemsites',
       repo: 'vitamix',
@@ -202,6 +251,7 @@ export default {
     ]);
 
     createRelatedArticles(main, CONFIG.origin, document);
+    createRelatedRecipes(main, CONFIG.origin, document);
 
     WebImporter.DOMUtils.remove(main, [
       '.related-recipes-section',
@@ -209,17 +259,25 @@ export default {
     ]);
 
     WebImporter.rules.createMetadata(main, document);
-    
-    const metadataTable = [...document.querySelectorAll('table')].find((table) => table.querySelector('tr th[colspan="2"]')?.textContent.trim() === 'Metadata');
+
+    const metadataTable = [...document.querySelectorAll('table')].find(
+      (table) => table.querySelector('tr th[colspan="2"]')?.textContent.trim() === 'Metadata',
+    );
     if (metadataTable) {
-      const hasAuthorAndDate = addAuthorAndDateToMetadata(main, metadataTable, CONFIG.source, CONFIG.origin, document);
+      const hasAuthorAndDate = addAuthorAndDateToMetadata(
+        main,
+        metadataTable,
+        CONFIG.source,
+        CONFIG.origin,
+        document,
+      );
       addTagsToMetadata(main, metadataTable, CONFIG.source, CONFIG.origin, document);
 
       if (hasAuthorAndDate) {
         document.querySelector('section[itemprop="articleBody"]')?.firstElementChild?.remove();
       }
     }
-    
+
     WebImporter.rules.transformBackgroundImages(main, document);
     WebImporter.rules.convertIcons(main, document);
 
