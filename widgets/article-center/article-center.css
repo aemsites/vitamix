@@ -149,6 +149,50 @@
   background-color: var(--color-gray-100);
 }
 
+/* Pagination */
+.article-center .pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-60);
+  padding: var(--spacing-600) 0;
+}
+
+/* stylelint-disable-next-line no-descending-specificity */
+.article-center .pagination button {
+  padding: var(--spacing-60) var(--spacing-100);
+  background-color: var(--color-white);
+  color: var(--color-charcoal);
+  border: var(--border-s) solid var(--color-gray-400);
+  border-radius: var(--rounding-m);
+  cursor: pointer;
+  font-size: var(--body-size-m);
+  transition: all 0.2s ease;
+  min-width: 40px;
+}
+
+.article-center .pagination button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.article-center .pagination button:hover:not(:disabled) {
+  background-color: var(--color-gray-100);
+  border-color: var(--color-charcoal);
+}
+
+.article-center .pagination button[aria-current="page"] {
+  background-color: var(--color-charcoal);
+  color: var(--color-white);
+  border-color: var(--color-charcoal);
+}
+
+.article-center .pagination .pages {
+  display: flex;
+  gap: var(--spacing-40);
+  align-items: center;
+}
+
 /* Results Grid */
 .article-center .results {
   display: flex;
@@ -261,49 +305,6 @@
 .article-center .card .matched-tags .tag .highlight {
   background-color: var(--color-yellow, #fff3cd);
   padding: 0 2px;
-}
-
-/* Pagination */
-.article-center .pagination {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: var(--spacing-60);
-  padding: var(--spacing-600) 0;
-}
-
-.article-center .pagination button {
-  padding: var(--spacing-60) var(--spacing-100);
-  background-color: var(--color-white);
-  color: var(--color-charcoal);
-  border: var(--border-s) solid var(--color-gray-400);
-  border-radius: var(--rounding-m);
-  cursor: pointer;
-  font-size: var(--body-size-m);
-  transition: all 0.2s ease;
-  min-width: 40px;
-}
-
-.article-center .pagination button:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.article-center .pagination button:hover:not(:disabled) {
-  background-color: var(--color-gray-100);
-  border-color: var(--color-charcoal);
-}
-
-.article-center .pagination button[aria-current="page"] {
-  background-color: var(--color-charcoal);
-  color: var(--color-white);
-  border-color: var(--color-charcoal);
-}
-
-.article-center .pagination .pages {
-  display: flex;
-  gap: var(--spacing-40);
-  align-items: center;
 }
 
 /* Responsive */
