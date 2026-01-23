@@ -91,7 +91,7 @@ export function isVariantAvailableForSale(variant) {
  * @param {Object} parent - Parent product object
  * @returns {HTMLElement} Container div with either add to cart functionality or alternative buttons
  */
-export default function renderAddToCart(block, parent, ph) {
+export default function renderAddToCart(ph, block, parent) {
   // Default selectedVariant to parent product, if simple product, selectedVariant will be undefined
   // TODO: this should be fixed with https://github.com/aemsites/vitamix/issues/185
   let selectedVariant = parent.offers?.[0]?.custom ? parent.offers[0] : parent;

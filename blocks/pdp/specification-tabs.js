@@ -90,7 +90,7 @@ function createWarrantyContent(warranty, customWarranty) {
  * @param {Array<Object>} resources - The resources array containing name, content-type, and URL.
  * @returns {HTMLDivElement} The resources content container.
  */
-function createResourcesContent(resources, productName, ph) {
+function createResourcesContent(ph, resources, productName) {
   const container = document.createElement('div');
   container.classList.add('resources-container');
 
@@ -141,7 +141,7 @@ function createResourcesContent(resources, productName, ph) {
  * @param {Object} data - The JSON-LD object containing custom data.
  * @returns {HTMLDivElement} The content container for the tab.
  */
-function createTabContent(tab, specifications, standardWarranty, custom, productName, ph) {
+function createTabContent(ph, tab, specifications, standardWarranty, custom, productName) {
   const { warranty } = window;
   const content = document.createElement('div');
   content.classList.add('tab-content');
@@ -159,7 +159,7 @@ function createTabContent(tab, specifications, standardWarranty, custom, product
       }
       break;
     case 'resources':
-      content.appendChild(createResourcesContent(custom.resources, productName, ph));
+      content.appendChild(createResourcesContent(ph, custom.resources, productName));
       break;
     default:
       break;
@@ -212,7 +212,7 @@ function initializeTabs(container) {
  * @param {Object} data - The JSON-LD object containing custom data.
  * @returns {Element} The specifications container element
  */
-export default function renderSpecs(specifications, custom, productName, ph) {
+export default function renderSpecs(ph, specifications, custom, productName) {
   const { options } = custom;
   const { warranty } = window;
   const standardWarranty = options?.find((option) => option.name.includes('Standard Warranty'));
@@ -238,12 +238,12 @@ export default function renderSpecs(specifications, custom, productName, ph) {
 
   tabs.forEach((tab) => {
     const content = createTabContent(
+      ph,
       tab,
       specifications,
       standardWarranty,
       custom,
       productName,
-      ph,
     );
     contents.appendChild(content);
   });

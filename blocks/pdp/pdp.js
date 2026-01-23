@@ -49,7 +49,7 @@ function renderTitle(block, custom, reviewsId) {
  * @param {Element} features - The features element from the fragment
  * @returns {Element} The details container element
  */
-function renderDetails(features, ph) {
+function renderDetails(ph, features) {
   const detailsContainer = document.createElement('div');
   detailsContainer.classList.add('details');
   detailsContainer.append(...features.children);
@@ -64,7 +64,7 @@ function renderDetails(features, ph) {
  * @param {Element} block - The PDP block element
  */
 // eslint-disable-next-line no-unused-vars
-async function renderReviews(block, reviewsId, ph) {
+async function renderReviews(ph, block, reviewsId) {
   // TODO: Add Bazaarvoice reviews
   const bazaarvoiceContainer = document.createElement('div');
   bazaarvoiceContainer.classList.add('pdp-reviews-container');
@@ -92,7 +92,7 @@ function renderFAQ(ph) {
   return faqContainer;
 }
 
-function renderCompare(custom, ph) {
+function renderCompare(ph, custom) {
   const { locale, language } = getLocaleAndLanguage();
   const { entityId } = custom;
   const compareContainer = document.createElement('div');
@@ -131,7 +131,7 @@ function renderCompare(custom, ph) {
   return compareContainer;
 }
 
-function renderContent(block, ph) {
+function renderContent(ph, block) {
   const { jsonLdData } = window;
   const { custom } = jsonLdData;
 
@@ -145,18 +145,18 @@ function renderContent(block, ph) {
 
   const { features } = window;
   if (features) {
-    const detailsContainer = renderDetails(features, ph);
+    const detailsContainer = renderDetails(ph, features);
     block.append(detailsContainer);
   }
 
   const { specifications } = window;
   if (specifications) {
-    const specsContainer = renderSpecs(specifications, custom, jsonLdData.name, ph);
+    const specsContainer = renderSpecs(ph, specifications, custom, jsonLdData.name);
     block.append(specsContainer);
   }
 }
 
-async function fetchFragment(block, ph) {
+async function fetchFragment(ph, block) {
   const fragmentPath = window.location.pathname.replace('/products/', '/products/fragments/');
   const fragment = await loadFragment(fragmentPath);
   if (fragment) {
@@ -177,10 +177,10 @@ async function fetchFragment(block, ph) {
     }
   }
 
-  renderContent(block, ph);
+  renderContent(ph, block);
 }
 
-function renderFreeShipping(offers, ph) {
+function renderFreeShipping(ph, offers) {
   if (!offers[0] || offers[0].price < 150) return null;
   const freeShippingContainer = document.createElement('div');
   freeShippingContainer.classList.add('pdp-free-shipping-container');
@@ -361,7 +361,7 @@ async function renderFreeGift() {
 export default async function decorate(block) {
   const { jsonLdData, variants } = window;
   const { custom, offers } = jsonLdData;
-  const { locale, language } = await getLocaleAndLanguage();
+  const { locale, language } = getLocaleAndLanguage();
   const ph = await fetchPlaceholders(`/${locale}/${language}/products/config`);
 
   const reviewsId = custom.reviewsId || toClassName(getMetadata('sku')).replace(/-/g, '');
@@ -377,11 +377,11 @@ export default async function decorate(block) {
   const isParentOutOfStock = isProductOutOfStock();
 
   const pricingContainer = renderPricing(ph, block);
-  const optionsContainer = renderOptions(block, variants, custom, isParentOutOfStock, ph);
-  const addToCartContainer = renderAddToCart(block, jsonLdData, ph);
-  const compareContainer = renderCompare(custom, ph);
+  const optionsContainer = renderOptions(ph, block, variants, custom, isParentOutOfStock);
+  const addToCartContainer = renderAddToCart(ph, block, jsonLdData);
+  const compareContainer = renderCompare(ph, custom);
   const freeGiftContainer = await renderFreeGift();
-  const freeShippingContainer = renderFreeShipping(offers, ph);
+  const freeShippingContainer = renderFreeShipping(ph, offers);
   const shareContainer = renderShare();
 
   // Hide free gift container if parent is out of stock
@@ -401,13 +401,13 @@ export default async function decorate(block) {
 
   if (isNextPipeline()) {
     // Content is already in the initial HTML
-    renderContent(block, ph);
+    renderContent(ph, block);
   } else {
     // Fetch and render the fragment for legacy pipeline
-    fetchFragment(block);
+    fetchFragment(ph, block);
   }
 
-  renderReviews(block, reviewsId, ph);
+  renderReviews(ph, block, reviewsId);
 
   block.append(
     alertContainer || '',
@@ -422,7 +422,7 @@ export default async function decorate(block) {
   const color = queryParams.get('color');
 
   if (color) {
-    onOptionChange(block, variants, color, ph, isParentOutOfStock);
+    onOptionChange(ph, block, variants, color, isParentOutOfStock);
   } else if (variants.length > 0) {
     [window.selectedVariant] = variants;
   }
