@@ -34,36 +34,27 @@ const removeDnt = (html) => {
 
 const adjustURLs = (html, context) => {
   const { path } = context;
-  const split = path.split('/');
-  html.querySelectorAll('a[href]').forEach((element) => {
-    if (!element.href) return;
-    const { pathname } = new URL(element.href);
-    const splitPathname = pathname.split('/');
+  // test if path starts with /<lang>/<locale>.
+  const pathPrefixRegex = /^\/?[a-z]{2}\/[a-z]{2}[-_][a-z]{2}(?=\/|$)/;
+  const isLocalPath = pathPrefixRegex.test(path);
+  const pathSegments = path.replace(/^\/+/, '').split('/');
+  const basePrefix = pathSegments.length >= 2 ? `/${pathSegments[0]}/${pathSegments[1]}` : '';
+  if (isLocalPath && basePrefix) {
+    html.querySelectorAll('a[href]').forEach((element) => {
+      if (!element.href) return;
+      const { pathname } = new URL(element.href);
 
-    if (splitPathname.length === split.length
-      && splitPathname[split.length - 1] === split[split.length - 1]) {
-      // same path length and last segment is the same,
-      // maybe we can adjust the locale and language (first 2 segments)
-      if (split.length > 1 && splitPathname[1] !== split[1]
-        && (split[1].length === 2 || split[1].length === 5)) {
-        // eslint-disable-next-line prefer-destructuring
-        splitPathname[1] = split[1];
+      if (pathPrefixRegex.test(pathname)) {
+        // replace the first 2 segments of the pathname with the first 2 segments of the path
+        const newPathname = pathname.replace(pathPrefixRegex, basePrefix);
+        const newHref = element.href.replace(pathname, newPathname);
+        if (element.textContent === element.href) {
+          element.textContent = newHref;
+        }
+        element.href = newHref;
       }
-
-      if (split.length > 2 && splitPathname[2] !== split[2]
-        && (split[2].length === 2 || split[2].length === 5)) {
-        // eslint-disable-next-line prefer-destructuring
-        splitPathname[2] = split[2];
-      }
-
-      const newPathname = splitPathname.join('/');
-      const newHref = element.href.replace(pathname, newPathname);
-      if (element.textContent === element.href) {
-        element.textContent = newHref;
-      }
-      element.href = newHref;
-    }
-  });
+    });
+  }
   return html.documentElement.outerHTML;
 };
 
