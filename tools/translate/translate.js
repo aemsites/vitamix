@@ -60,7 +60,7 @@ const translate = async (text, language, context) => {
 
   let selection = 'No text selected.';
   try {
-    selection = await actions.readSelection();
+    selection = await actions.getSelection();
   } catch (error) {
     // ignore
   }
