@@ -32,9 +32,7 @@ const removeDnt = (text) => {
   return html.documentElement.outerHTML;
 };
 
-const translate = async (text, language, context) => {
-  const html = addDnt(text);
-
+const translate = async (html, language, context) => {
   const body = new FormData();
   body.append('data', html);
   body.append('fromlang', 'en');
@@ -61,6 +59,7 @@ const translate = async (text, language, context) => {
   let selection = 'No text selected.';
   try {
     selection = await actions.getSelection();
+    selection = addDnt(selection);
   } catch (error) {
     // ignore
   }
