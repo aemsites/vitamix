@@ -204,6 +204,8 @@ export default function renderAddToCart(block, parent) {
       } else if (color === 'Shadow Black') {
         selectedOptions.push('Y29uZmlndXJhYmxlLzkzLzUzNA==');
       }
+
+      selectedOptions.push('Y3VzdG9tLW9wdGlvbi8zMDAwLzM5Mzk=');
     }
 
     // add selected variant option if available
