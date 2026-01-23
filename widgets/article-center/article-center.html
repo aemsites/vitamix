@@ -1,0 +1,29 @@
+<script type="module" src="/widgets/article-center/article-center.js"></script>
+<div class="article-center">
+  <h1 class="title">Search Articles</h1>
+  <form class="controls" aria-label="Article search">
+    <div class="search">
+      <input id="fulltext" type="search" aria-label="Search articles" placeholder="Search">
+      <button type="submit" class="search-btn" aria-label="Search">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"/>
+        </svg>
+      </button>
+    </div>
+  </form>
+  <div class="info">
+    <p>Showing <span id="results-start">1</span>-<span id="results-end">12</span> of <span id="results-count">0</span></p>
+    <details class="sort">
+      <summary>Sort by: <span id="sortby" data-sort="newest">Newest Articles</span></summary>
+      <menu>
+        <li><button type="button" data-sort="default">Default</button></li>
+        <li><button type="button" data-sort="newest" aria-pressed="true">Newest Articles</button></li>
+        <li><button type="button" data-sort="oldest">Oldest Articles</button></li>
+        <li><button type="button" data-sort="name-asc">Name A-Z</button></li>
+        <li><button type="button" data-sort="name-desc">Name Z-A</button></li>
+      </menu>
+    </details>
+  </div>
+  <ul class="results"></ul>
+  <nav class="pagination"></nav>
+</div>
