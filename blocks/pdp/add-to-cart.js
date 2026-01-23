@@ -195,6 +195,17 @@ export default function renderAddToCart(block, parent) {
     // build array of selected options (variants, warranties, required bundles)
     const selectedOptions = [];
 
+    // Temporary Special Case for Ascent X3
+    if (sku === 'Ascent X3') {
+      const { options } = selectedVariant;
+      const { value: color } = options[0];
+      if (color === 'Polar White') {
+        selectedOptions.push('Y29uZmlndXJhYmxlLzkzLzUzMQ==');
+      } else if (color === 'Shadow Black') {
+        selectedOptions.push('Y29uZmlndXJhYmxlLzkzLzUzNA==');
+      }
+    }
+
     // add selected variant option if available
     if (window.selectedVariant?.options?.uid) {
       selectedOptions.push(window.selectedVariant.options.uid);
