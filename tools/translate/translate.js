@@ -1,4 +1,4 @@
-import DA_SDK from './sdk.js';
+import DA_SDK from 'https://da.live/nx/utils/sdk.js';
 
 const addDnt = (text) => {
   // parse text into html
