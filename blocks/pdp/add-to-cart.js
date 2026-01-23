@@ -114,6 +114,10 @@ export default function renderAddToCart(block, parent) {
     return '';
   }
 
+  if (parent?.custom?.visibility === 'Search') {
+    return '';
+  }
+
   // If we have a selected variant, use it's custom object,
   // otherwise use the parent product's custom object
   const { custom } = selectedVariant || parent;
