@@ -758,20 +758,14 @@ function decorateSectionBackgrounds(main) {
   });
 
   main.querySelectorAll('.section.light, .section.dark').forEach((section) => {
-    /**
-     * Sets the collapse data attribute on a section element.
-     * @param {Element} el - The section element to set collapse on.
-     * @param {string} position - 'top' or 'bottom'.
-     */
-    const setCollapse = (el, position) => {
-      const existing = el?.dataset?.collapse;
-      if (existing === (position === 'top' ? 'bottom' : 'top')) {
-        el.dataset.collapse = 'both';
-      } else if (!existing) el.dataset.collapse = position;
-    };
-
-    setCollapse(section.previousElementSibling, 'bottom');
-    setCollapse(section.nextElementSibling, 'top');
+    const prev = section.previousElementSibling;
+    const next = section.nextElementSibling;
+    if (prev) {
+      prev.dataset.collapse = prev.dataset.collapse === 'top' ? 'both' : 'bottom';
+    }
+    if (next) {
+      next.dataset.collapse = next.dataset.collapse === 'bottom' ? 'both' : 'top';
+    }
   });
 }
 
