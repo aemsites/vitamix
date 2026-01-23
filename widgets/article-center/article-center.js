@@ -441,7 +441,7 @@ function buildArticleFiltering(container, config = {}) {
       'name-desc': (a, b) => b.title.localeCompare(a.title),
     };
 
-    let results = await lookupArticles(filterConfig);
+    const results = await lookupArticles(filterConfig);
 
     // Check for sort in filterConfig first, then fall back to UI element
     let sortBy = filterConfig.sort || 'newest';
