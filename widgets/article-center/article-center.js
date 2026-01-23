@@ -1,6 +1,6 @@
 /* eslint-disable max-len */
 
-import { loadCSS } from '../../scripts/aem.js';
+import { loadCSS, fetchPlaceholders } from '../../scripts/aem.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 /**
@@ -67,11 +67,11 @@ async function lookupArticles(config = {}) {
     };
   }
 
-  // Filter by fulltext search if provided
+  // Filter by search if provided
   let results = window.articleIndex.data.map((article) => ({ ...article }));
 
-  if (config.fulltext && config.fulltext.trim()) {
-    const searchTerm = config.fulltext.toLowerCase().trim();
+  if (config.search && config.search.trim()) {
+    const searchTerm = config.search.toLowerCase().trim();
     results = results.filter((article) => {
       const titleMatch = article.title.toLowerCase().includes(searchTerm);
       const descMatch = article.description.toLowerCase().includes(searchTerm);
@@ -143,9 +143,10 @@ function getRelativeImagePath(imageUrl) {
 /**
  * Creates an article card DOM element for display in the article listing.
  * @param {Object} article - Article data object with title, image, description, etc.
+ * @param {Object} placeholders - Placeholders object for i18n
  * @returns {HTMLElement} Article card element
  */
-function createArticleCard(article) {
+function createArticleCard(article, placeholders = {}) {
   const li = document.createElement('li');
   li.className = 'card';
 
@@ -190,7 +191,8 @@ function createArticleCard(article) {
     const authorDisplay = article.matchedAuthor && article.searchTerm
       ? highlightMatch(article.author, article.searchTerm)
       : article.author;
-    metaParts.push(`By: <a href="#">${authorDisplay}</a>`);
+    const byLabel = placeholders.by || 'By';
+    metaParts.push(`${byLabel}: <a href="#">${authorDisplay}</a>`);
   }
   meta.innerHTML = metaParts.join(' | ');
 
@@ -264,8 +266,9 @@ function updateURL(filterConfig) {
  * Builds complete article listing with search and sorting functionality.
  * @param {HTMLElement} container - Container element to transform into an article listing
  * @param {Object} config - Initial filter configuration
+ * @param {Object} placeholders - Placeholders object for i18n
  */
-function buildArticleFiltering(container, config = {}) {
+function buildArticleFiltering(container, config = {}, placeholders = {}) {
   const ITEMS_PER_PAGE = 12;
   let currentPage = 1;
 
@@ -296,13 +299,13 @@ function buildArticleFiltering(container, config = {}) {
 
   // Highlights search terms in article titles
   const highlightResults = (res) => {
-    const fulltext = document.getElementById('fulltext').value;
-    if (fulltext) {
+    const search = document.getElementById('fulltext').value;
+    if (search) {
       res.querySelectorAll('h3').forEach((title) => {
         const content = title.textContent;
-        const offset = content.toLowerCase().indexOf(fulltext.toLowerCase());
+        const offset = content.toLowerCase().indexOf(search.toLowerCase());
         if (offset >= 0) {
-          title.innerHTML = `${content.substring(0, offset)}<span class="highlight">${content.substring(offset, offset + fulltext.length)}</span>${content.substring(offset + fulltext.length)}`;
+          title.innerHTML = `${content.substring(0, offset)}<span class="highlight">${content.substring(offset, offset + search.length)}</span>${content.substring(offset + search.length)}`;
         }
       });
     }
@@ -317,7 +320,7 @@ function buildArticleFiltering(container, config = {}) {
     const paginatedResults = results.slice(startIndex, endIndex);
 
     paginatedResults.forEach((article) => {
-      resultsElement.append(createArticleCard(article));
+      resultsElement.append(createArticleCard(article, placeholders));
     });
     highlightResults(resultsElement);
 
@@ -337,7 +340,7 @@ function buildArticleFiltering(container, config = {}) {
     if (totalPages <= 1) return;
 
     const prevBtn = document.createElement('button');
-    prevBtn.textContent = 'Previous';
+    prevBtn.textContent = placeholders.previous || 'Previous';
     prevBtn.disabled = page <= 1;
     if (page > 1) prevBtn.dataset.page = page - 1;
     paginationElement.appendChild(prevBtn);
@@ -382,7 +385,7 @@ function buildArticleFiltering(container, config = {}) {
     paginationElement.appendChild(pages);
 
     const nextBtn = document.createElement('button');
-    nextBtn.textContent = 'Next';
+    nextBtn.textContent = placeholders.next || 'Next';
     nextBtn.disabled = page >= totalPages;
     if (page < totalPages) nextBtn.dataset.page = page + 1;
     paginationElement.appendChild(nextBtn);
@@ -405,7 +408,7 @@ function buildArticleFiltering(container, config = {}) {
   const createFilterConfig = (resetPage = false) => {
     const filterConfig = { ...config };
 
-    filterConfig.fulltext = document.getElementById('fulltext').value;
+    filterConfig.search = document.getElementById('fulltext').value;
 
     if (resetPage) {
       currentPage = 1;
@@ -471,8 +474,8 @@ function buildArticleFiltering(container, config = {}) {
     }
   };
 
-  const fulltextElement = container.querySelector('#fulltext');
-  fulltextElement.addEventListener('input', () => {
+  const searchElement = container.querySelector('#fulltext');
+  searchElement.addEventListener('input', () => {
     runSearch(createFilterConfig(true));
   });
 
@@ -486,7 +489,7 @@ function buildArticleFiltering(container, config = {}) {
   }
 
   // Also trigger search on Enter key
-  fulltextElement.addEventListener('keypress', (e) => {
+  searchElement.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
       runSearch(createFilterConfig(true));
     }
@@ -502,8 +505,8 @@ function buildArticleFiltering(container, config = {}) {
   }
 
   // Apply URL params to UI elements
-  if (urlConfig.fulltext) {
-    fulltextElement.value = urlConfig.fulltext;
+  if (urlConfig.search) {
+    searchElement.value = urlConfig.search;
   }
 
   if (urlConfig.sort) {
@@ -526,10 +529,10 @@ function buildArticleFiltering(container, config = {}) {
       const savedConfig = event.state.filterConfig;
 
       // Update search input
-      if (savedConfig.fulltext) {
-        fulltextElement.value = savedConfig.fulltext;
+      if (savedConfig.search) {
+        searchElement.value = savedConfig.search;
       } else {
-        fulltextElement.value = '';
+        searchElement.value = '';
       }
 
       // Update sort
@@ -556,10 +559,63 @@ function buildArticleFiltering(container, config = {}) {
 }
 
 // Initialize the article center
-function init() {
+async function init() {
   const articleCenter = document.querySelector('.article-center');
   if (articleCenter) {
-    buildArticleFiltering(articleCenter);
+    const { locale, language } = getLocaleAndLanguage();
+    const placeholders = await fetchPlaceholders(`/${locale}/${language}`);
+
+    // Move existing H1 into article-center if it exists
+    const existingH1 = document.querySelector('main h1');
+    if (existingH1 && !articleCenter.contains(existingH1)) {
+      existingH1.classList.add('title');
+      articleCenter.insertBefore(existingH1, articleCenter.firstChild);
+    }
+
+    // Populate placeholder text in HTML
+    const searchInput = articleCenter.querySelector('#fulltext');
+    if (searchInput) {
+      searchInput.placeholder = placeholders.search || 'Search';
+    }
+
+    const showingLabel = articleCenter.querySelector('.showing-label');
+    if (showingLabel) {
+      showingLabel.textContent = placeholders.showing || 'Showing';
+    }
+
+    const ofLabel = articleCenter.querySelector('.of-label');
+    if (ofLabel) {
+      ofLabel.textContent = placeholders.of || 'of';
+    }
+
+    const sortByLabel = articleCenter.querySelector('.sort-by-label');
+    if (sortByLabel) {
+      sortByLabel.textContent = `${placeholders.sortBy || 'Sort by'}:`;
+    }
+
+    // Populate sort options
+    const sortLabel = articleCenter.querySelector('#sortby');
+    if (sortLabel) {
+      sortLabel.textContent = placeholders.newestArticles || 'Newest Articles';
+    }
+
+    const sortButtons = articleCenter.querySelectorAll('.sort menu button');
+    sortButtons.forEach((btn) => {
+      const sortType = btn.dataset.sort;
+      if (sortType === 'default') {
+        btn.textContent = placeholders.default || 'Default';
+      } else if (sortType === 'newest') {
+        btn.textContent = placeholders.newestArticles || 'Newest Articles';
+      } else if (sortType === 'oldest') {
+        btn.textContent = placeholders.oldestArticles || 'Oldest Articles';
+      } else if (sortType === 'name-asc') {
+        btn.textContent = placeholders.nameAZ || 'Name A-Z';
+      } else if (sortType === 'name-desc') {
+        btn.textContent = placeholders.nameZA || 'Name Z-A';
+      }
+    });
+
+    buildArticleFiltering(articleCenter, {}, placeholders);
   }
 }
 
