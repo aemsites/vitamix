@@ -90,13 +90,13 @@ function createWarrantyContent(warranty, customWarranty) {
  * @param {Array<Object>} resources - The resources array containing name, content-type, and URL.
  * @returns {HTMLDivElement} The resources content container.
  */
-function createResourcesContent(resources, productName) {
+function createResourcesContent(resources, productName, ph) {
   const container = document.createElement('div');
   container.classList.add('resources-container');
 
   if (resources && resources.length > 0) {
     const resourceTitle = document.createElement('h3');
-    resourceTitle.textContent = `${productName} Resources`;
+    resourceTitle.textContent = `${productName} ${ph.resources}`;
     container.append(resourceTitle);
 
     resources.forEach((resource) => {
@@ -123,8 +123,8 @@ function createResourcesContent(resources, productName) {
   const questions = document.createElement('div');
   questions.classList.add('pdp-questions-container');
   questions.innerHTML = `
-    <h3>Have a question?</h3>
-    <p>Contact customer service!</p>
+    <h3>${ph.haveAQuestion}</h3>
+    <p>${ph.contactCustomerService}</p>
     <a href="mailto:service@vitamix.com"><img class="icon" src="/icons/email.svg" alt="Email">service@vitamix.com</a>
     <a href="tel:18008482649"><img class="icon" src="/icons/phone.svg" alt="Phone">1.800.848.2649</a>
   `;
@@ -141,7 +141,7 @@ function createResourcesContent(resources, productName) {
  * @param {Object} data - The JSON-LD object containing custom data.
  * @returns {HTMLDivElement} The content container for the tab.
  */
-function createTabContent(tab, specifications, standardWarranty, custom, productName) {
+function createTabContent(tab, specifications, standardWarranty, custom, productName, ph) {
   const { warranty } = window;
   const content = document.createElement('div');
   content.classList.add('tab-content');
@@ -159,7 +159,7 @@ function createTabContent(tab, specifications, standardWarranty, custom, product
       }
       break;
     case 'resources':
-      content.appendChild(createResourcesContent(custom.resources, productName));
+      content.appendChild(createResourcesContent(custom.resources, productName, ph));
       break;
     default:
       break;
@@ -212,14 +212,14 @@ function initializeTabs(container) {
  * @param {Object} data - The JSON-LD object containing custom data.
  * @returns {Element} The specifications container element
  */
-export default function renderSpecs(specifications, custom, productName) {
+export default function renderSpecs(specifications, custom, productName, ph) {
   const { options } = custom;
   const { warranty } = window;
   const standardWarranty = options?.find((option) => option.name.includes('Standard Warranty'));
   const tabs = [
-    { id: 'specifications', label: 'Specifications', show: !!specifications },
-    { id: 'warranty', label: 'Warranty', show: warranty },
-    { id: 'resources', label: 'Resources', show: true },
+    { id: 'specifications', label: ph.specifications, show: !!specifications },
+    { id: 'warranty', label: ph.warranty, show: warranty },
+    { id: 'resources', label: ph.resources, show: true },
   ].filter((tab) => tab.show);
 
   // if there are no tabs, don't render anything
@@ -237,7 +237,14 @@ export default function renderSpecs(specifications, custom, productName) {
   contents.classList.add('tab-contents');
 
   tabs.forEach((tab) => {
-    const content = createTabContent(tab, specifications, standardWarranty, custom, productName);
+    const content = createTabContent(
+      tab,
+      specifications,
+      standardWarranty,
+      custom,
+      productName,
+      ph,
+    );
     contents.appendChild(content);
   });
 

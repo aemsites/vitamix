@@ -401,11 +401,11 @@ function parsePDPContentSections(sections) {
   sections.forEach((section) => {
     const h3 = section.querySelector('h3')?.textContent.toLowerCase();
     if (h3) {
-      if (h3.includes('features')) {
+      if (h3.includes('features') || h3.includes('caractéristiques')) {
         window.features = section;
-      } else if (h3.includes('specifications')) {
+      } else if (h3.includes('specifications') || h3.includes('spécifications')) {
         window.specifications = section;
-      } else if (h3.includes('warranty')) {
+      } else if (h3.includes('warranty') || h3.includes('garantie')) {
         window.warranty = section;
       }
     }

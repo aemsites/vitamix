@@ -91,7 +91,7 @@ export function isVariantAvailableForSale(variant) {
  * @param {Object} parent - Parent product object
  * @returns {HTMLElement} Container div with either add to cart functionality or alternative buttons
  */
-export default function renderAddToCart(block, parent) {
+export default function renderAddToCart(block, parent, ph) {
   // Default selectedVariant to parent product, if simple product, selectedVariant will be undefined
   // TODO: this should be fixed with https://github.com/aemsites/vitamix/issues/185
   let selectedVariant = parent.offers?.[0]?.custom ? parent.offers[0] : parent;
@@ -170,7 +170,7 @@ export default function renderAddToCart(block, parent) {
 
   // create and configure add to cart button
   const addToCartButton = document.createElement('button');
-  addToCartButton.textContent = 'Add to Cart';
+  addToCartButton.textContent = ph.addToCart;
 
   // add click event handler for add to cart functionality
   addToCartButton.addEventListener('click', async () => {
@@ -221,7 +221,7 @@ export default function renderAddToCart(block, parent) {
       console.error('Failed to add item to cart', error);
     } finally {
       // update button state to show ATC
-      addToCartButton.textContent = 'Add to Cart';
+      addToCartButton.textContent = ph.addToCart;
       addToCartButton.removeAttribute('aria-disabled');
     }
   });

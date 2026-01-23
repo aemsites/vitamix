@@ -30,7 +30,7 @@ export function extractPricing(element) {
  * @param {Element} block - The PDP block element
  * @returns {Element} The pricing container element
  */
-export default function renderPricing(block, variant) {
+export default function renderPricing(ph, block, variant) {
   const pricingContainer = document.createElement('div');
   pricingContainer.classList.add('pricing');
 
@@ -97,8 +97,8 @@ export default function renderPricing(block, variant) {
       window._affirm_config = {
         public_api_key: '6PJNMXGC9XLXNFHX',
         script: 'https://cdn1.affirm.com/js/v2/affirm.js',
-        locale: 'en_US',
-        country_code: 'USA',
+        locale: ph.languagecode,
+        country_code: ph.countrycode,
         logo: 'blue',
         min_order_total: '50.00',
         max_order_total: '50000',
