@@ -1,3 +1,4 @@
+// eslint-disable-next-line import/no-unresolved
 import DA_SDK from 'https://da.live/nx/utils/sdk.js';
 
 const addDnt = (text) => {
@@ -24,12 +25,55 @@ const addDnt = (text) => {
   return html.documentElement.outerHTML;
 };
 
-const removeDnt = (text) => {
-  const html = new DOMParser().parseFromString(text, 'text/html');
+const removeDnt = (html) => {
   html.querySelectorAll('[translate="no"]').forEach((element) => {
     element.removeAttribute('translate');
   });
   return html.documentElement.outerHTML;
+};
+
+const adjustURLs = (html, context) => {
+  const { path } = context;
+  const split = path.split('/');
+  html.querySelectorAll('a[href]').forEach((element) => {
+    if (!element.href) return;
+    const { pathname } = new URL(element.href);
+    const splitPathname = pathname.split('/');
+
+    if (splitPathname.length === split.length
+      && splitPathname[split.length - 1] === split[split.length - 1]) {
+      // same path length and last segment is the same,
+      // maybe we can adjust the locale and language (first 2 segments)
+      if (split.length > 1 && splitPathname[1] !== split[1]
+        && (split[1].length === 2 || split[1].length === 5)) {
+        // eslint-disable-next-line prefer-destructuring
+        splitPathname[1] = split[1];
+      }
+
+      if (split.length > 2 && splitPathname[2] !== split[2]
+        && (split[2].length === 2 || split[2].length === 5)) {
+        // eslint-disable-next-line prefer-destructuring
+        splitPathname[2] = split[2];
+      }
+
+      const newPathname = splitPathname.join('/');
+      const newHref = element.href.replace(pathname, newPathname);
+      if (element.textContent === element.href) {
+        element.textContent = newHref;
+      }
+      element.href = newHref;
+    }
+  });
+  return html.documentElement.outerHTML;
+};
+
+const postProcess = (text, context) => {
+  const html = new DOMParser().parseFromString(text, 'text/html');
+  let result = removeDnt(html);
+  // remove start tag <html><head></head><body> and end tag </body></html>
+  result = adjustURLs(html, context);
+  result = result.replace(/^<html><head><\/head><body>/, '').replace(/<\/body><\/html>$/, '');
+  return result;
 };
 
 const translate = async (html, language, context) => {
@@ -45,9 +89,8 @@ const translate = async (html, language, context) => {
 
   const json = await resp.json();
 
-  const translated = removeDnt(json.translated, context);
-  // remove start tag <html><head></head><body> and end tag </body></html>
-  return translated.replace(/^<html><head><\/head><body>/, '').replace(/<\/body><\/html>$/, '');
+  const translated = postProcess(json.translated, context);
+  return translated;
 };
 
 (async function init() {
