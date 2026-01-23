@@ -13,9 +13,9 @@ function updateOOSMessage(ph, oosMessage, isParentOutOfStock) {
   if (!oosMessage) return;
 
   if (isParentOutOfStock) {
-    oosMessage.textContent = ph.itemOutOfStock;
+    oosMessage.textContent = ph.itemOutOfStock || 'This item is temporarily out of stock.';
   } else {
-    oosMessage.textContent = ph.colorOutOfStock;
+    oosMessage.textContent = ph.colorOutOfStock || 'This color is temporarily out of stock.';
   }
 }
 
@@ -80,7 +80,7 @@ export function onOptionChange(ph, block, variants, color, isParentOutOfStock = 
   }
 
   const variantColor = variant.options.color;
-  selectedOptionLabel.textContent = `Color: ${variantColor}`;
+  selectedOptionLabel.textContent = `${ph.color || 'Color'}: ${variantColor}`;
 
   // check if bundle (should skip variant images)
   let variantImages = variant.images || [];
@@ -177,7 +177,7 @@ export function renderOptions(ph, block, variants, custom, isParentOutOfStock) {
 
   const selectedOptionLabel = document.createElement('div');
   selectedOptionLabel.classList.add('selected-option-label');
-  selectedOptionLabel.textContent = `${ph.color}: ${variants[0].options.color}`;
+  selectedOptionLabel.textContent = `${ph.color || 'Color'}: ${variants[0].options.color}`;
   selectionContainer.append(selectedOptionLabel);
 
   const colors = variants.map((variant) => toClassName(variant.options.color));
@@ -215,7 +215,7 @@ export function renderOptions(ph, block, variants, custom, isParentOutOfStock) {
     warrantyContainer.classList.add('warranty');
 
     const warrantyHeading = document.createElement('div');
-    warrantyHeading.textContent = `${ph.warranty}:`;
+    warrantyHeading.textContent = `${ph.warranty || 'Warranty'}:`;
     warrantyContainer.append(warrantyHeading);
 
     options.forEach((option, i) => {
@@ -223,7 +223,7 @@ export function renderOptions(ph, block, variants, custom, isParentOutOfStock) {
         if (price) {
           return `$${price.toFixed(2)}`;
         }
-        return ph.free;
+        return ph.free || 'Free';
       };
       const warrantyValue = document.createElement('div');
       warrantyValue.classList.add('pdp-warranty-option');

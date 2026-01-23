@@ -97,8 +97,8 @@ export default function renderPricing(ph, block, variant) {
       window._affirm_config = {
         public_api_key: '6PJNMXGC9XLXNFHX',
         script: 'https://cdn1.affirm.com/js/v2/affirm.js',
-        locale: ph.languagecode,
-        country_code: ph.countrycode,
+        locale: ph.languagecode || 'en_US',
+        country_code: ph.countrycode || 'USA',
         logo: 'blue',
         min_order_total: '50.00',
         max_order_total: '50000',

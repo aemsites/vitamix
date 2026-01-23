@@ -21,7 +21,7 @@ function renderFindLocally(block) {
  * @param {HTMLElement} block - PDP block element
  * @returns {HTMLElement} Container div with "Find Dealer" button and expert consultation link
  */
-function renderFindDealer(block) {
+function renderFindDealer(ph, block) {
   const findDealerContainer = document.createElement('div');
   findDealerContainer.classList.add('add-to-cart');
   findDealerContainer.innerHTML = `<a
@@ -134,7 +134,7 @@ export default function renderAddToCart(ph, block, parent) {
 
   // check if product should show "Find Dealer" instead of add to cart
   if (findDealer === 'Yes' && !isAvailableForSale) {
-    return renderFindDealer(block);
+    return renderFindDealer(ph, block);
   }
 
   // create main add to cart container
@@ -170,12 +170,12 @@ export default function renderAddToCart(ph, block, parent) {
 
   // create and configure add to cart button
   const addToCartButton = document.createElement('button');
-  addToCartButton.textContent = ph.addToCart;
+  addToCartButton.textContent = ph.addToCart || 'Add to Cart';
 
   // add click event handler for add to cart functionality
   addToCartButton.addEventListener('click', async () => {
     // update button state to show loading
-    addToCartButton.textContent = 'Adding...';
+    addToCartButton.textContent = ph.adding || 'Adding...';
     addToCartButton.setAttribute('aria-disabled', 'true');
 
     // import required modules for cart functionality
@@ -221,7 +221,7 @@ export default function renderAddToCart(ph, block, parent) {
       console.error('Failed to add item to cart', error);
     } finally {
       // update button state to show ATC
-      addToCartButton.textContent = ph.addToCart;
+      addToCartButton.textContent = ph.addToCart || 'Add to Cart';
       addToCartButton.removeAttribute('aria-disabled');
     }
   });

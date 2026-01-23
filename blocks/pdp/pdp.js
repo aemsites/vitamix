@@ -54,7 +54,7 @@ function renderDetails(ph, features) {
   detailsContainer.classList.add('details');
   detailsContainer.append(...features.children);
   const h2 = document.createElement('h2');
-  h2.textContent = ph.about;
+  h2.textContent = ph.about || 'About';
   detailsContainer.prepend(h2);
   return detailsContainer;
 }
@@ -71,7 +71,7 @@ async function renderReviews(ph, block, reviewsId) {
   bazaarvoiceContainer.innerHTML = `<div data-bv-show="reviews" data-bv-product-id="${reviewsId}"></div>`;
 
   setTimeout(async () => {
-    await loadScript(`https://apps.bazaarvoice.com/deployments/vitamix/main_site/production/${ph.languagecode}/bv.js`);
+    await loadScript(`https://apps.bazaarvoice.com/deployments/vitamix/main_site/production/${ph.languagecode || 'en_US'}/bv.js`);
   }, 500);
 
   window.bvCallback = () => { };
@@ -84,10 +84,10 @@ function renderFAQ(ph) {
   const faqContainer = document.createElement('div');
   faqContainer.classList.add('faq-container');
   faqContainer.innerHTML = `
-  <h4>${ph.haveAQuestion}</h4>
+  <h4>${ph.haveAQuestion || 'Have a question?'}</h4>
   <ul>
-    <li><a href="https://www.vitamix.com/${locale}/${language}/owners-resources/product-support/faqs/">${ph.frequentlyAskedQuestions}</a></li>
-    <li><a href="https://www.vitamix.com/${locale}/${language}/customer-service/contact-us/">${ph.contactUs}</a></li>
+    <li><a href="https://www.vitamix.com/${locale}/${language}/owners-resources/product-support/faqs/">${ph.frequentlyAskedQuestions || 'Frequently Asked Questions'}</a></li>
+    <li><a href="https://www.vitamix.com/${locale}/${language}/customer-service/contact-us/">${ph.contactUs || 'Contact Us'}</a></li>
   </ul>`;
   return faqContainer;
 }
@@ -99,8 +99,8 @@ function renderCompare(ph, custom) {
   compareContainer.classList.add('pdp-compare-container');
   compareContainer.innerHTML = `
     <div>
-      <button class="pdp-compare-button">${ph.compare}</button>
-      <a href="/${locale}/${language}/catalog/product_compare/index/" title="${ph.viewComparisonList}" class="comparelistlink">${ph.viewComparisonList}.</a>
+      <button class="pdp-compare-button">${ph.compare || 'Compare'}</button>
+      <a href="/${locale}/${language}/catalog/product_compare/index/" title="${ph.viewComparisonList || 'View Comparison List'}" class="comparelistlink">${ph.viewComparisonList || 'View Comparison List'}.</a>
     </div>`;
 
   const compareButton = compareContainer.querySelector('.pdp-compare-button');
@@ -186,7 +186,7 @@ function renderFreeShipping(ph, offers) {
   freeShippingContainer.classList.add('pdp-free-shipping-container');
   freeShippingContainer.innerHTML = `
       <img src="/icons/delivery.svg" alt="Free Shipping" />
-      <span>${ph.freeShipping}</span>
+      <span>${ph.freeShipping || 'Eligible for FREE shipping'}</span>
   `;
   return freeShippingContainer;
 }
