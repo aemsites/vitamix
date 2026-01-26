@@ -1,35 +1,39 @@
 import { getMetadata } from '../../scripts/aem.js';
-import { checkVariantOutOfStock } from '../../scripts/scripts.js';
+import { checkVariantOutOfStock, getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 /**
  * Renders "Find Locally" button container.
+ * @param {Object} ph - Placeholders object
  * @param {HTMLElement} block - PDP block element
  * @returns {HTMLElement} Container div with the "Find Locally" button
  */
-function renderFindLocally(block) {
+function renderFindLocally(ph, block) {
+  const { locale, language } = getLocaleAndLanguage();
   const findLocallyContainer = document.createElement('div');
   findLocallyContainer.classList.add('add-to-cart');
   findLocallyContainer.innerHTML = `<a
     class="button emphasis pdp-find-locally-button"
-    href="https://www.vitamix.com/us/en_us/where-to-buy?productFamily=&productType=HH">Find Locally</a>`;
+    href="https://www.vitamix.com/${locale}/${language}/where-to-buy?productFamily=&productType=HH">${ph.findLocally || 'Find Locally'}</a>`;
   block.classList.add('pdp-find-locally');
   return findLocallyContainer;
 }
 
 /**
  * Renders a "Find Dealer" button container.
+ * @param {Object} ph - Placeholders object
  * @param {HTMLElement} block - PDP block element
  * @returns {HTMLElement} Container div with "Find Dealer" button and expert consultation link
  */
 function renderFindDealer(ph, block) {
+  const { locale, language } = getLocaleAndLanguage();
   const findDealerContainer = document.createElement('div');
   findDealerContainer.classList.add('add-to-cart');
   findDealerContainer.innerHTML = `<a
     class="button emphasis pdp-find-locally-button"
-    href="https://www.vitamix.com/us/en_us/where-to-buy?productFamily=2205202&productType=COMM">Find Dealer</a>
+    href="https://www.vitamix.com/${locale}/${language}/where-to-buy?productFamily=2205202&productType=COMM">${ph.findDealer || 'Find Dealer'}</a>
   <p>
     <a
-      href="https://www.vitamix.com/us/en_us/commercial/resources/consult-an-expert">Have a question? Consult an expert.</a>
+      href="https://www.vitamix.com/${locale}/${language}/commercial/resources/consult-an-expert">${ph.consultAnExpert || 'Have a question? Consult an expert.'}</a>
   </p>`;
   block.classList.add('pdp-find-dealer');
   return findDealerContainer;
@@ -123,13 +127,13 @@ export default function renderAddToCart(ph, block, parent) {
   // we always show the "Find Locally" button,
   // regardless of whether findLocally or findDealer is set to true or false.
   if (managedStock === '1' && !isAvailableForSale) {
-    return renderFindLocally(block);
+    return renderFindLocally(ph, block);
   }
 
   //  check if product should show "Find Locally" instead of add to cart if:
   // findLocally is enabled, findDealer is enabled but not commercial, OR product is out of stock
   if (findLocally === 'Yes' && !isAvailableForSale) {
-    return renderFindLocally(block);
+    return renderFindLocally(ph, block);
   }
 
   // check if product should show "Find Dealer" instead of add to cart
@@ -145,7 +149,7 @@ export default function renderAddToCart(ph, block, parent) {
 
   // create and configure quantity label
   const quantityLabel = document.createElement('label');
-  quantityLabel.textContent = 'Quantity:';
+  quantityLabel.textContent = `${ph.quantity || 'Quantity'}:`;
   quantityLabel.classList.add('pdp-quantity-label');
   quantityLabel.htmlFor = 'pdp-quantity-select';
   addToCartContainer.appendChild(quantityLabel);
@@ -215,7 +219,8 @@ export default function renderAddToCart(ph, block, parent) {
       await cartApi.addToCart(sku, selectedOptions, quantity);
 
       // redirect to cart page after successful addition
-      window.location.href = '/us/en_us/checkout/cart/';
+      const { locale, language } = getLocaleAndLanguage();
+      window.location.href = `/${locale}/${language}/checkout/cart/`;
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to add item to cart', error);

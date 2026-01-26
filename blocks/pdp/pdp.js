@@ -71,7 +71,7 @@ async function renderReviews(ph, block, reviewsId) {
   bazaarvoiceContainer.innerHTML = `<div data-bv-show="reviews" data-bv-product-id="${reviewsId}"></div>`;
 
   setTimeout(async () => {
-    await loadScript(`https://apps.bazaarvoice.com/deployments/vitamix/main_site/production/${ph.languagecode || 'en_US'}/bv.js`);
+    await loadScript(`https://apps.bazaarvoice.com/deployments/vitamix/main_site/production/${ph.languageCode || 'en_US'}/bv.js`);
   }, 500);
 
   window.bvCallback = () => { };
@@ -191,13 +191,13 @@ function renderFreeShipping(ph, offers) {
   return freeShippingContainer;
 }
 
-function renderAlert(block, custom) {
+function renderAlert(ph, block, custom) {
   const alertContainer = document.createElement('div');
   alertContainer.classList.add('pdp-alert');
 
   /* retired and coming soon */
   if (custom && custom.retired === 'Yes') {
-    alertContainer.innerText = 'Retired Product';
+    alertContainer.innerText = ph.retiredProduct || 'Retired Product';
     block.classList.add('pdp-retired');
     return alertContainer;
   }
@@ -214,7 +214,7 @@ function renderAlert(block, custom) {
   const pricing = extractPricing(pricingElement);
   if (pricing.regular && pricing.regular > pricing.final) {
     alertContainer.classList.add('pdp-promo-alert');
-    alertContainer.innerText = 'Save Now!';
+    alertContainer.innerText = ph.saveNow || 'Save Now!';
     return alertContainer;
   }
 
@@ -222,7 +222,7 @@ function renderAlert(block, custom) {
   return null;
 }
 
-function renderRelatedProducts(custom) {
+function renderRelatedProducts(ph, custom) {
   const { relatedSkus } = custom;
   const relatedProducts = relatedSkus || [];
   if (relatedProducts.length > 0) {
@@ -239,7 +239,7 @@ function renderRelatedProducts(custom) {
       const currentRelatedProducts = products.filter((product) => product && product.custom.retired === 'No');
       if (currentRelatedProducts.length > 0) {
         relatedProductsContainer.innerHTML = `
-          <h2>Related Products</h2>
+          <h2>${ph.relatedProducts || 'Related Products'}</h2>
         `;
         const ul = document.createElement('ul');
         currentRelatedProducts.forEach((product) => {
@@ -267,16 +267,16 @@ function renderRelatedProducts(custom) {
   return null;
 }
 
-function renderShare() {
+function renderShare(ph) {
   const shareContainer = document.createElement('div');
   shareContainer.classList.add('pdp-share-container');
   const url = decodeURIComponent(window.location.href);
   shareContainer.innerHTML = `
-    Share: 
+    ${ph.share || 'Share'}:
     <a rel="noopener noreferrer nofollow" href="https://www.facebook.com/sharer/sharer.php?u=${url}&quote=${url}"><img src="/icons/facebook.svg" alt="Facebook" /></a>
     <a rel="noopener noreferrer nofollow" href="https://www.twitter.com/share?url=${url}"><img src="/icons/x.svg" alt="X" /></a>
     <a rel="noopener noreferrer nofollow" href="https://www.pinterest.com/pin/create/button/?url=${url}"><img src="/icons/pinterest.svg" alt="Pinterest" /></a>
-    <a rel="noopener noreferrer nofollow" class="pdp-share-email" href="mailto:?subject=Check this out on Vitamix.com&body=${url}"><img src="/icons/email.svg" alt="Email" /></a>
+    <a rel="noopener noreferrer nofollow" class="pdp-share-email" href="mailto:?subject=${encodeURIComponent(ph.checkThisOut || 'Check this out on Vitamix.com')}&body=${url}"><img src="/icons/email.svg" alt="Email" /></a>
   `;
   return shareContainer;
 }
@@ -367,8 +367,8 @@ export default async function decorate(block) {
   const reviewsId = custom.reviewsId || toClassName(getMetadata('sku')).replace(/-/g, '');
   const galleryContainer = renderGallery(block, variants);
   const titleContainer = renderTitle(block, custom, reviewsId);
-  const alertContainer = renderAlert(block, custom);
-  const relatedProductsContainer = renderRelatedProducts(custom);
+  const alertContainer = renderAlert(ph, block, custom);
+  const relatedProductsContainer = renderRelatedProducts(ph, custom);
 
   const buyBox = document.createElement('div');
   buyBox.classList.add('pdp-buy-box');
@@ -382,7 +382,7 @@ export default async function decorate(block) {
   const compareContainer = renderCompare(ph, custom);
   const freeGiftContainer = await renderFreeGift();
   const freeShippingContainer = renderFreeShipping(ph, offers);
-  const shareContainer = renderShare();
+  const shareContainer = renderShare(ph);
 
   // Hide free gift container if parent is out of stock
   updateFreeGiftVisibility(freeGiftContainer, isParentOutOfStock, false);

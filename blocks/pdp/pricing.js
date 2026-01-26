@@ -51,7 +51,7 @@ export default function renderPricing(ph, block, variant) {
   if (pricing.regular && pricing.regular > pricing.final) {
     const nowLabel = document.createElement('div');
     nowLabel.className = 'pricing-now';
-    nowLabel.textContent = isReconditioned ? 'Recon Price' : 'Now';
+    nowLabel.textContent = isReconditioned ? (ph.reconPrice || 'Recon Price') : (ph.now || 'Now');
     pricingContainer.appendChild(nowLabel);
   }
 
@@ -67,7 +67,9 @@ export default function renderPricing(ph, block, variant) {
     const savingsAmount = pricing.regular - pricing.final;
     const saveText = document.createElement('span');
     saveText.className = 'pricing-save';
-    saveText.textContent = isReconditioned ? `Save $${savingsAmount.toFixed(2)} | New ` : `Save $${savingsAmount.toFixed(2)} | Was `;
+    saveText.textContent = isReconditioned
+      ? `${ph.save || 'Save'} $${savingsAmount.toFixed(2)} | ${ph.new || 'New'} `
+      : `${ph.save || 'Save'} $${savingsAmount.toFixed(2)} | ${ph.was || 'Was'} `;
 
     const regularPrice = document.createElement('del');
     regularPrice.className = 'pricing-regular';
@@ -97,8 +99,8 @@ export default function renderPricing(ph, block, variant) {
       window._affirm_config = {
         public_api_key: '6PJNMXGC9XLXNFHX',
         script: 'https://cdn1.affirm.com/js/v2/affirm.js',
-        locale: ph.languagecode || 'en_US',
-        country_code: ph.countrycode || 'USA',
+        locale: ph.languageCode || 'en_US',
+        country_code: ph.countryCode || 'USA',
         logo: 'blue',
         min_order_total: '50.00',
         max_order_total: '50000',
