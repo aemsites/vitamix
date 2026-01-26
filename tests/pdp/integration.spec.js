@@ -24,9 +24,9 @@ test.describe('PDP Integration Tests', () => {
   });
 
   test.describe('Configurable Product Page', () => {
-    const productPath = '/us/en_us/products/ascent-x3';
+    const productPath = '/us/en_us/products/ascent-x2';
 
-    test('should load Ascent X3 product page with all required elements', async ({ page }) => {
+    test('should load Ascent X2 product page with all required elements', async ({ page }) => {
       const productUrl = buildProductUrl(productPath, currentBranch);
       console.log(`Testing URL: ${productUrl}`);
 
@@ -35,13 +35,13 @@ test.describe('PDP Integration Tests', () => {
       // Wait for page to load
       await page.waitForLoadState('networkidle');
 
-      await expect(page).toHaveTitle(/Ascent X3/i);
+      await expect(page).toHaveTitle(/Ascent X2/i);
       await assertPDPElements(page);
       await assertSaleableElements(page);
       await assertOptionElements(page);
     });
 
-    test('should deeplink to Ascent X3 variant', async ({ page }) => {
+    test('should deeplink to Ascent X2 variant', async ({ page }) => {
       const productUrl = buildProductUrl(productPath, currentBranch, {
         color: 'polar-white',
       });
@@ -53,7 +53,7 @@ test.describe('PDP Integration Tests', () => {
       // Wait for page to load
       await page.waitForLoadState('networkidle');
 
-      await expect(page).toHaveTitle(/Ascent X3/i);
+      await expect(page).toHaveTitle(/Ascent X2/i);
       await assertPDPElements(page);
       await assertPDPElements(page);
       await assertSaleableElements(page);
@@ -68,11 +68,11 @@ test.describe('PDP Integration Tests', () => {
         expect(requestBody.variables).toEqual({
           cartItems: [
             {
-              sku: 'Ascent X3',
+              sku: 'Ascent X2',
               quantity: '1',
               selected_options: [
                 'Y29uZmlndXJhYmxlLzkzLzUzNA==',
-                'Y3VzdG9tLW9wdGlvbi8zMDAyLzM5NDE=',
+                'Y3VzdG9tLW9wdGlvbi8zMDAwLzM5Mzk=',
               ],
             },
           ],
@@ -88,7 +88,7 @@ test.describe('PDP Integration Tests', () => {
                 cart: {
                   items: [
                     {
-                      sku: 'Ascent X3',
+                      sku: 'Ascent X2',
                       quantity: '1',
                     },
                   ],
@@ -126,11 +126,11 @@ test.describe('PDP Integration Tests', () => {
         expect(requestBody.variables).toEqual({
           cartItems: [
             {
-              sku: 'Ascent X3',
+              sku: 'Ascent X2',
               quantity: '1',
               selected_options: [
                 'Y29uZmlndXJhYmxlLzkzLzUzNA==',
-                'Y3VzdG9tLW9wdGlvbi8zMDAyLzM5NDE=',
+                'Y3VzdG9tLW9wdGlvbi8zMDAwLzM5Mzk=',
               ],
             },
           ],
@@ -205,15 +205,15 @@ test.describe('PDP Integration Tests', () => {
         });
         expect(data).toEqual({
           index_id: '534',
-          product: '3641',
-          item: '3641',
+          product: '3627',
+          item: '3627',
           form_key: 'null',
           qty: '1',
           'super_attribute[93]': '534',
-          vitamixProductId: '3641',
-          'options[3002]': '3941',
+          vitamixProductId: '3627',
+          'options[3000]': '3939',
           warranty_sku: 'sku-10-year-standard-warranty',
-          'warranty_skus[3941]': 'sku-10-year-standard-warranty',
+          'warranty_skus[3939]': 'sku-10-year-standard-warranty',
         });
 
         // Log the arguments that were passed to addToCart
