@@ -75,9 +75,13 @@ const translate = async (html, language, context) => {
     const target = Math.min(start + maxChunk, html.length);
     let splitIndex = target;
     if (target < html.length) {
-      // find the last </div> tag before the target
-      const divIndex = html.indexOf('</div>', target);
-      splitIndex = divIndex === -1 ? target : divIndex + 6;
+      // find the last closing tag before the target
+      const chunk = html.slice(start, target);
+      const matches = [...chunk.matchAll(/<\/[a-zA-Z][^>]*>/g)];
+      if (matches.length > 0) {
+        const last = matches[matches.length - 1];
+        splitIndex = start + last.index + last[0].length;
+      }
     }
     splits.push(html.slice(start, splitIndex));
     start = splitIndex;
