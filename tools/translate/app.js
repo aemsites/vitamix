@@ -114,7 +114,7 @@ const ADMIN_URL = 'https://admin.da.live';
             updateStatus(listItem, 'error', `Failed to save translated HTML: (${resp.statusText})`);
           }
           const daHref = `https://da.live/edit#/${context.org}/${context.repo}${u.pathname}`;
-          updateStatus(listItem, 'posted', `Translated page saved! View page: <a href="${daHref}" target="_blank">${daHref}</a>`);
+          updateStatus(listItem, 'saved', `Translated page saved! View page: <a href="${daHref}" target="_blank">${daHref}</a>`);
         } catch (error) {
           // eslint-disable-next-line no-console
           console.error('Error retrieving page content', error);

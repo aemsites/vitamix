@@ -121,7 +121,8 @@ button:hover {
   background: #deebff;
 }
 
-.status.translated {
+.status.translated,
+.status.saved {
   color: #064;
   background: #e3fcef;
 }
