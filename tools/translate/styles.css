@@ -6,22 +6,23 @@
 
 :root {
   color-scheme: light;
+
   --bg: #f5f6f7;
-  --card: #ffffff;
+  --card: #fff;
   --text: #1d1d1f;
   --muted: #5b6169;
   --border: #d9dde3;
   --primary: #2a64d3;
   --primary-dark: #1f4da3;
-  --ring: rgba(42, 100, 211, 0.2);
-  --shadow: 0 2px 8px rgba(28, 39, 52, 0.08);
+  --ring: rgb(42 100 211 / 20%);
+  --shadow: 0 2px 8px rgb(28 39 52 / 8%);
   --radius: 10px;
   --radius-sm: 8px;
 }
 
 body {
   margin: 0;
-  font-family: "Adobe Clean", "Inter", "Helvetica Neue", Arial, sans-serif;
+  font-family: "Adobe Clean", Inter, "Helvetica Neue", Arial, sans-serif;
   color: var(--text);
   background: var(--bg);
   min-height: 100vh;
@@ -51,6 +52,13 @@ body {
   gap: 12px;
 }
 
+.translate-error {
+  color: #c62828;
+  font-size: 13px;
+  min-height: 16px;
+  display: none;
+}
+
 .translate-input {
   grid-template-columns: minmax(0, 1fr) 200px;
   align-items: start;
@@ -66,7 +74,7 @@ textarea {
   font-size: 15px;
   line-height: 1.5;
   color: var(--text);
-  background: #ffffff;
+  background: #fff;
   box-shadow: none;
 }
 
@@ -81,7 +89,7 @@ select {
   padding: 12px 14px;
   font-size: 14px;
   color: var(--text);
-  background: #ffffff;
+  background: #fff;
   box-shadow: none;
 }
 
@@ -105,7 +113,7 @@ button {
 
 button[name="translate"] {
   background: var(--primary);
-  color: #ffffff;
+  color: #fff;
   box-shadow: none;
 }
 
@@ -123,7 +131,7 @@ button[name="replace"]:hover {
   background: #e7eaee;
 }
 
-@media (max-width: 720px) {
+@media (width <= 720px) {
   .translate-form {
     padding: 20px;
   }
@@ -137,7 +145,7 @@ button[name="replace"]:hover {
   }
 }
 
-@media (max-width: 500px) {
+@media (width <= 500px) {
   .translate-input textarea,
   .translate-output textarea,
   button[name="replace"] {

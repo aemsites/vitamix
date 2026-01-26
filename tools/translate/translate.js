@@ -96,7 +96,7 @@ const translate = async (html, language, context) => {
     const opts = { method: 'POST', body };
     const resp = await fetch('https://translate.da.live/google', opts);
     if (!resp.ok) {
-      throw new Error(`Translate failed: ${resp.status}`);
+      throw new Error(`Translation failed: ${resp.status}`);
     }
 
     const json = await resp.json();
@@ -135,9 +135,25 @@ const translate = async (html, language, context) => {
   languageSelector.value = 'fr';
 
   const translateBtn = document.querySelector('button[name="translate"]');
+  const errorMessage = document.querySelector('.translate-error');
+
   translateBtn.addEventListener('click', async (e) => {
     e.preventDefault();
-    const translation = await translate(inputTextarea.value, languageSelector.value, context);
+    if (errorMessage) {
+      errorMessage.textContent = '';
+      errorMessage.style.display = 'none';
+    }
+    let translation = '';
+    try {
+      translation = await translate(inputTextarea.value, languageSelector.value, context);
+    } catch (error) {
+      if (errorMessage) {
+        errorMessage.textContent = error?.message || 'Translation failed.';
+        errorMessage.style.display = 'block';
+      }
+      return;
+    }
+
     if (isLightVersion) {
       actions.sendHTML(translation);
       actions.closeLibrary();
