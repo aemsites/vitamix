@@ -75,13 +75,16 @@ const translate = async (html, language, context) => {
 
   const opts = { method: 'POST', body };
 
-  const resp = await fetch('https://translate.da.live/google', opts);
+  const resp = await fetch('http://localhost:62879/google', opts);
   if (!resp.ok) return null;
 
   const json = await resp.json();
 
-  const translated = postProcess(json.translated, context);
-  return translated;
+  if (json.translated) {
+    const translated = postProcess(json.translated, context);
+    return translated;
+  }
+  throw new Error(json.error || 'Failed to translate');
 };
 
 (async function init() {
