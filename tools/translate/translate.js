@@ -68,23 +68,43 @@ const postProcess = (text, context) => {
 };
 
 const translate = async (html, language, context) => {
-  const body = new FormData();
-  body.append('data', html);
-  body.append('fromlang', 'en');
-  body.append('tolang', language);
-
-  const opts = { method: 'POST', body };
-
-  const resp = await fetch('http://localhost:62879/google', opts);
-  if (!resp.ok) return null;
-
-  const json = await resp.json();
-
-  if (json.translated) {
-    const translated = postProcess(json.translated, context);
-    return translated;
+  const splits = [];
+  const maxChunk = 30000;
+  let start = 0;
+  while (start < html.length) {
+    const target = Math.min(start + maxChunk, html.length);
+    let splitIndex = target;
+    if (target < html.length) {
+      // find the last </div> tag before the target
+      const divIndex = html.indexOf('</div>', target);
+      splitIndex = divIndex === -1 ? target : divIndex + 6;
+    }
+    splits.push(html.slice(start, splitIndex));
+    start = splitIndex;
   }
-  throw new Error(json.error || 'Failed to translate');
+
+  const translateSplit = async (split) => {
+    const body = new FormData();
+    body.append('data', split);
+    body.append('fromlang', 'en');
+    body.append('tolang', language);
+
+    const opts = { method: 'POST', body };
+    const resp = await fetch('http://translate.da.live/google', opts);
+    if (!resp.ok) {
+      throw new Error(`Translate failed: ${resp.status}`);
+    }
+
+    const json = await resp.json();
+    if (!json.translated) {
+      throw new Error(json.error || 'Failed to translate');
+    }
+    return json.translated;
+  };
+
+  const translatedParts = await Promise.all(splits.map((split) => translateSplit(split)));
+  const combined = translatedParts.join('');
+  return postProcess(combined, context);
 };
 
 (async function init() {
