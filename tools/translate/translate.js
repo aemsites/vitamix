@@ -90,7 +90,7 @@ const translate = async (html, language, context) => {
     body.append('tolang', language);
 
     const opts = { method: 'POST', body };
-    const resp = await fetch('http://translate.da.live/google', opts);
+    const resp = await fetch('https://translate.da.live/google', opts);
     if (!resp.ok) {
       throw new Error(`Translate failed: ${resp.status}`);
     }
