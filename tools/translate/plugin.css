@@ -1,36 +1,4 @@
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-
-:root {
-  color-scheme: light;
-
-  --bg: #f5f6f7;
-  --card: #fff;
-  --text: #1d1d1f;
-  --muted: #5b6169;
-  --border: #d9dde3;
-  --primary: #2a64d3;
-  --primary-dark: #1f4da3;
-  --ring: rgb(42 100 211 / 20%);
-  --shadow: 0 2px 8px rgb(28 39 52 / 8%);
-  --radius: 10px;
-  --radius-sm: 8px;
-}
-
-body {
-  margin: 0;
-  font-family: "Adobe Clean", Inter, "Helvetica Neue", Arial, sans-serif;
-  color: var(--text);
-  background: var(--bg);
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-}
+@import url('./shared.css');
 
 .translate-container {
   width: min(560px, 100%);
