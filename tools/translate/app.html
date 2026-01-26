@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Translation tool</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <link rel="stylesheet" href="./app.css">
+    <script src="./app.js" type="module"></script>
+  </head>
+  <body>
+    <div class="app-container">
+      <h1>Translation tool</h1>
+      <p>Enter list of URLs to translate</p>
+      <form class="app-form">
+        <div class="app-input">
+          <textarea name="urls" placeholder="Enter list of URLs to translate"></textarea>
+          <select name="language">
+            <option value="en">English</option>
+            <option value="es">Spanish</option>
+            <option value="fr">French</option>
+            <option value="de">German</option>
+            <option value="it">Italian</option>
+          </select>
+          <div class="app-error" aria-live="polite"></div>
+          <button name="translate">Translate</button>
+        </div>
+        <div class="app-output">
+          <ul class="app-output-list"></ul>
+        </div>
+      </form>
+    </div>
+  </body>
+</html>
