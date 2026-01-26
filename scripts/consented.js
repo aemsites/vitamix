@@ -76,20 +76,6 @@ fbq('track', 'PageView');
 
 // End Facebook Pixel Code
 
-// Snap Pixel Code
-try {
-  (function(e,t,n){if(e.snaptr)return;var a=e.snaptr=function()
-    {a.handleRequest?a.handleRequest.apply(a,arguments):a.queue.push(arguments)};
-    a.queue=[];var s='script';const r=t.createElement(s);r.async=!0;
-    r.src=n;var u=t.getElementsByTagName(s)[0];
-    u.parentNode.insertBefore(r,u);})
-    (window,document,'https://sc-static.net/scevent.min.js');
-    snaptr('init', '308aeb00-4528-4312-b257-3d04cbdc93a0', {'user_email': 'email_variable'});
-    snaptr('track', 'PAGE_VIEW');
-} catch (error) {
-  console.error('Snap Pixel Code failed to load', error);
-}
-// End of Snap Pixel Code
 
 // Pinterest Tag
 !function(e){
