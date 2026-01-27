@@ -352,11 +352,11 @@ function parsePDPContentSections(sections) {
   sections.forEach((section) => {
     const h3 = section.querySelector('h3')?.textContent.toLowerCase();
     if (h3) {
-      if (h3.includes('features')) {
+      if (h3.includes('features') || h3.includes('caractéristiques')) {
         window.features = section;
-      } else if (h3.includes('specifications')) {
+      } else if (h3.includes('specifications') || h3.includes('spécifications')) {
         window.specifications = section;
-      } else if (h3.includes('warranty')) {
+      } else if (h3.includes('warranty') || h3.includes('garantie')) {
         window.warranty = section;
       }
     }
@@ -461,6 +461,25 @@ function buildAutoBlocks(main) {
       document.body.classList.add('pdp-template');
     }
 
+    // setup articles pages
+    if (getMetadata('template') === 'article') {
+      let hero = main.querySelector('.hero');
+      if (!hero) {
+        const picture = main.querySelector('picture');
+        const h1 = main.querySelector('h1');
+        if (picture && h1) {
+          const section = document.createElement('div');
+          hero = buildBlock('hero', { elems: [picture, h1] });
+          section.append(hero);
+          main.prepend(section);
+        }
+      }
+      // add article-info block after hero
+      if (hero) {
+        hero.after(buildBlock('article-info', { elems: [] }));
+      }
+    }
+
     // wrap recipes in block
     if (document.querySelector('main') === main) {
       const template = getMetadata('template');
@@ -480,6 +499,16 @@ function buildAutoBlocks(main) {
         const footer = buildBlock('fragment', footerLink);
         main.firstElementChild.append(footer);
       }
+    }
+
+    // setup toc
+    const tocRef = getMetadata('toc');
+    if (tocRef && (tocRef !== 'none') && !document.querySelector('.toc')) {
+      const toc = buildBlock('toc', [[`<a href="${tocRef}">${tocRef}</a>`]]);
+      const section = document.createElement('div');
+      section.classList.add('section');
+      section.append(toc);
+      main.prepend(section);
     }
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -613,6 +642,10 @@ function decorateEyebrows(main) {
       // ignore p tags with images or links
       const disqualifiers = beforeH.querySelector('img, a[href]');
       if (disqualifiers) return;
+      // ignore really long p tags
+      const words = beforeH.textContent.trim().split(' ');
+      if (words.length > 12) return;
+
       beforeH.classList.add('eyebrow');
       h.dataset.eyebrow = beforeH.textContent.trim();
     }
@@ -663,20 +696,14 @@ function decorateSectionBackgrounds(main) {
   });
 
   main.querySelectorAll('.section.light, .section.dark').forEach((section) => {
-    /**
-     * Sets the collapse data attribute on a section element.
-     * @param {Element} el - The section element to set collapse on.
-     * @param {string} position - 'top' or 'bottom'.
-     */
-    const setCollapse = (el, position) => {
-      const existing = el?.dataset?.collapse;
-      if (existing === (position === 'top' ? 'bottom' : 'top')) {
-        el.dataset.collapse = 'both';
-      } else if (!existing) el.dataset.collapse = position;
-    };
-
-    setCollapse(section.previousElementSibling, 'bottom');
-    setCollapse(section.nextElementSibling, 'top');
+    const prev = section.previousElementSibling;
+    const next = section.nextElementSibling;
+    if (prev) {
+      prev.dataset.collapse = prev.dataset.collapse === 'top' ? 'both' : 'bottom';
+    }
+    if (next) {
+      next.dataset.collapse = next.dataset.collapse === 'bottom' ? 'both' : 'top';
+    }
   });
 }
 
@@ -1053,6 +1080,35 @@ async function loadNavBanner(main) {
 }
 
 /**
+ * Simulates a PDP preview on localhost, aem.page and aem.live.
+ */
+
+async function simulatePDPPreview() {
+  const corsProxyFetch = async (url) => {
+    const corsProxy = 'https://fcors.org/?url=';
+    const corsKey = '&key=Mg23N96GgR8O3NjU';
+    const fullUrl = `https://main--vitamix--aemsites.aem.network${url}`;
+    return fetch(`${corsProxy}${encodeURIComponent(fullUrl)}${corsKey}`);
+  };
+  const { pathname } = new URL(window.location.href);
+  const resp = await corsProxyFetch(pathname);
+  const html = await resp.text();
+  const dom = new DOMParser().parseFromString(html, 'text/html');
+  const stashedMain = document.querySelector('main');
+  const mainProductInfoDivs = dom.querySelectorAll('main div');
+  const lastDiv = mainProductInfoDivs[mainProductInfoDivs.length - 1];
+  lastDiv.after(...stashedMain.children);
+  dom.querySelector('main').querySelectorAll('img[src^="./media_"]').forEach((el) => {
+    el.setAttribute('src', el.getAttribute('src').replace('./media_', 'https://main--vitamix--aemsites.aem.network/us/en_us/products/media_'));
+  });
+  dom.querySelector('main').querySelectorAll('source[srcset^="./media_"]').forEach((el) => {
+    el.setAttribute('srcset', el.getAttribute('srcset').replace('./media_', 'https://main--vitamix--aemsites.aem.network/us/en_us/products/media_'));
+  });
+  document.body.innerHTML = dom.body.innerHTML;
+  document.head.innerHTML = dom.head.innerHTML;
+}
+
+/**
  * Loads everything needed to get to LCP.
  * @param {Element} doc The container element
  */
@@ -1061,11 +1117,13 @@ async function loadEager(doc) {
   const language = locale ? locale.split('_')[0] : 'en';
   document.documentElement.lang = language;
 
+  /* simulation date */
   const params = new URLSearchParams(window.location.search);
   if (params.get('simulateDate')) {
     window.simulateDate = params.get('simulateDate');
   }
 
+  /* adjust shop images to locale root path, util all of shop is mapped */
   if (window.location.pathname.includes('/shop/')) {
     const images = doc.querySelectorAll('img[src^="./media_"]');
     images.forEach((img) => {
@@ -1075,6 +1133,18 @@ async function loadEager(doc) {
     sources.forEach((source) => {
       source.setAttribute('srcset', source.getAttribute('srcset').replace('./media_', '/us/en_us/media_'));
     });
+  }
+
+  /* pdp simulation on localhost, aem.page and aem.live */
+  const isProd = window.location.hostname.includes('vitamix.com') || window.location.hostname.includes('.aem.network');
+  if (!isProd && window.location.pathname.includes('/products/')) {
+    const metaSku = document.querySelector('meta[name="sku"]');
+    const pdpBlock = document.querySelector('.pdp');
+    if (!metaSku && !pdpBlock) {
+      /* eslint-disable-next-line no-console */
+      console.log('PDP simulation on localhost, aem.page and aem.live');
+      await simulatePDPPreview();
+    }
   }
 
   decorateTemplateAndTheme();

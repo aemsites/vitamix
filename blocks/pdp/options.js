@@ -9,13 +9,13 @@ import renderAddToCart from './add-to-cart.js';
  * @param {Element} oosMessage - The OOS message element
  * @param {boolean} isParentOutOfStock - Whether the parent product is out of stock
  */
-function updateOOSMessage(oosMessage, isParentOutOfStock) {
+function updateOOSMessage(ph, oosMessage, isParentOutOfStock) {
   if (!oosMessage) return;
 
   if (isParentOutOfStock) {
-    oosMessage.textContent = 'This item is temporarily out of stock.';
+    oosMessage.textContent = ph.itemOutOfStock || 'This item is temporarily out of stock.';
   } else {
-    oosMessage.textContent = 'This color is temporarily out of stock.';
+    oosMessage.textContent = ph.colorOutOfStock || 'This color is temporarily out of stock.';
   }
 }
 
@@ -46,7 +46,7 @@ export function updateFreeGiftVisibility(
  * @param {string} color - The color of the selected option
  * @param {boolean} isParentOutOfStock - Whether the parent product is out of stock
  */
-export function onOptionChange(block, variants, color, isParentOutOfStock = false) {
+export function onOptionChange(ph, block, variants, color, isParentOutOfStock = false) {
   if (variants[0].options.color.replace(/\s+/g, '-').toLowerCase() !== color) {
     // eslint-disable-next-line no-restricted-globals
     history.replaceState(null, '', `?color=${color}`);
@@ -67,20 +67,20 @@ export function onOptionChange(block, variants, color, isParentOutOfStock = fals
 
   // Update the OOS message text based on parent vs variant
   const oosMessage = block.querySelector('.pdp-oos-message');
-  updateOOSMessage(oosMessage, isParentOutOfStock);
+  updateOOSMessage(ph, oosMessage, isParentOutOfStock);
 
   // Hide/show free gift container based on availability
   const freeGiftContainer = block.querySelector('.pdp-free-gift-container');
   updateFreeGiftVisibility(freeGiftContainer, isParentOutOfStock, oos);
 
   // update pricing
-  const pricingContainer = renderPricing(block, variant);
+  const pricingContainer = renderPricing(ph, block, variant);
   if (pricingContainer) {
     block.querySelector('.pricing').replaceWith(pricingContainer);
   }
 
   const variantColor = variant.options.color;
-  selectedOptionLabel.textContent = `Color: ${variantColor}`;
+  selectedOptionLabel.textContent = `${ph.color || 'Color'}: ${variantColor}`;
 
   // check if bundle (should skip variant images)
   let variantImages = variant.images || [];
@@ -135,16 +135,16 @@ export function onOptionChange(block, variants, color, isParentOutOfStock = fals
   window.selectedVariant = variant;
 
   // update add to cart
-  const addToCartContainer = renderAddToCart(block, window.jsonLdData);
+  const addToCartContainer = renderAddToCart(ph, block, window.jsonLdData);
   if (addToCartContainer) {
     block.querySelector('.add-to-cart').replaceWith(addToCartContainer);
   }
 }
 
-function renderOOSMessage(element, isParentOutOfStock) {
+function renderOOSMessage(ph, element, isParentOutOfStock) {
   const oosMessage = document.createElement('div');
   oosMessage.classList.add('pdp-oos-message');
-  updateOOSMessage(oosMessage, isParentOutOfStock);
+  updateOOSMessage(ph, oosMessage, isParentOutOfStock);
   element.append(oosMessage);
 }
 
@@ -155,7 +155,7 @@ function renderOOSMessage(element, isParentOutOfStock) {
  * @param {Record<string, any>} custom - The custom data for the product
  * @returns {Element} The options container element
  */
-export function renderOptions(block, variants, custom, isParentOutOfStock) {
+export function renderOptions(ph, block, variants, custom, isParentOutOfStock) {
   const optionsContainer = document.createElement('div');
   optionsContainer.classList.add('options');
   const { options } = custom;
@@ -163,7 +163,7 @@ export function renderOptions(block, variants, custom, isParentOutOfStock) {
   // If we are dealing with an out of stock simple product,
   // render the OOS message and return
   if (isParentOutOfStock && custom.type === 'simple') {
-    renderOOSMessage(optionsContainer, isParentOutOfStock);
+    renderOOSMessage(ph, optionsContainer, isParentOutOfStock);
     return optionsContainer;
   }
 
@@ -177,7 +177,7 @@ export function renderOptions(block, variants, custom, isParentOutOfStock) {
 
   const selectedOptionLabel = document.createElement('div');
   selectedOptionLabel.classList.add('selected-option-label');
-  selectedOptionLabel.textContent = `Color: ${variants[0].options.color}`;
+  selectedOptionLabel.textContent = `${ph.color || 'Color'}: ${variants[0].options.color}`;
   selectionContainer.append(selectedOptionLabel);
 
   const colors = variants.map((variant) => toClassName(variant.options.color));
@@ -196,7 +196,7 @@ export function renderOptions(block, variants, custom, isParentOutOfStock) {
     colorOption.append(colorSwatch);
 
     colorOption.addEventListener('click', () => {
-      onOptionChange(block, variants, color, isParentOutOfStock);
+      onOptionChange(ph, block, variants, color, isParentOutOfStock);
     });
 
     return colorOption;
@@ -208,14 +208,14 @@ export function renderOptions(block, variants, custom, isParentOutOfStock) {
   selectionContainer.append(colorOptionsContainer);
 
   optionsContainer.append(selectionContainer);
-  renderOOSMessage(optionsContainer, isParentOutOfStock);
+  renderOOSMessage(ph, optionsContainer, isParentOutOfStock);
 
   if (options && options.length > 0) {
     const warrantyContainer = document.createElement('div');
     warrantyContainer.classList.add('warranty');
 
     const warrantyHeading = document.createElement('div');
-    warrantyHeading.textContent = 'Warranty:';
+    warrantyHeading.textContent = `${ph.warranty || 'Warranty'}:`;
     warrantyContainer.append(warrantyHeading);
 
     options.forEach((option, i) => {
@@ -223,7 +223,7 @@ export function renderOptions(block, variants, custom, isParentOutOfStock) {
         if (price) {
           return `$${price.toFixed(2)}`;
         }
-        return 'Free';
+        return ph.free || 'Free';
       };
       const warrantyValue = document.createElement('div');
       warrantyValue.classList.add('pdp-warranty-option');

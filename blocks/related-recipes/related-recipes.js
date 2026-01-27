@@ -9,6 +9,25 @@ const WEIGHTS = {
 };
 
 /**
+ * Find matching recipe in data by href path.
+ * @param {string} href - href path to match
+ * @param {Object[]} data - Array of all recipe objects
+ * @returns {Object|undefined} Matching recipe or undefined
+ */
+function findMatchingRecipe(href, data) {
+  // If href has -r ID, try exact match; otherwise match base path
+  if (href.includes('-r')) {
+    return data.find((recipe) => recipe.path === href);
+  }
+
+  // Match base path (without r-ID suffix)
+  return data.find((recipe) => {
+    const recipePath = recipe.path.split('-r')[0];
+    return recipePath === href;
+  });
+}
+
+/**
  * Parse comma-separated string into trimmed array.
  * @param {string} str - String
  * @returns {string[]} Array of trimmed, non-empty values
@@ -156,32 +175,49 @@ function findRelatedRecipes(target, allRecipes, max = 3) {
 
 export default async function decorate(block) {
   const { locale, language } = getLocaleAndLanguage();
-  const path = `/${locale}/${language}/recipes/data/query-index.json`;
+  const path = `/${locale}/${language}/recipes/query-index.json`;
   const resp = await fetch(path);
-  const { data } = await resp.json();
+  if (!resp.ok) {
+    block.remove();
+    return;
+  }
 
+  const { data } = await resp.json();
   if (!data || data.length === 0) {
     block.remove();
     return;
   }
 
-  // Get current recipe metadata
-  const title = document.querySelector('h1').textContent.trim() || '';
-  const titleWords = getTitleWords(title);
-  const recipeType = parseList(getMetadata('recipe-type'));
-  const course = parseList(getMetadata('course'));
-  const dietaryInterests = parseList(getMetadata('dietary-interests'));
+  // Get links from block and find matching recipes in data
+  const links = [...block.querySelectorAll('a[href]')];
+  const hrefs = links.map((a) => new URL(a.href).pathname);
+  const matchingRecipes = hrefs
+    .map((href) => findMatchingRecipe(href, data))
+    .filter((r) => r);
 
-  const target = {
-    path: window.location.pathname,
-    title,
-    titleWords,
-    recipeType,
-    course,
-    dietaryInterests,
-  };
+  // If no manual links found, use algorithmic matching
+  let relatedRecipes;
+  if (matchingRecipes.length > 0) {
+    relatedRecipes = matchingRecipes;
+  } else {
+    // Get current recipe metadata
+    const title = document.querySelector('h1').textContent.trim() || '';
+    const titleWords = getTitleWords(title);
+    const recipeType = parseList(getMetadata('recipe-type'));
+    const course = parseList(getMetadata('course'));
+    const dietaryInterests = parseList(getMetadata('dietary-interests'));
 
-  const relatedRecipes = findRelatedRecipes(target, data);
+    const target = {
+      path: window.location.pathname,
+      title,
+      titleWords,
+      recipeType,
+      course,
+      dietaryInterests,
+    };
+
+    relatedRecipes = findRelatedRecipes(target, data);
+  }
 
   if (relatedRecipes.length < 1) {
     block.remove();
@@ -189,20 +225,20 @@ export default async function decorate(block) {
   }
 
   // Build the related recipes UI
-  const list = document.createElement('ul');
+  const ul = document.createElement('ul');
 
   relatedRecipes.forEach((recipe) => {
     const li = document.createElement('li');
-    const image = recipe.image.replace('/recipes/data/media_', '/media_');
+    const image = recipe.image.replace('/recipes/media_', '/media_');
     li.innerHTML = `
       <a href="${recipe.path}">
         <img src="${image}" alt="" loading="lazy" />
         <span>${recipe.title}</span>
       </a>
     `;
-    list.append(li);
+    ul.append(li);
   });
 
-  block.replaceChildren(list);
+  block.replaceChildren(ul);
   buildCarousel(block, false);
 }

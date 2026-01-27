@@ -252,6 +252,7 @@ export default async function decorate(block) {
 
   const recipeContainer = document.createElement('div');
   recipeContainer.classList.add('recipe-body');
+  recipeContainer.id = 'recipe';
   const recipeToolbar = buildToolbar();
   recipeContainer.prepend(recipeToolbar);
   recipeContainer.append(...block.children);
@@ -321,7 +322,7 @@ export default async function decorate(block) {
   const ingredientsSection = block.querySelector('.recipe-ingredients');
   if (recipeTitle && ingredientsSection) {
     try {
-      const response = await fetch(`/${locale}/${language}/recipes/data/query-index.json`);
+      const response = await fetch(`/${locale}/${language}/recipes/query-index.json`);
       const data = await response.json();
 
       // Find all recipes with the same title
@@ -362,7 +363,7 @@ export default async function decorate(block) {
         sortedContainers.forEach(([container, path]) => {
           const li = document.createElement('li');
           const a = document.createElement('a');
-          a.href = path;
+          a.href = `${path}#recipe`;
           a.textContent = container;
           if (path === currentPath) {
             a.setAttribute('aria-current', 'page');
