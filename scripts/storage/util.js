@@ -1,3 +1,5 @@
+import { getLocaleAndLanguage } from '../scripts.js';
+
 const COMMERCE_CACHE_TIMEOUT_KEY = 'mage-cache-timeout';
 const COMMERCE_CACHE_STORAGE_KEY = 'mage-cache-storage';
 const COMMERCE_CACHE_INVALIDATION_KEY = 'mage-cache-storage-section-invalidation';
@@ -165,14 +167,11 @@ export function isCommerceStatePristine() {
  * @return {void}
  */
 export async function updateMagentoCacheSections(sections) {
+  const { locale, language } = getLocaleAndLanguage();
   let result = {};
   let updatedSections = null;
   try {
     const loginAbortController = new AbortController();
-
-    const pathSegments = window.location.pathname.split('/').filter(Boolean);
-    const locale = pathSegments[0] || 'us'; // fallback to 'us' if not found
-    const language = pathSegments[1] || 'en_us'; // fallback to 'en_us' if not found
 
     setTimeout(() => loginAbortController.abort('Section data took too long to respond.'), 10000);
     result = await fetch(`/${locale}/${language}/customer/section/load/?sections=${encodeURIComponent(sections.join(','))}&force_new_section_timestamp=false`, {
@@ -210,7 +209,8 @@ export async function updateMagentoCacheSections(sections) {
   }
 
   Object.entries(updatedSections).forEach(([key, value]) => {
-    // Store side-by-side section under a store-specific key to maintain separate carts per store view
+    // Store side-by-side section under a store-specific
+    // key to maintain separate carts per store view
     if (key === 'side-by-side') {
       const storeSpecificKey = `side-by-side-${locale}-${language}`;
       magentoCache[storeSpecificKey] = value;
