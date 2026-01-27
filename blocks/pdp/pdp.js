@@ -1,4 +1,6 @@
-import { loadScript, toClassName, getMetadata } from '../../scripts/aem.js';
+import {
+  loadScript, toClassName, getMetadata, fetchPlaceholders,
+} from '../../scripts/aem.js';
 import renderAddToCart from './add-to-cart.js';
 import renderGallery from './gallery.js';
 import renderSpecs from './specification-tabs.js';
@@ -11,6 +13,7 @@ import {
   isProductOutOfStock,
   isNextPipeline,
   parseEasternDateTime,
+  getLocaleAndLanguage,
 } from '../../scripts/scripts.js';
 import { openModal } from '../modal/modal.js';
 
@@ -46,12 +49,12 @@ function renderTitle(block, custom, reviewsId) {
  * @param {Element} features - The features element from the fragment
  * @returns {Element} The details container element
  */
-function renderDetails(features) {
+function renderDetails(ph, features) {
   const detailsContainer = document.createElement('div');
   detailsContainer.classList.add('details');
   detailsContainer.append(...features.children);
   const h2 = document.createElement('h2');
-  h2.textContent = 'About';
+  h2.textContent = ph.about || 'About';
   detailsContainer.prepend(h2);
   return detailsContainer;
 }
@@ -61,14 +64,14 @@ function renderDetails(features) {
  * @param {Element} block - The PDP block element
  */
 // eslint-disable-next-line no-unused-vars
-async function renderReviews(block, reviewsId) {
+async function renderReviews(ph, block, reviewsId) {
   // TODO: Add Bazaarvoice reviews
   const bazaarvoiceContainer = document.createElement('div');
   bazaarvoiceContainer.classList.add('pdp-reviews-container');
   bazaarvoiceContainer.innerHTML = `<div data-bv-show="reviews" data-bv-product-id="${reviewsId}"></div>`;
 
   setTimeout(async () => {
-    await loadScript('https://apps.bazaarvoice.com/deployments/vitamix/main_site/production/en_US/bv.js');
+    await loadScript(`https://apps.bazaarvoice.com/deployments/vitamix/main_site/production/${ph.languageCode || 'en_US'}/bv.js`);
   }, 500);
 
   window.bvCallback = () => { };
@@ -76,31 +79,33 @@ async function renderReviews(block, reviewsId) {
   block.parentElement.append(bazaarvoiceContainer);
 }
 
-function renderFAQ() {
+function renderFAQ(ph) {
+  const { locale, language } = getLocaleAndLanguage();
   const faqContainer = document.createElement('div');
   faqContainer.classList.add('faq-container');
   faqContainer.innerHTML = `
-  <h4>Have a question?</h4>
+  <h4>${ph.haveAQuestion || 'Have a question?'}</h4>
   <ul>
-    <li><a href="https://www.vitamix.com/us/en_us/owners-resources/product-support/faqs/">Frequently Asked Questions</a></li>
-    <li><a href="https://www.vitamix.com/us/en_us/customer-service/contact-us/">Contact Us</a></li>
+    <li><a href="https://www.vitamix.com/${locale}/${language}/owners-resources/product-support/faqs/">${ph.frequentlyAskedQuestions || 'Frequently Asked Questions'}</a></li>
+    <li><a href="https://www.vitamix.com/${locale}/${language}/customer-service/contact-us/">${ph.contactUs || 'Contact Us'}</a></li>
   </ul>`;
   return faqContainer;
 }
 
-function renderCompare(custom) {
+function renderCompare(ph, custom) {
+  const { locale, language } = getLocaleAndLanguage();
   const { entityId } = custom;
   const compareContainer = document.createElement('div');
   compareContainer.classList.add('pdp-compare-container');
   compareContainer.innerHTML = `
     <div>
-      <button class="pdp-compare-button">Compare</button>
-      <a href="/us/en_us/catalog/product_compare/index/" title="View Comparison" class="comparelistlink">View Comparison List.</a>
+      <button class="pdp-compare-button">${ph.compare || 'Compare'}</button>
+      <a href="/${locale}/${language}/catalog/product_compare/index/" title="${ph.viewComparisonList || 'View Comparison List'}" class="comparelistlink">${ph.viewComparisonList || 'View Comparison List'}.</a>
     </div>`;
 
   const compareButton = compareContainer.querySelector('.pdp-compare-button');
   compareButton.addEventListener('click', () => {
-    fetch('/us/en_us/catalog/product_compare/add/', {
+    fetch(`/${locale}/${language}/catalog/product_compare/add/`, {
       headers: {
         'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
         'x-requested-with': 'XMLHttpRequest',
@@ -110,7 +115,7 @@ function renderCompare(custom) {
       credentials: 'include',
     }).then((resp) => {
       if (resp.ok) {
-        openModal('/us/en_us/products/modals/compare').then((modal) => {
+        openModal(`/${locale}/${language}/products/modals/compare`).then((modal) => {
           if (modal) {
             const content = modal.querySelector('.default-content-wrapper');
             const product = document.createElement('p');
@@ -126,7 +131,7 @@ function renderCompare(custom) {
   return compareContainer;
 }
 
-function renderContent(block) {
+function renderContent(ph, block) {
   const { jsonLdData } = window;
   const { custom } = jsonLdData;
 
@@ -140,18 +145,18 @@ function renderContent(block) {
 
   const { features } = window;
   if (features) {
-    const detailsContainer = renderDetails(features);
+    const detailsContainer = renderDetails(ph, features);
     block.append(detailsContainer);
   }
 
   const { specifications } = window;
   if (specifications) {
-    const specsContainer = renderSpecs(specifications, custom, jsonLdData.name);
+    const specsContainer = renderSpecs(ph, specifications, custom, jsonLdData.name);
     block.append(specsContainer);
   }
 }
 
-async function fetchFragment(block) {
+async function fetchFragment(ph, block) {
   const fragmentPath = window.location.pathname.replace('/products/', '/products/fragments/');
   const fragment = await loadFragment(fragmentPath);
   if (fragment) {
@@ -172,27 +177,27 @@ async function fetchFragment(block) {
     }
   }
 
-  renderContent(block);
+  renderContent(ph, block);
 }
 
-function renderFreeShipping(offers) {
+function renderFreeShipping(ph, offers) {
   if (!offers[0] || offers[0].price < 150) return null;
   const freeShippingContainer = document.createElement('div');
   freeShippingContainer.classList.add('pdp-free-shipping-container');
   freeShippingContainer.innerHTML = `
       <img src="/icons/delivery.svg" alt="Free Shipping" />
-      <span>Eligible for FREE shipping</span>
+      <span>${ph.freeShipping || 'Eligible for FREE shipping'}</span>
   `;
   return freeShippingContainer;
 }
 
-function renderAlert(block, custom) {
+function renderAlert(ph, block, custom) {
   const alertContainer = document.createElement('div');
   alertContainer.classList.add('pdp-alert');
 
   /* retired and coming soon */
   if (custom && custom.retired === 'Yes') {
-    alertContainer.innerText = 'Retired Product';
+    alertContainer.innerText = ph.retiredProduct || 'Retired Product';
     block.classList.add('pdp-retired');
     return alertContainer;
   }
@@ -209,7 +214,7 @@ function renderAlert(block, custom) {
   const pricing = extractPricing(pricingElement);
   if (pricing.regular && pricing.regular > pricing.final) {
     alertContainer.classList.add('pdp-promo-alert');
-    alertContainer.innerText = 'Save Now!';
+    alertContainer.innerText = ph.saveNow || 'Save Now!';
     return alertContainer;
   }
 
@@ -217,7 +222,7 @@ function renderAlert(block, custom) {
   return null;
 }
 
-function renderRelatedProducts(custom) {
+function renderRelatedProducts(ph, custom) {
   const { relatedSkus } = custom;
   const relatedProducts = relatedSkus || [];
   if (relatedProducts.length > 0) {
@@ -234,7 +239,7 @@ function renderRelatedProducts(custom) {
       const currentRelatedProducts = products.filter((product) => product && product.custom.retired === 'No');
       if (currentRelatedProducts.length > 0) {
         relatedProductsContainer.innerHTML = `
-          <h2>Related Products</h2>
+          <h2>${ph.relatedProducts || 'Related Products'}</h2>
         `;
         const ul = document.createElement('ul');
         currentRelatedProducts.forEach((product) => {
@@ -262,16 +267,16 @@ function renderRelatedProducts(custom) {
   return null;
 }
 
-function renderShare() {
+function renderShare(ph) {
   const shareContainer = document.createElement('div');
   shareContainer.classList.add('pdp-share-container');
   const url = decodeURIComponent(window.location.href);
   shareContainer.innerHTML = `
-    Share: 
+    ${ph.share || 'Share'}:
     <a rel="noopener noreferrer nofollow" href="https://www.facebook.com/sharer/sharer.php?u=${url}&quote=${url}"><img src="/icons/facebook.svg" alt="Facebook" /></a>
     <a rel="noopener noreferrer nofollow" href="https://www.twitter.com/share?url=${url}"><img src="/icons/x.svg" alt="X" /></a>
     <a rel="noopener noreferrer nofollow" href="https://www.pinterest.com/pin/create/button/?url=${url}"><img src="/icons/pinterest.svg" alt="Pinterest" /></a>
-    <a rel="noopener noreferrer nofollow" class="pdp-share-email" href="mailto:?subject=Check this out on Vitamix.com&body=${url}"><img src="/icons/email.svg" alt="Email" /></a>
+    <a rel="noopener noreferrer nofollow" class="pdp-share-email" href="mailto:?subject=${encodeURIComponent(ph.checkThisOut || 'Check this out on Vitamix.com')}&body=${url}"><img src="/icons/email.svg" alt="Email" /></a>
   `;
   return shareContainer;
 }
@@ -356,12 +361,14 @@ async function renderFreeGift() {
 export default async function decorate(block) {
   const { jsonLdData, variants } = window;
   const { custom, offers } = jsonLdData;
+  const { locale, language } = getLocaleAndLanguage();
+  const ph = await fetchPlaceholders(`/${locale}/${language}/products/config`);
 
   const reviewsId = custom.reviewsId || toClassName(getMetadata('sku')).replace(/-/g, '');
   const galleryContainer = renderGallery(block, variants);
   const titleContainer = renderTitle(block, custom, reviewsId);
-  const alertContainer = renderAlert(block, custom);
-  const relatedProductsContainer = renderRelatedProducts(custom);
+  const alertContainer = renderAlert(ph, block, custom);
+  const relatedProductsContainer = renderRelatedProducts(ph, custom);
 
   const buyBox = document.createElement('div');
   buyBox.classList.add('pdp-buy-box');
@@ -369,13 +376,13 @@ export default async function decorate(block) {
   // Check if parent product is out of stock (all variants are out of stock)
   const isParentOutOfStock = isProductOutOfStock();
 
-  const pricingContainer = renderPricing(block);
-  const optionsContainer = renderOptions(block, variants, custom, isParentOutOfStock);
-  const addToCartContainer = renderAddToCart(block, jsonLdData);
-  const compareContainer = renderCompare(custom);
+  const pricingContainer = renderPricing(ph, block);
+  const optionsContainer = renderOptions(ph, block, variants, custom, isParentOutOfStock);
+  const addToCartContainer = renderAddToCart(ph, block, jsonLdData);
+  const compareContainer = renderCompare(ph, custom);
   const freeGiftContainer = await renderFreeGift();
-  const freeShippingContainer = renderFreeShipping(offers);
-  const shareContainer = renderShare();
+  const freeShippingContainer = renderFreeShipping(ph, offers);
+  const shareContainer = renderShare(ph);
 
   // Hide free gift container if parent is out of stock
   updateFreeGiftVisibility(freeGiftContainer, isParentOutOfStock, false);
@@ -390,17 +397,17 @@ export default async function decorate(block) {
     shareContainer,
   );
 
-  const faqContainer = renderFAQ(block);
+  const faqContainer = renderFAQ(ph);
 
   if (isNextPipeline()) {
     // Content is already in the initial HTML
-    renderContent(block);
+    renderContent(ph, block);
   } else {
     // Fetch and render the fragment for legacy pipeline
-    fetchFragment(block);
+    fetchFragment(ph, block);
   }
 
-  renderReviews(block, reviewsId);
+  renderReviews(ph, block, reviewsId);
 
   block.append(
     alertContainer || '',
@@ -415,7 +422,7 @@ export default async function decorate(block) {
   const color = queryParams.get('color');
 
   if (color) {
-    onOptionChange(block, variants, color, isParentOutOfStock);
+    onOptionChange(ph, block, variants, color, isParentOutOfStock);
   } else if (variants.length > 0) {
     [window.selectedVariant] = variants;
   }
