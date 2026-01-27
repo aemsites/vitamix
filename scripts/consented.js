@@ -51,8 +51,32 @@ loadScript('https://www.googletagmanager.com/gtag/js?id=G-XJB3SPQE38');
 gtag('js', new Date());
 gtag('config', 'G-XJB3SPQE38');
 
+// Replace Innovid Conversion Tag with Google Consent Mode
 
-loadScript('https://s-a.innovid.com/conversion/1hk0tl');
+loadScript('https://www.googletagmanager.com/gtag/js?id=DC-15266370');
+gtag('js', new Date());
+gtag('config', 'DC-15266370');
+
+const path = window.location.pathname;
+const isHome = path === '/us/en_us/';
+const isAscentXcategory = path === '/us/en_us/shop/ascent-x-series-blenders';
+
+if (isHome) {
+  gtag('event', 'conversion', {
+    allow_custom_scripts: true,
+    send_to: 'DC-15266370/2026u0/vitam0+standard',
+  });
+}
+
+if (isAscentXcategory) {
+  gtag('event', 'conversion', {
+    allow_custom_scripts: true,
+    send_to: 'DC-15266370/2026u0/vitam00+standard',
+  });
+}
+
+//End Floodlight tag
+
 loadScript('https://arttrk.com/pixel/?ad_log=referer&action=content&pixid=82dc3545-14a0-41d8-9870-2156059087d9');
 loadScript('https://cdn.evgnet.com/beacon/vitamixmgmtcorp/vitamix_us/scripts/evergage.min.js');
 
