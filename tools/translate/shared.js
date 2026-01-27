@@ -61,6 +61,22 @@ const RULES = {
       });
       return html;
     },
+  }, {
+    description: 'Icon names should be not translated',
+    apply: (html) => {
+      const ps = html.querySelectorAll('p');
+      ps.forEach((p) => {
+        const text = p.textContent;
+        const regex = /:([a-zA-Z0-9-_]+):/g;
+        const matches = text.match(regex);
+        if (matches) {
+          matches.forEach((match) => {
+            p.innerHTML = p.innerHTML.replace(match, `<span translate="no">${match}</span>`);
+          });
+        }
+      });
+      return html;
+    },
   }],
   [ADMIN_FORMAT]: [{
     description: 'First column of all rows in "metadata" block should be not translated',
@@ -82,6 +98,22 @@ const RULES = {
       });
       return html;
     },
+  }, {
+    description: 'Icon names should be not translated',
+    apply: (html) => {
+      const ps = html.querySelectorAll('p');
+      ps.forEach((p) => {
+        const text = p.textContent;
+        const regex = /:([a-zA-Z0-9-_]+):/g;
+        const matches = text.match(regex);
+        if (matches) {
+          matches.forEach((match) => {
+            p.innerHTML = p.innerHTML.replace(match, `<span translate="no">${match}</span>`);
+          });
+        }
+      });
+      return html;
+    },
   }],
 };
 
@@ -100,6 +132,10 @@ const addDnt = (text, format) => {
 const removeDnt = (html) => {
   html.querySelectorAll('[translate="no"]').forEach((element) => {
     element.removeAttribute('translate');
+
+    if (element.tagName === 'SPAN') {
+      element.replaceWith(element.textContent);
+    }
   });
   return html.documentElement.outerHTML;
 };
