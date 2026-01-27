@@ -31,6 +31,24 @@ async function loadFonts() {
 }
 
 /**
+ * Gets the locale and language from the window.location.pathname.
+ * @returns {Object} Object with locale and language.
+ */
+export function getLocaleAndLanguage(forceEnCA = false) {
+  const pathSegments = window.location.pathname.split('/').filter(Boolean);
+  const locale = pathSegments[0] || 'us'; // fallback to 'us' if not found
+  const language = pathSegments[1] || 'en_us'; // fallback to 'en_us' if not found
+
+  // Commerce backend uses the language code en_ca for the Canada english store view.
+  // On the frontend they are incorrectly using the en_us language code.
+  if (forceEnCA && locale === 'ca' && language === 'en_us') {
+    return { locale, language: 'en_ca' };
+  }
+
+  return { locale, language };
+}
+
+/**
  * Parses `document.cookie` into key-value map.
  * @returns {Object} Object representing all cookies as key-value pairs
  */
@@ -409,12 +427,13 @@ function buildPDPBlock(main) {
 
   parsePDPContentSections(Array.from(main.querySelectorAll(':scope > div')));
 
+  const { locale, language } = getLocaleAndLanguage();
   const navMeta = document.head.querySelector('meta[name="nav"]');
   if (!navMeta) {
     [
-      ['nav', '/us/en_us/nav/nav'],
-      ['footer', '/us/en_us/footer/footer'],
-      ['nav-banners', '/us/en_us/nav/nav-banners'],
+      ['nav', `/${locale}/${language}/nav/nav`],
+      ['footer', `/${locale}/${language}/footer/footer`],
+      ['nav-banners', `/${locale}/${language}/nav/nav-banners`],
     ].forEach(([name, content]) => {
       const meta = document.createElement('meta');
       meta.name = name;
@@ -1024,24 +1043,6 @@ export function findBestAlertBanner(banners, date = new Date()) {
     }
   });
   return bestBanner;
-}
-
-/**
- * Gets the locale and language from the window.location.pathname.
- * @returns {Object} Object with locale and language.
- */
-export function getLocaleAndLanguage(forceEnCA = false) {
-  const pathSegments = window.location.pathname.split('/').filter(Boolean);
-  const locale = pathSegments[0] || 'us'; // fallback to 'us' if not found
-  const language = pathSegments[1] || 'en_us'; // fallback to 'en_us' if not found
-
-  // Commerce backend uses the language code en_ca for the Canada english store view.
-  // On the frontend they are incorrectly using the en_us language code.
-  if (forceEnCA && locale === 'ca' && language === 'en_us') {
-    return { locale, language: 'en_ca' };
-  }
-
-  return { locale, language };
 }
 
 /**
