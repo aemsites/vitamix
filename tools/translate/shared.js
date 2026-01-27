@@ -10,10 +10,56 @@
  * governing permissions and limitations under the License.
  */
 
+const ADMIN_URL = 'https://admin.da.live';
+// const ADMIN_URL = 'https://stage-admin.da.live';
+// const ADMIN_URL = 'http://localhost:8787';
+
 const TRANSLATION_SERVICE_URL = 'https://translate.da.live/google';
+
+const CONFIG_PATH = '/.da/translate.json';
+const CONFIG_CONTENT_DNT_SHEET = 'dnt-content-rules';
 
 const EDITOR_FORMAT = 'table';
 const ADMIN_FORMAT = 'div';
+
+const ICONS_RULE = {
+  description: 'Icon names should be not translated',
+  apply: (html) => {
+    const ps = html.querySelectorAll('p');
+    ps.forEach((p) => {
+      const text = p.textContent;
+      const regex = /:([a-zA-Z0-9-_]+):/g;
+      const matches = text.match(regex);
+      if (matches) {
+        matches.forEach((match) => {
+          p.innerHTML = p.innerHTML.replace(match, `<span translate="no">${match}</span>`);
+        });
+      }
+    });
+    return html;
+  },
+};
+
+const CONTENT_DNT_RULE = {
+  description: 'Specific content fragments should be not translated',
+  apply: (html, config) => {
+    const fragments = config[CONFIG_CONTENT_DNT_SHEET]?.data || [];
+    if (fragments.length === 0) {
+      return html;
+    }
+    const elements = html.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, a');
+    elements.forEach((element) => {
+      const text = element.textContent;
+      fragments.forEach((fragment) => {
+        const { content } = fragment;
+        if (content && text.includes(content)) {
+          element.innerHTML = element.innerHTML.replace(content, `<span translate="no">${content}</span>`);
+        }
+      });
+    });
+    return html;
+  },
+};
 
 const RULES = {
   [EDITOR_FORMAT]: [{
@@ -61,23 +107,7 @@ const RULES = {
       });
       return html;
     },
-  }, {
-    description: 'Icon names should be not translated',
-    apply: (html) => {
-      const ps = html.querySelectorAll('p');
-      ps.forEach((p) => {
-        const text = p.textContent;
-        const regex = /:([a-zA-Z0-9-_]+):/g;
-        const matches = text.match(regex);
-        if (matches) {
-          matches.forEach((match) => {
-            p.innerHTML = p.innerHTML.replace(match, `<span translate="no">${match}</span>`);
-          });
-        }
-      });
-      return html;
-    },
-  }],
+  }, ICONS_RULE, CONTENT_DNT_RULE],
   [ADMIN_FORMAT]: [{
     description: 'First column of all rows in "metadata" block should be not translated',
     apply: (html) => {
@@ -98,32 +128,25 @@ const RULES = {
       });
       return html;
     },
-  }, {
-    description: 'Icon names should be not translated',
-    apply: (html) => {
-      const ps = html.querySelectorAll('p');
-      ps.forEach((p) => {
-        const text = p.textContent;
-        const regex = /:([a-zA-Z0-9-_]+):/g;
-        const matches = text.match(regex);
-        if (matches) {
-          matches.forEach((match) => {
-            p.innerHTML = p.innerHTML.replace(match, `<span translate="no">${match}</span>`);
-          });
-        }
-      });
-      return html;
-    },
-  }],
+  }, ICONS_RULE, CONTENT_DNT_RULE],
 };
 
-const addDnt = (text, format) => {
-  // parse text into html
+const getConfig = async (context, daFetch) => {
+  const resp = await daFetch(`${ADMIN_URL}/source/${context.org}/${context.repo}${CONFIG_PATH}`);
+  if (!resp.ok) {
+    return {};
+  }
+  const config = await resp.json();
+  return config || {};
+};
+
+const addDnt = async (text, format, context, daFetch) => {
+  const config = await getConfig(context, daFetch);
   let html = new DOMParser().parseFromString(text, 'text/html');
   const rules = RULES[format];
   if (rules) {
     rules.forEach((rule) => {
-      html = rule.apply(html);
+      html = rule.apply(html, config);
     });
   }
   return html.documentElement.outerHTML;
@@ -175,10 +198,10 @@ const postProcess = (text, context) => {
   return result;
 };
 
-const translate = async (htmlInput, language, context, format, skipDnt = false) => {
+const translate = async (htmlInput, language, context, format, daFetch, skipDnt = false) => {
   let html = htmlInput;
   if (!skipDnt) {
-    html = addDnt(html, format);
+    html = await addDnt(html, format, context, daFetch);
   }
   const splits = [];
   const maxChunk = 30000;
@@ -224,5 +247,5 @@ const translate = async (htmlInput, language, context, format, skipDnt = false) 
 };
 
 export {
-  addDnt, removeDnt, adjustURLs, postProcess, translate, EDITOR_FORMAT, ADMIN_FORMAT,
+  addDnt, removeDnt, adjustURLs, postProcess, translate, EDITOR_FORMAT, ADMIN_FORMAT, ADMIN_URL,
 };

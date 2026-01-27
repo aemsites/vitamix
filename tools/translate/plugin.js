@@ -23,7 +23,7 @@ import { addDnt, translate, EDITOR_FORMAT } from './shared.js';
   let selection = 'No text selected.';
   try {
     selection = await actions.getSelection();
-    selection = addDnt(selection, EDITOR_FORMAT);
+    selection = await addDnt(selection, EDITOR_FORMAT, context, actions.daFetch);
   } catch (error) {
     // ignore
   }
@@ -53,6 +53,7 @@ import { addDnt, translate, EDITOR_FORMAT } from './shared.js';
         languageSelector.value,
         context,
         EDITOR_FORMAT,
+        actions.daFetch,
         true,
       );
     } catch (error) {

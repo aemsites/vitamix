@@ -14,15 +14,10 @@
 
 // eslint-disable-next-line import/no-unresolved
 import DA_SDK from 'https://da.live/nx/utils/sdk.js';
-import { translate, ADMIN_FORMAT } from './shared.js';
-
-const ADMIN_URL = 'https://admin.da.live';
-// const ADMIN_URL = 'https://stage-admin.da.live';
-// const ADMIN_URL = 'http://localhost:8787';
+import { translate, ADMIN_FORMAT, ADMIN_URL } from './shared.js';
 
 (async function init() {
-  // eslint-disable-next-line no-unused-vars
-  const { context, token, actions } = await DA_SDK;
+  const { context, actions } = await DA_SDK;
   const { daFetch } = actions;
 
   const urlsTextarea = document.querySelector('textarea[name="urls"]');
@@ -149,6 +144,7 @@ const ADMIN_URL = 'https://admin.da.live';
             languageSelect.value,
             context,
             ADMIN_FORMAT,
+            daFetch,
           );
 
           updateStatus(listItem, 'translated', 'Translated');
