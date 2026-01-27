@@ -68,7 +68,7 @@ function parseData(data, locale, language) {
  * @returns {Promise<Array<Object>>} Array of filtered parent product objects (with nested variants)
  */
 export async function lookupProducts(config, facets = {}) {
-  const { locale, language } = await getLocaleAndLanguage();
+  const { locale, language } = getLocaleAndLanguage();
   const corsProxyFetch = async (url) => {
     const corsProxy = 'https://fcors.org/?url=';
     const corsKey = '&key=Mg23N96GgR8O3NjU';
@@ -722,7 +722,7 @@ function buildFiltering(block, ph, config) {
 }
 
 export default async function decorate(block) {
-  const { locale, language } = await getLocaleAndLanguage();
+  const { locale, language } = getLocaleAndLanguage();
   const ph = await fetchPlaceholders(`/${locale}/${language}/products/config`);
   const config = readBlockConfig(block);
   const isCarousel = block.classList.contains('carousel');
