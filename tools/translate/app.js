@@ -16,6 +16,8 @@
 import DA_SDK from 'https://da.live/nx/utils/sdk.js';
 import { translate, ADMIN_FORMAT, ADMIN_URL } from './shared.js';
 
+const EDIT_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-edit"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+
 (async function init() {
   const { context, actions } = await DA_SDK;
   const { daFetch } = actions;
@@ -100,8 +102,19 @@ import { translate, ADMIN_FORMAT, ADMIN_URL } from './shared.js';
 
     // eslint-disable-next-line no-restricted-syntax
     for (let i = 0; i < urls.length; i += 1) {
+      // Add a numbered badge to the left of the list item
+      const badge = document.createElement('span');
+      badge.className = 'app-li-number';
+      badge.textContent = `${i + 1}.`;
+      badge.style.fontWeight = 'bold';
+      badge.style.marginRight = '8px';
+
       const listItem = document.createElement('li');
-      listItem.textContent = urls[i];
+      const a = document.createElement('a');
+      a.href = urls[i];
+      a.textContent = urls[i];
+      listItem.appendChild(a);
+      listItem.insertBefore(badge, listItem.firstChild);
       outputList.appendChild(listItem);
 
       let url;
@@ -158,7 +171,7 @@ import { translate, ADMIN_FORMAT, ADMIN_URL } from './shared.js';
             updateStatus(listItem, 'error', `Failed to save translated HTML: (${resp.statusText})`);
           }
           const daHref = `https://da.live/edit#/${context.org}/${context.repo}${resourcePath}`;
-          updateStatus(listItem, 'saved', `Translated page saved! View page: <a href="${daHref}" target="_blank">${daHref}</a>`);
+          updateStatus(listItem, 'saved', `Translated page saved! <a href="${daHref}" target="_blank">${EDIT_ICON_SVG}</a>`);
         } catch (error) {
           // eslint-disable-next-line no-console
           console.error('Error retrieving page content', error);

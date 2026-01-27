@@ -86,14 +86,9 @@ body {
   padding-left: 16px;
 }
 
-.app-output-list li::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background-color: var(--muted);
+.app-li-number {
+  font-weight: bold;
+  margin-right: 8px;
 }
 
 textarea {
@@ -147,7 +142,7 @@ button:hover {
 }
 
 .status {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   padding: 2px 8px;
   border-radius: 12px;
@@ -171,6 +166,14 @@ button:hover {
 .status.error {
   color: #bf2600;
   background: #ffebe6;
+}
+
+.status svg {
+  vertical-align: middle;
+  margin-right: 4px;
+  margin-left: 4px;
+  width: 16px;
+  height: 16px;
 }
 
 .app-error {
