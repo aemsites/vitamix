@@ -373,7 +373,7 @@ export default async function decorate(block) {
 
   const faqContainer = renderFAQ(ph);
 
-  renderContent(block);
+  renderContent(ph, block);
 
   renderReviews(ph, block, reviewsId);
 
