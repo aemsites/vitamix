@@ -27,10 +27,55 @@ const ADMIN_URL = 'https://admin.da.live';
 
   const urlsTextarea = document.querySelector('textarea[name="urls"]');
   const languageSelect = document.querySelector('select[name="language"]');
-  languageSelect.value = 'fr';
   const translateButton = document.querySelector('button[name="translate"]');
   const outputList = document.querySelector('.app-output-list');
   const errorMessage = document.querySelector('.app-error');
+  const loadFromFolderLink = document.querySelector('#load-from-folder');
+  const loaderRow = document.querySelector('.app-input-loader');
+  const folderInput = document.querySelector('input[name="folder"]');
+  const loadFromFolderButton = document.querySelector('button[name="load-from-folder"]');
+  const folderLoaderErrorMessage = document.querySelector('.app-folder-loader-error');
+
+  loadFromFolderLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    folderInput.value = `https://da.live/#/${context.org}/${context.repo}/drafts`;
+    loaderRow.classList.toggle('open');
+  });
+
+  loadFromFolderButton.addEventListener('click', async (e) => {
+    folderLoaderErrorMessage.textContent = '';
+    folderLoaderErrorMessage.style.display = 'none';
+
+    e.preventDefault();
+    const folder = folderInput.value;
+    let url;
+    try {
+      url = new URL(folder);
+    } catch (error) {
+      folderLoaderErrorMessage.textContent = `Invalid folder URL: ${error.message}`;
+      folderLoaderErrorMessage.style.display = 'block';
+      return;
+    }
+
+    if (!folder.startsWith(`https://da.live/#/${context.org}/${context.repo}`)) {
+      folderLoaderErrorMessage.textContent = `Folder URL must be a valid da.live folder URL - example: https://da.live/#/${context.org}/${context.repo}/...`;
+      folderLoaderErrorMessage.style.display = 'block';
+      return;
+    }
+
+    const pathname = url.hash.replace(`#/${context.org}/${context.repo}`, '');
+    const listUrl = `${ADMIN_URL}/list/${context.org}/${context.repo}${pathname}`;
+    const resp = await daFetch(listUrl);
+    if (!resp.ok) {
+      folderLoaderErrorMessage.textContent = `Failed to load folder list: ${resp.statusText}`;
+      folderLoaderErrorMessage.style.display = 'block';
+      return;
+    }
+
+    const list = await resp.json();
+    urlsTextarea.value = list.filter((item) => item.ext === 'html').map((item) => `https://da.live/edit#${item.path.replace(/\.html$/, '')}`).join('\n');
+    loaderRow.classList.toggle('open');
+  });
 
   const updateStatus = (listItem, status, text) => {
     let statusEl = listItem.querySelector('.status');
