@@ -7,11 +7,9 @@ import renderSpecs from './specification-tabs.js';
 import renderPricing, { extractPricing } from './pricing.js';
 // eslint-disable-next-line import/no-cycle
 import { renderOptions, onOptionChange, updateFreeGiftVisibility } from './options.js';
-import { loadFragment } from '../fragment/fragment.js';
 import {
   checkVariantOutOfStock,
   isProductOutOfStock,
-  isNextPipeline,
   parseEasternDateTime,
   getLocaleAndLanguage,
 } from '../../scripts/scripts.js';
@@ -154,30 +152,6 @@ function renderContent(ph, block) {
     const specsContainer = renderSpecs(ph, specifications, custom, jsonLdData.name);
     block.append(specsContainer);
   }
-}
-
-async function fetchFragment(ph, block) {
-  const fragmentPath = window.location.pathname.replace('/products/', '/products/fragments/');
-  const fragment = await loadFragment(fragmentPath);
-  if (fragment) {
-    const sections = [...fragment.querySelectorAll('main > div.section')];
-    while (sections.length > 0) {
-      const section = sections.shift();
-      const h3 = section.querySelector('h3')?.textContent.toLowerCase();
-      if (h3) {
-        // Only include features for now, ignore all other sections with an h3
-        if (h3.includes('features')) {
-          window.features = section;
-        } else if (h3.includes('specifications')) {
-          window.specifications = section;
-        } else if (h3.includes('warranty')) {
-          window.warranty = section;
-        }
-      }
-    }
-  }
-
-  renderContent(ph, block);
 }
 
 function renderFreeShipping(ph, offers) {
@@ -399,13 +373,7 @@ export default async function decorate(block) {
 
   const faqContainer = renderFAQ(ph);
 
-  if (isNextPipeline()) {
-    // Content is already in the initial HTML
-    renderContent(ph, block);
-  } else {
-    // Fetch and render the fragment for legacy pipeline
-    fetchFragment(ph, block);
-  }
+  renderContent(ph, block);
 
   renderReviews(ph, block, reviewsId);
 
