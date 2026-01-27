@@ -154,7 +154,7 @@ function renderContent(ph, block) {
   }
 }
 
-function renderFreeShipping(offers) {
+function renderFreeShipping(ph, offers) {
   if (!offers[0] || offers[0].price < 150) return null;
   const freeShippingContainer = document.createElement('div');
   freeShippingContainer.classList.add('pdp-free-shipping-container');
