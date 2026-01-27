@@ -60,30 +60,33 @@ const ADMIN_URL = 'https://admin.da.live';
 
     // eslint-disable-next-line no-restricted-syntax
     for (let i = 0; i < urls.length; i += 1) {
-      const url = urls[i];
       const listItem = document.createElement('li');
-      listItem.textContent = url;
+      listItem.textContent = urls[i];
       outputList.appendChild(listItem);
 
-      let u;
+      let url;
       try {
-        u = new URL(url);
+        url = new URL(urls[i]);
       } catch (error) {
         updateStatus(listItem, 'error', 'Invalid URL format');
         continue;
       }
 
       // Validate URL format
-      // Expected: https://<branch>--<repo>--<owner>.<host>/<path>
-      if (!u.hostname.includes(context.org) || !u.hostname.includes(context.repo)) {
+      // Expected: https://<branch>--<repo>--<org>.<host><path> or https://da.live/edit#/<org>/<repo><path>
+      const isDaLiveEditUrl = url.toString().startsWith(`https://da.live/edit#/${context.org}/${context.repo}/`);
+      const isPreviewUrl = url.hostname.includes(`${context.repo}--${context.org}`);
+      if (!isPreviewUrl && !isDaLiveEditUrl) {
         updateStatus(listItem, 'error', 'Must be a URL from this organization and repository');
       } else {
         updateStatus(listItem, 'loading', 'Loading');
 
         try {
-          let sourceUrl = `${ADMIN_URL}/source/${context.org}/${context.repo}${u.pathname}`;
+          const resourcePath = isDaLiveEditUrl ? url.hash.replace(/^#/, '').replace(`/${context.org}/${context.repo}`, '') : url.pathname;
+          let sourceUrl = `${ADMIN_URL}/source/${context.org}/${context.repo}${resourcePath}`;
+
           // if needed, append .html
-          if (!u.pathname.endsWith('.html')) {
+          if (!sourceUrl.endsWith('.html')) {
             sourceUrl += '.html';
           }
 
@@ -113,7 +116,7 @@ const ADMIN_URL = 'https://admin.da.live';
           if (!resp.ok) {
             updateStatus(listItem, 'error', `Failed to save translated HTML: (${resp.statusText})`);
           }
-          const daHref = `https://da.live/edit#/${context.org}/${context.repo}${u.pathname}`;
+          const daHref = `https://da.live/edit#/${context.org}/${context.repo}${resourcePath}`;
           updateStatus(listItem, 'saved', `Translated page saved! View page: <a href="${daHref}" target="_blank">${daHref}</a>`);
         } catch (error) {
           // eslint-disable-next-line no-console
