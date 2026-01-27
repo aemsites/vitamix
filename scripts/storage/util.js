@@ -210,7 +210,13 @@ export async function updateMagentoCacheSections(sections) {
   }
 
   Object.entries(updatedSections).forEach(([key, value]) => {
-    magentoCache[key] = value;
+    // Store side-by-side section under a store-specific key to maintain separate carts per store view
+    if (key === 'side-by-side') {
+      const storeSpecificKey = `side-by-side-${locale}-${language}`;
+      magentoCache[storeSpecificKey] = value;
+    } else {
+      magentoCache[key] = value;
+    }
   });
 
   if (isMagentoCacheInvalidated(sections)) {

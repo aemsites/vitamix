@@ -356,11 +356,12 @@ function getProductID(sku) {
  * @param {number} quantity
  */
 async function addToCartLegacy(sku, options, quantity) {
+  const { locale, language } = getLocaleAndLanguage();
   const uenc = window.location.href.includes('?')
     ? window.location.href.split('?').map(btoa).join('_')
     : btoa(window.location.href);
   const [productId, formKey] = await Promise.all([getProductID(sku), getFormKey()]);
-  const url = `/us/en_us/checkout/cart/add/uenc/${uenc}/product/${productId}/`;
+  const url = `/${locale}/${language}/checkout/cart/add/uenc/${uenc}/product/${productId}/`;
 
   const formData = new FormData();
   formData.append('product', productId);
