@@ -403,7 +403,6 @@ async function addToCartLegacy(sku, options, quantity) {
   if (!resp.ok) {
     console.error('Failed to add item to cart', resp);
     // Generic error modal
-    const { locale, language } = getLocaleAndLanguage();
     await openModal(`/${locale}/${language}/products/modals/atc-error`);
     throw new Error('Failed to add item to cart');
   }
