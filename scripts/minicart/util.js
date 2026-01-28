@@ -1,3 +1,4 @@
+import { getLocaleAndLanguage } from '../scripts.js';
 import { getMagentoCache } from '../storage/util.js';
 
 /**
@@ -7,9 +8,7 @@ import { getMagentoCache } from '../storage/util.js';
  * @returns {string} The side-by-side key
  */
 export function getSideBySideKey() {
-  const pathSegments = window.location.pathname.split('/').filter(Boolean);
-  const locale = pathSegments[0] || 'us';
-  const language = pathSegments[1] || 'en_us';
+  const { locale, language } = getLocaleAndLanguage();
 
   // Keep original key for US store to preserve existing carts
   if (locale === 'us' && language === 'en_us') {
