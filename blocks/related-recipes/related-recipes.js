@@ -229,10 +229,17 @@ export default async function decorate(block) {
 
   relatedRecipes.forEach((recipe) => {
     const li = document.createElement('li');
-    const image = recipe.image.replace('/recipes/media_', '/media_');
+    // Convert image URL to relative path (pathname + query params only)
+    let imagePath = recipe.image.replace('/recipes/media_', '/media_');
+    try {
+      const imageUrl = new URL(imagePath, window.location.origin);
+      imagePath = imageUrl.pathname + imageUrl.search;
+    } catch (e) {
+      // If URL parsing fails, use the transformed path as-is
+    }
     li.innerHTML = `
       <a href="${recipe.path}">
-        <img src="${image}" alt="" loading="lazy" />
+        <img src="${imagePath}" alt="" loading="lazy" />
         <span>${recipe.title}</span>
       </a>
     `;
