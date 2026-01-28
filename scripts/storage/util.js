@@ -209,11 +209,13 @@ export async function updateMagentoCacheSections(sections) {
   }
 
   Object.entries(updatedSections).forEach(([key, value]) => {
-    // Store side-by-side section under a store-specific
-    // key to maintain separate carts per store view
+    // Store side-by-side section under a store-specific key for non-US stores
+    // to maintain separate carts per store view. Keep original key for US
+    // to preserve existing carts.
     if (key === 'side-by-side') {
-      const storeSpecificKey = `side-by-side-${locale}-${language}`;
-      magentoCache[storeSpecificKey] = value;
+      const isUSStore = locale === 'us' && language === 'en_us';
+      const sideBySideKey = isUSStore ? 'side-by-side' : `side-by-side-${locale}-${language}`;
+      magentoCache[sideBySideKey] = value;
     } else {
       magentoCache[key] = value;
     }

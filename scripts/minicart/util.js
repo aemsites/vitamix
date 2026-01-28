@@ -1,14 +1,21 @@
 import { getMagentoCache } from '../storage/util.js';
 
 /**
- * Gets the store-specific key for the side-by-side section.
- * This allows maintaining separate carts for each store view.
- * @returns {string} The store-specific key (e.g., 'side-by-side-us-en_us')
+ * Gets the key for the side-by-side section.
+ * For /us/en_us, returns the original 'side-by-side' key to preserve existing carts.
+ * For other stores, returns a store-specific key (e.g., 'side-by-side-ca-fr_ca').
+ * @returns {string} The side-by-side key
  */
 export function getSideBySideKey() {
   const pathSegments = window.location.pathname.split('/').filter(Boolean);
   const locale = pathSegments[0] || 'us';
   const language = pathSegments[1] || 'en_us';
+
+  // Keep original key for US store to preserve existing carts
+  if (locale === 'us' && language === 'en_us') {
+    return 'side-by-side';
+  }
+
   return `side-by-side-${locale}-${language}`;
 }
 
