@@ -60,12 +60,12 @@ export default async function decorate(block) {
   }
 
   // Convert image URL to relative path (pathname + query params only)
-  let imagePath = recipe.image.replace('/recipes/media_', '/media_');
+  let imagePath = recipe.image;
   try {
     const imageUrl = new URL(imagePath, window.location.origin);
     imagePath = imageUrl.pathname + imageUrl.search;
   } catch (e) {
-    // If URL parsing fails, use the transformed path as-is
+    // If URL parsing fails, use the path as-is
   }
 
   block.innerHTML = `
