@@ -1,4 +1,4 @@
-import { getMetadata, toClassName } from '../../scripts/aem.js';
+import { getMetadata, toClassName, fetchPlaceholders } from '../../scripts/aem.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 function wrapInDiv(element, className) {
@@ -17,7 +17,7 @@ function wrapInDiv(element, className) {
   );
 }
 
-function formatTime(timeString) {
+function formatTime(timeString, placeholders = {}) {
   if (!timeString) return '';
 
   // Parse HH:MM:SS format
@@ -41,13 +41,15 @@ function formatTime(timeString) {
   // Build readable string
   const parts2 = [];
   if (finalHours > 0) {
-    parts2.push(`${finalHours} Hour${finalHours !== 1 ? 's' : ''}`);
+    const hourLabel = finalHours !== 1 ? (placeholders.hours || 'Hours') : (placeholders.hour || 'Hour');
+    parts2.push(`${finalHours} ${hourLabel}`);
   }
   if (finalMinutes > 0) {
-    parts2.push(`${finalMinutes} Minute${finalMinutes !== 1 ? 's' : ''}`);
+    const minuteLabel = finalMinutes !== 1 ? (placeholders.minutes || 'Minutes') : (placeholders.minute || 'Minute');
+    parts2.push(`${finalMinutes} ${minuteLabel}`);
   }
 
-  return parts2.length > 0 ? parts2.join(' ') : '0 Minutes';
+  return parts2.length > 0 ? parts2.join(' ') : `0 ${placeholders.minutes || 'Minutes'}`;
 }
 
 function formatServings(servingsString) {
@@ -66,25 +68,34 @@ function formatServings(servingsString) {
   return unit ? `${formattedNumber} ${unit}` : `${formattedNumber}`;
 }
 
-function buildToolbar() {
+function buildToolbar(placeholders = {}) {
   const toolbar = document.createElement('div');
   toolbar.classList.add('recipe-toolbar');
+
+  const saveLabel = placeholders.save || 'Save';
+  const printLabel = placeholders.print || 'Print';
+  const shareLabel = placeholders.share || 'Share';
+  const shareFacebookLabel = placeholders.shareOnFacebook || 'Share on Facebook';
+  const shareTwitterLabel = placeholders.shareOnTwitter || 'Share on X';
+  const sharePinterestLabel = placeholders.shareOnPinterest || 'Share on Pinterest';
+  const shareEmailLabel = placeholders.shareViaEmail || 'Share via Email';
+
   toolbar.innerHTML = `
-    <button type="button" class="recipe-save"><img src="/blocks/recipe/save.svg" alt=""> Save</button>
-    <button type="button" class="recipe-print"><img src="/blocks/recipe/print.svg" alt=""> Print</button>
+    <button type="button" class="recipe-save"><img src="/blocks/recipe/save.svg" alt=""> ${saveLabel}</button>
+    <button type="button" class="recipe-print"><img src="/blocks/recipe/print.svg" alt=""> ${printLabel}</button>
     <div class="recipe-share-wrapper">
-      <button type="button" class="recipe-share"><img src="/blocks/recipe/share.svg" alt=""> Share</button>
+      <button type="button" class="recipe-share"><img src="/blocks/recipe/share.svg" alt=""> ${shareLabel}</button>
       <div class="recipe-share-popup" hidden>
-        <button type="button" class="share-facebook" aria-label="Share on Facebook" title="Share on Facebook">
+        <button type="button" class="share-facebook" aria-label="${shareFacebookLabel}" title="${shareFacebookLabel}">
           <img src="/icons/social-facebook.svg" alt="">
         </button>
-        <button type="button" class="share-twitter" aria-label="Share on X" title="Share on X">
+        <button type="button" class="share-twitter" aria-label="${shareTwitterLabel}" title="${shareTwitterLabel}">
           <img src="/icons/x.svg" alt="">
         </button>
-        <button type="button" class="share-pinterest" aria-label="Share on Pinterest" title="Share on Pinterest">
+        <button type="button" class="share-pinterest" aria-label="${sharePinterestLabel}" title="${sharePinterestLabel}">
           <img src="/icons/social-pinterest.svg" alt="">
         </button>
-        <button type="button" class="share-email" aria-label="Share via Email" title="Share via Email">
+        <button type="button" class="share-email" aria-label="${shareEmailLabel}" title="${shareEmailLabel}">
           <img src="/icons/email.svg" alt="">
         </button>
       </div>
@@ -161,8 +172,9 @@ function buildToolbar() {
     },
     email: () => {
       const { url, recipeTitle } = getShareData();
-      const subject = encodeURIComponent(`${recipeTitle} Recipe`);
-      const body = encodeURIComponent(`${recipeTitle} Recipe: ${url}`);
+      const recipeLabel = placeholders.recipe || 'Recipe';
+      const subject = encodeURIComponent(`${recipeTitle} ${recipeLabel}`);
+      const body = encodeURIComponent(`${recipeTitle} ${recipeLabel}: ${url}`);
       window.location.href = `mailto:?subject=${subject}&body=${body}`;
     },
   };
@@ -186,6 +198,7 @@ function writeDietaryInterests(data, locale, language) {
 
 export default async function decorate(block) {
   const { locale, language } = getLocaleAndLanguage();
+  const placeholders = await fetchPlaceholders(`/${locale}/${language}`);
 
   const totalTime = getMetadata('total-time');
   const yields = getMetadata('yield');
@@ -197,7 +210,7 @@ export default async function decorate(block) {
   const picture = block.querySelector('picture');
 
   // Format total time to be human readable
-  const formattedTime = formatTime(totalTime);
+  const formattedTime = formatTime(totalTime, placeholders);
   const formattedYields = formatServings(yields);
 
   const recipeHeader = document.createElement('div');
@@ -212,15 +225,15 @@ export default async function decorate(block) {
     <p>${description ? description.textContent : ''}</p>
     <div class="recipe-stats">
      <div class="recipe-stat recipe-stat-total-time">
-      <p class="eyebrow">Total Time</p>
+      <p class="eyebrow">${placeholders.totalTime || 'Total Time'}</p>
       <p>${formattedTime}</p>
      </div>
      <div class="recipe-stat recipe-stat-yields">
-      <p class="eyebrow">Yields</p>
+      <p class="eyebrow">${placeholders.yields || 'Yields'}</p>
       <p>${formattedYields}</p>
      </div>
      <div class="recipe-stat recipe-stat-difficulty">
-      <p class="eyebrow">Difficulty</p>
+      <p class="eyebrow">${placeholders.difficulty || 'Difficulty'}</p>
       <p>${difficulty}</p>
      </div>
     </div>
@@ -228,16 +241,16 @@ export default async function decorate(block) {
   ${picture ? `<div class="recipe-image">${picture.outerHTML}</div>` : ''}
   <div class="recipe-additional-info">
     <div class="recipe-additional-info-item recipe-dietary-interests">
-      <p class="eyebrow">Dietary Interests</p>
+      <p class="eyebrow">${placeholders.dietaryInterests || 'Dietary Interests'}</p>
       <p>${dietaryInterests.map((i) => i.outerHTML).join(', ')}</p>
     </div>
     <div class="recipe-additional-info-item recipe-submitted-by">
-      <p class="eyebrow">Submitted By</p>
+      <p class="eyebrow">${placeholders.submittedBy || 'Submitted By'}</p>
       <p>Vitamix</p>
     </div>
     <div class="recipe-additional-info-item recipe-manage-preferences">
       <p>
-        <a href="/${locale}/${language}/customer/account/login">Manage Preferences</a>
+        <a href="/${locale}/${language}/customer/account/login">${placeholders.managePreferences || 'Manage Preferences'}</a>
       </p>
     </div>
   </div>`;
@@ -253,15 +266,32 @@ export default async function decorate(block) {
   const recipeContainer = document.createElement('div');
   recipeContainer.classList.add('recipe-body');
   recipeContainer.id = 'recipe';
-  const recipeToolbar = buildToolbar();
+  const recipeToolbar = buildToolbar(placeholders);
   recipeContainer.prepend(recipeToolbar);
   recipeContainer.append(...block.children);
   block.prepend(recipeHeader);
   block.append(recipeContainer);
 
-  // Wrap content sections
-  ['ingredients', 'directions', 'notes', 'nutrition'].forEach((id) => {
-    wrapInDiv(block.querySelector(`#${id}`), `recipe-${id}`);
+  // Get section names from placeholders
+  const sectionNames = {
+    ingredients: placeholders.ingredients || 'Ingredients',
+    directions: placeholders.directions || 'Directions',
+    notes: placeholders.notes || 'Notes',
+    nutrition: placeholders.nutrition || 'Nutrition',
+  };
+
+  // Find H2 elements by text content and wrap them
+  Object.keys(sectionNames).forEach((key) => {
+    const sectionText = sectionNames[key];
+    // Find H2 with matching text content (case-insensitive, trimmed)
+    const h2Elements = [...block.querySelectorAll('h2')];
+    const h2 = h2Elements.find(
+      (heading) => heading.textContent.trim().toLowerCase() === sectionText.toLowerCase(),
+    );
+
+    if (h2) {
+      wrapInDiv(h2, `recipe-${key}`);
+    }
   });
 
   // Group ingredients + directions in shared container
@@ -351,13 +381,13 @@ export default async function decorate(block) {
         containerSection.className = 'recipe-refine';
 
         const heading = document.createElement('h2');
-        heading.textContent = 'Refine Your Recipe';
+        heading.textContent = placeholders.refineYourRecipe || 'Refine Your Recipe';
 
         const details = document.createElement('details');
         details.open = true;
 
         const summary = document.createElement('summary');
-        summary.textContent = 'Container Size';
+        summary.textContent = placeholders.containerSize || 'Container Size';
 
         const ul = document.createElement('ul');
         sortedContainers.forEach(([container, path]) => {

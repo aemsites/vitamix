@@ -1,6 +1,6 @@
 /* eslint-disable max-len */
 
-import { loadCSS } from '../../scripts/aem.js';
+import { loadCSS, fetchPlaceholders } from '../../scripts/aem.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 /**
@@ -37,20 +37,42 @@ async function lookupRecipes(config = {}, facets = {}) {
   const { locale, language } = getLocaleAndLanguage();
   if (!window.recipeIndex) {
     // fetch the main recipe index
-    const resp = await fetch(`/${locale}/${language}/recipes/data/query-index.json`);
-    const { data } = await resp.json();
+    const resp = await fetch(`/${locale}/${language}/recipes/query-index.json`);
+    if (!resp.ok) {
+      // Try alternate path with /data/ for backwards compatibility
+      const altResp = await fetch(`/${locale}/${language}/recipes/data/query-index.json`);
+      if (!altResp.ok) {
+        window.recipeIndex = { data: [] };
+        return [];
+      }
+      const { data } = await altResp.json();
+      
+      // parse and filter recipes - only include Updated or New status, exclude Deleted
+      const recipes = data
+        .map((d) => parseRecipeData(d))
+        .filter((recipe) => {
+          const status = recipe.status ? recipe.status.toLowerCase() : '';
+          return status === 'updated' || status === 'new';
+        });
 
-    // parse and filter recipes - only include Updated or New status, exclude Deleted
-    const recipes = data
-      .map((d) => parseRecipeData(d))
-      .filter((recipe) => {
-        const status = recipe.status ? recipe.status.toLowerCase() : '';
-        return status === 'updated' || status === 'new';
-      });
+      window.recipeIndex = {
+        data: recipes,
+      };
+    } else {
+      const { data } = await resp.json();
 
-    window.recipeIndex = {
-      data: recipes,
-    };
+      // parse and filter recipes - only include Updated or New status, exclude Deleted
+      const recipes = data
+        .map((d) => parseRecipeData(d))
+        .filter((recipe) => {
+          const status = recipe.status ? recipe.status.toLowerCase() : '';
+          return status === 'updated' || status === 'new';
+        });
+
+      window.recipeIndex = {
+        data: recipes,
+      };
+    }
   }
 
   // extract all facet keys from the facets object for dynamic filter UI
@@ -426,18 +448,19 @@ function updateURL(filterConfig) {
  * Builds complete recipe listing with filtering, sorting, and search functionality.
  * @param {HTMLElement} container - Container element to transform into a recipe listing
  * @param {Object} config - Initial filter configuration
+ * @param {Object} placeholders - Placeholders object for i18n
  * @returns {void}
  */
-function buildRecipeFiltering(container, config = {}) {
+function buildRecipeFiltering(container, config = {}, placeholders = {}) {
   const ITEMS_PER_PAGE = 12;
   let currentPage = 1;
 
-  const placeholders = {
-    difficulty: 'Difficulty',
-    'compatible-containers': 'Compatible Containers',
-    'dietary-interests': 'Dietary Interests',
-    course: 'Course',
-    'recipe-type': 'Recipe Type',
+  const facetPlaceholders = {
+    difficulty: placeholders.difficulty || 'Difficulty',
+    'compatible-containers': placeholders.compatibleContainers || 'Compatible Containers',
+    'dietary-interests': placeholders.dietaryInterests || 'Dietary Interests',
+    course: placeholders.course || 'Course',
+    'recipe-type': placeholders.recipeType || 'Recipe Type',
   };
 
   // Reference existing DOM elements from static HTML
@@ -532,7 +555,7 @@ function buildRecipeFiltering(container, config = {}) {
     if (totalPages <= 1) return;
 
     const prevBtn = document.createElement('button');
-    prevBtn.textContent = 'Previous';
+    prevBtn.textContent = placeholders.previous || 'Previous';
     prevBtn.disabled = page <= 1;
     if (page > 1) prevBtn.dataset.page = page - 1;
     paginationElement.appendChild(prevBtn);
@@ -577,7 +600,7 @@ function buildRecipeFiltering(container, config = {}) {
     paginationElement.appendChild(pages);
 
     const nextBtn = document.createElement('button');
-    nextBtn.textContent = 'Next';
+    nextBtn.textContent = placeholders.next || 'Next';
     nextBtn.disabled = page >= totalPages;
     if (page < totalPages) nextBtn.dataset.page = page + 1;
     paginationElement.appendChild(nextBtn);
@@ -662,7 +685,7 @@ function buildRecipeFiltering(container, config = {}) {
     if (selected.length > 0) {
       const clearButton = document.createElement('button');
       clearButton.className = 'clear';
-      clearButton.textContent = 'Clear All';
+      clearButton.textContent = placeholders.clearAll || 'Clear All';
       clearButton.addEventListener('click', () => {
         selected.forEach((tag) => {
           document.getElementById(`filter-${tag}`).checked = false;
@@ -689,7 +712,7 @@ function buildRecipeFiltering(container, config = {}) {
       }
 
       const summary = document.createElement('summary');
-      summary.textContent = placeholders[facetKey] || facetKey;
+      summary.textContent = facetPlaceholders[facetKey] || facetKey;
       details.append(summary);
 
       const facetValues = Object.keys(facets[facetKey]).sort((a, b) => a.localeCompare(b));
@@ -941,10 +964,100 @@ function buildRecipeFiltering(container, config = {}) {
 }
 
 // Initialize the recipe center
-function init() {
+async function init() {
   const recipeCenter = document.querySelector('.recipe-center');
   if (recipeCenter) {
-    buildRecipeFiltering(recipeCenter);
+    const { locale, language } = getLocaleAndLanguage();
+    const placeholders = await fetchPlaceholders(`/${locale}/${language}`);
+
+    // Move existing H1 into recipe-center if it exists
+    const existingH1 = document.querySelector('main h1');
+    if (existingH1 && !recipeCenter.contains(existingH1)) {
+      existingH1.classList.add('title');
+      recipeCenter.insertBefore(existingH1, recipeCenter.firstChild);
+    }
+
+    // Populate placeholder text in HTML
+    const searchInput = recipeCenter.querySelector('#fulltext');
+    if (searchInput) {
+      searchInput.placeholder = placeholders.searchRecipes || 'Type to search recipes';
+    }
+
+    const goButton = recipeCenter.querySelector('.go');
+    if (goButton) {
+      goButton.textContent = placeholders.go || 'Go';
+    }
+
+    const itemsLabel = recipeCenter.querySelector('.info > p');
+    if (itemsLabel) {
+      const startSpan = recipeCenter.querySelector('#results-start');
+      const endSpan = recipeCenter.querySelector('#results-end');
+      const countSpan = recipeCenter.querySelector('#results-count');
+      // Keep the structure but update the text nodes
+      itemsLabel.childNodes[0].textContent = `${placeholders.items || 'Items'} `;
+      itemsLabel.childNodes[2].textContent = ' - ';
+      itemsLabel.childNodes[4].textContent = ` ${placeholders.of || 'of'} `;
+    }
+
+    const sortLabel = recipeCenter.querySelector('#sortby');
+    if (sortLabel) {
+      sortLabel.textContent = placeholders.featured || 'Featured';
+    }
+
+    const sortSummary = recipeCenter.querySelector('.sort summary');
+    if (sortSummary) {
+      sortSummary.childNodes[0].textContent = `${placeholders.sortBy || 'Sort By'}: `;
+    }
+
+    // Populate sort options
+    const sortButtons = recipeCenter.querySelectorAll('.sort menu button');
+    sortButtons.forEach((btn) => {
+      const sortType = btn.dataset.sort;
+      if (sortType === 'featured') {
+        btn.textContent = placeholders.featured || 'Featured';
+      } else if (sortType === 'name-asc') {
+        btn.textContent = placeholders.nameAZ || 'Name (A-Z)';
+      } else if (sortType === 'name-desc') {
+        btn.textContent = placeholders.nameZA || 'Name (Z-A)';
+      } else if (sortType === 'time-asc') {
+        btn.textContent = placeholders.timeLowToHigh || 'Time (Low to High)';
+      } else if (sortType === 'time-desc') {
+        btn.textContent = placeholders.timeHighToLow || 'Time (High to Low)';
+      }
+    });
+
+    const refineHeading = recipeCenter.querySelector('.facets h2');
+    if (refineHeading) {
+      refineHeading.textContent = placeholders.refineYourRecipe || 'Refine Your Recipe';
+    }
+
+    const applyButton = recipeCenter.querySelector('.facets .apply');
+    if (applyButton) {
+      applyButton.textContent = placeholders.seeResults || 'See Results';
+    }
+
+    const legend = recipeCenter.querySelector('legend');
+    if (legend) {
+      legend.textContent = placeholders.refineYourSearch || 'Refine Your Search';
+    }
+
+    // Update select dropdown placeholders
+    const dietarySelect = recipeCenter.querySelector('#dietary-interests option[value=""]');
+    if (dietarySelect) {
+      dietarySelect.textContent = placeholders.dietary || 'Dietary';
+    }
+
+    const courseOption = recipeCenter.querySelector('#course option[value=""]');
+    if (courseOption) {
+      courseOption.textContent = placeholders.course || 'Course';
+    }
+
+    const recipeTypeOption = recipeCenter.querySelector('#recipe-type option[value=""]');
+    if (recipeTypeOption) {
+      recipeTypeOption.textContent = placeholders.recipeType || 'Recipe Type';
+    }
+
+    buildRecipeFiltering(recipeCenter, {}, placeholders);
   }
 }
 

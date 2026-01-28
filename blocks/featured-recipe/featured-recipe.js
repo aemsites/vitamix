@@ -23,8 +23,23 @@ function formatYield(yieldString) {
 
 export default async function decorate(block) {
   const { locale, language } = getLocaleAndLanguage();
-  const resp = await fetch(`/${locale}/${language}/recipes/data/query-index.json`);
+  
+  // Try primary path first, then fallback to /data/ path
+  let resp = await fetch(`/${locale}/${language}/recipes/query-index.json`);
+  if (!resp.ok) {
+    resp = await fetch(`/${locale}/${language}/recipes/data/query-index.json`);
+    if (!resp.ok) {
+      block.remove();
+      return;
+    }
+  }
+  
   const { data } = await resp.json();
+  if (!data || data.length === 0) {
+    block.remove();
+    return;
+  }
+  
   const recipes = data.filter((r) => r.status !== 'Deleted' && r.image && !r.image.includes('default-meta-image'));
 
   let recipe;
@@ -40,6 +55,12 @@ export default async function decorate(block) {
       .filter((r) => r['date-created'])
       .sort((x, y) => new Date(y['date-created']) - new Date(x['date-created']));
     [recipe] = sorted;
+  }
+
+  // If no recipe found after filtering and fallback, remove the block
+  if (!recipe) {
+    block.remove();
+    return;
   }
 
   const image = recipe.image.replace('/recipes/data/media_', '/media_');
