@@ -1,6 +1,7 @@
+import { fetchPlaceholders } from '../../scripts/aem.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 
-function formatTime(timeString) {
+function formatTime(timeString, placeholders = {}) {
   if (!timeString) return '';
   const parts = timeString.split(':');
   if (parts.length !== 3) return timeString;
@@ -8,21 +9,25 @@ function formatTime(timeString) {
   const minutes = parseInt(parts[1], 10) + (parseInt(parts[2], 10) > 0 ? 1 : 0);
   const h = Math.floor((hours * 60 + minutes) / 60);
   const m = (hours * 60 + minutes) % 60;
-  if (h > 0 && m > 0) return `${h} hours ${m} minutes`;
-  if (h > 0) return `${h} hours`;
-  return `${m} minutes`;
+  const hourLabel = h !== 1 ? (placeholders.hours || 'hours') : (placeholders.hour || 'hour');
+  const minuteLabel = m !== 1 ? (placeholders.minutes || 'minutes') : (placeholders.minute || 'minute');
+  if (h > 0 && m > 0) return `${h} ${hourLabel} ${m} ${minuteLabel}`;
+  if (h > 0) return `${h} ${hourLabel}`;
+  return `${m} ${minuteLabel}`;
 }
 
-function formatYield(yieldString) {
+function formatYield(yieldString, placeholders = {}) {
   if (!yieldString) return '';
   const match = yieldString.match(/^([\d.]+)/);
   if (!match) return yieldString;
   const num = parseFloat(match[1]);
-  return num % 1 === 0 ? `${Math.floor(num)} servings` : `${num} servings`;
+  const servingsLabel = placeholders.servings || 'servings';
+  return num % 1 === 0 ? `${Math.floor(num)} ${servingsLabel}` : `${num} ${servingsLabel}`;
 }
 
 export default async function decorate(block) {
   const { locale, language } = getLocaleAndLanguage();
+  const placeholders = await fetchPlaceholders(`/${locale}/${language}`);
 
   const resp = await fetch(`/${locale}/${language}/recipes/query-index.json`);
   if (!resp.ok) {
@@ -68,20 +73,25 @@ export default async function decorate(block) {
     // If URL parsing fails, use the path as-is
   }
 
+  const timeLabel = placeholders.time || 'Time';
+  const servingsLabel = placeholders.servings || 'Servings';
+  const newFeaturedRecipeLabel = placeholders.newFeaturedRecipe || 'New Featured Recipe';
+  const getTheRecipeLabel = placeholders.getTheRecipe || 'Get the Recipe';
+
   block.innerHTML = `
     <img src="${imagePath}" alt="" loading="lazy">
     <div class="featured-recipe-content">
-      <p class="eyebrow">New Featured Recipe</p>
+      <p class="eyebrow">${newFeaturedRecipeLabel}</p>
       <h2>${recipe.title}</h2>
       <p>${recipe.description || ''}</p>
       <dl>
-        <dt><img src="/blocks/recipe/time.svg" alt="Time"></dt>
-        <dd class="eyebrow">${formatTime(recipe['total-time'])}</dd>
-        <dt><img src="/blocks/recipe/yield.svg" alt="Servings"></dt>
-        <dd class="eyebrow">${formatYield(recipe.yield)}</dd>
+        <dt><img src="/blocks/recipe/time.svg" alt="${timeLabel}"></dt>
+        <dd class="eyebrow">${formatTime(recipe['total-time'], placeholders)}</dd>
+        <dt><img src="/blocks/recipe/yield.svg" alt="${servingsLabel}"></dt>
+        <dd class="eyebrow">${formatYield(recipe.yield, placeholders)}</dd>
       </dl>
       <p class="button-wrapper">
-        <a class="button" href="${recipe.path}">Get the Recipe</a>
+        <a class="button" href="${recipe.path}">${getTheRecipeLabel}</a>
       </p>
     </div>
   `;
