@@ -335,9 +335,10 @@ function enableFooterSignUp(form) {
     const entries = Object.fromEntries(data.entries());
     const { email, mobile, optIn } = entries;
     const country = window.location.pathname.split('/')[1];
-    const emailType = optIn ? 'emsms' : 'em';
-    const location = form.closest('dialog') ? 'modal' : 'footer';
-    const leadSource = `sub-${emailType}-${location}-${country}`;
+    let leadSource = `sub-em-footer-${country}`;
+    if (form.closest('dialog')) {
+      leadSource = `sub-em-modal-${country}`;
+    }
     const payload = {
       email,
       mobile,
