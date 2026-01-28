@@ -23,7 +23,7 @@ function formatYield(yieldString) {
 
 export default async function decorate(block) {
   const { locale, language } = getLocaleAndLanguage();
-  
+
   // Try primary path first, then fallback to /data/ path
   let resp = await fetch(`/${locale}/${language}/recipes/query-index.json`);
   if (!resp.ok) {
@@ -33,13 +33,13 @@ export default async function decorate(block) {
       return;
     }
   }
-  
+
   const { data } = await resp.json();
   if (!data || data.length === 0) {
     block.remove();
     return;
   }
-  
+
   const recipes = data.filter((r) => r.status !== 'Deleted' && r.image && !r.image.includes('default-meta-image'));
 
   let recipe;

@@ -46,7 +46,7 @@ async function lookupRecipes(config = {}, facets = {}) {
         return [];
       }
       const { data } = await altResp.json();
-      
+
       // parse and filter recipes - only include Updated or New status, exclude Deleted
       const recipes = data
         .map((d) => parseRecipeData(d))
@@ -990,9 +990,6 @@ async function init() {
 
     const itemsLabel = recipeCenter.querySelector('.info > p');
     if (itemsLabel) {
-      const startSpan = recipeCenter.querySelector('#results-start');
-      const endSpan = recipeCenter.querySelector('#results-end');
-      const countSpan = recipeCenter.querySelector('#results-count');
       // Keep the structure but update the text nodes
       itemsLabel.childNodes[0].textContent = `${placeholders.items || 'Items'} `;
       itemsLabel.childNodes[2].textContent = ' - ';
