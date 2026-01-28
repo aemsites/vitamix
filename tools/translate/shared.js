@@ -18,6 +18,8 @@ const TRANSLATION_SERVICE_URL = 'https://translate.da.live/google';
 
 const CONFIG_PATH = '/.da/translate.json';
 const CONFIG_CONTENT_DNT_SHEET = 'dnt-content-rules';
+const CONFIG_METADATA_FIELDS_SHEET = 'dt-metadata-fields';
+const METADATA_FIELDS_TO_TRANSLATE = ['title', 'description'];
 
 const EDITOR_FORMAT = 'table';
 const ADMIN_FORMAT = 'div';
@@ -27,11 +29,20 @@ const ICONS_RULE = {
   apply: (html) => {
     const ps = html.querySelectorAll('p');
     ps.forEach((p) => {
+      // ignore p if one parent has a translate="no" attribute
+      if (p.closest('[translate="no"]')) {
+        return;
+      }
       const text = p.textContent;
       const regex = /:([a-zA-Z0-9-_]+):/g;
       const matches = text.match(regex);
+
       if (matches) {
         matches.forEach((match) => {
+          // ignore if only digits (could be a timestamp)
+          if (/^:[\d:]+:$/i.test(match)) {
+            return;
+          }
           p.innerHTML = p.innerHTML.replace(match, `<span translate="no">${match}</span>`);
         });
       }
@@ -75,16 +86,30 @@ const RULES = {
       return html;
     },
   }, {
-    description: 'First column of all rows in "metadata" table should be not translated',
-    apply: (html) => {
+    description: 'Property names of the "metadata" table should be not translated (except Title and Description or the ones in the config)',
+    apply: (html, config) => {
+      const keys = (() => {
+        const data = config[CONFIG_METADATA_FIELDS_SHEET]?.data || [];
+        const ks = data.filter((f) => f.metadata).map((f) => f.metadata.toLowerCase().trim());
+        ks.push(...METADATA_FIELDS_TO_TRANSLATE.map((f) => f.toLowerCase().trim()));
+        return [...new Set(ks)];
+      })();
+
       const tables = html.querySelectorAll('table');
       tables.forEach((table) => {
         const rows = table.querySelectorAll('tr');
         if (rows.length > 0) {
           const metadataTable = rows[0].textContent.toLowerCase().trim() === 'metadata';
           if (metadataTable) {
+            table.setAttribute('translate', 'no');
             rows.forEach((row) => {
-              row.querySelector('td:first-child').setAttribute('translate', 'no');
+              const keyEl = row.querySelector('td:first-child');
+              const valueEl = row.querySelector('td:last-child');
+              const key = keyEl?.textContent.toLowerCase().trim();
+              const value = valueEl?.textContent.toLowerCase().trim();
+              if (key && value && keys.includes(key)) {
+                valueEl.setAttribute('translate', 'yes');
+              }
             });
           }
         }
@@ -110,11 +135,25 @@ const RULES = {
   }, ICONS_RULE, CONTENT_DNT_RULE],
   [ADMIN_FORMAT]: [{
     description: 'First column of all rows in "metadata" block should be not translated',
-    apply: (html) => {
+    apply: (html, config) => {
+      const keys = (() => {
+        const data = config[CONFIG_METADATA_FIELDS_SHEET]?.data || [];
+        const ks = data.filter((f) => f.metadata).map((f) => f.metadata.toLowerCase().trim());
+        ks.push(...METADATA_FIELDS_TO_TRANSLATE.map((f) => f.toLowerCase().trim()));
+        return [...new Set(ks)];
+      })();
+
       const divs = html.querySelectorAll('div[class=metadata]');
-      divs.forEach((div) => {
-        div.querySelectorAll('& > div > div:first-child').forEach((child) => {
-          child.setAttribute('translate', 'no');
+      divs.forEach((block) => {
+        block.setAttribute('translate', 'no');
+        block.querySelectorAll('& > div').forEach((row) => {
+          const keyEl = row.querySelector('div:first-child');
+          const valueEl = row.querySelector('div:last-child');
+          const key = keyEl?.textContent.toLowerCase().trim();
+          const value = valueEl?.textContent.toLowerCase().trim();
+          if (key && value && keys.includes(key)) {
+            valueEl.setAttribute('translate', 'yes');
+          }
         });
       });
       return html;
