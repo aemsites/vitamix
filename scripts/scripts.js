@@ -62,24 +62,6 @@ export function getCookies() {
   return cookieMap;
 }
 
-/**
- * Gets the locale and language from the window.location.pathname.
- * @returns {Object} Object with locale and language.
- */
-export function getLocaleAndLanguage(forceEnCA = false) {
-  const pathSegments = window.location.pathname.split('/').filter(Boolean);
-  const locale = pathSegments[0] || 'us'; // fallback to 'us' if not found
-  const language = pathSegments[1] || 'en_us'; // fallback to 'en_us' if not found
-
-  // Commerce backend uses the language code en_ca for the Canada english store view.
-  // On the frontend they are incorrectly using the en_us language code.
-  if (forceEnCA && locale === 'ca' && language === 'en_us') {
-    return { locale, language: 'en_ca' };
-  }
-
-  return { locale, language };
-}
-
 function setAffiliateCoupon() {
   const urlParams = new URLSearchParams(window.location.search);
   const { cjdata, cjevent, COUPON } = Object.fromEntries(urlParams);
