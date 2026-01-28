@@ -24,14 +24,10 @@ function formatYield(yieldString) {
 export default async function decorate(block) {
   const { locale, language } = getLocaleAndLanguage();
 
-  // Try primary path first, then fallback to /data/ path
-  let resp = await fetch(`/${locale}/${language}/recipes/query-index.json`);
+  const resp = await fetch(`/${locale}/${language}/recipes/query-index.json`);
   if (!resp.ok) {
-    resp = await fetch(`/${locale}/${language}/recipes/data/query-index.json`);
-    if (!resp.ok) {
-      block.remove();
-      return;
-    }
+    block.remove();
+    return;
   }
 
   const { data } = await resp.json();

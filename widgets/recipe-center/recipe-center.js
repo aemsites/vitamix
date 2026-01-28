@@ -39,40 +39,23 @@ async function lookupRecipes(config = {}, facets = {}) {
     // fetch the main recipe index
     const resp = await fetch(`/${locale}/${language}/recipes/query-index.json`);
     if (!resp.ok) {
-      // Try alternate path with /data/ for backwards compatibility
-      const altResp = await fetch(`/${locale}/${language}/recipes/data/query-index.json`);
-      if (!altResp.ok) {
-        window.recipeIndex = { data: [] };
-        return [];
-      }
-      const { data } = await altResp.json();
-
-      // parse and filter recipes - only include Updated or New status, exclude Deleted
-      const recipes = data
-        .map((d) => parseRecipeData(d))
-        .filter((recipe) => {
-          const status = recipe.status ? recipe.status.toLowerCase() : '';
-          return status === 'updated' || status === 'new';
-        });
-
-      window.recipeIndex = {
-        data: recipes,
-      };
-    } else {
-      const { data } = await resp.json();
-
-      // parse and filter recipes - only include Updated or New status, exclude Deleted
-      const recipes = data
-        .map((d) => parseRecipeData(d))
-        .filter((recipe) => {
-          const status = recipe.status ? recipe.status.toLowerCase() : '';
-          return status === 'updated' || status === 'new';
-        });
-
-      window.recipeIndex = {
-        data: recipes,
-      };
+      window.recipeIndex = { data: [] };
+      return [];
     }
+
+    const { data } = await resp.json();
+
+    // parse and filter recipes - only include Updated or New status, exclude Deleted
+    const recipes = data
+      .map((d) => parseRecipeData(d))
+      .filter((recipe) => {
+        const status = recipe.status ? recipe.status.toLowerCase() : '';
+        return status === 'updated' || status === 'new';
+      });
+
+    window.recipeIndex = {
+      data: recipes,
+    };
   }
 
   // extract all facet keys from the facets object for dynamic filter UI
