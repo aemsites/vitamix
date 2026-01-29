@@ -1272,7 +1272,7 @@ async function loadDelayed() {
       });
     }
   }
-  if (window.location.origin.endsWith('.aem.page') || window.location.origin === 'http://localhost:3000') {
+  if (params.get('linkchecker') === 'on' && (window.location.origin.endsWith('.aem.page') || window.location.origin === 'http://localhost:3000')) {
     import('../tools/linkchecker/linkchecker.js');
   }
   setTimeout(decorateExternalLinks, 1000);
