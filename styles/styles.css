@@ -274,7 +274,6 @@ main .section.banner.overlay.dark::before {
 }
 
 /* stylelint-disable no-descending-specificity */
-
 main > .section.banner > div {
   padding: 0;
 }
