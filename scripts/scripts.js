@@ -1272,9 +1272,16 @@ async function loadDelayed() {
       });
     }
   }
-  if (params.get('linkchecker') === 'on' && (window.location.origin.endsWith('.aem.page') || window.location.origin === 'http://localhost:3000')) {
-    import('../tools/linkchecker/linkchecker.js');
+
+  try {
+    if (window.location.origin.endsWith('.aem.page') || window.location.origin === 'http://localhost:3000') {
+      import('../tools/linkchecker/linkchecker.js');
+    }
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error('Error loading link checker', e);
   }
+
   setTimeout(decorateExternalLinks, 1000);
 }
 
