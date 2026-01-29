@@ -403,6 +403,10 @@ h6 {
   font-size: var(--heading-size-xs);
 }
 
+sup {
+  font-size: 0.5em;
+}
+
 /* stylelint-disable-next-line no-descending-specificity */
 .eyebrow {
   margin-bottom: var(--spacing-60);
