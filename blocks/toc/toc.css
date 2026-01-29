@@ -46,17 +46,13 @@ main.toc-left > .toc-container > .toc-wrapper {
   font-size: var(--heading-size-l);
 }
 
+.toc-container .toc-no-heading {
+  margin-top: var(--spacing-850);
+}
+
 .toc ul {
   list-style: none;
   padding: 0;
-}
-
-.toc ul > li {
-  font-size: var(--body-size-s);
-}
-
-.toc ul > li + li {
-  padding-top: var(--spacing-200);
 }
 
 .toc a {
@@ -66,4 +62,37 @@ main.toc-left > .toc-container > .toc-wrapper {
 .toc a:hover,
 .toc a:focus {
   text-decoration: underline;
+}
+
+/* external TOC */
+
+.toc.toc-external li p {
+  margin: 0;
+}
+
+.toc.toc-external ul ul {
+  padding-left: var(--spacing-100);
+}
+
+
+.toc.toc-external li ul {
+  display: none;
+}
+
+.toc.toc-external li.toc-open > ul {
+  display: block;
+}
+
+.toc.toc-external ul > li {
+  padding: var(--spacing-100) 0;
+}
+
+/* internal TOC */
+
+.toc.toc-internal ul > li {
+  font-size: var(--body-size-s);
+}
+
+.toc.toc-internal ul > li + li {
+  padding-top: var(--spacing-200);
 }

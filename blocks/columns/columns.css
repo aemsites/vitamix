@@ -128,3 +128,9 @@ p + .columns-container {
 .columns.text-center {
   text-align: center;
 }
+
+
+.columns .icon-circle-1 svg, .columns .icon-circle-2 svg, .columns .icon-circle-3 svg {
+  height: 4em;
+  width: 4em;
+}

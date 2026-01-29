@@ -1,0 +1,21 @@
+.table {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table table th,
+.table table td {
+  padding: 0 var(--spacing-s);
+  text-align: left;
+  vertical-align: top;
+}
+
+.table table th {
+  border-bottom: 1px solid;
+  font-weight: normal;
+}
