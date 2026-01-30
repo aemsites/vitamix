@@ -66,7 +66,7 @@ export function getCartFromLocalStorage() {
 }
 
 /**
- * Returns the cart ID stored in the cached section data from Magento.
+ * Returns the cart ID stored in the cached section data from Magento
  *
  * @returns {string|undefined} The ID or undefined
  */
@@ -77,7 +77,7 @@ export function getCartIdFromLocalStorage() {
 
 /**
  * Returns the bearer token used for GraphQL authentication
- * stored in the cached section data from Magento.
+ * stored in the cached section data from Magento
  *
  * @returns {string|undefined} The token or undefined
  */
