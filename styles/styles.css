@@ -403,10 +403,6 @@ h6 {
   font-size: var(--heading-size-xs);
 }
 
-sup {
-  font-size: 0.4em;
-}
-
 /* stylelint-disable-next-line no-descending-specificity */
 .eyebrow {
   margin-bottom: var(--spacing-60);
@@ -418,6 +414,15 @@ sup {
 
 [data-eyebrow] {
   margin-top: 0;
+}
+
+/* Superscript styling for trademark symbols */
+sup {
+  vertical-align: top;
+  font-size: 0.6em;
+  line-height: 0;
+  position: relative;
+  top: 0;
 }
 
 strong {
