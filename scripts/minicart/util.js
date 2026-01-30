@@ -1,22 +1,4 @@
-import { getLocaleAndLanguage } from '../scripts.js';
 import { getMagentoCache } from '../storage/util.js';
-
-/**
- * Gets the key for the side-by-side section.
- * For /us/en_us, returns the original 'side-by-side' key to preserve existing carts.
- * For other stores, returns a store-specific key (e.g., 'side-by-side-ca-fr_ca').
- * @returns {string} The side-by-side key
- */
-export function getSideBySideKey() {
-  const { locale, language } = getLocaleAndLanguage();
-
-  // Keep original key for US store to preserve existing carts
-  if (locale === 'us' && language === 'en_us') {
-    return 'side-by-side';
-  }
-
-  return `side-by-side-${locale}-${language}`;
-}
 
 /**
  * A helper function used to take the cart representation stored in localStorage
@@ -85,25 +67,21 @@ export function getCartFromLocalStorage() {
 
 /**
  * Returns the cart ID stored in the cached section data from Magento.
- * Uses a store-specific key to maintain separate carts per store view.
  *
  * @returns {string|undefined} The ID or undefined
  */
 export function getCartIdFromLocalStorage() {
   const magentoCache = getMagentoCache();
-  const sideBySideKey = getSideBySideKey();
-  return magentoCache[sideBySideKey]?.cart_id;
+  return magentoCache['side-by-side']?.cart_id;
 }
 
 /**
  * Returns the bearer token used for GraphQL authentication
  * stored in the cached section data from Magento.
- * Uses a store-specific key to maintain separate tokens per store view.
  *
  * @returns {string|undefined} The token or undefined
  */
 export function getTokenFromLocalStorage() {
   const magentoCache = getMagentoCache();
-  const sideBySideKey = getSideBySideKey();
-  return magentoCache[sideBySideKey]?.token;
+  return magentoCache['side-by-side']?.token;
 }
