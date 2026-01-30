@@ -3,6 +3,7 @@ import { loadCSS } from '../../scripts/aem.js';
 loadCSS('/tools/linkchecker/linkchecker.css');
 
 function checkLinks() {
+  if (window.location.pathname.startsWith('/drafts/')) return;
   const locale = window.location.pathname.split('/').slice(0, 3).join('/');
   const links = document.querySelectorAll('a[href]');
   links.forEach((link) => {
