@@ -418,11 +418,7 @@ h6 {
 
 /* Superscript styling for trademark symbols */
 sup {
-  vertical-align: top;
   font-size: 0.4em;
-  line-height: 0;
-  position: relative;
-  top: 1em;
 }
 
 strong {
