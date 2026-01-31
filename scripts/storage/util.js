@@ -1,7 +1,43 @@
-const COMMERCE_CACHE_TIMEOUT_KEY = 'mage-cache-timeout';
-const COMMERCE_CACHE_STORAGE_KEY = 'mage-cache-storage';
-const COMMERCE_CACHE_INVALIDATION_KEY = 'mage-cache-storage-section-invalidation';
+import { getLocaleAndLanguage } from '../scripts.js';
+
 const COMMERCE_CACHE_SESSION_COOKIE = 'mage-cache-sessid';
+
+/**
+ * Gets the store-specific suffix for localStorage keys.
+ * Returns empty string for US store to preserve existing carts.
+ * @returns {string} Store suffix (e.g., '-ca-fr_ca') or empty string for US
+ */
+function getStoreSuffix() {
+  const { locale, language } = getLocaleAndLanguage();
+  if (locale === 'us' && language === 'en_us') {
+    return '';
+  }
+  return `-${locale}-${language}`;
+}
+
+/**
+ * Gets the store-specific cache storage key.
+ * @returns {string} The localStorage key for mage-cache-storage
+ */
+function getCacheStorageKey() {
+  return `mage-cache-storage${getStoreSuffix()}`;
+}
+
+/**
+ * Gets the store-specific cache timeout key.
+ * @returns {string} The localStorage key for mage-cache-timeout
+ */
+function getCacheTimeoutKey() {
+  return `mage-cache-timeout${getStoreSuffix()}`;
+}
+
+/**
+ * Gets the store-specific cache invalidation key.
+ * @returns {string} The localStorage key for mage-cache-storage-section-invalidation
+ */
+function getCacheInvalidationKey() {
+  return `mage-cache-storage-section-invalidation${getStoreSuffix()}`;
+}
 
 /**
  * Use the Magento systems cache timeout to determine if it's safe to use the
@@ -10,7 +46,7 @@ const COMMERCE_CACHE_SESSION_COOKIE = 'mage-cache-sessid';
  * @returns {boolean} true if local storage is expired
  */
 export function isMagentoLocalStorageExpired() {
-  const localMageCacheTimeout = localStorage.getItem(COMMERCE_CACHE_TIMEOUT_KEY);
+  const localMageCacheTimeout = localStorage.getItem(getCacheTimeoutKey());
 
   // This cookie will expire around when when the Magento PHP session cookie expires
   // see: vendor/magento/module-customer/view/frontend/web/js/customer-data.js:48
@@ -44,7 +80,8 @@ export function isMagentoLocalStorageExpired() {
  * @returns {void}
  */
 export function addMagentoCacheInvalidations(sectionsToAdd) {
-  let invalidations = localStorage.getItem(COMMERCE_CACHE_INVALIDATION_KEY);
+  const cacheInvalidationKey = getCacheInvalidationKey();
+  let invalidations = localStorage.getItem(cacheInvalidationKey);
 
   try {
     invalidations = JSON.parse(invalidations);
@@ -57,7 +94,7 @@ export function addMagentoCacheInvalidations(sectionsToAdd) {
     return;
   }
 
-  localStorage.setItem(COMMERCE_CACHE_INVALIDATION_KEY, JSON.stringify(invalidations));
+  localStorage.setItem(cacheInvalidationKey, JSON.stringify(invalidations));
 }
 
 /**
@@ -68,7 +105,8 @@ export function addMagentoCacheInvalidations(sectionsToAdd) {
  */
 function removeMagentoCacheInvalidations(invalidatedSections) {
   // update invalidation to remove the cart and customer
-  let invalidations = localStorage.getItem(COMMERCE_CACHE_INVALIDATION_KEY);
+  const cacheInvalidationKey = getCacheInvalidationKey();
+  let invalidations = localStorage.getItem(cacheInvalidationKey);
 
   try {
     invalidations = JSON.parse(invalidations);
@@ -83,7 +121,7 @@ function removeMagentoCacheInvalidations(invalidatedSections) {
     }
     return true;
   }));
-  localStorage.setItem(COMMERCE_CACHE_INVALIDATION_KEY, JSON.stringify(result));
+  localStorage.setItem(cacheInvalidationKey, JSON.stringify(result));
 }
 
 /**
@@ -95,7 +133,7 @@ function removeMagentoCacheInvalidations(invalidatedSections) {
  * @returns {boolean} true if local storage is expired
  */
 export function isMagentoCacheInvalidated(sections) {
-  const localMageCacheInvalidations = localStorage.getItem(COMMERCE_CACHE_INVALIDATION_KEY);
+  const localMageCacheInvalidations = localStorage.getItem(getCacheInvalidationKey());
 
   if (!localMageCacheInvalidations) {
     return false;
@@ -121,7 +159,7 @@ export function isMagentoCacheInvalidated(sections) {
  * @returns {*} object representing the current Magento cache
  */
 export function getMagentoCache() {
-  const magentoCache = localStorage.getItem(COMMERCE_CACHE_STORAGE_KEY);
+  const magentoCache = localStorage.getItem(getCacheStorageKey());
   if (!magentoCache || isMagentoLocalStorageExpired()) {
     return {};
   }
@@ -152,9 +190,9 @@ export function getLoggedInFromLocalStorage() {
  * @returns {boolean} true if no commerce state is present
  */
 export function isCommerceStatePristine() {
-  return !localStorage.getItem(COMMERCE_CACHE_INVALIDATION_KEY)
-    && !localStorage.getItem(COMMERCE_CACHE_STORAGE_KEY)
-    && !localStorage.getItem(COMMERCE_CACHE_TIMEOUT_KEY)
+  return !localStorage.getItem(getCacheInvalidationKey())
+    && !localStorage.getItem(getCacheStorageKey())
+    && !localStorage.getItem(getCacheTimeoutKey())
     && (document.cookie.indexOf(`${COMMERCE_CACHE_SESSION_COOKIE}`) === -1);
 }
 
@@ -165,14 +203,14 @@ export function isCommerceStatePristine() {
  * @return {void}
  */
 export async function updateMagentoCacheSections(sections) {
+  const { locale, language } = getLocaleAndLanguage();
+  const cacheStorageKey = getCacheStorageKey();
+  const cacheTimeoutKey = getCacheTimeoutKey();
+
   let result = {};
   let updatedSections = null;
   try {
     const loginAbortController = new AbortController();
-
-    const pathSegments = window.location.pathname.split('/').filter(Boolean);
-    const locale = pathSegments[0] || 'us'; // fallback to 'us' if not found
-    const language = pathSegments[1] || 'en_us'; // fallback to 'en_us' if not found
 
     setTimeout(() => loginAbortController.abort('Section data took too long to respond.'), 10000);
     result = await fetch(`/${locale}/${language}/customer/section/load/?sections=${encodeURIComponent(sections.join(','))}&force_new_section_timestamp=false`, {
@@ -201,7 +239,7 @@ export async function updateMagentoCacheSections(sections) {
   // to the lifetime of the PHPSESSID but it's unknown here. This could be improved.
   const minutesToTimeout = 25;
   document.cookie = `${COMMERCE_CACHE_SESSION_COOKIE}=true; path=/; expires=${(new Date(new Date().getTime() + minutesToTimeout * 60000)).toUTCString()}; SameSite=Lax; ${window.location.protocol === 'http:' ? '' : 'Secure'}`;
-  let magentoCache = localStorage.getItem(COMMERCE_CACHE_STORAGE_KEY);
+  let magentoCache = localStorage.getItem(cacheStorageKey);
 
   try {
     magentoCache = JSON.parse(magentoCache) || {};
@@ -217,12 +255,12 @@ export async function updateMagentoCacheSections(sections) {
     removeMagentoCacheInvalidations(sections);
   }
   const minutesToExpire = 30;
-  localStorage.setItem(COMMERCE_CACHE_STORAGE_KEY, JSON.stringify(magentoCache));
+  localStorage.setItem(cacheStorageKey, JSON.stringify(magentoCache));
   localStorage.setItem(
-    COMMERCE_CACHE_TIMEOUT_KEY,
+    cacheTimeoutKey,
     JSON.stringify((new Date(new Date().getTime() + minutesToExpire * 60000)).toISOString()),
   );
-  window.dispatchEvent(new StorageEvent('storage', { key: COMMERCE_CACHE_STORAGE_KEY }));
+  window.dispatchEvent(new StorageEvent('storage', { key: cacheStorageKey }));
 }
 
 /**
@@ -232,8 +270,9 @@ export async function updateMagentoCacheSections(sections) {
  * @param {function} callback the method to be called with the results of the event
  */
 export function addMagentoCacheListener(callback) {
+  const cacheStorageKey = getCacheStorageKey();
   window.addEventListener('storage', (event) => {
-    if (event.key === COMMERCE_CACHE_STORAGE_KEY) {
+    if (event.key === cacheStorageKey) {
       callback(event);
     }
   });
