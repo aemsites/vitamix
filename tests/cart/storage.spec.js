@@ -118,6 +118,8 @@ test.describe('Cart Storage Tests', () => {
       if (cartData && cartData['side-by-side']) {
         expect(cartData['side-by-side'].cart_id).toBe('us-cart-abc123');
         console.log('✓ US cart stored in mage-cache-storage with correct cart_id');
+      } else {
+        expect.fail('US cart not stored in mage-cache-storage');
       }
     });
   });
@@ -231,6 +233,8 @@ test.describe('Cart Storage Tests', () => {
       if (cartData && cartData['side-by-side']) {
         expect(cartData['side-by-side'].cart_id).toBe('fr-cart-isolated');
         console.log('✓ FR-CA cart stored in mage-cache-storage-ca-fr_ca with correct cart_id');
+      } else {
+        expect.fail('FR-CA cart not stored in mage-cache-storage-ca-fr_ca');
       }
     });
   });
