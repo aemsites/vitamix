@@ -30,7 +30,7 @@ const chatbot = document.createElement('div');
 chatbot.id = 'chatbot-container';
 document.body.appendChild(chatbot);
 
-loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-chatbot.lc-d95b877a5e0c2ce39cd26f0aa190faef-lc.min.js');
+loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-chatbot.lc-dd65664b07118365206104c205ccc20e-lc.min.js');
 loadScript('https://www.vitamix.com/etc.clientlibs/core/wcm/components/commons/site/clientlibs/container.lc-0a6aff292f5cc42142779cde92054524-lc.min.js');
 
 await loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-library.lc-259cf15444c5fe1f89e5c54df7b6e1e9-lc.min.js');
@@ -51,8 +51,32 @@ loadScript('https://www.googletagmanager.com/gtag/js?id=G-XJB3SPQE38');
 gtag('js', new Date());
 gtag('config', 'G-XJB3SPQE38');
 
+// Replace Innovid Conversion Tag with Google Consent Mode
 
-loadScript('https://s-a.innovid.com/conversion/1hk0tl');
+loadScript('https://www.googletagmanager.com/gtag/js?id=DC-15266370');
+gtag('js', new Date());
+gtag('config', 'DC-15266370');
+
+const path = window.location.pathname;
+const isHome = path === '/us/en_us/';
+const isAscentXcategory = path === '/us/en_us/shop/ascent-x-series-blenders';
+
+if (isHome) {
+  gtag('event', 'conversion', {
+    allow_custom_scripts: true,
+    send_to: 'DC-15266370/2026u0/vitam0+standard',
+  });
+}
+
+if (isAscentXcategory) {
+  gtag('event', 'conversion', {
+    allow_custom_scripts: true,
+    send_to: 'DC-15266370/2026u0/vitam00+standard',
+  });
+}
+
+//End Floodlight tag
+
 loadScript('https://arttrk.com/pixel/?ad_log=referer&action=content&pixid=82dc3545-14a0-41d8-9870-2156059087d9');
 loadScript('https://cdn.evgnet.com/beacon/vitamixmgmtcorp/vitamix_us/scripts/evergage.min.js');
 
@@ -76,20 +100,6 @@ fbq('track', 'PageView');
 
 // End Facebook Pixel Code
 
-// Snap Pixel Code
-try {
-  (function(e,t,n){if(e.snaptr)return;var a=e.snaptr=function()
-    {a.handleRequest?a.handleRequest.apply(a,arguments):a.queue.push(arguments)};
-    a.queue=[];var s='script';const r=t.createElement(s);r.async=!0;
-    r.src=n;var u=t.getElementsByTagName(s)[0];
-    u.parentNode.insertBefore(r,u);})
-    (window,document,'https://sc-static.net/scevent.min.js');
-    snaptr('init', '308aeb00-4528-4312-b257-3d04cbdc93a0', {'user_email': 'email_variable'});
-    snaptr('track', 'PAGE_VIEW');
-} catch (error) {
-  console.error('Snap Pixel Code failed to load', error);
-}
-// End of Snap Pixel Code
 
 // Pinterest Tag
 !function(e){
@@ -119,29 +129,6 @@ try {
 // End of LinkedIn Insight Tag
 
 /* eslint-disable */
-
-// Big Happy Tag add 11-17-25 end 12-28-25
-try {
-  const adentifiAccountId = 26653;
-  const pageUrl = encodeURIComponent(window.location.href);
-  const uqNum = Math.random() * 10000000000000;
-
-  const pixelUrl =
-    'https://px.adentifi.com/Pixels?a_id=' + adentifiAccountId +
-    ';p_url=' + pageUrl +
-    ';uq=' + uqNum;
-
-  const img = document.createElement('img');
-  img.src = pixelUrl;
-  img.height = 1;
-  img.width = 1;
-  img.style.display = 'none';
-
-  document.body.appendChild(img);
-} catch (error) {
-  console.error('Adentifi pixel failed to load', error);
-}
-// End of Big Happy Tag
 
 // TV Scientific Pixel Code
 try {

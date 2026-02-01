@@ -1,0 +1,98 @@
+import { fetchPlaceholders } from '../../scripts/aem.js';
+import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+
+function formatTime(timeString, placeholders = {}) {
+  if (!timeString) return '';
+  const parts = timeString.split(':');
+  if (parts.length !== 3) return timeString;
+  const hours = parseInt(parts[0], 10);
+  const minutes = parseInt(parts[1], 10) + (parseInt(parts[2], 10) > 0 ? 1 : 0);
+  const h = Math.floor((hours * 60 + minutes) / 60);
+  const m = (hours * 60 + minutes) % 60;
+  const hourLabel = h !== 1 ? (placeholders.hours || 'hours') : (placeholders.hour || 'hour');
+  const minuteLabel = m !== 1 ? (placeholders.minutes || 'minutes') : (placeholders.minute || 'minute');
+  if (h > 0 && m > 0) return `${h} ${hourLabel} ${m} ${minuteLabel}`;
+  if (h > 0) return `${h} ${hourLabel}`;
+  return `${m} ${minuteLabel}`;
+}
+
+function formatYield(yieldString, placeholders = {}) {
+  if (!yieldString) return '';
+  const match = yieldString.match(/^([\d.]+)/);
+  if (!match) return yieldString;
+  const num = parseFloat(match[1]);
+  const servingsLabel = placeholders.servings || 'servings';
+  return num % 1 === 0 ? `${Math.floor(num)} ${servingsLabel}` : `${num} ${servingsLabel}`;
+}
+
+export default async function decorate(block) {
+  const { locale, language } = getLocaleAndLanguage();
+  const placeholders = await fetchPlaceholders(`/${locale}/${language}`);
+
+  const resp = await fetch(`/${locale}/${language}/recipes/query-index.json`);
+  if (!resp.ok) {
+    block.remove();
+    return;
+  }
+
+  const { data } = await resp.json();
+  if (!data || data.length === 0) {
+    block.remove();
+    return;
+  }
+
+  const recipes = data.filter((r) => r.status !== 'Deleted' && r.image && !r.image.includes('default-meta-image'));
+
+  let recipe;
+  const a = block.querySelector('a[href]');
+  if (a) {
+    const url = new URL(a.href, window.location);
+    recipe = recipes.find((r) => r.path === url.pathname);
+  }
+
+  // fall back to most recent recipe
+  if (!recipe) {
+    const sorted = recipes
+      .filter((r) => r['date-created'])
+      .sort((x, y) => new Date(y['date-created']) - new Date(x['date-created']));
+    [recipe] = sorted;
+  }
+
+  // If no recipe found after filtering and fallback, remove the block
+  if (!recipe) {
+    block.remove();
+    return;
+  }
+
+  // Convert image URL to relative path (pathname + query params only)
+  let imagePath = recipe.image;
+  try {
+    const imageUrl = new URL(imagePath, window.location.origin);
+    imagePath = imageUrl.pathname + imageUrl.search;
+  } catch (e) {
+    // If URL parsing fails, use the path as-is
+  }
+
+  const timeLabel = placeholders.time || 'Time';
+  const servingsLabel = placeholders.servings || 'Servings';
+  const newFeaturedRecipeLabel = placeholders.newFeaturedRecipe || 'New Featured Recipe';
+  const getTheRecipeLabel = placeholders.getTheRecipe || 'Get the Recipe';
+
+  block.innerHTML = `
+    <img src="${imagePath}" alt="" loading="lazy">
+    <div class="featured-recipe-content">
+      <p class="eyebrow">${newFeaturedRecipeLabel}</p>
+      <h2>${recipe.title}</h2>
+      <p>${recipe.description || ''}</p>
+      <dl>
+        <dt><img src="/blocks/recipe/time.svg" alt="${timeLabel}"></dt>
+        <dd class="eyebrow">${formatTime(recipe['total-time'], placeholders)}</dd>
+        <dt><img src="/blocks/recipe/yield.svg" alt="${servingsLabel}"></dt>
+        <dd class="eyebrow">${formatYield(recipe.yield, placeholders)}</dd>
+      </dl>
+      <p class="button-wrapper">
+        <a class="button" href="${recipe.path}">${getTheRecipeLabel}</a>
+      </p>
+    </div>
+  `;
+}

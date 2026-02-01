@@ -31,6 +31,24 @@ async function loadFonts() {
 }
 
 /**
+ * Gets the locale and language from the window.location.pathname.
+ * @returns {Object} Object with locale and language.
+ */
+export function getLocaleAndLanguage(forceEnCA = false) {
+  const pathSegments = window.location.pathname.split('/').filter(Boolean);
+  const locale = pathSegments[0] || 'us'; // fallback to 'us' if not found
+  const language = pathSegments[1] || 'en_us'; // fallback to 'en_us' if not found
+
+  // Commerce backend uses the language code en_ca for the Canada english store view.
+  // On the frontend they are incorrectly using the en_us language code.
+  if (forceEnCA && locale === 'ca' && language === 'en_us') {
+    return { locale, language: 'en_ca' };
+  }
+
+  return { locale, language };
+}
+
+/**
  * Parses `document.cookie` into key-value map.
  * @returns {Object} Object representing all cookies as key-value pairs
  */
@@ -295,46 +313,6 @@ function parseVariants(sections) {
 
     const metadata = {};
     const options = {};
-    const metadataDiv = div.querySelector('.section-metadata');
-
-    if (metadataDiv) {
-      metadataDiv.querySelectorAll('div').forEach((meta) => {
-        const [keyNode, valueNode, uidNode] = meta.children;
-        const key = keyNode?.textContent.trim();
-        const value = valueNode?.textContent.trim();
-        const uid = uidNode?.textContent.trim();
-
-        if (key && value) {
-          (key === 'sku' ? metadata : options)[key] = value;
-        }
-
-        if (uid) {
-          options.uid = uid;
-        }
-      });
-    }
-
-    const imagesHTML = div.querySelectorAll('picture');
-
-    const priceHTML = div.querySelector('p:nth-of-type(1)');
-    const price = extractPricing(priceHTML);
-
-    return {
-      ...metadata,
-      name,
-      options,
-      price,
-      images: imagesHTML,
-    };
-  });
-}
-
-function parseVariantsNext(sections) {
-  return sections.map((div) => {
-    const name = div.querySelector('h2')?.textContent.trim();
-
-    const metadata = {};
-    const options = {};
 
     options.uid = div.dataset.uid;
     options.color = div.dataset.color;
@@ -363,18 +341,25 @@ function parseVariantsNext(sections) {
 }
 
 // eslint-disable-next-line no-unused-vars
-export function checkOutOfStock(sku) {
+export function checkVariantOutOfStock(sku) {
   const { availability } = window.jsonLdData.offers.find((offer) => offer.sku === sku);
   return availability === 'https://schema.org/OutOfStock';
 }
 
-/**
- * Checks if the current pipeline is the Next pipeline.
- * @returns {boolean} True if the current pipeline is the Next pipeline, false otherwise.
- */
-export function isNextPipeline() {
-  const pipelineMeta = document.head.querySelector('meta[name="pipeline"]')?.content;
-  return pipelineMeta === 'next';
+export function isProductOutOfStock() {
+  // Check if all variants are out of stock, if any are in stock, return false
+  const { offers, custom } = window.jsonLdData;
+
+  // If the product is a bundle and parent is out of stock, return true
+  if (custom.type === 'bundle' && custom.parentAvailability === 'OutOfStock') {
+    return true;
+  }
+
+  // If the product is not a bundle and no offers are available, return true
+  if (!offers || offers.length === 0) return true;
+
+  // If the product is not a bundle and any offers are in stock, return false
+  return !offers.some((offer) => offer.availability === 'https://schema.org/InStock');
 }
 
 /**
@@ -385,11 +370,11 @@ function parsePDPContentSections(sections) {
   sections.forEach((section) => {
     const h3 = section.querySelector('h3')?.textContent.toLowerCase();
     if (h3) {
-      if (h3.includes('features')) {
+      if (h3.includes('features') || h3.includes('caractéristiques')) {
         window.features = section;
-      } else if (h3.includes('specifications')) {
+      } else if (h3.includes('specifications') || h3.includes('spécifications')) {
         window.specifications = section;
-      } else if (h3.includes('warranty')) {
+      } else if (h3.includes('warranty') || h3.includes('garantie')) {
         window.warranty = section;
       }
     }
@@ -404,18 +389,13 @@ function buildPDPBlock(main) {
   const section = document.createElement('div');
   const type = document.head.querySelector('meta[name="type"]')?.content;
 
-  const nextPipeline = isNextPipeline();
   const isValidType = ['simple', 'configurable', 'bundle'].includes(type);
   if (isValidType) {
     // Find LCP picture element based on pipeline structure
     // In both cases we try and pull the first picture from the first image in a variant section
     // If it's a simple product, we pull the first picture on the page
-    let lcpPicture;
-    if (nextPipeline) {
-      lcpPicture = main.querySelector('div.section picture') || main.querySelector('picture:first-of-type');
-    } else {
-      lcpPicture = main.querySelector('div:nth-child(2) picture') || main.querySelector('picture:first-of-type');
-    }
+    const lcpPicture = main.querySelector('div.section picture') || main.querySelector('picture:first-of-type');
+
     const lcpImage = lcpPicture?.querySelector('img');
     if (lcpImage) {
       lcpImage.loading = 'eager';
@@ -440,27 +420,20 @@ function buildPDPBlock(main) {
   const jsonLd = document.head.querySelector('script[type="application/ld+json"]');
   window.jsonLdData = jsonLd ? JSON.parse(jsonLd.textContent) : null;
 
-  // Select variant sections based on pipeline type
-  const selector = nextPipeline
-    ? ':scope > div.section'
-    : ':scope > div';
-  const variantSections = Array.from(main.querySelectorAll(selector));
+  const variantSections = Array.from(main.querySelectorAll(':scope > div.section'));
 
   // Parse variants using the appropriate parser
-  window.variants = nextPipeline
-    ? parseVariantsNext(variantSections)
-    : parseVariants(variantSections);
+  window.variants = parseVariants(variantSections);
 
-  if (nextPipeline) {
-    parsePDPContentSections(Array.from(main.querySelectorAll(':scope > div')));
-  }
+  parsePDPContentSections(Array.from(main.querySelectorAll(':scope > div')));
 
+  const { locale, language } = getLocaleAndLanguage();
   const navMeta = document.head.querySelector('meta[name="nav"]');
   if (!navMeta) {
     [
-      ['nav', '/us/en_us/nav/nav'],
-      ['footer', '/us/en_us/footer/footer'],
-      ['nav-banners', '/us/en_us/nav/nav-banners'],
+      ['nav', `/${locale}/${language}/nav/nav`],
+      ['footer', `/${locale}/${language}/footer/footer`],
+      ['nav-banners', `/${locale}/${language}/nav/nav-banners`],
     ].forEach(([name, content]) => {
       const meta = document.createElement('meta');
       meta.name = name;
@@ -506,6 +479,56 @@ function buildAutoBlocks(main) {
     if (metaSku || pdpBlock) {
       document.body.classList.add('pdp-template');
     }
+
+    // setup articles pages
+    if (getMetadata('template') === 'article') {
+      let hero = main.querySelector('.hero');
+      if (!hero) {
+        const picture = main.querySelector('picture');
+        const h1 = main.querySelector('h1');
+        if (picture && h1) {
+          const section = document.createElement('div');
+          hero = buildBlock('hero', { elems: [picture, h1] });
+          section.append(hero);
+          main.prepend(section);
+        }
+      }
+      // add article-info block after hero
+      if (hero) {
+        hero.after(buildBlock('article-info', { elems: [] }));
+      }
+    }
+
+    // wrap recipes in block
+    if (document.querySelector('main') === main) {
+      const template = getMetadata('template');
+      const recipeType = getMetadata('recipe-type');
+      const totalTime = getMetadata('total-time');
+      if (template === 'recipe' && (recipeType || totalTime)) {
+        const block = document.createElement('div');
+        block.classList.add('recipe');
+        block.append(...main.firstElementChild.children);
+        main.firstElementChild.append(block);
+        // eslint-disable-next-line no-use-before-define
+        const { locale, language } = getLocaleAndLanguage();
+        const footerPath = new URL(`/${locale}/${language}/recipes/fragments/footer`, window.location.origin);
+        const footerLink = document.createElement('a');
+        footerLink.href = footerPath.pathname;
+        footerLink.textContent = footerPath.pathname;
+        const footer = buildBlock('fragment', footerLink);
+        main.firstElementChild.append(footer);
+      }
+    }
+
+    // setup toc
+    const tocRef = getMetadata('toc');
+    if (tocRef && (tocRef !== 'none') && !document.querySelector('.toc')) {
+      const toc = buildBlock('toc', [[`<a href="${tocRef}">${tocRef}</a>`]]);
+      const section = document.createElement('div');
+      section.classList.add('section');
+      section.append(toc);
+      main.prepend(section);
+    }
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Auto Blocking failed', error);
@@ -526,8 +549,10 @@ export function buildVideo(el) {
     const video = document.createElement('video');
     video.loop = true;
     video.muted = true;
+    video.autoplay = true;
+    video.playsInline = true;
+    video.setAttribute('autoplay', '');
     video.setAttribute('muted', '');
-    video.setAttribute('playsinline', '');
     video.setAttribute('preload', 'none');
     // create source element
     const source = document.createElement('source');
@@ -539,9 +564,15 @@ export function buildVideo(el) {
       entries.forEach((entry) => {
         if (entry.isIntersecting && !source.dataset.loaded) {
           source.src = source.dataset.src;
-          video.autoplay = true;
           video.load();
-          video.addEventListener('canplay', () => video.play());
+          // handle play promise to catch autoplay blocks
+          const playPromise = video.play();
+          if (playPromise !== undefined) {
+            playPromise.catch((error) => {
+              // eslint-disable-next-line no-console
+              console.log('video autoplay prevented:', error);
+            });
+          }
           source.dataset.loaded = true;
           observer.disconnect();
         }
@@ -630,6 +661,10 @@ function decorateEyebrows(main) {
       // ignore p tags with images or links
       const disqualifiers = beforeH.querySelector('img, a[href]');
       if (disqualifiers) return;
+      // ignore really long p tags
+      const words = beforeH.textContent.trim().split(' ');
+      if (words.length > 12) return;
+
       beforeH.classList.add('eyebrow');
       h.dataset.eyebrow = beforeH.textContent.trim();
     }
@@ -676,6 +711,17 @@ function decorateSectionBackgrounds(main) {
       if (text) section.classList.add('overlay');
     } catch (e) {
       // do nothing
+    }
+  });
+
+  main.querySelectorAll('.section.light, .section.dark').forEach((section) => {
+    const prev = section.previousElementSibling;
+    const next = section.nextElementSibling;
+    if (prev) {
+      prev.dataset.collapse = prev.dataset.collapse === 'top' ? 'both' : 'bottom';
+    }
+    if (next) {
+      next.dataset.collapse = next.dataset.collapse === 'bottom' ? 'both' : 'top';
     }
   });
 }
@@ -802,85 +848,146 @@ export function applyImgColor(block) {
 }
 
 /**
+ * Determines if a given date falls within US Eastern Daylight Saving Time.
+ * DST starts: 2nd Sunday of March at 2:00 AM
+ * DST ends: 1st Sunday of November at 2:00 AM
+ * @param {number} year - The year
+ * @param {number} month - The month (1-12)
+ * @param {number} day - The day of month
+ * @returns {boolean} True if the date is in DST (EDT), false if in standard time (EST)
+ */
+function isEasternDST(year, month, day) {
+  // DST doesn't apply in Jan, Feb, or Dec
+  if (month < 3 || month > 11) return false;
+  // DST always applies Apr-Oct
+  if (month > 3 && month < 11) return true;
+
+  // For March: DST starts 2nd Sunday at 2am
+  if (month === 3) {
+    // Find the 2nd Sunday of March
+    const firstOfMonth = new Date(year, 2, 1); // March 1st (month is 0-indexed)
+    const firstSunday = 1 + ((7 - firstOfMonth.getDay()) % 7);
+    const secondSunday = firstSunday + 7;
+    // On or after the second Sunday means DST
+    return day >= secondSunday;
+  }
+
+  // For November: DST ends 1st Sunday at 2am
+  if (month === 11) {
+    // Find the 1st Sunday of November
+    const firstOfMonth = new Date(year, 10, 1); // November 1st (month is 0-indexed)
+    const firstSunday = 1 + ((7 - firstOfMonth.getDay()) % 7);
+    // Before the first Sunday means still in DST
+    return day < firstSunday;
+  }
+
+  return false;
+}
+
+/**
+ * Parses a datetime string and returns a Date object.
+ * Supports formats like "9/12/2025 9am", "9/19/2025 3pm", or "9/12/2025 9:30am"
+ * Defaults to Eastern time (EST/EDT based on daylight savings) when no timezone specified.
+ * @param {string} dateStr - The datetime string to parse (e.g., "6/23/2025 9am")
+ * @returns {Date} The parsed Date object
+ * @throws {Error} If the datetime format is invalid
+ */
+export function parseEasternDateTime(dateStr) {
+  if (!dateStr) {
+    throw new Error('DateTime string is required');
+  }
+
+  // Handle formats like "9/12/2025 9am" or "9/12/2025 9:30am"
+  // Timezone is optional, defaults to Eastern (EST/EDT)
+  const regex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2})(?::(\d{2}))?(am|pm)(?:\s+([A-Z]{3,4}))?$/i;
+  const match = dateStr.trim().match(regex);
+
+  if (!match) {
+    throw new Error(`Invalid datetime format: ${dateStr}. Expected format: M/D/YYYY HHam/pm`);
+  }
+
+  const month = parseInt(match[1], 10);
+  const day = parseInt(match[2], 10);
+  const year = parseInt(match[3], 10);
+  let hours = parseInt(match[4], 10);
+  const minutesValue = match[5] ? parseInt(match[5], 10) : 0;
+  const ampm = match[6].toLowerCase();
+  const timezone = match[7];
+
+  // Convert 12-hour to 24-hour format
+  if (ampm === 'am' && hours === 12) {
+    hours = 0; // 12am = 00:00
+  } else if (ampm === 'pm' && hours !== 12) {
+    hours += 12; // 1pm-11pm = 13:00-23:00, 12pm stays 12:00
+  }
+
+  // Timezone offsets from UTC
+  const timezoneOffsets = {
+    EDT: -4,
+    EST: -5,
+    CDT: -5,
+    CST: -6,
+    MDT: -6,
+    MST: -7,
+    PDT: -7,
+    PST: -8,
+  };
+
+  let offsetHours;
+  if (timezone) {
+    // Use explicitly specified timezone
+    offsetHours = timezoneOffsets[timezone.toUpperCase()];
+    if (offsetHours === undefined) {
+      throw new Error(`Unsupported timezone: ${timezone}`);
+    }
+  } else {
+    // Default to Eastern time - auto-detect EST/EDT based on date
+    const isDST = isEasternDST(year, month, day);
+    offsetHours = isDST ? -4 : -5; // EDT = -4, EST = -5
+  }
+
+  // Convert the local time to UTC by subtracting the offset
+  // If EDT is UTC-4, then 9am EDT = 1pm UTC (9 - (-4) = 13)
+  const utcHour = hours - offsetHours;
+
+  // Create UTC date object
+  return new Date(Date.UTC(year, month - 1, day, utcHour, minutesValue, 0));
+}
+
+/**
  * Parses alert banner rows from a block element and returns an array of banner objects.
+ * Expected row format:
+ *   Column 1: Start datetime (e.g., "6/23/2025 9am")
+ *   Column 2: End datetime (e.g., "12/31/2025 11:59pm")
+ *   Column 3: Content
+ *   Column 4: Color
+ * Defaults to Eastern time (EST/EDT based on whether DST is in effect for that date).
  * @param {HTMLElement} block - The DOM element containing alert banner rows as children.
  * @returns {Array<Object>} Array of parsed banner objects with properties:
  */
 export function parseAlertBanners(block) {
-  // Timezone offset lookup table (offsets from UTC in hours)
-  const convertToISODate = (date, time) => {
-    const TIMEZONE_OFFSETS = {
-      // Eastern Time
-      EST: -5, // Eastern Standard Time
-      EDT: -4, // Eastern Daylight Time
-      // Central Time
-      CST: -6, // Central Standard Time
-      CDT: -5, // Central Daylight Time
-      // Mountain Time
-      MST: -7, // Mountain Standard Time
-      MDT: -6, // Mountain Daylight Time
-      // Pacific Time
-      PST: -8, // Pacific Standard Time
-      PDT: -7, // Pacific Daylight Time
-      // Other common timezones
-      UTC: 0, // Coordinated Universal Time
-      GMT: 0, // Greenwich Mean Time
-    };
-
-    // Parse date as month/day format
-    const [month, day] = date.split('/');
-    const year = new Date().getFullYear();
-
-    // Extract time and timezone from strings like "12am EDT", "11:59pm EST", "2:30pm", etc.
-    const timeMatch = time.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)(?:\s+([A-Z]{2,4}))?/i);
-    if (!timeMatch) {
-      throw new Error(`Invalid time format: ${time}`);
+  /**
+   * Parses a datetime string, returning null for empty values (open-ended).
+   * @param {string} dateStr - The datetime string to parse
+   * @returns {Date|null} The parsed Date or null if empty
+   */
+  const parseDateOrNull = (dateStr) => {
+    const trimmed = dateStr?.trim();
+    if (!trimmed) {
+      return null; // Empty = open-ended
     }
-
-    let hours = parseInt(timeMatch[1], 10);
-    const minutes = timeMatch[2] || '00';
-    const ampm = timeMatch[3].toLowerCase();
-    const timezone = timeMatch[4] || 'UTC'; // Default to UTC if no timezone specified
-
-    // Convert 12-hour to 24-hour format
-    if (ampm === 'am' && hours === 12) {
-      hours = 0; // 12am = 00:00
-    } else if (ampm === 'pm' && hours !== 12) {
-      hours += 12; // 1pm-11pm = 13:00-23:00, 12pm stays 12:00
-    }
-
-    // Get timezone offset
-    const timezoneOffset = TIMEZONE_OFFSETS[timezone.toUpperCase()];
-    if (timezoneOffset === undefined) {
-      throw new Error(`Unsupported timezone: ${timezone}`);
-    }
-
-    // Pad with zeros
-    const paddedMonth = month.padStart(2, '0');
-    const paddedDay = day.padStart(2, '0');
-    const paddedHours = hours.toString().padStart(2, '0');
-    const paddedMinutes = minutes.padStart(2, '0');
-
-    // Return ISO string with timezone offset
-    if (timezoneOffset === 0) {
-      return `${year}-${paddedMonth}-${paddedDay}T${paddedHours}:${paddedMinutes}:00Z`;
-    }
-    const offsetSign = timezoneOffset >= 0 ? '+' : '-';
-    const offsetHours = Math.abs(timezoneOffset).toString().padStart(2, '0');
-    return `${year}-${paddedMonth}-${paddedDay}T${paddedHours}:${paddedMinutes}:00${offsetSign}${offsetHours}:00`;
+    return parseEasternDateTime(trimmed);
   };
 
   const rows = [...block.children];
   const banners = rows.map((row) => {
-    const [dates, times, content, colorEl] = [...row.children];
+    const [startEl, endEl, content, colorEl] = [...row.children];
     const color = colorEl.textContent.trim();
     try {
-      const [startDate, endDate] = dates.textContent.split('-');
-      const [startTime, endTime] = times.textContent.split('-');
       return ({
         valid: true,
-        start: new Date(convertToISODate(startDate, startTime)),
-        end: new Date(convertToISODate(endDate, endTime)),
+        start: parseDateOrNull(startEl.textContent),
+        end: parseDateOrNull(endEl.textContent),
         content,
         color,
       });
@@ -900,16 +1007,21 @@ export function parseAlertBanners(block) {
 
 /**
  * Determines whether the current date is before, during, or after the given start/end range.
- * @param {Date} start - The start date/time of the range.
- * @param {Date} end - The end date/time of the range.
+ * Null start means open-ended in the past (always started).
+ * Null end means open-ended in the future (never expires).
+ * @param {Date|null} start - The start date/time of the range (null = open-ended past).
+ * @param {Date|null} end - The end date/time of the range (null = open-ended future).
  * @param {Date} [date=new Date()] - The reference date/time to compare (defaults to now).
  * @returns {string} String indicating the status relative to the range.
  */
 export function currentPastFuture(start, end, date = new Date()) {
-  if (start <= date && end >= date) {
+  const afterStart = !start || start <= date;
+  const beforeEnd = !end || end >= date;
+
+  if (afterStart && beforeEnd) {
     return 'current';
   }
-  if (start > date) {
+  if (start && start > date) {
     return 'future';
   }
   return 'past';
@@ -931,17 +1043,6 @@ export function findBestAlertBanner(banners, date = new Date()) {
     }
   });
   return bestBanner;
-}
-
-/**
- * Gets the locale and language from the window.location.pathname.
- * @returns {Object} Object with locale and language.
- */
-export async function getLocaleAndLanguage() {
-  const pathSegments = window.location.pathname.split('/').filter(Boolean);
-  const locale = pathSegments[0] || 'us'; // fallback to 'us' if not found
-  const language = pathSegments[1] || 'en_us'; // fallback to 'en_us' if not found
-  return { locale, language };
 }
 
 /**
@@ -987,6 +1088,35 @@ async function loadNavBanner(main) {
 }
 
 /**
+ * Simulates a PDP preview on localhost, aem.page and aem.live.
+ */
+
+async function simulatePDPPreview() {
+  const corsProxyFetch = async (url) => {
+    const corsProxy = 'https://fcors.org/?url=';
+    const corsKey = '&key=Mg23N96GgR8O3NjU';
+    const fullUrl = `https://main--vitamix--aemsites.aem.network${url}`;
+    return fetch(`${corsProxy}${encodeURIComponent(fullUrl)}${corsKey}`);
+  };
+  const { pathname } = new URL(window.location.href);
+  const resp = await corsProxyFetch(pathname);
+  const html = await resp.text();
+  const dom = new DOMParser().parseFromString(html, 'text/html');
+  const stashedMain = document.querySelector('main');
+  const mainProductInfoDivs = dom.querySelectorAll('main div');
+  const lastDiv = mainProductInfoDivs[mainProductInfoDivs.length - 1];
+  lastDiv.after(...stashedMain.children);
+  dom.querySelector('main').querySelectorAll('img[src^="./media_"]').forEach((el) => {
+    el.setAttribute('src', el.getAttribute('src').replace('./media_', 'https://main--vitamix--aemsites.aem.network/us/en_us/products/media_'));
+  });
+  dom.querySelector('main').querySelectorAll('source[srcset^="./media_"]').forEach((el) => {
+    el.setAttribute('srcset', el.getAttribute('srcset').replace('./media_', 'https://main--vitamix--aemsites.aem.network/us/en_us/products/media_'));
+  });
+  document.body.innerHTML = dom.body.innerHTML;
+  document.head.innerHTML = dom.head.innerHTML;
+}
+
+/**
  * Loads everything needed to get to LCP.
  * @param {Element} doc The container element
  */
@@ -995,11 +1125,13 @@ async function loadEager(doc) {
   const language = locale ? locale.split('_')[0] : 'en';
   document.documentElement.lang = language;
 
+  /* simulation date */
   const params = new URLSearchParams(window.location.search);
   if (params.get('simulateDate')) {
     window.simulateDate = params.get('simulateDate');
   }
 
+  /* adjust shop images to locale root path, util all of shop is mapped */
   if (window.location.pathname.includes('/shop/')) {
     const images = doc.querySelectorAll('img[src^="./media_"]');
     images.forEach((img) => {
@@ -1011,6 +1143,18 @@ async function loadEager(doc) {
     });
   }
 
+  /* pdp simulation on localhost, aem.page and aem.live */
+  const isProd = window.location.hostname.includes('vitamix.com') || window.location.hostname.includes('.aem.network');
+  if (!isProd && window.location.pathname.includes('/products/')) {
+    const metaSku = document.querySelector('meta[name="sku"]');
+    const pdpBlock = document.querySelector('.pdp');
+    if (!metaSku && !pdpBlock) {
+      /* eslint-disable-next-line no-console */
+      console.log('PDP simulation on localhost, aem.page and aem.live');
+      await simulatePDPPreview();
+    }
+  }
+
   decorateTemplateAndTheme();
 
   const main = doc.querySelector('main');
@@ -1018,7 +1162,10 @@ async function loadEager(doc) {
     decorateMain(main);
     await loadNavBanner(main);
     document.body.classList.add('appear');
-    await loadSection(main.querySelector('.section'), waitForFirstImage);
+    await loadSection(main.querySelector('.section'), (section) => {
+      if (document.body.classList.contains('quick-edit')) return Promise.resolve();
+      return waitForFirstImage(section);
+    });
   }
 
   sampleRUM.enhance();
@@ -1059,19 +1206,39 @@ async function loadLazy(doc) {
     await openSyncModal();
   };
 
+  const loadQuickEdit = async (...args) => {
+    // eslint-disable-next-line import/no-cycle
+    const { default: initQuickEdit } = await import('../tools/quick-edit/quick-edit.js');
+    initQuickEdit(...args);
+  };
+
+  const addSidekickListeners = (sk) => {
+    sk.addEventListener('custom:sync', syncSku);
+    sk.addEventListener('custom:quick-edit', loadQuickEdit);
+  };
+
   const sk = document.querySelector('aem-sidekick');
   if (sk) {
-    sk.addEventListener('custom:sync', syncSku);
+    addSidekickListeners(sk);
   } else {
     // wait for sidekick to be loaded
     document.addEventListener('sidekick-ready', () => {
     // sidekick now loaded
-      document.querySelector('aem-sidekick')
-        .addEventListener('custom:sync', syncSku);
+      addSidekickListeners(document.querySelector('aem-sidekick'));
     }, { once: true });
   }
 }
 
+function decorateExternalLinks() {
+  const externalLinks = document.querySelectorAll('a[href^="https://"]');
+  externalLinks.forEach((link) => {
+    const { hostname } = new URL(link.href);
+    if (!link.href.includes('vitamix') || hostname === 'localhost') {
+      link.setAttribute('target', '_blank');
+      link.setAttribute('rel', 'noopener');
+    }
+  });
+}
 /**
  * Loads everything that happens a lot later,
  * without impacting the user experience.
@@ -1105,12 +1272,23 @@ async function loadDelayed() {
       });
     }
   }
+
+  try {
+    if (window.location.origin.endsWith('.aem.page') || window.location.origin === 'http://localhost:3000') {
+      import('../tools/linkchecker/linkchecker.js');
+    }
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error('Error loading link checker', e);
+  }
+
+  setTimeout(decorateExternalLinks, 1000);
 }
 
 /**
  * Loads the page in eager, lazy, and delayed phases.
  */
-async function loadPage() {
+export async function loadPage() {
   await loadEager(document);
   await loadLazy(document);
   loadDelayed();

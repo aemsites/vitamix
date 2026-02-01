@@ -121,10 +121,11 @@ export function getSignInToken() {
 
 export async function performMonolithGraphQLQuery(query, variables, GET = true, USE_TOKEN = false) {
   const GRAPHQL_ENDPOINT = `${window.location.origin}/graphql`;
+  const { language } = getLocaleAndLanguage(true);
 
   const headers = {
     'Content-Type': 'application/json',
-    Store: 'en_us',
+    Store: language,
   };
 
   if (USE_TOKEN) {
@@ -310,7 +311,8 @@ function shouldUseLegacyAddToCart() {
 let pformKey;
 async function getFormKey() {
   if (!pformKey) {
-    const resp = await fetch('/us/en_us/checkout/cart/');
+    const { locale, language } = getLocaleAndLanguage();
+    const resp = await fetch(`/${locale}/${language}/checkout/cart/`);
     const txt = await resp.text();
     const input = txt.match(/<input name="form_key" type="hidden" value="([^"]+)"/);
     pformKey = input ? input[1] : null;
@@ -400,7 +402,7 @@ async function addToCartLegacy(sku, options, quantity) {
   if (!resp.ok) {
     console.error('Failed to add item to cart', resp);
     // Generic error modal
-    const { locale, language } = await getLocaleAndLanguage();
+    const { locale, language } = getLocaleAndLanguage();
     await openModal(`/${locale}/${language}/products/modals/atc-error`);
     throw new Error('Failed to add item to cart');
   }
@@ -439,7 +441,7 @@ export async function addToCart(sku, options, quantity) {
 
       const { cart, user_errors: userErrors } = data.addProductsToCart;
       if (userErrors && userErrors.length > 0) {
-        const { locale, language } = await getLocaleAndLanguage();
+        const { locale, language } = getLocaleAndLanguage();
 
         console.error('User errors while adding item to cart', userErrors);
         const { code } = userErrors[0];

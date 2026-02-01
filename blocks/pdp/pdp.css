@@ -647,8 +647,8 @@ a.button.pdp-find-locally-button {
   margin-top: 0;
 }
 
-main .section > div.pdp-wrapper {
-  margin-top: 0;
+main > .section.pdp-container > div.pdp-wrapper:first-child:not(.default-content-wrapper) {
+  margin-top: var(--horizontal-spacing);
 }
 
 .pdp-questions-container img.icon {
@@ -685,6 +685,10 @@ main .section > div.pdp-wrapper {
 
 .pdp-free-gift-container {
   max-width: 32em;
+}
+
+.pdp-free-gift-container.hidden {
+  display: none;
 }
 
 .pdp-free-gift-heading {

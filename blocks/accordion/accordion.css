@@ -1,13 +1,16 @@
 .accordion details {
-  border-bottom: 1px solid var(--color-gray-300);
+  background-color: var(--color-gray-300);
+  margin-bottom: var(--spacing-100);
 }
 
 .accordion details summary {
-  position: relative;
-  padding-left: var(--spacing-200);
-  cursor: pointer;
-  font-size: var(--body-size-l);
   list-style: none;
+  position: relative;
+  padding: var(--spacing-100) var(--spacing-300);
+  padding-right: calc(2 * var(--spacing-300));
+  font-family: var(--heading-font-family);
+  font-size: var(--body-size-l);
+  cursor: pointer;
 }
 
 .accordion details summary:focus,
@@ -19,27 +22,33 @@
   display: none;
 }
 
+.accordion details summary::before,
 .accordion details summary::after {
   content: '';
   position: absolute;
-  top: 0.66em;
-  left: 0;
-  transform: translateY(-50%) rotate(45deg);
-  width: 8px;
-  height: 8px;
-  border: var(--border-m) solid var(--color-gray-800);
-  border-width: var(--border-m) var(--border-m) 0 0;
-  transition: transform 0.2s;
+  top: 50%;
+  right: var(--spacing-300);
+  width: 14px;
+  height: 2px;
+  background-color: currentcolor;
+  transition: transform 0.2s ease;
 }
 
-.accordion details[open] summary::after {
-  transform: translateY(-50%) rotate(135deg);
+.accordion details summary::after {
+  transform: rotate(90deg);
+}
+
+.accordion details[open]:not([data-closing]) summary::after {
+  transform: rotate(0deg);
 }
 
 .accordion details .accordion-item-body {
   height: 0;
-  padding-left: var(--spacing-200);
-  color: var(--color-gray-900);
+  padding: 0 var(--spacing-300);
   overflow: hidden;
-  transition: height 0.6s;
+  transition: height 0.6s ease;
+}
+
+.accordion details .accordion-item-body > *:last-child {
+  margin-bottom: var(--spacing-300);
 }
