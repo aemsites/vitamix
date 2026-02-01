@@ -580,13 +580,6 @@ button.button.accent {
   background-color: var(--color-brand-secondary);
 }
 
-a.button.ghost,
-button.button.ghost {
-  border-color: var(--color-white);
-  background-color: transparent;
-  color: var(--color-white);
-}
-
 button.button.close {
   width: 40px;
   height: 40px;
@@ -631,10 +624,6 @@ select {
   padding: var(--spacing-60) var(--spacing-100);
   background-color: var(--color-white);
   color: var(--color-text);
-}
-
-select {
-  min-height: 48px;
 }
 
 button,

@@ -56,6 +56,17 @@ main > .locator-container.section {
   line-height: 48px;
 }
 
+.locator a.button.ghost,
+.locator button.button.ghost {
+  border-color: var(--color-white);
+  background-color: transparent;
+  color: var(--color-white);
+}
+
+.locator select {
+  min-height: 48px;
+}
+
 .locator form i.symbol.symbol-loading {
   border-color: var(--color-gray-500);
 }
