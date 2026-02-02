@@ -1,0 +1,209 @@
+main > .locator-container.section {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.locator-container .locator-wrapper {
+  margin: 0;
+  padding: 0;
+}
+
+.locator .section.banner {
+  flex-direction: column;
+  gap: var(--spacing-300);
+  height: 415px;
+  padding: 0 var(--horizontal-spacing);
+  text-align: unset;
+}
+
+.locator .section.banner > div {
+  width: 100%;
+  max-width: 1000px;
+}
+
+.locator h1 {
+  text-align: center;
+}
+
+.locator label {
+  color: var(--color-white);
+}
+
+.locator form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--spacing-100);
+}
+
+.locator form > * {
+  flex: 1 1 100%;
+}
+
+.locator form [data-name='productType'] {
+  flex: 1 1 55%;
+}
+
+.locator form .button-wrapper {
+  flex: 1 1 100px;
+  align-self: flex-end;
+  margin-top: var(--spacing-100);
+}
+
+.locator form .button-wrapper button {
+  width: 100%;
+  max-height: 48px;
+  padding: 0;
+  line-height: 48px;
+}
+
+.locator a.button.ghost,
+.locator button.button.ghost {
+  border-color: var(--color-white);
+  background-color: transparent;
+  color: var(--color-white);
+}
+
+.locator select {
+  min-height: 48px;
+}
+
+.locator form i.symbol.symbol-loading {
+  border-color: var(--color-gray-500);
+}
+
+.locator form i.symbol.symbol-loading::after {
+  border-right-color: var(--color-white);
+}
+
+@media (width >= 900px) {
+  .locator form [data-name='address'] {
+    flex: 1 1 45%;
+  }
+
+  .locator form [data-name='productType'] {
+    flex: 1 1 25%;
+  }
+
+  .locator form .form-field + .form-field {
+    margin-top: 0;
+  }
+}
+
+/* stylelint-disable no-descending-specificity */
+
+.locator-results {
+  background-color: var(--color-charcoal);
+}
+
+.locator-results h3 {
+  margin-top: 0;
+  font-size: var(--body-size-xxl);
+  font-family: var(--font-family-body);
+  font-weight: var(--font-weight-medium);
+}
+
+.locator-results ol {
+  counter-reset: locator-result-counter;
+  list-style: none;
+  margin: 0;
+}
+
+.locator-results .locator-retailers {
+  --locator-accent-color: var(--color-rosewood);
+}
+
+.locator-results .locator-distributors {
+  --locator-accent-color: var(--color-green);
+}
+
+.locator-results .locator-online {
+  --locator-accent-color: var(--color-blue);
+}
+
+.locator-results .locator-localrep {
+  --locator-accent-color: var(--color-blue);
+}
+
+.locator-results .locator-events {
+  --locator-accent-color: var(--color-red);
+}
+
+
+.locator-results ol li {
+  counter-increment: locator-result-counter;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-60);
+  margin-bottom: var(--spacing-200);
+  padding: var(--spacing-200);
+  background-color: var(--color-white);
+}
+
+.locator-results ol li::before {
+  content: counter(locator-result-counter);
+  color: var(--color-white);
+  font-size: 1.5rem;
+  font-weight: bold;
+  position: absolute;
+
+  --size: 48px;
+  
+  left: calc(-1 * var(--size));
+  line-height: var(--size);
+  width: var(--size);
+  height: var(--size);
+  top: var(--vertical-spacing);
+  background: var(--locator-accent-color);
+  border-radius: 50%;
+  text-align: center;
+}
+
+.locator-results-tablist {
+  max-width: 1000px;
+  margin: 0 auto;
+  display: flex;
+  color: var(--color-white);
+  background-color: var(--color-charcoal);
+}
+
+.locator-results-tablist button {
+  color: var(--color-white);
+  background-color: transparent;
+  border: none;
+  padding: var(--spacing-200) var(--spacing-300);
+  font-weight: var(--font-weight-normal);
+}
+
+.locator-results-tablist button[aria-selected='true'] {
+  background-color: var(--color-white);
+  color: var(--color-charcoal);
+  border-top: 4px solid var(--locator-accent-color);
+}
+
+.locator-tabpanels {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: var(--spacing-300);
+  background-color: var(--color-white);
+}
+
+.locator-results .locator-website-label {
+  font-weight: var(--weight-medium);
+}
+
+.locator-results .locator-phone-label {
+  font-weight: var(--weight-medium);
+}
+
+.locator-results .locator-distance {
+  font-style: italic;
+}
+
+.locator-results .locator-tabpanel[aria-hidden='true'] {
+  display: none;
+}
+
+.locator .locator-results[aria-hidden='true'] {
+  display: none;
+}

@@ -91,6 +91,44 @@ function buildTextArea(field) {
 }
 
 /**
+ * Decodes option string into text and value pair
+ * @param {string} option - Option string
+ * @returns {Array<string>} Text and value pair
+ */
+function decodeOption(option) {
+  return option.split('=').map((o) => o.trim());
+}
+
+/**
+ * Creates a select element with options
+ * @param {Object} field - Field configuration object
+ * @returns {HTMLSelectElement} Select element
+ */
+function buildSelect(field) {
+  const {
+    field: fieldName, required, default: defaultValue, options,
+  } = field;
+
+  const select = createElement('select');
+  select.id = generateId(fieldName);
+  select.name = select.id;
+  select.required = required === 'true';
+
+  if (options) {
+    options.split(',').forEach((o) => {
+      const [text, value] = decodeOption(o);
+      const option = createElement('option');
+      option.value = value || text;
+      option.textContent = text;
+      if (text === defaultValue) option.selected = true;
+      select.appendChild(option);
+    });
+  }
+
+  return select;
+}
+
+/**
  * Creates a radio/checkbox input for an option
  * @param {Object} field - Field configuration object
  * @param {string} option - Option value
@@ -311,13 +349,29 @@ function resetLoadingButton(button) {
   button.removeAttribute('style');
 }
 
-function toggleForm(form, disabled = true) {
+export function toggleForm(form, disabled = true) {
   [...form.elements].forEach((el) => {
     el.disabled = disabled;
     if (el.type === 'submit') {
       if (disabled) showLoadingButton(el);
       else resetLoadingButton(el);
     }
+  });
+}
+
+/**
+ * Configures nav search form with submission handling.
+ * @param {HTMLFormElement} form - Nav search form
+ */
+function enableNavSearch(form) {
+  form.classList.add('nav-search');
+  const button = form.querySelector('button');
+  button.classList.add('emphasis');
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const data = new FormData(form);
+    const { search } = Object.fromEntries(data.entries()) || '';
+    window.location.href = `https://www.vitamix.com/us/en_us/search-result?search=${search}`;
   });
 }
 
@@ -368,19 +422,12 @@ function enableFooterSignUp(form) {
   });
 }
 
-/**
- * Configures nav search form with submission handling.
- * @param {HTMLFormElement} form - Nav search form
- */
-function enableNavSearch(form) {
-  form.classList.add('nav-search');
-  const button = form.querySelector('button');
-  button.classList.add('emphasis');
-  form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const data = new FormData(form);
-    const { search } = Object.fromEntries(data.entries()) || '';
-    window.location.href = `https://www.vitamix.com/us/en_us/search-result?search=${search}`;
+function enableLocator(form) {
+  // set initial values from query params
+  const queryParams = Object.fromEntries(new URLSearchParams(window.location.search));
+  Object.entries(queryParams).forEach(([key, value]) => {
+    const input = form.querySelector(`[name="${toClassName(key)}"]`);
+    if (input) input.value = value;
   });
 }
 
@@ -390,11 +437,9 @@ function enableNavSearch(form) {
  * @param {string} path -Path associated with the form
  */
 function enableSubmission(form, path) {
-  if (path.includes('/footer-sign-up.json')) {
-    enableFooterSignUp(form);
-  } else if (path.includes('/nav-search.json')) {
-    enableNavSearch(form);
-  }
+  if (path.includes('/nav-search.json')) enableNavSearch(form);
+  if (path.includes('/footer-sign-up.json')) enableFooterSignUp(form);
+  if (path.includes('/locator.json')) enableLocator(form);
 }
 
 /**
@@ -423,7 +468,7 @@ function buildField(field) {
     return fieldset;
   }
 
-  // inputs and textareas get a wrapper div
+  // inputs, textareas, and selects get a wrapper div
   const wrapper = createElement('div', `form-field ${type}-field`);
   if (controlled) {
     const controller = controlled.split('-')[0];
@@ -440,7 +485,15 @@ function buildField(field) {
     wrapper.append(helpText);
   }
 
-  const input = type === 'textarea' ? buildTextArea(field) : buildInput(field);
+  // create the appropriate input element
+  let input;
+  if (type === 'textarea') {
+    input = buildTextArea(field);
+  } else if (type === 'select') {
+    input = buildSelect(field);
+  } else {
+    input = buildInput(field);
+  }
 
   if (type === 'textarea') {
     wrapper.append(input);
