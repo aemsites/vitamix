@@ -415,6 +415,11 @@ h6 {
   margin-top: 0;
 }
 
+/* Superscript styling for trademark symbols */
+sup {
+  font-size: 0.4em;
+}
+
 strong {
   font-weight: var(--weight-medium);
 }
