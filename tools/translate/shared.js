@@ -182,7 +182,12 @@ const getConfig = async (context, daFetch) => {
 const addDnt = async (text, format, context, daFetch) => {
   const config = await getConfig(context, daFetch);
   let html = new DOMParser().parseFromString(text, 'text/html');
-  const rules = RULES[format];
+  let rules;
+  if (format) {
+    rules = RULES[format];
+  } else {
+    rules = [...RULES[ADMIN_FORMAT], ...RULES[EDITOR_FORMAT]];
+  }
   if (rules) {
     rules.forEach((rule) => {
       html = rule.apply(html, config);
@@ -192,7 +197,7 @@ const addDnt = async (text, format, context, daFetch) => {
 };
 
 const removeDnt = (html) => {
-  html.querySelectorAll('[translate="no"]').forEach((element) => {
+  html.querySelectorAll('[translate]').forEach((element) => {
     element.removeAttribute('translate');
 
     if (element.tagName === 'SPAN') {
