@@ -453,7 +453,7 @@ function buildPDPBlock(main) {
 function buildAutoBlocks(main) {
   try {
     // autoreplace fragment references
-    const fragments = main.querySelectorAll('a[href*="/fragments/"]');
+    const fragments = [...main.querySelectorAll('a[href*="/fragments/"]')].filter((f) => !f.closest('.fragment'));
     if (fragments.length > 0) {
       // eslint-disable-next-line import/no-cycle
       import('../blocks/fragment/fragment.js').then(({ loadFragment }) => {
