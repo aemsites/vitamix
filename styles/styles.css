@@ -416,7 +416,7 @@ h6 {
 }
 
 /* Superscript styling for trademark symbols */
-sup {
+h1 sup {
   font-size: 0.4em;
 }
 
