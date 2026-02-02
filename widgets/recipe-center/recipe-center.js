@@ -28,6 +28,16 @@ function parseRecipeData(data) {
 }
 
 /**
+ * Capitalizes the first letter of a string.
+ * @param {string} str - String to capitalize
+ * @returns {string} String with first letter capitalized
+ */
+function capitalizeFirstLetter(str) {
+  if (!str) return str;
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+}
+
+/**
  * Fetches and filters recipes from the recipe index.
  * @param {Object} config - Object with filter criteria
  * @param {Object} facets - Optional object to populate with facet counts for UI filters.
@@ -76,8 +86,11 @@ async function lookupRecipes(config = {}, facets = {}) {
 
   // Track which recipe titles have been counted for each facet value to avoid duplicates
   const facetTitleTracking = {};
+  // Track the canonical case for each facet value (first occurrence wins)
+  const facetCanonicalCase = {};
   facetKeys.forEach((facetKey) => {
     facetTitleTracking[facetKey] = {};
+    facetCanonicalCase[facetKey] = {};
   });
 
   // parse comma-separated filter values into trimmed token arrays for matching
@@ -123,11 +136,11 @@ async function lookupRecipes(config = {}, facets = {}) {
       } else if (recipe[filterKey]) {
         // array-based filter matching (dietary-interests, compatible-containers, etc.)
         if (Array.isArray(recipe[filterKey])) {
-          // recipe matches if ANY of its values match ANY of the filter tokens
-          matched = tokens[filterKey].some((t) => recipe[filterKey].includes(t));
+          // recipe matches if ANY of its values match ANY of the filter tokens (case-insensitive)
+          matched = tokens[filterKey].some((t) => recipe[filterKey].some((rv) => rv.toLowerCase() === t.toLowerCase()));
         } else {
-          // for non-array fields, check if the value matches any token
-          matched = tokens[filterKey].some((t) => recipe[filterKey] === t);
+          // for non-array fields, check if the value matches any token (case-insensitive)
+          matched = tokens[filterKey].some((t) => recipe[filterKey].toLowerCase() === t.toLowerCase());
         }
       }
 
@@ -155,21 +168,29 @@ async function lookupRecipes(config = {}, facets = {}) {
           const values = Array.isArray(recipe[facetKey]) ? recipe[facetKey] : [recipe[facetKey]];
           values.forEach((val) => {
             if (val) {
+              const valLower = val.toLowerCase();
+              
+              // Store the canonical case (first occurrence, capitalized for display)
+              if (!facetCanonicalCase[facetKey][valLower]) {
+                facetCanonicalCase[facetKey][valLower] = capitalizeFirstLetter(val);
+              }
+              const canonicalVal = facetCanonicalCase[facetKey][valLower];
+              
               // Track by recipe title to avoid counting duplicate recipes with same name
-              if (!facetTitleTracking[facetKey][val]) {
-                facetTitleTracking[facetKey][val] = new Set();
+              if (!facetTitleTracking[facetKey][valLower]) {
+                facetTitleTracking[facetKey][valLower] = new Set();
               }
 
               // Only count this recipe if we haven't seen this title for this facet value yet
-              if (!facetTitleTracking[facetKey][val].has(recipe.title)) {
-                facetTitleTracking[facetKey][val].add(recipe.title);
+              if (!facetTitleTracking[facetKey][valLower].has(recipe.title)) {
+                facetTitleTracking[facetKey][valLower].add(recipe.title);
 
-                if (facets[facetKey][val]) {
+                if (facets[facetKey][canonicalVal]) {
                   // increment existing count
-                  facets[facetKey][val] += 1;
+                  facets[facetKey][canonicalVal] += 1;
                 } else {
                   // initialize count for a new facet value
-                  facets[facetKey][val] = 1;
+                  facets[facetKey][canonicalVal] = 1;
                 }
               }
             }
@@ -686,6 +707,7 @@ function buildRecipeFiltering(container, config = {}, placeholders = {}) {
     facetKeys.forEach((facetKey, index) => {
       const filter = filters[facetKey];
       const filterValues = filter ? filter.split(',').map((t) => t.trim()) : [];
+      const filterValuesLower = filterValues.map((v) => v.toLowerCase());
 
       const details = document.createElement('details');
       details.className = 'facet';
@@ -703,7 +725,7 @@ function buildRecipeFiltering(container, config = {}, placeholders = {}) {
         const input = document.createElement('input');
         input.type = 'checkbox';
         input.value = facetValue;
-        input.checked = filterValues.includes(facetValue);
+        input.checked = filterValuesLower.includes(facetValue.toLowerCase());
         input.id = `filter-${facetValue}`;
         input.name = facetKey;
         const label = document.createElement('label');
@@ -734,6 +756,7 @@ function buildRecipeFiltering(container, config = {}, placeholders = {}) {
   const populateDropdown = (select, facetData, facetKey, filterConfig) => {
     const currentValue = select.value;
     const filterValues = filterConfig[facetKey] ? filterConfig[facetKey].split(',').map((t) => t.trim()) : [];
+    const filterValuesLower = filterValues.map((v) => v.toLowerCase());
 
     // Keep the first option (placeholder)
     const firstOption = select.options[0];
@@ -746,7 +769,7 @@ function buildRecipeFiltering(container, config = {}, placeholders = {}) {
       const option = document.createElement('option');
       option.value = value;
       option.textContent = `${value} (${facetData[value]})`;
-      if (filterValues.includes(value)) {
+      if (filterValuesLower.includes(value.toLowerCase())) {
         option.selected = true;
       }
       select.appendChild(option);
