@@ -4,6 +4,26 @@ main > .navigation-container.section {
   z-index: 2;
 }
 
+main > .navigation-container.section ~ .section h1,
+main > .navigation-container.section ~ .section h2,
+main > .navigation-container.section ~ .section h3,
+main > .navigation-container.section ~ .section h4,
+main > .navigation-container.section ~ .section h5,
+main > .navigation-container.section ~ .section h6 {
+  scroll-margin-top: calc(56px + 1em);
+}
+
+@media (width >= 800px) {
+  main > .navigation-container.section ~ .section h1,
+  main > .navigation-container.section ~ .section h2,
+  main > .navigation-container.section ~ .section h3,
+  main > .navigation-container.section ~ .section h4,
+  main > .navigation-container.section ~ .section h5,
+  main > .navigation-container.section ~ .section h6 {
+    scroll-margin-top: calc(83px + 1em);
+  }
+}
+
 .hero-container + .navigation-container {
   margin-top: 0;
 }
