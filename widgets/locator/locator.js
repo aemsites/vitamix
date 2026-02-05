@@ -51,7 +51,7 @@ const haversineDistance = (lat1, lon1, lat2, lon2) => {
 };
 
 async function geoCode(address) {
-  const resp = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=AIzaSyCPlws-m9FD9W0nP-WRR-5ldW2a4nh-t4E`);
+  const resp = await fetch(`https://helix-geocode.adobeaem.workers.dev/?address=${encodeURIComponent(address)}`);
   const json = await resp.json();
   const { results } = json;
   const r0 = results?.[0];
