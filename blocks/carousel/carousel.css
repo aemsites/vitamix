@@ -158,7 +158,7 @@
 
 .carousel.items ul {
   gap: var(--carousel-gap);
-  align-items: flex-start;
+  align-items: stretch;
 }
 
 .carousel.items img {
@@ -203,6 +203,7 @@
   .carousel.items.slides-4 ul > li,
   .carousel.items.slides-5 ul > li {
     flex: 0 0 calc((100% - (3 * var(--carousel-gap))) / 4);
+    height: auto;
   }
 }
 
