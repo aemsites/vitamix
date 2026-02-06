@@ -7,16 +7,27 @@ import { loadFragment } from '../fragment/fragment.js';
  * @param {Element} block The footer block element
  */
 export default async function decorate(block) {
-  // load footer as fragment
-  const footerMeta = getMetadata('footer');
-  const footerPath = footerMeta ? new URL(footerMeta, window.location).pathname : '/footer';
-  const fragment = await loadFragment(footerPath);
+  let footer = block.querySelector('#footer');
+  const hasExistingContent = block.children.length > 0 && (block.querySelector('ul') || block.querySelector('a'));
 
-  // decorate footer DOM
-  block.textContent = '';
-  const footer = document.createElement('section');
-  footer.id = 'footer';
-  while (fragment.firstElementChild) footer.append(fragment.firstElementChild);
+  if (!footer && hasExistingContent) {
+    // content already in DOM (e.g. from aem-embed)
+    footer = document.createElement('section');
+    footer.id = 'footer';
+    while (block.firstElementChild) footer.append(block.firstElementChild);
+  }
+
+  if (!footer) {
+    // load footer as fragment
+    const footerMeta = getMetadata('footer');
+    const footerPath = footerMeta ? new URL(footerMeta, window.location).pathname : '/footer';
+    const fragment = await loadFragment(footerPath);
+
+    block.textContent = '';
+    footer = document.createElement('section');
+    footer.id = 'footer';
+    while (fragment.firstElementChild) footer.append(fragment.firstElementChild);
+  }
 
   const classes = ['ribbon', 'form', 'social', 'links', 'copyright'];
   const children = footer.children.length;
@@ -76,7 +87,9 @@ export default async function decorate(block) {
     });
   }
 
-  block.append(footer);
+  if (!block.contains(footer)) {
+    block.append(footer);
+  }
   swapIcons(block);
 
   const cookieDeclaration = block.querySelector('a[href$="cookie-declaration"]');

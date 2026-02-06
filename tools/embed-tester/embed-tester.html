@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Embed Tester – Header / Footer</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, sans-serif;
+      margin: 0;
+      padding: 1rem;
+      max-width: 1200px;
+      margin-inline: auto;
+    }
+    h1 { margin-top: 0; }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: flex-end;
+      margin-bottom: 1.5rem;
+      padding: 1rem;
+      background: #f5f5f5;
+      border-radius: 8px;
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    .field label { font-weight: 600; font-size: 0.875rem; }
+    input[type="url"], select {
+      padding: 0.5rem 0.75rem;
+      font-size: 1rem;
+      min-width: 280px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    button {
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      background: #333;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover { background: #555; }
+    .embed-zone {
+      border: 1px dashed #999;
+      border-radius: 8px;
+      min-height: 120px;
+      padding: 1rem;
+    }
+    .embed-zone:empty::before {
+      content: "Enter a URL and submit the form to test the embed.";
+      color: #888;
+    }
+    .embed-zone aem-embed { display: block; }
+    .debug {
+      margin-top: 1.5rem;
+      padding: 1rem;
+      background: #f9f9f9;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-family: ui-monospace, monospace;
+      font-size: 0.8125rem;
+    }
+    .debug h3 { margin: 0 0 0.5rem 0; font-size: 0.875rem; }
+    .debug pre { margin: 0; white-space: pre-wrap; word-break: break-all; }
+    .debug .line { margin-bottom: 0.25rem; }
+    .debug .ts { color: #666; }
+    .debug .error { color: #c00; }
+    .debug .ok { color: #060; }
+  </style>
+</head>
+<body>
+  <h1>Embed Tester</h1>
+  <p>Test header and footer embeds by entering the URL used in the <code>&lt;aem-embed&gt;</code> tag.</p>
+
+  <form class="controls" method="get" id="embed-form">
+    <div class="field">
+      <label for="embed-url">Embed URL</label>
+      <input type="url" id="embed-url" name="url" placeholder="https://main--yoursite--owner.aem.page/nav" />
+    </div>
+    <div class="field">
+      <label for="embed-type">Type</label>
+      <select id="embed-type" name="type">
+        <option value="header">Header</option>
+        <option value="footer">Footer</option>
+        <option value="">Generic</option>
+      </select>
+    </div>
+    <button type="submit">Load</button>
+  </form>
+
+  <div class="embed-zone" id="embed-zone"></div>
+
+  <div class="debug" id="debug">
+    <h3>Debug</h3>
+    <div class="line" id="debug-status">Custom element: <span id="debug-ce">checking…</span></div>
+    <pre id="debug-log"></pre>
+  </div>
+
+  <script src="aem-embed.js" type="module"></script>
+  <script>
+    (function () {
+      const params = new URLSearchParams(window.location.search);
+      const urlParam = params.get('url') || '';
+      const typeParam = params.get('type') || 'header';
+
+      const urlInput = document.getElementById('embed-url');
+      const typeSelect = document.getElementById('embed-type');
+      const zone = document.getElementById('embed-zone');
+      const debugCe = document.getElementById('debug-ce');
+      const debugLog = document.getElementById('debug-log');
+
+      // Pre-fill form from query params
+      if (urlParam) urlInput.value = urlParam;
+      if (typeParam) typeSelect.value = typeParam;
+
+      function isCustomElementDefined() {
+        return customElements.get('aem-embed') !== undefined;
+      }
+
+      function updateCeStatus() {
+        debugCe.textContent = isCustomElementDefined() ? 'defined ✓' : 'not defined';
+        debugCe.className = isCustomElementDefined() ? 'ok' : 'error';
+      }
+
+      function log(msg, isError) {
+        const ts = new Date().toLocaleTimeString('en-GB', { hour12: false });
+        const line = document.createElement('div');
+        line.className = 'line' + (isError ? ' error' : '');
+        line.innerHTML = `<span class="ts">[${ts}]</span> ${msg}`;
+        debugLog.appendChild(line);
+        debugLog.scrollTop = debugLog.scrollHeight;
+      }
+
+      setTimeout(updateCeStatus, 100);
+
+      zone.addEventListener('aem-embed:fetch-start', function (e) {
+        const { url, plainUrl, type } = e.detail;
+        log(`Fetch start (type=${type})\n  URL: ${url}\n  Resolved: ${plainUrl}`);
+      });
+      zone.addEventListener('aem-embed:fetch-success', function (e) {
+        const { url, type } = e.detail;
+        log(`Fetch success: ${url} (type=${type})`, false);
+      });
+      zone.addEventListener('aem-embed:fetch-error', function (e) {
+        const { url, type, error } = e.detail;
+        log(`Fetch error (type=${type})\n  URL: ${url}\n  Error: ${error}`, true);
+      });
+
+      function loadFromParams() {
+        const url = urlParam.trim();
+        debugLog.innerHTML = '';
+        if (!url) return;
+        updateCeStatus();
+        if (!isCustomElementDefined()) {
+          log('Cannot load: <aem-embed> custom element is not defined. Is aem-embed.js loading?', true);
+          return;
+        }
+        log(`Load from query params: ${url} (type=${typeParam})`);
+        const embed = document.createElement('aem-embed');
+        embed.setAttribute('url', url);
+        if (typeParam) embed.setAttribute('type', typeParam);
+        zone.innerHTML = '';
+        zone.appendChild(embed);
+      }
+
+      if (urlParam) {
+        setTimeout(loadFromParams, 150);
+      }
+    })();
+  </script>
+</body>
+</html>

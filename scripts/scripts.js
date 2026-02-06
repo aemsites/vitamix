@@ -1287,6 +1287,15 @@ async function loadDelayed() {
 }
 
 /**
+ * Returns true when running inside an aem-embed (e.g. header/footer fragment).
+ * Suppress full page load so only the fragment is used.
+ */
+function isEmbedContext() {
+  return document.getRootNode() instanceof ShadowRoot
+    || new URL(window.location.href).searchParams.get('embed') === '1';
+}
+
+/**
  * Loads the page in eager, lazy, and delayed phases.
  */
 export async function loadPage() {
@@ -1301,7 +1310,9 @@ if (window.location.hostname.includes('ue.da.live')) {
   import(`${window.hlx.codeBasePath}/ue/scripts/ue.js`).then(({ default: ue }) => ue());
 }
 
-loadPage();
+if (!isEmbedContext()) {
+  loadPage();
+}
 
 // DA Live Preview
 (async function loadDa() {
