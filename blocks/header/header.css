@@ -1,5 +1,8 @@
 /* stylelint-disable no-descending-specificity */
 header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   max-width: var(--site-width);
   margin: 0 auto;
   background-color: var(--layer-base);
