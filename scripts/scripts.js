@@ -1242,7 +1242,7 @@ function decorateExternalLinks() {
   });
 }
 /**
- * Loads everything that happens a lot later,
+ * Loads everything that happens later,
  * without impacting the user experience.
  */
 async function loadDelayed() {
