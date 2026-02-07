@@ -9,8 +9,32 @@ import {
   Other blocks can also use the createModal() and openModal() functions.
 */
 
-export async function createModal(contentNodes, path) {
-  await loadCSS(`${window.hlx.codeBasePath}/blocks/modal/modal.css`);
+/**
+ * @param {Node[]} contentNodes - Fragment child nodes for the modal body
+ * @param {string} path - Modal path (for title and config)
+ * @param {{ root?: ShadowRoot|DocumentFragment|Element }} [options] - Optional root to append modal to (e.g. embed shadow root)
+ */
+export async function createModal(contentNodes, path, options = {}) {
+  const root = options.root;
+  const container = root || document.querySelector('main') || document.body;
+  const modalOpenTarget = root?.host || document.body;
+
+  if (root instanceof ShadowRoot) {
+    const modalCssHref = new URL('modal.css', import.meta.url).href;
+    if (!root.querySelector(`link[href="${modalCssHref}"]`)) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = modalCssHref;
+      root.appendChild(link);
+      await new Promise((resolve, reject) => {
+        link.onload = resolve;
+        link.onerror = reject;
+      });
+    }
+  } else {
+    await loadCSS(`${window.hlx.codeBasePath}/blocks/modal/modal.css`);
+  }
+
   const title = toClassName(path.split('/modals/')[1] || 'modal');
 
   const dialog = document.createElement('dialog');
@@ -29,9 +53,23 @@ export async function createModal(contentNodes, path) {
   dialog.prepend(closeButton);
 
   const block = buildBlock('modal', '');
-  document.querySelector('main').append(block);
+  if (root instanceof ShadowRoot) {
+    const wrapper = document.createElement('div');
+    wrapper.append(block);
+    container.append(wrapper);
+  } else {
+    container.append(block);
+  }
   decorateBlock(block);
-  await loadBlock(block);
+  try {
+    await loadBlock(block);
+  } catch (err) {
+    if (root instanceof ShadowRoot) {
+      // loadBlock uses document.head + relative URL; modal CSS already in shadow root
+    } else {
+      throw err;
+    }
+  }
 
   // close on click outside the dialog
   dialog.addEventListener('click', (e) => {
@@ -45,8 +83,10 @@ export async function createModal(contentNodes, path) {
   });
 
   dialog.addEventListener('close', () => {
-    document.body.classList.remove('modal-open');
+    modalOpenTarget.classList.remove('modal-open');
+    const wrapper = root instanceof ShadowRoot ? block.parentElement : null;
     block.remove();
+    if (wrapper) wrapper.remove();
   });
 
   block.innerHTML = '';
@@ -61,20 +101,22 @@ export async function createModal(contentNodes, path) {
     block,
     showModal: () => {
       dialog.showModal();
-      // reset scroll position
-      // setTimeout(() => { dialogContent.scrollTop = 0; }, 0);
-      document.body.classList.add('modal-open');
+      modalOpenTarget.classList.add('modal-open');
     },
   };
 }
 
-export async function openModal(fragmentUrl) {
+/**
+ * @param {string} fragmentUrl - URL or path of the modal fragment
+ * @param {{ root?: ShadowRoot|DocumentFragment|Element }} [options] - Optional root (e.g. embed shadow root) to append modal to
+ */
+export async function openModal(fragmentUrl, options = {}) {
   const path = fragmentUrl.startsWith('http')
     ? new URL(fragmentUrl, window.location).pathname
     : fragmentUrl;
 
   const fragment = await loadFragment(path);
-  const { block, showModal } = await createModal(fragment.childNodes, path);
+  const { block, showModal } = await createModal(fragment.childNodes, path, options);
   block.dataset.modalPath = path;
   showModal();
   return block;

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Header & Footer Example</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, sans-serif;
+      margin: 0;
+      padding: 1rem;
+      width: 100%;
+    }
+    h1 { margin-top: 0; }
+    .embed-section {
+      margin-bottom: 1.5rem;
+    }
+    .embed-section h2 {
+      font-size: 0.875rem;
+      font-weight: 600;
+      margin: 0 0 0.5rem 0;
+      color: #555;
+    }
+    .embed-section .embed-zone {
+      border: 1px dashed #999;
+      border-radius: 8px;
+      min-height: 60px;
+      padding: 0.5rem;
+    }
+    .embed-section .embed-zone aem-embed { display: block; }
+  </style>
+  <script src="aem-embed.js" type="module"></script>
+</head>
+<body>
+  <h1>Header & Footer Example</h1>
+  <p>Hardcoded header and footer embeds using the Vitamix preview URLs.</p>
+
+  <div class="embed-section">
+    <h2>Header</h2>
+    <div class="embed-zone">
+      <aem-embed
+        url="https://feat-aem-embed-header-footer--vitamix--aemsites.aem.live/us/en_us/nav/nav"
+        type="header">
+      </aem-embed>
+    </div>
+  </div>
+
+  <div class="embed-section">
+    <h2>Footer</h2>
+    <div class="embed-zone">
+      <aem-embed
+        url="https://feat-aem-embed-header-footer--vitamix--aemsites.aem.live/us/en_us/footer/footer"
+        type="footer">
+      </aem-embed>
+    </div>
+  </div>
+
+</body>
+</html>

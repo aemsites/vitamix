@@ -749,13 +749,25 @@ export async function openModal(href) {
 }
 
 /**
+ * Finds the clicked modal link, including when the click originated inside a shadow root.
+ * @param {Event} e - Click event
+ * @returns {HTMLAnchorElement|null} The modal link or null
+ */
+function getModalLinkFromEvent(e) {
+  const path = e.composedPath ? e.composedPath() : [e.target];
+  const isModalLink = (el) => el?.tagName === 'A' && el.href && el.href.includes('/modals/');
+  return path.find(isModalLink) || null;
+}
+
+/**
  * Automatically loads and opens modal dialogs.
+ * Uses composedPath() so clicks on modal links inside shadow DOM (e.g. embedded header) work.
  * @param {Document|HTMLElement} doc - Document or container to attach the event listener to.
  */
 function autolinkModals(doc) {
   doc.addEventListener('click', async (e) => {
-    const origin = e.target.closest('a[href]');
-    if (origin && origin.href && origin.href.includes('/modals/')) {
+    const origin = getModalLinkFromEvent(e);
+    if (origin) {
       e.preventDefault();
       await openModal(origin.href);
     }

@@ -75,6 +75,7 @@ export class AEMEmbed extends HTMLElement {
 
     body.style.height = 'var(--nav-height)';
     body.classList.add('appear');
+    this.attachModalLinkHandler(origin);
   }
 
   async handleFooter(htmlText, body, origin) {
@@ -97,6 +98,7 @@ export class AEMEmbed extends HTMLElement {
 
     block.dataset.blockStatus = 'loaded';
     body.classList.add('appear');
+    this.attachModalLinkHandler(origin);
   }
 
   async pseudoDecorateMain(htmlText, body, origin) {
@@ -137,6 +139,32 @@ export class AEMEmbed extends HTMLElement {
   async handleMain(htmlText, body, origin) {
     await this.pseudoDecorateMain(htmlText, body, origin);
     body.classList.add('appear');
+    this.attachModalLinkHandler(origin);
+  }
+
+  /**
+   * Listens for clicks on /modals/ links inside the shadow root and opens the modal
+   * using the embedded site's modal block (so the host page doesn't need scripts.js).
+   * @param {string} origin - Embedded site origin (e.g. https://example.aem.live)
+   */
+  attachModalLinkHandler(origin) {
+    if (this.modalHandlerAttached) return;
+    this.modalHandlerAttached = true;
+    const base = `${origin}${window.hlx.codeBasePath || ''}`.replace(/\/?$/, '/');
+    const root = this.shadowRoot;
+    this.shadowRoot.addEventListener('click', async (e) => {
+      const path = e.composedPath ? e.composedPath() : [e.target];
+      const link = path.find((el) => el?.tagName === 'A' && el.href && el.href.includes('/modals/'));
+      if (!link) return;
+      e.preventDefault();
+      try {
+        const { openModal } = await import(`${base}blocks/modal/modal.js`);
+        await openModal(link.href, { root });
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.log('Modal open failed', err);
+      }
+    });
   }
 
   /**
