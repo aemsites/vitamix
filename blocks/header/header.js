@@ -308,7 +308,7 @@ export default async function decorate(block) {
     innerNav.replaceWith(nav);
     rewriteLinks(nav);
   } else if (hasExistingContent) {
-    // content already in DOM (e.g. from aem-embed)
+    // content already in DOM (e.g. from aem-embed, or server-sided content)
     nav = document.createElement('section');
     nav.id = 'nav';
     while (block.firstElementChild) nav.append(block.firstElementChild);
