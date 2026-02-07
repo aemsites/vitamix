@@ -146,19 +146,19 @@ export class AEMEmbed extends HTMLElement {
    */
   async connectedCallback() {
     if (!this.initialized) {
-      try {
-        const urlAttribute = this.attributes.getNamedItem('url');
-        if (!urlAttribute) {
-          throw new Error('aem-embed missing url attribute');
-        }
+      const urlAttribute = this.attributes.getNamedItem('url');
+      const url = urlAttribute?.value?.trim();
+      if (!url) {
+        return;
+      }
 
+      try {
         const type = this.getAttribute('type') || 'main';
 
         const body = document.createElement('body');
         body.style = 'display: none';
         this.shadowRoot.append(body);
 
-        const url = urlAttribute.value;
         const plainUrl = url.endsWith('/') ? `${url}index.plain.html` : `${url}.plain.html`;
         const { href, origin } = new URL(plainUrl);
 
