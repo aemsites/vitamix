@@ -115,9 +115,10 @@ function swapIcon(icon) {
 
 /**
  * Replaces image icons with inline SVGs when they enter the viewport.
+ * @param {Document|Element} [root] Root to search (default: document). Pass block in embeds.
  */
-export function swapIcons() {
-  document.querySelectorAll('span.icon > img[src]').forEach((icon) => {
+export function swapIcons(root = document) {
+  root.querySelectorAll('span.icon > img[src]').forEach((icon) => {
     swapIcon(icon);
   });
 }
@@ -1292,7 +1293,8 @@ async function loadDelayed() {
  */
 function isEmbedContext() {
   return document.getRootNode() instanceof ShadowRoot
-    || new URL(window.location.href).searchParams.get('embed') === '1';
+    || new URL(window.location.href).searchParams.get('embed') === '1'
+    || window.hlx?.suppressLoadPage === true;
 }
 
 /**

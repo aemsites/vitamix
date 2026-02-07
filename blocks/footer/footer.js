@@ -8,9 +8,16 @@ import { loadFragment } from '../fragment/fragment.js';
  */
 export default async function decorate(block) {
   let footer = block.querySelector('#footer');
+  const innerNav = block.querySelector('nav');
   const hasExistingContent = block.children.length > 0 && (block.querySelector('ul') || block.querySelector('a'));
 
-  if (!footer && hasExistingContent) {
+  if (!footer && innerNav && innerNav.children.length >= 4) {
+    // aem-embed: block > row > cell > nav (with sections) – use that nav
+    footer = document.createElement('section');
+    footer.id = 'footer';
+    while (innerNav.firstElementChild) footer.append(innerNav.firstElementChild);
+    innerNav.replaceWith(footer);
+  } else if (!footer && hasExistingContent) {
     // content already in DOM (e.g. from aem-embed)
     footer = document.createElement('section');
     footer.id = 'footer';

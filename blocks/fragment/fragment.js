@@ -81,6 +81,28 @@ export async function loadFragment(path) {
   return null;
 }
 
+/**
+ * Injects block CSS into the given root (e.g. shadow root when in embed).
+ * When a fragment is loaded inside an embed, aem.js loadBlock adds CSS to document.head,
+ * so styles don't apply. This re-injects block styles into the fragment's root.
+ * @param {ShadowRoot} root Shadow root to inject into
+ * @param {string[]} blockNames Block names (e.g. ['form'])
+ * @param {string} baseUrl Origin + path for block assets (e.g. from fragment link)
+ */
+function injectBlockStylesIntoRoot(root, blockNames, baseUrl) {
+  const codeBase = (window.hlx?.codeBasePath || '').replace(/^\/?/, '').replace(/\/?$/, '/');
+  const base = `${baseUrl.replace(/\/?$/, '/')}${codeBase}`;
+  [...new Set(blockNames)].forEach((name) => {
+    const href = `${base}blocks/${name}/${name}.css`;
+    if (!root.querySelector(`link[href="${href}"]`)) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = href;
+      root.appendChild(link);
+    }
+  });
+}
+
 export default async function decorate(block) {
   const link = block.querySelector('a');
   const path = link ? link.getAttribute('href') : block.textContent.trim();
@@ -88,8 +110,19 @@ export default async function decorate(block) {
   if (fragment) {
     const fragmentSection = fragment.querySelector(':scope .section');
     if (fragmentSection) {
+      const root = block.getRootNode();
+      const isEmbed = root instanceof ShadowRoot;
+      const baseUrl = path.startsWith('http') ? new URL(path).origin : window.location.origin;
+      const blockNames = isEmbed
+        ? [...fragment.querySelectorAll('.block[data-block-name]')].map((el) => el.dataset.blockName).filter(Boolean)
+        : [];
+
       block.closest('.section').classList.add(...fragmentSection.classList);
       block.closest('.fragment').replaceWith(...fragment.childNodes);
+
+      if (isEmbed && blockNames.length) {
+        injectBlockStylesIntoRoot(root, blockNames, baseUrl);
+      }
     }
   }
 }

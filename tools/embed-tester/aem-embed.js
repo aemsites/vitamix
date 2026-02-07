@@ -24,7 +24,7 @@ export class AEMEmbed extends HTMLElement {
   // eslint-disable-next-line class-methods-use-this
   async loadBlock(body, block, blockName, origin) {
     const blockCss = `${origin}${window.hlx.codeBasePath}/blocks/${blockName}/${blockName}.css`;
-    if (!body.querySelector(`link[href="${blockCss}"]`)) {
+    if (!this.shadowRoot.querySelector(`link[href="${blockCss}"]`)) {
       const link = document.createElement('link');
       link.setAttribute('rel', 'stylesheet');
       link.setAttribute('href', blockCss);
@@ -34,7 +34,7 @@ export class AEMEmbed extends HTMLElement {
         link.onerror = resolve;
       });
 
-      body.appendChild(link);
+      this.shadowRoot.appendChild(link);
       // eslint-disable-next-line no-await-in-loop
       await cssLoaded;
     }
@@ -175,9 +175,23 @@ export class AEMEmbed extends HTMLElement {
         const styles = document.createElement('link');
         styles.setAttribute('rel', 'stylesheet');
         styles.setAttribute('href', `${origin}${window.hlx.codeBasePath}/styles/styles.css`);
-        styles.onload = () => { body.style = ''; };
-        styles.onerror = () => { body.style = ''; };
+        const stylesLoaded = new Promise((resolve) => {
+          styles.onload = () => { body.style = ''; resolve(); };
+          styles.onerror = () => { body.style = ''; resolve(); };
+        });
         this.shadowRoot.appendChild(styles);
+
+        const fontsHref = `${origin}${window.hlx.codeBasePath}/styles/fonts.css`;
+        const fonts = document.createElement('link');
+        fonts.setAttribute('rel', 'stylesheet');
+        fonts.setAttribute('href', fontsHref);
+        const fontsLoaded = new Promise((resolve) => {
+          fonts.onload = resolve;
+          fonts.onerror = resolve;
+        });
+        this.shadowRoot.appendChild(fonts);
+
+        await Promise.all([stylesLoaded, fontsLoaded]);
 
         let htmlText = await resp.text();
         // Fix relative image urls
@@ -190,11 +204,6 @@ export class AEMEmbed extends HTMLElement {
         if (type === 'main') await this.handleMain(htmlText, body, origin);
         if (type === 'header') await this.handleHeader(htmlText, body, origin);
         if (type === 'footer') await this.handleFooter(htmlText, body, origin);
-
-        const fonts = document.createElement('link');
-        fonts.setAttribute('rel', 'stylesheet');
-        fonts.setAttribute('href', `${origin}${window.hlx.codeBasePath}/styles/fonts.css`);
-        this.shadowRoot.appendChild(fonts);
       } catch (err) {
         // eslint-disable-next-line no-console
         console.log(err || 'An error occured while loading the content');

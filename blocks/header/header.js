@@ -295,10 +295,18 @@ function setupFragmentLoader(nav, ul, li, a) {
 export default async function decorate(block) {
   let nav;
   const existingNav = block.querySelector('#nav') || block.querySelector('.nav-wrapper section');
+  const innerNav = block.querySelector('nav');
   const hasExistingContent = block.children.length > 0 && block.querySelector('ul');
 
   if (existingNav) {
     nav = existingNav.id === 'nav' ? existingNav : existingNav.querySelector('#nav') || existingNav;
+  } else if (innerNav && innerNav.children.length >= 4) {
+    // aem-embed: block > row > cell > nav (with 4 sections) – use that nav
+    nav = document.createElement('section');
+    nav.id = 'nav';
+    while (innerNav.firstElementChild) nav.append(innerNav.firstElementChild);
+    innerNav.replaceWith(nav);
+    rewriteLinks(nav);
   } else if (hasExistingContent) {
     // content already in DOM (e.g. from aem-embed)
     nav = document.createElement('section');
