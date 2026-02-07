@@ -169,13 +169,13 @@ async function lookupRecipes(config = {}, facets = {}) {
           values.forEach((val) => {
             if (val) {
               const valLower = val.toLowerCase();
-              
+
               // Store the canonical case (first occurrence, capitalized for display)
               if (!facetCanonicalCase[facetKey][valLower]) {
                 facetCanonicalCase[facetKey][valLower] = capitalizeFirstLetter(val);
               }
               const canonicalVal = facetCanonicalCase[facetKey][valLower];
-              
+
               // Track by recipe title to avoid counting duplicate recipes with same name
               if (!facetTitleTracking[facetKey][valLower]) {
                 facetTitleTracking[facetKey][valLower] = new Set();

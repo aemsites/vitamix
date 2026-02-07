@@ -7,7 +7,6 @@ export function extractPricing(element) {
   if (!element) return null;
 
   const pricingText = element.textContent.trim();
-
   // Matches price values in the format $XXX.XX (e.g. $399.95, $1,299.99)
   // \$ - matches literal dollar sign
   // ([\d,]+) - matches one or more digits or commas (for thousands)
