@@ -64,7 +64,7 @@ export default async function decorate(block) {
     });
   }
 
-  // decorate social
+  // decorate social section
   const social = footer.querySelector('.footer-social');
   if (social) {
     social.querySelectorAll('a[href]').forEach((a) => {

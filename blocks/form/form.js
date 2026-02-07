@@ -71,7 +71,7 @@ function buildInput(field) {
 }
 
 /**
- * Creates a textarea element
+ * Creates a <textarea> element
  * @param {Object} field - Field configuration object
  * @returns {HTMLTextAreaElement} Textarea element
  */
