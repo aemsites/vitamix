@@ -1,6 +1,6 @@
 /* Recipe Center Widget */
 .recipe-center {
-  max-width: 2000px;
+  max-width: var(--site-width);
   margin: 0 auto;
 }
 
@@ -29,7 +29,7 @@
   display: inline-block;
   margin: 0 var(--spacing-600);
   border-radius: var(--rounding-m) var(--rounding-m) 0 0;
-  padding: 8px 24px 0;
+  padding: var(--spacing-60) var(--spacing-300) 0;
   background-color: var(--color-charcoal);
   color: var(--color-white);
 }
@@ -67,10 +67,10 @@
   width: 100%;
   border: none;
   border-radius: var(--rounding-m);
-  padding: 10px 35px 10px 12px;
+  padding: 10px var(--spacing-500) 10px var(--spacing-80);
   background-color: var(--color-white);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23333' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
-  background-position: right 12px center;
+  background-position: right var(--spacing-80) center;
   background-repeat: no-repeat;
   background-size: 12px;
   color: var(--color-charcoal);
@@ -110,7 +110,7 @@
   flex: 1;
   border: none;
   border-radius: var(--rounding-m);
-  padding: 12px 50px 12px 16px;
+  padding: var(--spacing-80) 50px var(--spacing-80) var(--spacing-100);
   background-color: var(--color-white);
   font-size: var(--body-size-m);
 }
@@ -208,7 +208,7 @@
   margin: var(--spacing-40) 0 0;
   padding: 0;
   background-color: var(--color-background);
-  box-shadow: 0 2px 5px 0 var(--shadow-100);
+  box-shadow: var(--shadow-hover);
   font-size: var(--body-size-m);
   min-width: 190px;
 }
@@ -288,12 +288,12 @@
   border-radius: var(--rounding-l);
   margin-right: var(--spacing-60);
   margin-bottom: var(--spacing-60);
-  padding: 10px 12px 10px 38px;
+  padding: 10px var(--spacing-80) 10px 38px;
   background-color: var(--color-charcoal);
   background-image: url('/blocks/plp/close-white.svg');
   background-position: 8px center;
   background-repeat: no-repeat;
-  background-size: 25px;
+  background-size: var(--icon-m);
   color: var(--color-white);
   font-size: var(--body-size-m);
   cursor: pointer;
@@ -383,7 +383,7 @@
     display: block;
     position: static;
     grid-area: facets;
-    padding: 40px 30px 40px 40px;
+    padding: var(--spacing-600) 30px var(--spacing-600) var(--spacing-600);
     background: none;
     overflow: visible;
   }
@@ -404,7 +404,7 @@
 }
 
 .recipe-center .results .highlight {
-  padding: 0 2px;
+  padding: 0 var(--spacing-20);
   background-color: var(--color-yellow);
 }
 
@@ -469,7 +469,7 @@
     grid-area: results;
     gap: 30px;
     margin: 0;
-    padding: 40px 40px 40px 30px;
+    padding: var(--spacing-600) var(--spacing-600) var(--spacing-600) 30px;
   }
 }
 
