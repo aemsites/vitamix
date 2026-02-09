@@ -137,12 +137,20 @@
 
 .add-to-cart.fixed {
   position: fixed;
-  top: 0;
+  top: calc(var(--header-height) + 56px); /* header + navigation height */
   left: 0;
   right: 0;
   border-bottom: 1px solid var(--color-gray-400);
   padding: var(--spacing-80) var(--horizontal-spacing);
   background-color: var(--color-gray-100);
+  z-index: 8;
+}
+
+/* For larger screens where navigation is taller */
+@media (width >= 800px) {
+  .add-to-cart.fixed {
+    top: calc(var(--header-height) + 83px); /* header + larger navigation height */
+  }
 }
 
 @media (width >= 900px) {
