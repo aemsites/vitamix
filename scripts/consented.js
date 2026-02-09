@@ -62,6 +62,7 @@ function showMinimizedTeaser(text, newsletterLink) {
 
   textEl.addEventListener('click', (e) => {
     e.stopPropagation();
+    window.leadSourceOverride = 'minimizedmodal';
     markShown();
     newsletterLink.click();
   });
