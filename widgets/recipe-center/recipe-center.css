@@ -141,8 +141,7 @@
   }
 
   .recipe-center .filters {
-    flex-direction: row;
-    flex-wrap: wrap;
+    flex-flow: row wrap;
     align-items: center;
   }
 
@@ -233,12 +232,12 @@
   cursor: pointer;
 }
 
-.recipe-center .sort button[aria-pressed="true"] {
-  background: url('/blocks/plp/checkmark.svg') center right 10px no-repeat;
-}
-
 .recipe-center .sort button:hover {
   background-color: var(--color-gray-300);
+}
+
+.recipe-center .sort button[aria-pressed="true"] {
+  background: url('/blocks/plp/checkmark.svg') center right 10px no-repeat;
 }
 
 @media (width >= 900px) {
@@ -495,7 +494,8 @@
   padding: var(--spacing-600);
 }
 
-.recipe-center .pagination button {
+/* stylelint-disable-next-line no-descending-specificity */
+.recipe-center .pagination > button {
   border: var(--border-s) solid var(--color-gray-400);
   border-radius: var(--rounding-m);
   padding: var(--spacing-60) var(--spacing-100);
