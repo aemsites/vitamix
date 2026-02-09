@@ -55,18 +55,19 @@
 }
 
 .recipe-center .filters legend {
-  margin-right: var(--spacing-60);
   padding: 0;
   color: var(--color-white);
   float: left;
   font-size: var(--body-size-m);
   line-height: 42px;
+  text-align: center;
   white-space: nowrap;
 }
 
 .recipe-center .filters select {
   appearance: none;
   width: 100%;
+  font-weight: var(--weight-regular);
   padding-right: var(--spacing-500);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23333' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
   background-position: right var(--spacing-80) center;
@@ -91,6 +92,7 @@
 
 .recipe-center .search input {
   flex: 1;
+  font-weight: var(--weight-regular);
   padding-right: var(--spacing-600);
 }
 
@@ -131,7 +133,7 @@
   }
 
   .recipe-center .go {
-    width: auto;
+    display: none;
   }
 }
 
@@ -144,10 +146,6 @@
   .recipe-center .controls {
     grid-area: controls;
   }
-
-  .recipe-center .go {
-    display: none;
-  }
 }
 
 /* Info Bar */
@@ -155,6 +153,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 1ch;
   border-bottom: var(--border-s) solid var(--color-gray-300);
   padding: var(--spacing-200) var(--spacing-600);
   background-color: var(--color-gray-100);
@@ -466,7 +465,7 @@
 }
 
 /* stylelint-disable-next-line no-descending-specificity */
-.recipe-center .pagination > button {
+.recipe-center .pagination button {
   border: var(--border-s) solid var(--color-gray-400);
   border-radius: var(--rounding-m);
   padding: var(--spacing-60) var(--spacing-100);
@@ -495,9 +494,15 @@
 }
 
 .recipe-center .pagination .pages {
-  display: flex;
+  display: none;
   align-items: center;
   gap: var(--spacing-40);
+}
+
+@media (width >= 600px) {
+  .recipe-center .pagination .pages {
+    display: flex;
+  }
 }
 
 @media (width >= 900px) {
