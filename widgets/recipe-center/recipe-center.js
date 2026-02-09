@@ -470,6 +470,10 @@ function buildRecipeFiltering(container, config = {}, placeholders = {}) {
   // Reference existing DOM elements from static HTML
   const resultsElement = container.querySelector('.results');
   const facetsElement = container.querySelector('.facets');
+  const paginationElement = container.querySelector('.pagination');
+  const resultsCountElement = container.querySelector('#results-count');
+  const resultsStartElement = container.querySelector('#results-start');
+  const resultsEndElement = container.querySelector('#results-end');
 
   // Set up facet panel event listeners
   const applyButton = facetsElement.querySelector('.apply');
@@ -490,6 +494,8 @@ function buildRecipeFiltering(container, config = {}, placeholders = {}) {
   const courseSelect = container.querySelector('#course');
   const recipeTypeSelect = container.querySelector('#recipe-type');
   const goButton = container.querySelector('.go');
+  const fulltextElement = container.querySelector('#fulltext');
+  const form = container.querySelector('form.controls');
 
   // Sort dropdown uses native <details> element
   const sortDetails = container.querySelector('.sort');
@@ -516,7 +522,7 @@ function buildRecipeFiltering(container, config = {}, placeholders = {}) {
 
   // highlights search terms in recipe titles by wrapping matches in a span.
   const highlightResults = (res) => {
-    const fulltext = document.getElementById('fulltext').value;
+    const fulltext = fulltextElement.value;
     if (fulltext) {
       res.querySelectorAll('h3').forEach((title) => {
         const content = title.textContent;
@@ -550,7 +556,6 @@ function buildRecipeFiltering(container, config = {}, placeholders = {}) {
 
   // renders pagination controls
   const displayPagination = (totalResults, page = 1) => {
-    const paginationElement = container.querySelector('.pagination');
     if (!paginationElement) return;
 
     const totalPages = Math.ceil(totalResults / ITEMS_PER_PAGE);
@@ -649,7 +654,7 @@ function buildRecipeFiltering(container, config = {}, placeholders = {}) {
       else filterConfig[facetKey] = facetValue;
     });
 
-    filterConfig.fulltext = document.getElementById('fulltext').value;
+    filterConfig.fulltext = fulltextElement.value;
 
     // Reset to page 1 when filters change, unless explicitly maintaining page
     if (resetPage) {
@@ -678,7 +683,8 @@ function buildRecipeFiltering(container, config = {}, placeholders = {}) {
       span.className = 'tag';
       span.textContent = tag;
       span.addEventListener('click', () => {
-        document.getElementById(`filter-${tag}`).checked = false;
+        const checkbox = container.querySelector(`[id="filter-${tag}"]`);
+        if (checkbox) checkbox.checked = false;
         const filterConfig = createFilterConfig(true);
         // eslint-disable-next-line no-use-before-define
         runSearch(filterConfig);
@@ -692,7 +698,8 @@ function buildRecipeFiltering(container, config = {}, placeholders = {}) {
       clearButton.textContent = placeholders.clearAll || 'Clear All';
       clearButton.addEventListener('click', () => {
         selected.forEach((tag) => {
-          document.getElementById(`filter-${tag}`).checked = false;
+          const checkbox = container.querySelector(`[id="filter-${tag}"]`);
+          if (checkbox) checkbox.checked = false;
         });
         const filterConfig = createFilterConfig(true);
         // eslint-disable-next-line no-use-before-define
@@ -834,9 +841,9 @@ function buildRecipeFiltering(container, config = {}, placeholders = {}) {
     const startNum = totalResults > 0 ? ((page - 1) * ITEMS_PER_PAGE) + 1 : 0;
     const endNum = Math.min(page * ITEMS_PER_PAGE, totalResults);
 
-    container.querySelector('#results-count').textContent = totalResults;
-    container.querySelector('#results-start').textContent = startNum;
-    container.querySelector('#results-end').textContent = endNum;
+    if (resultsCountElement) resultsCountElement.textContent = totalResults;
+    if (resultsStartElement) resultsStartElement.textContent = startNum;
+    if (resultsEndElement) resultsEndElement.textContent = endNum;
 
     // Populate top dropdowns
     populateDropdown(dietarySelect, facets['dietary-interests'], 'dietary-interests', filterConfig);
@@ -853,7 +860,6 @@ function buildRecipeFiltering(container, config = {}, placeholders = {}) {
     }
   };
 
-  const fulltextElement = container.querySelector('#fulltext');
   fulltextElement.addEventListener('input', () => {
     runSearch(createFilterConfig(true)); // Reset to page 1 on search
   });
@@ -876,7 +882,6 @@ function buildRecipeFiltering(container, config = {}, placeholders = {}) {
   });
 
   // Search button click (form submit)
-  const form = container.querySelector('form.controls');
   if (form) {
     form.addEventListener('submit', (e) => {
       e.preventDefault();
@@ -1065,11 +1070,15 @@ async function init() {
 }
 
 // Wait for DOM to be ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', init);
-} else {
+const start = () => {
   loadCSS('/widgets/recipe-center/recipe-center.css');
   init();
+};
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', start);
+} else {
+  start();
 }
 
 export default { lookupRecipes };
