@@ -2,6 +2,7 @@
 .recipe-center {
   max-width: var(--site-width);
   margin: 0 auto;
+  margin-top: calc(-1 * var(--spacing-700));
 }
 
 @media (width >= 800px) {
@@ -21,6 +22,7 @@
       'facets results'
       'facets pagination';
     grid-template-columns: 280px 1fr;
+    margin-top: -140px;
   }
 }
 
@@ -75,6 +77,7 @@
   background-size: 12px;
   color: var(--color-charcoal);
   font-size: var(--body-size-m);
+  font-weight: var(--weight-regular);
   cursor: pointer;
 }
 
@@ -113,6 +116,7 @@
   padding: var(--spacing-80) 50px var(--spacing-80) var(--spacing-100);
   background-color: var(--color-white);
   font-size: var(--body-size-m);
+  font-weight: var(--weight-regular);
 }
 
 .recipe-center .search-btn {
