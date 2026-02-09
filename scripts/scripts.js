@@ -1132,6 +1132,20 @@ async function loadEager(doc) {
     window.simulateDate = params.get('simulateDate');
   }
 
+  /* query param based redirects: comma-separated pairs of
+   * <queryparam>=<value>:<redirectPathname> (e.g. "product=123:/us/en_us/products/123")
+   */
+  const paramRedirects = getMetadata('param-redirects');
+  if (paramRedirects) {
+    paramRedirects.split(',').forEach((row) => {
+      const i = row.indexOf(':');
+      if (i === -1) return;
+      const matchParam = row.slice(0, i).trim();
+      const pathname = row.slice(i + 1).trim();
+      if (window.location.search.includes(matchParam)) window.location.pathname = pathname;
+    });
+  }
+
   /* adjust shop images to locale root path, util all of shop is mapped */
   if (window.location.pathname.includes('/shop/')) {
     const images = doc.querySelectorAll('img[src^="./media_"]');
