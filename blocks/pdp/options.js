@@ -1,5 +1,5 @@
 import { buildSlide, buildThumbnails } from './gallery.js';
-import { rebuildIndices, checkVariantOutOfStock } from '../../scripts/scripts.js';
+import { rebuildIndices, checkVariantOutOfStock, formatPrice } from '../../scripts/scripts.js';
 import { toClassName } from '../../scripts/aem.js';
 import renderPricing from './pricing.js';
 import renderAddToCart from './add-to-cart.js';
@@ -219,15 +219,15 @@ export function renderOptions(ph, block, variants, custom, isParentOutOfStock) {
     warrantyContainer.append(warrantyHeading);
 
     options.forEach((option, i) => {
-      const formatPrice = (price) => {
+      const formatOptionPrice = (price) => {
         if (price) {
-          return `$${price.toFixed(2)}`;
+          return formatPrice(price, ph);
         }
         return ph.free || 'Free';
       };
       const warrantyValue = document.createElement('div');
       warrantyValue.classList.add('pdp-warranty-option');
-      warrantyValue.textContent = `${option.name} (${formatPrice(+option.finalPrice)})`;
+      warrantyValue.textContent = `${option.name} (${formatOptionPrice(+option.finalPrice)})`;
       if (options.length > 1) {
         const radio = document.createElement('input');
         radio.type = 'radio';
