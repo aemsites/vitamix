@@ -8,8 +8,11 @@ header {
   background-color: var(--layer-base);
 }
 
-:focus {
-  scroll-margin-top: calc(var(--header-height) );
+:target,
+:focus,
+::target-text,
+mark {
+  scroll-margin-top: calc(var(--header-height));
 }
 
 header a:any-link {
@@ -81,7 +84,10 @@ header [aria-hidden='true'] {
 }
 
 @media (width >= 800px) {
-  :focus {
+  :target,
+  :focus,
+  ::target-text,
+  mark {
     scroll-margin-top: calc(var(--header-height));
   }
 }
