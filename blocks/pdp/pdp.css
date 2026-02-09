@@ -137,28 +137,25 @@
 
 .add-to-cart.fixed {
   position: fixed;
-  top: calc(var(--header-height) + 56px) !important; /* header + navigation height */
+  bottom: 0; 
   left: 0;
   right: 0;
-  border-bottom: 1px solid var(--color-gray-400);
+  top: auto; 
+  border-top: 1px solid var(--color-gray-400); 
+  border-bottom: none;
   padding: var(--spacing-80) var(--horizontal-spacing);
   background-color: var(--color-gray-100);
   z-index: 8;
-}
-
-/* For larger screens where navigation is taller */
-@media (width >= 800px) {
-  .add-to-cart.fixed {
-    top: calc(var(--header-height) + 83px) !important; /* header + larger navigation height */
-  }
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1); 
 }
 
 @media (width >= 900px) {
   .add-to-cart.fixed {
     position: static;
-    border-bottom: 0;
+    border-top: 0;
     padding: 0;
     background-color: transparent;
+    box-shadow: none;
   }
 }
 
