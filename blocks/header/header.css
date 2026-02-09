@@ -12,7 +12,7 @@ header {
 :focus,
 ::target-text,
 mark {
-  scroll-margin-top: calc(var(--header-height));
+  scroll-margin-top: calc(var(--header-height) + 56px);
 }
 
 header a:any-link {
@@ -88,7 +88,7 @@ header [aria-hidden='true'] {
   :focus,
   ::target-text,
   mark {
-    scroll-margin-top: calc(var(--header-height));
+    scroll-margin-top: calc(var(--header-height) + 83px);
   }
 }
 
