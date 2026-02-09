@@ -8,6 +8,10 @@ header {
   background-color: var(--layer-base);
 }
 
+:focus {
+  scroll-margin-top: calc(var(--header-height) );
+}
+
 header a:any-link {
   color: currentcolor;
   text-decoration: none;
@@ -74,6 +78,12 @@ header section[data-expanded='true'] {
 
 header [aria-hidden='true'] {
   display: none;
+}
+
+@media (width >= 800px) {
+  :focus {
+    scroll-margin-top: calc(var(--header-height));
+  }
 }
 
 @media (width >= 1000px) {
