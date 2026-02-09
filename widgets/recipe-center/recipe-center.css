@@ -67,41 +67,21 @@
 .recipe-center .filters select {
   appearance: none;
   width: 100%;
-  border: none;
-  border-radius: var(--rounding-m);
-  padding: 10px var(--spacing-500) 10px var(--spacing-80);
-  background-color: var(--color-white);
+  padding-right: var(--spacing-500);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23333' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
   background-position: right var(--spacing-80) center;
   background-repeat: no-repeat;
   background-size: 12px;
-  color: var(--color-charcoal);
-  font-size: var(--body-size-m);
-  font-weight: var(--weight-regular);
-  cursor: pointer;
 }
 
-.recipe-center .filters select:hover {
+.recipe-center .filters select:hover,
+.recipe-center .filters select:focus-visible {
   background-color: var(--color-gray-100);
 }
 
 .recipe-center .go {
   width: 100%;
-  border: none;
-  border-radius: var(--rounding-m);
-  padding: 10px var(--spacing-400);
-  background-color: var(--color-red);
-  color: var(--color-white);
-  font-size: var(--body-size-m);
-  font-weight: var(--weight-medium);
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
   white-space: nowrap;
-  cursor: pointer;
-}
-
-.recipe-center .go:hover {
-  background-color: var(--color-madder);
 }
 
 .recipe-center .search {
@@ -111,12 +91,7 @@
 
 .recipe-center .search input {
   flex: 1;
-  border: none;
-  border-radius: var(--rounding-m);
-  padding: var(--spacing-80) 50px var(--spacing-80) var(--spacing-100);
-  background-color: var(--color-white);
-  font-size: var(--body-size-m);
-  font-weight: var(--weight-regular);
+  padding-right: var(--spacing-600);
 }
 
 .recipe-center .search-btn {
@@ -315,15 +290,7 @@
 
 .recipe-center .facets .apply {
   width: 100%;
-  border: none;
-  border-radius: var(--rounding-m);
   margin-top: var(--spacing-400);
-  padding: var(--spacing-80);
-  background-color: var(--color-red);
-  color: var(--color-white);
-  font-size: var(--body-size-m);
-  font-weight: var(--weight-medium);
-  cursor: pointer;
 }
 
 .recipe-center .facet {
@@ -471,9 +438,9 @@
 @media (width >= 900px) {
   .recipe-center .results {
     grid-area: results;
-    gap: 30px;
+    gap: var(--spacing-400);
     margin: 0;
-    padding: var(--spacing-600) var(--spacing-600) var(--spacing-600) 30px;
+    padding: var(--spacing-600) var(--spacing-600) var(--spacing-600) var(--spacing-400);
   }
 }
 
