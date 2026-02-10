@@ -1,4 +1,3 @@
-import { extractPricing } from '../blocks/pdp/pricing.js';
 import {
   loadHeader,
   loadFooter,
@@ -28,6 +27,32 @@ async function loadFonts() {
   } catch (e) {
     // do nothing
   }
+}
+
+/**
+ * Extracts pricing from a JSON-LD offer object.
+ * @param {Object} offer - A schema.org Offer from the JSON-LD data
+ * @returns {Object|null} An object containing the final and regular price.
+ */
+export function getOfferPricing(offer) {
+  if (!offer) return null;
+  return {
+    final: parseFloat(offer.price),
+    regular: offer.priceSpecification?.price || null,
+  };
+}
+
+/**
+ * Formats a price using the locale and currency from placeholders.
+ * Uses Intl.NumberFormat for locale-aware currency formatting.
+ * @param {number} value - The price value to format
+ * @param {Object} ph - Placeholders object containing languageCode and currencyCode
+ * @returns {string} The formatted price string (e.g., "$399.95" or "399,95 $")
+ */
+export function formatPrice(value, ph) {
+  const locale = (ph.languageCode || 'en_US').replace('_', '-');
+  const currency = ph.currencyCode || 'USD';
+  return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(value);
 }
 
 /**
@@ -321,10 +346,8 @@ function parseVariants(sections) {
 
     const imagesHTML = div.querySelectorAll('picture');
 
-    const priceHTML = div.querySelector('p:nth-of-type(1)');
-    const price = extractPricing(priceHTML);
-
     const ldVariant = window.jsonLdData.offers.find((offer) => offer.sku === metadata.sku);
+    const price = getOfferPricing(ldVariant);
     if (ldVariant) {
       metadata.itemCondition = ldVariant.itemCondition;
       metadata.availability = ldVariant.availability;

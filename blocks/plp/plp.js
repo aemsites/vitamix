@@ -9,7 +9,7 @@ import {
   loadBlock,
 } from '../../scripts/aem.js';
 
-import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { getLocaleAndLanguage, formatPrice } from '../../scripts/scripts.js';
 
 /**
  * Constructs a localized product URL path.
@@ -275,10 +275,10 @@ function createProductTitle(product, h = 'h4') {
  * @param {Object} product - Product data object
  * @returns {HTMLParagraphElement} Product price element
  */
-function createProductPrice(product) {
+function createProductPrice(product, ph) {
   const price = document.createElement('p');
   price.className = 'plp-price';
-  price.textContent = product.price ? `$${product.price}` : '';
+  price.textContent = product.price ? formatPrice(product.price, ph) : '';
   return price;
 }
 
@@ -382,7 +382,7 @@ function createProductCard(product, ph) {
 
   const image = createProductImage(product);
   const title = createProductTitle(product);
-  const price = createProductPrice(product);
+  const price = createProductPrice(product, ph);
   const colors = createProductColors(product);
   const viewDetails = createProductButton(product, ph, 'View Details', 'emphasis');
   const compare = createProductButton(product, ph, 'Compare');
@@ -451,13 +451,13 @@ async function styleRowAsSlide(content, ph) {
     startingAt.className = 'eyebrow';
     startingAt.textContent = ph.startingAt || 'Starting at';
 
-    const price = createProductPrice(product);
+    const price = createProductPrice(product, ph);
     if (product.regularPrice && product.regularPrice > product.price) {
       const savings = (product.regularPrice - product.price).toFixed(2);
       const saleInfo = document.createElement('span');
-      saleInfo.textContent = `| ${ph.save || 'Save'} $${savings}`;
+      saleInfo.textContent = `| ${ph.save || 'Save'} ${formatPrice(savings, ph)}`;
       const regularPrice = document.createElement('del');
-      regularPrice.textContent = `$${product.regularPrice}`;
+      regularPrice.textContent = formatPrice(product.regularPrice, ph);
       saleInfo.prepend(regularPrice);
       price.append(saleInfo);
     }
