@@ -1,29 +1,4 @@
-/**
- * Extracts pricing information from a given element.
- * @param {Element} element - The element containing the pricing information.
- * @returns {Object} An object containing the final price and regular price.
- */
-export function extractPricing(element) {
-  if (!element) return null;
-
-  const pricingText = element.textContent.trim();
-
-  // Matches price values in the format $XXX.XX (e.g. $399.95, $1,299.99)
-  // \$ - matches literal dollar sign
-  // ([\d,]+) - matches one or more digits or commas (for thousands)
-  // \.\d{2} - matches decimal point followed by exactly 2 digits
-  const priceMatch = pricingText.match(/\$([\d,]+\.\d{2})/g);
-
-  if (!priceMatch) return null;
-
-  const finalPrice = parseFloat(priceMatch[0].replace(/[$,]/g, ''));
-  const regularPrice = priceMatch[1] ? parseFloat(priceMatch[1].replace(/[$,]/g, '')) : null;
-
-  return {
-    final: finalPrice,
-    regular: regularPrice,
-  };
-}
+import { formatPrice, getOfferPricing } from '../../scripts/scripts.js';
 
 /**
  * Renders the pricing section of the PDP block.
@@ -34,13 +9,18 @@ export default function renderPricing(ph, block, variant) {
   const pricingContainer = document.createElement('div');
   pricingContainer.classList.add('pricing');
 
-  const pricingElement = block.querySelector('p:nth-of-type(1)');
-  const pricing = variant ? variant.price : extractPricing(pricingElement);
+  const pricing = variant
+    ? variant.price
+    : getOfferPricing(window.jsonLdData?.offers?.[0]);
   if (!pricing) {
     return null;
   }
 
-  if (!variant) pricingElement.remove();
+  // remove the pipeline-rendered pricing text from the DOM
+  if (!variant) {
+    const pricingElement = block.querySelector('p:nth-of-type(1)');
+    if (pricingElement) pricingElement.remove();
+  }
 
   // Check if the product is reconditioned
   // If the variant is not null, check if the item condition is refurbished
@@ -57,7 +37,7 @@ export default function renderPricing(ph, block, variant) {
 
   const finalPrice = document.createElement('div');
   finalPrice.className = 'pricing-final';
-  finalPrice.textContent = `$${pricing.final.toFixed(2)}`;
+  finalPrice.textContent = formatPrice(pricing.final, ph);
   pricingContainer.appendChild(finalPrice);
 
   if (pricing.regular && pricing.regular > pricing.final) {
@@ -68,12 +48,12 @@ export default function renderPricing(ph, block, variant) {
     const saveText = document.createElement('span');
     saveText.className = 'pricing-save';
     saveText.textContent = isReconditioned
-      ? `${ph.save || 'Save'} $${savingsAmount.toFixed(2)} | ${ph.new || 'New'} `
-      : `${ph.save || 'Save'} $${savingsAmount.toFixed(2)} | ${ph.was || 'Was'} `;
+      ? `${ph.save || 'Save'} ${formatPrice(savingsAmount, ph)} | ${ph.new || 'New'} `
+      : `${ph.save || 'Save'} ${formatPrice(savingsAmount, ph)} | ${ph.was || 'Was'} `;
 
     const regularPrice = document.createElement('del');
     regularPrice.className = 'pricing-regular';
-    regularPrice.textContent = `$${pricing.regular.toFixed(2)}`;
+    regularPrice.textContent = formatPrice(pricing.regular, ph);
 
     savingsContainer.appendChild(saveText);
     savingsContainer.appendChild(regularPrice);
