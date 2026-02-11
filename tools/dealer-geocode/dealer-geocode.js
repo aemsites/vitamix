@@ -12,19 +12,95 @@ const ADDRESS_FIELDS = [
 ];
 
 /**
+ * Split TSV string into row strings. Newlines inside double-quoted fields are not row separators.
+ * Handles \n, \r\n, and \r line endings. Strips BOM from first row.
+ * @param {string} tsv
+ * @returns {string[]}
+ */
+function splitTSVRows(tsv) {
+  const rows = [];
+  let current = '';
+  let inQuotes = false;
+  const s = tsv.trimEnd();
+  for (let i = 0; i < s.length; i += 1) {
+    const c = s[i];
+    if (c === '"') {
+      inQuotes = !inQuotes;
+      current += c;
+    } else if (!inQuotes && (c === '\n' || c === '\r')) {
+      if (c === '\r' && s[i + 1] === '\n') i += 1;
+      rows.push(current);
+      current = '';
+    } else {
+      current += c;
+    }
+  }
+  if (current.length > 0) rows.push(current);
+  if (rows.length > 0 && rows[0].charCodeAt(0) === 0xFEFF) {
+    rows[0] = rows[0].slice(1);
+  }
+  return rows;
+}
+
+/**
+ * Split a single TSV row string into fields. Tabs inside double-quoted fields are not separators.
+ * Handles "" as escaped quote within quoted field.
+ * @param {string} row
+ * @returns {string[]}
+ */
+function splitTSVRow(row) {
+  const fields = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < row.length; i += 1) {
+    const c = row[i];
+    if (c === '"') {
+      if (inQuotes && row[i + 1] === '"') {
+        current += '"';
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (c === '\t' && !inQuotes) {
+      fields.push(current);
+      current = '';
+    } else {
+      current += c;
+    }
+  }
+  fields.push(current);
+  return fields;
+}
+
+/**
+ * Unquote a TSV field value: remove surrounding quotes and unescape "" to ".
+ * Trims whitespace and trailing \r from unquoted values.
+ * @param {string} field
+ * @returns {string}
+ */
+function unquoteField(field) {
+  const trimmed = field.trim().replace(/\r+$/, '');
+  if (trimmed.length >= 2 && trimmed.startsWith('"') && trimmed.endsWith('"')) {
+    return trimmed.slice(1, -1).replace(/""/g, '"');
+  }
+  return trimmed;
+}
+
+/**
  * Parse TSV into { header, columnIndex, rows }.
+ * Handles quoted fields that contain newlines, tabs, and double-quote escapes.
  * @param {string} tsv
  * @returns {{ header: string[], columnIndex: Record<string, number>, rows: string[][] }}
  */
 export function parseTSV(tsv) {
-  const lines = tsv.trim().split(/\r?\n/);
-  if (lines.length < 2) {
+  const rowStrings = splitTSVRows(tsv);
+  if (rowStrings.length < 2) {
     throw new Error('TSV must have a header row and at least one data row.');
   }
-  const header = lines[0].split('\t');
+  const header = splitTSVRow(rowStrings[0]).map((col) => unquoteField(col).trim());
   const columnIndex = {};
   header.forEach((col, i) => {
-    columnIndex[col.trim()] = i;
+    columnIndex[col] = i;
   });
 
   const required = ['NAME', 'ADDRESS_1', 'LAT', 'LONG'];
@@ -35,8 +111,9 @@ export function parseTSV(tsv) {
   }
 
   const numCols = header.length;
-  const rows = lines.slice(1).map((line) => {
-    const cells = line.split('\t');
+  const rows = rowStrings.slice(1).map((line) => {
+    const raw = splitTSVRow(line);
+    const cells = raw.map((cell) => unquoteField(cell));
     while (cells.length < numCols) cells.push('');
     return cells.slice(0, numCols);
   });
@@ -44,7 +121,17 @@ export function parseTSV(tsv) {
 }
 
 /**
+ * Normalize whitespace (including newlines) to single spaces.
+ * @param {string} s
+ * @returns {string}
+ */
+function normalizeWhitespace(s) {
+  return s.replace(/\s+/g, ' ').trim();
+}
+
+/**
  * Build address string for geocode from row and column index.
+ * Normalizes newlines and other whitespace to single spaces.
  * @param {string[]} row
  * @param {Record<string, number>} columnIndex
  * @returns {string}
@@ -53,8 +140,7 @@ export function buildAddress(row, columnIndex) {
   const parts = ADDRESS_FIELDS.map((field) => {
     const i = columnIndex[field];
     if (i === undefined) return '';
-    const value = (row[i] || '').trim();
-    return value;
+    return normalizeWhitespace(row[i] || '');
   }).filter(Boolean);
   return parts.join(' ');
 }
@@ -83,16 +169,28 @@ export async function geocodeAddress(address) {
 }
 
 /**
+ * Quote a field for TSV if it contains newline, tab, or double-quote.
+ * @param {string} field
+ * @returns {string}
+ */
+function quoteField(field) {
+  const s = String(field);
+  if (/[\r\n\t"]/.test(s)) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
+/**
  * Serialize parsed TSV back to string.
+ * Fields that contain newlines, tabs, or quotes are quoted and escaped.
  * @param {{ header: string[], rows: string[][] }} parsed
  * @returns {string}
  */
 export function serializeTSV(parsed) {
-  const lines = [parsed.header.join('\t')];
-  for (const row of parsed.rows) {
-    lines.push(row.join('\t'));
-  }
-  return lines.join('\n');
+  const headerLine = parsed.header.map(quoteField).join('\t');
+  const dataLines = parsed.rows.map((row) => row.map(quoteField).join('\t'));
+  return [headerLine, ...dataLines].join('\n');
 }
 
 /**
@@ -162,6 +260,13 @@ export async function runLookup() {
     const row = rows[i];
     const address1 = (row[address1Idx] || '').trim();
     if (!address1) {
+      done += 1;
+      updateProgress(done, total);
+      continue;
+    }
+    const lat = (row[latIdx] || '').trim();
+    const lng = (row[lngIdx] || '').trim();
+    if (lat && lng) {
       done += 1;
       updateProgress(done, total);
       continue;
