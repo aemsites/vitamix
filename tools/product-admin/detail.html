@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="Description" content="Vitamix PIM – Product detail" />
+    <meta name="robots" content="noindex" />
+    <title>Vitamix PIM – Product</title>
+    <link rel="stylesheet" href="pim.css" />
+    <link rel="stylesheet" href="detail.css" />
+  </head>
+  <body>
+    <main class="pim-main pim-detail-main">
+      <div class="pim-detail-toolbar" id="toolbar" style="display: none;">
+        <a href="../product-admin.html" class="pim-detail-back-link">← Back to products</a>
+        <label class="pim-edit-toggle" for="editModeCheckbox">
+          <span class="pim-edit-toggle-label">Edit mode</span>
+          <span class="pim-edit-toggle-track">
+            <input type="checkbox" id="editModeCheckbox" class="pim-edit-toggle-input" />
+            <span class="pim-edit-toggle-thumb"></span>
+          </span>
+        </label>
+      </div>
+
+      <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <p>Loading product…</p>
+      </div>
+
+      <div class="error" id="error"></div>
+
+      <div class="pim-detail-content" id="content"></div>
+    </main>
+    <script src="detail.js" type="module"></script>
+  </body>
+</html>

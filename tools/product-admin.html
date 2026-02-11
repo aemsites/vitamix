@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <script src="https://da.live/nx/utils/sdk.js" type="module"></script>
+    <script src="/tools/product-admin/pim.js" type="module"></script>
+    <meta name="Description" content="Vitamix PIM – Product overview" />
+    <meta name="robots" content="noindex" />
+    <title>Vitamix PIM – Products</title>
+    <link rel="stylesheet" href="./product-admin/pim.css" />
+  </head>
+
+  <body>
+    <main class="pim-main">
+      <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <p>Loading products…</p>
+      </div>
+
+      <div class="error" id="error"></div>
+
+      <div class="pim-content" id="content">
+        <div class="pim-toolbar">
+          <input type="search" id="searchInput" class="pim-search" placeholder="Search products…" aria-label="Search products" />
+          <span class="pim-count" id="productCount"></span>
+          <label class="pim-index-label" for="indexSelect">Index</label>
+          <select id="indexSelect" class="pim-index-select" aria-label="Product index">
+            <option value="us/en_us">🇺🇸 US English</option>
+            <option value="ca/en_us">🇨🇦 CA English</option>
+            <option value="ca/fr_ca">🇨🇦 CA French</option>
+          </select>
+        </div>
+        <div class="pim-list-wrapper">
+          <table class="pim-list" id="productList">
+            <thead>
+              <tr>
+                <th class="pim-col-thumb"></th>
+                <th class="pim-col-product pim-sortable" data-sort="title" tabindex="0">Product</th>
+                <th class="pim-col-sku pim-sortable" data-sort="sku" tabindex="0">SKU</th>
+                <th class="pim-col-variants pim-sortable" data-sort="variants" tabindex="0">Variants</th>
+                <th class="pim-col-availability pim-sortable" data-sort="availability" tabindex="0">Availability</th>
+                <th class="pim-col-price pim-sortable" data-sort="price" tabindex="0">Price</th>
+              </tr>
+            </thead>
+            <tbody id="productGrid"></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

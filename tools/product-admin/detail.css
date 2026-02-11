@@ -1,0 +1,561 @@
+/* Detail view – back link and layout */
+.pim-detail-main {
+  padding-top: 16px;
+}
+
+.pim-detail-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.pim-detail-back-link {
+  color: #2c2c2e;
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.pim-detail-back-link:hover {
+  text-decoration: underline;
+}
+
+.pim-edit-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: #202223;
+  cursor: pointer;
+  user-select: none;
+}
+
+.pim-edit-toggle-label {
+  font-weight: 500;
+}
+
+.pim-edit-toggle-track {
+  position: relative;
+  display: inline-block;
+  width: 51px;
+  height: 31px;
+  background: #e1e3e5;
+  border-radius: 31px;
+  transition: background-color 0.2s ease;
+}
+
+.pim-edit-toggle-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+.pim-edit-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 27px;
+  height: 27px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgb(0 0 0 / 20%);
+  transition: transform 0.2s ease;
+  pointer-events: none;
+}
+
+.pim-edit-toggle-input:checked + .pim-edit-toggle-thumb {
+  transform: translateX(20px);
+}
+
+.pim-edit-toggle-input:focus-visible + .pim-edit-toggle-thumb {
+  box-shadow: 0 0 0 3px rgb(52 199 89 / 40%);
+}
+
+.pim-edit-toggle-track:has(.pim-edit-toggle-input:checked) {
+  background: #34c759;
+}
+
+.pim-detail-header {
+  margin-bottom: 24px;
+}
+
+.pim-detail-name {
+  margin: 0 0 12px;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #202223;
+}
+
+/* Edit mode – editable values (horizontal padding only to avoid layout shift) */
+.pim-edit-mode .pim-editable {
+  cursor: pointer;
+  border-radius: 3px;
+  padding: 0 4px;
+  margin: 0 -4px;
+}
+
+.pim-edit-mode .pim-editable:hover {
+  background: #e8f4fc;
+  outline: 1px solid #2c2c2e;
+}
+
+/* Availability pill: keep same look in edit mode (no padding override, hover outline only) */
+.pim-edit-mode .pim-editable.pim-card-availability {
+  padding: 2px 8px;
+  margin: 0;
+}
+
+.pim-edit-mode .pim-editable.pim-card-availability:hover {
+  outline: 1px solid #2c2c2e;
+}
+
+.pim-edit-mode .pim-editable.pim-card-availability.instock:hover { background: #d4edda; }
+.pim-edit-mode .pim-editable.pim-card-availability.outofstock:hover { background: #f8d7da; }
+.pim-edit-mode .pim-editable.pim-card-availability.discontinued:hover { background: #e2e3e5; }
+.pim-edit-mode .pim-editable.pim-card-availability:not(.instock, .outofstock, .discontinued):hover { background: #e1e3e5; }
+
+/* Keep header spacing unchanged in edit mode */
+.pim-edit-mode .pim-detail-header .pim-detail-name {
+  margin-bottom: 12px;
+}
+
+.pim-edit-mode .pim-edit-list-item {
+  position: relative;
+  display: inline-block;
+}
+
+/* Resources list (base) – before edit-mode overrides for no-descending-specificity */
+.pim-detail-resource-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pim-detail-resource {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 14px;
+}
+
+.pim-detail-resource:last-child {
+  border-bottom: none;
+}
+
+.pim-detail-resource a {
+  color: #2c2c2e;
+  text-decoration: none;
+}
+
+.pim-detail-resource a:hover {
+  text-decoration: underline;
+}
+
+.pim-detail-resource-type {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  background: #e1e3e5;
+  color: #414548;
+}
+
+.pim-detail-resource-type-pdf {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.pim-detail-linked-grid .pim-edit-list-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Resources: keep one-per-line layout and same flex gap (link + PDF tag spacing) */
+.pim-edit-mode .pim-detail-resource-list .pim-edit-list-item {
+  display: flex;
+}
+
+.pim-edit-mode .pim-detail-resource-list .pim-detail-resource {
+  padding-right: 36px;
+}
+
+.pim-edit-mode .pim-edit-delete {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+  background: #f8d7da;
+  color: #721c24;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.pim-edit-mode .pim-edit-delete:hover {
+  background: #f5c6cb;
+}
+
+.pim-edit-mode .pim-edit-add {
+  padding: 6px 12px;
+  font-size: 12px;
+  background: #d4edda;
+  color: #155724;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+.pim-edit-mode .pim-edit-add:hover {
+  background: #c3e6cb;
+}
+
+/* Inline editor overlay */
+.pim-inline-editor-wrap {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 30%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.pim-inline-editor {
+  background: #fff;
+  padding: 16px;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgb(0 0 0 / 15%);
+  min-width: 280px;
+  max-width: 90vw;
+}
+
+.pim-inline-editor label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6d7175;
+  margin-bottom: 6px;
+}
+
+.pim-inline-editor input,
+.pim-inline-editor select,
+.pim-inline-editor textarea {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 14px;
+  border: 1px solid #e1e3e5;
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+
+.pim-inline-editor textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.pim-inline-editor-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.pim-inline-editor-actions button {
+  padding: 8px 16px;
+  font-size: 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: none;
+}
+
+.pim-inline-editor-actions .pim-btn-cancel {
+  background: #f0f0f0;
+  color: #202223;
+}
+
+.pim-inline-editor-actions .pim-btn-save {
+  background: #2c2c2e;
+  color: #fff;
+}
+
+.pim-detail-content {
+  background: #fff;
+  border: 1px solid #e1e3e5;
+  border-radius: 8px;
+  padding: 24px;
+}
+
+.pim-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  align-items: center;
+}
+
+.pim-detail-field {
+  display: inline-flex;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.pim-detail-label {
+  color: #6d7175;
+}
+
+.pim-detail-value {
+  color: #202223;
+}
+
+.pim-detail-section {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #e1e3e5;
+}
+
+.pim-detail-section-title {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #202223;
+}
+
+/* Gallery */
+.pim-detail-gallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.pim-detail-img-wrap {
+  display: block;
+  flex-shrink: 0;
+}
+
+.pim-detail-img {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid #e1e3e5;
+}
+
+/* Add image placeholder – exact same size as gallery thumb (120×120), grey dotted ghost */
+.pim-edit-mode .pim-edit-add.pim-detail-img-add {
+  flex-shrink: 0;
+  box-sizing: border-box;
+  width: 120px;
+  height: 120px;
+  min-width: 120px;
+  min-height: 120px;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #e8e8e8;
+  border: 2px dashed #b0b0b0;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #8c9196;
+  font-size: 28px;
+  line-height: 1;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.pim-edit-mode .pim-edit-add.pim-detail-img-add:hover {
+  background: #ddd;
+  border-color: #8c9196;
+  color: #202223;
+}
+
+.pim-detail-img-add-inner {
+  display: block;
+}
+
+/* Custom / options tables */
+.pim-detail-custom-table {
+  width: 100%;
+  max-width: 600px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.pim-detail-custom-table td {
+  padding: 6px 12px 6px 0;
+  border-bottom: 1px solid #f0f0f0;
+  vertical-align: top;
+}
+
+/* Category / value tags */
+.pim-detail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pim-detail-tag {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.pim-detail-tag-cat.pim-detail-tag-i0 {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.pim-detail-tag-cat.pim-detail-tag-i1 {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.pim-detail-tag-cat.pim-detail-tag-i2 {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.pim-detail-tag-cat.pim-detail-tag-i3 {
+  background: #e9d5ff;
+  color: #6b21a8;
+}
+
+.pim-detail-tag-cat.pim-detail-tag-i4 {
+  background: #fce7f3;
+  color: #9d174d;
+}
+
+.pim-detail-custom-val .pim-detail-tag {
+  margin-right: 4px;
+  margin-bottom: 4px;
+}
+
+/* Cross-sell / Related – linked product cards */
+.pim-detail-linked-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.pim-detail-linked-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 120px;
+  padding: 12px;
+  background: #f6f6f7;
+  border: 1px solid #e1e3e5;
+  border-radius: 8px;
+  text-decoration: none;
+  color: #202223;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.pim-detail-linked-card:hover {
+  border-color: #8c9196;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 6%);
+}
+
+.pim-detail-linked-thumb {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 8px;
+  background: #fff;
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pim-detail-linked-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pim-detail-linked-no-img {
+  font-size: 12px;
+  color: #8c9196;
+}
+
+.pim-detail-linked-name {
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+  line-height: 1.3;
+}
+
+.pim-detail-custom-key {
+  color: #6d7175;
+  width: 180px;
+}
+
+.pim-detail-custom-val {
+  color: #202223;
+  word-break: break-word;
+}
+
+/* Variants table */
+.pim-detail-table-wrap {
+  overflow-x: auto;
+}
+
+.pim-detail-variants-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.pim-detail-variants-table th,
+.pim-detail-variants-table td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid #e1e3e5;
+}
+
+.pim-detail-variants-table th {
+  background: #f6f6f7;
+  font-weight: 600;
+  color: #202223;
+}
+
+.pim-detail-var-thumb {
+  width: 56px;
+}
+
+.pim-detail-var-img {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.pim-detail-raw {
+  margin: 0;
+  padding: 12px;
+  background: #f6f6f7;
+  border-radius: 6px;
+  font-size: 12px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
