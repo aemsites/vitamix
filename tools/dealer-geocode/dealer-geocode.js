@@ -104,11 +104,11 @@ export function parseTSV(tsv) {
   });
 
   const required = ['NAME', 'ADDRESS_1', 'LAT', 'LONG'];
-  for (const col of required) {
+  required.forEach((col) => {
     if (columnIndex[col] === undefined) {
       throw new Error(`Missing required column: ${col}. Header: ${header.join(', ')}`);
     }
-  }
+  });
 
   const numCols = header.length;
   const rows = rowStrings.slice(1).map((line) => {
@@ -220,77 +220,11 @@ export function updateProgress(current, total, text) {
   progressText.textContent = text ?? `Looking up coordinates... ${current} of ${total}`;
 }
 
-/**
- * Run geocode lookup on TSV and fill LAT/LONG.
- */
-export async function runLookup() {
-  const tsvInput = document.getElementById('tsvInput');
-  const tsv = tsvInput.value.trim();
-  if (!tsv) {
-    showError('Please paste TSV data first.');
-    return;
-  }
-
-  let parsed;
-  try {
-    parsed = parseTSV(tsv);
-  } catch (e) {
-    showError(e.message);
-    return;
-  }
-
-  const { header, columnIndex, rows } = parsed;
-  const latIdx = columnIndex.LAT;
-  const lngIdx = columnIndex.LONG;
-  const total = rows.length;
-  const loadingDiv = document.getElementById('loading');
-  const lookupBtn = document.getElementById('lookupBtn');
-  const resultsDiv = document.getElementById('results');
-  const tsvOutput = document.getElementById('tsvOutput');
-
-  document.getElementById('error').classList.remove('active');
-  resultsDiv.classList.remove('active');
-  loadingDiv.classList.add('active');
-  lookupBtn.disabled = true;
-  updateProgress(0, total);
-
-  const address1Idx = columnIndex.ADDRESS_1;
-  let done = 0;
-  for (let i = 0; i < rows.length; i += 1) {
-    const row = rows[i];
-    const address1 = (row[address1Idx] || '').trim();
-    if (!address1) {
-      done += 1;
-      updateProgress(done, total);
-      continue;
-    }
-    const lat = (row[latIdx] || '').trim();
-    const lng = (row[lngIdx] || '').trim();
-    if (lat && lng) {
-      done += 1;
-      updateProgress(done, total);
-      continue;
-    }
-    const address = buildAddress(row, columnIndex);
-    try {
-      const result = await geocodeAddress(address);
-      if (result) {
-        row[latIdx] = String(result.lat);
-        row[lngIdx] = String(result.lng);
-      }
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.warn(`Geocode failed for row ${i + 2}:`, err);
-    }
-    done += 1;
-    updateProgress(done, total);
-  }
-
-  loadingDiv.classList.remove('active');
-  lookupBtn.disabled = false;
-  tsvOutput.value = serializeTSV(parsed);
-  renderResultsTable(parsed);
-  resultsDiv.classList.add('active');
+function escapeHtml(str) {
+  if (!str) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
 }
 
 const GOOGLE_MAPS_SEARCH = 'https://www.google.com/maps/search/?api=1&query=';
@@ -328,11 +262,72 @@ export function renderResultsTable(parsed) {
   });
 }
 
-function escapeHtml(str) {
-  if (!str) return '';
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
+/**
+ * Run geocode lookup on TSV and fill LAT/LONG.
+ */
+export async function runLookup() {
+  const tsvInput = document.getElementById('tsvInput');
+  const tsv = tsvInput.value.trim();
+  if (!tsv) {
+    showError('Please paste TSV data first.');
+    return;
+  }
+
+  let parsed;
+  try {
+    parsed = parseTSV(tsv);
+  } catch (e) {
+    showError(e.message);
+    return;
+  }
+
+  const { columnIndex, rows } = parsed;
+  const latIdx = columnIndex.LAT;
+  const lngIdx = columnIndex.LONG;
+  const total = rows.length;
+  const loadingDiv = document.getElementById('loading');
+  const lookupBtn = document.getElementById('lookupBtn');
+  const resultsDiv = document.getElementById('results');
+  const tsvOutput = document.getElementById('tsvOutput');
+
+  document.getElementById('error').classList.remove('active');
+  resultsDiv.classList.remove('active');
+  loadingDiv.classList.add('active');
+  lookupBtn.disabled = true;
+  updateProgress(0, total);
+
+  const address1Idx = columnIndex.ADDRESS_1;
+  let done = 0;
+  const processRow = async (row, i) => {
+    const address1 = (row[address1Idx] || '').trim();
+    if (!address1) return;
+    const lat = (row[latIdx] || '').trim();
+    const lng = (row[lngIdx] || '').trim();
+    if (!(lat && lng)) {
+      const address = buildAddress(row, columnIndex);
+      try {
+        const result = await geocodeAddress(address);
+        if (result) {
+          row[latIdx] = String(result.lat);
+          row[lngIdx] = String(result.lng);
+        }
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn(`Geocode failed for row ${i + 2}:`, err);
+      }
+    }
+  };
+  await rows.reduce((promise, row, i) => promise.then(async () => {
+    await processRow(row, i);
+    done += 1;
+    updateProgress(done, total);
+  }), Promise.resolve());
+
+  loadingDiv.classList.remove('active');
+  lookupBtn.disabled = false;
+  tsvOutput.value = serializeTSV(parsed);
+  renderResultsTable(parsed);
+  resultsDiv.classList.add('active');
 }
 
 /**
