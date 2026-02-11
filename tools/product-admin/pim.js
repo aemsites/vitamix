@@ -179,7 +179,7 @@ export function renderProductList(parents, query = '') {
     tr.tabIndex = 0;
     const thumbCell = imgUrl
       ? `<img src="${escapeHtml(imgUrl)}" alt="" loading="lazy" width="48" height="48" class="pim-thumb-img" />`
-      : '<span class="pim-card-no-img">—</span>';
+      : '<span class="pim-thumb-placeholder" aria-hidden="true"></span>';
     tr.innerHTML = `
       <td class="pim-col-thumb">${thumbCell}</td>
       <td class="pim-col-product pim-cell-title">${highlightMatch(title, query)}</td>
