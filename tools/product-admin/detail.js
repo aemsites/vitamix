@@ -44,6 +44,7 @@ function setByPath(obj, path, value) {
 function resolveImageUrl(imagePath) {
   if (!imagePath) return '';
   const path = typeof imagePath === 'string' ? imagePath : imagePath?.url || '';
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
   const normalized = path.startsWith('./') ? path.slice(2) : path;
   return normalized ? PRODUCTS_BASE_URL + normalized + IMAGE_QUERY : '';
 }
@@ -100,6 +101,7 @@ function pathToUrlKey(path) {
 function resolveIndexImageUrl(imagePath) {
   if (!imagePath) return '';
   const path = typeof imagePath === 'string' ? imagePath : imagePath?.url || '';
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
   const normalized = path.startsWith('./') ? path.slice(2) : path;
   return normalized ? PRODUCTS_BASE_URL + normalized + IMAGE_QUERY : '';
 }

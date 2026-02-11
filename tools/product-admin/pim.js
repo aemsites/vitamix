@@ -35,6 +35,7 @@ const IMAGE_QUERY = '?width=750&format=webply&optimize=medium';
 export function resolveImageUrl(imagePath) {
   if (!imagePath) return '';
   const path = imagePath.startsWith('./') ? imagePath.slice(2) : imagePath;
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
   return getProductsBaseUrl() + path + IMAGE_QUERY;
 }
 
