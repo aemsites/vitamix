@@ -393,6 +393,10 @@ function enableFooterSignUp(form) {
     if (form.closest('dialog')) {
       leadSource = `sub-em-modal-${country}`;
     }
+    if (window.leadSourceOverride) {
+      leadSource = `sub-em-${window.leadSourceOverride}-${country}`;
+    }
+
     const payload = {
       email,
       mobile,
