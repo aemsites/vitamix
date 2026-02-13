@@ -2,7 +2,7 @@
   max-width: 56rem;
   margin: 0 auto;
   padding: 1.5rem;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   color: #1a1a1a;
 }
 
@@ -93,12 +93,8 @@
 }
 
 .btn-primary {
-  background: #0066cc;
+  background: #06c;
   color: #fff;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: #0052a3;
 }
 
 .btn-primary:disabled {
@@ -106,18 +102,22 @@
   cursor: not-allowed;
 }
 
+.btn-primary:hover:not(:disabled) {
+  background: #0052a3;
+}
+
 .btn-secondary {
   background: #e5e5e5;
   color: #333;
 }
 
-.btn-secondary:hover:not(:disabled) {
-  background: #d0d0d0;
-}
-
 .btn-secondary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #d0d0d0;
 }
 
 .status-section {
@@ -139,7 +139,7 @@
 .status-section .progress-fill {
   height: 100%;
   width: 0%;
-  background: #0066cc;
+  background: #06c;
   border-radius: 4px;
   transition: width 0.2s ease;
 }
@@ -153,6 +153,90 @@
   word-break: break-all;
 }
 
+.status-badge {
+  display: inline-block;
+  margin-left: 0.25rem;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: #eee;
+  color: #333;
+  border-radius: 4px;
+}
+
+.link-list {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.link-list li {
+  margin-bottom: 0.35rem;
+  word-break: break-all;
+}
+
+.link-list a {
+  color: #06c;
+  text-decoration: none;
+}
+
+.from-pages-list a {
+  color: #06c;
+}
+
+.status-line a {
+  color: #06c;
+  text-decoration: none;
+}
+
+.link-list a:hover {
+  text-decoration: underline;
+}
+
+.from-pages-list a:hover {
+  text-decoration: underline;
+}
+
+.status-line a:hover {
+  text-decoration: underline;
+}
+
+.link-list.broken a { color: #c00; }
+
+.link-list.broken .broken-item {
+  margin-bottom: 0.75rem;
+  list-style: none;
+}
+
+.link-list.broken .prod-link {
+  color: #06c;
+  font-size: 0.8125rem;
+}
+
+.link-list.broken .prod-link:hover {
+  text-decoration: underline;
+}
+
+.from-pages-label {
+  margin-top: 0.35rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #555;
+}
+
+.from-pages-list {
+  margin: 0.25rem 0 0 1rem;
+  padding-left: 1rem;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.from-pages {
+  color: #666;
+  font-size: 0.8125rem;
+}
+
 .status-line {
   margin-bottom: 0.2rem;
   padding: 0.15rem 0;
@@ -163,48 +247,54 @@
   border-bottom: none;
 }
 
-.status-line a {
-  color: #0066cc;
-  text-decoration: none;
-}
-
-.status-line a:hover {
-  text-decoration: underline;
-}
-
-.status-line--phase {
+.status-line-phase {
   font-weight: 600;
   color: #333;
 }
 
-.status-line--page {
+.status-line-page {
   padding-left: 0.25rem;
   color: #444;
 }
 
-.status-line--page-links {
+.status-line-page-links {
   padding-left: 1rem;
   color: #666;
   font-style: italic;
 }
 
-.status-line--link {
+.status-line-link {
   padding-left: 1rem;
   color: #555;
 }
 
-.status-line--link-result {
+.status-line-link-result {
   padding-left: 1.5rem;
 }
 
-.status-line--link-result .status-badge {
+.status-line-link-result .status-badge {
   margin-left: 0.25rem;
 }
 
-.status-badge--ok { background: #d4edda; color: #0a7a0a; }
-.status-badge--fail { background: #f8d7da; color: #c00; }
-.status-badge--warn { background: #fff3cd; color: #856404; }
-.status-badge--neutral { background: #eee; color: #333; }
+.status-badge-ok {
+  background: #d4edda;
+  color: #0a7a0a;
+}
+
+.status-badge-fail {
+  background: #f8d7da;
+  color: #c00;
+}
+
+.status-badge-warn {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.status-badge-neutral {
+  background: #eee;
+  color: #333;
+}
 
 .results {
   margin-top: 1.5rem;
@@ -246,45 +336,6 @@
 
 .results-detail h3:first-child {
   margin-top: 0;
-}
-
-.link-list {
-  margin: 0;
-  padding-left: 1.25rem;
-  font-size: 0.875rem;
-  line-height: 1.5;
-}
-
-.link-list li {
-  margin-bottom: 0.35rem;
-  word-break: break-all;
-}
-
-.link-list a {
-  color: #0066cc;
-  text-decoration: none;
-}
-
-.link-list a:hover {
-  text-decoration: underline;
-}
-
-.link-list.broken a { color: #c00; }
-
-.from-pages {
-  color: #666;
-  font-size: 0.8125rem;
-}
-
-.status-badge {
-  display: inline-block;
-  margin-left: 0.25rem;
-  padding: 0.15rem 0.4rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  background: #eee;
-  color: #333;
-  border-radius: 4px;
 }
 
 .link-list.more {

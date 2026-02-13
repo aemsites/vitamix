@@ -1,4 +1,4 @@
-(function () {
+(function initBulkLinkChecker() {
   const pageLimitInput = document.getElementById('page-limit');
   const pathFilterInput = document.getElementById('path-filter');
   const filterCountEl = document.getElementById('filter-count');
@@ -29,7 +29,7 @@
     statusSection.hidden = false;
     const entry = document.createElement('div');
     entry.className = 'status-line';
-    if (line.type) entry.classList.add(`status-line--${line.type}`);
+    if (line.type) entry.classList.add(`status-line-${line.type}`);
     if (line.text != null) entry.appendChild(document.createTextNode(line.text));
     if (line.url) {
       const a = document.createElement('a');
@@ -41,7 +41,7 @@
     }
     if (line.badge != null) {
       const badge = document.createElement('span');
-      badge.className = `status-badge status-badge--${line.badgeClass || 'neutral'}`;
+      badge.className = `status-badge status-badge-${line.badgeClass || 'neutral'}`;
       badge.textContent = line.badge;
       entry.appendChild(badge);
     }
@@ -147,119 +147,23 @@
     }
   }
 
-  async function runCheck() {
-    hideError();
-    resultsSection.hidden = true;
-    clearStatus();
-    const baseUrl = window.location.origin;
-    const limit = Math.max(1, Math.min(500, parseInt(pageLimitInput.value, 10) || 10));
-    pageLimitInput.value = limit;
-    abortController = new AbortController();
-    runBtn.disabled = true;
-    cancelBtn.disabled = false;
-
-    try {
-      let paths = allPaths.length ? allPaths : null;
-      if (!paths) {
-        appendStatus({ text: 'Fetching sitemap…', type: 'phase' });
-        setProgress(5);
-        const sitemapUrl = `${baseUrl}/sitemap.json`;
-        const sitemapRes = await fetchWithTimeout(sitemapUrl, { signal: abortController.signal });
-        if (!sitemapRes.ok) throw new Error(`Sitemap failed: ${sitemapRes.status} ${sitemapRes.statusText}`);
-        const sitemap = await sitemapRes.json();
-        paths = (sitemap.data || []).map((row) => (row.path != null ? row.path : row[0])).filter(Boolean);
-        allPaths = paths;
-      } else {
-        setProgress(5);
-      }
-      const filtered = paths.filter((p) => pathMatchesFilter(p, pathFilterInput.value || ''));
-      const toCheck = filtered.slice(0, limit);
-      appendStatus({ text: `Sitemap loaded. Checking ${toCheck.length} page(s).`, type: 'phase' });
-
-      const allLinks = new Map(); // url -> { status, fromPages: Set }
-      let pagesDone = 0;
-
-      for (let i = 0; i < toCheck.length; i++) {
-        const path = toCheck[i].startsWith('/') ? toCheck[i] : `/${toCheck[i]}`;
-        const pageUrl = `${baseUrl}${path}`;
-        appendStatus({ text: `Page ${i + 1}/${toCheck.length}: `, type: 'page', url: pageUrl });
-        setProgress(10 + (60 * (i + 1)) / toCheck.length);
-
-        const pageRes = await fetchWithTimeout(pageUrl, { signal: abortController.signal });
-        const html = await pageRes.text();
-        const links = extractLinksFromHtml(html, pageUrl);
-
-        appendStatus({ text: `  Found ${links.length} link(s) on this page.`, type: 'page-links' });
-
-        for (const linkUrl of links) {
-          if (!allLinks.has(linkUrl)) {
-            allLinks.set(linkUrl, { status: null, fromPages: new Set() });
-          }
-          allLinks.get(linkUrl).fromPages.add(pageUrl);
-        }
-        pagesDone++;
-      }
-
-      const linkList = [...allLinks.keys()];
-      appendStatus({ text: `Checking ${linkList.length} unique link(s)…`, type: 'phase' });
-
-      for (let i = 0; i < linkList.length; i++) {
-        const url = linkList[i];
-        const info = allLinks.get(url);
-        appendStatus({ text: '  Checking: ', type: 'link', url });
-        try {
-          const res = await fetchWithTimeout(url, {
-            method: 'HEAD',
-            signal: abortController.signal,
-            redirect: 'follow',
-          });
-          info.status = res.status;
-        } catch (_) {
-          try {
-            const res = await fetchWithTimeout(url, {
-              method: 'GET',
-              signal: abortController.signal,
-              redirect: 'follow',
-            });
-            info.status = res.status;
-          } catch (e) {
-            info.status = e.name === 'AbortError' ? 'aborted' : 'error';
-          }
-        }
-        const badgeClass = info.status === 200 ? 'ok' : info.status === 404 ? 'fail' : 'warn';
-        appendStatus({ text: '  → ', type: 'link-result', badge: String(info.status), badgeClass });
-        setProgress(70 + (25 * (i + 1)) / linkList.length);
-      }
-
-      appendStatus({ text: 'Done.', type: 'phase' });
-      setProgress(100);
-      renderResults(allLinks, pagesDone, linkList.length);
-      resultsSection.hidden = false;
-    } catch (e) {
-      if (e.name === 'AbortError') {
-        appendStatus({ text: 'Cancelled.', type: 'phase' });
-        setProgress(0);
-      } else {
-        showError(e.message || 'Check failed.');
-        appendStatus({ text: `Error: ${e.message}`, type: 'phase' });
-        setProgress(0);
-      }
-    } finally {
-      runBtn.disabled = false;
-      cancelBtn.disabled = true;
-      abortController = null;
-    }
+  function escapeHtml(s) {
+    const div = document.createElement('div');
+    div.textContent = s;
+    return div.innerHTML;
   }
 
   function renderResults(allLinks, pagesChecked, totalLinks) {
-    const byStatus = { 200: [], 404: [], other: [], error: [], aborted: [] };
-    for (const [url, info] of allLinks) {
+    const byStatus = {
+      200: [], 404: [], other: [], error: [], aborted: [],
+    };
+    Array.from(allLinks.entries()).forEach(([url, info]) => {
       const s = info.status;
       if (s === 200) byStatus[200].push({ url, info });
       else if (s === 404) byStatus[404].push({ url, info });
       else if (s === 'error' || s === 'aborted') byStatus[s].push({ url, info });
       else byStatus.other.push({ url, info });
-    }
+    });
 
     const ok = byStatus[200].length;
     const broken = byStatus[404].length;
@@ -284,13 +188,46 @@
       ul.className = 'link-list broken';
       byStatus[404].forEach(({ url, info }) => {
         const li = document.createElement('li');
-        li.innerHTML = `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a>`;
+        li.className = 'broken-item';
+        const brokenLink = document.createElement('a');
+        brokenLink.href = url;
+        brokenLink.target = '_blank';
+        brokenLink.rel = 'noopener';
+        brokenLink.textContent = url;
+        li.appendChild(brokenLink);
+        try {
+          const u = new URL(url);
+          const prodUrl = `https://www.vitamix.com${u.pathname}${u.search}${u.hash}`;
+          const prodLink = document.createElement('a');
+          prodLink.href = prodUrl;
+          prodLink.target = '_blank';
+          prodLink.rel = 'noopener';
+          prodLink.className = 'prod-link';
+          prodLink.textContent = 'View on www.vitamix.com';
+          li.appendChild(document.createTextNode(' · '));
+          li.appendChild(prodLink);
+        } catch (_) {
+          // invalid URL, skip prod link
+        }
         const from = [...info.fromPages];
         if (from.length) {
-          const fromEl = document.createElement('span');
-          fromEl.className = 'from-pages';
-          fromEl.textContent = ` (from ${from.length} page(s))`;
-          li.appendChild(fromEl);
+          const fromLabel = document.createElement('div');
+          fromLabel.className = 'from-pages-label';
+          fromLabel.textContent = 'Referenced from:';
+          li.appendChild(fromLabel);
+          const fromList = document.createElement('ul');
+          fromList.className = 'from-pages-list';
+          from.forEach((pageUrl) => {
+            const fromLi = document.createElement('li');
+            const fromA = document.createElement('a');
+            fromA.href = pageUrl;
+            fromA.target = '_blank';
+            fromA.rel = 'noopener';
+            fromA.textContent = pageUrl;
+            fromLi.appendChild(fromA);
+            fromList.appendChild(fromLi);
+          });
+          li.appendChild(fromList);
         }
         ul.appendChild(li);
       });
@@ -350,10 +287,123 @@
     resultsDetail.appendChild(fragment);
   }
 
-  function escapeHtml(s) {
-    const div = document.createElement('div');
-    div.textContent = s;
-    return div.innerHTML;
+  async function runCheck() {
+    hideError();
+    resultsSection.hidden = true;
+    clearStatus();
+    const baseUrl = window.location.origin;
+    const limit = Math.max(1, Math.min(500, parseInt(pageLimitInput.value, 10) || 10));
+    pageLimitInput.value = limit;
+    abortController = new AbortController();
+    runBtn.disabled = true;
+    cancelBtn.disabled = false;
+
+    try {
+      let paths = allPaths.length ? allPaths : null;
+      if (!paths) {
+        appendStatus({ text: 'Fetching sitemap…', type: 'phase' });
+        setProgress(5);
+        const sitemapUrl = `${baseUrl}/sitemap.json`;
+        const sitemapRes = await fetchWithTimeout(sitemapUrl, { signal: abortController.signal });
+        if (!sitemapRes.ok) {
+          throw new Error(`Sitemap failed: ${sitemapRes.status} ${sitemapRes.statusText}`);
+        }
+        const sitemap = await sitemapRes.json();
+        const rows = sitemap.data || [];
+        paths = rows.map((row) => (row.path != null ? row.path : row[0])).filter(Boolean);
+        allPaths = paths;
+      } else {
+        setProgress(5);
+      }
+      const filtered = paths.filter((p) => pathMatchesFilter(p, pathFilterInput.value || ''));
+      const toCheck = filtered.slice(0, limit);
+      appendStatus({ text: `Sitemap loaded. Checking ${toCheck.length} page(s).`, type: 'phase' });
+
+      const allLinks = new Map(); // url -> { status, fromPages: Set }
+      let pagesDone = 0;
+
+      await toCheck.reduce(async (prev, path, i) => {
+        await prev;
+        const pathNorm = path.startsWith('/') ? path : `/${path}`;
+        const pageUrl = `${baseUrl}${pathNorm}`;
+        appendStatus({
+          text: `Page ${i + 1}/${toCheck.length}: `,
+          type: 'page',
+          url: pageUrl,
+        });
+        setProgress(10 + (60 * (i + 1)) / toCheck.length);
+
+        const pageRes = await fetchWithTimeout(pageUrl, { signal: abortController.signal });
+        const html = await pageRes.text();
+        const links = extractLinksFromHtml(html, pageUrl);
+
+        appendStatus({ text: `  Found ${links.length} link(s) on this page.`, type: 'page-links' });
+
+        links.forEach((linkUrl) => {
+          if (!allLinks.has(linkUrl)) {
+            allLinks.set(linkUrl, { status: null, fromPages: new Set() });
+          }
+          allLinks.get(linkUrl).fromPages.add(pageUrl);
+        });
+        pagesDone += 1;
+      }, Promise.resolve());
+
+      const linkList = [...allLinks.keys()];
+      appendStatus({ text: `Checking ${linkList.length} unique link(s)…`, type: 'phase' });
+
+      await linkList.reduce(async (prev, url, i) => {
+        await prev;
+        const info = allLinks.get(url);
+        appendStatus({ text: '  Checking: ', type: 'link', url });
+        try {
+          const res = await fetchWithTimeout(url, {
+            method: 'HEAD',
+            signal: abortController.signal,
+            redirect: 'follow',
+          });
+          info.status = res.status;
+        } catch (_) {
+          try {
+            const res = await fetchWithTimeout(url, {
+              method: 'GET',
+              signal: abortController.signal,
+              redirect: 'follow',
+            });
+            info.status = res.status;
+          } catch (e) {
+            info.status = e.name === 'AbortError' ? 'aborted' : 'error';
+          }
+        }
+        let badgeClass = 'warn';
+        if (info.status === 200) badgeClass = 'ok';
+        else if (info.status === 404) badgeClass = 'fail';
+        appendStatus({
+          text: '  → ',
+          type: 'link-result',
+          badge: String(info.status),
+          badgeClass,
+        });
+        setProgress(70 + (25 * (i + 1)) / linkList.length);
+      }, Promise.resolve());
+
+      appendStatus({ text: 'Done.', type: 'phase' });
+      setProgress(100);
+      renderResults(allLinks, pagesDone, linkList.length);
+      resultsSection.hidden = false;
+    } catch (e) {
+      if (e.name === 'AbortError') {
+        appendStatus({ text: 'Cancelled.', type: 'phase' });
+        setProgress(0);
+      } else {
+        showError(e.message || 'Check failed.');
+        appendStatus({ text: `Error: ${e.message}`, type: 'phase' });
+        setProgress(0);
+      }
+    } finally {
+      runBtn.disabled = false;
+      cancelBtn.disabled = true;
+      abortController = null;
+    }
   }
 
   pathFilterInput.addEventListener('input', updateFilterCount);
@@ -371,10 +421,11 @@
       const res = await fetch(`${baseUrl}/sitemap.json`);
       if (!res.ok) return;
       const sitemap = await res.json();
-      allPaths = (sitemap.data || []).map((row) => (row.path != null ? row.path : row[0])).filter(Boolean);
+      const rows = sitemap.data || [];
+      allPaths = rows.map((row) => (row.path != null ? row.path : row[0])).filter(Boolean);
       updateFilterCount();
     } catch (_) {
       filterCountEl.textContent = 'Sitemap could not be loaded';
     }
-  })();
-})();
+  }());
+}());
