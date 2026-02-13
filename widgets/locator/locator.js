@@ -1,8 +1,7 @@
 import { loadCSS } from '../../scripts/aem.js';
 
 const MAX_DISTANCE = 200;
-const EVENTS_MAX_DISTANCE = 50;
-
+const EVENTS_MAX_DISTANCE = 500;
 
 const hhRetailersResults = document.querySelector('#locator-hh-retailers-tabpanel');
 const hhDistributorsResults = document.querySelector('#locator-hh-distributors-tabpanel');
@@ -32,7 +31,7 @@ async function fetchData(form) {
   window.locatorData = {};
   window.locatorData.HH = await fetchSheet('https://main--thinktanked--davidnuescheler.aem.live/vitamix/storelocations-hh.json?limit=10000');
   window.locatorData.COMM = await fetchSheet('https://main--thinktanked--davidnuescheler.aem.live/vitamix/storelocations-comm.json?limit=2000');
-  window.locatorData.EVENTS = await fetchSheet('https://main--thinktanked--davidnuescheler.aem.live/vitamix/storelocations-events.json');
+  window.locatorData.EVENTS = await fetchSheet('https://main--thinktanked--davidnuescheler.aem.live/vitamix/storelocations-events.json?limit=3000');
   form.dataset.status = 'loaded';
   return window.locatorData;
 }
@@ -66,7 +65,6 @@ async function geoCode(address) {
   };
 }
 
-
 // Common helpers
 function norm(v) {
   return (v ?? '').toString().trim();
@@ -94,7 +92,9 @@ function recordKey(item) {
   ].map(normLower).join('|');
 }
 
-function applyAemRules(rows, { countryShort, countryLong, productType, allowedTypes }) {
+function applyAemRules(rows, {
+  countryShort, countryLong, productType, allowedTypes,
+}) {
   const map = new Map();
 
   (rows || []).forEach((r) => {
@@ -221,23 +221,20 @@ function groupByStartDate(rows) {
   return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0]));
 }
 
-
 function findEventsResults(data, location) {
-  
   const hhClean = applyAemRulesEvents(data, { productType: 'HH' });
   const commClean = applyAemRulesEvents(data, { productType: 'COMM' });
 
   const hhFuture = filterFutureEvents(hhClean);
   const commFuture = filterFutureEvents(commClean);
 
-  const hhNearby = (hhFuture || []).filter((e) =>
-    haversineDistance(location.lat, location.lng, e.lat, e.lng) <= EVENTS_MAX_DISTANCE
+  const hhNearby = (hhFuture || []).filter(
+    (e) => haversineDistance(location.lat, location.lng, e.lat, e.lng) <= EVENTS_MAX_DISTANCE,
   );
-  const commNearby = (commFuture || []).filter((e) =>
-    haversineDistance(location.lat, location.lng, e.lat, e.lng) <= EVENTS_MAX_DISTANCE
+  const commNearby = (commFuture || []).filter(
+    (e) => haversineDistance(location.lat, location.lng, e.lat, e.lng) <= EVENTS_MAX_DISTANCE,
   );
 
-  
   const sortEvents = (arr) => {
     arr.sort((a, b) => {
       const ad = parseAnyDate(a.START_DATE)?.getTime() ?? 0;
@@ -269,27 +266,21 @@ function findCommResults(data, location, countryShort, countryLong) {
   const distributors = cleaned
     .filter((i) => i.TYPE === 'DEALER/DISTRIBUTOR'
       && haversineDistance(location.lat, location.lng, i.lat, i.lng) <= MAX_DISTANCE)
-    .sort((a, b) =>
-      haversineDistance(location.lat, location.lng, a.lat, a.lng)
+    .sort((a, b) => haversineDistance(location.lat, location.lng, a.lat, a.lng)
       - haversineDistance(location.lat, location.lng, b.lat, b.lng));
 
   const localRep = cleaned
     .filter((i) => i.TYPE === 'LOCAL REP'
       && haversineDistance(location.lat, location.lng, i.lat, i.lng) <= MAX_DISTANCE)
-    .sort((a, b) =>
-      haversineDistance(location.lat, location.lng, a.lat, a.lng)
+    .sort((a, b) => haversineDistance(location.lat, location.lng, a.lat, a.lng)
       - haversineDistance(location.lat, location.lng, b.lat, b.lng));
 
   return { distributors, localRep };
 }
 
-
-
-
 function findHHResults(data, location, countryShort, countryLong) {
   const allowedTypes = ['ONLINE', 'RETAILERS', 'DEALER/DISTRIBUTOR'];
 
-  
   const cleaned = applyAemRules(data, {
     countryShort,
     countryLong,
@@ -297,19 +288,16 @@ function findHHResults(data, location, countryShort, countryLong) {
     allowedTypes,
   });
 
-  
   const retailers = cleaned
     .filter((i) => i.TYPE === 'RETAILERS'
       && haversineDistance(location.lat, location.lng, i.lat, i.lng) <= MAX_DISTANCE)
-    .sort((a, b) =>
-      haversineDistance(location.lat, location.lng, a.lat, a.lng)
+    .sort((a, b) => haversineDistance(location.lat, location.lng, a.lat, a.lng)
       - haversineDistance(location.lat, location.lng, b.lat, b.lng));
 
   const distributors = cleaned
     .filter((i) => i.TYPE === 'DEALER/DISTRIBUTOR'
       && haversineDistance(location.lat, location.lng, i.lat, i.lng) <= MAX_DISTANCE)
-    .sort((a, b) =>
-      haversineDistance(location.lat, location.lng, a.lat, a.lng)
+    .sort((a, b) => haversineDistance(location.lat, location.lng, a.lat, a.lng)
       - haversineDistance(location.lat, location.lng, b.lat, b.lng));
 
   const online = cleaned
@@ -318,7 +306,6 @@ function findHHResults(data, location, countryShort, countryLong) {
 
   return { retailers, distributors, online };
 }
-
 
 function displayCommResults(results, location) {
   const { distributors, localRep } = results;
@@ -615,6 +602,23 @@ function displayEventsResults(results, location) {
       grid.append(blank);
     }
 
+    const createCellClickHandler = (cellKey) => () => {
+      activeDateKey = activeDateKey === cellKey ? null : cellKey;
+
+      if (activeDateKey) {
+        const hhFiltered = (hhGrouped || []).filter(([k]) => k === activeDateKey);
+        const commFiltered = (commGrouped || []).filter(([k]) => k === activeDateKey);
+
+        renderGroupedList(eventsHHResults, hhFiltered);
+        renderGroupedList(eventsCommResults, commFiltered);
+      } else {
+        renderGroupedList(eventsHHResults, hhGrouped);
+        renderGroupedList(eventsCommResults, commGrouped);
+      }
+
+      renderCalendar();
+    };
+
     for (let day = 1; day <= daysInMonth; day += 1) {
       const d = new Date(viewYear, viewMonth, day);
       d.setHours(0, 0, 0, 0);
@@ -628,21 +632,7 @@ function displayEventsResults(results, location) {
       if (eventDates.has(key)) cell.classList.add('has-event');
       if (activeDateKey === key) cell.classList.add('is-active');
 
-      cell.addEventListener('click', () => {
-        activeDateKey = (activeDateKey === key) ? null : key;
-
-        if (activeDateKey) {
-          const hhFiltered = (hhGrouped || []).filter(([k]) => k === activeDateKey);
-          const commFiltered = (commGrouped || []).filter(([k]) => k === activeDateKey);
-          renderGroupedList(eventsHHResults, hhFiltered);
-          renderGroupedList(eventsCommResults, commFiltered);
-        } else {
-          renderGroupedList(eventsHHResults, hhGrouped);
-          renderGroupedList(eventsCommResults, commGrouped);
-        }
-
-        renderCalendar();
-      });
+      cell.addEventListener('click', createCellClickHandler(key));
 
       grid.append(cell);
     }
@@ -813,7 +803,6 @@ function displayHHResults(results, location) {
   }
 }
 
-
 export default function decorate(widget) {
   widget.style.visibility = 'hidden';
   loadCSS('/blocks/form/form.css').then(() => widget.removeAttribute('style'));
@@ -866,7 +855,12 @@ export default function decorate(widget) {
 
     if (data.productType === 'COMM') {
       if (location) {
-        const results = findCommResults(window.locatorData.COMM, location, countryShort, countryLong);
+        const results = findCommResults(
+          window.locatorData.COMM,
+          location,
+          countryShort,
+          countryLong,
+        );
         displayCommResults(results, location);
       } else {
         displayCommResults({});
