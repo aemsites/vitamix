@@ -9,6 +9,11 @@ export default function renderPricing(ph, block, variant) {
   const pricingContainer = document.createElement('div');
   pricingContainer.classList.add('pricing');
 
+  // Don't render pricing if addToCart is set to No
+  if (window.jsonLdData?.custom?.addToCart === 'No') {
+    return pricingContainer;
+  }
+
   const pricing = variant
     ? variant.price
     : getOfferPricing(window.jsonLdData?.offers?.[0]);
