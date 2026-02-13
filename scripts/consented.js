@@ -1,14 +1,6 @@
 import { loadScript } from './aem.js';
 
-if (localStorage.getItem('newsletter-popped-up') !== 'true') {
-  localStorage.setItem('newsletter-popped-up', 'true');
-  const newsletterLink = document.querySelector('a[href*="/modals/sign-up"]');
-  if (newsletterLink) {
-    setTimeout(() => {
-      newsletterLink.click();
-    }, 5000);
-  }
-}
+import './consented/newsletter.js';
 
 // add delayed functionality here
 window.config = {
