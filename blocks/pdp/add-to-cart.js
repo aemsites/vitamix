@@ -106,7 +106,7 @@ export default function renderAddToCart(ph, block, parent) {
   }
 
   // Only look at findLocally and findDealer from parent product
-  const { findLocally, findDealer } = parent;
+  const { findLocally, findDealer } = parent.custom;
   block.classList.remove('pdp-find-locally');
   block.classList.remove('pdp-find-dealer');
 
