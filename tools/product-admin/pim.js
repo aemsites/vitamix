@@ -2,7 +2,49 @@ const AEM_BASE = 'https://main--vitamix--aemsites.aem.network';
 const CORS_PROXY = 'https://fcors.org/?url=';
 const CORS_KEY = '&key=Mg23N96GgR8O3NjU';
 
+const CATALOG_PARAM = 'catalog';
+const PRODUCT_PARAM = 'product';
+
 let currentLocalePath = 'us/en_us';
+
+function getLocation() {
+  try {
+    return window.location;
+  } catch {
+    return null;
+  }
+}
+
+function getParams() {
+  const loc = getLocation();
+  if (!loc || !loc.search) return new URLSearchParams();
+  return new URLSearchParams(loc.search);
+}
+
+function readCatalogFromParams() {
+  const params = getParams();
+  const catalog = params.get(CATALOG_PARAM);
+  if (catalog) return catalog;
+  return null;
+}
+
+function readProductFromParams() {
+  const params = getParams();
+  return params.get(PRODUCT_PARAM);
+}
+
+function updateUrlParams(updates) {
+  const loc = getLocation();
+  if (!loc) return;
+  const params = new URLSearchParams(loc.search);
+  Object.entries(updates).forEach(([key, value]) => {
+    if (value != null && value !== '') params.set(key, value);
+    else params.delete(key);
+  });
+  const query = params.toString();
+  const url = query ? `${loc.pathname}?${query}` : loc.pathname;
+  window.history.replaceState({}, '', url);
+}
 
 function getIndexUrl() {
   return `${AEM_BASE}/${currentLocalePath}/products/index.json?include=all`;
@@ -174,7 +216,8 @@ export function renderProductList(parents, query = '') {
 
     const title = product.title || product.sku;
     const tr = document.createElement('tr');
-    tr.className = 'pim-row';
+    const selectedProduct = readProductFromParams();
+    tr.className = 'pim-row' + (selectedProduct && urlKey === selectedProduct ? ' pim-row-selected' : '');
     tr.dataset.urlkey = urlKey;
     tr.setAttribute('role', 'button');
     tr.tabIndex = 0;
@@ -193,6 +236,17 @@ export function renderProductList(parents, query = '') {
     `;
     tbody.appendChild(tr);
   });
+
+  const productFromUrl = readProductFromParams();
+  if (productFromUrl) {
+    const selectedRow = [...tbody.querySelectorAll('tr.pim-row')].find(
+      (tr) => tr.dataset.urlkey === productFromUrl
+    );
+    if (selectedRow) {
+      selectedRow.classList.add('pim-row-selected');
+      selectedRow.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+    }
+  }
 
   updateSortHeaders();
 }
@@ -238,13 +292,23 @@ export async function init() {
   content.classList.remove('active');
   errorEl.classList.remove('active');
 
+  const catalogFromUrl = readCatalogFromParams();
+  if (catalogFromUrl) {
+    indexSelect.value = catalogFromUrl;
+    currentLocalePath = catalogFromUrl;
+  } else {
+    currentLocalePath = indexSelect.value;
+  }
+
   indexSelect.addEventListener('change', () => {
     currentLocalePath = indexSelect.value;
+    updateUrlParams({ [CATALOG_PARAM]: currentLocalePath });
     loadIndex();
   });
 
   try {
     currentLocalePath = indexSelect.value;
+    updateUrlParams({ [CATALOG_PARAM]: currentLocalePath });
     const json = await fetchProductsIndex();
     const data = json.data || json;
     allParents = getParentProducts(data);

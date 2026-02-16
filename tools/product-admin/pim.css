@@ -215,6 +215,10 @@ body {
   background: #fafafa;
 }
 
+.pim-list tbody tr.pim-row-selected {
+  background: #e8f4fd;
+}
+
 .pim-row-link {
   color: inherit;
   text-decoration: none;
