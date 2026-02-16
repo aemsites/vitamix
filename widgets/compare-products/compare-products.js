@@ -1,28 +1,87 @@
-import { loadCSS } from '../../scripts/aem.js';
+import { loadCSS, toClassName } from '../../scripts/aem.js';
 
 const FEATURE_KEYS = [
   'Series',
-  'Container Capacity',
-  'Programs',
-  'Touch Screen',
-  'Timer',
+  'Blending Programs',
+  'Variable Speed Control',
+  'Touch Buttons',
   'Pulse',
+  'Digital Timer',
   'Self-Detect Technology',
-  'Dishwasher Safe',
-  'Dimensions',
-  'HP',
+  'Tamper Indicator',
+  'Plus 15 Second Button',
   'Warranty',
+  'Dimensions (L × W × H)',
 ];
 
-/** Map page spec labels to our feature keys */
+/** Map page spec labels to our feature keys (for product specs lookup) */
 const SPEC_LABEL_MAP = {
-  Series: 'Series',
-  Capacity: 'Container Capacity',
-  Dimensions: 'Dimensions',
-  HP: 'HP',
-  'Dishwasher Safe': 'Dishwasher Safe',
+  Dimensions: 'Dimensions (L × W × H)',
   Warranty: 'Warranty',
 };
+
+const FEATURES_BY_SERIES_PATH = '/us/en_us/products/config/features-by-series.json';
+
+/**
+ * Fetch features-by-series config (same-origin only; no fcors).
+ * @returns {Promise<Object|null>} Parsed JSON or null
+ */
+async function fetchFeaturesBySeries() {
+  const url = new URL(FEATURES_BY_SERIES_PATH, window.location.origin).href;
+  const resp = await fetch(url);
+  if (!resp.ok) return null;
+  try {
+    return await resp.json();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Get series name from product (for features-by-series lookup).
+ * @param {Object} product - Product with .custom, .name
+ * @returns {string} Series name or ''
+ */
+function getProductSeries(product) {
+  if (!product) return '';
+  const c = product.custom || {};
+  return (c.series || c.collection || product.name || '').trim();
+}
+
+/**
+ * Normalize series name for matching: remove "Vitamix", trim, strip ®™.
+ * @param {string} s - Series or product name
+ * @returns {string} Normalized string for comparison
+ */
+function normalizeSeriesForMatch(s) {
+  if (!s || typeof s !== 'string') return '';
+  let t = s
+    .replace(/\s*®\s*|\s*™\s*/gi, ' ')
+    .replace(/\bVitamix\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return t;
+}
+
+/**
+ * Find features row for a series in features-by-series.data.
+ * @param {Object} featuresBySeries - { data: Array<{ Series: string, ... }> }
+ * @param {string} series - Series name from product
+ * @returns {Object|null} Row object or null
+ */
+function getSeriesFeaturesRow(featuresBySeries, series) {
+  if (!featuresBySeries?.data?.length || !series) return null;
+  const data = featuresBySeries.data;
+  const norm = normalizeSeriesForMatch(series);
+  if (!norm) return null;
+  const normLower = norm.toLowerCase();
+  const exact = data.find((row) => normalizeSeriesForMatch(row.Series).toLowerCase() === normLower);
+  if (exact) return exact;
+  return data.find((row) => {
+    const rowNorm = normalizeSeriesForMatch(row.Series).toLowerCase();
+    return rowNorm === normLower || rowNorm.includes(normLower) || normLower.includes(rowNorm);
+  }) || null;
+}
 
 /**
  * Resolve product comparison paths from window.location query
@@ -64,7 +123,7 @@ function useFcors() {
  * Fetch product page HTML (no .json). Uses fcors from aem.network on
  * localhost / .aem.page / .aem.live.
  * @param {string} path - Product path (e.g. /us/en_us/products/ascent-x2)
- * @returns {Promise<string|null>} HTML string or null
+ * @returns {Promise<{ html: string|null, status: number }>}
  */
 async function fetchProductPage(path) {
   const pathOnly = path.startsWith('http') ? new URL(path).pathname : path;
@@ -80,8 +139,8 @@ async function fetchProductPage(path) {
     const url = path.startsWith('http') ? path : new URL(path, window.location.origin).href;
     resp = await fetch(url);
   }
-  if (!resp.ok) return null;
-  return resp.text();
+  if (!resp.ok) return { html: null, status: resp.status };
+  return { html: await resp.text(), status: resp.status };
 }
 
 /**
@@ -241,41 +300,63 @@ function parseProductFromPage(html, path) {
 /**
  * Fetch product by loading the live page (no .json) and parsing HTML.
  * @param {string} path - Product path
- * @returns {Promise<Object|null>} Normalized product object or null
+ * @returns {Promise<{ product: Object|null, errorStatus?: number }>}
  */
 async function fetchProduct(path) {
-  const html = await fetchProductPage(path);
-  if (!html) return null;
-  return parseProductFromPage(html, path);
+  const { html, status } = await fetchProductPage(path);
+  if (!html) return { product: null, errorStatus: status };
+  const product = parseProductFromPage(html, path);
+  return { product, errorStatus: product ? undefined : status };
 }
 
 /**
- * Get feature value for a product (page specs, then custom fallbacks).
+ * Get feature value for a product (page specs, then custom fallbacks, then features-by-series).
  * @param {Object} product - Normalized product (has .specs from page)
  * @param {string} key - Feature label (e.g. 'Series', 'Warranty')
+ * @param {Object} [featuresBySeries] - Optional { data } from features-by-series.json
  * @returns {string} Display value
  */
-function getFeatureValue(product, key) {
+function getFeatureValue(product, key, featuresBySeries) {
   const specs = product?.specs || {};
   const custom = product?.custom || {};
 
   const mapKey = SPEC_LABEL_MAP[key] || key;
   const direct = specs[key] ?? specs[mapKey];
+
+  if (key === 'Dimensions (L × W × H)') {
+    const seriesRow = getSeriesFeaturesRow(featuresBySeries, getProductSeries(product));
+    if (seriesRow) {
+      const sheetVal = seriesRow[key];
+      if (sheetVal != null && String(sheetVal).trim() !== '') return String(sheetVal).trim();
+    }
+    if (direct) return direct;
+    return '—';
+  }
+
+  if (key === 'Series') {
+    const seriesRow = getSeriesFeaturesRow(featuresBySeries, getProductSeries(product));
+    if (seriesRow?.Series) return String(seriesRow.Series).trim();
+    return custom.series || custom.collection || '—';
+  }
+
   if (direct) return direct;
 
-  if (key === 'Container Capacity' && specs.Capacity) return specs.Capacity;
-  if (key === 'Series') return custom.series || custom.collection || '—';
   if (key === 'Warranty') {
-    if (specs.Warranty) return specs.Warranty;
     const opts = custom.options;
     if (Array.isArray(opts) && opts.length > 0) {
       const name = opts[0].name || '';
       const match = name.match(/(\d+)\s*yr|(\d+)\s*year/i);
       if (match) return `${match[1] || match[2]} Years`;
-      return name;
+      if (name) return name;
     }
-    return '—';
   }
+
+  const seriesRow = getSeriesFeaturesRow(featuresBySeries, getProductSeries(product));
+  if (seriesRow) {
+    const sheetVal = seriesRow[key];
+    if (sheetVal != null && String(sheetVal).trim() !== '') return String(sheetVal).trim();
+  }
+
   return '—';
 }
 
@@ -316,24 +397,38 @@ function getProductImageUrl(product, variantIndex = 0) {
 }
 
 /**
- * Simple color name to hex for swatches (optional).
- * @param {string} name - Color name
- * @returns {string} CSS color
+ * Build a placeholder card when a product failed to load.
+ * @param {string} path - Product path (for link)
+ * @param {number} index - Index (for remove)
+ * @param {Function} onRemove - Callback when remove is clicked
+ * @param {number} [errorStatus] - HTTP status when failed (e.g. 404)
+ * @returns {HTMLElement}
  */
-function getColorHex(name) {
-  const map = {
-    black: '#1a1a1a',
-    'shadow black': '#1a1a1a',
-    white: '#f5f5f5',
-    'polar white': '#f5f5f5',
-    gray: '#6b6b6b',
-    'nano gray': '#6b6b6b',
-    grey: '#6b6b6b',
-    blue: '#2c5282',
-    'midnight blue': '#1e3a5f',
-  };
-  const key = (name || '').toLowerCase().trim();
-  return map[key] || 'var(--color-gray-300)';
+function buildPlaceholderCard(path, index, onRemove, errorStatus) {
+  const col = document.createElement('div');
+  col.className = 'compare-products-product compare-products-product-placeholder';
+  col.dataset.index = String(index);
+
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.className = 'button button close compare-products-product-remove';
+  removeBtn.setAttribute('aria-label', 'Remove from comparison');
+  removeBtn.textContent = '×';
+  removeBtn.addEventListener('click', () => onRemove(index));
+
+  const msg = document.createElement('p');
+  msg.className = 'compare-products-product-placeholder-msg';
+  msg.textContent = errorStatus === 404
+    ? 'Product not found (404).'
+    : 'Could not load this product.';
+
+  const link = document.createElement('a');
+  link.href = path.startsWith('http') ? path : new URL(path, window.location.origin).href;
+  link.textContent = 'Try opening the product page';
+  link.className = 'button link';
+
+  col.append(removeBtn, msg, link);
+  return col;
 }
 
 /**
@@ -350,7 +445,7 @@ function buildProductCard(product, index, onRemove) {
 
   const removeBtn = document.createElement('button');
   removeBtn.type = 'button';
-  removeBtn.className = 'compare-products-product-remove';
+  removeBtn.className = 'button button close compare-products-product-remove';
   removeBtn.setAttribute('aria-label', `Remove ${product.name} from comparison`);
   removeBtn.textContent = '×';
   removeBtn.addEventListener('click', () => onRemove(index));
@@ -374,7 +469,10 @@ function buildProductCard(product, index, onRemove) {
       btn.className = `compare-products-product-color ${i === 0 ? 'selected' : ''}`;
       btn.setAttribute('aria-label', opt.value);
       btn.title = opt.value;
-      btn.style.backgroundColor = getColorHex(opt.value);
+      const colorSlug = toClassName(opt.value);
+      btn.style.backgroundColor = colorSlug
+        ? `var(--color-${colorSlug}, var(--color-gray-300))`
+        : 'var(--color-gray-300)';
       btn.dataset.variantIndex = String(i);
       btn.addEventListener('click', () => {
         colorsWrap.querySelectorAll('.compare-products-product-color').forEach((c) => c.classList.remove('selected'));
@@ -403,7 +501,7 @@ function buildProductCard(product, index, onRemove) {
   }
 
   const cta = document.createElement('a');
-  cta.className = 'compare-products-product-cta';
+  cta.className = 'button emphasis';
   const { path: productPath, url: productUrl } = product || {};
   cta.href = productPath || productUrl || '#';
   cta.textContent = 'VIEW DETAILS';
@@ -413,26 +511,38 @@ function buildProductCard(product, index, onRemove) {
 }
 
 /**
- * Build features table body (feature rows with one cell per product).
- * @param {Object[]} products - Array of product JSON
+ * Build features table body (feature rows with one cell per product/slot).
+ * @param {{ path: string, product: Object|null }[]} slots - One slot per requested path
  * @param {HTMLElement} tableEl - Table container
- * @param {number} columnCount - Number of product columns
+ * @param {Object} [featuresBySeries] - Optional { data } from features-by-series.json for fallbacks
  */
-function buildFeaturesTable(products, tableEl, columnCount) {
+function buildFeaturesTable(slots, tableEl, featuresBySeries) {
+  const columnCount = slots.length;
   tableEl.style.setProperty('--compare-cols', String(columnCount));
   tableEl.innerHTML = '';
 
-  FEATURE_KEYS.forEach((key) => {
+  FEATURE_KEYS.forEach((key, rowIndex) => {
     const row = document.createElement('div');
-    row.className = 'compare-products-features-row';
+    row.className = `compare-products-features-row ${rowIndex % 2 ? 'row-odd' : 'row-even'}`;
     const nameCell = document.createElement('div');
-    nameCell.className = 'compare-products-features-cell feature-name';
+    nameCell.className = `compare-products-features-cell feature-name ${rowIndex % 2 ? 'row-odd' : 'row-even'}`;
     nameCell.textContent = key;
     row.appendChild(nameCell);
-    products.forEach((product) => {
+    slots.forEach((slot) => {
       const cell = document.createElement('div');
-      cell.className = 'compare-products-features-cell';
-      cell.textContent = getFeatureValue(product, key);
+      cell.className = `compare-products-features-cell ${rowIndex % 2 ? 'row-odd' : 'row-even'}`;
+      const value = slot.product
+        ? getFeatureValue(slot.product, key, featuresBySeries)
+        : '—';
+      if (value === 'Yes') {
+        const check = document.createElement('span');
+        check.className = 'compare-products-features-cell-check';
+        check.setAttribute('aria-hidden', 'true');
+        check.textContent = '✓';
+        cell.appendChild(check);
+      } else {
+        cell.textContent = value;
+      }
       row.appendChild(cell);
     });
     tableEl.appendChild(row);
@@ -442,31 +552,34 @@ function buildFeaturesTable(products, tableEl, columnCount) {
 /**
  * Render the full compare view: product cards + features table.
  * @param {HTMLElement} widget - Widget root
- * @param {Object[]} products - Array of product JSON
+ * @param {{ path: string, product: Object|null }[]} slots - One slot per requested path
+ * @param {Object} [featuresBySeries] - Optional { data } from features-by-series.json for fallbacks
  */
-function render(widget, products) {
+function render(widget, slots, featuresBySeries) {
   const productsContainer = widget.querySelector('.compare-products-products');
   const featuresTable = widget.querySelector('.compare-products-features-table');
   if (!productsContainer || !featuresTable) return;
 
-  productsContainer.style.setProperty('--compare-cols', String(products.length));
+  widget.style.setProperty('--compare-cols', String(slots.length));
   productsContainer.innerHTML = '';
 
   const removeProduct = (index) => {
-    const next = products.filter((_, i) => i !== index);
+    const next = slots.filter((_, i) => i !== index);
     if (next.length === 0) {
       widget.dispatchEvent(new CustomEvent('compare-products-empty'));
       return;
     }
-    render(widget, next);
+    render(widget, next, featuresBySeries);
   };
 
-  products.forEach((product, index) => {
-    const card = buildProductCard(product, index, removeProduct);
+  slots.forEach((slot, index) => {
+    const card = slot.product
+      ? buildProductCard(slot.product, index, removeProduct)
+      : buildPlaceholderCard(slot.path, index, removeProduct, slot.errorStatus);
     productsContainer.appendChild(card);
   });
 
-  buildFeaturesTable(products, featuresTable, products.length);
+  buildFeaturesTable(slots, featuresTable, featuresBySeries);
 }
 
 /**
@@ -485,9 +598,19 @@ export default async function decorate(widget) {
     return;
   }
 
-  const products = await Promise.all(paths.map(fetchProduct));
-  const valid = products.filter(Boolean);
-  if (valid.length === 0) {
+  const [featuresBySeries, ...slotResults] = await Promise.all([
+    fetchFeaturesBySeries(),
+    ...paths.map((path) => fetchProduct(path)),
+  ]);
+
+  const slots = slotResults.map(({ product, errorStatus }, i) => ({
+    path: paths[i],
+    product,
+    errorStatus,
+  }));
+
+  const allFailed = slots.every((slot) => !slot.product);
+  if (allFailed) {
     widget.querySelector('.compare-products-products')?.appendChild(
       Object.assign(document.createElement('p'), {
         textContent: 'Could not load product data.',
@@ -497,7 +620,7 @@ export default async function decorate(widget) {
     return;
   }
 
-  render(widget, valid);
+  render(widget, slots, featuresBySeries || undefined);
 }
 
 // Load CSS
