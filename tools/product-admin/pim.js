@@ -1,3 +1,5 @@
+import { fetchReviewLog, getLatestStatusByUrlKey, getLastStatusUpdateByUrlKey } from './review-status.js';
+
 const AEM_BASE = 'https://main--vitamix--aemsites.aem.network';
 const CORS_PROXY = 'https://fcors.org/?url=';
 const CORS_KEY = '&key=Mg23N96GgR8O3NjU';
@@ -138,11 +140,33 @@ let sortState = { key: 'title', dir: 1 };
 /** @type {Array<object>} */
 let allParents = [];
 
+/** @type {Record<string, string>} urlKey -> latest review status */
+let reviewStatusByUrlKey = {};
+/** @type {Record<string, string>} urlKey -> last status update ts (ISO) */
+let lastReviewUpdateByUrlKey = {};
+
+function getUrlKeyFromProduct(p) {
+  return p.urlKey || (p.url ? p.url.replace(/\/$/, '').split('/').pop() : '') || p.sku || '';
+}
+
+function formatLastReview(ts) {
+  if (!ts) return '—';
+  try {
+    const d = new Date(ts);
+    return d.toLocaleDateString(undefined, { dateStyle: 'short' });
+  } catch {
+    return ts;
+  }
+}
+
 function enrichForSort(p) {
+  const urlKey = getUrlKeyFromProduct(p);
   return {
     ...p,
     _variants: getVariantCount(p.variantSkus),
     _priceNum: p.price != null ? Number(p.price) : NaN,
+    _lastReviewTs: lastReviewUpdateByUrlKey[urlKey] || '',
+    _reviewStatus: reviewStatusByUrlKey[urlKey] || 'Not started',
   };
 }
 
@@ -150,11 +174,13 @@ function compare(a, b, key) {
   let sortKey = key;
   if (key === 'variants') sortKey = '_variants';
   else if (key === 'price') sortKey = '_priceNum';
+  else if (key === 'lastReview') sortKey = '_lastReviewTs';
+  else if (key === 'reviewStatus') sortKey = '_reviewStatus';
   const av = a[sortKey];
   const bv = b[sortKey];
   if (av == null && bv == null) return 0;
-  if (av == null) return 1;
-  if (bv == null) return -1;
+  if (av == null || av === '') return 1;
+  if (bv == null || bv === '') return -1;
   if (typeof av === 'number' && typeof bv === 'number') return av - bv;
   return String(av).localeCompare(String(bv), undefined, { sensitivity: 'base' });
 }
@@ -168,6 +194,8 @@ function sortProducts(products, key, dir) {
 function matchesQuery(product, q) {
   if (!q || !q.trim()) return true;
   const term = q.trim().toLowerCase();
+  const urlKey = getUrlKeyFromProduct(product);
+  const reviewStatus = (reviewStatusByUrlKey[urlKey] || 'Not started').toLowerCase();
   const title = (product.title || product.sku || '').toLowerCase();
   const sku = (product.sku || '').toLowerCase();
   const availability = (product.availability || '').toLowerCase();
@@ -177,6 +205,7 @@ function matchesQuery(product, q) {
     || sku.includes(term)
     || availability.includes(term)
     || priceStr.includes(term)
+    || reviewStatus.includes(term)
   );
 }
 
@@ -212,7 +241,9 @@ export function renderProductList(parents, query = '') {
     const availability = product.availability || '—';
     const availabilityClass = (availability || '').toLowerCase().replace(/\s+/g, '-');
     const price = product.price != null ? String(product.price) : '';
-    const urlKey = product.urlKey || (product.url ? product.url.replace(/\/$/, '').split('/').pop() : '') || product.sku;
+    const urlKey = getUrlKeyFromProduct(product);
+    const reviewStatus = reviewStatusByUrlKey[urlKey] || 'Not started';
+    const lastReviewDisplay = formatLastReview(lastReviewUpdateByUrlKey[urlKey]);
 
     const title = product.title || product.sku;
     const tr = document.createElement('tr');
@@ -233,6 +264,8 @@ export function renderProductList(parents, query = '') {
         <span class="pim-card-availability ${availabilityClass}">${highlightMatch(availability, query)}</span>
       </td>
       <td class="pim-col-price pim-cell-price">${price ? highlightMatch(price, query) : '—'}</td>
+      <td class="pim-col-review pim-cell-review">${escapeHtml(reviewStatus)}</td>
+      <td class="pim-col-last-review pim-cell-last-review">${escapeHtml(lastReviewDisplay)}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -309,9 +342,14 @@ export async function init() {
   try {
     currentLocalePath = indexSelect.value;
     updateUrlParams({ [CATALOG_PARAM]: currentLocalePath });
-    const json = await fetchProductsIndex();
+    const [json, reviewEvents] = await Promise.all([
+      fetchProductsIndex(),
+      fetchReviewLog().catch(() => []),
+    ]);
     const data = json.data || json;
     allParents = getParentProducts(data);
+    reviewStatusByUrlKey = getLatestStatusByUrlKey(reviewEvents);
+    lastReviewUpdateByUrlKey = getLastStatusUpdateByUrlKey(reviewEvents);
     content.classList.add('active');
 
     searchInput.addEventListener('input', refreshList);

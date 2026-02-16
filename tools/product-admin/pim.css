@@ -207,6 +207,20 @@ body {
   white-space: nowrap;
 }
 
+.pim-col-review {
+  min-width: 110px;
+  max-width: 140px;
+  color: #6d7175;
+  font-size: 13px;
+}
+
+.pim-col-last-review {
+  min-width: 95px;
+  white-space: nowrap;
+  color: #6d7175;
+  font-size: 13px;
+}
+
 .pim-list tbody tr.pim-row {
   cursor: pointer;
 }

@@ -1,3 +1,11 @@
+import {
+  fetchReviewLog,
+  appendReviewEvent,
+  getReviewHistoryForProduct,
+  REVIEW_STATUS_OPTIONS,
+} from './review-status.js';
+import { getFirstName } from './user-identity.js';
+
 const AEM_BASE = 'https://main--vitamix--aemsites.aem.network';
 const PRODUCT_JSON_BASE = `${AEM_BASE}/us/en_us/products/`;
 const PRODUCTS_BASE_URL = `${AEM_BASE}/us/en_us/products/`;
@@ -9,6 +17,8 @@ const CORS_KEY = '&key=Mg23N96GgR8O3NjU';
 let currentProductData = null;
 let currentIndexByUrlKey = {};
 let editMode = false;
+/** @type {Array<{ op: string, user: string, ts: string, status?: string, text?: string }>} */
+let reviewHistory = [];
 
 function getProductParam() {
   const params = new URLSearchParams(window.location.search);
@@ -251,6 +261,60 @@ function renderOptions(options) {
   return `<div class="pim-detail-section"><h3 class="pim-detail-section-title">Options</h3><table class="pim-detail-custom-table"><tbody>${rows}</tbody></table></div>`;
 }
 
+function getCurrentReviewStatus(history) {
+  const last = [...(history || [])].filter((e) => e.op === 'status_change').pop();
+  return last ? last.status : '';
+}
+
+function formatReviewTs(ts) {
+  if (!ts) return '';
+  try {
+    const d = new Date(ts);
+    return d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
+  } catch {
+    return ts;
+  }
+}
+
+function renderReviewSection(urlKey, history) {
+  const currentStatus = getCurrentReviewStatus(history);
+  const effectiveStatus = currentStatus || 'Not started';
+  const optionsHtml = REVIEW_STATUS_OPTIONS.map((opt) => {
+    const val = escapeHtml(opt);
+    const label = escapeHtml(opt);
+    const sel = opt === effectiveStatus ? ' selected' : '';
+    return `<option value="${val}"${sel}>${label}</option>`;
+  }).join('');
+  const historyHtml = (history || []).map((e) => {
+    if (e.op === 'status_change') {
+      return `<li class="pim-review-entry pim-review-status"><span class="pim-review-meta">${escapeHtml(e.user || '')} · ${formatReviewTs(e.ts)}</span><span class="pim-review-status-badge">${escapeHtml(e.status || '')}</span></li>`;
+    }
+    if (e.op === 'comment') {
+      return `<li class="pim-review-entry pim-review-comment"><span class="pim-review-meta">${escapeHtml(e.user || '')} · ${formatReviewTs(e.ts)}</span><p class="pim-review-comment-text">${escapeHtml(e.text || '')}</p></li>`;
+    }
+    return '';
+  }).filter(Boolean).join('');
+  return `
+    <div class="pim-detail-section pim-review-section" data-review-urlkey="${escapeHtml(urlKey)}">
+      <h3 class="pim-detail-section-title">Review</h3>
+      <div class="pim-review-controls">
+        <label for="pim-review-status-select">Status</label>
+        <select id="pim-review-status-select" class="pim-review-status-select" aria-label="Review status">
+          ${optionsHtml}
+        </select>
+      </div>
+      <div class="pim-review-add-comment">
+        <label for="pim-review-comment-input">Add comment</label>
+        <textarea id="pim-review-comment-input" class="pim-review-comment-input" rows="2" placeholder="Add a comment…" aria-label="Comment text"></textarea>
+        <button type="button" id="pim-review-save" class="pim-review-comment-submit">Save</button>
+      </div>
+      <div class="pim-review-history">
+        <h4 class="pim-review-history-title">History</h4>
+        <ul class="pim-review-history-list">${historyHtml || '<li class="pim-review-empty">No status changes or comments yet.</li>'}</ul>
+      </div>
+    </div>`;
+}
+
 function renderProduct(data, indexByUrlKey = {}, isEditMode = false) {
   const availabilityClass = (data.availability || '').toLowerCase().replace(/\s+/g, '-');
   const priceBlock = renderPrice(data.price, isEditMode);
@@ -421,12 +485,61 @@ function attachEditHandlers() {
   });
 }
 
+async function refreshReviewSection() {
+  const urlKey = getProductParam();
+  if (!urlKey) return;
+  try {
+    const events = await fetchReviewLog();
+    reviewHistory = getReviewHistoryForProduct(events, urlKey);
+  } catch {
+    reviewHistory = [];
+  }
+  refreshDetailContent();
+}
+
 function refreshDetailContent() {
   const content = document.getElementById('content');
+  const urlKey = getProductParam();
   content.innerHTML = renderProduct(currentProductData, currentIndexByUrlKey, editMode);
+  if (urlKey) {
+    const reviewEl = document.createElement('div');
+    reviewEl.innerHTML = renderReviewSection(urlKey, reviewHistory);
+    content.appendChild(reviewEl.firstElementChild);
+  }
   if (editMode) content.classList.add('pim-edit-mode');
   else content.classList.remove('pim-edit-mode');
   attachEditHandlers();
+  attachReviewHandlers();
+}
+
+function attachReviewHandlers() {
+  const urlKey = getProductParam();
+  if (!urlKey) return;
+  const statusSelect = document.getElementById('pim-review-status-select');
+  const commentInput = document.getElementById('pim-review-comment-input');
+  const saveBtn = document.getElementById('pim-review-save');
+  if (saveBtn) {
+    saveBtn.addEventListener('click', async () => {
+      const status = statusSelect ? statusSelect.value : '';
+      const text = (commentInput && commentInput.value || '').trim();
+      const currentStatus = getCurrentReviewStatus(reviewHistory);
+      const statusChanged = status !== currentStatus;
+      if (!statusChanged && !text) return;
+      const user = await getFirstName();
+      try {
+        if (statusChanged) {
+          await appendReviewEvent({ op: 'status_change', urlKey, user, status, ts: new Date().toISOString() });
+        }
+        if (text) {
+          await appendReviewEvent({ op: 'comment', urlKey, user, text, ts: new Date().toISOString() });
+        }
+        if (commentInput) commentInput.value = '';
+        await refreshReviewSection();
+      } catch (err) {
+        showError(err.message || 'Failed to save');
+      }
+    });
+  }
 }
 /* eslint-enable no-use-before-define */
 
@@ -449,12 +562,14 @@ async function init() {
   errorEl.classList.remove('active');
 
   try {
-    const [data, indexData] = await Promise.all([
+    const [data, indexData, reviewEvents] = await Promise.all([
       fetchProductJson(urlKey),
       fetchProductsIndex().catch(() => []),
+      fetchReviewLog().catch(() => []),
     ]);
     currentProductData = JSON.parse(JSON.stringify(data));
     currentIndexByUrlKey = buildIndexByUrlKey(indexData);
+    reviewHistory = getReviewHistoryForProduct(reviewEvents, urlKey);
     loading.classList.remove('active');
     toolbar.style.display = 'flex';
 
