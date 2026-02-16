@@ -2,6 +2,7 @@ import { loadCSS } from '../../scripts/aem.js';
 
 const MAX_DISTANCE = 200;
 const EVENTS_MAX_DISTANCE = 500;
+const MAX_DISTANCE_COMM = 1000;
 
 const hhRetailersResults = document.querySelector('#locator-hh-retailers-tabpanel');
 const hhDistributorsResults = document.querySelector('#locator-hh-distributors-tabpanel');
@@ -265,13 +266,13 @@ function findCommResults(data, location, countryShort, countryLong) {
 
   const distributors = cleaned
     .filter((i) => i.TYPE === 'DEALER/DISTRIBUTOR'
-      && haversineDistance(location.lat, location.lng, i.lat, i.lng) <= MAX_DISTANCE)
+      && haversineDistance(location.lat, location.lng, i.lat, i.lng) <= MAX_DISTANCE_COMM)
     .sort((a, b) => haversineDistance(location.lat, location.lng, a.lat, a.lng)
       - haversineDistance(location.lat, location.lng, b.lat, b.lng));
 
   const localRep = cleaned
     .filter((i) => i.TYPE === 'LOCAL REP'
-      && haversineDistance(location.lat, location.lng, i.lat, i.lng) <= MAX_DISTANCE)
+      && haversineDistance(location.lat, location.lng, i.lat, i.lng) <= MAX_DISTANCE_COMM)
     .sort((a, b) => haversineDistance(location.lat, location.lng, a.lat, a.lng)
       - haversineDistance(location.lat, location.lng, b.lat, b.lng));
 
