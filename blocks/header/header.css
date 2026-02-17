@@ -3,6 +3,9 @@ header {
   max-width: var(--site-width);
   margin: 0 auto;
   background-color: var(--layer-base);
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 header a:any-link {
@@ -59,6 +62,8 @@ header section {
   height: var(--header-height);
   padding: 0 var(--spacing-200);
   transition: height 0.6s ease-in;
+  border-bottom: 1px solid var(--color-gray-400);
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
 }
 
 header section[data-expanded='true'] {
