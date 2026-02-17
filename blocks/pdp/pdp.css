@@ -135,12 +135,12 @@
   flex-direction: column;
 }
 
-.pdp .add-to-cart.fixed {
+.add-to-cart.fixed {
   position: fixed;
   bottom: 0; 
   left: 0;
   right: 0;
-  top: auto; 
+  top: unset; 
   border-top: 1px solid var(--color-gray-400); 
   border-bottom: none;
   padding: var(--spacing-80) var(--horizontal-spacing);
