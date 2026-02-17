@@ -530,13 +530,26 @@ function buildSearchFiltering(container, config = {}, placeholders = {}) {
     }
   };
 
+  const updateTypeFilterButtons = (typeCounts = {}) => {
+    if (!typeFiltersEl) return;
+    typeFiltersEl.querySelectorAll('.type-filter').forEach((btn) => {
+      const typeVal = btn.dataset.type;
+      btn.disabled = typeVal !== '' && (typeCounts[typeVal] || 0) === 0;
+    });
+  };
+
   const runSearch = async (filterConfig = config, updateURLState = true) => {
     const index = await loadSearchIndex();
     let results = filterBySearch(index, filterConfig.search || '');
+    const typeCounts = {};
+    results.forEach((item) => {
+      typeCounts[item.type] = (typeCounts[item.type] || 0) + 1;
+    });
     if (filterConfig.type) {
       results = results.filter((item) => item.type === filterConfig.type);
     }
     sortByRelevance(results, filterConfig.search || '');
+    updateTypeFilterButtons(typeCounts);
 
     const page = parseInt(filterConfig.page, 10) || 1;
     currentPage = page;

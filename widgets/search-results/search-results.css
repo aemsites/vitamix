@@ -85,6 +85,12 @@
   color: var(--color-charcoal);
 }
 
+.search-results .type-filter:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .search-results .type-filter.active,
 .search-results .type-filter[aria-pressed="true"] {
   background-color: var(--color-charcoal);
