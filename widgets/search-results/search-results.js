@@ -280,12 +280,31 @@ function getRelativeImagePath(imageUrl) {
 }
 
 /**
+ * Whether the URL is usable as a result card image (rejects data: and invalid URLs).
+ * @param {string} url
+ * @returns {boolean}
+ */
+function isUsableImageUrl(url) {
+  if (!url || typeof url !== 'string' || !url.trim()) return false;
+  const s = url.trim().toLowerCase();
+  if (s.startsWith('data:')) return false;
+  try {
+    const parsed = new URL(url, window.location.origin);
+    return Boolean(parsed);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Get image src for a result card. Product images use .aem.network on preview origins.
+ * Query index: only https:// URLs; others use placeholder. Rest: reject data:/invalid.
  * @param {Object} item - Normalized search item
  * @returns {string}
  */
 function getResultImageSrc(item) {
-  if (!item?.image) return '';
+  if (!item?.image || !isUsableImageUrl(item.image)) return '';
+  if (item.type === 'query' && !item.image.trim().startsWith('https://')) return '';
   if (item.type === 'product' && useFcors()) {
     const path = item.image.startsWith('http')
       ? new URL(item.image).pathname
@@ -346,17 +365,12 @@ function createResultCard(item, placeholders = {}) {
   link.href = item.path || '#';
 
   let imageEl;
-  if (item.image) {
-    const imageSrc = getResultImageSrc(item);
-    if (!imageSrc || imageSrc.includes('default-meta-image')) {
-      imageEl = document.createElement('div');
-      imageEl.className = 'img placeholder';
-    } else {
-      imageEl = document.createElement('img');
-      imageEl.src = imageSrc;
-      imageEl.alt = '';
-      imageEl.loading = 'lazy';
-    }
+  const imageSrc = getResultImageSrc(item);
+  if (imageSrc && !imageSrc.includes('default-meta-image')) {
+    imageEl = document.createElement('img');
+    imageEl.src = imageSrc;
+    imageEl.alt = '';
+    imageEl.loading = 'lazy';
   } else {
     imageEl = document.createElement('div');
     imageEl.className = 'img placeholder';
