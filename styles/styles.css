@@ -108,6 +108,18 @@ html {
   scroll-behavior: smooth;
 }
 
+:target, 
+::target-text {
+  scroll-padding-top: calc(var(--header-height) + 56px);
+}
+
+@media (width >= 800px) {
+  :target,
+  ::target-text {
+    scroll-padding-top: calc(var(--header-height) + 83px);
+  }
+}
+
 body {
   display: none;
   margin: 0;
@@ -876,15 +888,3 @@ body.corp main .default-content-wrapper h1 {
 body.corp main .default-content-wrapper h2 {
   font-size: var(--font-size-500);
 }
-
-:target, ::target-text, {
-  scroll-padding-top: calc(var(--header-height) + 56px);
-}
-
-@media (width >= 800px) {
-  :target,
-  ::target-text {
-    scroll-padding-top: calc(var(--header-height) + 83px);
-  }
-}
-
