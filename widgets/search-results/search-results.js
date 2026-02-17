@@ -415,17 +415,29 @@ function updateURL(filterConfig) {
       if (key !== 'page' || val !== 1) params.set(key, val);
     }
   });
-  const newURL = params.toString() ? `${window.location.pathname}?${params.toString()}` : window.location.pathname;
+  const newURL = params.toString()
+    ? `${window.location.pathname}?${params.toString()}`
+    : window.location.pathname;
   window.history.pushState({ filterConfig }, '', newURL);
 }
 
-/** Type filter options (value '' = all). Labels: primary placeholder key, then fallback key (same as card badges). */
+/** Type filter options (value '' = all). Uses same placeholder keys as card badges. */
 const FILTER_TYPES = [
-  { value: '', labelKey: 'filterAll', fallbackKey: null, defaultLabel: 'All' },
-  { value: 'product', labelKey: 'typeProduct', fallbackKey: 'product', defaultLabel: 'Product' },
-  { value: 'recipe', labelKey: 'typeRecipe', fallbackKey: 'recipe', defaultLabel: 'Recipe' },
-  { value: 'article', labelKey: 'typeArticle', fallbackKey: 'item', defaultLabel: 'Article' },
-  { value: 'query', labelKey: 'typeQuery', fallbackKey: 'page', defaultLabel: 'Page' },
+  {
+    value: '', labelKey: 'filterAll', fallbackKey: null, defaultLabel: 'All',
+  },
+  {
+    value: 'product', labelKey: 'typeProduct', fallbackKey: 'product', defaultLabel: 'Product',
+  },
+  {
+    value: 'recipe', labelKey: 'typeRecipe', fallbackKey: 'recipe', defaultLabel: 'Recipe',
+  },
+  {
+    value: 'article', labelKey: 'typeArticle', fallbackKey: 'item', defaultLabel: 'Article',
+  },
+  {
+    value: 'query', labelKey: 'typeQuery', fallbackKey: 'page', defaultLabel: 'Page',
+  },
 ];
 
 /**
@@ -449,30 +461,6 @@ function buildSearchFiltering(container, config = {}, placeholders = {}) {
     filterConfig.page = resetPage ? 1 : currentPage;
     if (resetPage) currentPage = 1;
     return filterConfig;
-  };
-
-  const renderTypeFilters = () => {
-    if (!typeFiltersEl) return;
-    typeFiltersEl.innerHTML = '';
-    FILTER_TYPES.forEach(({ value, labelKey, fallbackKey, defaultLabel }) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'type-filter';
-      btn.dataset.type = value;
-      const label = placeholders[labelKey] || (fallbackKey ? placeholders[fallbackKey] : null) || defaultLabel;
-      btn.textContent = label;
-      btn.setAttribute('aria-pressed', currentTypeFilter === value ? 'true' : 'false');
-      if (currentTypeFilter === value) btn.classList.add('active');
-      btn.addEventListener('click', () => {
-        currentTypeFilter = value;
-        typeFiltersEl.querySelectorAll('.type-filter').forEach((b) => {
-          b.setAttribute('aria-pressed', b.dataset.type === value ? 'true' : 'false');
-          b.classList.toggle('active', b.dataset.type === value);
-        });
-        runSearch(createFilterConfig(true));
-      });
-      typeFiltersEl.appendChild(btn);
-    });
   };
 
   const displayResults = (results, page = 1) => {
@@ -570,6 +558,34 @@ function buildSearchFiltering(container, config = {}, placeholders = {}) {
     if (updateURLState) updateURL(filterConfig);
   };
 
+  const renderTypeFilters = () => {
+    if (!typeFiltersEl) return;
+    typeFiltersEl.innerHTML = '';
+    FILTER_TYPES.forEach(({
+      value, labelKey, fallbackKey, defaultLabel,
+    }) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'type-filter';
+      btn.dataset.type = value;
+      const label = placeholders[labelKey]
+        || (fallbackKey ? placeholders[fallbackKey] : null)
+        || defaultLabel;
+      btn.textContent = label;
+      btn.setAttribute('aria-pressed', currentTypeFilter === value ? 'true' : 'false');
+      if (currentTypeFilter === value) btn.classList.add('active');
+      btn.addEventListener('click', () => {
+        currentTypeFilter = value;
+        typeFiltersEl.querySelectorAll('.type-filter').forEach((b) => {
+          b.setAttribute('aria-pressed', b.dataset.type === value ? 'true' : 'false');
+          b.classList.toggle('active', b.dataset.type === value);
+        });
+        runSearch(createFilterConfig(true));
+      });
+      typeFiltersEl.appendChild(btn);
+    });
+  };
+
   const searchElement = container.querySelector('#fulltext');
   searchElement.addEventListener('input', () => runSearch(createFilterConfig(true)));
   searchElement.addEventListener('keypress', (e) => {
@@ -588,7 +604,9 @@ function buildSearchFiltering(container, config = {}, placeholders = {}) {
   const initialConfig = { ...config, ...urlConfig };
   if (urlConfig.page) currentPage = parseInt(urlConfig.page, 10);
   if (urlConfig.search) searchElement.value = urlConfig.search;
-  if (urlConfig.type && FILTER_TYPES.some((t) => t.value === urlConfig.type)) currentTypeFilter = urlConfig.type;
+  if (urlConfig.type && FILTER_TYPES.some((t) => t.value === urlConfig.type)) {
+    currentTypeFilter = urlConfig.type;
+  }
 
   renderTypeFilters();
   runSearch(initialConfig);
