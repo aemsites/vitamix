@@ -103,19 +103,13 @@ body.pdp-template {
   box-sizing: border-box;
 }
 
-
 html {
   scroll-behavior: smooth;
-}
-
-:target, 
-::target-text {
   scroll-padding-top: calc(var(--header-height) + 56px);
 }
 
 @media (width >= 800px) {
-  :target,
-  ::target-text {
+  html {
     scroll-padding-top: calc(var(--header-height) + 83px);
   }
 }
