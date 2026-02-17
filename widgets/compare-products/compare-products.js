@@ -55,7 +55,7 @@ function getProductSeries(product) {
  */
 function normalizeSeriesForMatch(s) {
   if (!s || typeof s !== 'string') return '';
-  let t = s
+  const t = s
     .replace(/\s*®\s*|\s*™\s*/gi, ' ')
     .replace(/\bVitamix\b/gi, '')
     .replace(/\s+/g, ' ')
@@ -70,8 +70,8 @@ function normalizeSeriesForMatch(s) {
  * @returns {Object|null} Row object or null
  */
 function getSeriesFeaturesRow(featuresBySeries, series) {
-  if (!featuresBySeries?.data?.length || !series) return null;
-  const data = featuresBySeries.data;
+  const { data } = featuresBySeries || {};
+  if (!data?.length || !series) return null;
   const norm = normalizeSeriesForMatch(series);
   if (!norm) return null;
   const normLower = norm.toLowerCase();

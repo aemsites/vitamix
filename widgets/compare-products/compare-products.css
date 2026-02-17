@@ -1,5 +1,26 @@
 /* Compare Products Widget – layout only; typography, buttons, colors inherit from site */
+
 /* Swatch colors aligned with blocks/pdp/color-swatches.css */
+.compare-products-product-color {
+  width: 24px;
+  height: 24px;
+  border: var(--border-s) solid var(--color-gray-400);
+  border-radius: 50%;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.compare-products-product-color:hover {
+  transform: scale(1.1);
+}
+
+.compare-products-product-color.selected {
+  border-width: 2px;
+  border-color: var(--color-charcoal);
+  box-shadow: 0 0 0 2px var(--color-background);
+}
+
 .compare-products .compare-products-product-color {
   /* blacks */
   --color-black: #000;
@@ -146,26 +167,6 @@
   justify-content: center;
   gap: var(--spacing-60);
   margin-bottom: var(--spacing-200);
-}
-
-.compare-products-product-color {
-  width: 24px;
-  height: 24px;
-  border: var(--border-s) solid var(--color-gray-400);
-  border-radius: 50%;
-  padding: 0;
-  cursor: pointer;
-  transition: transform 0.15s, box-shadow 0.15s;
-}
-
-.compare-products-product-color:hover {
-  transform: scale(1.1);
-}
-
-.compare-products-product-color.selected {
-  border-width: 2px;
-  border-color: var(--color-charcoal);
-  box-shadow: 0 0 0 2px var(--color-background);
 }
 
 .compare-products-product-name {
