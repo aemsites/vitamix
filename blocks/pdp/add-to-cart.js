@@ -63,7 +63,7 @@ function toggleFixedAddToCart(container) {
       container.classList.add('fixed');
       container.style.top = `${offset}px`;
     } else {
-      container.classList.remove('fixed');
+      //container.classList.remove('fixed');
       container.removeAttribute('style');
     }
   });
