@@ -140,7 +140,7 @@
   bottom: 0; 
   left: 0;
   right: 0;
-  top: auto; 
+  top: auto !important; 
   border-top: 1px solid var(--color-gray-400); 
   border-bottom: none;
   padding: var(--spacing-80) var(--horizontal-spacing);
