@@ -152,9 +152,10 @@
 @media (width >= 900px) {
   .add-to-cart.fixed {
     position: static;
-    border-bottom: 0;
+    border-top: 0;
     padding: 0;
     background-color: transparent;
+    box-shadow: none;
   }
 }
 
