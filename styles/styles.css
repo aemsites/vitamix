@@ -878,13 +878,13 @@ body.corp main .default-content-wrapper h2 {
 }
 
 :target, ::target-text, {
-  scroll-margin-top: calc(var(--header-height) + 56px);
+  scroll-padding-top: calc(var(--header-height) + 56px);
 }
 
 @media (width >= 800px) {
   :target,
   ::target-text {
-    scroll-margin-top: calc(var(--header-height) + 83px);
+    scroll-padding-top: calc(var(--header-height) + 83px);
   }
 }
 
