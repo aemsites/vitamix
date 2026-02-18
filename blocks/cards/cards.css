@@ -61,6 +61,10 @@
   cursor: pointer;
 }
 
+.cards.text-center {
+  text-align: center;
+}
+
 /* default filled */
 .cards .filled {
   padding: var(--horizontal-spacing);
@@ -141,7 +145,7 @@
 }
 
 .cards.articles .card-body {
-  padding: var(--spacing-400) 0 0 var(--spacing-300);
+  padding: var(--spacing-400) var(--spacing-300) 0 var(--spacing-300);
 }
 
 .cards.articles .card-body p:not(.eyebrow) {
