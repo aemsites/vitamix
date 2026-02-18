@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Translation tool</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <link rel="stylesheet" href="./app.css">
+    <script src="./app.js" type="module"></script>
+  </head>
+  <body>
+    <div class="app-container">
+      <h1>Translation tool</h1>
+      <p>Enter list of URLs to translate or <a href="#" id="load-from-folder">load from folder</a></p>
+      <form class="app-form">
+        <div class="app-input">
+          <div class="app-input-loader">
+            <div class="app-input-loader-content">
+              <input type="text" name="folder" placeholder="Enter da.live folder url"/>
+              <button name="load-from-folder">Load from folder</button>
+              <div class="app-folder-loader-error" aria-live="polite"></div>
+            </div>
+          </div>
+          <textarea name="urls" placeholder="Enter list of URLs to translate"></textarea>
+          <select name="language">
+            <option value="en">English</option>
+            <option value="es">Spanish</option>
+            <option value="fr" selected>French</option>
+            <option value="de">German</option>
+            <option value="it">Italian</option>
+          </select>
+          <button name="translate">Translate</button>
+          <div class="app-error" aria-live="polite"></div>
+        </div>
+        <div class="app-output">
+          <ul class="app-output-list"></ul>
+        </div>
+      </form>
+    </div>
+  </body>
+</html> 
