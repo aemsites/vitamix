@@ -33,3 +33,84 @@
 .table.striped tbody tr:nth-child(odd) {
   background-color: var(--color-gray-200);
 }
+
+/* Comparison variant: heading row + heading column, 2x first column width */
+.table.comparison .table-comparison-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table.comparison .table-comparison-scroll table {
+  width: 100%;
+  min-width: 600px;
+  table-layout: fixed;
+  border-collapse: collapse;
+  border: 1px solid #e0e0e0;
+}
+
+.table.comparison .table-comparison-scroll th,
+.table.comparison .table-comparison-scroll td {
+  padding: 16px 12px;
+  border: 1px solid #e0e0e0;
+  vertical-align: top;
+}
+
+.table.comparison .table-comparison-scroll thead th {
+  background-color: #ececec;
+  font-weight: 700;
+  text-align: center;
+  color: #333;
+}
+
+.table.comparison .table-comparison-scroll tbody th {
+  background-color: #fff;
+  font-weight: 600;
+  text-align: left;
+  color: #333;
+  vertical-align: middle;
+}
+
+.table.comparison .table-comparison-scroll thead th:first-child {
+  text-align: left;
+  color: #6c757d;
+  font-weight: 600;
+}
+
+/* Heading column: small image left, text right, vertically centered */
+.table.comparison .table-comparison-scroll tbody th .table-comparison-cell-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.table.comparison .table-comparison-scroll tbody th .table-comparison-cell-content picture,
+.table.comparison .table-comparison-scroll tbody th .table-comparison-cell-content img {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  margin: 0;
+}
+
+.table.comparison .table-comparison-scroll tbody th .table-comparison-cell-content img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+
+.table.comparison .table-comparison-scroll tbody th .table-comparison-cell-content a {
+  color: #06c;
+  text-decoration: none;
+  flex: 1;
+  min-width: 0;
+}
+
+.table.comparison .table-comparison-scroll tbody th .table-comparison-cell-content a:hover {
+  text-decoration: underline;
+}
+
+.table.comparison .table-comparison-scroll tbody td {
+  background-color: #fff;
+  text-align: center;
+  color: #333;
+}
