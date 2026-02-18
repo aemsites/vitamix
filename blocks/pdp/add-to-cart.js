@@ -59,19 +59,18 @@ function toggleFixedAddToCart(container) {
     const offset = Math.max(headerHeight - scrollY, 0);
 
     // apply or remove "fixed" class and dynamic top offset
-if (scrollY > 0) {
-  container.classList.add('fixed');
+    if (scrollY > 0) {
+      container.classList.add('fixed');
 
-  if (offset > 0) {
-    container.style.top = `${offset}px`;
-  } else {
-    container.style.removeProperty('top');
-  }
-
-} else {
-  container.classList.remove('fixed');
-  container.removeAttribute('style');
-}
+      if (offset > 0) {
+        container.style.top = `${offset}px`;
+      } else {
+        container.style.removeProperty('top');
+      }
+    } else {
+      container.classList.remove('fixed');
+      container.removeAttribute('style');
+    }
   });
 }
 
