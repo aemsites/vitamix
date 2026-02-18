@@ -145,7 +145,7 @@
   padding: var(--spacing-80) var(--horizontal-spacing);
   background-color: var(--color-gray-100);
   z-index: 8;
-  box-shadow: 0 -2px 8px var(--color-gray-100); 
+  box-shadow: 0 -2px 8px color-mix(in srgb, var(--color-gray-900) 40%, transparent);
 }
 
 @media (width >= 900px) {
