@@ -63,7 +63,7 @@ header section {
   padding: 0 var(--spacing-200);
   transition: height 0.6s ease-in;
   border-bottom: 1px solid var(--color-gray-400);
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 10%);
+  box-shadow: 0 -2px 8px rgb(0 0 0 / 10%);
 }
 
 header section[data-expanded='true'] {
