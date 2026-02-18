@@ -3,12 +3,12 @@
 .search-results {
   max-width: 1200px;
   margin: 0 auto;
-  padding: var(--spacing-600) var(--spacing-400);
+  padding: var(--spacing-400) var(--spacing-200);
 }
 
 .search-results .title {
   font-family: var(--heading-font-family);
-  font-size: var(--font-size-900);
+  font-size: var(--font-size-700);
   font-weight: var(--weight-regular);
   text-align: center;
   margin: 0 0 var(--spacing-400);
@@ -106,8 +106,9 @@
 
 .search-results .info {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: var(--spacing-100);
+  align-items: flex-start;
   padding: var(--spacing-100) 0;
   margin-bottom: var(--spacing-200);
   font-size: var(--body-size-s);
@@ -182,21 +183,24 @@
   text-decoration: none;
   color: inherit;
   display: flex;
+  flex-direction: column;
   gap: var(--spacing-300);
   align-items: flex-start;
 }
 
 .search-results .card img {
-  width: 140px;
-  height: 140px;
+  width: 100%;
+  aspect-ratio: 1;
+  height: auto;
   object-fit: cover;
   flex-shrink: 0;
   background-color: var(--color-gray-200);
 }
 
 .search-results .card .placeholder {
-  width: 140px;
-  height: 140px;
+  width: 100%;
+  aspect-ratio: 1;
+  height: auto;
   flex-shrink: 0;
   background-color: var(--color-gray-200);
   display: flex;
@@ -243,29 +247,29 @@
   padding: 0 2px;
 }
 
-@media (width <= 600px) {
+@media (width >= 600px) {
   .search-results {
-    padding: var(--spacing-400) var(--spacing-200);
+    padding: var(--spacing-600) var(--spacing-400);
   }
 
   .search-results .title {
-    font-size: var(--font-size-700);
+    font-size: var(--font-size-900);
   }
 
   .search-results .card a {
-    flex-direction: column;
+    flex-direction: row;
   }
 
   .search-results .card img,
   .search-results .card .placeholder {
-    width: 100%;
-    aspect-ratio: 1;
-    height: auto;
+    width: 140px;
+    height: 140px;
+    aspect-ratio: auto;
   }
 
   .search-results .info {
-    flex-direction: column;
-    gap: var(--spacing-100);
-    align-items: flex-start;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
   }
 }
