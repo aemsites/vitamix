@@ -1,0 +1,45 @@
+/* Media Contact form – vertical stack, labels above, uses global form/input styles */
+.forms-media-contact {
+  background-color: var(--color-gray-100);
+  padding: var(--spacing-300);
+  border-radius: var(--rounding-m);
+  max-width: 100%;
+}
+
+.forms-media-contact .media-contact-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-200);
+  max-width: 32rem;
+}
+
+.forms-media-contact .media-contact-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
+}
+
+.forms-media-contact .media-contact-field label {
+  margin-bottom: 0;
+}
+
+.forms-media-contact .media-contact-field .required {
+  color: var(--color-red);
+  margin-left: 0.15em;
+}
+
+.forms-media-contact .media-contact-actions {
+  margin-top: var(--spacing-100);
+}
+
+.forms-media-contact .media-contact-form button[type="submit"] {
+  background-color: var(--color-charcoal);
+  border-color: var(--color-charcoal);
+  color: var(--color-white);
+}
+
+.forms-media-contact .media-contact-form button[type="submit"]:hover,
+.forms-media-contact .media-contact-form button[type="submit"]:focus {
+  background-color: var(--color-gray-900);
+  border-color: var(--color-gray-900);
+}
