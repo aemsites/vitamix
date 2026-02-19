@@ -53,43 +53,38 @@ const haversineDistance = (lat1, lon1, lat2, lon2) => {
 };
 
 async function geoCode(address) {
-  try {
-    const resp = await fetch(
-      `https://helix-geocode.adobeaem.workers.dev/?address=${encodeURIComponent(address)}`,
-    );
+  const resp = await fetch(
+    `https://helix-geocode.adobeaem.workers.dev/?address=${encodeURIComponent(address)}`,
+  );
 
-    const json = await resp.json();
-    const results = json?.results;
+  const json = await resp.json();
+  const results = json?.results;
 
-    if (!results || !results.length) {
-      return null;
-    }
-
-    const result = results[0];
-    const components = result?.address_components || [];
-
-    const getComponent = (type) => components.find((c) => c.types?.includes(type));
-
-    const countryComponent = getComponent('country');
-    const stateComponent = getComponent('administrative_area_level_1');
-
-    return {
-      // Geo Location
-      location: result?.geometry?.location || null,
-
-      // Country
-      countryShort: countryComponent?.short_name || null,
-      countryLong: countryComponent?.long_name || null,
-
-      // State
-      stateShort: stateComponent?.short_name || null,
-      stateLong: stateComponent?.long_name || null,
-
-    };
-  } catch (error) {
-    console.error('Geocode error:', error);
+  if (!results || !results.length) {
     return null;
   }
+
+  const result = results[0];
+  const components = result?.address_components || [];
+
+  const getComponent = (type) => components.find((c) => c.types?.includes(type));
+
+  const countryComponent = getComponent('country');
+  const stateComponent = getComponent('administrative_area_level_1');
+
+  return {
+    // Geo Location
+    location: result?.geometry?.location || null,
+
+    // Country
+    countryShort: countryComponent?.short_name || null,
+    countryLong: countryComponent?.long_name || null,
+
+    // State
+    stateShort: stateComponent?.short_name || null,
+    stateLong: stateComponent?.long_name || null,
+
+  };
 }
 
 // Common helpers
