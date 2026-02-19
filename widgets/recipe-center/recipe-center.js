@@ -2,6 +2,7 @@
 
 import { loadCSS, fetchPlaceholders } from '../../scripts/aem.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { normalizeCompatibleContainers, isFrenchContainerLocale } from '../../blocks/recipe/recipe-containers.js';
 
 /**
  * Parses raw recipe data from index and transforms values.
@@ -62,6 +63,15 @@ async function lookupRecipes(config = {}, facets = {}) {
         const status = recipe.status ? recipe.status.toLowerCase() : '';
         return status === 'updated' || status === 'new';
       });
+
+    // Normalize compatible-containers for French only (translation artifacts → canonical, display in French)
+    if (isFrenchContainerLocale(locale, language)) {
+      recipes.forEach((recipe) => {
+        if (recipe['compatible-containers']) {
+          recipe['compatible-containers'] = normalizeCompatibleContainers(recipe['compatible-containers'], true);
+        }
+      });
+    }
 
     window.recipeIndex = {
       data: recipes,

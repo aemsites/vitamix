@@ -81,6 +81,7 @@
 }
 
 .recipe-center .go {
+  display: none; /* not needed: dropdowns run search on change */
   width: 100%;
   white-space: nowrap;
 }
@@ -130,10 +131,6 @@
     flex: 1;
     width: auto;
     min-width: 150px;
-  }
-
-  .recipe-center .go {
-    display: none;
   }
 }
 
@@ -238,7 +235,7 @@
   display: none;
   position: fixed;
   inset: 0;
-  z-index: 1000;
+  z-index: 1;
   padding: var(--spacing-400);
   background-color: var(--shadow-300);
   overflow-y: auto;
@@ -352,6 +349,7 @@
   .recipe-center .facets {
     display: block;
     position: static;
+    z-index: auto; /* only need z-index when fixed overlay on small screens */
     grid-area: facets;
     padding: var(--spacing-600) 30px var(--spacing-600) var(--spacing-600);
     background: none;
