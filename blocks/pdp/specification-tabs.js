@@ -110,6 +110,8 @@ function createResourcesContent(ph, resources, productName) {
 
       const resourceLink = document.createElement('a');
       resourceLink.href = resource.url;
+      resourceLink.target = '_blank';
+      resourceLink.rel = 'noopener noreferrer';
       resourceLink.textContent = resource.name;
 
       const resourceDetails = document.createElement('p');
