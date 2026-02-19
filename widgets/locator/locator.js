@@ -1,7 +1,7 @@
 import { loadCSS } from '../../scripts/aem.js';
 
 const MAX_DISTANCE = 200;
-const EVENTS_MAX_DISTANCE = 500;
+const EVENTS_MAX_DISTANCE = 100;
 const MAX_DISTANCE_COMM = 1000;
 
 const hhRetailersResults = document.querySelector('#locator-hh-retailers-tabpanel');
@@ -53,17 +53,43 @@ const haversineDistance = (lat1, lon1, lat2, lon2) => {
 };
 
 async function geoCode(address) {
-  const resp = await fetch(`https://helix-geocode.adobeaem.workers.dev/?address=${encodeURIComponent(address)}`);
-  const json = await resp.json();
-  const { results } = json;
+  try {
+    const resp = await fetch(
+      `https://helix-geocode.adobeaem.workers.dev/?address=${encodeURIComponent(address)}`,
+    );
 
-  const countryComponent = results[0]?.address_components?.find((c) => c.types?.includes('country'));
+    const json = await resp.json();
+    const results = json?.results;
 
-  return {
-    location: results[0]?.geometry?.location,
-    countryShort: countryComponent?.short_name,
-    countryLong: countryComponent?.long_name,
-  };
+    if (!results || !results.length) {
+      return null;
+    }
+
+    const result = results[0];
+    const components = result?.address_components || [];
+
+    const getComponent = (type) => components.find((c) => c.types?.includes(type));
+
+    const countryComponent = getComponent('country');
+    const stateComponent = getComponent('administrative_area_level_1');
+
+    return {
+      // Geo Location
+      location: result?.geometry?.location || null,
+
+      // Country
+      countryShort: countryComponent?.short_name || null,
+      countryLong: countryComponent?.long_name || null,
+
+      // State
+      stateShort: stateComponent?.short_name || null,
+      stateLong: stateComponent?.long_name || null,
+
+    };
+  } catch (error) {
+    console.error('Geocode error:', error);
+    return null;
+  }
 }
 
 // Common helpers
@@ -254,12 +280,14 @@ function findEventsResults(data, location) {
   };
 }
 
-function findCommResults(data, location, countryShort, countryLong) {
+function findCommResults(data, location, countryShort, countryLong, stateShort, stateLong) {
   const allowedTypes = ['DEALER/DISTRIBUTOR', 'LOCAL REP'];
 
   const cleaned = applyAemRules(data, {
     countryShort,
     countryLong,
+    stateShort,
+    stateLong,
     productType: 'COMM',
     allowedTypes,
   });
@@ -272,9 +300,7 @@ function findCommResults(data, location, countryShort, countryLong) {
 
   const localRep = cleaned
     .filter((i) => i.TYPE === 'LOCAL REP'
-      && haversineDistance(location.lat, location.lng, i.lat, i.lng) <= MAX_DISTANCE_COMM)
-    .sort((a, b) => haversineDistance(location.lat, location.lng, a.lat, a.lng)
-      - haversineDistance(location.lat, location.lng, b.lat, b.lng));
+    && (i.STATE_PROVINCE === stateShort || i.STATE_NAME === stateLong));
 
   return { distributors, localRep };
 }
@@ -842,7 +868,13 @@ export default function decorate(widget) {
     e.preventDefault();
     const formData = new FormData(form);
     const data = Object.fromEntries(formData);
-    const { location, countryShort, countryLong } = await geoCode(data.address);
+    const {
+      location,
+      countryShort,
+      countryLong,
+      stateShort,
+      stateLong,
+    } = await geoCode(data.address);
 
     if (data.productType === 'HH') {
       if (location) {
@@ -861,6 +893,8 @@ export default function decorate(widget) {
           location,
           countryShort,
           countryLong,
+          stateShort,
+          stateLong,
         );
         displayCommResults(results, location);
       } else {
