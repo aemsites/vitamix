@@ -74,8 +74,10 @@ export default async function decorate(widget) {
   // Select first-option placeholder
   const businessLineSelect = form.querySelector('#media-contact-business-line');
   const reasonSelect = form.querySelector('#media-contact-reason');
-  if (businessLineSelect?.firstElementChild) businessLineSelect.firstElementChild.textContent = selectOption;
-  if (reasonSelect?.firstElementChild) reasonSelect.firstElementChild.textContent = selectOption;
+  const businessFirst = businessLineSelect?.firstElementChild;
+  const reasonFirst = reasonSelect?.firstElementChild;
+  if (businessFirst) businessFirst.textContent = selectOption;
+  if (reasonFirst) reasonFirst.textContent = selectOption;
 
   // Optional: options from placeholders (comma-separated "Label=value" or "Label")
   const businessLineOptions = get('businessLineOptions');
@@ -129,7 +131,9 @@ export default async function decorate(widget) {
       // eslint-disable-next-line no-console
       console.error('Media contact form submission failed', err);
       [...form.elements].forEach((el) => { el.disabled = false; });
-      if (submitButton) submitButton.textContent = submitButton.dataset.originalLabel || buttonLabel;
+      if (submitButton) {
+        submitButton.textContent = submitButton.dataset.originalLabel || buttonLabel;
+      }
     }
   });
 }
