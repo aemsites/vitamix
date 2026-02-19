@@ -359,7 +359,7 @@ export default async function decorate(block) {
       // Find all recipes with the same title
       const sameRecipes = data.data.filter((recipe) => recipe.title === recipeTitle);
 
-      // Build container display names (alias + French display when applicable) and map to a recipe path
+      // Build container display names (alias + French if needed) and map to a recipe path
       const useFrenchDisplay = isFrenchContainerLocale(locale, language);
       const containerMap = new Map();
       sameRecipes.forEach((recipe) => {
