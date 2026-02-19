@@ -501,21 +501,30 @@ export async function fetchRecipeDetailsForSync(
     const portionSize = nutritionElement.querySelector('PortionSize')?.textContent.trim() || '';
     const nutrients = nutritionElement.querySelectorAll('Nutrient');
 
-    const findNutrient = (key) => {
-      const nutrientEl = Array.from(nutrients).find((n) => {
+    const findNutrient = (key, preferredUnit = null) => {
+      const candidates = Array.from(nutrients).filter((n) => {
         const nutKey = n.querySelector('NutKey')?.textContent.trim();
         const displayName = n.querySelector('DisplayName')?.textContent.trim();
         return nutKey === key || displayName === key;
       });
+      const nutrientEl = preferredUnit
+        ? candidates.find((n) => (n.querySelector('Unit')?.textContent.trim() || '').toLowerCase() === preferredUnit.toLowerCase()) || candidates[0]
+        : candidates[0];
       if (nutrientEl) {
-        const valueImposed = nutrientEl.querySelector('ValueImposed')?.textContent.trim() || '0';
+        const valueImposedStr = nutrientEl.querySelector('ValueImposed')?.textContent.trim() || '0';
+        const valueStr = nutrientEl.querySelector('Value')?.textContent.trim() || '0';
+        const valueImposed = parseFloat(valueImposedStr);
+        const value = parseFloat(valueStr);
+        const num = (valueImposed > 0 ? valueImposed : value);
         const unit = nutrientEl.querySelector('Unit')?.textContent.trim() || '';
-        return { value: Math.round(parseFloat(valueImposed)), unit };
+        const format = nutrientEl.querySelector('Format')?.textContent.trim() || '#,##0';
+        const isDecimal = format.includes('0.00');
+        return { value: isDecimal ? Math.round(num * 100) / 100 : Math.round(num), unit };
       }
       return null;
     };
 
-    const calories = findNutrient('Calories');
+    const calories = findNutrient('Calories', 'kcal');
     const totalFat = findNutrient('Total Fat');
     const totalCarbs = findNutrient('Carbohydrates');
     const dietaryFiber = findNutrient('Dietary Fiber');
@@ -524,33 +533,31 @@ export async function fetchRecipeDetailsForSync(
     const cholesterol = findNutrient('Cholesterol');
     const sodium = findNutrient('Sodium');
 
-    if (portionSize) {
-      const nutritionItems = [];
-      if (calories) nutritionItems.push(`<li>Calories: ${calories.value}</li>`);
-      if (totalFat) nutritionItems.push(`<li>Total Fat: ${totalFat.value}${totalFat.unit}</li>`);
-      if (totalCarbs) {
-        nutritionItems.push(`<li>Total Carbohydrate: ${totalCarbs.value}${totalCarbs.unit}`);
-        const subItems = [];
-        if (dietaryFiber) subItems.push(`<li>Dietary Fiber: ${dietaryFiber.value}${dietaryFiber.unit}</li>`);
-        if (sugars) subItems.push(`<li>Sugars: ${sugars.value}${sugars.unit}</li>`);
-        if (subItems.length > 0) {
-          nutritionItems.push(`<ul>${subItems.join('')}</ul>`);
-        }
-        nutritionItems.push('</li>');
+    const nutritionItems = [];
+    if (calories) nutritionItems.push(`<li>Calories: ${calories.value}</li>`);
+    if (totalFat) nutritionItems.push(`<li>Total Fat: ${totalFat.value}${totalFat.unit}</li>`);
+    if (totalCarbs) {
+      nutritionItems.push(`<li>Total Carbohydrate: ${totalCarbs.value}${totalCarbs.unit}`);
+      const subItems = [];
+      if (dietaryFiber) subItems.push(`<li>Dietary Fiber: ${dietaryFiber.value}${dietaryFiber.unit}</li>`);
+      if (sugars) subItems.push(`<li>Sugars: ${sugars.value}${sugars.unit}</li>`);
+      if (subItems.length > 0) {
+        nutritionItems.push(`<ul>${subItems.join('')}</ul>`);
       }
-      if (protein) nutritionItems.push(`<li>Protein: ${protein.value}${protein.unit}</li>`);
-      if (cholesterol) nutritionItems.push(`<li>Cholesterol: ${cholesterol.value}${cholesterol.unit}</li>`);
-      if (sodium) nutritionItems.push(`<li>Sodium: ${sodium.value}${sodium.unit}</li>`);
+      nutritionItems.push('</li>');
+    }
+    if (protein) nutritionItems.push(`<li>Protein: ${protein.value}${protein.unit}</li>`);
+    if (cholesterol) nutritionItems.push(`<li>Cholesterol: ${cholesterol.value}${cholesterol.unit}</li>`);
+    if (sodium) nutritionItems.push(`<li>Sodium: ${sodium.value}${sodium.unit}</li>`);
 
-      if (nutritionItems.length > 0) {
-        nutritionHtml = `
+    if (nutritionItems.length > 0) {
+      nutritionHtml = `
           <h2>Nutrition</h2>
-          <p>${portionSize}</p>
+          ${portionSize ? `<p>${portionSize}</p>` : '<p>Per serving</p>'}
           <ul>
             ${nutritionItems.join('')}
           </ul>
         `;
-      }
     }
   }
 
@@ -1318,22 +1325,31 @@ export async function displayRecipeDetails(recipeNumber) {
       const portionSize = nutritionElement.querySelector('PortionSize')?.textContent.trim() || '';
       const nutrients = nutritionElement.querySelectorAll('Nutrient');
 
-      // Helper function to find nutrient by key
-      const findNutrient = (key) => {
-        const nutrientEl = Array.from(nutrients).find((n) => {
+      // Helper function to find nutrient by key (use Value when ValueImposed is 0; optional preferredUnit e.g. 'kcal')
+      const findNutrient = (key, preferredUnit = null) => {
+        const candidates = Array.from(nutrients).filter((n) => {
           const nutKey = n.querySelector('NutKey')?.textContent.trim();
           const displayName = n.querySelector('DisplayName')?.textContent.trim();
           return nutKey === key || displayName === key;
         });
+        const nutrientEl = preferredUnit
+          ? candidates.find((n) => (n.querySelector('Unit')?.textContent.trim() || '').toLowerCase() === preferredUnit.toLowerCase()) || candidates[0]
+          : candidates[0];
         if (nutrientEl) {
-          const valueImposed = nutrientEl.querySelector('ValueImposed')?.textContent.trim() || '0';
+          const valueImposedStr = nutrientEl.querySelector('ValueImposed')?.textContent.trim() || '0';
+          const valueStr = nutrientEl.querySelector('Value')?.textContent.trim() || '0';
+          const valueImposed = parseFloat(valueImposedStr);
+          const value = parseFloat(valueStr);
+          const num = (valueImposed > 0 ? valueImposed : value);
           const unit = nutrientEl.querySelector('Unit')?.textContent.trim() || '';
-          return { value: Math.round(parseFloat(valueImposed)), unit };
+          const format = nutrientEl.querySelector('Format')?.textContent.trim() || '#,##0';
+          const isDecimal = format.includes('0.00');
+          return { value: isDecimal ? Math.round(num * 100) / 100 : Math.round(num), unit };
         }
         return null;
       };
 
-      const calories = findNutrient('Calories');
+      const calories = findNutrient('Calories', 'kcal');
       const totalFat = findNutrient('Total Fat');
       const totalCarbs = findNutrient('Carbohydrates');
       const dietaryFiber = findNutrient('Dietary Fiber');
@@ -1342,33 +1358,31 @@ export async function displayRecipeDetails(recipeNumber) {
       const cholesterol = findNutrient('Cholesterol');
       const sodium = findNutrient('Sodium');
 
-      if (portionSize) {
-        const nutritionItems = [];
-        if (calories) nutritionItems.push(`<li>Calories: ${calories.value}</li>`);
-        if (totalFat) nutritionItems.push(`<li>Total Fat: ${totalFat.value}${totalFat.unit}</li>`);
-        if (totalCarbs) {
-          nutritionItems.push(`<li>Total Carbohydrate: ${totalCarbs.value}${totalCarbs.unit}`);
-          const subItems = [];
-          if (dietaryFiber) subItems.push(`<li>Dietary Fiber: ${dietaryFiber.value}${dietaryFiber.unit}</li>`);
-          if (sugars) subItems.push(`<li>Sugars: ${sugars.value}${sugars.unit}</li>`);
-          if (subItems.length > 0) {
-            nutritionItems.push(`<ul>${subItems.join('')}</ul>`);
-          }
-          nutritionItems.push('</li>');
+      const nutritionItems = [];
+      if (calories) nutritionItems.push(`<li>Calories: ${calories.value}</li>`);
+      if (totalFat) nutritionItems.push(`<li>Total Fat: ${totalFat.value}${totalFat.unit}</li>`);
+      if (totalCarbs) {
+        nutritionItems.push(`<li>Total Carbohydrate: ${totalCarbs.value}${totalCarbs.unit}`);
+        const subItems = [];
+        if (dietaryFiber) subItems.push(`<li>Dietary Fiber: ${dietaryFiber.value}${dietaryFiber.unit}</li>`);
+        if (sugars) subItems.push(`<li>Sugars: ${sugars.value}${sugars.unit}</li>`);
+        if (subItems.length > 0) {
+          nutritionItems.push(`<ul>${subItems.join('')}</ul>`);
         }
-        if (protein) nutritionItems.push(`<li>Protein: ${protein.value}${protein.unit}</li>`);
-        if (cholesterol) nutritionItems.push(`<li>Cholesterol: ${cholesterol.value}${cholesterol.unit}</li>`);
-        if (sodium) nutritionItems.push(`<li>Sodium: ${sodium.value}${sodium.unit}</li>`);
+        nutritionItems.push('</li>');
+      }
+      if (protein) nutritionItems.push(`<li>Protein: ${protein.value}${protein.unit}</li>`);
+      if (cholesterol) nutritionItems.push(`<li>Cholesterol: ${cholesterol.value}${cholesterol.unit}</li>`);
+      if (sodium) nutritionItems.push(`<li>Sodium: ${sodium.value}${sodium.unit}</li>`);
 
-        if (nutritionItems.length > 0) {
-          nutritionHtml = `
+      if (nutritionItems.length > 0) {
+        nutritionHtml = `
             <h2>Nutrition</h2>
-            <p>${portionSize}</p>
+            ${portionSize ? `<p>${portionSize}</p>` : '<p>Per serving</p>'}
             <ul>
               ${nutritionItems.join('')}
             </ul>
           `;
-        }
       }
     }
 
