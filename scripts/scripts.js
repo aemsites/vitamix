@@ -785,25 +785,16 @@ function autolinkModals(doc) {
 }
 
 async function decorateFragmentPreviews() {
-  const params = new URLSearchParams(window.location.search);
-  const fragmentPath = params.get('reloadFragment');
-  if (fragmentPath && fragmentPath.length < 200) {
-    const isValid = /^[a-zA-Z0-9-_/]+$/.test(fragmentPath);
-    if (!isValid) return;
-    const url = new URL(fragmentPath, window.location);
-    const { pathname } = url;
-    const resp = await fetch(`${pathname}.plain.html`, {
-      cache: 'reload',
-    });
-    await resp.text();
-  }
   const path = window.location.pathname;
-  if (path.includes('/nav/') || path.includes('/footer/')) {
-    if (window.location.search.includes('dapreview=on')) {
-      document.body.classList.add('fragment-preview');
+  if (path.includes('/nav/')) {
+    if (path.endsWith('/nav/nav') || path.endsWith('/nav/products')) {
+      document.body.classList.add('fragment-preview-nav');
     } else {
-      window.location.href = `/us/en_us/why-vitamix?reloadFragment=${path}`;
+      document.body.classList.add('fragment-preview');
     }
+  }
+  if (path.includes('/footer/')) {
+    document.body.classList.add('fragment-preview-footer');
   }
 }
 
