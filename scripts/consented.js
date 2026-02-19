@@ -1,202 +1,929 @@
-import { loadScript } from './aem.js';
+import { loadCSS } from '../../scripts/aem.js';
 
-if (localStorage.getItem('newsletter-popped-up') !== 'true') {
-  localStorage.setItem('newsletter-popped-up', 'true');
-  const newsletterLink = document.querySelector('a[href*="/modals/sign-up"]');
-  if (newsletterLink) {
-    setTimeout(() => {
-      newsletterLink.click();
-    }, 5000);
-  }
+const MAX_DISTANCE = 200;
+const EVENTS_MAX_DISTANCE = 100;
+const MAX_DISTANCE_COMM = 1000;
+
+const hhRetailersResults = document.querySelector('#locator-hh-retailers-tabpanel');
+const hhDistributorsResults = document.querySelector('#locator-hh-distributors-tabpanel');
+const hhOnlineResults = document.querySelector('#locator-hh-online-tabpanel');
+
+const commDistributorsResults = document.querySelector('#locator-comm-distributors-tabpanel');
+const commLocalrepResults = document.querySelector('#locator-comm-localrep-tabpanel');
+
+const eventsHHResults = document.querySelector('#locator-events-hh-tabpanel');
+const eventsCommResults = document.querySelector('#locator-events-comm-tabpanel');
+
+async function fetchData(form) {
+  const fetchSheet = async (src) => {
+    const resp = await fetch(`https://little-forest-58aa.david8603.workers.dev/?url=${encodeURIComponent(src)}`);
+    const { data } = await resp.json();
+    data.forEach((item) => {
+      item.lat = +item.LAT;
+      item.lng = +item.LONG;
+    });
+    return data;
+  };
+
+  const loaded = form.dataset.status;
+  if (loaded) return window.locatorData;
+
+  form.dataset.status = 'loading';
+  window.locatorData = {};
+  window.locatorData.HH = await fetchSheet('https://main--thinktanked--davidnuescheler.aem.live/vitamix/storelocations-hh.json?limit=10000');
+  window.locatorData.COMM = await fetchSheet('https://main--thinktanked--davidnuescheler.aem.live/vitamix/storelocations-comm.json?limit=2000');
+  window.locatorData.EVENTS = await fetchSheet('https://main--thinktanked--davidnuescheler.aem.live/vitamix/storelocations-events.json?limit=3000');
+  form.dataset.status = 'loaded';
+  return window.locatorData;
 }
 
-// add delayed functionality here
-window.config = {
-  POOLID: 'us-east-1:d54ecd7d-db6e-456d-bf35-d26346122a63',
-  REGION: 'us-east-1',
-  BOTID: 'JBPXLTC0LW',
-  BOTALIASID: 'HUKYDI5LGI',
+const haversineDistance = (lat1, lon1, lat2, lon2) => {
+  const toRadians = (deg) => (deg * Math.PI) / 180;
+  const R = 6371;
+  const dLat = toRadians(lat2 - lat1);
+  const dLon = toRadians(lon2 - lon1);
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+    + Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) * Math.sin(dLon / 2)
+    * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distanceInKm = R * c;
+  // Convert kilometers to miles
+  const distanceInMiles = distanceInKm * 0.621371;
+  return distanceInMiles;
 };
 
-window.adobeDataLayer = window.adobeDataLayer || [];
+async function geoCode(address) {
+  try {
+    const resp = await fetch(
+      `https://helix-geocode.adobeaem.workers.dev/?address=${encodeURIComponent(address)}`,
+    );
 
-const currentEnvironment = document.createElement('div');
-currentEnvironment.classList.add('currentEnvironment');
-currentEnvironment.dataset.deploymentEnv = 'prod';
-currentEnvironment.dataset.templatePath = '/conf/vitamix/settings/wcm/templates/default-page';
-document.body.appendChild(currentEnvironment);
+    const json = await resp.json();
+    const results = json?.results;
 
-const chatbot = document.createElement('div');
-chatbot.id = 'chatbot-container';
-document.body.appendChild(chatbot);
+    if (!results || !results.length) {
+      return null;
+    }
 
-loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-chatbot.lc-dd65664b07118365206104c205ccc20e-lc.min.js');
-loadScript('https://www.vitamix.com/etc.clientlibs/core/wcm/components/commons/site/clientlibs/container.lc-0a6aff292f5cc42142779cde92054524-lc.min.js');
+    const result = results[0];
+    const components = result?.address_components || [];
 
-await loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-library.lc-259cf15444c5fe1f89e5c54df7b6e1e9-lc.min.js');
-await loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-analytics.lc-26814920488a848ff91c1f425646d010-lc.min.js');
-loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-base.lc-daf5b8dac79e9cf7cb1c0b30d8372e7a-lc.min.js');
+    const getComponent = (type) => components.find((c) => c.types?.includes(type));
 
-loadScript('https://assets.adobedtm.com/launch-EN40f2d69539754c3ea73511e70c65c801.min.js');
+    const countryComponent = getComponent('country');
+    const stateComponent = getComponent('administrative_area_level_1');
 
-/* eslint-disable */
+    return {
+      // Geo Location
+      location: result?.geometry?.location || null,
 
-loadScript('https://www.googletagmanager.com/gtag/js?id=AW-1070742187', { 'data-cookieconsent': 'marketing' });
-window.dataLayer = window.dataLayer || [];
-function gtag() { dataLayer.push(arguments); }
-gtag('js', new Date());
-gtag('config', 'AW-1070742187');
+      // Country
+      countryShort: countryComponent?.short_name || null,
+      countryLong: countryComponent?.long_name || null,
 
-loadScript('https://www.googletagmanager.com/gtag/js?id=G-XJB3SPQE38');
-gtag('js', new Date());
-gtag('config', 'G-XJB3SPQE38');
+      // State
+      stateShort: stateComponent?.short_name || null,
+      stateLong: stateComponent?.long_name || null,
 
-// Replace Innovid Conversion Tag with Google Consent Mode
-
-loadScript('https://www.googletagmanager.com/gtag/js?id=DC-15266370');
-gtag('js', new Date());
-gtag('config', 'DC-15266370');
-
-const path = window.location.pathname;
-const isHome = path === '/us/en_us/';
-const isAscentXcategory = path === '/us/en_us/shop/ascent-x-series-blenders';
-
-if (isHome) {
-  gtag('event', 'conversion', {
-    allow_custom_scripts: true,
-    send_to: 'DC-15266370/2026u0/vitam0+standard',
-  });
-}
-
-if (isAscentXcategory) {
-  gtag('event', 'conversion', {
-    allow_custom_scripts: true,
-    send_to: 'DC-15266370/2026u0/vitam00+standard',
-  });
-}
-
-//End Floodlight tag
-
-loadScript('https://arttrk.com/pixel/?ad_log=referer&action=content&pixid=82dc3545-14a0-41d8-9870-2156059087d9');
-loadScript('https://cdn.evgnet.com/beacon/vitamixmgmtcorp/vitamix_us/scripts/evergage.min.js');
-
-loadScript('https://www.googletagmanager.com/gtag/js?id=DC-10418690');
-gtag('js', new Date());
-gtag('config', 'DC-10418690');
-
-
-// Facebook Pixel Code
-
-!function(f,b,e,v,n,t,s)
-{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-n.queue=[];t=b.createElement(e);t.async=!0;
-t.src=v;s=b.getElementsByTagName(e)[0];
-s.parentNode.insertBefore(t,s)}(window,document,'script',
-'https://connect.facebook.net/en_US/fbevents.js');
-fbq('init', '1597403650511067');
-fbq('track', 'PageView');
-
-// End Facebook Pixel Code
-
-
-// Pinterest Tag
-!function(e){
-if(!window.pintrk){window.pintrk=function(){window.pintrk.queue.push(
-Array.prototype.slice.call(arguments))};
-var n=window.pintrk;n.queue=[],n.version="3.0";
-var t=document.createElement("script");t.async=!0,t.src=e;
-var r=document.getElementsByTagName("script")[0];
-r.parentNode.insertBefore(t,r)}}
-("https://s.pinimg.com/ct/core.js");
-pintrk('load', '2621075961855'); pintrk('page');
-// End of Pinterest Tag
-
-/* eslint-enable */
-
-// LinkedIn Insight Tag
-try {
-  const lpids = '_linkedin_data_partner_ids';
-  window[lpids] = window[lpids] || [];
-  window[lpids].push('2976369');
-  loadScript('https://snap.licdn.com/li.lms-analytics/insight.min.js');
-} catch (error) {
-  /* eslint-disable-next-line no-console */
-  console.error('LinkedIn Insight Tag failed to load', error);
-}
-
-// End of LinkedIn Insight Tag
-
-/* eslint-disable */
-
-// TV Scientific Pixel Code
-try {
-setTimeout(function () {var p, s, d, w;d = document;w = window.location;p = d.createElement("IMG");s = w.protocol + "//tvspix.com/t.png?&t=" + (new Date).getTime() + "&l=tvscientific-pix-o-4b66e973-23f2-45e9-91e5-aa5f89462df5&u3=" + encodeURIComponent(w.href);p.setAttribute("src", s);
-p.setAttribute("height", "0");p.setAttribute("width", "0");p.setAttribute("alt", "");p.style.setProperty("display", "none");p.style.setProperty("position", "absolute");
-p.style.setProperty("visibility", "hidden");d.body.appendChild(p);},500);
-} catch (error) {
-  console.error('TV Scientific Pixel Code failed to load', error);
-}
-
-
-// Tune Pixel Code
-!function(){var e=window.tdl=window.tdl||[];if(e.invoked)window.console&&console.error&&console.error("Tune snippet has been included more than once.");else{e.invoked=!0,e.methods=["init","identify","convert"],e.factory=function(t){return function(){var n=Array.prototype.slice.call(arguments);return n.unshift(t),e.push(n),e}};for(var t=0;t<e.methods.length;t++){var n=e.methods[t];e[n]=e.factory(n)}e.init=function(t){var n=document.createElement("script");n.type="text/javascript",n.async=!0,n.src="https://js.go2sdk.com/v2/tune.js";var r=document.getElementsByTagName("script")[0];r.parentNode.insertBefore(n,r),e.domain=t}}}();
-tdl.init("https://perkspot.go2cloud.org");
-tdl.identify();
-// End of Tune Pixel Code
-
-// Krateo pixel
-    (function(a,b,c,d){
-        var cookieUrl = encodeURIComponent("https://www.vitamix.com/us/en_us/cookie/index/index");
-        a='https://www.mczbf.com/tags/11931/tag.js?cookieUrl='+cookieUrl;
-        b=document;c='script';d=b.createElement(c);d.src=a;
-        d.type='text/java'+c;d.async=true;
-        d.id='cjapitag';
-        a=b.getElementsByTagName(c)[0];a.parentNode.insertBefore(d,a)
-    })();
-
-
-
-await loadScript('https://www.googletagmanager.com/gtag/js?id=AW-992994739');
-gtag('js', new Date());
-gtag('config', 'AW-992994739');
-
-
-
-loadScript('https://cdn.datasteam.io/js/D26F66D1AD707A.js');
-
-(function(w,d,t,r,u)
-{
-  var f,n,i;
-  w[u]=w[u]||[],f=function()
-  {
-    var o={ti:"355047220", enableAutoSpaTracking: true};
-    o.q=w[u],w[u]=new UET(o),w[u].push("pageLoad")
-  },
-  n=d.createElement(t),n.src=r,n.async=1,n.onload=n.onreadystatechange=function()
-  {
-    var s=this.readyState;
-    s&&s!=="loaded"&&s!=="complete"||(f(),n.onload=n.onreadystatechange=null)
-  },
-  i=d.getElementsByTagName(t)[0],i.parentNode.insertBefore(n,i)
-})
-(window,document,"script","//bat.bing.com/bat.js","uetq");
-
-(function(w, d){
-  var id='spdt-capture', n='script';
-  if (!d.getElementById(id)) {
-    w.spdt =
-      w.spdt ||
-      function() {
-        (w.spdt.q = w.spdt.q || []).push(arguments);
-      };
-    var e = d.createElement(n); e.id = id; e.async=1;
-    e.src = 'https://pixel.byspotify.com/ping.min.js';
-    var s = d.getElementsByTagName(n)[0];
-    s.parentNode.insertBefore(e, s);
+    };
+  } catch (error) {
+    console.error('Geocode error:', error);
+    return null;
   }
-  w.spdt('conf', { key: '18858202ee0c4082a0f7e6d3d8b53c94' });
-  w.spdt('view');
-})(window, document);
+}
 
+// Common helpers
+function norm(v) {
+  return (v ?? '').toString().trim();
+}
+function normLower(v) {
+  return norm(v).toLowerCase();
+}
+function isEnabled(v) {
+  return ['true', '1', 'yes', 'y'].includes(normLower(v));
+}
+function countryMatches(itemCountry, countryShort, countryLong) {
+  const c = normLower(itemCountry);
+  return c && (c === normLower(countryShort) || c === normLower(countryLong));
+}
+function recordKey(item) {
+  return [
+    item.TYPE,
+    item.PRODUCT_TYPE,
+    item.NAME,
+    item.ADDRESS_1,
+    item.CITY,
+    item.STATE_PROVINCE,
+    item.POSTAL_CODE,
+    item.COUNTRY,
+  ].map(normLower).join('|');
+}
+
+function applyAemRules(rows, {
+  countryShort, countryLong, productType, allowedTypes,
+}) {
+  const map = new Map();
+
+  (rows || []).forEach((r) => {
+    if (!isEnabled(r.ENABLED)) return;
+
+    if (productType && normLower(r.PRODUCT_TYPE) !== normLower(productType)) return;
+
+    if (allowedTypes && !allowedTypes.includes(norm(r.TYPE))) return;
+
+    if (!countryMatches(r.COUNTRY, countryShort, countryLong)) return;
+
+    const action = normLower(r.ACTION);
+    const key = recordKey(r);
+
+    if (action === 'remove') {
+      map.delete(key);
+      return;
+    }
+
+    if (action === '' || action === 'add' || action === 'update') {
+      map.set(key, r);
+    }
+  });
+
+  return Array.from(map.values());
+}
+
+// EVENTS helpers
+function excelSerialToDate(serial) {
+  const excelEpoch = new Date(1900, 0, 1);
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const adjusted = serial > 59 ? serial - 1 : serial; // Excel leap-year bug
+  return new Date(excelEpoch.getTime() + (adjusted - 1) * msPerDay);
+}
+
+function parseAnyDate(v) {
+  if (v == null || v === '') return null;
+
+  if (!Number.isNaN(Number(v)) && String(v).trim() !== '') {
+    return excelSerialToDate(Number(v));
+  }
+
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function ymdKey(d) {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function formatMDYFromKey(key) {
+  const [yyyy, mm, dd] = key.split('-');
+  return `${mm}/${dd}/${yyyy}`;
+}
+
+function eventKey(e) {
+  const s = parseAnyDate(e.START_DATE);
+  const startKey = s ? ymdKey(s) : '';
+  return [
+    normLower(e.PRODUCT_TYPE),
+    normLower(e.NAME),
+    normLower(e.ADDRESS_1),
+    normLower(e.CITY),
+    normLower(e.STATE_PROVINCE),
+    normLower(e.POSTAL_CODE),
+    normLower(e.COUNTRY),
+    startKey,
+  ].join('|');
+}
+
+function applyAemRulesEvents(rows, { productType }) {
+  const map = new Map();
+
+  (rows || []).forEach((r) => {
+    if (!isEnabled(r.ENABLED)) return;
+    if (productType && normLower(r.PRODUCT_TYPE) !== normLower(productType)) return;
+
+    const action = normLower(r.ACTION);
+    const key = eventKey(r);
+
+    if (action === 'remove') {
+      map.delete(key);
+      return;
+    }
+    if (action === '' || action === 'add' || action === 'update') {
+      map.set(key, r);
+    }
+  });
+
+  return Array.from(map.values());
+}
+
+function filterFutureEvents(rows) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return (rows || []).filter((e) => {
+    const start = parseAnyDate(e.START_DATE);
+    const end = parseAnyDate(e.END_DATE);
+    const compare = (end || start);
+    if (!compare) return false;
+
+    compare.setHours(0, 0, 0, 0);
+    return compare >= today;
+  });
+}
+
+function groupByStartDate(rows) {
+  const groups = new Map();
+
+  (rows || []).forEach((e) => {
+    const start = parseAnyDate(e.START_DATE);
+    if (!start) return;
+    start.setHours(0, 0, 0, 0);
+
+    const key = ymdKey(start);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(e);
+  });
+
+  return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+}
+
+function findEventsResults(data, location) {
+  const hhClean = applyAemRulesEvents(data, { productType: 'HH' });
+  const commClean = applyAemRulesEvents(data, { productType: 'COMM' });
+
+  const hhFuture = filterFutureEvents(hhClean);
+  const commFuture = filterFutureEvents(commClean);
+
+  const hhNearby = (hhFuture || []).filter(
+    (e) => haversineDistance(location.lat, location.lng, e.lat, e.lng) <= EVENTS_MAX_DISTANCE,
+  );
+  const commNearby = (commFuture || []).filter(
+    (e) => haversineDistance(location.lat, location.lng, e.lat, e.lng) <= EVENTS_MAX_DISTANCE,
+  );
+
+  const sortEvents = (arr) => {
+    arr.sort((a, b) => {
+      const ad = parseAnyDate(a.START_DATE)?.getTime() ?? 0;
+      const bd = parseAnyDate(b.START_DATE)?.getTime() ?? 0;
+      if (ad !== bd) return ad - bd;
+      return haversineDistance(location.lat, location.lng, a.lat, a.lng)
+        - haversineDistance(location.lat, location.lng, b.lat, b.lng);
+    });
+  };
+  sortEvents(hhNearby);
+  sortEvents(commNearby);
+
+  return {
+    hhGrouped: groupByStartDate(hhNearby),
+    commGrouped: groupByStartDate(commNearby),
+  };
+}
+
+function findCommResults(data, location, countryShort, countryLong, stateShort, stateLong) {
+  const allowedTypes = ['DEALER/DISTRIBUTOR', 'LOCAL REP'];
+
+  const cleaned = applyAemRules(data, {
+    countryShort,
+    countryLong,
+    stateShort,
+    stateLong,
+    productType: 'COMM',
+    allowedTypes,
+  });
+
+  const distributors = cleaned
+    .filter((i) => i.TYPE === 'DEALER/DISTRIBUTOR'
+      && haversineDistance(location.lat, location.lng, i.lat, i.lng) <= MAX_DISTANCE_COMM)
+    .sort((a, b) => haversineDistance(location.lat, location.lng, a.lat, a.lng)
+      - haversineDistance(location.lat, location.lng, b.lat, b.lng));
+
+  const localRep = cleaned
+    .filter((i) => i.TYPE === 'LOCAL REP'
+    && (i.STATE_PROVINCE === stateShort || i.STATE_NAME === stateLong));
+
+  return { distributors, localRep };
+}
+
+function findHHResults(data, location, countryShort, countryLong) {
+  const allowedTypes = ['ONLINE', 'RETAILERS', 'DEALER/DISTRIBUTOR'];
+
+  const cleaned = applyAemRules(data, {
+    countryShort,
+    countryLong,
+    productType: 'HH',
+    allowedTypes,
+  });
+
+  const retailers = cleaned
+    .filter((i) => i.TYPE === 'RETAILERS'
+      && haversineDistance(location.lat, location.lng, i.lat, i.lng) <= MAX_DISTANCE)
+    .sort((a, b) => haversineDistance(location.lat, location.lng, a.lat, a.lng)
+      - haversineDistance(location.lat, location.lng, b.lat, b.lng));
+
+  const distributors = cleaned
+    .filter((i) => i.TYPE === 'DEALER/DISTRIBUTOR'
+      && haversineDistance(location.lat, location.lng, i.lat, i.lng) <= MAX_DISTANCE)
+    .sort((a, b) => haversineDistance(location.lat, location.lng, a.lat, a.lng)
+      - haversineDistance(location.lat, location.lng, b.lat, b.lng));
+
+  const online = cleaned
+    .filter((i) => i.TYPE === 'ONLINE')
+    .sort((a, b) => normLower(a.NAME).localeCompare(normLower(b.NAME)));
+
+  return { retailers, distributors, online };
+}
+
+function displayCommResults(results, location) {
+  const { distributors, localRep } = results;
+
+  const createDistributorResult = (result) => {
+    const li = document.createElement('li');
+    const title = document.createElement('h3');
+    title.textContent = result.NAME;
+    li.append(title);
+
+    const distance = document.createElement('span');
+    distance.textContent = `${haversineDistance(location.lat, location.lng, result.lat, result.lng).toFixed(1)} miles away`;
+    distance.classList.add('locator-distance');
+    li.append(distance);
+
+    if (result.ADDRESS_1) {
+      const addressWrapper = document.createElement('span');
+      addressWrapper.classList.add('locator-address');
+
+      const addressLabel = document.createElement('strong');
+      addressLabel.textContent = 'Address: ';
+      addressWrapper.append(addressLabel);
+
+      const addressLink = document.createElement('a');
+      const addressQuery = `${result.ADDRESS_1}, ${result.CITY}, ${result.STATE_PROVINCE} ${result.POSTAL_CODE}`;
+      addressLink.href = `https://maps.google.com/?q=${encodeURIComponent(addressQuery)}`;
+      addressLink.target = '_blank';
+      addressLink.rel = 'noopener noreferrer';
+      addressLink.textContent = addressQuery;
+
+      addressWrapper.append(addressLink);
+      li.append(addressWrapper);
+    }
+
+    // Phone number
+    if (result.PHONE_NUMBER) {
+      const phoneWrapper = document.createElement('span');
+      phoneWrapper.classList.add('locator-phone');
+
+      const phoneLabel = document.createElement('strong');
+      phoneLabel.textContent = 'Phone: ';
+      phoneWrapper.append(phoneLabel);
+
+      const phoneLink = document.createElement('a');
+      phoneLink.href = `tel:${result.PHONE_NUMBER}`;
+      phoneLink.textContent = result.PHONE_NUMBER;
+      phoneLink.target = '_blank';
+      phoneLink.rel = 'noopener noreferrer';
+
+      phoneWrapper.append(phoneLink);
+      li.append(phoneWrapper);
+    }
+    // Web address
+    if (result.WEB_ADDRESS) {
+      const webWrapper = document.createElement('span');
+      webWrapper.classList.add('locator-web');
+
+      const webLabel = document.createElement('strong');
+      webLabel.textContent = 'Website: ';
+      webWrapper.append(webLabel);
+
+      const webLink = document.createElement('a');
+      const webAddress = result.WEB_ADDRESS.startsWith('http')
+        ? result.WEB_ADDRESS
+        : `https://${result.WEB_ADDRESS}`;
+
+      webLink.href = webAddress;
+      webLink.target = '_blank';
+      webLink.rel = 'noopener noreferrer';
+      webLink.textContent = result.WEB_ADDRESS_LINK_TEXT || result.WEB_ADDRESS;
+
+      webWrapper.append(webLink);
+      li.append(webWrapper);
+    }
+
+    return li;
+  };
+
+  const createLocalRepResult = (result) => {
+    const li = document.createElement('li');
+    const title = document.createElement('h3');
+    title.textContent = result.NAME;
+    li.append(title);
+
+    const distance = document.createElement('span');
+    distance.textContent = `${haversineDistance(location.lat, location.lng, result.lat, result.lng).toFixed(1)} miles away`;
+    distance.classList.add('locator-distance');
+    li.append(distance);
+
+    // Phone number
+    if (result.PHONE_NUMBER) {
+      const phoneWrapper = document.createElement('span');
+      phoneWrapper.classList.add('locator-phone');
+      const phoneLabel = document.createElement('strong');
+      phoneLabel.textContent = 'Phone: ';
+      phoneWrapper.append(phoneLabel);
+
+      const phoneLink = document.createElement('a');
+      phoneLink.href = `tel:${result.PHONE_NUMBER}`;
+      phoneLink.textContent = result.PHONE_NUMBER;
+      phoneWrapper.append(phoneLink);
+
+      li.append(phoneWrapper);
+    }
+
+    // Web address
+    if (result.WEB_ADDRESS) {
+      const webWrapper = document.createElement('span');
+      webWrapper.classList.add('locator-web');
+
+      const webLabel = document.createElement('strong');
+      webLabel.textContent = 'Website: ';
+      webWrapper.append(webLabel);
+
+      const webLink = document.createElement('a');
+      const webAddress = result.WEB_ADDRESS.startsWith('http')
+        ? result.WEB_ADDRESS
+        : `https://${result.WEB_ADDRESS}`;
+
+      webLink.href = webAddress;
+      webLink.target = '_blank';
+      webLink.textContent = result.WEB_ADDRESS_LINK_TEXT || result.WEB_ADDRESS;
+      webWrapper.append(webLink);
+
+      li.append(webWrapper);
+    }
+
+    return li;
+  };
+
+  if (distributors && distributors.length > 0) {
+    const distributorList = document.createElement('ol');
+    distributors.forEach((distributor) => {
+      distributorList.appendChild(createDistributorResult(distributor));
+    });
+    commDistributorsResults.textContent = '';
+    commDistributorsResults.appendChild(distributorList);
+  } else {
+    commDistributorsResults.innerHTML = '<p>No distributors found</p>';
+  }
+
+  if (localRep && localRep.length > 0) {
+    const localRepList = document.createElement('ol');
+    localRep.forEach((lr) => {
+      localRepList.appendChild(createLocalRepResult(lr));
+    });
+    commLocalrepResults.textContent = '';
+    commLocalrepResults.appendChild(localRepList);
+  } else {
+    commLocalrepResults.innerHTML = '<p>No local representatives found</p>';
+  }
+}
+
+function displayEventsResults(results, location) {
+  const { hhGrouped, commGrouped } = results;
+
+  const renderGroupedList = (container, grouped) => {
+    container.textContent = '';
+
+    if (!grouped || grouped.length === 0) {
+      container.innerHTML = '<p>No events found</p>';
+      return;
+    }
+
+    grouped.forEach(([dateKey, items]) => {
+      const heading = document.createElement('h4');
+      heading.classList.add('locator-events-dateheading');
+      heading.textContent = formatMDYFromKey(dateKey);
+      container.append(heading);
+
+      const ol = document.createElement('ol');
+      ol.classList.add('locator-events-list');
+
+      items.forEach((e) => {
+        const li = document.createElement('li');
+        li.classList.add('locator-event-card');
+
+        const title = document.createElement('h3');
+        title.textContent = e.NAME;
+        li.append(title);
+
+        const start = parseAnyDate(e.START_DATE);
+        const end = parseAnyDate(e.END_DATE);
+        if (start) {
+          const dateLine = document.createElement('span');
+          dateLine.classList.add('locator-date');
+          const startTxt = start.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+          const endTxt = end
+            ? end.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+            : '';
+          dateLine.textContent = endTxt ? `${startTxt} - ${endTxt}` : startTxt;
+          li.append(dateLine);
+        }
+
+        const dist = document.createElement('span');
+        dist.classList.add('locator-distance');
+        dist.textContent = `${haversineDistance(location.lat, location.lng, e.lat, e.lng).toFixed(1)} miles away`;
+        li.append(dist);
+
+        if (e.ADDRESS_1) {
+          const addressWrapper = document.createElement('span');
+          addressWrapper.classList.add('locator-address');
+
+          const addressLabel = document.createElement('strong');
+          addressLabel.textContent = 'Address: ';
+          addressWrapper.append(addressLabel);
+
+          const addressLink = document.createElement('a');
+          const addressQuery = `${e.ADDRESS_1}, ${e.CITY}, ${e.STATE_PROVINCE} ${e.POSTAL_CODE}`.replace(/\s+/g, ' ').trim();
+          addressLink.href = `https://maps.google.com/?q=${encodeURIComponent(addressQuery)}`;
+          addressLink.target = '_blank';
+          addressLink.rel = 'noopener noreferrer';
+          addressLink.textContent = addressQuery;
+
+          addressWrapper.append(addressLink);
+          li.append(addressWrapper);
+        }
+
+        ol.append(li);
+      });
+
+      container.append(ol);
+    });
+  };
+
+  // render both tab panels
+  renderGroupedList(eventsHHResults, hhGrouped);
+  renderGroupedList(eventsCommResults, commGrouped);
+
+  // calendar (optional)
+  const calendarEl = document.querySelector('#locator-events-calendar');
+  if (!calendarEl) return;
+
+  const eventDates = new Set();
+  const addDatesFromGrouped = (grouped) => (grouped || []).forEach(([k]) => eventDates.add(k));
+  addDatesFromGrouped(hhGrouped);
+  addDatesFromGrouped(commGrouped);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  let viewYear = today.getFullYear();
+  let viewMonth = today.getMonth();
+  let activeDateKey = null;
+
+  const renderCalendar = () => {
+    calendarEl.textContent = '';
+
+    const header = document.createElement('div');
+    header.classList.add('locator-cal-header');
+
+    const prevBtn = document.createElement('button');
+    prevBtn.type = 'button';
+    prevBtn.textContent = '‹';
+    prevBtn.addEventListener('click', () => {
+      viewMonth -= 1;
+      if (viewMonth < 0) { viewMonth = 11; viewYear -= 1; }
+      renderCalendar();
+    });
+
+    const nextBtn = document.createElement('button');
+    nextBtn.type = 'button';
+    nextBtn.textContent = '›';
+    nextBtn.addEventListener('click', () => {
+      viewMonth += 1;
+      if (viewMonth > 11) { viewMonth = 0; viewYear += 1; }
+      renderCalendar();
+    });
+
+    const monthTitle = document.createElement('div');
+    monthTitle.classList.add('locator-cal-title');
+    monthTitle.textContent = new Date(viewYear, viewMonth, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+    header.append(prevBtn, monthTitle, nextBtn);
+    calendarEl.append(header);
+
+    const grid = document.createElement('div');
+    grid.classList.add('locator-cal-grid');
+
+    ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach((d) => {
+      const cell = document.createElement('div');
+      cell.classList.add('locator-cal-dow');
+      cell.textContent = d;
+      grid.append(cell);
+    });
+
+    const firstDay = new Date(viewYear, viewMonth, 1);
+    const startWeekday = firstDay.getDay();
+    const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+
+    for (let i = 0; i < startWeekday; i += 1) {
+      const blank = document.createElement('div');
+      blank.classList.add('locator-cal-cell', 'is-blank');
+      grid.append(blank);
+    }
+
+    const createCellClickHandler = (cellKey) => () => {
+      activeDateKey = activeDateKey === cellKey ? null : cellKey;
+
+      if (activeDateKey) {
+        const hhFiltered = (hhGrouped || []).filter(([k]) => k === activeDateKey);
+        const commFiltered = (commGrouped || []).filter(([k]) => k === activeDateKey);
+
+        renderGroupedList(eventsHHResults, hhFiltered);
+        renderGroupedList(eventsCommResults, commFiltered);
+      } else {
+        renderGroupedList(eventsHHResults, hhGrouped);
+        renderGroupedList(eventsCommResults, commGrouped);
+      }
+
+      renderCalendar();
+    };
+
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const d = new Date(viewYear, viewMonth, day);
+      d.setHours(0, 0, 0, 0);
+      const key = ymdKey(d);
+
+      const cell = document.createElement('button');
+      cell.type = 'button';
+      cell.classList.add('locator-cal-cell');
+      cell.textContent = String(day);
+
+      if (eventDates.has(key)) cell.classList.add('has-event');
+      if (activeDateKey === key) cell.classList.add('is-active');
+
+      cell.addEventListener('click', createCellClickHandler(key));
+
+      grid.append(cell);
+    }
+
+    calendarEl.append(grid);
+  };
+
+  renderCalendar();
+}
+
+function displayHHResults(results, location) {
+  const { retailers, distributors, online } = results;
+
+  const cleanTel = (v) => (v || '').toString().replace(/[^\d+]/g, '');
+
+  const appendAddress = (li, result) => {
+    if (!result.ADDRESS_1) return;
+
+    const addressWrapper = document.createElement('span');
+    addressWrapper.classList.add('locator-address');
+
+    const addressLabel = document.createElement('strong');
+    addressLabel.textContent = 'Address: ';
+    addressWrapper.append(addressLabel);
+
+    const addressLink = document.createElement('a');
+    const addressQuery = `${result.ADDRESS_1}, ${result.CITY}, ${result.STATE_PROVINCE} ${result.POSTAL_CODE}`.replace(/\s+/g, ' ').trim();
+    addressLink.href = `https://maps.google.com/?q=${encodeURIComponent(addressQuery)}`;
+    addressLink.target = '_blank';
+    addressLink.rel = 'noopener noreferrer';
+    addressLink.textContent = addressQuery;
+
+    addressWrapper.append(addressLink);
+    li.append(addressWrapper);
+  };
+
+  const appendWebsite = (li, result) => {
+    if (!result.WEB_ADDRESS) return;
+
+    const webWrapper = document.createElement('span');
+    webWrapper.classList.add('locator-web');
+
+    const webLabel = document.createElement('strong');
+    webLabel.textContent = 'Website: ';
+    webWrapper.append(webLabel);
+
+    const webLink = document.createElement('a');
+    const webAddress = result.WEB_ADDRESS.startsWith('http')
+      ? result.WEB_ADDRESS
+      : `https://${result.WEB_ADDRESS}`;
+
+    webLink.href = webAddress;
+    webLink.target = '_blank';
+    webLink.rel = 'noopener noreferrer';
+    webLink.textContent = result.WEB_ADDRESS_LINK_TEXT || result.WEB_ADDRESS;
+
+    webWrapper.append(webLink);
+    li.append(webWrapper);
+  };
+
+  const appendPhone = (li, result) => {
+    if (!result.PHONE_NUMBER) return;
+
+    const phoneWrapper = document.createElement('span');
+    phoneWrapper.classList.add('locator-phone');
+
+    const phoneLabel = document.createElement('strong');
+    phoneLabel.textContent = 'Phone: ';
+    phoneWrapper.append(phoneLabel);
+
+    const phoneLink = document.createElement('a');
+    phoneLink.href = `tel:${cleanTel(result.PHONE_NUMBER)}`;
+    phoneLink.textContent = result.PHONE_NUMBER;
+    phoneLink.target = '_blank';
+    phoneLink.rel = 'noopener noreferrer';
+
+    phoneWrapper.append(phoneLink);
+    li.append(phoneWrapper);
+  };
+
+  const appendDistance = (li, result) => {
+    if (!location?.lat || !location?.lng || result.lat == null || result.lng == null) return;
+
+    const distance = document.createElement('span');
+    distance.textContent = `${haversineDistance(location.lat, location.lng, result.lat, result.lng).toFixed(1)} miles away`;
+    distance.classList.add('locator-distance');
+    li.append(distance);
+  };
+
+  const createOnlineResult = (result) => {
+    const li = document.createElement('li');
+
+    const title = document.createElement('h3');
+    title.textContent = result.NAME;
+    li.append(title);
+
+    appendAddress(li, result);
+    appendWebsite(li, result);
+    appendPhone(li, result);
+
+    return li;
+  };
+
+  const createDistributorResult = (result) => {
+    const li = document.createElement('li');
+
+    const title = document.createElement('h3');
+    title.textContent = result.NAME;
+    li.append(title);
+
+    appendDistance(li, result);
+    appendAddress(li, result);
+    appendWebsite(li, result);
+    appendPhone(li, result);
+
+    return li;
+  };
+
+  const createRetailerResult = (result) => {
+    const li = document.createElement('li');
+
+    const title = document.createElement('h3');
+    title.textContent = result.NAME;
+    li.append(title);
+
+    appendDistance(li, result);
+    appendAddress(li, result);
+    appendWebsite(li, result);
+    appendPhone(li, result);
+
+    return li;
+  };
+
+  // Retailers
+  if (retailers && retailers.length > 0) {
+    const retailerList = document.createElement('ol');
+    retailers.forEach((retailer) => {
+      retailerList.appendChild(createRetailerResult(retailer));
+    });
+    hhRetailersResults.textContent = '';
+    hhRetailersResults.appendChild(retailerList);
+  } else {
+    hhRetailersResults.innerHTML = '<p>No retailers found</p>';
+  }
+
+  // Distributors
+  if (distributors && distributors.length > 0) {
+    const distributorList = document.createElement('ol');
+    distributors.forEach((distributor) => {
+      distributorList.appendChild(createDistributorResult(distributor));
+    });
+    hhDistributorsResults.textContent = '';
+    hhDistributorsResults.appendChild(distributorList);
+  } else {
+    hhDistributorsResults.innerHTML = '<p>No distributors found</p>';
+  }
+
+  // Online
+  if (online && online.length > 0) {
+    const onlineList = document.createElement('ol');
+    online.forEach((item) => {
+      onlineList.appendChild(createOnlineResult(item));
+    });
+    hhOnlineResults.textContent = '';
+    hhOnlineResults.appendChild(onlineList);
+  } else {
+    hhOnlineResults.innerHTML = '<p>No online retailers found</p>';
+  }
+}
+
+export default function decorate(widget) {
+  widget.style.visibility = 'hidden';
+  loadCSS('/blocks/form/form.css').then(() => widget.removeAttribute('style'));
+
+  const form = widget.querySelector('form');
+
+  // set initial values from query params
+  const queryParams = Object.fromEntries(new URLSearchParams(window.location.search));
+  Object.entries(queryParams).forEach(([key, value]) => {
+    const input = form.querySelector(`[name="${key}"]`);
+    if (input) input.value = value;
+  });
+
+  // load results data
+  setTimeout(() => fetchData(form), 300);
+
+  const tabpanels = widget.querySelectorAll('.locator-tabpanels .locator-tabpanel');
+  const tablistButtons = widget.querySelectorAll('.locator-results-tablist button');
+  const showTab = (tabButton) => {
+    tablistButtons.forEach((b) => b.removeAttribute('aria-selected'));
+    tabpanels.forEach((panel) => panel.setAttribute('aria-hidden', true));
+    tabButton.setAttribute('aria-selected', 'true');
+    const tabpanel = document.getElementById(tabButton.getAttribute('aria-controls'));
+    tabpanel.setAttribute('aria-hidden', false);
+  };
+
+  const showType = (type) => {
+    widget.querySelectorAll('.locator-results').forEach((result) => {
+      result.setAttribute('aria-hidden', true);
+    });
+    widget.querySelector(`.locator-results.locator-${type}-results`).setAttribute('aria-hidden', false);
+    showTab(widget.querySelector(`.locator-results.locator-${type}-results button`));
+  };
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData);
+    const {
+      location,
+      countryShort,
+      countryLong,
+      stateShort,
+      stateLong,
+    } = await geoCode(data.address);
+
+    if (data.productType === 'HH') {
+      if (location) {
+        const results = findHHResults(window.locatorData.HH, location, countryShort, countryLong);
+        displayHHResults(results, location);
+      } else {
+        displayHHResults({});
+      }
+      showType('hh');
+    }
+
+    if (data.productType === 'COMM') {
+      if (location) {
+        const results = findCommResults(
+          window.locatorData.COMM,
+          location,
+          countryShort,
+          countryLong,
+          stateShort,
+          stateLong,
+        );
+        displayCommResults(results, location);
+      } else {
+        displayCommResults({});
+      }
+      showType('comm');
+    }
+
+    if (data.productType === 'EVENTS') {
+      if (location) {
+        const results = findEventsResults(window.locatorData.EVENTS, location);
+        displayEventsResults(results, location);
+      } else {
+        displayEventsResults({ hhGrouped: [], commGrouped: [] }, location);
+      }
+      showType('events');
+    }
+  });
+
+  tablistButtons.forEach((button) => {
+    button.addEventListener('click', (e) => {
+      e.preventDefault();
+      showTab(button);
+    });
+  });
+
+  widget.querySelector('#productType').addEventListener('change', () => {
+    if (widget.querySelector('#address').value) {
+      form.requestSubmit();
+    }
+  });
+}
