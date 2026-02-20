@@ -247,3 +247,14 @@
   font-weight: bold;
 }
 
+/* When compare-products param filtered columns: table reflows so visible columns share width */
+.widget-container.compare-products-columns-filtered .table.comparison .table-comparison-scroll table {
+  table-layout: auto;
+  width: 100%;
+}
+
+.widget-container.compare-products-columns-filtered .table.comparison .table-comparison-scroll th.compare-products-column-visible,
+.widget-container.compare-products-columns-filtered .table.comparison .table-comparison-scroll td.compare-products-column-visible {
+  min-width: 120px;
+}
+

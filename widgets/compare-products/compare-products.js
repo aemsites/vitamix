@@ -1,5 +1,17 @@
 import { loadCSS, toClassName } from '../../scripts/aem.js';
 
+const DEBUG = typeof window !== 'undefined' && (
+  new URLSearchParams(window.location.search).has('compare-products-debug')
+  || new URLSearchParams(window.location.search).has('compare-products')
+);
+
+function debug(...args) {
+  if (DEBUG) {
+    // eslint-disable-next-line no-console
+    console.log('[compare-products]', ...args);
+  }
+}
+
 const FEATURE_KEYS = [
   'Series',
   'Blending Programs',
@@ -20,14 +32,27 @@ const SPEC_LABEL_MAP = {
   Warranty: 'Warranty',
 };
 
-const FEATURES_BY_SERIES_PATH = '/us/en_us/products/config/features-by-series.json';
+const FEATURES_BY_SERIES_PATH_DEFAULT = '/us/en_us/products/config/features-by-series.json';
+
+/**
+ * Get features-by-series path for current locale (e.g. /ca/fr_ca/... -> /ca/fr_ca/products/config/...).
+ * @returns {string}
+ */
+function getFeaturesBySeriesPath() {
+  const match = window.location.pathname.match(/^(\/[^/]+\/[^/]+)\//);
+  if (match) {
+    return `${match[1]}/products/config/features-by-series.json`;
+  }
+  return FEATURES_BY_SERIES_PATH_DEFAULT;
+}
 
 /**
  * Fetch features-by-series config (same-origin only; no fcors).
  * @returns {Promise<Object|null>} Parsed JSON or null
  */
 async function fetchFeaturesBySeries() {
-  const url = new URL(FEATURES_BY_SERIES_PATH, window.location.origin).href;
+  const path = getFeaturesBySeriesPath();
+  const url = new URL(path, window.location.origin).href;
   const resp = await fetch(url);
   if (!resp.ok) return null;
   try {
@@ -49,7 +74,7 @@ function getProductSeries(product) {
 }
 
 /**
- * Normalize series name for matching: remove "Vitamix", trim, strip ®™.
+ * Normalize series name for matching: remove "Vitamix", trailing " Series", trim, strip ®™.
  * @param {string} s - Series or product name
  * @returns {string} Normalized string for comparison
  */
@@ -58,6 +83,8 @@ function normalizeSeriesForMatch(s) {
   const t = s
     .replace(/\s*®\s*|\s*™\s*/gi, ' ')
     .replace(/\bVitamix\b/gi, '')
+    .replace(/\s+series\s*$/gi, '')
+    .replace(/\s+série\s*$/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
   return t;
@@ -106,6 +133,83 @@ function getProductComparisonPaths() {
     });
 }
 
+/**
+ * Product paths from ?compare-products= (comma-separated; each replaces that product's series column).
+ * @returns {string[]} Array of product paths (e.g. ['/us/en_us/products/ascent-x2', ...]); empty if not set
+ */
+function getCompareProductsParamPaths() {
+  const params = new URLSearchParams(window.location.search);
+  const raw = params.get('compare-products');
+  debug('getCompareProductsParamPaths: raw=', raw);
+  if (!raw || typeof raw !== 'string') return [];
+  let decoded = raw;
+  try {
+    decoded = decodeURIComponent(raw);
+  } catch {
+    // keep raw if invalid encoding
+  }
+  const paths = decoded
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => {
+      try {
+        if (s.startsWith('http')) return new URL(s).pathname;
+        const url = new URL(s, window.location.origin);
+        return url.pathname;
+      } catch {
+        return s.startsWith('/') ? s : `/${s}`;
+      }
+    });
+  debug('getCompareProductsParamPaths: parsed paths=', paths);
+  return paths;
+}
+
+/** True when ?compare-products= was set (single or multiple paths). */
+function getCompareProductsParam() {
+  return getCompareProductsParamPaths().length > 0;
+}
+
+/** Map row header text (EN/FR) to FEATURE_KEYS for table column replacement */
+const ROW_LABEL_TO_FEATURE = {
+  series: 'Series',
+  série: 'Series',
+  'blending programs': 'Blending Programs',
+  'programmes de fusion': 'Blending Programs',
+  'variable speed control': 'Variable Speed Control',
+  'commande de vitesse variable': 'Variable Speed Control',
+  'touch buttons': 'Touch Buttons',
+  'boutons tactiles': 'Touch Buttons',
+  pulse: 'Pulse',
+  impulsion: 'Pulse',
+  'digital timer': 'Digital Timer',
+  'minuteur numérique': 'Digital Timer',
+  'self-detect technology': 'Self-Detect Technology',
+  "technologie d'autodétection": 'Self-Detect Technology',
+  'tamper indicator': 'Tamper Indicator',
+  "indicateur de falsification": 'Tamper Indicator',
+  'plus 15 second': 'Plus 15 Second Button',
+  '+15 secondes': 'Plus 15 Second Button',
+  warranty: 'Warranty',
+  garantie: 'Warranty',
+  dimensions: 'Dimensions (L × W × H)',
+  couleurs: 'Colors',
+  colors: 'Colors',
+};
+
+/** Feature keys that use series-level data from the original table; do not replace cell content. */
+const SERIES_INHERITED_FEATURE_KEYS = new Set([
+  'Blending Programs',
+  'Variable Speed Control',
+  'Touch Buttons',
+  'Pulse',
+  'Digital Timer',
+  'Self-Detect Technology',
+  'Tamper Indicator',
+  'Plus 15 Second Button',
+  'Dimensions (L × W × H)',
+]);
+
 const AEM_NETWORK_ORIGIN = 'https://main--vitamix--aemsites.aem.network';
 
 /**
@@ -129,6 +233,8 @@ async function fetchProductPage(path) {
   const pathOnly = path.startsWith('http') ? new URL(path).pathname : path;
   const fullUrl = path.startsWith('http') ? path : `${AEM_NETWORK_ORIGIN}${pathOnly}`;
 
+  debug('fetchProductPage: path=', path, 'fullUrl=', fullUrl, 'useFcors=', useFcors());
+
   let resp;
   if (useFcors()) {
     const corsProxy = 'https://fcors.org/?url=';
@@ -139,8 +245,12 @@ async function fetchProductPage(path) {
     const url = path.startsWith('http') ? path : new URL(path, window.location.origin).href;
     resp = await fetch(url);
   }
+
+  debug('fetchProductPage: path=', path, 'status=', resp.status, 'ok=', resp.ok);
   if (!resp.ok) return { html: null, status: resp.status };
-  return { html: await resp.text(), status: resp.status };
+  const html = await resp.text();
+  debug('fetchProductPage: path=', path, 'htmlLength=', html?.length);
+  return { html, status: resp.status };
 }
 
 /**
@@ -225,14 +335,21 @@ function parseProductFromPage(html, path) {
   const baseUrl = canonical || new URL(path, window.location.origin).href;
 
   const jsonLdScript = doc.querySelector('script[type="application/ld+json"]');
-  if (!jsonLdScript?.textContent) return null;
+  if (!jsonLdScript?.textContent) {
+    debug('parseProductFromPage: no JSON-LD script', path);
+    return null;
+  }
   let ld;
   try {
     ld = JSON.parse(jsonLdScript.textContent);
-  } catch {
+  } catch (e) {
+    debug('parseProductFromPage: JSON parse error', path, e);
     return null;
   }
-  if (ld['@type'] !== 'Product' || !ld.name) return null;
+  if (ld['@type'] !== 'Product' || !ld.name) {
+    debug('parseProductFromPage: not Product or no name', path, '@type=', ld['@type'], 'name=', ld?.name);
+    return null;
+  }
 
   const offers = ld.offers || [];
   const firstOffer = offers[0];
@@ -303,9 +420,14 @@ function parseProductFromPage(html, path) {
  * @returns {Promise<{ product: Object|null, errorStatus?: number }>}
  */
 async function fetchProduct(path) {
+  debug('fetchProduct: start', path);
   const { html, status } = await fetchProductPage(path);
-  if (!html) return { product: null, errorStatus: status };
+  if (!html) {
+    debug('fetchProduct: no html', path, 'status=', status);
+    return { product: null, errorStatus: status };
+  }
   const product = parseProductFromPage(html, path);
+  debug('fetchProduct: parsed', path, 'product=', product ? { name: product.name, series: getProductSeries(product) } : null);
   return { product, errorStatus: product ? undefined : status };
 }
 
@@ -374,6 +496,261 @@ function formatPrice(price) {
     ? `Save $${(regular - finalVal).toFixed(2)} | Was $${regular.toFixed(2)}`
     : null;
   return { now, save };
+}
+
+/**
+ * Find which table column index (1-based, 0 = row header) matches the given series.
+ * Uses first table's first tbody row and, for labels, the second table's thead (series names like "Séries Ascent et Venturist").
+ * @param {HTMLElement} container - .widget-container (section that has tables + widget)
+ * @param {string} series - Product series name
+ * @returns {number} 1-based column index or 1 if no match
+ */
+function findColumnIndexForSeries(container, series) {
+  const tables = container.querySelectorAll('.table.comparison .table-comparison-scroll table');
+  const firstTable = tables[0];
+  if (!firstTable) {
+    debug('findColumnIndexForSeries: no first table');
+    return 1;
+  }
+  const firstDataRow = firstTable.querySelector('tbody tr');
+  if (!firstDataRow) {
+    debug('findColumnIndexForSeries: no first tbody tr');
+    return 1;
+  }
+  const headerTable = tables[1] || firstTable;
+  const theadRow = headerTable.querySelector('thead tr');
+  const bodyCells = [...firstDataRow.children];
+  const targetNorm = normalizeSeriesForMatch(series).toLowerCase();
+  debug('findColumnIndexForSeries: series=', series, 'targetNorm=', targetNorm, 'cellCount=', bodyCells.length);
+  if (!targetNorm) return 1;
+  for (let i = 1; i < bodyCells.length; i += 1) {
+    let columnText = (firstDataRow.children[i]?.textContent || '').trim();
+    if (theadRow?.children[i]) {
+      const thText = (theadRow.children[i].textContent || '').trim();
+      if (thText) columnText = `${thText} ${columnText}`;
+    }
+    const cellNorm = normalizeSeriesForMatch(columnText).toLowerCase();
+    if (!cellNorm) continue;
+    if (cellNorm === targetNorm || cellNorm.includes(targetNorm) || targetNorm.includes(cellNorm)) {
+      debug('findColumnIndexForSeries: match at column', i, 'cellText=', columnText.slice(0, 60));
+      return i;
+    }
+  }
+  debug('findColumnIndexForSeries: no match, using column 1');
+  return 1;
+}
+
+/**
+ * Create color swatches DOM for comparison table (same structure as table block).
+ * @param {Object} product - Product with options[].values (color names)
+ * @returns {DocumentFragment}
+ */
+function createColorSwatchesForProduct(product) {
+  const frag = document.createDocumentFragment();
+  const wrap = document.createElement('div');
+  wrap.className = 'table-comparison-color-swatches';
+  const colorOpt = product?.options?.find((o) => o.id === 'color');
+  const values = colorOpt?.values || [];
+  values.forEach((opt) => {
+    const label = opt.value || '';
+    const slug = toClassName(label);
+    const swatch = document.createElement('div');
+    swatch.className = 'table-comparison-color-swatch';
+    swatch.title = label;
+    const inner = document.createElement('div');
+    inner.className = 'table-comparison-color-inner';
+    inner.style.backgroundColor = slug ? `var(--color-${slug}, #888)` : '#888';
+    swatch.appendChild(inner);
+    wrap.appendChild(swatch);
+  });
+  frag.appendChild(wrap);
+  return frag;
+}
+
+/**
+ * Replace one column in all comparison tables with the specific product's data.
+ * @param {HTMLElement} container - .widget-container (section that has tables + widget)
+ * @param {number} columnIndex - Column index (0 = row header, 1 = first product)
+ * @param {Object} product - Parsed product from fetchProduct
+ * @param {Object} [featuresBySeries] - Optional features-by-series config
+ */
+function replaceColumnWithProduct(container, columnIndex, product, featuresBySeries) {
+  const tables = container.querySelectorAll('.table.comparison .table-comparison-scroll table');
+  if (!tables.length) return;
+
+  const productUrl = product.path?.startsWith('http') ? product.path : new URL(product.path || '', window.location.origin).href;
+  const imageUrl = getProductImageUrl(product, 0);
+  const { now: priceNow, save: priceSave } = formatPrice(product?.price || product?.variants?.[0]?.price);
+  const priceText = priceSave ? `Now ${priceNow} | ${priceSave}` : `From ${priceNow}`;
+  const learnMoreText = 'En savoir plus'; // could be localized
+
+  tables.forEach((table, tableIndex) => {
+    const theadRow = table.querySelector('thead tr');
+    const isFirstTable = tableIndex === 0;
+
+    if (isFirstTable && theadRow) {
+      const th = theadRow.children[columnIndex];
+      if (th) {
+        th.innerHTML = '';
+        if (imageUrl) {
+          const picture = document.createElement('picture');
+          const img = document.createElement('img');
+          img.loading = 'lazy';
+          img.alt = product.name || '';
+          img.src = imageUrl;
+          img.width = 320;
+          img.height = 440;
+          picture.appendChild(img);
+          th.appendChild(picture);
+        }
+      }
+    }
+
+    const bodyRows = table.querySelectorAll('tbody tr');
+    bodyRows.forEach((row, rowIndex) => {
+      const cells = [...row.children];
+      const cell = cells[columnIndex];
+      if (!cell || cell.tagName !== 'TD') return;
+
+      if (isFirstTable && row.classList.contains('table-comparison-row-header-empty') && rowIndex === 0) {
+        cell.innerHTML = `
+          <p><strong>${(product.name || '').replace(/</g, '&lt;')}</strong></p>
+          <p>${priceText.replace(/</g, '&lt;')}</p>
+          <p><strong><a href="${productUrl.replace(/"/g, '&quot;')}">${learnMoreText}</a></strong></p>
+        `;
+        return;
+      }
+
+      const headerCell = row.querySelector('th');
+      const headerText = (headerCell?.textContent || '').trim().toLowerCase();
+      const normalized = headerText.replace(/\s+/g, ' ').trim();
+      const featureKey = ROW_LABEL_TO_FEATURE[normalized]
+        || Object.keys(ROW_LABEL_TO_FEATURE).find((k) => normalized.includes(k));
+
+      if (featureKey === 'Colors') {
+        cell.textContent = '';
+        cell.appendChild(createColorSwatchesForProduct(product));
+        return;
+      }
+
+      if (featureKey === 'Series') {
+        const p = document.createElement('p');
+        p.textContent = product.name || '—';
+        cell.textContent = '';
+        cell.appendChild(p);
+        return;
+      }
+
+      if (featureKey && SERIES_INHERITED_FEATURE_KEYS.has(featureKey)) {
+        return;
+      }
+
+      if (featureKey && featureKey !== 'Colors') {
+        const value = getFeatureValue(product, featureKey, featuresBySeries);
+        if (value === 'Yes') {
+          cell.innerHTML = '<p><span class="icon icon-check"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="20" height="20"><title>Check</title><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg></span></p>';
+        } else {
+          cell.textContent = value || '—';
+          if (!cell.querySelector('p')) {
+            const p = document.createElement('p');
+            p.textContent = cell.textContent;
+            cell.textContent = '';
+            cell.appendChild(p);
+          }
+        }
+      }
+    });
+  });
+}
+
+/**
+ * Hide table columns whose index is not in the used set (keeps row header column 0 and selected product columns).
+ * @param {HTMLElement} container - .widget-container
+ * @param {Set<number>} usedColumnIndices - Column indices to keep (e.g. 0, 1, 2, 5)
+ */
+function hideUnusedColumns(container, usedColumnIndices) {
+  const tables = container.querySelectorAll('.table.comparison .table-comparison-scroll table');
+  tables.forEach((table) => {
+    const colgroup = table.querySelector('colgroup');
+    if (colgroup) {
+      [...colgroup.children].forEach((col, index) => {
+        if (usedColumnIndices.has(index)) {
+          col.classList.add('compare-products-column-visible');
+        } else {
+          col.style.display = 'none';
+        }
+      });
+    }
+    [...table.querySelectorAll('thead tr'), ...table.querySelectorAll('tbody tr')].forEach((tr) => {
+      [...tr.children].forEach((cell, index) => {
+        if (usedColumnIndices.has(index)) {
+          cell.classList.add('compare-products-column-visible');
+        } else {
+          cell.style.display = 'none';
+        }
+      });
+    });
+  });
+  debug('hideUnusedColumns: kept columns', [...usedColumnIndices].sort((a, b) => a - b));
+}
+
+/**
+ * When compare-products=path[,path2,...] is set: inject each product into its matching series column, hide other columns, then remove widget.
+ * @param {HTMLElement} widget - Widget root
+ * @returns {Promise<boolean>} true if the param was set and handling was done
+ */
+async function handleCompareProductsParam(widget) {
+  const paths = getCompareProductsParamPaths();
+  debug('handleCompareProductsParam: paths=', paths);
+  if (paths.length === 0) {
+    debug('handleCompareProductsParam: no paths, skip');
+    return false;
+  }
+
+  const container = widget.closest('.widget-container');
+  debug('handleCompareProductsParam: container=', container ? 'found' : 'NOT FOUND (need .widget-container on page)');
+  if (!container) return false;
+
+  debug('handleCompareProductsParam: fetching featuresBySeries and', paths.length, 'products');
+  const featuresBySeries = await fetchFeaturesBySeries();
+  const results = await Promise.all(paths.map((path) => fetchProduct(path)));
+  debug('handleCompareProductsParam: results=', results.map((r, i) => ({ path: paths[i], hasProduct: !!r.product, errorStatus: r.errorStatus })));
+
+  const usedColumnIndices = new Set([0]);
+  let anyReplaced = false;
+  results.forEach(({ product }, i) => {
+    if (!product) {
+      debug('handleCompareProductsParam: skip path (no product)', paths[i]);
+      return;
+    }
+    const series = getProductSeries(product);
+    const columnIndex = findColumnIndexForSeries(container, series);
+    debug('handleCompareProductsParam: replace column', 'path=', paths[i], 'series=', series, 'columnIndex=', columnIndex);
+    usedColumnIndices.add(columnIndex);
+    replaceColumnWithProduct(container, columnIndex, product, featuresBySeries || undefined);
+    anyReplaced = true;
+  });
+
+  if (anyReplaced) {
+    hideUnusedColumns(container, usedColumnIndices);
+    container.classList.add('compare-products-columns-filtered');
+    container.dataset.compareProductsVisible = String(usedColumnIndices.size - 1);
+  }
+
+  debug('handleCompareProductsParam: done, anyReplaced=', anyReplaced, 'visibleColumns=', usedColumnIndices.size - 1);
+  removeWidgetWrapperLater(widget);
+  return true;
+}
+
+/**
+ * Remove the widget wrapper on the next task so widget block can finish (it uses wrapper after we return).
+ * @param {HTMLElement} widget - Widget root
+ */
+function removeWidgetWrapperLater(widget) {
+  setTimeout(() => {
+    const wrapper = widget.closest('.widget-wrapper');
+    if (wrapper) wrapper.remove();
+  }, 0);
 }
 
 /**
@@ -584,39 +961,42 @@ function render(widget, slots, featuresBySeries) {
 
 /**
  * Initialize compare-products widget: read config, fetch products, render.
+ * If ?compare-products=path is set, inject that product into the matching series column in the page tables and hide the widget.
+ * Otherwise use ?productComparison=path1,path2 to show the widget comparison grid.
  * @param {HTMLElement} widget - Widget root
  */
 export default async function decorate(widget) {
-  const paths = getProductComparisonPaths();
-  if (paths.length === 0) {
-    widget.querySelector('.compare-products-products')?.appendChild(
-      Object.assign(document.createElement('p'), {
-        textContent: 'Add product paths to compare (productComparison).',
-        className: 'compare-products-empty',
-      }),
-    );
+  const paths = getCompareProductsParamPaths();
+  debug('decorate: compare-products paths=', paths.length ? paths : 'none');
+  const handled = await handleCompareProductsParam(widget);
+  debug('decorate: handled=', handled);
+  if (handled) return;
+
+  if (getCompareProductsParam()) {
+    removeWidgetWrapperLater(widget);
+    return;
+  }
+
+  const comparisonPaths = getProductComparisonPaths();
+  if (comparisonPaths.length === 0) {
+    removeWidgetWrapperLater(widget);
     return;
   }
 
   const [featuresBySeries, ...slotResults] = await Promise.all([
     fetchFeaturesBySeries(),
-    ...paths.map((path) => fetchProduct(path)),
+    ...comparisonPaths.map((path) => fetchProduct(path)),
   ]);
 
   const slots = slotResults.map(({ product, errorStatus }, i) => ({
-    path: paths[i],
+    path: comparisonPaths[i],
     product,
     errorStatus,
   }));
 
   const allFailed = slots.every((slot) => !slot.product);
   if (allFailed) {
-    widget.querySelector('.compare-products-products')?.appendChild(
-      Object.assign(document.createElement('p'), {
-        textContent: 'Could not load product data.',
-        className: 'compare-products-empty',
-      }),
-    );
+    removeWidgetWrapperLater(widget);
     return;
   }
 

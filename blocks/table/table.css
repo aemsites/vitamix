@@ -77,35 +77,36 @@
   font-weight: 600;
 }
 
-/* Heading column: small image left, text right, vertically centered */
-.table.comparison .table-comparison-scroll tbody th .table-comparison-cell-content {
+/* Heading column: flex on <p>, image left, text right, vertically centered */
+.table.comparison .table-comparison-scroll tbody th .table-comparison-cell-content p {
   display: flex;
   align-items: center;
   gap: 12px;
+  margin: 0;
 }
 
-.table.comparison .table-comparison-scroll tbody th .table-comparison-cell-content picture,
-.table.comparison .table-comparison-scroll tbody th .table-comparison-cell-content img {
+.table.comparison .table-comparison-scroll tbody th .table-comparison-cell-content p picture,
+.table.comparison .table-comparison-scroll tbody th .table-comparison-cell-content p img {
   flex-shrink: 0;
   width: 48px;
   height: 48px;
   margin: 0;
 }
 
-.table.comparison .table-comparison-scroll tbody th .table-comparison-cell-content img {
+.table.comparison .table-comparison-scroll tbody th .table-comparison-cell-content p img {
   width: 48px;
   height: 48px;
   object-fit: contain;
 }
 
-.table.comparison .table-comparison-scroll tbody th .table-comparison-cell-content a {
+.table.comparison .table-comparison-scroll tbody th .table-comparison-cell-content p a {
   color: #06c;
   text-decoration: none;
   flex: 1;
   min-width: 0;
 }
 
-.table.comparison .table-comparison-scroll tbody th .table-comparison-cell-content a:hover {
+.table.comparison .table-comparison-scroll tbody th .table-comparison-cell-content p a:hover {
   text-decoration: underline;
 }
 
@@ -113,4 +114,43 @@
   background-color: #fff;
   text-align: center;
   color: #333;
+}
+
+.table.comparison .table-comparison-scroll thead tr.table-comparison-row-header-empty th,
+.table.comparison .table-comparison-scroll tbody tr.table-comparison-row-header-empty th,
+.table.comparison .table-comparison-scroll tbody tr.table-comparison-row-header-empty td {
+  background-color: transparent;
+  border-color: transparent;
+}
+
+/* Comparison table: colors row – round swatches from pdp/color-swatches.css */
+.table.comparison .table-comparison-scroll .table-comparison-color-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.table.comparison .table-comparison-scroll .table-comparison-color-swatch {
+  width: 24px;
+  height: 24px;
+  border: 1px solid #333f48;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.table.comparison .table-comparison-scroll .table-comparison-color-inner {
+  width: 16px;
+  height: 16px;
+  border: 1px solid #333f48;
+  border-radius: 50%;
+}
+
+.table.comparison .table-comparison-scroll .table-comparison-color-text {
+  font-size: 0.9em;
+  color: #666;
 }
