@@ -35,7 +35,8 @@ const SPEC_LABEL_MAP = {
 const FEATURES_BY_SERIES_PATH_DEFAULT = '/us/en_us/products/config/features-by-series.json';
 
 /**
- * Get features-by-series path for current locale (e.g. /ca/fr_ca/... -> /ca/fr_ca/products/config/...).
+ * Get features-by-series path for current locale.
+ * E.g. /ca/fr_ca/... -> /ca/fr_ca/products/config/...
  * @returns {string}
  */
 function getFeaturesBySeriesPath() {
@@ -134,8 +135,9 @@ function getProductComparisonPaths() {
 }
 
 /**
- * Product paths from ?compare-products= (comma-separated; each replaces that product's series column).
- * @returns {string[]} Array of product paths (e.g. ['/us/en_us/products/ascent-x2', ...]); empty if not set
+ * Product paths from ?compare-products= (comma-separated).
+ * Each path replaces that product's series column.
+ * @returns {string[]} Array of product paths; empty if not set
  */
 function getCompareProductsParamPaths() {
   const params = new URLSearchParams(window.location.search);
@@ -187,7 +189,7 @@ const ROW_LABEL_TO_FEATURE = {
   'self-detect technology': 'Self-Detect Technology',
   "technologie d'autodétection": 'Self-Detect Technology',
   'tamper indicator': 'Tamper Indicator',
-  "indicateur de falsification": 'Tamper Indicator',
+  'indicateur de falsification': 'Tamper Indicator',
   'plus 15 second': 'Plus 15 Second Button',
   '+15 secondes': 'Plus 15 Second Button',
   warranty: 'Warranty',
@@ -500,7 +502,7 @@ function formatPrice(price) {
 
 /**
  * Find which table column index (1-based, 0 = row header) matches the given series.
- * Uses first table's first tbody row and, for labels, the second table's thead (series names like "Séries Ascent et Venturist").
+ * Uses first table's first tbody row and second table's thead for labels.
  * @param {HTMLElement} container - .widget-container (section that has tables + widget)
  * @param {string} series - Product series name
  * @returns {number} 1-based column index or 1 if no match
@@ -530,8 +532,12 @@ function findColumnIndexForSeries(container, series) {
       if (thText) columnText = `${thText} ${columnText}`;
     }
     const cellNorm = normalizeSeriesForMatch(columnText).toLowerCase();
-    if (!cellNorm) continue;
-    if (cellNorm === targetNorm || cellNorm.includes(targetNorm) || targetNorm.includes(cellNorm)) {
+    const matches = cellNorm && (
+      cellNorm === targetNorm
+      || cellNorm.includes(targetNorm)
+      || targetNorm.includes(cellNorm)
+    );
+    if (matches) {
       debug('findColumnIndexForSeries: match at column', i, 'cellText=', columnText.slice(0, 60));
       return i;
     }
@@ -568,6 +574,28 @@ function createColorSwatchesForProduct(product) {
 }
 
 /**
+ * Resolve image URL for display (variant or product level).
+ * @param {Object} product - Product JSON
+ * @param {number} variantIndex - Selected variant index
+ * @returns {string} Image URL
+ */
+function getProductImageUrl(product, variantIndex = 0) {
+  const variants = product?.variants;
+  if (Array.isArray(variants) && variants[variantIndex]?.images?.length > 0) {
+    const [{ url }] = variants[variantIndex].images;
+    return url.startsWith('http') || url.startsWith('/')
+      ? url : new URL(url, window.location.origin).pathname;
+  }
+  const images = product?.images;
+  if (Array.isArray(images) && images.length > 0) {
+    const [{ url }] = images;
+    return url.startsWith('http') || url.startsWith('/')
+      ? url : new URL(url, window.location.origin).pathname;
+  }
+  return '';
+}
+
+/**
  * Replace one column in all comparison tables with the specific product's data.
  * @param {HTMLElement} container - .widget-container (section that has tables + widget)
  * @param {number} columnIndex - Column index (0 = row header, 1 = first product)
@@ -578,9 +606,12 @@ function replaceColumnWithProduct(container, columnIndex, product, featuresBySer
   const tables = container.querySelectorAll('.table.comparison .table-comparison-scroll table');
   if (!tables.length) return;
 
-  const productUrl = product.path?.startsWith('http') ? product.path : new URL(product.path || '', window.location.origin).href;
+  const productUrl = product.path?.startsWith('http')
+    ? product.path
+    : new URL(product.path || '', window.location.origin).href;
   const imageUrl = getProductImageUrl(product, 0);
-  const { now: priceNow, save: priceSave } = formatPrice(product?.price || product?.variants?.[0]?.price);
+  const priceOrVariant = product?.price || product?.variants?.[0]?.price;
+  const { now: priceNow, save: priceSave } = formatPrice(priceOrVariant);
   const priceText = priceSave ? `Now ${priceNow} | ${priceSave}` : `From ${priceNow}`;
   const learnMoreText = 'En savoir plus'; // could be localized
 
@@ -664,7 +695,8 @@ function replaceColumnWithProduct(container, columnIndex, product, featuresBySer
 }
 
 /**
- * Hide table columns whose index is not in the used set (keeps row header column 0 and selected product columns).
+ * Hide table columns whose index is not in the used set.
+ * Keeps row header column 0 and selected product columns.
  * @param {HTMLElement} container - .widget-container
  * @param {Set<number>} usedColumnIndices - Column indices to keep (e.g. 0, 1, 2, 5)
  */
@@ -695,7 +727,19 @@ function hideUnusedColumns(container, usedColumnIndices) {
 }
 
 /**
- * When compare-products=path[,path2,...] is set: inject each product into its matching series column, hide other columns, then remove widget.
+ * Remove the widget wrapper on the next task so widget block can finish.
+ * @param {HTMLElement} widget - Widget root
+ */
+function removeWidgetWrapperLater(widget) {
+  setTimeout(() => {
+    const wrapper = widget.closest('.widget-wrapper');
+    if (wrapper) wrapper.remove();
+  }, 0);
+}
+
+/**
+ * When compare-products=path[,path2,...] is set: inject each product into its matching
+ * series column, hide other columns, then remove widget.
  * @param {HTMLElement} widget - Widget root
  * @returns {Promise<boolean>} true if the param was set and handling was done
  */
@@ -708,7 +752,10 @@ async function handleCompareProductsParam(widget) {
   }
 
   const container = widget.closest('.widget-container');
-  debug('handleCompareProductsParam: container=', container ? 'found' : 'NOT FOUND (need .widget-container on page)');
+  debug(
+    'handleCompareProductsParam: container=',
+    container ? 'found' : 'NOT FOUND (need .widget-container on page)',
+  );
   if (!container) return false;
 
   debug('handleCompareProductsParam: fetching featuresBySeries and', paths.length, 'products');
@@ -737,40 +784,14 @@ async function handleCompareProductsParam(widget) {
     container.dataset.compareProductsVisible = String(usedColumnIndices.size - 1);
   }
 
-  debug('handleCompareProductsParam: done, anyReplaced=', anyReplaced, 'visibleColumns=', usedColumnIndices.size - 1);
+  debug(
+    'handleCompareProductsParam: done, anyReplaced=',
+    anyReplaced,
+    'visibleColumns=',
+    usedColumnIndices.size - 1,
+  );
   removeWidgetWrapperLater(widget);
   return true;
-}
-
-/**
- * Remove the widget wrapper on the next task so widget block can finish (it uses wrapper after we return).
- * @param {HTMLElement} widget - Widget root
- */
-function removeWidgetWrapperLater(widget) {
-  setTimeout(() => {
-    const wrapper = widget.closest('.widget-wrapper');
-    if (wrapper) wrapper.remove();
-  }, 0);
-}
-
-/**
- * Resolve image URL for display (variant or product level).
- * @param {Object} product - Product JSON
- * @param {number} variantIndex - Selected variant index
- * @returns {string} Image URL
- */
-function getProductImageUrl(product, variantIndex = 0) {
-  const variants = product?.variants;
-  if (Array.isArray(variants) && variants[variantIndex]?.images?.length > 0) {
-    const [{ url }] = variants[variantIndex].images;
-    return url.startsWith('http') || url.startsWith('/') ? url : new URL(url, window.location.origin).pathname;
-  }
-  const images = product?.images;
-  if (Array.isArray(images) && images.length > 0) {
-    const [{ url }] = images;
-    return url.startsWith('http') || url.startsWith('/') ? url : new URL(url, window.location.origin).pathname;
-  }
-  return '';
 }
 
 /**
@@ -961,7 +982,7 @@ function render(widget, slots, featuresBySeries) {
 
 /**
  * Initialize compare-products widget: read config, fetch products, render.
- * If ?compare-products=path is set, inject that product into the matching series column in the page tables and hide the widget.
+ * If ?compare-products=path is set, inject that product into the matching series column.
  * Otherwise use ?productComparison=path1,path2 to show the widget comparison grid.
  * @param {HTMLElement} widget - Widget root
  */
