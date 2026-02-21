@@ -1,4 +1,5 @@
 import { loadCSS, toClassName } from '../../scripts/aem.js';
+import { lookupProducts } from '../../blocks/plp/plp.js';
 
 const DEBUG = typeof window !== 'undefined' && (
   new URLSearchParams(window.location.search).has('compare-products-debug')
@@ -11,6 +12,12 @@ function debug(...args) {
     console.log('[compare-products]', ...args);
   }
 }
+
+/** productType used to show "add a product" grid (from products index) */
+const ADD_TO_COMPARE_PRODUCT_TYPE = 'Countertop Blender';
+
+/** Show "add a product" grid until this many products are in the comparison */
+const MAX_COMPARISON_PRODUCTS = 4;
 
 const FEATURE_KEYS = [
   'Series',
@@ -72,6 +79,25 @@ function getProductSeries(product) {
   if (!product) return '';
   const c = product.custom || {};
   return (c.series || c.collection || product.name || '').trim();
+}
+
+/**
+ * Infer series from product path/title when they clearly indicate the series (avoids wrong page data).
+ * @param {Object} product - Product with .path, .name, .url
+ * @returns {string} Series name or ''
+ */
+function inferSeriesFromPathAndTitle(product) {
+  if (!product) return '';
+  const path = (product.path || product.url || '').toLowerCase();
+  const title = (product.name || product.title || '').toLowerCase();
+  const s = `${path} ${title}`;
+  if (/\bascent\s*[-]?\s*x\s*\d|\bascent\s*x2|\bascent\s*x3|\bascent\s*x4|\bascent\s*x5/.test(s)) return 'Ascent X Series';
+  if (/\bventurist\b|v1200/.test(s)) return 'Venturist Series';
+  if (/\bpropel\b/.test(s)) return 'Propel Series';
+  if (/\bexplorian\b|e310|e320/.test(s)) return 'Explorian Series';
+  if (/\bascent\b|a2500|a3500/.test(s)) return 'Ascent Series';
+  if (/\b5200\b|legacy\b/.test(s)) return 'Legacy Series';
+  return '';
 }
 
 /**
@@ -223,6 +249,19 @@ function useFcors() {
   return hostname === 'localhost'
     || hostname.endsWith('.aem.page')
     || hostname.endsWith('.aem.live');
+}
+
+/**
+ * Resolve image URL for display: when on localhost / .aem.page / .aem.live, load from aem.network.
+ * @param {string} url - Image URL (absolute or path)
+ * @returns {string} URL to use for img src
+ */
+function resolveImageUrlForDisplay(url) {
+  if (!url) return '';
+  if (!useFcors()) return url;
+  if (url.startsWith('http')) return url;
+  const path = url.startsWith('/') ? url : `/${url}`;
+  return `${AEM_NETWORK_ORIGIN}${path}`;
 }
 
 /**
@@ -525,6 +564,11 @@ function findColumnIndexForSeries(container, series) {
   const targetNorm = normalizeSeriesForMatch(series).toLowerCase();
   debug('findColumnIndexForSeries: series=', series, 'targetNorm=', targetNorm, 'cellCount=', bodyCells.length);
   if (!targetNorm) return 1;
+
+  const isAscentNonX = targetNorm === 'ascent' || (targetNorm.startsWith('ascent') && !targetNorm.includes('x'));
+  const isAscentX = targetNorm.includes('ascent') && targetNorm.includes('x');
+  const isVenturist = targetNorm.includes('venturist');
+
   for (let i = 1; i < bodyCells.length; i += 1) {
     let columnText = (firstDataRow.children[i]?.textContent || '').trim();
     if (theadRow?.children[i]) {
@@ -537,13 +581,37 @@ function findColumnIndexForSeries(container, series) {
       || cellNorm.includes(targetNorm)
       || targetNorm.includes(cellNorm)
     );
-    if (matches) {
-      debug('findColumnIndexForSeries: match at column', i, 'cellText=', columnText.slice(0, 60));
-      return i;
-    }
+    if (!matches) continue;
+
+    if (isAscentNonX && cellNorm.includes('ascent x')) continue;
+    if (isAscentX && cellNorm.includes('venturist')) continue;
+    if (isVenturist && cellNorm.includes('ascent x')) continue;
+
+    debug('findColumnIndexForSeries: match at column', i, 'cellText=', columnText.slice(0, 60));
+    return i;
   }
   debug('findColumnIndexForSeries: no match, using column 1');
   return 1;
+}
+
+/**
+ * Get the column header label for a column index (same source as findColumnIndexForSeries).
+ * @param {HTMLElement} container - .widget-container
+ * @param {number} columnIndex - Column index (0 = row header, 1 = first product column)
+ * @returns {string} Column label or ''
+ */
+function getColumnLabel(container, columnIndex) {
+  const tables = container.querySelectorAll('.table.comparison .table-comparison-scroll table');
+  const firstTable = tables[0];
+  const firstDataRow = firstTable?.querySelector('tbody tr');
+  const headerTable = tables[1] || firstTable;
+  const theadRow = headerTable?.querySelector('thead tr');
+  let text = (firstDataRow?.children[columnIndex]?.textContent || '').trim();
+  if (theadRow?.children[columnIndex]) {
+    const thText = (theadRow.children[columnIndex].textContent || '').trim();
+    if (thText) text = `${thText} ${text}`.trim() || text;
+  }
+  return text.trim();
 }
 
 /**
@@ -596,13 +664,31 @@ function getProductImageUrl(product, variantIndex = 0) {
 }
 
 /**
+ * Snapshot original table cell content (by table, row, column) before any replacement.
+ * @param {HTMLElement} container - .widget-container
+ * @returns {Array<Array<string[]>>} snapshot[tableIndex][rowIndex][colIndex] = cell innerHTML
+ */
+function snapshotTableContent(container) {
+  const tables = container.querySelectorAll('.table.comparison .table-comparison-scroll table');
+  return [...tables].map((table) => {
+    const rows = table.querySelectorAll('tbody tr');
+    return [...rows].map((row) => {
+      const cells = [...row.children];
+      return cells.map((cell) => (cell.tagName === 'TD' ? cell.innerHTML : ''));
+    });
+  });
+}
+
+/**
  * Replace one column in all comparison tables with the specific product's data.
+ * Series-inherited feature rows use the table's series column content (no features-by-series.json).
  * @param {HTMLElement} container - .widget-container (section that has tables + widget)
  * @param {number} columnIndex - Column index (0 = row header, 1 = first product)
  * @param {Object} product - Parsed product from fetchProduct
- * @param {Object} [featuresBySeries] - Optional features-by-series config
+ * @param {number} [sourceSeriesColumnIndex] - Product's series column; when columnIndex differs, copy feature cells from this column
+ * @param {Array<Array<string[]>>} [originalContent] - Snapshot from snapshotTableContent; used so we clone from unmodified series column
  */
-function replaceColumnWithProduct(container, columnIndex, product, featuresBySeries) {
+function replaceColumnWithProduct(container, columnIndex, product, sourceSeriesColumnIndex, originalContent) {
   const tables = container.querySelectorAll('.table.comparison .table-comparison-scroll table');
   if (!tables.length) return;
 
@@ -618,22 +704,46 @@ function replaceColumnWithProduct(container, columnIndex, product, featuresBySer
   tables.forEach((table, tableIndex) => {
     const theadRow = table.querySelector('thead tr');
     const isFirstTable = tableIndex === 0;
+    const th = theadRow?.children[columnIndex];
 
-    if (isFirstTable && theadRow) {
-      const th = theadRow.children[columnIndex];
-      if (th) {
-        th.innerHTML = '';
-        if (imageUrl) {
-          const picture = document.createElement('picture');
-          const img = document.createElement('img');
-          img.loading = 'lazy';
-          img.alt = product.name || '';
-          img.src = imageUrl;
-          img.width = 320;
-          img.height = 440;
-          picture.appendChild(img);
-          th.appendChild(picture);
-        }
+    if (th) {
+      th.innerHTML = '';
+      const pathToRemove = product.path;
+      if (isFirstTable && pathToRemove) {
+        th.classList.add('compare-products-column-with-remove');
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'compare-products-remove-from-comparison';
+        removeBtn.setAttribute('aria-label', `Remove ${product.name || 'product'} from comparison`);
+        removeBtn.textContent = '×';
+        removeBtn.addEventListener('click', () => {
+          const current = getCompareProductsParamPaths();
+          const next = current.filter((p) => p !== pathToRemove);
+          const url = new URL(window.location.href);
+          if (next.length) {
+            url.searchParams.set('compare-products', next.join(','));
+          } else {
+            url.searchParams.delete('compare-products');
+          }
+          window.location.href = url.toString();
+        });
+        th.appendChild(removeBtn);
+      }
+      if (isFirstTable && imageUrl) {
+        const picture = document.createElement('picture');
+        const img = document.createElement('img');
+        img.loading = 'lazy';
+        img.alt = product.name || '';
+        img.src = imageUrl;
+        img.width = 320;
+        img.height = 440;
+        picture.appendChild(img);
+        th.appendChild(picture);
+      } else if (!isFirstTable || !imageUrl) {
+        const label = product.name || product.series || '—';
+        const p = document.createElement('p');
+        p.textContent = label;
+        th.appendChild(p);
       }
     }
 
@@ -672,12 +782,17 @@ function replaceColumnWithProduct(container, columnIndex, product, featuresBySer
         return;
       }
 
-      if (featureKey && SERIES_INHERITED_FEATURE_KEYS.has(featureKey)) {
+      if (sourceSeriesColumnIndex != null && sourceSeriesColumnIndex !== columnIndex && originalContent) {
+        const rowSnapshot = originalContent[tableIndex]?.[rowIndex];
+        const cloned = rowSnapshot?.[sourceSeriesColumnIndex];
+        if (cloned != null) cell.innerHTML = cloned;
         return;
       }
 
+      if (featureKey && SERIES_INHERITED_FEATURE_KEYS.has(featureKey)) return;
+
       if (featureKey && featureKey !== 'Colors') {
-        const value = getFeatureValue(product, featureKey, featuresBySeries);
+        const value = getFeatureValue(product, featureKey, undefined);
         if (value === 'Yes') {
           cell.innerHTML = '<p><span class="icon icon-check"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="20" height="20"><title>Check</title><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg></span></p>';
         } else {
@@ -738,8 +853,8 @@ function removeWidgetWrapperLater(widget) {
 }
 
 /**
- * When compare-products=path[,path2,...] is set: inject each product into its matching
- * series column, hide other columns, then remove widget.
+ * When compare-products=path[,path2,...] is set: inject each product into the column that
+ * matches its series (so the table’s existing feature values stay correct), hide other columns.
  * @param {HTMLElement} widget - Widget root
  * @returns {Promise<boolean>} true if the param was set and handling was done
  */
@@ -758,10 +873,15 @@ async function handleCompareProductsParam(widget) {
   );
   if (!container) return false;
 
-  debug('handleCompareProductsParam: fetching featuresBySeries and', paths.length, 'products');
-  const featuresBySeries = await fetchFeaturesBySeries();
+  debug('handleCompareProductsParam: fetching', paths.length, 'products');
   const results = await Promise.all(paths.map((path) => fetchProduct(path)));
   debug('handleCompareProductsParam: results=', results.map((r, i) => ({ path: paths[i], hasProduct: !!r.product, errorStatus: r.errorStatus })));
+
+  const originalContent = snapshotTableContent(container);
+
+  const firstTable = container.querySelector('.table.comparison .table-comparison-scroll table');
+  const firstRow = firstTable?.querySelector('thead tr, tbody tr');
+  const maxColumns = firstRow ? firstRow.children.length : 0;
 
   const usedColumnIndices = new Set([0]);
   let anyReplaced = false;
@@ -770,11 +890,16 @@ async function handleCompareProductsParam(widget) {
       debug('handleCompareProductsParam: skip path (no product)', paths[i]);
       return;
     }
-    const series = getProductSeries(product);
-    const columnIndex = findColumnIndexForSeries(container, series);
-    debug('handleCompareProductsParam: replace column', 'path=', paths[i], 'series=', series, 'columnIndex=', columnIndex);
+    const columnIndex = i + 1;
+    if (columnIndex >= maxColumns) {
+      debug('handleCompareProductsParam: skip path (no column left)', paths[i]);
+      return;
+    }
+    const series = inferSeriesFromPathAndTitle(product) || getProductSeries(product);
+    const sourceSeriesColumnIndex = findColumnIndexForSeries(container, series);
     usedColumnIndices.add(columnIndex);
-    replaceColumnWithProduct(container, columnIndex, product, featuresBySeries || undefined);
+    debug('handleCompareProductsParam: replace column', 'path=', paths[i], 'series=', series, 'columnIndex=', columnIndex, 'sourceSeriesColumn=', sourceSeriesColumnIndex);
+    replaceColumnWithProduct(container, columnIndex, product, sourceSeriesColumnIndex, originalContent);
     anyReplaced = true;
   });
 
@@ -790,7 +915,10 @@ async function handleCompareProductsParam(widget) {
     'visibleColumns=',
     usedColumnIndices.size - 1,
   );
-  removeWidgetWrapperLater(widget);
+
+  if (paths.length >= MAX_COMPARISON_PRODUCTS) {
+    removeWidgetWrapperLater(widget);
+  }
   return true;
 }
 
@@ -948,6 +1076,112 @@ function buildFeaturesTable(slots, tableEl, featuresBySeries) {
 }
 
 /**
+ * Build a card for the "add a product" grid (product from index.json).
+ * @param {Object} product - Product from lookupProducts (title, image, price, url)
+ * @returns {HTMLElement}
+ */
+function buildAddProductCard(product) {
+  const col = document.createElement('div');
+  col.className = 'compare-products-product compare-products-add-card';
+
+  const imgWrap = document.createElement('div');
+  imgWrap.className = 'compare-products-product-image-wrap';
+  const img = document.createElement('img');
+  img.src = resolveImageUrlForDisplay(product.image) || '';
+  img.alt = '';
+  img.loading = 'lazy';
+  imgWrap.appendChild(img);
+
+  const nameEl = document.createElement('h3');
+  nameEl.className = 'compare-products-product-name';
+  nameEl.textContent = product.title || '';
+
+  const priceEl = document.createElement('div');
+  priceEl.className = 'compare-products-product-price';
+  const price = product.price != null ? `$${Number(product.price).toFixed(2)}` : '';
+  priceEl.innerHTML = price ? `<span class="compare-products-product-price-now">${price}</span>` : '';
+
+  const addBtn = document.createElement('button');
+  addBtn.type = 'button';
+  addBtn.className = 'button emphasis compare-products-add-to-comparison';
+  addBtn.textContent = 'Add to comparison';
+  addBtn.addEventListener('click', () => {
+    const current = getCompareProductsParamPaths();
+    const next = [...current, product.url].filter(Boolean);
+    const url = new URL(window.location.href);
+    url.searchParams.set('compare-products', next.join(','));
+    window.location.href = url.toString();
+  });
+
+  col.append(imgWrap, addBtn, nameEl, priceEl);
+  return col;
+}
+
+/**
+ * Fetch Full Size Blenders from index (fcors like PLP) and render grid to add a product.
+ * @param {HTMLElement} widget - Widget root
+ * @param {Object} [options] - Options
+ * @param {boolean} [options.inSection] - If true, render into .compare-products-add-section
+ *   below features (1–2 products); else replace products area (0 products).
+ * @param {string[]} [options.excludePaths] - Paths already in comparison (omit from grid).
+ */
+async function renderAddProductsGrid(widget, options = {}) {
+  const { inSection = false, excludePaths = [] } = options;
+  const scroll = widget.querySelector('.compare-products-scroll');
+  const productsContainer = widget.querySelector('.compare-products-products');
+  const featuresSection = widget.querySelector('.compare-products-features');
+  if (!scroll) return;
+
+  let container;
+  if (inSection) {
+    let section = widget.querySelector('.compare-products-add-section');
+    if (!section) {
+      section = document.createElement('div');
+      section.className = 'compare-products-add-section';
+      scroll.appendChild(section);
+    }
+    section.hidden = false;
+    section.innerHTML = '';
+    container = section;
+  } else {
+    if (!productsContainer) return;
+    container = productsContainer;
+    container.innerHTML = '';
+    if (featuresSection) featuresSection.hidden = true;
+  }
+
+  const heading = document.createElement('h2');
+  heading.className = 'compare-products-add-heading';
+  heading.textContent = 'Add a product to compare';
+  container.appendChild(heading);
+
+  let products = [];
+  try {
+    products = await lookupProducts({ productType: ADD_TO_COMPARE_PRODUCT_TYPE });
+  } catch (e) {
+    debug('renderAddProductsGrid: lookupProducts failed', e);
+  }
+
+  const excludeSet = new Set(excludePaths.filter(Boolean));
+  const filtered = products.filter((p) => p.url && !excludeSet.has(p.url));
+
+  if (filtered.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'compare-products-add-empty';
+    empty.textContent = inSection && products.length > 0
+      ? 'All selected. Remove one to add another.'
+      : 'No countertop blenders found.';
+    container.appendChild(empty);
+    return;
+  }
+
+  const grid = document.createElement('div');
+  grid.className = 'compare-products-add-grid';
+  filtered.forEach((product) => grid.appendChild(buildAddProductCard(product)));
+  container.appendChild(grid);
+}
+
+/**
  * Render the full compare view: product cards + features table.
  * @param {HTMLElement} widget - Widget root
  * @param {{ path: string, product: Object|null }[]} slots - One slot per requested path
@@ -991,7 +1225,13 @@ export default async function decorate(widget) {
   debug('decorate: compare-products paths=', paths.length ? paths : 'none');
   const handled = await handleCompareProductsParam(widget);
   debug('decorate: handled=', handled);
-  if (handled) return;
+  if (handled) {
+    const pathsAfter = getCompareProductsParamPaths();
+    if (pathsAfter.length < MAX_COMPARISON_PRODUCTS) {
+      await renderAddProductsGrid(widget, { excludePaths: pathsAfter });
+    }
+    return;
+  }
 
   if (getCompareProductsParam()) {
     removeWidgetWrapperLater(widget);
@@ -1000,7 +1240,7 @@ export default async function decorate(widget) {
 
   const comparisonPaths = getProductComparisonPaths();
   if (comparisonPaths.length === 0) {
-    removeWidgetWrapperLater(widget);
+    await renderAddProductsGrid(widget);
     return;
   }
 
@@ -1022,6 +1262,16 @@ export default async function decorate(widget) {
   }
 
   render(widget, slots, featuresBySeries || undefined);
+
+  if (slots.length < MAX_COMPARISON_PRODUCTS) {
+    await renderAddProductsGrid(widget, {
+      inSection: true,
+      excludePaths: comparisonPaths,
+    });
+  } else {
+    const addSection = widget.querySelector('.compare-products-add-section');
+    if (addSection) addSection.hidden = true;
+  }
 }
 
 // Load CSS
