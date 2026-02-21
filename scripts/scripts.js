@@ -621,6 +621,7 @@ function decorateFullWidthBlocks(main) {
  */
 function decorateButtons(main) {
   main.querySelectorAll('p a[href]').forEach((a) => {
+    if (a.closest('[data-button-decoration="disabled"]')) return;
     a.title = a.title || a.textContent;
     const p = a.closest('p');
     const text = a.textContent.trim();
