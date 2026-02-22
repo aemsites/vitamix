@@ -1,4 +1,5 @@
 import { loadCSS, toClassName } from '../../scripts/aem.js';
+import { formatPrice as formatPriceValue, getLocaleAndLanguage } from '../../scripts/scripts.js';
 import { lookupProducts } from '../../blocks/plp/plp.js';
 
 const DEBUG = typeof window !== 'undefined' && (
@@ -34,6 +35,58 @@ const FEATURE_KEYS = [
 ];
 
 const FEATURES_BY_PRODUCT_PATH_DEFAULT = '/us/en_us/products/config/features-by-product.json';
+
+/** Merged Key->Text from translations + placeholders (locale config) */
+let comparisonTranslations = {};
+
+/**
+ * Get products config base path for current locale (e.g. /ca/fr_ca/products/config).
+ * @returns {string}
+ */
+function getConfigBasePath() {
+  const match = window.location.pathname.match(/^(\/[^/]+\/[^/]+)\//);
+  if (match) return `${match[1]}/products/config`;
+  return '/us/en_us/products/config';
+}
+
+/**
+ * Load translations + placeholders from config (Key/Text sheets); set comparisonTranslations.
+ * Call once before rendering; safe to call multiple times (overwrites).
+ */
+async function loadComparisonTranslations() {
+  const base = getConfigBasePath();
+  const urls = [
+    `${base}/translations.json`,
+    `${base}/placeholders.json`,
+  ];
+  const map = {};
+  await Promise.all(urls.map(async (url) => {
+    try {
+      const resp = await fetch(new URL(url, window.location.origin).href);
+      if (!resp.ok) return;
+      const json = await resp.json();
+      const data = json?.data;
+      if (Array.isArray(data)) {
+        data.forEach((entry) => {
+          if (entry?.Key != null) map[entry.Key] = entry.Text ?? entry.Key;
+        });
+      }
+    } catch {
+      // ignore
+    }
+  }));
+  comparisonTranslations = map;
+}
+
+/**
+ * Translate a key if present in loaded translations/placeholders; otherwise return key.
+ * @param {string} key - English (or source) string
+ * @returns {string}
+ */
+function t(key) {
+  if (!key || typeof key !== 'string') return key;
+  return comparisonTranslations[key] ?? key;
+}
 
 /** SVG path for checkmark icon in comparison table */
 const CHECK_ICON_PATH = 'M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293'
@@ -120,7 +173,7 @@ function getFeaturesRowByPath(featuresByProduct, productPath) {
  */
 function normalizeSeriesForMatch(s) {
   if (!s || typeof s !== 'string') return '';
-  let t = s
+  let norm = s
     .replace(/\s*®\s*|\s*™\s*/gi, ' ')
     .replace(/\bVitamix\b/gi, '')
     .replace(/\s+series\s*$/gi, '')
@@ -128,8 +181,8 @@ function normalizeSeriesForMatch(s) {
     .replace(/\s+/g, ' ')
     .trim();
   // Strip leading "Séries" / "Series" so "Séries Ascent et Venturist" matches "venturist"
-  t = t.replace(/^\s*séries\s+/gi, '').replace(/^\s*series\s+/gi, '').trim();
-  return t;
+  norm = norm.replace(/^\s*séries\s+/gi, '').replace(/^\s*series\s+/gi, '').trim();
+  return norm;
 }
 
 /** Map our feature keys to features-by-product.json column names (locale may vary) */
@@ -181,7 +234,7 @@ function getFeatureDisplayFromRow(featuresRow, featureKey) {
   const raw = getFeatureValueFromRow(featuresRow, jsonKey) ?? featuresRow[featureKey];
   if (raw == null || String(raw).trim() === '') return '—';
   const s = String(raw).trim();
-  if (s === ':check:') return 'Yes';
+  if (s === ':check:') return t('Yes');
   if (s === '-') return '—';
   return s;
 }
@@ -509,18 +562,28 @@ async function fetchProduct(path) {
   return { product, errorStatus: product ? undefined : status };
 }
 
+/** Placeholders for locale-aware price formatting (languageCode + currencyCode). */
+function getPricePlaceholders() {
+  const { locale, language } = getLocaleAndLanguage();
+  return {
+    languageCode: language,
+    currencyCode: locale === 'ca' ? 'CAD' : 'USD',
+  };
+}
+
 /**
- * Format price for display.
+ * Format price for display using central Intl-based formatter (e.g. "50 $" for fr-CA).
  * @param {Object} price - { currency, regular, final }
  * @returns {{ now: string, save: string|null }}
  */
 function formatPrice(price) {
   if (!price || price.final == null) return { now: '', save: null };
-  const now = `$${parseFloat(price.final).toFixed(2)}`;
-  const regular = parseFloat(price.regular);
+  const ph = getPricePlaceholders();
   const finalVal = parseFloat(price.final);
+  const regular = parseFloat(price.regular);
+  const now = formatPriceValue(finalVal, ph);
   const save = regular > finalVal
-    ? `Save $${(regular - finalVal).toFixed(2)} | Was $${regular.toFixed(2)}`
+    ? `${t('Save')} ${formatPriceValue(regular - finalVal, ph)} | ${t('Was')} ${formatPriceValue(regular, ph)}`
     : null;
   return { now, save };
 }
@@ -682,8 +745,10 @@ function replaceColumnWithProduct(
   const imageUrl = getProductImageUrl(product, 0);
   const priceOrVariant = product?.price || product?.variants?.[0]?.price;
   const { now: priceNow, save: priceSave } = formatPrice(priceOrVariant);
-  const priceText = priceSave ? `Now ${priceNow} | ${priceSave}` : `From ${priceNow}`;
-  const learnMoreText = 'En savoir plus'; // could be localized
+  const priceText = priceSave
+    ? `${t('Now')} ${priceNow} | ${priceSave}`
+    : `${t('Starting at')} ${priceNow}`;
+  const learnMoreText = t('En savoir plus');
 
   tables.forEach((table, tableIndex) => {
     const theadRow = table.querySelector('thead tr');
@@ -698,7 +763,7 @@ function replaceColumnWithProduct(
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
         removeBtn.className = 'compare-products-remove-from-comparison';
-        removeBtn.setAttribute('aria-label', `Remove ${product.name || 'product'} from comparison`);
+        removeBtn.setAttribute('aria-label', `${t('Remove')} ${product.name || t('product')} ${t('from comparison')}`);
         removeBtn.textContent = '×';
         removeBtn.addEventListener('click', () => {
           const current = getCompareProductsParamPaths();
@@ -773,7 +838,7 @@ function replaceColumnWithProduct(
         const value = getFeatureDisplayFromRow(featuresRow, featureKey);
         if (value === 'Yes') {
           const checkHtml = '<p><span class="icon icon-check"><svg xmlns="http://www.w3.org/2000/svg" '
-            + 'viewBox="0 0 20 20" fill="currentColor" width="20" height="20"><title>Check</title>'
+            + `viewBox="0 0 20 20" fill="currentColor" width="20" height="20"><title>${t('Check')}</title>`
             + `<path fill-rule="evenodd" d="${CHECK_ICON_PATH}" clip-rule="evenodd"></path></svg></span></p>`;
           cell.innerHTML = checkHtml;
         } else {
@@ -950,19 +1015,19 @@ function buildPlaceholderCard(path, index, onRemove, errorStatus) {
   const removeBtn = document.createElement('button');
   removeBtn.type = 'button';
   removeBtn.className = 'button button close compare-products-product-remove';
-  removeBtn.setAttribute('aria-label', 'Remove from comparison');
+  removeBtn.setAttribute('aria-label', t('Remove from comparison'));
   removeBtn.textContent = '×';
   removeBtn.addEventListener('click', () => onRemove(index));
 
   const msg = document.createElement('p');
   msg.className = 'compare-products-product-placeholder-msg';
   msg.textContent = errorStatus === 404
-    ? 'Product not found (404).'
-    : 'Could not load this product.';
+    ? t('Product not found (404).')
+    : t('Could not load this product.');
 
   const link = document.createElement('a');
   link.href = path.startsWith('http') ? path : new URL(path, window.location.origin).href;
-  link.textContent = 'Try opening the product page';
+  link.textContent = t('View Details');
   link.className = 'button link';
 
   col.append(removeBtn, msg, link);
@@ -984,7 +1049,7 @@ function buildProductCard(product, index, onRemove) {
   const removeBtn = document.createElement('button');
   removeBtn.type = 'button';
   removeBtn.className = 'button button close compare-products-product-remove';
-  removeBtn.setAttribute('aria-label', `Remove ${product.name} from comparison`);
+  removeBtn.setAttribute('aria-label', `${t('Remove')} ${product.name || t('product')} ${t('from comparison')}`);
   removeBtn.textContent = '×';
   removeBtn.addEventListener('click', () => onRemove(index));
 
@@ -1030,7 +1095,7 @@ function buildProductCard(product, index, onRemove) {
   priceEl.className = 'compare-products-product-price';
   const price = product?.price || variants[0]?.price;
   const { now, save } = formatPrice(price);
-  priceEl.innerHTML = `<span class="compare-products-product-price-now">Now ${now}</span>`;
+  priceEl.innerHTML = `<span class="compare-products-product-price-now">${t('Now')} ${now}</span>`;
   if (save) {
     const saveEl = document.createElement('span');
     saveEl.className = 'compare-products-product-price-save';
@@ -1042,7 +1107,7 @@ function buildProductCard(product, index, onRemove) {
   cta.className = 'button emphasis';
   const { path: productPath, url: productUrl } = product || {};
   cta.href = productPath || productUrl || '#';
-  cta.textContent = 'VIEW DETAILS';
+  cta.textContent = t('View Details').toUpperCase();
 
   col.append(removeBtn, imgWrap, colorsWrap, nameEl, priceEl, cta);
   return col;
@@ -1065,7 +1130,7 @@ function buildFeaturesTable(slots, tableEl, featuresByProduct) {
     row.className = `compare-products-features-row ${rowIndex % 2 ? 'row-odd' : 'row-even'}`;
     const nameCell = document.createElement('div');
     nameCell.className = `compare-products-features-cell feature-name ${rowIndex % 2 ? 'row-odd' : 'row-even'}`;
-    nameCell.textContent = key;
+    nameCell.textContent = t(key);
     row.appendChild(nameCell);
     slots.forEach((slot) => {
       const cell = document.createElement('div');
@@ -1119,13 +1184,15 @@ function buildAddProductCard(product) {
 
   const priceEl = document.createElement('div');
   priceEl.className = 'compare-products-product-price';
-  const price = product.price != null ? `$${Number(product.price).toFixed(2)}` : '';
+  const price = product.price != null
+    ? formatPriceValue(Number(product.price), getPricePlaceholders())
+    : '';
   priceEl.innerHTML = price ? `<span class="compare-products-product-price-now">${price}</span>` : '';
 
   const addBtn = document.createElement('button');
   addBtn.type = 'button';
   addBtn.className = 'button emphasis compare-products-add-to-comparison';
-  addBtn.textContent = 'Add to comparison';
+  addBtn.textContent = t('Add to comparison');
   addBtn.addEventListener('click', () => {
     const current = getCompareProductsParamPaths();
     const next = [...current, product.url].filter(Boolean);
@@ -1173,7 +1240,7 @@ async function renderAddProductsGrid(widget, options = {}) {
 
   const heading = document.createElement('h2');
   heading.className = 'compare-products-add-heading';
-  heading.textContent = 'Add a product to compare';
+  heading.textContent = t('Add a product to compare');
   container.appendChild(heading);
 
   let products = [];
@@ -1190,8 +1257,8 @@ async function renderAddProductsGrid(widget, options = {}) {
     const empty = document.createElement('p');
     empty.className = 'compare-products-add-empty';
     empty.textContent = inSection && products.length > 0
-      ? 'All selected. Remove one to add another.'
-      : 'No countertop blenders found.';
+      ? t('All selected. Remove one to add another.')
+      : t('No countertop blenders found.');
     container.appendChild(empty);
     return;
   }
@@ -1242,6 +1309,7 @@ function render(widget, slots, featuresByProduct) {
  * @param {HTMLElement} widget - Widget root
  */
 export default async function decorate(widget) {
+  await loadComparisonTranslations();
   const paths = getCompareProductsParamPaths();
   debug('decorate: compare-products paths=', paths.length ? paths : 'none');
   const handled = await handleCompareProductsParam(widget);
