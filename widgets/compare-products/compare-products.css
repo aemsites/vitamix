@@ -123,6 +123,16 @@
 }
 
 /* Add-a-product grid (Full Size Blenders from index.json) */
+.compare-products-products {
+  grid-column: 2 / -1;
+  display: grid;
+  grid-template-columns: repeat(var(--compare-cols, 2), 1fr);
+  gap: var(--spacing-400);
+  border-bottom: var(--border-m) solid var(--color-gray-300);
+  padding-bottom: var(--spacing-400);
+  margin-bottom: var(--spacing-300);
+}
+
 .compare-products-products:has(.compare-products-add-heading) {
   display: block;
   grid-column: 1 / -1;
@@ -152,17 +162,6 @@
   margin-top: var(--spacing-400);
   padding-top: var(--spacing-400);
   border-top: var(--border-m) solid var(--color-gray-300);
-}
-
-/* Product cards row – start after feature-label column so cards align with table data columns */
-.compare-products-products {
-  grid-column: 2 / -1;
-  display: grid;
-  grid-template-columns: repeat(var(--compare-cols, 2), 1fr);
-  gap: var(--spacing-400);
-  border-bottom: var(--border-m) solid var(--color-gray-300);
-  padding-bottom: var(--spacing-400);
-  margin-bottom: var(--spacing-300);
 }
 
 .compare-products-product {

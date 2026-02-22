@@ -33,33 +33,31 @@ const FEATURE_KEYS = [
   'Dimensions (L × W × H)',
 ];
 
-/** Map page spec labels to our feature keys (for product specs lookup) */
-const SPEC_LABEL_MAP = {
-  Dimensions: 'Dimensions (L × W × H)',
-  Warranty: 'Warranty',
-};
+const FEATURES_BY_PRODUCT_PATH_DEFAULT = '/us/en_us/products/config/features-by-product.json';
 
-const FEATURES_BY_SERIES_PATH_DEFAULT = '/us/en_us/products/config/features-by-series.json';
+/** SVG path for checkmark icon in comparison table */
+const CHECK_ICON_PATH = 'M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293'
+  + 'a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z';
 
 /**
- * Get features-by-series path for current locale.
- * E.g. /ca/fr_ca/... -> /ca/fr_ca/products/config/...
+ * Get features-by-product config path for current locale.
+ * E.g. /ca/fr_ca/... -> /ca/fr_ca/products/config/features-by-product.json
  * @returns {string}
  */
-function getFeaturesBySeriesPath() {
+function getFeaturesByProductPath() {
   const match = window.location.pathname.match(/^(\/[^/]+\/[^/]+)\//);
   if (match) {
-    return `${match[1]}/products/config/features-by-series.json`;
+    return `${match[1]}/products/config/features-by-product.json`;
   }
-  return FEATURES_BY_SERIES_PATH_DEFAULT;
+  return FEATURES_BY_PRODUCT_PATH_DEFAULT;
 }
 
 /**
- * Fetch features-by-series config (same-origin only; no fcors).
- * @returns {Promise<Object|null>} Parsed JSON or null
+ * Fetch features-by-product config (same-origin only; no fcors).
+ * @returns {Promise<Object|null>} { data: Array<{ Path, Series, ... }> } or null
  */
-async function fetchFeaturesBySeries() {
-  const path = getFeaturesBySeriesPath();
+async function fetchFeaturesByProduct() {
+  const path = getFeaturesByProductPath();
   const url = new URL(path, window.location.origin).href;
   const resp = await fetch(url);
   if (!resp.ok) return null;
@@ -71,70 +69,121 @@ async function fetchFeaturesBySeries() {
 }
 
 /**
- * Get series name from product (for features-by-series lookup).
- * @param {Object} product - Product with .custom, .name
- * @returns {string} Series name or ''
+ * Normalize product path for lookup (strip hash/query, trailing slash, ensure leading slash).
+ * @param {string} path - Product path or URL
+ * @returns {string}
  */
-function getProductSeries(product) {
-  if (!product) return '';
-  const c = product.custom || {};
-  return (c.series || c.collection || product.name || '').trim();
+function normalizePathForLookup(path) {
+  if (!path || typeof path !== 'string') return '';
+  const p = path.replace(/#.*$/, '').replace(/\?.*$/, '').trim();
+  const slash = p.startsWith('/') ? p : `/${p}`;
+  const normalized = slash.endsWith('/') && slash.length > 1 ? slash.slice(0, -1) : slash;
+  return normalized.toLowerCase();
 }
 
 /**
- * Infer series from product path/title when they clearly indicate the series (avoids wrong page data).
- * @param {Object} product - Product with .path, .name, .url
- * @returns {string} Series name or ''
+ * Get the last path segment (slug) from a path.
+ * @param {string} path - e.g. /ca/fr_ca/products/vx1-and-pca-bundle-ca
+ * @returns {string} e.g. vx1-and-pca-bundle-ca
  */
-function inferSeriesFromPathAndTitle(product) {
-  if (!product) return '';
-  const path = (product.path || product.url || '').toLowerCase();
-  const title = (product.name || product.title || '').toLowerCase();
-  const s = `${path} ${title}`;
-  if (/\bascent\s*[-]?\s*x\s*\d|\bascent\s*x2|\bascent\s*x3|\bascent\s*x4|\bascent\s*x5/.test(s)) return 'Ascent X Series';
-  if (/\bventurist\b|v1200/.test(s)) return 'Venturist Series';
-  if (/\bpropel\b/.test(s)) return 'Propel Series';
-  if (/\bexplorian\b|e310|e320/.test(s)) return 'Explorian Series';
-  if (/\bascent\b|a2500|a3500/.test(s)) return 'Ascent Series';
-  if (/\b5200\b|legacy\b/.test(s)) return 'Legacy Series';
-  return '';
+function getPathSlug(path) {
+  const p = (path || '').trim().replace(/\/+$/, '');
+  if (!p) return '';
+  const segments = p.split('/').filter(Boolean);
+  return segments[segments.length - 1] || '';
 }
 
 /**
- * Normalize series name for matching: remove "Vitamix", trailing " Series", trim, strip ®™.
+ * Get the features row for a product path from features-by-product.data.
+ * Paths are expected to match the index; lookup is exact (normalized) with slug fallback.
+ * @param {Object} featuresByProduct - { data: Array<{ Path: string, Series: string, ... }> }
+ * @param {string} productPath - Product path (e.g. /ca/fr_ca/products/propel-series-510)
+ * @returns {Object|null} Row object or null
+ */
+function getFeaturesRowByPath(featuresByProduct, productPath) {
+  const { data } = featuresByProduct || {};
+  if (!data?.length || !productPath) return null;
+  const key = normalizePathForLookup(productPath);
+
+  const exact = data.find((row) => normalizePathForLookup(row.Path) === key);
+  if (exact) return exact;
+
+  const keySlug = getPathSlug(key).toLowerCase();
+  if (!keySlug) return null;
+  return data.find((row) => getPathSlug(row.Path).toLowerCase() === keySlug) || null;
+}
+
+/**
+ * Normalize series name for matching: remove Vitamix, Series/Séries, trim, strip ®™.
  * @param {string} s - Series or product name
  * @returns {string} Normalized string for comparison
  */
 function normalizeSeriesForMatch(s) {
   if (!s || typeof s !== 'string') return '';
-  const t = s
+  let t = s
     .replace(/\s*®\s*|\s*™\s*/gi, ' ')
     .replace(/\bVitamix\b/gi, '')
     .replace(/\s+series\s*$/gi, '')
     .replace(/\s+série\s*$/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
+  // Strip leading "Séries" / "Series" so "Séries Ascent et Venturist" matches "venturist"
+  t = t.replace(/^\s*séries\s+/gi, '').replace(/^\s*series\s+/gi, '').trim();
   return t;
 }
 
+/** Map our feature keys to features-by-product.json column names (locale may vary) */
+const FEATURE_KEY_TO_JSON_KEY = {
+  'Blending Programs': 'Programmes de fusion',
+  'Variable Speed Control': 'Commande de vitesse variable',
+  'Touch Buttons': 'Boutons tactiles',
+  Pulse: 'Impulsion',
+  'Digital Timer': 'Minuteur numérique',
+  'Self-Detect Technology': "Technologie d'autodétection",
+  'Tamper Indicator': 'Indicateur de falsification',
+  'Plus 15 Second Button': '+15 secondes',
+  Warranty: 'Garantie',
+  'Dimensions (L × W × H)': 'Dimensions',
+  'Ce que vous pouvez fabriquer': 'Ce que vous pouvez fabriquer',
+};
+
 /**
- * Find features row for a series in features-by-series.data.
- * @param {Object} featuresBySeries - { data: Array<{ Series: string, ... }> }
- * @param {string} series - Series name from product
- * @returns {Object|null} Row object or null
+ * Find the value for a feature in a row by matching keys (exact, then by normalized match).
+ * Handles sheet keys that differ slightly (e.g. with ™ or "Dimensions (L × W × H)").
+ * @param {Object} featuresRow - Row from features-by-product.data
+ * @param {string} jsonKey - Preferred key (e.g. "Technologie d'autodétection", "Dimensions")
+ * @returns {*} Raw value or undefined
  */
-function getSeriesFeaturesRow(featuresBySeries, series) {
-  const { data } = featuresBySeries || {};
-  if (!data?.length || !series) return null;
-  const norm = normalizeSeriesForMatch(series);
-  if (!norm) return null;
-  const normLower = norm.toLowerCase();
-  const exact = data.find((row) => normalizeSeriesForMatch(row.Series).toLowerCase() === normLower);
-  if (exact) return exact;
-  return data.find((row) => {
-    const rowNorm = normalizeSeriesForMatch(row.Series).toLowerCase();
-    return rowNorm === normLower || rowNorm.includes(normLower) || normLower.includes(rowNorm);
-  }) || null;
+function getFeatureValueFromRow(featuresRow, jsonKey) {
+  if (!featuresRow || typeof featuresRow !== 'object') return undefined;
+  const exact = featuresRow[jsonKey];
+  if (exact !== undefined && exact !== null && String(exact).trim() !== '') return exact;
+  const norm = (s) => String(s || '').replace(/\s*®\s*|\s*™\s*/gi, ' ').toLowerCase().trim();
+  const targetNorm = norm(jsonKey);
+  if (!targetNorm) return undefined;
+  const rowKey = Object.keys(featuresRow).find((k) => {
+    const kn = norm(k);
+    return kn === targetNorm || kn.startsWith(targetNorm) || targetNorm.startsWith(kn);
+  });
+  return rowKey != null ? featuresRow[rowKey] : undefined;
+}
+
+/**
+ * Get display value from a features-by-product row for a feature key.
+ * :check: -> 'Yes', - or empty -> '—', else verbatim.
+ * @param {Object} featuresRow - Row from features-by-product.data
+ * @param {string} featureKey - Our feature key (e.g. 'Blending Programs')
+ * @returns {string}
+ */
+function getFeatureDisplayFromRow(featuresRow, featureKey) {
+  if (!featuresRow) return '—';
+  const jsonKey = FEATURE_KEY_TO_JSON_KEY[featureKey] ?? featureKey;
+  const raw = getFeatureValueFromRow(featuresRow, jsonKey) ?? featuresRow[featureKey];
+  if (raw == null || String(raw).trim() === '') return '—';
+  const s = String(raw).trim();
+  if (s === ':check:') return 'Yes';
+  if (s === '-') return '—';
+  return s;
 }
 
 /**
@@ -223,20 +272,8 @@ const ROW_LABEL_TO_FEATURE = {
   dimensions: 'Dimensions (L × W × H)',
   couleurs: 'Colors',
   colors: 'Colors',
+  'ce que vous pouvez fabriquer': 'Ce que vous pouvez fabriquer',
 };
-
-/** Feature keys that use series-level data from the original table; do not replace cell content. */
-const SERIES_INHERITED_FEATURE_KEYS = new Set([
-  'Blending Programs',
-  'Variable Speed Control',
-  'Touch Buttons',
-  'Pulse',
-  'Digital Timer',
-  'Self-Detect Technology',
-  'Tamper Indicator',
-  'Plus 15 Second Button',
-  'Dimensions (L × W × H)',
-]);
 
 const AEM_NETWORK_ORIGIN = 'https://main--vitamix--aemsites.aem.network';
 
@@ -468,59 +505,8 @@ async function fetchProduct(path) {
     return { product: null, errorStatus: status };
   }
   const product = parseProductFromPage(html, path);
-  debug('fetchProduct: parsed', path, 'product=', product ? { name: product.name, series: getProductSeries(product) } : null);
+  debug('fetchProduct: parsed', path, 'product=', product ? { name: product.name } : null);
   return { product, errorStatus: product ? undefined : status };
-}
-
-/**
- * Get feature value for a product (page specs, then custom fallbacks, then features-by-series).
- * @param {Object} product - Normalized product (has .specs from page)
- * @param {string} key - Feature label (e.g. 'Series', 'Warranty')
- * @param {Object} [featuresBySeries] - Optional { data } from features-by-series.json
- * @returns {string} Display value
- */
-function getFeatureValue(product, key, featuresBySeries) {
-  const specs = product?.specs || {};
-  const custom = product?.custom || {};
-
-  const mapKey = SPEC_LABEL_MAP[key] || key;
-  const direct = specs[key] ?? specs[mapKey];
-
-  if (key === 'Dimensions (L × W × H)') {
-    const seriesRow = getSeriesFeaturesRow(featuresBySeries, getProductSeries(product));
-    if (seriesRow) {
-      const sheetVal = seriesRow[key];
-      if (sheetVal != null && String(sheetVal).trim() !== '') return String(sheetVal).trim();
-    }
-    if (direct) return direct;
-    return '—';
-  }
-
-  if (key === 'Series') {
-    const seriesRow = getSeriesFeaturesRow(featuresBySeries, getProductSeries(product));
-    if (seriesRow?.Series) return String(seriesRow.Series).trim();
-    return custom.series || custom.collection || '—';
-  }
-
-  if (direct) return direct;
-
-  if (key === 'Warranty') {
-    const opts = custom.options;
-    if (Array.isArray(opts) && opts.length > 0) {
-      const name = opts[0].name || '';
-      const match = name.match(/(\d+)\s*yr|(\d+)\s*year/i);
-      if (match) return `${match[1] || match[2]} Years`;
-      if (name) return name;
-    }
-  }
-
-  const seriesRow = getSeriesFeaturesRow(featuresBySeries, getProductSeries(product));
-  if (seriesRow) {
-    const sheetVal = seriesRow[key];
-    if (sheetVal != null && String(sheetVal).trim() !== '') return String(sheetVal).trim();
-  }
-
-  return '—';
 }
 
 /**
@@ -565,6 +551,17 @@ function findColumnIndexForSeries(container, series) {
   debug('findColumnIndexForSeries: series=', series, 'targetNorm=', targetNorm, 'cellCount=', bodyCells.length);
   if (!targetNorm) return 1;
 
+  // Explicit match for "venturist" -> "Séries Ascent et Venturist" column (column 2)
+  if (targetNorm === 'venturist' && theadRow) {
+    for (let i = 1; i < theadRow.children.length; i += 1) {
+      const thText = (theadRow.children[i]?.textContent || '').toLowerCase();
+      if (thText.includes('venturist') && !thText.includes('ascent x')) {
+        debug('findColumnIndexForSeries: venturist match at column', i, 'thText=', thText.slice(0, 50));
+        return i;
+      }
+    }
+  }
+
   const isAscentNonX = targetNorm === 'ascent' || (targetNorm.startsWith('ascent') && !targetNorm.includes('x'));
   const isAscentX = targetNorm.includes('ascent') && targetNorm.includes('x');
   const isVenturist = targetNorm.includes('venturist');
@@ -581,37 +578,16 @@ function findColumnIndexForSeries(container, series) {
       || cellNorm.includes(targetNorm)
       || targetNorm.includes(cellNorm)
     );
-    if (!matches) continue;
-
-    if (isAscentNonX && cellNorm.includes('ascent x')) continue;
-    if (isAscentX && cellNorm.includes('venturist')) continue;
-    if (isVenturist && cellNorm.includes('ascent x')) continue;
-
-    debug('findColumnIndexForSeries: match at column', i, 'cellText=', columnText.slice(0, 60));
-    return i;
+    if (matches
+        && !(isAscentNonX && cellNorm.includes('ascent x'))
+        && !(isAscentX && cellNorm.includes('venturist'))
+        && !(isVenturist && cellNorm.includes('ascent x'))) {
+      debug('findColumnIndexForSeries: match at column', i, 'cellText=', columnText.slice(0, 60));
+      return i;
+    }
   }
   debug('findColumnIndexForSeries: no match, using column 1');
   return 1;
-}
-
-/**
- * Get the column header label for a column index (same source as findColumnIndexForSeries).
- * @param {HTMLElement} container - .widget-container
- * @param {number} columnIndex - Column index (0 = row header, 1 = first product column)
- * @returns {string} Column label or ''
- */
-function getColumnLabel(container, columnIndex) {
-  const tables = container.querySelectorAll('.table.comparison .table-comparison-scroll table');
-  const firstTable = tables[0];
-  const firstDataRow = firstTable?.querySelector('tbody tr');
-  const headerTable = tables[1] || firstTable;
-  const theadRow = headerTable?.querySelector('thead tr');
-  let text = (firstDataRow?.children[columnIndex]?.textContent || '').trim();
-  if (theadRow?.children[columnIndex]) {
-    const thText = (theadRow.children[columnIndex].textContent || '').trim();
-    if (thText) text = `${thText} ${text}`.trim() || text;
-  }
-  return text.trim();
 }
 
 /**
@@ -681,14 +657,22 @@ function snapshotTableContent(container) {
 
 /**
  * Replace one column in all comparison tables with the specific product's data.
- * Series-inherited feature rows use the table's series column content (no features-by-series.json).
+ * First table: from features-by-product.json; others: copy from series column.
  * @param {HTMLElement} container - .widget-container (section that has tables + widget)
  * @param {number} columnIndex - Column index (0 = row header, 1 = first product)
  * @param {Object} product - Parsed product from fetchProduct
- * @param {number} [sourceSeriesColumnIndex] - Product's series column; when columnIndex differs, copy feature cells from this column
- * @param {Array<Array<string[]>>} [originalContent] - Snapshot from snapshotTableContent; used so we clone from unmodified series column
+ * @param {number} [sourceSeriesColumnIndex] - For tables 1+: column index to copy from
+ * @param {Array<Array<string[]>>} [originalContent] - Snapshot; for tables 1+
+ * @param {Object} [featuresByProduct] - { data } from features-by-product.json
  */
-function replaceColumnWithProduct(container, columnIndex, product, sourceSeriesColumnIndex, originalContent) {
+function replaceColumnWithProduct(
+  container,
+  columnIndex,
+  product,
+  sourceSeriesColumnIndex,
+  originalContent,
+  featuresByProduct,
+) {
   const tables = container.querySelectorAll('.table.comparison .table-comparison-scroll table');
   if (!tables.length) return;
 
@@ -782,19 +766,16 @@ function replaceColumnWithProduct(container, columnIndex, product, sourceSeriesC
         return;
       }
 
-      if (sourceSeriesColumnIndex != null && sourceSeriesColumnIndex !== columnIndex && originalContent) {
-        const rowSnapshot = originalContent[tableIndex]?.[rowIndex];
-        const cloned = rowSnapshot?.[sourceSeriesColumnIndex];
-        if (cloned != null) cell.innerHTML = cloned;
-        return;
-      }
-
-      if (featureKey && SERIES_INHERITED_FEATURE_KEYS.has(featureKey)) return;
-
-      if (featureKey && featureKey !== 'Colors') {
-        const value = getFeatureValue(product, featureKey, undefined);
+      // Feature rows (from any table): use features-by-product when available
+      // Use for all tables so duplicated tables (e.g. sticky header clone) get correct data
+      if (featureKey && featuresByProduct?.data) {
+        const featuresRow = getFeaturesRowByPath(featuresByProduct, product.path);
+        const value = getFeatureDisplayFromRow(featuresRow, featureKey);
         if (value === 'Yes') {
-          cell.innerHTML = '<p><span class="icon icon-check"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="20" height="20"><title>Check</title><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg></span></p>';
+          const checkHtml = '<p><span class="icon icon-check"><svg xmlns="http://www.w3.org/2000/svg" '
+            + 'viewBox="0 0 20 20" fill="currentColor" width="20" height="20"><title>Check</title>'
+            + `<path fill-rule="evenodd" d="${CHECK_ICON_PATH}" clip-rule="evenodd"></path></svg></span></p>`;
+          cell.innerHTML = checkHtml;
         } else {
           cell.textContent = value || '—';
           if (!cell.querySelector('p')) {
@@ -804,6 +785,17 @@ function replaceColumnWithProduct(container, columnIndex, product, sourceSeriesC
             cell.appendChild(p);
           }
         }
+        return;
+      }
+
+      // Rows without a feature key (e.g. compatibility): copy from series column in DOM
+      const copyFromSeries = sourceSeriesColumnIndex != null
+        && sourceSeriesColumnIndex !== columnIndex
+        && originalContent;
+      if (copyFromSeries) {
+        const rowSnapshot = originalContent[tableIndex]?.[rowIndex];
+        const cloned = rowSnapshot?.[sourceSeriesColumnIndex];
+        if (cloned != null) cell.innerHTML = cloned;
       }
     });
   });
@@ -873,8 +865,10 @@ async function handleCompareProductsParam(widget) {
   );
   if (!container) return false;
 
-  debug('handleCompareProductsParam: fetching', paths.length, 'products');
-  const results = await Promise.all(paths.map((path) => fetchProduct(path)));
+  const [featuresByProduct, ...results] = await Promise.all([
+    fetchFeaturesByProduct(),
+    ...paths.map((path) => fetchProduct(path)),
+  ]);
   debug('handleCompareProductsParam: results=', results.map((r, i) => ({ path: paths[i], hasProduct: !!r.product, errorStatus: r.errorStatus })));
 
   const originalContent = snapshotTableContent(container);
@@ -895,11 +889,29 @@ async function handleCompareProductsParam(widget) {
       debug('handleCompareProductsParam: skip path (no column left)', paths[i]);
       return;
     }
-    const series = inferSeriesFromPathAndTitle(product) || getProductSeries(product);
+    const featuresRow = getFeaturesRowByPath(featuresByProduct, product.path);
+    const series = featuresRow?.Series ?? '';
     const sourceSeriesColumnIndex = findColumnIndexForSeries(container, series);
     usedColumnIndices.add(columnIndex);
-    debug('handleCompareProductsParam: replace column', 'path=', paths[i], 'series=', series, 'columnIndex=', columnIndex, 'sourceSeriesColumn=', sourceSeriesColumnIndex);
-    replaceColumnWithProduct(container, columnIndex, product, sourceSeriesColumnIndex, originalContent);
+    debug(
+      'handleCompareProductsParam: replace column',
+      'path=',
+      paths[i],
+      'series=',
+      series,
+      'columnIndex=',
+      columnIndex,
+      'sourceSeriesColumn=',
+      sourceSeriesColumnIndex,
+    );
+    replaceColumnWithProduct(
+      container,
+      columnIndex,
+      product,
+      sourceSeriesColumnIndex,
+      originalContent,
+      featuresByProduct,
+    );
     anyReplaced = true;
   });
 
@@ -1038,11 +1050,12 @@ function buildProductCard(product, index, onRemove) {
 
 /**
  * Build features table body (feature rows with one cell per product/slot).
+ * Uses features-by-product.json by path; product still used for name/colors when needed.
  * @param {{ path: string, product: Object|null }[]} slots - One slot per requested path
  * @param {HTMLElement} tableEl - Table container
- * @param {Object} [featuresBySeries] - Optional { data } from features-by-series.json for fallbacks
+ * @param {Object} [featuresByProduct] - Optional { data } from features-by-product.json
  */
-function buildFeaturesTable(slots, tableEl, featuresBySeries) {
+function buildFeaturesTable(slots, tableEl, featuresByProduct) {
   const columnCount = slots.length;
   tableEl.style.setProperty('--compare-cols', String(columnCount));
   tableEl.innerHTML = '';
@@ -1057,9 +1070,17 @@ function buildFeaturesTable(slots, tableEl, featuresBySeries) {
     slots.forEach((slot) => {
       const cell = document.createElement('div');
       cell.className = `compare-products-features-cell ${rowIndex % 2 ? 'row-odd' : 'row-even'}`;
-      const value = slot.product
-        ? getFeatureValue(slot.product, key, featuresBySeries)
-        : '—';
+      let value = '—';
+      if (slot.product && featuresByProduct?.data) {
+        const featuresRow = getFeaturesRowByPath(featuresByProduct, slot.path);
+        if (key === 'Series') {
+          value = slot.product.name || featuresRow?.Series || '—';
+        } else {
+          value = getFeatureDisplayFromRow(featuresRow, key);
+        }
+      } else if (slot.product) {
+        value = '—';
+      }
       if (value === 'Yes') {
         const check = document.createElement('span');
         check.className = 'compare-products-features-cell-check';
@@ -1185,9 +1206,9 @@ async function renderAddProductsGrid(widget, options = {}) {
  * Render the full compare view: product cards + features table.
  * @param {HTMLElement} widget - Widget root
  * @param {{ path: string, product: Object|null }[]} slots - One slot per requested path
- * @param {Object} [featuresBySeries] - Optional { data } from features-by-series.json for fallbacks
+ * @param {Object} [featuresByProduct] - Optional { data } from features-by-product.json
  */
-function render(widget, slots, featuresBySeries) {
+function render(widget, slots, featuresByProduct) {
   const productsContainer = widget.querySelector('.compare-products-products');
   const featuresTable = widget.querySelector('.compare-products-features-table');
   if (!productsContainer || !featuresTable) return;
@@ -1201,7 +1222,7 @@ function render(widget, slots, featuresBySeries) {
       widget.dispatchEvent(new CustomEvent('compare-products-empty'));
       return;
     }
-    render(widget, next, featuresBySeries);
+    render(widget, next, featuresByProduct);
   };
 
   slots.forEach((slot, index) => {
@@ -1211,7 +1232,7 @@ function render(widget, slots, featuresBySeries) {
     productsContainer.appendChild(card);
   });
 
-  buildFeaturesTable(slots, featuresTable, featuresBySeries);
+  buildFeaturesTable(slots, featuresTable, featuresByProduct);
 }
 
 /**
@@ -1244,8 +1265,8 @@ export default async function decorate(widget) {
     return;
   }
 
-  const [featuresBySeries, ...slotResults] = await Promise.all([
-    fetchFeaturesBySeries(),
+  const [featuresByProduct, ...slotResults] = await Promise.all([
+    fetchFeaturesByProduct(),
     ...comparisonPaths.map((path) => fetchProduct(path)),
   ]);
 
@@ -1261,7 +1282,7 @@ export default async function decorate(widget) {
     return;
   }
 
-  render(widget, slots, featuresBySeries || undefined);
+  render(widget, slots, featuresByProduct || undefined);
 
   if (slots.length < MAX_COMPARISON_PRODUCTS) {
     await renderAddProductsGrid(widget, {
