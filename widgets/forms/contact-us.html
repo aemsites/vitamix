@@ -1,0 +1,44 @@
+<form class="contact-us-form" method="post" action="" aria-label="Contact us">
+  <div class="contact-us-field">
+    <label for="contact-us-first-name">
+      <span class="label-text">First Name</span><span class="required" aria-hidden="true">*</span>
+    </label>
+    <input id="contact-us-first-name" type="text" name="firstName" required aria-required="true" placeholder="" autocomplete="given-name">
+  </div>
+  <div class="contact-us-field">
+    <label for="contact-us-last-name">
+      <span class="label-text">Last Name</span><span class="required" aria-hidden="true">*</span>
+    </label>
+    <input id="contact-us-last-name" type="text" name="lastName" required aria-required="true" placeholder="" autocomplete="family-name">
+  </div>
+  <div class="contact-us-field">
+    <label for="contact-us-email">
+      <span class="label-text">Email Address</span><span class="required" aria-hidden="true">*</span>
+    </label>
+    <input id="contact-us-email" type="email" name="email" required aria-required="true" placeholder="" autocomplete="email">
+  </div>
+  <div class="contact-us-field contact-us-radio-group">
+    <span class="label-text radio-legend" id="contact-us-type-legend"></span><span class="required" aria-hidden="true">*</span>
+    <div class="radio-options" role="radiogroup" aria-labelledby="contact-us-type-legend">
+      <label class="radio-option">
+        <input type="radio" name="typeOfRequest" value="domestic" required aria-required="true">
+        <span class="radio-label"></span>
+      </label>
+      <label class="radio-option">
+        <input type="radio" name="typeOfRequest" value="commercial">
+        <span class="radio-label"></span>
+      </label>
+    </div>
+  </div>
+  <div class="contact-us-field">
+    <label for="contact-us-reason">
+      <span class="label-text">Reason for communication</span><span class="required" aria-hidden="true">*</span>
+    </label>
+    <select id="contact-us-reason" name="reasonForCommunication" required aria-required="true">
+      <option value="">Select</option>
+    </select>
+  </div>
+  <div class="contact-us-actions">
+    <button type="submit" class="button emphasis">Submit</button>
+  </div>
+</form>
