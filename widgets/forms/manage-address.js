@@ -51,17 +51,21 @@ export default async function decorate(widget) {
   const p = await fetchPlaceholders(`/${locale}/${language}`);
   const get = (key, fallback = '') => (p[key] != null && p[key] !== '' ? p[key] : fallback);
 
-  // Lookup keys match toCamelCase(Key) from spreadsheet
+  // Lookup keys match toCamelCase(Key) from spreadsheet; fallbacks for alternate Key phrasing
   const labels = {
     manageAddress: get('manageAddress', 'Manage address'),
-    contactInformation: get('contactInformation', 'Contact Information'),
+    contactInformation: get('contactInformation')
+      || get('contactInfo')
+      || get('coordonnEs', 'Contact Information'),
     address: get('address', 'Address'),
     firstName: get('firstName', 'First Name'),
     lastName: get('lastName', 'Last Name'),
     company: get('company', 'Company'),
     phoneNumber: get('phoneNumber', 'Phone Number'),
-    phoneNumberHelp: get('phoneNumberHelp',
-      'Please enter a valid phone number. For example (207)973-7823, (207) 973-7823, 2079737823.'),
+    phoneNumberHelp: get('phoneNumberHelp')
+      || get('pleaseEnterAValidPhoneNumber')
+      || get('pleaseEnterAValidPhoneNumberForExample207973782320797378232079737823',
+        'Please enter a valid phone number. For example (207)973-7823, (207) 973-7823, 2079737823.'),
     addressLabel: get('address', 'Address'),
     addressLine2: get('addressLine2', 'Address Line 2'),
     city: get('city', 'City'),
