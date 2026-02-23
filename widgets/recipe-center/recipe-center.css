@@ -141,6 +141,8 @@
   }
 
   .recipe-center .controls {
+    padding-top: var(--spacing-800);
+    padding-bottom: var(--spacing-800);
     grid-area: controls;
   }
 }
@@ -507,4 +509,12 @@
   .recipe-center .pagination {
     grid-area: pagination;
   }
+}
+
+/* Suppress results when user has not applied filters or search */
+.recipe-center.suppress-results .info,
+.recipe-center.suppress-results .facets,
+.recipe-center.suppress-results .results,
+.recipe-center.suppress-results .pagination {
+  display: none;
 }

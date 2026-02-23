@@ -459,6 +459,19 @@ function updateURL(filterConfig) {
 }
 
 /**
+ * Returns true if the user has applied any filters or entered a fulltext query.
+ * @param {Object} filterConfig - Current filter configuration
+ * @returns {boolean}
+ */
+function hasActiveFilters(filterConfig) {
+  return Object.keys(filterConfig).some((key) => {
+    if (key === 'page' || key === 'sort') return false;
+    if (key === 'fulltext') return filterConfig[key] && filterConfig[key].trim().length > 0;
+    return !!filterConfig[key];
+  });
+}
+
+/**
  * Builds complete recipe listing with filtering, sorting, and search functionality.
  * @param {HTMLElement} container - Container element to transform into a recipe listing
  * @param {Object} config - Initial filter configuration
@@ -860,9 +873,18 @@ function buildRecipeFiltering(container, config = {}, placeholders = {}) {
     populateDropdown(courseSelect, facets.course, 'course', filterConfig);
     populateDropdown(recipeTypeSelect, facets['recipe-type'], 'recipe-type', filterConfig);
 
-    displayResults(results, page);
-    displayPagination(totalResults, page);
-    displayFacets(facets, filterConfig);
+    const showResults = hasActiveFilters(filterConfig);
+    if (showResults) {
+      container.classList.remove('suppress-results');
+      displayResults(results, page);
+      displayPagination(totalResults, page);
+      displayFacets(facets, filterConfig);
+    } else {
+      container.classList.add('suppress-results');
+      resultsElement.innerHTML = '';
+      if (paginationElement) paginationElement.innerHTML = '';
+      displayFacets(facets, filterConfig);
+    }
 
     // Update URL with current filter state
     if (updateURLState) {
