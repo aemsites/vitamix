@@ -67,8 +67,8 @@ export default async function decorate(widget) {
     city: get('city', 'City'),
     province: get('province', 'Province'),
     postalCode: get('postalCode', 'Postal code'),
-    provincePlaceholder: get('pleaseSelectRegionStateOrProvince',
-      'Please select a region, state or province'),
+    provincePlaceholder: get('pleaseSelectAProvince')
+      || get('pleaseSelectRegionStateOrProvince', 'Please select a region, state or province'),
     defaultBilling: get('useAsDefaultBillingAddress', 'Use as default billing address'),
     defaultShipping: get('useAsDefaultShippingAddress', 'Use as default shipping address'),
     saveAddress: get('saveAddress', 'Save address'),
