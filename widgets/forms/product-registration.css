@@ -1,0 +1,148 @@
+/* Product registration form – sections, labels above, uses global form/input styles */
+.forms-product-registration {
+  background-color: var(--color-gray-100);
+  padding: var(--spacing-300);
+  border-radius: var(--rounding-m);
+  max-width: 100%;
+}
+
+.forms-product-registration .product-registration-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-200);
+  max-width: 32rem;
+}
+
+.forms-product-registration .product-registration-section {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-200);
+}
+
+.forms-product-registration .product-registration-section-legend {
+  font-weight: var(--font-weight-bold, bold);
+  margin-bottom: 0;
+  padding: 0;
+}
+
+.forms-product-registration .product-registration-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
+}
+
+.forms-product-registration .product-registration-field label {
+  margin-bottom: 0;
+}
+
+.forms-product-registration .product-registration-field .required {
+  color: var(--color-red);
+  margin-left: 0.15em;
+}
+
+.forms-product-registration .field-hint {
+  font-size: var(--font-size-20);
+  color: var(--color-red);
+}
+
+.forms-product-registration .product-registration-link {
+  font-size: var(--font-size-20);
+  margin-top: 0.25em;
+}
+
+.forms-product-registration .product-registration-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+}
+
+.forms-product-registration .product-registration-radio-group .radio-legend {
+  font-weight: var(--font-weight-medium, 500);
+}
+
+.forms-product-registration .radio-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
+}
+
+.forms-product-registration .radio-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  cursor: pointer;
+}
+
+.forms-product-registration .date-input-wrap {
+  display: block;
+}
+
+.forms-product-registration .product-registration-consent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-200);
+}
+
+.forms-product-registration .product-registration-checkbox .checkbox-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5em;
+  cursor: pointer;
+}
+
+.forms-product-registration .product-registration-checkbox input[type="checkbox"] {
+  margin-top: 0.25em;
+  flex-shrink: 0;
+}
+
+.forms-product-registration .product-registration-disclaimer {
+  font-size: var(--font-size-20);
+  margin: 0;
+  color: var(--color-gray-700);
+}
+
+.forms-product-registration .product-registration-legal-links {
+  font-size: var(--font-size-20);
+  margin: 0;
+}
+
+.forms-product-registration .product-registration-legal-links a {
+  text-decoration: underline;
+}
+
+.forms-product-registration .product-registration-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-200);
+  margin-top: var(--spacing-100);
+}
+
+.forms-product-registration .product-registration-form button[type="submit"] {
+  background-color: var(--color-charcoal);
+  border-color: var(--color-charcoal);
+  color: var(--color-white);
+}
+
+.forms-product-registration .product-registration-form button[type="submit"]:hover,
+.forms-product-registration .product-registration-form button[type="submit"]:focus {
+  background-color: var(--color-gray-900);
+  border-color: var(--color-gray-900);
+}
+
+.forms-product-registration .clear-form-btn.link-style {
+  background: none;
+  border: none;
+  color: var(--color-gray-700);
+  text-decoration: underline;
+  padding: 0;
+  font: inherit;
+}
+
+.forms-product-registration .clear-form-btn.link-style:hover,
+.forms-product-registration .clear-form-btn.link-style:focus {
+  color: var(--color-charcoal);
+}
