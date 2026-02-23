@@ -21,8 +21,10 @@ export default async function decorate(widget) {
   // Lookup keys match toCamelCase(Key) from spreadsheet
   const labels = {
     accountInformation: get('accountInformation', 'Account Information'),
-    allFieldsMandatory: get('allFieldsAreMandatoryUnlessOtherwiseIndicatedOptional',
-      'All fields are mandatory unless otherwise indicated (optional).'),
+    allFieldsMandatory: get(
+      'allFieldsAreMandatoryUnlessOtherwiseIndicatedOptional',
+      'All fields are mandatory unless otherwise indicated (optional).',
+    ),
     firstName: get('firstName', 'First Name'),
     lastName: get('lastName', 'Last Name'),
     emailAddress: get('emailAddress', 'Email Address'),
@@ -31,8 +33,10 @@ export default async function decorate(widget) {
     yes: get('yes', 'Yes'),
     no: get('no', 'No'),
     communications: get('communications', 'Communications'),
-    newsletterQuestion: get('wouldYouLikeToReceivePeriodicEmailsAndNewslettersFromVitamix',
-      'Would you like to receive periodic emails and newsletters from Vitamix?'),
+    newsletterQuestion: get(
+      'wouldYouLikeToReceivePeriodicEmailsAndNewslettersFromVitamix',
+      'Would you like to receive periodic emails and newsletters from Vitamix?',
+    ),
     newsletterYes: get('yes', 'Yes'),
     newsletterNo: get('noDoNotSendMeElectronicMail', 'No, do not send me electronic mail'),
     emailConsentDisclaimer: get('emailConsentDisclaimer', ''),
@@ -74,7 +78,9 @@ export default async function decorate(widget) {
   if (newsletterRadioLabels[1]) newsletterRadioLabels[1].textContent = labels.newsletterNo;
 
   const consentEl = form.querySelector('.edit-account-consent');
-  if (consentEl && labels.emailConsentDisclaimer) consentEl.textContent = labels.emailConsentDisclaimer;
+  if (consentEl && labels.emailConsentDisclaimer) {
+    consentEl.textContent = labels.emailConsentDisclaimer;
+  }
 
   const firstNameInput = form.querySelector('#edit-account-first-name');
   const lastNameInput = form.querySelector('#edit-account-last-name');
@@ -83,7 +89,9 @@ export default async function decorate(widget) {
   if (firstNameInput && placeholders.firstName) firstNameInput.placeholder = placeholders.firstName;
   if (lastNameInput && placeholders.lastName) lastNameInput.placeholder = placeholders.lastName;
   if (emailInput && placeholders.emailAddress) emailInput.placeholder = placeholders.emailAddress;
-  if (postalCodeInput && placeholders.postalCode) postalCodeInput.placeholder = placeholders.postalCode;
+  if (postalCodeInput && placeholders.postalCode) {
+    postalCodeInput.placeholder = placeholders.postalCode;
+  }
 
   const submitBtn = form.querySelector('button[type="submit"]');
   if (submitBtn) submitBtn.textContent = labels.saveChanges;

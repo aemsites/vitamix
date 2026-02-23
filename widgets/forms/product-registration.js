@@ -6,7 +6,7 @@ const SHEET_LOGGER_URL = 'https://sheet-logger.david8603.workers.dev/vitamix.com
 
 const SELECT_OPTION_DEFAULT = 'Select an option';
 
-/** Default "Purchased from" options (Label=value). Overridden by placeholder purchasedFromOptions. */
+/** Default "Purchased from" options. Overridden by placeholder purchasedFromOptions. */
 const DEFAULT_PURCHASED_FROM_OPTIONS = [
   'Amazon=amazon',
   'Best Buy=best-buy',
@@ -84,11 +84,15 @@ export default async function decorate(widget) {
     postalCode: get('postalCode', 'Postal code'),
     phoneNumber: get('phoneNumber', 'Phone Number'),
     emailAddress: get('emailAddress', 'Email Address'),
-    sendNewsPromotionsOptional: get('sendNewsPromotionsOptional',
-      'Please send the latest Vitamix news and promotions to my email address. (optional)'),
+    sendNewsPromotionsOptional: get(
+      'sendNewsPromotionsOptional',
+      'Please send the latest Vitamix news and promotions to my email address. (optional)',
+    ),
     emailConsentDisclaimer: get('emailConsentDisclaimer', ''),
-    iAcceptTermsPrivacy: get('iAcceptTermsPrivacy',
-      'I accept the terms & conditions and Vitamix\'s privacy policy.'),
+    iAcceptTermsPrivacy: get(
+      'iAcceptTermsPrivacy',
+      'I accept the terms & conditions and Vitamix\'s privacy policy.',
+    ),
     clickHereToConsult: get('clickHereToConsult', 'Click here to consult our '),
     privacyPolicyLinkText: get('privacyPolicyLinkText', 'privacy policy'),
     andOur: get('andOur', ' and our '),
@@ -142,8 +146,10 @@ export default async function decorate(widget) {
     purchasedFromSelect.firstElementChild.textContent = placeholders.purchasedFrom;
   }
   const purchasedFromOptions = get('purchasedFromOptions') || DEFAULT_PURCHASED_FROM_OPTIONS;
-  setSelectOptions(purchasedFromSelect,
-    purchasedFromOptions.split(',').map((s) => s.trim()));
+  setSelectOptions(
+    purchasedFromSelect,
+    purchasedFromOptions.split(',').map((s) => s.trim()),
+  );
 
   const purchasedOnLabel = form.querySelector('[for="product-registration-purchased-on"] .label-text');
   if (purchasedOnLabel) purchasedOnLabel.textContent = labels.purchasedOn;

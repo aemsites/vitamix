@@ -64,8 +64,10 @@ export default async function decorate(widget) {
     phoneNumber: get('phoneNumber', 'Phone Number'),
     phoneNumberHelp: get('phoneNumberHelp')
       || get('pleaseEnterAValidPhoneNumber')
-      || get('pleaseEnterAValidPhoneNumberForExample207973782320797378232079737823',
-        'Please enter a valid phone number. For example (207)973-7823, (207) 973-7823, 2079737823.'),
+      || get(
+        'pleaseEnterAValidPhoneNumberForExample207973782320797378232079737823',
+        'Please enter a valid phone number. For example (207)973-7823, (207) 973-7823, 2079737823.',
+      ),
     addressLabel: get('address', 'Address'),
     addressLine2: get('addressLine2', 'Address Line 2'),
     city: get('city', 'City'),

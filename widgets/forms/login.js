@@ -8,7 +8,7 @@ const CODE_LENGTH = 4;
 
 /**
  * Decorates the login widget: applies placeholders and configures form.
- * On success, hides the form and shows the verification UI (title, instruction, 4 code inputs, resend).
+ * On success, hides form and shows verification UI (code inputs, resend).
  * @param {HTMLElement} widget - The widget root element
  */
 export default async function decorate(widget) {
@@ -25,8 +25,10 @@ export default async function decorate(widget) {
     submit: get('submit', 'Submit'),
     sending: get('sending', 'Sending...'),
     verifyYourEmail: get('verifyYourEmail', 'Verify Your Email'),
-    enterVerificationCodeSent: get('enterVerificationCodeSent',
-      'Enter the verification code sent to your email:'),
+    enterVerificationCodeSent: get(
+      'enterVerificationCodeSent',
+      'Enter the verification code sent to your email:',
+    ),
     didntReceiveCode: get('didntReceiveCode', 'Didn\'t receive the code?'),
     resendCode: get('resendCode', 'Resend code'),
   };
