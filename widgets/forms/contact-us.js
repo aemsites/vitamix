@@ -109,6 +109,7 @@ export default async function decorate(widget) {
     const data = new FormData(form);
     const payload = Object.fromEntries(data.entries());
     payload.pageUrl = window.location.href;
+    payload.formId = `${locale}/${language}/contact-us`;
 
     const submitButton = form.querySelector('button[type="submit"]');
     const buttonLabel = submitButton?.textContent;
