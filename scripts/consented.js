@@ -1,6 +1,8 @@
-import { loadScript } from './aem.js';
+import { loadScript, getMetadata } from './aem.js';
 
-import './consented/newsletter.js';
+if (getMetadata('target').toLowerCase() === 'on') {
+  import('./consented/adobe-target.js');
+}
 
 // add delayed functionality here
 window.config = {
