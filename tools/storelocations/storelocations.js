@@ -5,9 +5,9 @@ const ADMIN_BASE = 'https://admin.da.live/source/aemsites/vitamix/us/en_us/where
 const PUBLIC_BASE = 'https://main--vitamix--aemsites.aem.live/us/en_us/where-to-buy';
 
 const SOURCE_OPTIONS = [
-  { value: 'storelocation-hh', publicPath: 'storelocations-hh.json', adminPath: 'storelocation-hh.json' },
-  { value: 'storelocation-events', publicPath: 'storelocation-events.json', adminPath: 'storelocation-events.json' },
-  { value: 'storelocation-comm', publicPath: 'storelocations-comm.json', adminPath: 'storelocation-comm.json' },
+  { value: 'storelocations-hh', publicPath: 'storelocations-hh.json', adminPath: 'storelocations-hh.json' },
+  { value: 'storelocations-events', publicPath: 'storelocations-events.json', adminPath: 'storelocations-events.json' },
+  { value: 'storelocations-comm', publicPath: 'storelocations-comm.json', adminPath: 'storelocations-comm.json' },
 ];
 
 const SCHEMA_ORDER = [
