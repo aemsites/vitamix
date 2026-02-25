@@ -61,16 +61,16 @@ function createWarrantyContent(warranty, customWarranty) {
     const h3 = customWarranty.querySelector('h3');
 
     let warrantyImageName = '';
-    if (h3 && h3.textContent.toLowerCase.includes('Limited')) {
+    if (h3 && h3.textContent.toLowerCase().includes('limited')) {
       warrantyImageName = 'limited';
-    } else if (h3 && h3.textContent.toLowerCase.includes('full')) {
+    } else if (h3 && h3.textContent.toLowerCase().includes('full')) {
       warrantyImageName = 'full';
     }
 
-    if (warrantyImageName) {
+    if (warrantyImageName !== '') {
       const warrantyImage = document.createElement('img');
       warrantyImage.src = `/blocks/pdp/${warrantyImageName}-warranty.svg`;
-      warrantyImage.alt = warranty.name;
+      warrantyImage.alt = '';
       warrantyImage.classList.add('warranty-icon');
       container.append(warrantyImage);
     }
