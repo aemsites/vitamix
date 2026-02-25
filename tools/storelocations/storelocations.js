@@ -18,6 +18,40 @@ const SCHEMA_ORDER = [
 
 const PAGE_SIZE = 100;
 
+const DEFAULT_TYPE_OPTIONS = ['DEMO', 'DEALER/DISTRIBUTOR', 'RETAILER', 'EVENT', 'OTHER'];
+
+function getTypeOptions() {
+  const fromData = rawPayload?.data
+    ? [...new Set(rawPayload.data.map((r) => r.TYPE).filter(Boolean))]
+    : [];
+  const combined = [...new Set([...DEFAULT_TYPE_OPTIONS, ...fromData])].sort();
+  return combined;
+}
+
+function toDateInputValue(str) {
+  if (!str || typeof str !== 'string') return '';
+  const parts = str.trim().split(/[/-]/);
+  if (parts.length !== 3) return str;
+  const m = parseInt(parts[0], 10);
+  const d = parseInt(parts[1], 10);
+  const y = parseInt(parts[2], 10);
+  if (Number.isNaN(m) || Number.isNaN(d) || Number.isNaN(y)) return str;
+  const month = m < 10 ? `0${m}` : String(m);
+  const day = d < 10 ? `0${d}` : String(d);
+  const year = y < 100 ? (y < 50 ? 2000 + y : 1900 + y) : y;
+  return `${year}-${month}-${day}`;
+}
+
+function fromDateInputValue(str) {
+  if (!str || typeof str !== 'string') return '';
+  const match = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return str;
+  const [, y, m, d] = match;
+  const month = parseInt(m, 10);
+  const day = parseInt(d, 10);
+  return `${month}/${day}/${y}`;
+}
+
 let daToken = null;
 let rawPayload = null;
 let columns = [];
@@ -216,14 +250,71 @@ function renderTable() {
 function openEditModal(row) {
   const modal = document.getElementById('editModal');
   const form = document.getElementById('editForm');
+  const title = document.getElementById('editModalTitle');
+  const deleteBtn = document.getElementById('editDeleteBtn');
   form.innerHTML = '';
-  const dataIndex = rawPayload.data.indexOf(row);
+  const isNew = row == null;
+  if (isNew) {
+    row = columns.reduce((o, c) => ({ ...o, [c]: '' }), {});
+    row.ENABLED = 'TRUE';
+    row.ACTION = 'ADD';
+  }
+  const dataIndex = isNew ? -1 : rawPayload.data.indexOf(row);
   form.dataset.dataIndex = String(dataIndex);
+  title.textContent = isNew ? 'Add new record' : 'Edit record';
+  deleteBtn.style.display = isNew ? 'none' : 'inline-block';
 
+  const typeOptions = getTypeOptions();
   columns.forEach((col) => {
     const label = document.createElement('label');
     label.htmlFor = `edit-${col}`;
     label.textContent = col;
+    if (col === 'TYPE') {
+      const select = document.createElement('select');
+      select.id = `edit-${col}`;
+      select.name = col;
+      typeOptions.forEach((opt) => {
+        const o = document.createElement('option');
+        o.value = opt;
+        o.textContent = opt;
+        if (String(row[col] || '').trim() === opt) o.selected = true;
+        select.appendChild(o);
+      });
+      const current = (row[col] || '').trim();
+      if (current && !typeOptions.includes(current)) {
+        const o = document.createElement('option');
+        o.value = current;
+        o.textContent = current;
+        o.selected = true;
+        select.insertBefore(o, select.firstChild);
+      }
+      form.appendChild(label);
+      form.appendChild(select);
+      return;
+    }
+    if (col === 'ENABLED') {
+      const wrap = document.createElement('div');
+      wrap.className = 'form-field checkbox-field';
+      const input = document.createElement('input');
+      input.id = `edit-${col}`;
+      input.name = col;
+      input.type = 'checkbox';
+      input.checked = String(row[col] || '').toUpperCase() === 'TRUE';
+      wrap.appendChild(label);
+      wrap.appendChild(input);
+      form.appendChild(wrap);
+      return;
+    }
+    if (col === 'START_DATE' || col === 'END_DATE') {
+      const input = document.createElement('input');
+      input.id = `edit-${col}`;
+      input.name = col;
+      input.type = 'date';
+      input.value = toDateInputValue(row[col] || '');
+      form.appendChild(label);
+      form.appendChild(input);
+      return;
+    }
     const input = document.createElement('input');
     input.id = `edit-${col}`;
     input.name = col;
@@ -239,16 +330,42 @@ function closeEditModal() {
   document.getElementById('editModal').close();
 }
 
+function deleteCurrentRecord() {
+  const form = document.getElementById('editForm');
+  const dataIndex = parseInt(form.dataset.dataIndex, 10);
+  if (dataIndex < 0 || !rawPayload?.data || dataIndex >= rawPayload.data.length) return;
+  if (!window.confirm('Delete this record?')) return;
+  rawPayload.data.splice(dataIndex, 1);
+  rawPayload.total = rawPayload.data.length;
+  closeEditModal();
+  applySearchFilterSort();
+  if (daToken) saveToAdmin();
+}
+
 function saveEdit(e) {
   e.preventDefault();
   const form = document.getElementById('editForm');
   const dataIndex = parseInt(form.dataset.dataIndex, 10);
-  if (Number.isNaN(dataIndex) || !rawPayload?.data) return;
-  const row = rawPayload.data[dataIndex];
+  if (!rawPayload?.data) return;
+  const row = dataIndex >= 0 ? rawPayload.data[dataIndex] : columns.reduce((o, c) => ({ ...o, [c]: '' }), {});
   columns.forEach((col) => {
     const input = form.querySelector(`[name="${col}"]`);
-    if (input) row[col] = input.value.trim();
+    if (!input) return;
+    if (col === 'ENABLED') {
+      row[col] = input.checked ? 'TRUE' : 'FALSE';
+      return;
+    }
+    if (col === 'START_DATE' || col === 'END_DATE') {
+      const val = (input.value || '').trim();
+      row[col] = val ? fromDateInputValue(val) : '';
+      return;
+    }
+    row[col] = (input.value || '').trim();
   });
+  if (dataIndex < 0) {
+    rawPayload.data.push(row);
+    rawPayload.total = rawPayload.data.length;
+  }
   applySearchFilterSort();
   closeEditModal();
   if (daToken) saveToAdmin();
@@ -311,6 +428,7 @@ export async function loadSource() {
     viewData = [...payload.data];
     document.getElementById('tableSection').classList.add('active');
     document.getElementById('bulkAddBtn').disabled = !daToken;
+    document.getElementById('addNewBtn').disabled = !daToken;
     applySearchFilterSort();
   } catch (err) {
     showError(err.message || 'Failed to load');
@@ -393,6 +511,8 @@ function bindEvents() {
   document.getElementById('sortOrder').addEventListener('change', applySearchFilterSort);
   document.getElementById('editForm').addEventListener('submit', saveEdit);
   document.getElementById('editCancelBtn').addEventListener('click', closeEditModal);
+  document.getElementById('editDeleteBtn').addEventListener('click', deleteCurrentRecord);
+  document.getElementById('addNewBtn').addEventListener('click', () => openEditModal(null));
   document.getElementById('bulkAddBtn').addEventListener('click', openBulkModal);
   document.getElementById('bulkCancelBtn').addEventListener('click', closeBulkModal);
   document.getElementById('bulkImportBtn').addEventListener('click', bulkImport);

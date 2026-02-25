@@ -52,6 +52,7 @@
           </select>
         </div>
         <div class="actions-row">
+          <button type="button" id="addNewBtn" class="btn-secondary" disabled>Add new…</button>
           <button type="button" id="bulkAddBtn" class="btn-secondary" disabled>Bulk add from spreadsheet</button>
           <span class="record-count" id="recordCount"></span>
         </div>
@@ -75,11 +76,13 @@
       </div>
     </div>
 
-    <dialog id="editModal" class="modal" aria-labelledby="editModalTitle">
+    <dialog id="editModal" class="modal edit-modal" aria-labelledby="editModalTitle">
       <div class="modal-content">
         <h2 id="editModalTitle">Edit record</h2>
         <form id="editForm"></form>
         <div class="modal-actions">
+          <button type="button" id="editDeleteBtn" class="btn-danger" style="display: none;">Delete</button>
+          <span class="modal-actions-spacer"></span>
           <button type="button" id="editCancelBtn" class="btn-secondary">Cancel</button>
           <button type="submit" form="editForm" id="editSaveBtn" class="btn-primary">Save</button>
         </div>
