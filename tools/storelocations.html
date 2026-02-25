@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <script src="https://da.live/nx/utils/sdk.js" type="module"></script>
+    <script src="/tools/storelocations/storelocations.js" type="module"></script>
+    <meta name="Description" content="Vitamix Store Locations Table Tool" />
+    <meta name="robots" content="noindex" />
+    <title>Store Locations Tool</title>
+    <link rel="stylesheet" href="./storelocations/storelocations.css" />
+  </head>
+
+  <body>
+    <div class="container">
+      <h1>Store Locations</h1>
+      <p class="subtitle">Manage where-to-buy data: HH, Events, and Comm</p>
+
+      <div class="auth-notice" id="authNotice">
+        <strong>Sign in via DA:</strong> Open this tool from
+        <a href="https://da.live/app/aemsites/vitamix/tools/storelocations" target="_blank" rel="noopener noreferrer">da.live</a>
+        to load and save changes.
+      </div>
+
+      <div class="toolbar form-section">
+        <div class="source-row">
+          <label for="sourceSelect">Source</label>
+          <select id="sourceSelect" aria-label="Select data source">
+            <option value="storelocation-hh">Household (storelocation-hh)</option>
+            <option value="storelocation-events">Events (storelocation-events)</option>
+            <option value="storelocation-comm">Commercial (storelocation-comm)</option>
+          </select>
+          <button type="button" id="loadBtn" class="btn-primary">Load</button>
+        </div>
+        <div class="filter-row">
+          <input type="search" id="searchInput" placeholder="Search..." aria-label="Search table" />
+          <label for="filterColumn">Filter by</label>
+          <select id="filterColumn" aria-label="Filter column">
+            <option value="">—</option>
+          </select>
+          <input type="text" id="filterValue" placeholder="Value" aria-label="Filter value" />
+          <label for="sortColumn">Sort by</label>
+          <select id="sortColumn" aria-label="Sort column">
+            <option value="">—</option>
+          </select>
+          <select id="sortOrder" aria-label="Sort order">
+            <option value="asc">A→Z</option>
+            <option value="desc">Z→A</option>
+          </select>
+        </div>
+        <div class="actions-row">
+          <button type="button" id="bulkAddBtn" class="btn-secondary" disabled>Bulk add from spreadsheet</button>
+          <span class="record-count" id="recordCount"></span>
+        </div>
+      </div>
+
+      <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <p>Loading...</p>
+      </div>
+
+      <div class="error" id="error"></div>
+
+      <div class="table-section" id="tableSection">
+        <div class="table-wrapper">
+          <table class="data-table" id="dataTable">
+            <thead id="tableHead"></thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <dialog id="editModal" class="modal" aria-labelledby="editModalTitle">
+      <div class="modal-content">
+        <h2 id="editModalTitle">Edit record</h2>
+        <form id="editForm"></form>
+        <div class="modal-actions">
+          <button type="button" id="editCancelBtn" class="btn-secondary">Cancel</button>
+          <button type="submit" form="editForm" id="editSaveBtn" class="btn-primary">Save</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="bulkModal" class="modal" aria-labelledby="bulkModalTitle">
+      <div class="modal-content bulk-content">
+        <h2 id="bulkModalTitle">Bulk add from spreadsheet</h2>
+        <p class="help-text">Paste TSV or CSV (first row = headers). Columns should match: TYPE, ACTION, ENABLED, NAME, ADDRESS_1, ADDRESS_2, CITY, STATE_PROVINCE, POSTAL_CODE, COUNTY, COUNTRY, LAT, LONG, PHONE_NUMBER, etc.</p>
+        <textarea id="bulkTextarea" rows="10" placeholder="Paste spreadsheet data here..."></textarea>
+        <div class="modal-actions">
+          <button type="button" id="bulkCancelBtn" class="btn-secondary">Cancel</button>
+          <button type="button" id="bulkImportBtn" class="btn-primary">Import</button>
+        </div>
+      </div>
+    </dialog>
+  </body>
+</html>
