@@ -757,46 +757,51 @@ export async function bulkSyncWithDA() {
 
       addLogEntry(`  Syncing to DA: ${filename}`, 'info');
 
-      const blob = new Blob([htmlContent], { type: 'text/html' });
-      const body = new FormData();
-      body.append('data', blob);
+      const processPage = async (fullpath) => {
+        const blob = new Blob([htmlContent], { type: 'text/html' });
+        const body = new FormData();
+        body.append('data', blob);
 
-      const opts = {
-        headers: { Authorization: `Bearer ${token}` },
-        method: 'POST',
-        body,
+        const opts = {
+          headers: { Authorization: `Bearer ${token}` },
+          method: 'POST',
+          body,
+        };
+
+        const resp = await fetch(fullpath, opts);
+
+        if (!resp.ok) {
+          throw new Error(`${resp.status} ${resp.statusText}`);
+        }
+
+        addLogEntry(`  ✓ Successfully synced: ${filename}`, 'success');
+
+        // Preview and Publish if enabled
+        if (enablePublish) {
+          try {
+            addLogEntry('  Running preview...', 'info');
+            // eslint-disable-next-line no-await-in-loop
+            await previewRecipe(filename, token);
+            addLogEntry('  ✓ Preview complete', 'success');
+          } catch (previewError) {
+            addLogEntry(`  ⚠ Preview failed: ${previewError.message}`, 'warning');
+          }
+
+          try {
+            addLogEntry('  Publishing...', 'info');
+            // eslint-disable-next-line no-await-in-loop
+            await publishRecipe(filename, token);
+            addLogEntry('  ✓ Publish complete', 'success');
+          } catch (publishError) {
+            addLogEntry(`  ⚠ Publish failed: ${publishError.message}`, 'warning');
+          }
+        }
       };
 
-      const fullpath = `https://admin.da.live/source/aemsites/vitamix/us/en_us/recipes/${filename}`;
-      // eslint-disable-next-line no-await-in-loop
-      const resp = await fetch(fullpath, opts);
-
-      if (!resp.ok) {
-        throw new Error(`${resp.status} ${resp.statusText}`);
-      }
-
-      addLogEntry(`  ✓ Successfully synced: ${filename}`, 'success');
-
-      // Preview and Publish if enabled
-      if (enablePublish) {
-        try {
-          addLogEntry('  Running preview...', 'info');
-          // eslint-disable-next-line no-await-in-loop
-          await previewRecipe(filename, token);
-          addLogEntry('  ✓ Preview complete', 'success');
-        } catch (previewError) {
-          addLogEntry(`  ⚠ Preview failed: ${previewError.message}`, 'warning');
-        }
-
-        try {
-          addLogEntry('  Publishing...', 'info');
-          // eslint-disable-next-line no-await-in-loop
-          await publishRecipe(filename, token);
-          addLogEntry('  ✓ Publish complete', 'success');
-        } catch (publishError) {
-          addLogEntry(`  ⚠ Publish failed: ${publishError.message}`, 'warning');
-        }
-      }
+      ['us/en_us', 'ca/en_us', 'ca/fr_ca'].forEach(async (locale) => {
+        // eslint-disable-next-line no-await-in-loop
+        await processPage(`https://admin.da.live/source/aemsites/vitamix/${locale}/recipes/${filename}`);
+      });
 
       // eslint-disable-next-line no-plusplus
       successCount++;
@@ -879,26 +884,28 @@ ${recipeElement.innerHTML}
   if (!token) {
     throw new Error('DA token not found');
   }
-  // Create blob and form data
-  const blob = new Blob([htmlContent], { type: 'text/html' });
-  const body = new FormData();
-  body.append('data', blob);
 
-  const opts = {
-    headers: { Authorization: `Bearer ${token}` },
-    method: 'POST',
-    body,
-  };
+  const results = [];
+  ['us/en_us', 'ca/en_us', 'ca/fr_ca'].forEach(async (locale) => {
+    // Create blob and form data
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const body = new FormData();
+    body.append('data', blob);
 
-  const fullpath = `https://admin.da.live/source/aemsites/vitamix/us/en_us/recipes/${filename}`;
+    const opts = {
+      headers: { Authorization: `Bearer ${token}` },
+      method: 'POST',
+      body,
+    };
 
-  const resp = await fetch(fullpath, opts);
-
-  if (!resp.ok) {
-    throw new Error(`Failed to sync: ${resp.status} ${resp.statusText}`);
-  }
-
-  return { filename, url: fullpath };
+    const fullpath = `https://admin.da.live/source/aemsites/vitamix/${locale}/recipes/${filename}`;
+    const resp = await fetch(fullpath, opts);
+    if (!resp.ok) {
+      throw new Error(`Failed to sync: ${resp.status} ${resp.statusText}`);
+    }
+    results.push({ filename, url: fullpath });
+  });
+  return results;
 }
 
 // Display recipe details on page
@@ -1023,29 +1030,34 @@ export async function displayRecipeDetails(recipeNumber) {
           syncWithDABtn.disabled = true;
           syncWithDABtn.textContent = 'Syncing...';
 
-          const result = await syncWithDA(recipeName, recipeNumber);
+          const results = await syncWithDA(recipeName, recipeNumber);
 
           // Get token for preview/publish
           const token = window.sessionStorage.getItem('da-token');
 
-          // Preview and Publish if enabled
-          if (enablePublish && token) {
-            try {
-              await previewRecipe(result.filename, token);
-              // eslint-disable-next-line no-console
-              console.log('Preview complete');
-            } catch (previewError) {
-              // eslint-disable-next-line no-console
-              console.error('Preview failed:', previewError);
-            }
+          for (let i = 0; i < results.length; i += 1) {
+            const result = results[i];
+            // Preview and Publish if enabled
+            if (enablePublish && token) {
+              try {
+                // eslint-disable-next-line no-await-in-loop
+                await previewRecipe(result.filename, token);
+                // eslint-disable-next-line no-console
+                console.log('Preview complete');
+              } catch (previewError) {
+                // eslint-disable-next-line no-console
+                console.error('Preview failed:', previewError);
+              }
 
-            try {
-              await publishRecipe(result.filename, token);
-              // eslint-disable-next-line no-console
-              console.log('Publish complete');
-            } catch (publishError) {
-              // eslint-disable-next-line no-console
-              console.error('Publish failed:', publishError);
+              try {
+                // eslint-disable-next-line no-await-in-loop
+                await publishRecipe(result.filename, token);
+                // eslint-disable-next-line no-console
+                console.log('Publish complete');
+              } catch (publishError) {
+                // eslint-disable-next-line no-console
+                console.error('Publish failed:', publishError);
+              }
             }
           }
 
@@ -1053,7 +1065,7 @@ export async function displayRecipeDetails(recipeNumber) {
           syncWithDABtn.style.backgroundColor = '#28a745';
 
           // eslint-disable-next-line no-console
-          console.log('Successfully synced recipe:', result);
+          console.log('Successfully synced recipe:', results);
 
           // Reset button after 3 seconds
           setTimeout(() => {
@@ -1325,7 +1337,8 @@ export async function displayRecipeDetails(recipeNumber) {
       const portionSize = nutritionElement.querySelector('PortionSize')?.textContent.trim() || '';
       const nutrients = nutritionElement.querySelectorAll('Nutrient');
 
-      // Helper function to find nutrient by key (use Value when ValueImposed is 0; optional preferredUnit e.g. 'kcal')
+      // Helper function to find nutrient by key
+      // (use Value when ValueImposed is 0; optional preferredUnit e.g. 'kcal')
       const findNutrient = (key, preferredUnit = null) => {
         const candidates = Array.from(nutrients).filter((n) => {
           const nutKey = n.querySelector('NutKey')?.textContent.trim();
