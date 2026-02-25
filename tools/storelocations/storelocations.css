@@ -239,6 +239,31 @@ button:disabled {
   white-space: nowrap;
 }
 
+.pager {
+  display: none;
+  padding: 12px 16px;
+  border-top: 1px solid #e2e8f0;
+  background: #f8fafc;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.pager.active {
+  display: flex;
+}
+
+.pager .btn-page {
+  min-width: 80px;
+}
+
+.pager .pager-info {
+  font-size: 14px;
+  color: #475569;
+  font-weight: 500;
+}
+
 /* Modal */
 .modal {
   border: none;

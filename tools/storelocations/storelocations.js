@@ -16,10 +16,13 @@ const SCHEMA_ORDER = [
   'START_DATE', 'END_DATE', 'NOTES', 'PRODUCT_TYPE', 'WEB_ADDRESS', 'WEB_ADDRESS_LINK_TEXT',
 ];
 
+const PAGE_SIZE = 100;
+
 let daToken = null;
 let rawPayload = null;
 let columns = [];
 let viewData = [];
+let currentPage = 1;
 
 function getSourceConfig() {
   const select = document.getElementById('sourceSelect');
@@ -94,7 +97,8 @@ function buildColumns(data) {
   return ordered.filter((k) => keys.includes(k));
 }
 
-function applySearchFilterSort() {
+function applySearchFilterSort(resetPage = true) {
+  if (resetPage) currentPage = 1;
   const search = (document.getElementById('searchInput').value || '').trim().toLowerCase();
   const filterCol = document.getElementById('filterColumn').value;
   const filterVal = (document.getElementById('filterValue').value || '').trim().toLowerCase();
@@ -127,8 +131,48 @@ function applySearchFilterSort() {
   }
 
   viewData = out;
+  const totalFiltered = viewData.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / PAGE_SIZE));
+  if (currentPage > totalPages) currentPage = totalPages;
   renderTable();
-  document.getElementById('recordCount').textContent = `Showing ${viewData.length} of ${rawPayload?.data?.length ?? 0} records`;
+  const start = (currentPage - 1) * PAGE_SIZE + 1;
+  const end = Math.min(currentPage * PAGE_SIZE, totalFiltered);
+  document.getElementById('recordCount').textContent = totalFiltered <= PAGE_SIZE
+    ? `Showing ${totalFiltered} of ${rawPayload?.data?.length ?? 0} records`
+    : `Showing ${start}-${end} of ${totalFiltered} (of ${rawPayload?.data?.length ?? 0} total)`;
+  renderPager(totalFiltered, totalPages);
+}
+
+function getPageSlice() {
+  const start = (currentPage - 1) * PAGE_SIZE;
+  return viewData.slice(start, start + PAGE_SIZE);
+}
+
+function renderPager(totalFiltered, totalPages) {
+  const pager = document.getElementById('pager');
+  if (totalFiltered <= PAGE_SIZE) {
+    pager.classList.remove('active');
+    pager.innerHTML = '';
+    return;
+  }
+  pager.classList.add('active');
+  pager.innerHTML = '';
+  const prev = document.createElement('button');
+  prev.type = 'button';
+  prev.className = 'btn-secondary btn-page';
+  prev.textContent = 'Previous';
+  prev.disabled = currentPage <= 1;
+  prev.addEventListener('click', () => { currentPage -= 1; applySearchFilterSort(false); });
+  const span = document.createElement('span');
+  span.className = 'pager-info';
+  span.textContent = `Page ${currentPage} of ${totalPages}`;
+  const next = document.createElement('button');
+  next.type = 'button';
+  next.className = 'btn-secondary btn-page';
+  next.textContent = 'Next';
+  next.disabled = currentPage >= totalPages;
+  next.addEventListener('click', () => { currentPage += 1; applySearchFilterSort(false); });
+  pager.append(prev, span, next);
 }
 
 function renderTable() {
@@ -148,9 +192,9 @@ function renderTable() {
   });
   thead.appendChild(trHead);
 
-  viewData.forEach((row, index) => {
+  const pageRows = getPageSlice();
+  pageRows.forEach((row) => {
     const tr = document.createElement('tr');
-    tr.dataset.index = String(index);
     const editCell = document.createElement('td');
     const editBtn = document.createElement('button');
     editBtn.type = 'button';
