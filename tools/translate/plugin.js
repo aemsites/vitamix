@@ -12,7 +12,7 @@
 
 // eslint-disable-next-line import/no-unresolved
 import DA_SDK from 'https://da.live/nx/utils/sdk.js';
-import { addDnt, translate, EDITOR_FORMAT } from './shared.js';
+import { preprocess, translate, EDITOR_FORMAT } from './shared.js';
 
 (async function init() {
   // eslint-disable-next-line no-unused-vars
@@ -23,7 +23,7 @@ import { addDnt, translate, EDITOR_FORMAT } from './shared.js';
   let selection = 'No text selected.';
   try {
     selection = await actions.getSelection();
-    selection = await addDnt(selection, EDITOR_FORMAT, context, actions.daFetch);
+    selection = await preprocess(selection, EDITOR_FORMAT, context, actions.daFetch);
   } catch (error) {
     // ignore
   }

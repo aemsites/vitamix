@@ -24,6 +24,28 @@ const METADATA_FIELDS_TO_TRANSLATE = ['title', 'description'];
 const EDITOR_FORMAT = 'table';
 const ADMIN_FORMAT = 'div';
 
+const HELPERS = {
+  [EDITOR_FORMAT]: {
+    getMetadataTable: (html) => {
+      const tables = [...html.querySelectorAll('table')];
+      for (let i = 0; i < tables.length; i += 1) {
+        const table = tables[i];
+        const rows = table.querySelectorAll('tr');
+        if (rows.length > 0) {
+          const metadataTable = rows[0].textContent.toLowerCase().trim() === 'metadata';
+          if (metadataTable) {
+            return table;
+          }
+        }
+      }
+      return null;
+    },
+  },
+  [ADMIN_FORMAT]: {
+    getMetadataTable: (html) => html.querySelectorAll('div[class=metadata]'),
+  },
+};
+
 const ICONS_RULE = {
   description: 'Icon names should be not translated',
   apply: (html) => {
@@ -95,25 +117,21 @@ const RULES = {
         return [...new Set(ks)];
       })();
 
-      const tables = html.querySelectorAll('table');
-      tables.forEach((table) => {
+      const table = HELPERS[EDITOR_FORMAT].getMetadataTable(html);
+      if (table) {
+        table.setAttribute('translate', 'no');
         const rows = table.querySelectorAll('tr');
-        if (rows.length > 0) {
-          const metadataTable = rows[0].textContent.toLowerCase().trim() === 'metadata';
-          if (metadataTable) {
-            table.setAttribute('translate', 'no');
-            rows.forEach((row) => {
-              const keyEl = row.querySelector('td:first-child');
-              const valueEl = row.querySelector('td:last-child');
-              const key = keyEl?.textContent.toLowerCase().trim();
-              const value = valueEl?.textContent.toLowerCase().trim();
-              if (key && value && keys.includes(key)) {
-                valueEl.setAttribute('translate', 'yes');
-              }
-            });
+        rows.forEach((row) => {
+          const keyEl = row.querySelector('td:first-child');
+          const valueEl = row.querySelector('td:last-child');
+          const key = keyEl?.textContent.toLowerCase().trim();
+          const value = valueEl?.textContent.toLowerCase().trim();
+          if (key && value && keys.includes(key)) {
+            valueEl.setAttribute('translate', 'yes');
           }
-        }
-      });
+        });
+      }
+
       return html;
     },
   }, {
@@ -143,10 +161,10 @@ const RULES = {
         return [...new Set(ks)];
       })();
 
-      const divs = html.querySelectorAll('div[class=metadata]');
-      divs.forEach((block) => {
-        block.setAttribute('translate', 'no');
-        block.querySelectorAll('& > div').forEach((row) => {
+      const table = HELPERS[ADMIN_FORMAT].getMetadataTable(html);
+      if (table) {
+        table.setAttribute('translate', 'no');
+        table.querySelectorAll('& > div').forEach((row) => {
           const keyEl = row.querySelector('div:first-child');
           const valueEl = row.querySelector('div:last-child');
           const key = keyEl?.textContent.toLowerCase().trim();
@@ -155,7 +173,7 @@ const RULES = {
             valueEl.setAttribute('translate', 'yes');
           }
         });
-      });
+      }
       return html;
     },
   }, {
@@ -170,6 +188,82 @@ const RULES = {
   }, ICONS_RULE, CONTENT_DNT_RULE],
 };
 
+const FORMAT_RULES = {
+  [EDITOR_FORMAT]: [
+    {
+      description: 'Metadata property: convert commat separated list to ul list',
+      preProcess: (html) => {
+        const table = HELPERS[EDITOR_FORMAT].getMetadataTable(html);
+        if (table) {
+          const rows = table.querySelectorAll('tr');
+          rows.forEach((row) => {
+            const keyEl = row.querySelector('td:first-child');
+            const valueEl = row.querySelector('td:last-child');
+            const key = keyEl?.textContent.toLowerCase().trim();
+            const value = valueEl?.textContent.toLowerCase().trim();
+            if (key && value && key !== 'title' && key !== 'description') {
+              const list = value.split(',').map((item) => item.trim());
+              if (list.length > 1) {
+                valueEl.innerHTML = `<ul>${list.map((item) => `<li>${item}</li>`).join('')}</ul>`;
+              }
+            }
+          });
+        }
+        return html;
+      },
+      postProcess: (html) => {
+        // revert operation of preProcess
+        const table = HELPERS[EDITOR_FORMAT].getMetadataTable(html);
+        if (table) {
+          const uls = table.querySelectorAll('ul');
+          uls.forEach((ul) => {
+            const list = [];
+            const lis = ul.querySelectorAll('li');
+            lis.forEach((li) => {
+              list.push(li.textContent.trim());
+            });
+            ul.parentElement.textContent = list.join(', ');
+          });
+        }
+        return html;
+      },
+    },
+  ],
+  [ADMIN_FORMAT]: [{
+    description: 'Metadata property: convert commat separated list to ul list',
+    preProcess: (html) => {
+      const table = HELPERS[ADMIN_FORMAT].getMetadataTable(html);
+      if (table) {
+        const rows = table.querySelectorAll('& > div');
+        rows.forEach((row) => {
+          const valueEl = row.querySelector('div:last-child');
+          const value = valueEl?.textContent.toLowerCase().trim();
+          if (value) {
+            valueEl.innerHTML = `<ul>${value.split(',').map((item) => `<li>${item}</li>`).join('')}</ul>`;
+          }
+        });
+      }
+      return html;
+    },
+    postProcess: (html) => {
+      // revert operation of preProcess
+      const table = HELPERS[ADMIN_FORMAT].getMetadataTable(html);
+      if (table) {
+        const uls = table.querySelectorAll('& > ul');
+        uls.forEach((ul) => {
+          const list = [];
+          const lis = ul.querySelectorAll('li');
+          lis.forEach((li) => {
+            list.push(li.textContent.trim());
+          });
+          ul.parentElement.textContent = list.join(', ');
+        });
+      }
+      return html;
+    },
+  }],
+};
+
 const getConfig = async (context, daFetch) => {
   const resp = await daFetch(`${ADMIN_URL}/source/${context.org}/${context.repo}${CONFIG_PATH}`);
   if (!resp.ok) {
@@ -179,9 +273,9 @@ const getConfig = async (context, daFetch) => {
   return config || {};
 };
 
-const addDnt = async (text, format, context, daFetch) => {
+const addDnt = async (html, format, context, daFetch) => {
+  let result = html;
   const config = await getConfig(context, daFetch);
-  let html = new DOMParser().parseFromString(text, 'text/html');
   let rules;
   if (format) {
     rules = RULES[format];
@@ -190,9 +284,32 @@ const addDnt = async (text, format, context, daFetch) => {
   }
   if (rules) {
     rules.forEach((rule) => {
-      html = rule.apply(html, config);
+      result = rule.apply(result, config);
     });
   }
+  return result;
+};
+
+const reformat = (html, format) => {
+  let result = html;
+  FORMAT_RULES[format].forEach((rule) => {
+    result = rule.preProcess(html);
+  });
+  return result;
+};
+
+const unformat = (html, format) => {
+  let result = html;
+  FORMAT_RULES[format].forEach((rule) => {
+    result = rule.postProcess(html);
+  });
+  return result;
+};
+
+const preprocess = async (text, format, context, daFetch) => {
+  let html = new DOMParser().parseFromString(text, 'text/html');
+  html = await addDnt(html, format, context, daFetch);
+  html = reformat(html, format);
   return html.documentElement.outerHTML;
 };
 
@@ -204,7 +321,7 @@ const removeDnt = (html) => {
       element.replaceWith(element.textContent);
     }
   });
-  return html.documentElement.outerHTML;
+  return html;
 };
 
 const adjustURLs = (html, context) => {
@@ -230,22 +347,22 @@ const adjustURLs = (html, context) => {
       }
     });
   }
-  return html.documentElement.outerHTML;
+  return html;
 };
 
-const postProcess = (text, context) => {
-  const html = new DOMParser().parseFromString(text, 'text/html');
-  let result = removeDnt(html);
+const postProcess = (text, context, format) => {
+  let html = new DOMParser().parseFromString(text, 'text/html');
+  html = removeDnt(html);
+  html = unformat(html, format);
+  html = adjustURLs(html, context);
   // remove start tag <html><head></head><body> and end tag </body></html>
-  result = adjustURLs(html, context);
-  result = result.replace(/^<html><head><\/head><body>/, '').replace(/<\/body><\/html>$/, '');
-  return result;
+  return html.documentElement.outerHTML.replace(/^<html><head><\/head><body>/, '').replace(/<\/body><\/html>$/, '');
 };
 
-const translate = async (htmlInput, language, context, format, daFetch, skipDnt = false) => {
+const translate = async (htmlInput, language, context, format, daFetch, skipPreprocess = false) => {
   let html = htmlInput;
-  if (!skipDnt) {
-    html = await addDnt(html, format, context, daFetch);
+  if (!skipPreprocess) {
+    html = await preprocess(html, format, context, daFetch);
   }
   const splits = [];
   const maxChunk = 30000;
@@ -287,9 +404,9 @@ const translate = async (htmlInput, language, context, format, daFetch, skipDnt 
 
   const translatedParts = await Promise.all(splits.map((split) => translateSplit(split)));
   const combined = translatedParts.join('');
-  return postProcess(combined, context);
+  return postProcess(combined, context, format);
 };
 
 export {
-  addDnt, removeDnt, adjustURLs, postProcess, translate, EDITOR_FORMAT, ADMIN_FORMAT, ADMIN_URL,
+  adjustURLs, postProcess, preprocess, translate, EDITOR_FORMAT, ADMIN_FORMAT, ADMIN_URL,
 };
