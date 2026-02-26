@@ -5,6 +5,12 @@ const ADMIN_BASE = 'https://admin.da.live/source/aemsites/vitamix/us/en_us/where
 const PUBLIC_BASE = 'https://main--vitamix--aemsites.aem.live/us/en_us/where-to-buy';
 const CORS_PROXY = 'https://fcors.org/?url=';
 const CORS_KEY = '&key=Mg23N96GgR8O3NjU';
+const GEOCODE_BASE = 'https://helix-geocode.adobeaem.workers.dev/';
+const GOOGLE_MAPS_SEARCH = 'https://www.google.com/maps/search/?api=1&query=';
+
+const ADDRESS_FIELDS = ['NAME', 'ADDRESS_1', 'ADDRESS_2', 'CITY', 'STATE_PROVINCE', 'POSTAL_CODE', 'COUNTY', 'COUNTRY'];
+const META_COLUMNS = ['TYPE', 'ENABLED', 'PRODUCT FAMILY', 'START_DATE', 'END_DATE', 'NOTES', 'PRODUCT_TYPE', 'WEB_ADDRESS', 'WEB_ADDRESS_LINK_TEXT'];
+const ADDRESS_COLUMNS = ['NAME', 'ADDRESS_1', 'ADDRESS_2', 'CITY', 'STATE_PROVINCE', 'POSTAL_CODE', 'COUNTY', 'COUNTRY', 'PHONE_NUMBER', 'LAT', 'LONG'];
 
 const SOURCE_OPTIONS = [
   { value: 'storelocations-hh', publicPath: 'storelocations-hh.json', adminPath: 'storelocations-hh.json' },
@@ -50,6 +56,34 @@ function fromDateInputValue(str) {
   if (!match) return str;
   const [, y, m, d] = match;
   return `${parseInt(m, 10)}/${parseInt(d, 10)}/${y}`;
+}
+
+function buildAddressFromRow(row) {
+  const parts = ADDRESS_FIELDS.map((f) => (row[f] || '').toString().replace(/\s+/g, ' ').trim()).filter(Boolean);
+  return parts.join(' ');
+}
+
+function buildAddressFromForm(form) {
+  const parts = ADDRESS_FIELDS.map((f) => {
+    const input = form.querySelector(`[name="${f}"]`);
+    return input ? (input.value || '').replace(/\s+/g, ' ').trim() : '';
+  }).filter(Boolean);
+  return parts.join(' ');
+}
+
+async function geocodeAddress(address) {
+  if (!address || !address.trim()) return null;
+  const url = `${GEOCODE_BASE}?address=${encodeURIComponent(address)}`;
+  const response = await fetch(url);
+  if (!response.ok) return null;
+  const data = await response.json();
+  if (data.results && Array.isArray(data.results) && data.results.length > 0) {
+    const location = data.results[0].geometry?.location;
+    if (location && location.lat != null && location.lng != null) {
+      return { lat: Number(location.lat), lng: Number(location.lng) };
+    }
+  }
+  return null;
 }
 
 let daToken = null;
@@ -280,8 +314,22 @@ function openEditModal(row) {
   deleteBtn.style.display = isNew ? 'none' : 'inline-block';
 
   const typeOptions = getTypeOptions();
+  const leftCols = ['ENABLED'].filter((c) => columns.includes(c))
+    .concat(META_COLUMNS.filter((c) => columns.includes(c) && c !== 'ENABLED'));
+  const rightCols = ADDRESS_COLUMNS.filter((c) => columns.includes(c));
+  const restCols = columns.filter((c) => c !== 'ACTION' && !leftCols.includes(c) && !rightCols.includes(c));
 
-  function addField(col) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'edit-form-columns';
+  const leftCol = document.createElement('div');
+  leftCol.className = 'edit-form-col edit-form-meta';
+  const rightCol = document.createElement('div');
+  rightCol.className = 'edit-form-col edit-form-address';
+  wrapper.appendChild(leftCol);
+  wrapper.appendChild(rightCol);
+  form.appendChild(wrapper);
+
+  function addField(col, container) {
     const label = document.createElement('label');
     label.htmlFor = `edit-${col}`;
     label.textContent = col;
@@ -304,8 +352,8 @@ function openEditModal(row) {
         o.selected = true;
         select.insertBefore(o, select.firstChild);
       }
-      form.appendChild(label);
-      form.appendChild(select);
+      container.appendChild(label);
+      container.appendChild(select);
       return;
     }
     if (col === 'ENABLED') {
@@ -318,7 +366,7 @@ function openEditModal(row) {
       input.checked = String(row[col] || '').toUpperCase() === 'TRUE';
       wrap.appendChild(label);
       wrap.appendChild(input);
-      form.appendChild(wrap);
+      container.appendChild(wrap);
       return;
     }
     if (col === 'START_DATE' || col === 'END_DATE') {
@@ -327,8 +375,8 @@ function openEditModal(row) {
       input.name = col;
       input.type = 'date';
       input.value = toDateInputValue(row[col] || '');
-      form.appendChild(label);
-      form.appendChild(input);
+      container.appendChild(label);
+      container.appendChild(input);
       return;
     }
     const input = document.createElement('input');
@@ -336,17 +384,127 @@ function openEditModal(row) {
     input.name = col;
     input.type = 'text';
     input.value = (row[col] != null ? row[col] : '');
-    form.appendChild(label);
-    form.appendChild(input);
+    container.appendChild(label);
+    container.appendChild(input);
   }
 
-  if (columns.includes('ENABLED')) {
-    addField('ENABLED');
-  }
-  columns.forEach((col) => {
-    if (col === 'ACTION' || col === 'ENABLED') return;
-    addField(col);
+  leftCols.forEach((col) => {
+    if (col === 'END_DATE') return;
+    if (col === 'START_DATE') {
+      const dateRowEl = document.createElement('div');
+      dateRowEl.className = 'edit-form-row-half';
+      ['START_DATE', 'END_DATE'].forEach((dateCol) => {
+        const cell = document.createElement('div');
+        cell.className = 'edit-form-half-cell';
+        const lab = document.createElement('label');
+        lab.htmlFor = `edit-${dateCol}`;
+        lab.textContent = dateCol;
+        const inp = document.createElement('input');
+        inp.id = `edit-${dateCol}`;
+        inp.name = dateCol;
+        inp.type = 'date';
+        inp.value = toDateInputValue(row[dateCol] || '');
+        cell.appendChild(lab);
+        cell.appendChild(inp);
+        dateRowEl.appendChild(cell);
+      });
+      leftCol.appendChild(dateRowEl);
+      return;
+    }
+    addField(col, leftCol);
   });
+  restCols.forEach((col) => addField(col, leftCol));
+
+  const actionsSection = document.createElement('div');
+  actionsSection.className = 'edit-form-actions-section';
+  const actionsHeading = document.createElement('h3');
+  actionsHeading.className = 'edit-form-actions-heading';
+  actionsHeading.textContent = 'Actions';
+  actionsSection.appendChild(actionsHeading);
+  const mapsAddressBtn = document.createElement('button');
+  mapsAddressBtn.type = 'button';
+  mapsAddressBtn.className = 'btn-secondary btn-maps';
+  mapsAddressBtn.textContent = 'View address on Google Maps';
+  mapsAddressBtn.addEventListener('click', () => {
+    const q = buildAddressFromForm(form);
+    if (q) {
+      window.open(GOOGLE_MAPS_SEARCH + encodeURIComponent(q), '_blank');
+    }
+  });
+  actionsSection.appendChild(mapsAddressBtn);
+  const geocodeBtn = document.createElement('button');
+  geocodeBtn.type = 'button';
+  geocodeBtn.className = 'btn-secondary btn-geocode';
+  geocodeBtn.textContent = 'Geocode address';
+  geocodeBtn.addEventListener('click', async () => {
+    const address = buildAddressFromForm(form);
+    if (!address) return;
+    geocodeBtn.disabled = true;
+    geocodeBtn.textContent = 'Looking up…';
+    try {
+      const result = await geocodeAddress(address);
+      if (result) {
+        const latInput = form.querySelector('[name="LAT"]');
+        const lngInput = form.querySelector('[name="LONG"]');
+        if (latInput) latInput.value = String(result.lat);
+        if (lngInput) lngInput.value = String(result.lng);
+      } else {
+        showError('Geocode failed for this address.');
+      }
+    } finally {
+      geocodeBtn.disabled = false;
+      geocodeBtn.textContent = 'Geocode address';
+    }
+  });
+  actionsSection.appendChild(geocodeBtn);
+  const mapsCoordsBtn = document.createElement('button');
+  mapsCoordsBtn.type = 'button';
+  mapsCoordsBtn.className = 'btn-secondary btn-maps';
+  mapsCoordsBtn.textContent = 'View lat/long on Google Maps';
+  mapsCoordsBtn.addEventListener('click', () => {
+    const latInput = form.querySelector('[name="LAT"]');
+    const lngInput = form.querySelector('[name="LONG"]');
+    const lat = (latInput?.value || '').trim();
+    const lng = (lngInput?.value || '').trim();
+    if (lat && lng) {
+      window.open(GOOGLE_MAPS_SEARCH + encodeURIComponent(`${lat},${lng}`), '_blank');
+    }
+  });
+  actionsSection.appendChild(mapsCoordsBtn);
+  leftCol.appendChild(actionsSection);
+
+  rightCols.forEach((col) => {
+    if (col === 'COUNTRY') {
+      addField(col, rightCol);
+      if (columns.includes('PHONE_NUMBER')) {
+        addField('PHONE_NUMBER', rightCol);
+      }
+    } else if (col === 'LONG') {
+      return;
+    } else if (col === 'LAT') {
+      const latLongRowEl = document.createElement('div');
+      latLongRowEl.className = 'edit-form-row-half';
+      ['LAT', 'LONG'].forEach((coordCol) => {
+        const cell = document.createElement('div');
+        cell.className = 'edit-form-half-cell';
+        const lab = document.createElement('label');
+        lab.htmlFor = `edit-${coordCol}`;
+        lab.textContent = coordCol;
+        const inp = document.createElement('input');
+        inp.id = `edit-${coordCol}`;
+        inp.name = coordCol;
+        inp.type = 'text';
+        inp.value = (row[coordCol] != null ? row[coordCol] : '');
+        cell.appendChild(lab);
+        cell.appendChild(inp);
+        latLongRowEl.appendChild(cell);
+      });
+      rightCol.appendChild(latLongRowEl);
+    } else if (col !== 'PHONE_NUMBER') {
+      addField(col, rightCol);
+    }
+  });
+
   modal.showModal();
 }
 

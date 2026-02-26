@@ -282,8 +282,8 @@ button:disabled {
 
 .edit-modal {
   min-width: 320px;
-  width: 90vw;
-  max-width: 720px;
+  width: 95vw;
+  max-width: 960px;
 }
 
 .modal::backdrop {
@@ -294,6 +294,71 @@ button:disabled {
   padding: 24px;
   overflow-y: auto;
   max-height: 85vh;
+}
+
+.edit-form-columns {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+
+@media (min-width: 720px) {
+  .edit-form-columns {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.edit-form-col {
+  min-width: 0;
+}
+
+.edit-form-row-half {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 12px 0 0;
+}
+
+.edit-form-row-half .edit-form-half-cell label {
+  display: block;
+  margin: 0 0 4px;
+  font-weight: 600;
+  font-size: 13px;
+  color: #475569;
+}
+
+.edit-form-half-cell input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.edit-form-actions-section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.edit-form-actions-heading {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.edit-form-actions-section button {
+  display: block;
+  width: 100%;
+  margin-bottom: 8px;
+  font-size: 13px;
+  padding: 8px 12px;
+}
+
+.edit-form-actions-section button:last-child {
+  margin-bottom: 0;
 }
 
 .modal .modal-content h2 {
