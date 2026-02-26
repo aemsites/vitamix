@@ -1,5 +1,3 @@
-import { createOptimizedPicture } from '../../scripts/aem.js';
-
 /*
  * Creates the tab buttons for the specifications section.
  * @param {Array<{id: string, label: string}>} tabs - Array of tab objects with id and label.
@@ -59,10 +57,23 @@ function createWarrantyContent(warranty, customWarranty) {
   const container = document.createElement('div');
   container.classList.add('warranty-container');
 
-  if (warranty && warranty.sku) {
-    const warrantyImage = createOptimizedPicture(`/blocks/pdp/${warranty.sku}.png`, warranty.name, false);
-    warrantyImage.classList.add('warranty-icon');
-    container.append(warrantyImage);
+  if (customWarranty) {
+    const h3 = customWarranty.querySelector('h3');
+
+    let warrantyImageName = '';
+    if (h3 && h3.textContent.toLowerCase().includes('limited')) {
+      warrantyImageName = 'limited';
+    } else if (h3 && h3.textContent.toLowerCase().includes('full')) {
+      warrantyImageName = 'full';
+    }
+
+    if (warrantyImageName !== '') {
+      const warrantyImage = document.createElement('img');
+      warrantyImage.src = `/blocks/pdp/${warrantyImageName}-warranty.svg`;
+      warrantyImage.alt = '';
+      warrantyImage.classList.add('warranty-icon');
+      container.append(warrantyImage);
+    }
   }
 
   const details = document.createElement('div');
