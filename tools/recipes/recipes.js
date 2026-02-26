@@ -950,6 +950,7 @@ ${recipeElement.innerHTML}
     if (!resp.ok) {
       throw new Error(`Failed to sync: ${resp.status} ${resp.statusText}`);
     }
+    // eslint-disable-next-line no-console
     console.log('Sync complete', fullpath);
     results.push({ filename, url: fullpath, root: locale.root });
   }
