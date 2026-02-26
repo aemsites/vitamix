@@ -35,7 +35,6 @@ import { preprocess, translate, EDITOR_FORMAT } from './shared.js';
   outputTextarea.value = '';
 
   const languageSelector = document.querySelector('select[name="language"]');
-  languageSelector.value = 'fr';
 
   const translateBtn = document.querySelector('button[name="translate"]');
   const errorMessage = document.querySelector('.translate-error');
