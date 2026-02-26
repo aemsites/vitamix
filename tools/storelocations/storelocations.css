@@ -86,16 +86,22 @@ h1 {
   background: #fff;
 }
 
-.source-row #searchInput,
-.filter-row #filterValue {
+.source-row input[type="search"],
+.source-row input[type="text"],
+.filter-row input[type="search"],
+.filter-row input[type="text"] {
   min-width: 160px;
   padding: 8px 10px;
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 14px;
+  background: #fff;
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
 }
 
-.filter-row #searchInput {
+.filter-row input[type="search"] {
   min-width: 200px;
 }
 
@@ -335,9 +341,41 @@ button:disabled {
   font-size: 14px;
 }
 
-.modal form input:focus {
+.modal form select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  background: #fff;
+}
+
+.modal form input:focus,
+.modal form select:focus {
   outline: none;
   border-color: #2563eb;
+}
+
+.modal form .checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.modal form .checkbox-field label {
+  margin: 0;
+  order: 1;
+}
+
+.modal form .checkbox-field input[type="checkbox"] {
+  width: auto;
+  order: 0;
+}
+
+.modal form input[type="date"] {
+  width: 100%;
+  min-width: 0;
 }
 
 .modal-content.bulk-content .help-text {

@@ -3,6 +3,8 @@ import DA_SDK from 'https://da.live/nx/utils/sdk.js';
 
 const ADMIN_BASE = 'https://admin.da.live/source/aemsites/vitamix/us/en_us/where-to-buy';
 const PUBLIC_BASE = 'https://main--vitamix--aemsites.aem.live/us/en_us/where-to-buy';
+const CORS_PROXY = 'https://fcors.org/?url=';
+const CORS_KEY = '&key=Mg23N96GgR8O3NjU';
 
 const SOURCE_OPTIONS = [
   { value: 'storelocations-hh', publicPath: 'storelocations-hh.json', adminPath: 'storelocations-hh.json' },
@@ -47,9 +49,7 @@ function fromDateInputValue(str) {
   const match = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return str;
   const [, y, m, d] = match;
-  const month = parseInt(m, 10);
-  const day = parseInt(d, 10);
-  return `${month}/${day}/${y}`;
+  return `${parseInt(m, 10)}/${parseInt(d, 10)}/${y}`;
 }
 
 let daToken = null;
@@ -57,6 +57,20 @@ let rawPayload = null;
 let columns = [];
 let viewData = [];
 let currentPage = 1;
+
+function isOpenedInDA() {
+  try {
+    return window.self !== window.top
+      && typeof document.referrer === 'string'
+      && document.referrer.indexOf('da.live') >= 0;
+  } catch {
+    return false;
+  }
+}
+
+function isReadOnly() {
+  return !daToken;
+}
 
 function getSourceConfig() {
   const select = document.getElementById('sourceSelect');
@@ -70,19 +84,20 @@ function getDataUrl(useAdmin) {
   return `${base}/${path}`;
 }
 
-function setAuthNotice(hasToken) {
+function setAuthNotice() {
   const notice = document.getElementById('authNotice');
-  notice.classList.toggle('hidden', hasToken);
+  const show = isReadOnly() && !isOpenedInDA();
+  notice.classList.toggle('hidden', !show);
 }
 
 export async function initAuth() {
   try {
     const { token } = await DA_SDK;
     daToken = token || null;
-    setAuthNotice(!daToken);
+    setAuthNotice();
     return daToken;
   } catch (e) {
-    setAuthNotice(true);
+    setAuthNotice();
     return null;
   }
 }
@@ -265,7 +280,8 @@ function openEditModal(row) {
   deleteBtn.style.display = isNew ? 'none' : 'inline-block';
 
   const typeOptions = getTypeOptions();
-  columns.forEach((col) => {
+
+  function addField(col) {
     const label = document.createElement('label');
     label.htmlFor = `edit-${col}`;
     label.textContent = col;
@@ -322,6 +338,14 @@ function openEditModal(row) {
     input.value = (row[col] != null ? row[col] : '');
     form.appendChild(label);
     form.appendChild(input);
+  }
+
+  if (columns.includes('ENABLED')) {
+    addField('ENABLED');
+  }
+  columns.forEach((col) => {
+    if (col === 'ACTION' || col === 'ENABLED') return;
+    addField(col);
   });
   modal.showModal();
 }
@@ -339,7 +363,11 @@ function deleteCurrentRecord() {
   rawPayload.total = rawPayload.data.length;
   closeEditModal();
   applySearchFilterSort();
-  if (daToken) saveToAdmin();
+  if (daToken) {
+    saveToAdmin();
+  } else {
+    showError('Sign in via DA to save changes.');
+  }
 }
 
 function saveEdit(e) {
@@ -368,7 +396,11 @@ function saveEdit(e) {
   }
   applySearchFilterSort();
   closeEditModal();
-  if (daToken) saveToAdmin();
+  if (daToken) {
+    saveToAdmin();
+  } else {
+    showError('Sign in via DA to save changes.');
+  }
 }
 
 function saveToAdmin() {
@@ -413,7 +445,10 @@ function fillFilterSortOptions() {
 }
 
 export async function loadSource() {
-  const url = getDataUrl(!!daToken);
+  let url = getDataUrl(!!daToken);
+  if (isReadOnly()) {
+    url = CORS_PROXY + encodeURIComponent(url) + CORS_KEY;
+  }
   setLoading(true);
   document.getElementById('error').classList.remove('active');
   document.getElementById('tableSection').classList.remove('active');
@@ -427,8 +462,8 @@ export async function loadSource() {
     fillFilterSortOptions();
     viewData = [...payload.data];
     document.getElementById('tableSection').classList.add('active');
-    document.getElementById('bulkAddBtn').disabled = !daToken;
-    document.getElementById('addNewBtn').disabled = !daToken;
+    document.getElementById('bulkAddBtn').disabled = false;
+    document.getElementById('addNewBtn').disabled = false;
     applySearchFilterSort();
   } catch (err) {
     showError(err.message || 'Failed to load');
@@ -496,7 +531,11 @@ function bulkImport() {
   rawPayload.total = rawPayload.data.length;
   closeBulkModal();
   applySearchFilterSort();
-  if (daToken) saveToAdmin();
+  if (daToken) {
+    saveToAdmin();
+  } else {
+    showError('Sign in via DA to save changes.');
+  }
 }
 
 function bindEvents() {
@@ -521,8 +560,8 @@ function bindEvents() {
 }
 
 export async function init() {
-  await initAuth();
   bindEvents();
+  await initAuth();
 }
 
 init();
