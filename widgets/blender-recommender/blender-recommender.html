@@ -1,5 +1,5 @@
 <div class="devrawblock">
-    <article class="tmpl-page tmpl-page--blender-recommender" x-data="alpineJsBlenderRecommender(0,1)">
+    <article class="tmpl-page tmpl-page--blender-recommender" x-data="alpineJsBlenderRecommender(window.location.pathname.includes('/fr_') ? 1 : 0, 1)">
 
 
   <section class="ognm-blender-recommender tmpl-page__section clrs-light clrs-secondary is-loading" :class="(complete) ? 'is-complete' : ''" x-ref="componentbody" :style="minHeight">

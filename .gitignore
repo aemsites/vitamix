@@ -11,3 +11,4 @@ helix-importer-ui
 *.bak
 .idea
 .env
+.claude

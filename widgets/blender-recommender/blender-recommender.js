@@ -682,7 +682,7 @@ window.alpineJsBlenderRecommender = (paramLang = 0, paramPrice = 0) => {
   };
 
   loadScript('https://unpkg.com/alpinejs@3.10.3/dist/cdn.min.js', () => {
-    alpineJsBlenderRecommender(0,1);    
+    alpineJsBlenderRecommender(window.location.pathname.includes('/fr_') ? 1 : 0, 1);
   });
 
   loadCSS('https://www.vitamix.com/content/dam/vitamix/client-library/css/design-system.min.css?q=1765483391');
