@@ -1,3 +1,9 @@
+/*
+ * WARNING: This widget is imported AS IS.
+ * The code should be considered legacy tech debt
+ * If there is significant use it should be refactored
+ */
+
 import { loadCSS, loadScript } from '../../scripts/aem.js';
 
 /* eslint-disable */
