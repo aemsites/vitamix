@@ -42,7 +42,7 @@ const HELPERS = {
     },
   },
   [ADMIN_FORMAT]: {
-    getMetadataTable: (html) => html.querySelectorAll('div[class=metadata]'),
+    getMetadataTable: (html) => html.querySelector('div[class=metadata]'),
   },
 };
 
@@ -292,17 +292,33 @@ const addDnt = async (html, format, context, daFetch) => {
 
 const reformat = (html, format) => {
   let result = html;
-  FORMAT_RULES[format].forEach((rule) => {
-    result = rule.preProcess(html);
-  });
+  let rules;
+  if (format) {
+    rules = FORMAT_RULES[format];
+  } else {
+    rules = [...FORMAT_RULES[ADMIN_FORMAT], ...FORMAT_RULES[EDITOR_FORMAT]];
+  }
+  if (rules) {
+    rules.forEach((rule) => {
+      result = rule.preProcess(html);
+    });
+  }
   return result;
 };
 
 const unformat = (html, format) => {
   let result = html;
-  FORMAT_RULES[format].forEach((rule) => {
-    result = rule.postProcess(html);
-  });
+  let rules;
+  if (format) {
+    rules = FORMAT_RULES[format];
+  } else {
+    rules = [...FORMAT_RULES[ADMIN_FORMAT], ...FORMAT_RULES[EDITOR_FORMAT]];
+  }
+  if (rules) {
+    rules.forEach((rule) => {
+      result = rule.postProcess(html);
+    });
+  }
   return result;
 };
 
