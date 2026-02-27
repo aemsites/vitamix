@@ -239,7 +239,7 @@ export async function resolveSessionCartDrift(options) {
     return;
   }
 
-  let done = () => {};
+  let done = () => { };
   if (options.waitForCart) {
     done = waitForCart();
   }
@@ -263,7 +263,7 @@ export async function resolveSessionCartDrift(options) {
 }
 
 export function updateCartFromLocalStorage(options) {
-  let done = () => {};
+  let done = () => { };
   if (options.waitForCart) {
     done = waitForCart();
   }
@@ -357,14 +357,17 @@ function getProductID(sku) {
  */
 async function addToCartLegacy(sku, options, quantity) {
   const { locale, language } = getLocaleAndLanguage();
-  const uenc = window.location.href.includes('?')
+  const uenc = encodeURIComponent(window.location.href.includes('?')
     ? window.location.href.split('?').map(btoa).join('_')
-    : btoa(window.location.href);
+    : btoa(window.location.href));
   const [productId, formKey] = await Promise.all([getProductID(sku), getFormKey()]);
   const url = `/${locale}/${language}/checkout/cart/add/uenc/${uenc}/product/${productId}/`;
 
   const formData = new FormData();
+
   formData.append('product', productId);
+  formData.append('selected_configurable_option', '');
+  formData.append('related_product', '');
   formData.append('item', productId);
   formData.append('form_key', formKey);
   formData.append('qty', quantity);
@@ -382,6 +385,8 @@ async function addToCartLegacy(sku, options, quantity) {
       formData.append(`warranty_skus[${value}]`, window.selectedWarranty.sku);
       formData.append('warranty_sku', window.selectedWarranty.sku);
       warrantyIdsAdded.add(value);
+    } else if (type === 'bundle') {
+      formData.append(`bundle_option[${key}]`, value);
     }
   });
 
