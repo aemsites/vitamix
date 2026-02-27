@@ -236,10 +236,15 @@ const FORMAT_RULES = {
       if (table) {
         const rows = table.querySelectorAll('& > div');
         rows.forEach((row) => {
+          const keyEl = row.querySelector('div:first-child');
+          const key = keyEl?.textContent.toLowerCase().trim();
           const valueEl = row.querySelector('div:last-child');
           const value = valueEl?.textContent.toLowerCase().trim();
-          if (value) {
-            valueEl.innerHTML = `<ul>${value.split(',').map((item) => `<li>${item}</li>`).join('')}</ul>`;
+          if (key && value && key !== 'title' && key !== 'description') {
+            const list = value.split(',').map((item) => item.trim());
+            if (list.length > 1) {
+              valueEl.innerHTML = `<ul>${list.map((item) => `<li>${item}</li>`).join('')}</ul>`;
+            }
           }
         });
       }
@@ -249,7 +254,7 @@ const FORMAT_RULES = {
       // revert operation of preProcess
       const table = HELPERS[ADMIN_FORMAT].getMetadataTable(html);
       if (table) {
-        const uls = table.querySelectorAll('& > ul');
+        const uls = table.querySelectorAll('ul');
         uls.forEach((ul) => {
           const list = [];
           const lis = ul.querySelectorAll('li');
