@@ -1,6 +1,22 @@
 // eslint-disable-next-line import/no-unresolved
 import DA_SDK from 'https://da.live/nx/utils/sdk.js';
 
+import { translate } from '../translate/shared.js';
+
+const LOCALES = [{
+  root: 'us/en_us',
+}, {
+  root: 'ca/en_us',
+}, {
+  root: 'ca/fr_ca',
+  translateLocale: 'fr-CA',
+}];
+
+const { context, token, actions } = await DA_SDK;
+const { daFetch } = actions;
+// eslint-disable-next-line no-console
+console.log('DA SDK loaded', context, token, actions);
+
 // Parse query parameters
 export function getQueryParams() {
   const params = new URLSearchParams(window.location.search);
@@ -161,12 +177,17 @@ export function showError(message) {
 }
 
 // Add log entry to sync progress
-export function addLogEntry(message, type = 'info') {
+export function addLogEntry(message, type = 'info', html = false) {
   const syncLog = document.getElementById('syncLog');
   const entry = document.createElement('div');
   entry.className = `log-entry ${type}`;
   const timestamp = new Date().toLocaleTimeString();
-  entry.textContent = `[${timestamp}] ${message}`;
+  if (html) {
+    entry.innerHTML = message;
+    entry.prepend(`[${timestamp}] `);
+  } else {
+    entry.textContent = `[${timestamp}] ${message}`;
+  }
   syncLog.appendChild(entry);
   // Auto-scroll to bottom
   syncLog.scrollTop = syncLog.scrollHeight;
@@ -602,10 +623,10 @@ ${recipeHtml}
 }
 
 // Preview recipe on admin.hlx.page
-export async function previewRecipe(kebabName, token) {
+export async function previewRecipe(root, kebabName) {
   // Remove .html extension if present
   const cleanName = kebabName.endsWith('.html') ? kebabName.slice(0, -5) : kebabName;
-  const path = `us/en_us/recipes/${cleanName}`;
+  const path = `${root}/recipes/${cleanName}`;
   const previewUrl = `https://admin.hlx.page/preview/aemsites/vitamix/main/${path}`;
 
   const opts = {
@@ -619,14 +640,16 @@ export async function previewRecipe(kebabName, token) {
     throw new Error(`Preview failed: ${resp.status} ${resp.statusText}`);
   }
 
-  return previewUrl;
+  const json = await resp.json();
+
+  return json.preview.url;
 }
 
 // Publish recipe on admin.hlx.page
-export async function publishRecipe(kebabName, token) {
+export async function publishRecipe(root, kebabName) {
   // Remove .html extension if present
   const cleanName = kebabName.endsWith('.html') ? kebabName.slice(0, -5) : kebabName;
-  const path = `us/en_us/recipes/${cleanName}`;
+  const path = `${root}/recipes/${cleanName}`;
   const publishUrl = `https://admin.hlx.page/live/aemsites/vitamix/main/${path}`;
 
   const opts = {
@@ -640,7 +663,9 @@ export async function publishRecipe(kebabName, token) {
     throw new Error(`Publish failed: ${resp.status} ${resp.statusText}`);
   }
 
-  return publishUrl;
+  const json = await resp.json();
+
+  return json.live.url;
 }
 
 // Initialize session with CalcMenu to get session cookie
@@ -689,8 +714,6 @@ export async function bulkSyncWithDA() {
     return;
   }
 
-  // Check for DA token upfront
-  const token = window.sessionStorage.getItem('da-token');
   if (!token) {
     showError('DA token not found. Please wait for the page to fully load and try again.');
     return;
@@ -757,46 +780,70 @@ export async function bulkSyncWithDA() {
 
       addLogEntry(`  Syncing to DA: ${filename}`, 'info');
 
-      const blob = new Blob([htmlContent], { type: 'text/html' });
-      const body = new FormData();
-      body.append('data', blob);
+      const processPage = async (root, translateLocale) => {
+        let html = htmlContent;
+        if (translateLocale) {
+          // eslint-disable-next-line max-len
+          html = await translate(htmlContent, translateLocale, context, undefined, daFetch);
+        }
 
-      const opts = {
-        headers: { Authorization: `Bearer ${token}` },
-        method: 'POST',
-        body,
+        const blob = new Blob([html], { type: 'text/html' });
+        const body = new FormData();
+        body.append('data', blob);
+
+        const opts = {
+          headers: { Authorization: `Bearer ${token}` },
+          method: 'POST',
+          body,
+        };
+
+        const daAdminPath = `https://admin.da.live/source/aemsites/vitamix/${root}/recipes/${filename}`;
+        const resp = await fetch(daAdminPath, opts);
+
+        if (!resp.ok) {
+          throw new Error(`${resp.status} ${resp.statusText}`);
+        }
+
+        const url = new URL(resp.url);
+        const segments = url.pathname.split('/');
+        const editUrl = `https://da.live/edit#/${segments.slice(2).join('/')}`;
+        const pathname = segments.slice(4).join('/');
+        if (translateLocale) {
+          addLogEntry(`  ✓ Successfully created and translated to ${translateLocale}: <a href="${editUrl}" target="_blank">${pathname}</a>`, 'success', true);
+        } else {
+          addLogEntry(`  ✓ Successfully created: <a href="${editUrl}" target="_blank">${pathname}</a>`, 'success', true);
+        }
+
+        // Preview and Publish if enabled
+        if (enablePublish) {
+          try {
+            addLogEntry('  Running preview...', 'info');
+            // eslint-disable-next-line no-await-in-loop
+            const previewUrl = await previewRecipe(root, filename);
+            addLogEntry(`  ✓ <a href="${previewUrl}" target="_blank">Preview complete</a>`, 'success', true);
+          } catch (previewError) {
+            addLogEntry(`  ⚠ Preview failed: ${previewError.message}`, 'warning');
+          }
+
+          try {
+            addLogEntry('  Publishing...', 'info');
+            // eslint-disable-next-line no-await-in-loop
+            const publishUrl = await publishRecipe(root, filename);
+            addLogEntry(`  ✓ <a href="${publishUrl}" target="_blank">Publish complete</a>`, 'success', true);
+            addLogEntry('  ✓ Publish complete', 'success');
+          } catch (publishError) {
+            addLogEntry(`  ⚠ Publish failed: ${publishError.message}`, 'warning');
+          }
+        }
       };
 
-      const fullpath = `https://admin.da.live/source/aemsites/vitamix/us/en_us/recipes/${filename}`;
-      // eslint-disable-next-line no-await-in-loop
-      const resp = await fetch(fullpath, opts);
-
-      if (!resp.ok) {
-        throw new Error(`${resp.status} ${resp.statusText}`);
+      for (let l = 0; l < LOCALES.length; l += 1) {
+        const locale = LOCALES[l];
+        // eslint-disable-next-line no-await-in-loop
+        await processPage(locale.root, locale.translateLocale);
       }
 
-      addLogEntry(`  ✓ Successfully synced: ${filename}`, 'success');
-
-      // Preview and Publish if enabled
-      if (enablePublish) {
-        try {
-          addLogEntry('  Running preview...', 'info');
-          // eslint-disable-next-line no-await-in-loop
-          await previewRecipe(filename, token);
-          addLogEntry('  ✓ Preview complete', 'success');
-        } catch (previewError) {
-          addLogEntry(`  ⚠ Preview failed: ${previewError.message}`, 'warning');
-        }
-
-        try {
-          addLogEntry('  Publishing...', 'info');
-          // eslint-disable-next-line no-await-in-loop
-          await publishRecipe(filename, token);
-          addLogEntry('  ✓ Publish complete', 'success');
-        } catch (publishError) {
-          addLogEntry(`  ⚠ Publish failed: ${publishError.message}`, 'warning');
-        }
-      }
+      addLogEntry(`  ✓ Successfully synced to DA: ${filename}`, 'success');
 
       // eslint-disable-next-line no-plusplus
       successCount++;
@@ -873,32 +920,41 @@ ${recipeElement.innerHTML}
 </body>
 </html>`;
 
-  // Get DA token
-  // eslint-disable-next-line no-undef
-  const token = window.sessionStorage.getItem('da-token');
   if (!token) {
     throw new Error('DA token not found');
   }
-  // Create blob and form data
-  const blob = new Blob([htmlContent], { type: 'text/html' });
-  const body = new FormData();
-  body.append('data', blob);
 
-  const opts = {
-    headers: { Authorization: `Bearer ${token}` },
-    method: 'POST',
-    body,
-  };
+  const results = [];
+  for (let l = 0; l < LOCALES.length; l += 1) {
+    const locale = LOCALES[l];
+    let html = htmlContent;
+    if (locale.translateLocale) {
+      // eslint-disable-next-line no-await-in-loop
+      html = await translate(htmlContent, locale.translateLocale, context, undefined, daFetch);
+    }
 
-  const fullpath = `https://admin.da.live/source/aemsites/vitamix/us/en_us/recipes/${filename}`;
+    // Create blob and form data
+    const blob = new Blob([html], { type: 'text/html' });
+    const body = new FormData();
+    body.append('data', blob);
 
-  const resp = await fetch(fullpath, opts);
+    const opts = {
+      headers: { Authorization: `Bearer ${token}` },
+      method: 'POST',
+      body,
+    };
 
-  if (!resp.ok) {
-    throw new Error(`Failed to sync: ${resp.status} ${resp.statusText}`);
+    const fullpath = `https://admin.da.live/source/aemsites/vitamix/${locale.root}/recipes/${filename}`;
+    // eslint-disable-next-line no-await-in-loop
+    const resp = await fetch(fullpath, opts);
+    if (!resp.ok) {
+      throw new Error(`Failed to sync: ${resp.status} ${resp.statusText}`);
+    }
+    // eslint-disable-next-line no-console
+    console.log('Sync complete', fullpath);
+    results.push({ filename, url: fullpath, root: locale.root });
   }
-
-  return { filename, url: fullpath };
+  return results;
 }
 
 // Display recipe details on page
@@ -1023,29 +1079,31 @@ export async function displayRecipeDetails(recipeNumber) {
           syncWithDABtn.disabled = true;
           syncWithDABtn.textContent = 'Syncing...';
 
-          const result = await syncWithDA(recipeName, recipeNumber);
+          const results = await syncWithDA(recipeName, recipeNumber);
 
-          // Get token for preview/publish
-          const token = window.sessionStorage.getItem('da-token');
+          for (let i = 0; i < results.length; i += 1) {
+            const result = results[i];
+            // Preview and Publish if enabled
+            if (enablePublish && token) {
+              try {
+                // eslint-disable-next-line no-await-in-loop
+                const previewUrl = await previewRecipe(result.root, result.filename);
+                // eslint-disable-next-line no-console
+                console.log('Preview complete', previewUrl);
+              } catch (previewError) {
+                // eslint-disable-next-line no-console
+                console.error('Preview failed:', previewError);
+              }
 
-          // Preview and Publish if enabled
-          if (enablePublish && token) {
-            try {
-              await previewRecipe(result.filename, token);
-              // eslint-disable-next-line no-console
-              console.log('Preview complete');
-            } catch (previewError) {
-              // eslint-disable-next-line no-console
-              console.error('Preview failed:', previewError);
-            }
-
-            try {
-              await publishRecipe(result.filename, token);
-              // eslint-disable-next-line no-console
-              console.log('Publish complete');
-            } catch (publishError) {
-              // eslint-disable-next-line no-console
-              console.error('Publish failed:', publishError);
+              try {
+                // eslint-disable-next-line no-await-in-loop
+                const publishUrl = await publishRecipe(result.root, result.filename);
+                // eslint-disable-next-line no-console
+                console.log('Publish complete', publishUrl);
+              } catch (publishError) {
+                // eslint-disable-next-line no-console
+                console.error('Publish failed:', publishError);
+              }
             }
           }
 
@@ -1053,7 +1111,7 @@ export async function displayRecipeDetails(recipeNumber) {
           syncWithDABtn.style.backgroundColor = '#28a745';
 
           // eslint-disable-next-line no-console
-          console.log('Successfully synced recipe:', result);
+          console.log('Successfully synced recipe:', results);
 
           // Reset button after 3 seconds
           setTimeout(() => {
@@ -1325,7 +1383,8 @@ export async function displayRecipeDetails(recipeNumber) {
       const portionSize = nutritionElement.querySelector('PortionSize')?.textContent.trim() || '';
       const nutrients = nutritionElement.querySelectorAll('Nutrient');
 
-      // Helper function to find nutrient by key (use Value when ValueImposed is 0; optional preferredUnit e.g. 'kcal')
+      // Helper function to find nutrient by key
+      // (use Value when ValueImposed is 0; optional preferredUnit e.g. 'kcal')
       const findNutrient = (key, preferredUnit = null) => {
         const candidates = Array.from(nutrients).filter((n) => {
           const nutKey = n.querySelector('NutKey')?.textContent.trim();
@@ -1890,12 +1949,6 @@ export async function init() {
   } else {
     await makeApiCallFromParams();
   }
-
-  // eslint-disable-next-line no-unused-vars, no-undef
-  const { context, token, actions } = await DA_SDK;
-  window.sessionStorage.setItem('da-token', token);
-  // eslint-disable-next-line no-console
-  console.log('DA SDK loaded', context, token, actions);
 }
 
 init();
