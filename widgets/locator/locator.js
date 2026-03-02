@@ -30,9 +30,9 @@ async function fetchData(form) {
 
   form.dataset.status = 'loading';
   window.locatorData = {};
-  window.locatorData.HH = await fetchSheet('https://main--thinktanked--davidnuescheler.aem.live/vitamix/storelocations-hh.json?limit=10000');
-  window.locatorData.COMM = await fetchSheet('https://main--thinktanked--davidnuescheler.aem.live/vitamix/storelocations-comm.json?limit=2000');
-  window.locatorData.EVENTS = await fetchSheet('https://main--thinktanked--davidnuescheler.aem.live/vitamix/storelocations-events.json?limit=3000');
+  window.locatorData.HH = await fetchSheet('https://main--vitamix--aemsites.aem.live/us/en_us/where-to-buy/storelocations-hh.json');
+  window.locatorData.COMM = await fetchSheet('https://main--vitamix--aemsites.aem.live/us/en_us/where-to-buy/storelocations-comm.json');
+  window.locatorData.EVENTS = await fetchSheet('https://main--vitamix--aemsites.aem.live/us/en_us/where-to-buy/storelocations-events.json');
   form.dataset.status = 'loaded';
   return window.locatorData;
 }
