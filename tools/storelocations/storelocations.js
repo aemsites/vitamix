@@ -1,5 +1,6 @@
 // eslint-disable-next-line import/no-unresolved
 import DA_SDK from 'https://da.live/nx/utils/sdk.js';
+/* eslint-disable no-use-before-define -- functions are used before definition in this file */
 
 const ADMIN_BASE = 'https://admin.da.live/source/aemsites/vitamix/us/en_us/where-to-buy';
 const PUBLIC_BASE = 'https://main--vitamix--aemsites.aem.live/us/en_us/where-to-buy';
@@ -28,6 +29,12 @@ const PAGE_SIZE = 100;
 
 const DEFAULT_TYPE_OPTIONS = ['DEMO', 'DEALER/DISTRIBUTOR', 'RETAILER', 'EVENT', 'OTHER'];
 
+let daToken = null;
+let rawPayload = null;
+let columns = [];
+let viewData = [];
+let currentPage = 1;
+
 function getTypeOptions() {
   const fromData = rawPayload?.data
     ? [...new Set(rawPayload.data.map((r) => r.TYPE).filter(Boolean))]
@@ -46,7 +53,11 @@ function toDateInputValue(str) {
   if (Number.isNaN(m) || Number.isNaN(d) || Number.isNaN(y)) return str;
   const month = m < 10 ? `0${m}` : String(m);
   const day = d < 10 ? `0${d}` : String(d);
-  const year = y < 100 ? (y < 50 ? 2000 + y : 1900 + y) : y;
+  let fullYear = y;
+  if (y < 100) {
+    fullYear = y < 50 ? 2000 + y : 1900 + y;
+  }
+  const year = String(fullYear);
   return `${year}-${month}-${day}`;
 }
 
@@ -56,11 +67,6 @@ function fromDateInputValue(str) {
   if (!match) return str;
   const [, y, m, d] = match;
   return `${parseInt(m, 10)}/${parseInt(d, 10)}/${y}`;
-}
-
-function buildAddressFromRow(row) {
-  const parts = ADDRESS_FIELDS.map((f) => (row[f] || '').toString().replace(/\s+/g, ' ').trim()).filter(Boolean);
-  return parts.join(' ');
 }
 
 function buildAddressFromForm(form) {
@@ -85,12 +91,6 @@ async function geocodeAddress(address) {
   }
   return null;
 }
-
-let daToken = null;
-let rawPayload = null;
-let columns = [];
-let viewData = [];
-let currentPage = 1;
 
 function isOpenedInDA() {
   try {
@@ -132,12 +132,15 @@ function rowFingerprint(row) {
   Object.keys(row)
     .filter((k) => k !== ':type' && !k.startsWith(':'))
     .sort()
-    .forEach((k) => { o[k] = row[k]; });
+    .forEach((k) => {
+      o[k] = row[k];
+    });
   return JSON.stringify(o);
 }
 
 /**
- * Compare admin (to publish) vs live data. Returns { added, removed, changed, liveTotal, adminTotal }.
+ * Compare admin (to publish) vs live data.
+ * Returns { added, removed, changed, liveTotal, adminTotal }.
  */
 function diffLiveVsAdmin(liveData, adminData) {
   const liveRows = Array.isArray(liveData?.data) ? liveData.data : [];
@@ -172,7 +175,7 @@ function diffLiveVsAdmin(liveData, adminData) {
 /** Fetch current live JSON (PUBLIC_BASE). */
 async function fetchLiveJson() {
   const url = getDataUrl(false);
-  const finalUrl = isReadOnly() ? CORS_PROXY + encodeURIComponent(url) + CORS_KEY : url;
+  const finalUrl = CORS_PROXY + encodeURIComponent(url) + CORS_KEY;
   const res = await fetch(finalUrl);
   if (!res.ok) throw new Error(`Live fetch failed: ${res.status}`);
   return res.json();
@@ -283,12 +286,10 @@ function applySearchFilterSort(resetPage = true) {
   let out = rawPayload ? [...rawPayload.data] : [];
 
   if (search) {
-    out = out.filter((row) => {
-      return columns.some((col) => {
-        const v = row[col];
-        return typeof v === 'string' && v.toLowerCase().includes(search);
-      });
-    });
+    out = out.filter((row) => columns.some((col) => {
+      const v = row[col];
+      return typeof v === 'string' && v.toLowerCase().includes(search);
+    }));
   }
   if (filterCol && (filterVal || filterCol)) {
     out = out.filter((row) => {
@@ -395,12 +396,15 @@ function openEditModal(row) {
   const deleteBtn = document.getElementById('editDeleteBtn');
   form.innerHTML = '';
   const isNew = row == null;
-  if (isNew) {
-    row = columns.reduce((o, c) => ({ ...o, [c]: '' }), {});
-    row.ENABLED = 'TRUE';
-    row.ACTION = 'ADD';
-  }
-  const dataIndex = isNew ? -1 : rawPayload.data.indexOf(row);
+  const rowToEdit = isNew
+    ? (() => {
+      const r = columns.reduce((o, c) => ({ ...o, [c]: '' }), {});
+      r.ENABLED = 'TRUE';
+      r.ACTION = 'ADD';
+      return r;
+    })()
+    : row;
+  const dataIndex = isNew ? -1 : rawPayload.data.indexOf(rowToEdit);
   form.dataset.dataIndex = String(dataIndex);
   title.textContent = isNew ? 'Add new record' : 'Edit record';
   deleteBtn.style.display = isNew ? 'none' : 'inline-block';
@@ -433,10 +437,10 @@ function openEditModal(row) {
         const o = document.createElement('option');
         o.value = opt;
         o.textContent = opt;
-        if (String(row[col] || '').trim() === opt) o.selected = true;
+        if (String(rowToEdit[col] || '').trim() === opt) o.selected = true;
         select.appendChild(o);
       });
-      const current = (row[col] || '').trim();
+      const current = (rowToEdit[col] || '').trim();
       if (current && !typeOptions.includes(current)) {
         const o = document.createElement('option');
         o.value = current;
@@ -455,7 +459,7 @@ function openEditModal(row) {
       input.id = `edit-${col}`;
       input.name = col;
       input.type = 'checkbox';
-      input.checked = String(row[col] || '').toUpperCase() === 'TRUE';
+      input.checked = String(rowToEdit[col] || '').toUpperCase() === 'TRUE';
       wrap.appendChild(label);
       wrap.appendChild(input);
       container.appendChild(wrap);
@@ -466,7 +470,7 @@ function openEditModal(row) {
       input.id = `edit-${col}`;
       input.name = col;
       input.type = 'date';
-      input.value = toDateInputValue(row[col] || '');
+      input.value = toDateInputValue(rowToEdit[col] || '');
       container.appendChild(label);
       container.appendChild(input);
       return;
@@ -475,7 +479,7 @@ function openEditModal(row) {
     input.id = `edit-${col}`;
     input.name = col;
     input.type = 'text';
-    input.value = (row[col] != null ? row[col] : '');
+    input.value = (rowToEdit[col] != null ? rowToEdit[col] : '');
     container.appendChild(label);
     container.appendChild(input);
   }
@@ -495,7 +499,7 @@ function openEditModal(row) {
         inp.id = `edit-${dateCol}`;
         inp.name = dateCol;
         inp.type = 'date';
-        inp.value = toDateInputValue(row[dateCol] || '');
+        inp.value = toDateInputValue(rowToEdit[dateCol] || '');
         cell.appendChild(lab);
         cell.appendChild(inp);
         dateRowEl.appendChild(cell);
@@ -572,7 +576,7 @@ function openEditModal(row) {
         addField('PHONE_NUMBER', rightCol);
       }
     } else if (col === 'LONG') {
-      return;
+      // skip LONG (handled with LAT in same row)
     } else if (col === 'LAT') {
       const latLongRowEl = document.createElement('div');
       latLongRowEl.className = 'edit-form-row-half';
@@ -586,7 +590,7 @@ function openEditModal(row) {
         inp.id = `edit-${coordCol}`;
         inp.name = coordCol;
         inp.type = 'text';
-        inp.value = (row[coordCol] != null ? row[coordCol] : '');
+        inp.value = (rowToEdit[coordCol] != null ? rowToEdit[coordCol] : '');
         cell.appendChild(lab);
         cell.appendChild(inp);
         latLongRowEl.appendChild(cell);
@@ -608,6 +612,7 @@ function deleteCurrentRecord() {
   const form = document.getElementById('editForm');
   const dataIndex = parseInt(form.dataset.dataIndex, 10);
   if (dataIndex < 0 || !rawPayload?.data || dataIndex >= rawPayload.data.length) return;
+  // eslint-disable-next-line no-alert -- intentional confirm for destructive action
   if (!window.confirm('Delete this record?')) return;
   rawPayload.data.splice(dataIndex, 1);
   rawPayload.total = rawPayload.data.length;
@@ -678,7 +683,9 @@ function saveToAdmin() {
 }
 
 function renderPublishSummary(diff) {
-  const { added, removed, changed, liveTotal, adminTotal } = diff;
+  const {
+    added, removed, changed, liveTotal, adminTotal,
+  } = diff;
   const parts = [];
   parts.push(`<p><strong>Live</strong> (current): ${liveTotal} record(s).</p>`);
   parts.push(`<p><strong>Admin</strong> (to publish): ${adminTotal} record(s).</p>`);
@@ -842,7 +849,11 @@ function bulkImport() {
   });
   if (!rawPayload) {
     rawPayload = {
-      total: 0, limit: 0, offset: 0, data: [], ':type': 'sheet',
+      total: 0,
+      limit: 0,
+      offset: 0,
+      data: [],
+      ':type': 'sheet',
     };
     columns = buildColumns(newRows.length ? newRows : []);
     fillFilterSortOptions();
