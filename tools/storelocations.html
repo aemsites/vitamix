@@ -54,6 +54,7 @@
         <div class="actions-row">
           <button type="button" id="addNewBtn" class="btn-secondary" disabled>Add new…</button>
           <button type="button" id="bulkAddBtn" class="btn-secondary" disabled>Bulk add from spreadsheet</button>
+          <button type="button" id="publishBtn" class="btn-secondary" disabled>Publish…</button>
           <span class="record-count" id="recordCount"></span>
         </div>
       </div>
@@ -97,6 +98,17 @@
         <div class="modal-actions">
           <button type="button" id="bulkCancelBtn" class="btn-secondary">Cancel</button>
           <button type="button" id="bulkImportBtn" class="btn-primary">Import</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="publishModal" class="modal" aria-labelledby="publishModalTitle">
+      <div class="modal-content">
+        <h2 id="publishModalTitle">Publish</h2>
+        <div id="publishSummary" class="publish-summary"></div>
+        <div class="modal-actions">
+          <button type="button" id="publishCancelBtn" class="btn-secondary">Cancel</button>
+          <button type="button" id="publishConfirmBtn" class="btn-primary">Publish</button>
         </div>
       </div>
     </dialog>

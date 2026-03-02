@@ -118,6 +118,98 @@ function getDataUrl(useAdmin) {
   return `${base}/${path}`;
 }
 
+/** Build a stable key for a row (for diffing). */
+function rowKey(row) {
+  const parts = ['NAME', 'ADDRESS_1', 'CITY', 'POSTAL_CODE'].map(
+    (c) => (row[c] != null ? String(row[c]).trim() : ''),
+  );
+  return parts.join('|\u200b');
+}
+
+/** Normalize row to a comparable string (sorted keys). */
+function rowFingerprint(row) {
+  const o = {};
+  Object.keys(row)
+    .filter((k) => k !== ':type' && !k.startsWith(':'))
+    .sort()
+    .forEach((k) => { o[k] = row[k]; });
+  return JSON.stringify(o);
+}
+
+/**
+ * Compare admin (to publish) vs live data. Returns { added, removed, changed, liveTotal, adminTotal }.
+ */
+function diffLiveVsAdmin(liveData, adminData) {
+  const liveRows = Array.isArray(liveData?.data) ? liveData.data : [];
+  const adminRows = Array.isArray(adminData?.data) ? adminData.data : [];
+  const liveByKey = new Map();
+  const adminByKey = new Map();
+  liveRows.forEach((r) => liveByKey.set(rowKey(r), r));
+  adminRows.forEach((r) => adminByKey.set(rowKey(r), r));
+
+  let added = 0;
+  let removed = 0;
+  let changed = 0;
+  const adminKeys = new Set(adminByKey.keys());
+  const liveKeys = new Set(liveByKey.keys());
+  adminKeys.forEach((k) => {
+    if (!liveKeys.has(k)) added += 1;
+    else if (rowFingerprint(adminByKey.get(k)) !== rowFingerprint(liveByKey.get(k))) changed += 1;
+  });
+  liveKeys.forEach((k) => {
+    if (!adminKeys.has(k)) removed += 1;
+  });
+
+  return {
+    added,
+    removed,
+    changed,
+    liveTotal: liveRows.length,
+    adminTotal: adminRows.length,
+  };
+}
+
+/** Fetch current live JSON (PUBLIC_BASE). */
+async function fetchLiveJson() {
+  const url = getDataUrl(false);
+  const finalUrl = isReadOnly() ? CORS_PROXY + encodeURIComponent(url) + CORS_KEY : url;
+  const res = await fetch(finalUrl);
+  if (!res.ok) throw new Error(`Live fetch failed: ${res.status}`);
+  return res.json();
+}
+
+/** Path for admin.hlx.page (e.g. us/en_us/where-to-buy/storelocations-hh.json) */
+function getHlxPath() {
+  const config = getSourceConfig();
+  return `us/en_us/where-to-buy/${config.publicPath}`;
+}
+
+async function previewStorelocations(token) {
+  const path = getHlxPath();
+  const url = `https://admin.hlx.page/preview/aemsites/vitamix/main/${path}`;
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!resp.ok) {
+    throw new Error(`Preview failed: ${resp.status} ${resp.statusText}`);
+  }
+  return url;
+}
+
+async function publishStorelocations(token) {
+  const path = getHlxPath();
+  const url = `https://admin.hlx.page/live/aemsites/vitamix/main/${path}`;
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!resp.ok) {
+    throw new Error(`Publish failed: ${resp.status} ${resp.statusText}`);
+  }
+  return url;
+}
+
 function setAuthNotice() {
   const notice = document.getElementById('authNotice');
   const show = isReadOnly() && !isOpenedInDA();
@@ -585,6 +677,69 @@ function saveToAdmin() {
     .finally(() => setLoading(false));
 }
 
+function renderPublishSummary(diff) {
+  const { added, removed, changed, liveTotal, adminTotal } = diff;
+  const parts = [];
+  parts.push(`<p><strong>Live</strong> (current): ${liveTotal} record(s).</p>`);
+  parts.push(`<p><strong>Admin</strong> (to publish): ${adminTotal} record(s).</p>`);
+  if (added || removed || changed) {
+    parts.push('<ul class="publish-diff-list">');
+    if (added) parts.push(`<li>${added} added</li>`);
+    if (removed) parts.push(`<li>${removed} removed</li>`);
+    if (changed) parts.push(`<li>${changed} updated</li>`);
+    parts.push('</ul>');
+  } else {
+    parts.push('<p class="publish-no-changes">No content changes.</p>');
+  }
+  return parts.join('');
+}
+
+function closePublishModal() {
+  document.getElementById('publishModal').close();
+}
+
+async function openPublishModal() {
+  if (!daToken) {
+    showError('Sign in via DA to publish.');
+    return;
+  }
+  const summaryEl = document.getElementById('publishSummary');
+  const modal = document.getElementById('publishModal');
+  summaryEl.innerHTML = '<p>Comparing live vs admin…</p>';
+  modal.showModal();
+
+  let livePayload;
+  try {
+    livePayload = await fetchLiveJson();
+  } catch (e) {
+    summaryEl.innerHTML = `<p class="publish-error">Could not load live data: ${e.message}</p>`;
+    return;
+  }
+
+  const diff = diffLiveVsAdmin(livePayload, rawPayload);
+  summaryEl.innerHTML = renderPublishSummary(diff);
+}
+
+async function runPublish() {
+  if (!daToken) {
+    showError('Sign in via DA to publish.');
+    return;
+  }
+  closePublishModal();
+  const btn = document.getElementById('publishBtn');
+  btn.disabled = true;
+  setLoading(true);
+  try {
+    await previewStorelocations(daToken);
+    await publishStorelocations(daToken);
+  } catch (e) {
+    showError(e.message || 'Publish failed');
+  } finally {
+    setLoading(false);
+    btn.disabled = false;
+  }
+}
+
 function fillFilterSortOptions() {
   const filterCol = document.getElementById('filterColumn');
   const sortCol = document.getElementById('sortColumn');
@@ -626,6 +781,7 @@ export async function loadSource() {
     document.getElementById('tableSection').classList.add('active');
     document.getElementById('bulkAddBtn').disabled = false;
     document.getElementById('addNewBtn').disabled = false;
+    document.getElementById('publishBtn').disabled = false;
     applySearchFilterSort();
   } catch (err) {
     showError(err.message || 'Failed to load');
@@ -685,7 +841,9 @@ function bulkImport() {
     return obj;
   });
   if (!rawPayload) {
-    rawPayload = { total: 0, limit: 0, offset: 0, data: [], ':type': 'sheet' };
+    rawPayload = {
+      total: 0, limit: 0, offset: 0, data: [], ':type': 'sheet',
+    };
     columns = buildColumns(newRows.length ? newRows : []);
     fillFilterSortOptions();
   }
@@ -702,6 +860,10 @@ function bulkImport() {
 
 function bindEvents() {
   document.getElementById('loadBtn').addEventListener('click', () => loadSource());
+  document.getElementById('publishBtn').addEventListener('click', openPublishModal);
+  document.getElementById('publishCancelBtn').addEventListener('click', closePublishModal);
+  document.getElementById('publishConfirmBtn').addEventListener('click', runPublish);
+  document.getElementById('publishModal').addEventListener('cancel', closePublishModal);
   document.getElementById('sourceSelect').addEventListener('change', () => {
     if (rawPayload) loadSource();
   });
