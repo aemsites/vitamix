@@ -118,14 +118,6 @@ function getDataUrl(useAdmin) {
   return `${base}/${path}`;
 }
 
-/** Build a stable key for a row (for diffing). */
-function rowKey(row) {
-  const parts = ['NAME', 'ADDRESS_1', 'CITY', 'POSTAL_CODE'].map(
-    (c) => (row[c] != null ? String(row[c]).trim() : ''),
-  );
-  return parts.join('|\u200b');
-}
-
 /** Normalize row to a comparable string (sorted keys). */
 function rowFingerprint(row) {
   const o = {};
@@ -139,34 +131,29 @@ function rowFingerprint(row) {
 }
 
 /**
- * Compare admin (to publish) vs live data.
- * Returns { added, removed, changed, liveTotal, adminTotal }.
+ * Compare admin (to publish) vs live data by position.
+ * Returns { added, removed, edited, liveTotal, adminTotal }.
+ * Edited = same index, different content; added/removed = length difference at end.
  */
 function diffLiveVsAdmin(liveData, adminData) {
   const liveRows = Array.isArray(liveData?.data) ? liveData.data : [];
   const adminRows = Array.isArray(adminData?.data) ? adminData.data : [];
-  const liveByKey = new Map();
-  const adminByKey = new Map();
-  liveRows.forEach((r) => liveByKey.set(rowKey(r), r));
-  adminRows.forEach((r) => adminByKey.set(rowKey(r), r));
+  const minLen = Math.min(liveRows.length, adminRows.length);
 
-  let added = 0;
-  let removed = 0;
-  let changed = 0;
-  const adminKeys = new Set(adminByKey.keys());
-  const liveKeys = new Set(liveByKey.keys());
-  adminKeys.forEach((k) => {
-    if (!liveKeys.has(k)) added += 1;
-    else if (rowFingerprint(adminByKey.get(k)) !== rowFingerprint(liveByKey.get(k))) changed += 1;
-  });
-  liveKeys.forEach((k) => {
-    if (!adminKeys.has(k)) removed += 1;
-  });
+  let edited = 0;
+  for (let i = 0; i < minLen; i += 1) {
+    if (rowFingerprint(liveRows[i]) !== rowFingerprint(adminRows[i])) {
+      edited += 1;
+    }
+  }
+
+  const added = Math.max(0, adminRows.length - liveRows.length);
+  const removed = Math.max(0, liveRows.length - adminRows.length);
 
   return {
     added,
     removed,
-    changed,
+    edited,
     liveTotal: liveRows.length,
     adminTotal: adminRows.length,
   };
@@ -684,16 +671,16 @@ function saveToAdmin() {
 
 function renderPublishSummary(diff) {
   const {
-    added, removed, changed, liveTotal, adminTotal,
+    added, removed, edited, liveTotal, adminTotal,
   } = diff;
   const parts = [];
   parts.push(`<p><strong>Live</strong> (current): ${liveTotal} record(s).</p>`);
   parts.push(`<p><strong>Admin</strong> (to publish): ${adminTotal} record(s).</p>`);
-  if (added || removed || changed) {
+  if (added || removed || edited) {
     parts.push('<ul class="publish-diff-list">');
+    if (edited) parts.push(`<li>${edited} edited</li>`);
     if (added) parts.push(`<li>${added} added</li>`);
     if (removed) parts.push(`<li>${removed} removed</li>`);
-    if (changed) parts.push(`<li>${changed} updated</li>`);
     parts.push('</ul>');
   } else {
     parts.push('<p class="publish-no-changes">No content changes.</p>');
