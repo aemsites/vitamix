@@ -406,12 +406,7 @@ function displayCommResults(results, location) {
     const title = document.createElement('h3');
     title.textContent = result.NAME;
     li.append(title);
-
-    const distance = document.createElement('span');
-    distance.textContent = `${haversineDistance(location.lat, location.lng, result.lat, result.lng).toFixed(1)} miles away`;
-    distance.classList.add('locator-distance');
-    li.append(distance);
-
+    
     // Phone number
     if (result.PHONE_NUMBER) {
       const phoneWrapper = document.createElement('span');
