@@ -371,7 +371,10 @@ function enableNavSearch(form) {
     e.preventDefault();
     const data = new FormData(form);
     const { search } = Object.fromEntries(data.entries()) || '';
-    window.location.href = `https://www.vitamix.com/us/en_us/search-result?search=${search}`;
+    const { pathname } = window.location;
+    const parts = pathname.split('/').filter(Boolean);
+    const basePath = parts.length >= 2 ? `/${parts[0]}/${parts[1]}` : '';
+    window.location.href = `https://www.vitamix.com${basePath}/search-result?search=${search}`;
   });
 }
 
