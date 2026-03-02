@@ -505,7 +505,7 @@ export default async function decorateAlertBanners(block) {
 
       if (selectedBanner.color) {
         preview.style.backgroundColor = `var(--color-${selectedBanner.color})`;
-        const darkColors = ['charcoal', 'black', 'dark', 'red', 'blue', 'green'];
+        const darkColors = ['charcoal', 'black', 'dark', 'red', 'blue', 'green', 'xanadu', 'moss'];
         const textClass = darkColors.some((c) => selectedBanner.color.includes(c)) ? 'light' : 'dark';
         preview.classList.add(`nav-banner-${textClass}`);
       }
