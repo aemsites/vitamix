@@ -564,13 +564,17 @@ function saveEdit(e) {
 function saveToAdmin() {
   const url = getDataUrl(true);
   setLoading(true);
+
+  const body = new FormData();
+  const data = new Blob([JSON.stringify(rawPayload)], { type: 'application/json' });
+  body.append('data', data);
+
   fetch(url, {
-    method: 'PUT',
+    method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
       Authorization: `Bearer ${daToken}`,
     },
-    body: JSON.stringify(rawPayload),
+    body,
   })
     .then((res) => {
       if (!res.ok) throw new Error(`Save failed: ${res.status} ${res.statusText}`);
