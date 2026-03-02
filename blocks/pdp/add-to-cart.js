@@ -61,7 +61,12 @@ function toggleFixedAddToCart(container) {
     // apply or remove "fixed" class and dynamic top offset
     if (scrollY > 0) {
       container.classList.add('fixed');
-      container.style.top = `${offset}px`;
+
+      if (offset > 0) {
+        container.style.top = `${offset}px`;
+      } else {
+        container.style.removeProperty('top');
+      }
     } else {
       container.classList.remove('fixed');
       container.removeAttribute('style');
@@ -106,7 +111,7 @@ export default function renderAddToCart(ph, block, parent) {
   }
 
   // Only look at findLocally and findDealer from parent product
-  const { findLocally, findDealer } = parent;
+  const { findLocally, findDealer } = parent.custom;
   block.classList.remove('pdp-find-locally');
   block.classList.remove('pdp-find-dealer');
 

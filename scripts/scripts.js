@@ -1,4 +1,3 @@
-import { extractPricing } from '../blocks/pdp/pricing.js';
 import {
   loadHeader,
   loadFooter,
@@ -28,6 +27,32 @@ async function loadFonts() {
   } catch (e) {
     // do nothing
   }
+}
+
+/**
+ * Extracts pricing from a JSON-LD offer object.
+ * @param {Object} offer - A schema.org Offer from the JSON-LD data
+ * @returns {Object|null} An object containing the final and regular price.
+ */
+export function getOfferPricing(offer) {
+  if (!offer) return null;
+  return {
+    final: parseFloat(offer.price),
+    regular: offer.priceSpecification?.price || null,
+  };
+}
+
+/**
+ * Formats a price using the locale and currency from placeholders.
+ * Uses Intl.NumberFormat for locale-aware currency formatting.
+ * @param {number} value - The price value to format
+ * @param {Object} ph - Placeholders object containing languageCode and currencyCode
+ * @returns {string} The formatted price string (e.g., "$399.95" or "399,95 $")
+ */
+export function formatPrice(value, ph) {
+  const locale = (ph.languageCode || 'en_US').replace('_', '-');
+  const currency = ph.currencyCode || 'USD';
+  return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(value);
 }
 
 /**
@@ -321,10 +346,8 @@ function parseVariants(sections) {
 
     const imagesHTML = div.querySelectorAll('picture');
 
-    const priceHTML = div.querySelector('p:nth-of-type(1)');
-    const price = extractPricing(priceHTML);
-
     const ldVariant = window.jsonLdData.offers.find((offer) => offer.sku === metadata.sku);
+    const price = getOfferPricing(ldVariant);
     if (ldVariant) {
       metadata.itemCondition = ldVariant.itemCondition;
       metadata.availability = ldVariant.availability;
@@ -762,25 +785,16 @@ function autolinkModals(doc) {
 }
 
 async function decorateFragmentPreviews() {
-  const params = new URLSearchParams(window.location.search);
-  const fragmentPath = params.get('reloadFragment');
-  if (fragmentPath && fragmentPath.length < 200) {
-    const isValid = /^[a-zA-Z0-9-_/]+$/.test(fragmentPath);
-    if (!isValid) return;
-    const url = new URL(fragmentPath, window.location);
-    const { pathname } = url;
-    const resp = await fetch(`${pathname}.plain.html`, {
-      cache: 'reload',
-    });
-    await resp.text();
-  }
   const path = window.location.pathname;
-  if (path.includes('/nav/') || path.includes('/footer/')) {
-    if (window.location.search.includes('dapreview=on')) {
-      document.body.classList.add('fragment-preview');
+  if (path.includes('/nav/')) {
+    if (path.endsWith('/nav/nav') || path.endsWith('/nav/products')) {
+      document.body.classList.add('fragment-preview-nav');
     } else {
-      window.location.href = `/us/en_us/why-vitamix?reloadFragment=${path}`;
+      document.body.classList.add('fragment-preview');
     }
+  }
+  if (path.includes('/footer/')) {
+    document.body.classList.add('fragment-preview-footer');
   }
 }
 
@@ -1130,6 +1144,20 @@ async function loadEager(doc) {
   const params = new URLSearchParams(window.location.search);
   if (params.get('simulateDate')) {
     window.simulateDate = params.get('simulateDate');
+  }
+
+  /* query param based redirects: comma-separated pairs of
+   * <queryparam>=<value>:<redirectPathname> (e.g. "product=123:/us/en_us/products/123")
+   */
+  const paramRedirects = getMetadata('param-redirects');
+  if (paramRedirects) {
+    paramRedirects.split(',').forEach((row) => {
+      const i = row.indexOf(':');
+      if (i === -1) return;
+      const matchParam = row.slice(0, i).trim();
+      const pathname = row.slice(i + 1).trim();
+      if (window.location.search.includes(matchParam)) window.location.pathname = pathname;
+    });
   }
 
   /* adjust shop images to locale root path, util all of shop is mapped */

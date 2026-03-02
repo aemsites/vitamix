@@ -1,5 +1,5 @@
 import { buildSlide, buildThumbnails } from './gallery.js';
-import { rebuildIndices, checkVariantOutOfStock } from '../../scripts/scripts.js';
+import { rebuildIndices, checkVariantOutOfStock, formatPrice } from '../../scripts/scripts.js';
 import { toClassName } from '../../scripts/aem.js';
 import renderPricing from './pricing.js';
 import renderAddToCart from './add-to-cart.js';
@@ -167,6 +167,46 @@ export function renderOptions(ph, block, variants, custom, isParentOutOfStock) {
     return optionsContainer;
   }
 
+  if (options && options.length > 0) {
+    const warrantyContainer = document.createElement('div');
+    warrantyContainer.classList.add('warranty');
+
+    const warrantyHeading = document.createElement('div');
+    warrantyHeading.textContent = `${ph.warranty || 'Warranty'}:`;
+    warrantyContainer.append(warrantyHeading);
+
+    options.forEach((option, i) => {
+      const formatOptionPrice = (price) => {
+        if (price) {
+          return formatPrice(price, ph);
+        }
+        return ph.free || 'Free';
+      };
+      const warrantyValue = document.createElement('div');
+      warrantyValue.classList.add('pdp-warranty-option');
+      warrantyValue.textContent = `${option.name} (${formatOptionPrice(+option.finalPrice)})`;
+      if (options.length > 1) {
+        const radio = document.createElement('input');
+        radio.type = 'radio';
+        radio.name = 'warranty';
+        radio.value = option.name;
+        if (i === 0) {
+          radio.checked = true;
+        }
+        warrantyValue.prepend(radio);
+
+        radio.addEventListener('change', () => {
+          window.selectedWarranty = option;
+        });
+      }
+      warrantyContainer.append(warrantyValue);
+    });
+    // set default warranty
+    [window.selectedWarranty] = options;
+
+    optionsContainer.append(warrantyContainer);
+  }
+
   // if there are no variants, don't render anything
   if (!variants?.length) {
     return optionsContainer;
@@ -209,46 +249,6 @@ export function renderOptions(ph, block, variants, custom, isParentOutOfStock) {
 
   optionsContainer.append(selectionContainer);
   renderOOSMessage(ph, optionsContainer, isParentOutOfStock);
-
-  if (options && options.length > 0) {
-    const warrantyContainer = document.createElement('div');
-    warrantyContainer.classList.add('warranty');
-
-    const warrantyHeading = document.createElement('div');
-    warrantyHeading.textContent = `${ph.warranty || 'Warranty'}:`;
-    warrantyContainer.append(warrantyHeading);
-
-    options.forEach((option, i) => {
-      const formatPrice = (price) => {
-        if (price) {
-          return `$${price.toFixed(2)}`;
-        }
-        return ph.free || 'Free';
-      };
-      const warrantyValue = document.createElement('div');
-      warrantyValue.classList.add('pdp-warranty-option');
-      warrantyValue.textContent = `${option.name} (${formatPrice(+option.finalPrice)})`;
-      if (options.length > 1) {
-        const radio = document.createElement('input');
-        radio.type = 'radio';
-        radio.name = 'warranty';
-        radio.value = option.name;
-        if (i === 0) {
-          radio.checked = true;
-        }
-        warrantyValue.prepend(radio);
-
-        radio.addEventListener('change', () => {
-          window.selectedWarranty = option;
-        });
-      }
-      warrantyContainer.append(warrantyValue);
-    });
-    // set default warranty
-    [window.selectedWarranty] = options;
-
-    optionsContainer.append(warrantyContainer);
-  }
 
   // eslint-disable-next-line consistent-return
   return optionsContainer;

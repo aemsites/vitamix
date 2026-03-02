@@ -15,14 +15,14 @@ const WEIGHTS = {
  * @returns {Object|undefined} Matching recipe or undefined
  */
 function findMatchingRecipe(href, data) {
-  // If href has -r ID, try exact match; otherwise match base path
-  if (href.includes('-r')) {
+  if (href.match(/-r\d+$/)) {
     return data.find((recipe) => recipe.path === href);
   }
 
   // Match base path (without r-ID suffix)
   return data.find((recipe) => {
-    const recipePath = recipe.path.split('-r')[0];
+    const lastIndex = recipe.path.lastIndexOf('-r');
+    const recipePath = recipe.path.substring(0, lastIndex);
     return recipePath === href;
   });
 }

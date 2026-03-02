@@ -3,12 +3,13 @@
   align-items: flex-start;
 }
 
-.related-recipes li {
+.related-recipes.carousel.block ul > li {
   flex: 0 0 calc(50% - (var(--spacing-100) / 2));
+  width: auto;
 }
 
 @media (width >= 600px) {
-  .related-recipes li {
+  .related-recipes.carousel.block ul > li {
     flex: 0 0 calc((100% / 3) - (var(--spacing-100) / 1.5));
   }
 }

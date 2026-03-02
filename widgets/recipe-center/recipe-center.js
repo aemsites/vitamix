@@ -2,6 +2,7 @@
 
 import { loadCSS, fetchPlaceholders } from '../../scripts/aem.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { normalizeCompatibleContainers, isFrenchContainerLocale } from '../../blocks/recipe/recipe-containers.js';
 
 /**
  * Parses raw recipe data from index and transforms values.
@@ -62,6 +63,15 @@ async function lookupRecipes(config = {}, facets = {}) {
         const status = recipe.status ? recipe.status.toLowerCase() : '';
         return status === 'updated' || status === 'new';
       });
+
+    // Normalize compatible-containers for French only (translation artifacts → canonical, display in French)
+    if (isFrenchContainerLocale(locale, language)) {
+      recipes.forEach((recipe) => {
+        if (recipe['compatible-containers']) {
+          recipe['compatible-containers'] = normalizeCompatibleContainers(recipe['compatible-containers'], true);
+        }
+      });
+    }
 
     window.recipeIndex = {
       data: recipes,
@@ -169,13 +179,13 @@ async function lookupRecipes(config = {}, facets = {}) {
           values.forEach((val) => {
             if (val) {
               const valLower = val.toLowerCase();
-              
+
               // Store the canonical case (first occurrence, capitalized for display)
               if (!facetCanonicalCase[facetKey][valLower]) {
                 facetCanonicalCase[facetKey][valLower] = capitalizeFirstLetter(val);
               }
               const canonicalVal = facetCanonicalCase[facetKey][valLower];
-              
+
               // Track by recipe title to avoid counting duplicate recipes with same name
               if (!facetTitleTracking[facetKey][valLower]) {
                 facetTitleTracking[facetKey][valLower] = new Set();
@@ -449,6 +459,19 @@ function updateURL(filterConfig) {
 }
 
 /**
+ * Returns true if the user has applied any filters or entered a fulltext query.
+ * @param {Object} filterConfig - Current filter configuration
+ * @returns {boolean}
+ */
+function hasActiveFilters(filterConfig) {
+  return Object.keys(filterConfig).some((key) => {
+    if (key === 'page' || key === 'sort') return false;
+    if (key === 'fulltext') return filterConfig[key] && filterConfig[key].trim().length > 0;
+    return !!filterConfig[key];
+  });
+}
+
+/**
  * Builds complete recipe listing with filtering, sorting, and search functionality.
  * @param {HTMLElement} container - Container element to transform into a recipe listing
  * @param {Object} config - Initial filter configuration
@@ -470,6 +493,10 @@ function buildRecipeFiltering(container, config = {}, placeholders = {}) {
   // Reference existing DOM elements from static HTML
   const resultsElement = container.querySelector('.results');
   const facetsElement = container.querySelector('.facets');
+  const paginationElement = container.querySelector('.pagination');
+  const resultsCountElement = container.querySelector('#results-count');
+  const resultsStartElement = container.querySelector('#results-start');
+  const resultsEndElement = container.querySelector('#results-end');
 
   // Set up facet panel event listeners
   const applyButton = facetsElement.querySelector('.apply');
@@ -490,6 +517,8 @@ function buildRecipeFiltering(container, config = {}, placeholders = {}) {
   const courseSelect = container.querySelector('#course');
   const recipeTypeSelect = container.querySelector('#recipe-type');
   const goButton = container.querySelector('.go');
+  const fulltextElement = container.querySelector('#fulltext');
+  const form = container.querySelector('form.controls');
 
   // Sort dropdown uses native <details> element
   const sortDetails = container.querySelector('.sort');
@@ -516,7 +545,7 @@ function buildRecipeFiltering(container, config = {}, placeholders = {}) {
 
   // highlights search terms in recipe titles by wrapping matches in a span.
   const highlightResults = (res) => {
-    const fulltext = document.getElementById('fulltext').value;
+    const fulltext = fulltextElement.value;
     if (fulltext) {
       res.querySelectorAll('h3').forEach((title) => {
         const content = title.textContent;
@@ -550,7 +579,6 @@ function buildRecipeFiltering(container, config = {}, placeholders = {}) {
 
   // renders pagination controls
   const displayPagination = (totalResults, page = 1) => {
-    const paginationElement = container.querySelector('.pagination');
     if (!paginationElement) return;
 
     const totalPages = Math.ceil(totalResults / ITEMS_PER_PAGE);
@@ -649,7 +677,7 @@ function buildRecipeFiltering(container, config = {}, placeholders = {}) {
       else filterConfig[facetKey] = facetValue;
     });
 
-    filterConfig.fulltext = document.getElementById('fulltext').value;
+    filterConfig.fulltext = fulltextElement.value;
 
     // Reset to page 1 when filters change, unless explicitly maintaining page
     if (resetPage) {
@@ -678,7 +706,8 @@ function buildRecipeFiltering(container, config = {}, placeholders = {}) {
       span.className = 'tag';
       span.textContent = tag;
       span.addEventListener('click', () => {
-        document.getElementById(`filter-${tag}`).checked = false;
+        const checkbox = container.querySelector(`[id="filter-${tag}"]`);
+        if (checkbox) checkbox.checked = false;
         const filterConfig = createFilterConfig(true);
         // eslint-disable-next-line no-use-before-define
         runSearch(filterConfig);
@@ -692,7 +721,8 @@ function buildRecipeFiltering(container, config = {}, placeholders = {}) {
       clearButton.textContent = placeholders.clearAll || 'Clear All';
       clearButton.addEventListener('click', () => {
         selected.forEach((tag) => {
-          document.getElementById(`filter-${tag}`).checked = false;
+          const checkbox = container.querySelector(`[id="filter-${tag}"]`);
+          if (checkbox) checkbox.checked = false;
         });
         const filterConfig = createFilterConfig(true);
         // eslint-disable-next-line no-use-before-define
@@ -834,18 +864,27 @@ function buildRecipeFiltering(container, config = {}, placeholders = {}) {
     const startNum = totalResults > 0 ? ((page - 1) * ITEMS_PER_PAGE) + 1 : 0;
     const endNum = Math.min(page * ITEMS_PER_PAGE, totalResults);
 
-    container.querySelector('#results-count').textContent = totalResults;
-    container.querySelector('#results-start').textContent = startNum;
-    container.querySelector('#results-end').textContent = endNum;
+    if (resultsCountElement) resultsCountElement.textContent = totalResults;
+    if (resultsStartElement) resultsStartElement.textContent = startNum;
+    if (resultsEndElement) resultsEndElement.textContent = endNum;
 
     // Populate top dropdowns
     populateDropdown(dietarySelect, facets['dietary-interests'], 'dietary-interests', filterConfig);
     populateDropdown(courseSelect, facets.course, 'course', filterConfig);
     populateDropdown(recipeTypeSelect, facets['recipe-type'], 'recipe-type', filterConfig);
 
-    displayResults(results, page);
-    displayPagination(totalResults, page);
-    displayFacets(facets, filterConfig);
+    const showResults = hasActiveFilters(filterConfig);
+    if (showResults) {
+      container.classList.remove('suppress-results');
+      displayResults(results, page);
+      displayPagination(totalResults, page);
+      displayFacets(facets, filterConfig);
+    } else {
+      container.classList.add('suppress-results');
+      resultsElement.innerHTML = '';
+      if (paginationElement) paginationElement.innerHTML = '';
+      displayFacets(facets, filterConfig);
+    }
 
     // Update URL with current filter state
     if (updateURLState) {
@@ -853,7 +892,6 @@ function buildRecipeFiltering(container, config = {}, placeholders = {}) {
     }
   };
 
-  const fulltextElement = container.querySelector('#fulltext');
   fulltextElement.addEventListener('input', () => {
     runSearch(createFilterConfig(true)); // Reset to page 1 on search
   });
@@ -876,7 +914,6 @@ function buildRecipeFiltering(container, config = {}, placeholders = {}) {
   });
 
   // Search button click (form submit)
-  const form = container.querySelector('form.controls');
   if (form) {
     form.addEventListener('submit', (e) => {
       e.preventDefault();
@@ -1065,11 +1102,15 @@ async function init() {
 }
 
 // Wait for DOM to be ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', init);
-} else {
+const start = () => {
   loadCSS('/widgets/recipe-center/recipe-center.css');
   init();
+};
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', start);
+} else {
+  start();
 }
 
 export default { lookupRecipes };

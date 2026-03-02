@@ -1,4 +1,5 @@
 import { toCamelCase, toClassName } from '../../scripts/aem.js';
+import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 /**
  * Creates an HTML element with an optional class name
@@ -371,7 +372,9 @@ function enableNavSearch(form) {
     e.preventDefault();
     const data = new FormData(form);
     const { search } = Object.fromEntries(data.entries()) || '';
-    window.location.href = `https://www.vitamix.com/us/en_us/search-result?search=${search}`;
+    const { locale, language } = getLocaleAndLanguage();
+    const basePath = `/${locale}/${language}`;
+    window.location.href = `https://www.vitamix.com${basePath}/search-result?search=${search}`;
   });
 }
 
@@ -393,6 +396,10 @@ function enableFooterSignUp(form) {
     if (form.closest('dialog')) {
       leadSource = `sub-em-modal-${country}`;
     }
+    if (window.leadSourceOverride) {
+      leadSource = `sub-em-${window.leadSourceOverride}-${country}`;
+    }
+
     const payload = {
       email,
       mobile,

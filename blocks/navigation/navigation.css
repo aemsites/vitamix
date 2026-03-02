@@ -1,7 +1,27 @@
 main > .navigation-container.section {
   position: sticky;
-  top: 0;
-  z-index: 2;
+  top: var(--header-height); 
+  z-index: 9;
+}
+
+main > .navigation-container.section ~ .section h1,
+main > .navigation-container.section ~ .section h2,
+main > .navigation-container.section ~ .section h3,
+main > .navigation-container.section ~ .section h4,
+main > .navigation-container.section ~ .section h5,
+main > .navigation-container.section ~ .section h6 {
+  scroll-margin-top: calc(56px + 1em);
+}
+
+@media (width >= 800px) {
+  main > .navigation-container.section ~ .section h1,
+  main > .navigation-container.section ~ .section h2,
+  main > .navigation-container.section ~ .section h3,
+  main > .navigation-container.section ~ .section h4,
+  main > .navigation-container.section ~ .section h5,
+  main > .navigation-container.section ~ .section h6 {
+    scroll-margin-top: calc(83px + 1em);
+  }
 }
 
 .hero-container + .navigation-container {
@@ -205,7 +225,7 @@ main > .navigation-container.section {
 }
 
 .navigation .navigation-popover a:hover {
-  color: var(--color-gray);
+  color: var(--color-white);
   text-decoration: underline;
 }
 
