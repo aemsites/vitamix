@@ -338,11 +338,6 @@ function displayCommResults(results, location) {
     title.textContent = result.NAME;
     li.append(title);
 
-    const distance = document.createElement('span');
-    distance.textContent = `${haversineDistance(location.lat, location.lng, result.lat, result.lng).toFixed(1)} miles away`;
-    distance.classList.add('locator-distance');
-    li.append(distance);
-
     if (result.ADDRESS_1) {
       const addressWrapper = document.createElement('span');
       addressWrapper.classList.add('locator-address');
