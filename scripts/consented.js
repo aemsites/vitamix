@@ -1,4 +1,5 @@
 import { loadScript, getMetadata } from './aem.js';
+import './consented/newsletter.js';
 
 if (getMetadata('target').toLowerCase() === 'on') {
   import('./consented/adobe-target.js');
