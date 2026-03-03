@@ -1,2 +1,4 @@
 mountpoints:
-    /: https://content.da.live/QuentinVecchio/vitamix
+    /:
+      url: https://content.da.live/QuentinVecchio/vitamix/
+      type: markup
