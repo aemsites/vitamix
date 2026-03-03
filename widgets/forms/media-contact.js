@@ -1,31 +1,41 @@
-import { fetchPlaceholders } from '../../scripts/aem.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 /** Sheet logger endpoint for media contact form */
 const SHEET_LOGGER_URL = 'https://sheet-logger.david8603.workers.dev/vitamix.com/forms-testing/media-contact';
 
-/** Default option label for select placeholders when sheet has no value */
-const SELECT_OPTION_DEFAULT = 'Select an option';
+/**
+ * Loads form copy from the widget's local JSON (same name as the script).
+ * @param {string} lang - Language key (en, fr, es)
+ * @returns {Promise<Object>} Form copy for that language
+ */
+async function loadFormCopy(lang) {
+  const scriptPath = new URL(import.meta.url).pathname;
+  const jsonPath = scriptPath.replace(/\.js$/, '.json');
+  const url = `${window.hlx?.codeBasePath || ''}${jsonPath}`;
+  const resp = await fetch(url);
+  const data = await resp.json();
+  const key = data[lang] ? lang : 'en';
+  return data[key];
+}
 
 /**
- * Injects placeholder-driven options into a select (keeps first empty option).
+ * Injects options into a select (keeps first empty option).
  * @param {HTMLSelectElement} select - The select element
- * @param {string[]} options - Array of "Label" or "Label=value" strings
+ * @param {{ label: string, value: string }[]} options - Options array
  */
 function setSelectOptions(select, options) {
-  if (!options || !options.length) return;
+  if (!select || !options?.length) return;
   while (select.options.length > 1) select.remove(1);
   options.forEach((opt) => {
-    const [label, value] = opt.includes('=') ? opt.split('=').map((s) => s.trim()) : [opt, opt];
     const option = document.createElement('option');
-    option.value = value || label;
-    option.textContent = label;
+    option.value = opt.value;
+    option.textContent = opt.label;
     select.appendChild(option);
   });
 }
 
 /**
- * Decorates the media-contact widget: applies placeholders and configures form.
+ * Decorates the media-contact widget: applies copy from JSON and configures form.
  * @param {HTMLElement} widget - The widget root element
  */
 export default async function decorate(widget) {
@@ -33,74 +43,45 @@ export default async function decorate(widget) {
   if (!form) return;
 
   const { locale, language } = getLocaleAndLanguage();
-  const p = await fetchPlaceholders(`/${locale}/${language}`);
+  const lang = (language || 'en_us').split('_')[0];
+  const copy = await loadFormCopy(lang);
+  const labels = copy.labels || {};
+  const placeholders = copy.placeholders || {};
+  const selectOption = copy.selectOption ?? 'Select an option';
+  const businessLineOptions = copy.businessLineOptions || [];
+  const reasonForContactOptions = copy.reasonForContactOptions || [];
 
-  const get = (key, fallback = '') => (p[key] != null && p[key] !== '' ? p[key] : fallback);
+  form.querySelector('[for="media-contact-business-line"] .label-text').textContent = labels.businessLine ?? 'Business Line';
+  form.querySelector('[for="media-contact-publication-company"] .label-text').textContent = labels.publicationCompanyOptional ?? 'Publication / Company (Optional)';
+  form.querySelector('[for="media-contact-first-name"] .label-text').textContent = labels.firstName ?? 'First Name';
+  form.querySelector('[for="media-contact-last-name"] .label-text').textContent = labels.lastName ?? 'Last Name';
+  form.querySelector('[for="media-contact-email"] .label-text').textContent = labels.emailAddress ?? 'Email Address';
+  form.querySelector('[for="media-contact-phone"] .label-text').textContent = labels.phoneNumber ?? 'Phone Number';
+  form.querySelector('[for="media-contact-reason"] .label-text').textContent = labels.reasonForContact ?? 'Reason for Contact';
+  form.querySelector('[for="media-contact-comments"] .label-text').textContent = labels.additionalCommentsOptional ?? 'Additional Comments (Optional)';
 
-  const selectOption = get('selectAnOption', SELECT_OPTION_DEFAULT);
-
-  // Labels
-  const labels = {
-    businessLine: get('businessLine', 'Business Line'),
-    publicationCompanyOptional: get('publicationCompanyOptional', 'Publication / Company (Optional)'),
-    firstName: get('firstName', 'First Name'),
-    lastName: get('lastName', 'Last Name'),
-    emailAddress: get('emailAddress', 'Email Address'),
-    phoneNumber: get('phoneNumber', 'Phone Number'),
-    reasonForContact: get('reasonForContact', 'Reason for Contact'),
-    additionalCommentsOptional: get('additionalCommentsOptional', 'Additional Comments (Optional)'),
-    submit: get('submit', 'Submit'),
-  };
-
-  const placeholders = {
-    publicationCompany: get('publicationCompanyPlaceholder'),
-    firstName: get('firstNamePlaceholder'),
-    lastName: get('lastNamePlaceholder'),
-    emailAddress: get('emailAddressPlaceholder'),
-    phoneNumber: get('phoneNumberPlaceholder'),
-    additionalComments: get('additionalCommentsPlaceholder'),
-  };
-
-  // Apply label text
-  form.querySelector('[for="media-contact-business-line"] .label-text').textContent = labels.businessLine;
-  form.querySelector('[for="media-contact-publication-company"] .label-text').textContent = labels.publicationCompanyOptional;
-  form.querySelector('[for="media-contact-first-name"] .label-text').textContent = labels.firstName;
-  form.querySelector('[for="media-contact-last-name"] .label-text').textContent = labels.lastName;
-  form.querySelector('[for="media-contact-email"] .label-text').textContent = labels.emailAddress;
-  form.querySelector('[for="media-contact-phone"] .label-text').textContent = labels.phoneNumber;
-  form.querySelector('[for="media-contact-reason"] .label-text').textContent = labels.reasonForContact;
-  form.querySelector('[for="media-contact-comments"] .label-text').textContent = labels.additionalCommentsOptional;
-
-  // Select first-option placeholder
   const businessLineSelect = form.querySelector('#media-contact-business-line');
   const reasonSelect = form.querySelector('#media-contact-reason');
-  const businessFirst = businessLineSelect?.firstElementChild;
-  const reasonFirst = reasonSelect?.firstElementChild;
-  if (businessFirst) businessFirst.textContent = selectOption;
-  if (reasonFirst) reasonFirst.textContent = selectOption;
+  if (businessLineSelect?.firstElementChild) businessLineSelect.firstElementChild.textContent = selectOption;
+  if (reasonSelect?.firstElementChild) reasonSelect.firstElementChild.textContent = selectOption;
+  setSelectOptions(businessLineSelect, businessLineOptions);
+  setSelectOptions(reasonSelect, reasonForContactOptions);
 
-  // Optional: options from placeholders (comma-separated "Label=value" or "Label")
-  const businessLineOptions = get('businessLineOptions');
-  const reasonForContactOptions = get('reasonForContactOptions');
-  if (businessLineOptions) setSelectOptions(businessLineSelect, businessLineOptions.split(',').map((s) => s.trim()));
-  if (reasonForContactOptions) setSelectOptions(reasonSelect, reasonForContactOptions.split(',').map((s) => s.trim()));
-
-  // Input/textarea placeholders
   const pubInput = form.querySelector('#media-contact-publication-company');
   const firstInput = form.querySelector('#media-contact-first-name');
   const lastInput = form.querySelector('#media-contact-last-name');
   const emailInput = form.querySelector('#media-contact-email');
   const phoneInput = form.querySelector('#media-contact-phone');
   const commentsTextarea = form.querySelector('#media-contact-comments');
-  if (pubInput) pubInput.placeholder = placeholders.publicationCompany;
-  if (firstInput) firstInput.placeholder = placeholders.firstName;
-  if (lastInput) lastInput.placeholder = placeholders.lastName;
-  if (emailInput) emailInput.placeholder = placeholders.emailAddress;
-  if (phoneInput) phoneInput.placeholder = placeholders.phoneNumber;
-  if (commentsTextarea) commentsTextarea.placeholder = placeholders.additionalComments;
+  if (pubInput) pubInput.placeholder = placeholders.publicationCompany ?? '';
+  if (firstInput) firstInput.placeholder = placeholders.firstName ?? '';
+  if (lastInput) lastInput.placeholder = placeholders.lastName ?? '';
+  if (emailInput) emailInput.placeholder = placeholders.emailAddress ?? '';
+  if (phoneInput) phoneInput.placeholder = placeholders.phoneNumber ?? '';
+  if (commentsTextarea) commentsTextarea.placeholder = placeholders.additionalComments ?? '';
 
   const submitBtn = form.querySelector('button[type="submit"]');
-  if (submitBtn) submitBtn.textContent = labels.submit;
+  if (submitBtn) submitBtn.textContent = labels.submit ?? 'Submit';
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -114,7 +95,7 @@ export default async function decorate(widget) {
     [...form.elements].forEach((el) => { el.disabled = true; });
     if (submitButton) {
       submitButton.dataset.originalLabel = buttonLabel;
-      submitButton.textContent = submitButton.dataset.sendingLabel || 'Sending...';
+      submitButton.textContent = labels.sending ?? 'Sending...';
     }
 
     try {

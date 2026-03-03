@@ -1,11 +1,25 @@
-import { fetchPlaceholders } from '../../scripts/aem.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 /** Sheet logger endpoint for edit-account form */
 const SHEET_LOGGER_URL = 'https://sheet-logger.david8603.workers.dev/vitamix.com/forms-testing/edit-account';
 
 /**
- * Decorates the edit-account widget: applies placeholders and configures form.
+ * Loads form copy from the widget's local JSON (same name as the script).
+ * @param {string} lang - Language key (en, fr, es)
+ * @returns {Promise<Object>} Form copy for that language
+ */
+async function loadFormCopy(lang) {
+  const scriptPath = new URL(import.meta.url).pathname;
+  const jsonPath = scriptPath.replace(/\.js$/, '.json');
+  const url = `${window.hlx?.codeBasePath || ''}${jsonPath}`;
+  const resp = await fetch(url);
+  const data = await resp.json();
+  const key = data[lang] ? lang : 'en';
+  return data[key];
+}
+
+/**
+ * Decorates the edit-account widget: applies copy from JSON and configures form.
  * No password section; authentication is via email PIN.
  * @param {HTMLElement} widget - The widget root element
  */
@@ -15,67 +29,36 @@ export default async function decorate(widget) {
   if (!header || !form) return;
 
   const { locale, language } = getLocaleAndLanguage();
-  const p = await fetchPlaceholders(`/${locale}/${language}`);
-  const get = (key, fallback = '') => (p[key] != null && p[key] !== '' ? p[key] : fallback);
+  const lang = (language || 'en_us').split('_')[0];
+  const copy = await loadFormCopy(lang);
+  const labels = copy.labels || {};
+  const placeholders = copy.placeholders || {};
 
-  // Lookup keys match toCamelCase(Key) from spreadsheet
-  const labels = {
-    accountInformation: get('accountInformation', 'Account Information'),
-    allFieldsMandatory: get(
-      'allFieldsAreMandatoryUnlessOtherwiseIndicatedOptional',
-      'All fields are mandatory unless otherwise indicated (optional).',
-    ),
-    firstName: get('firstName', 'First Name'),
-    lastName: get('lastName', 'Last Name'),
-    emailAddress: get('emailAddress', 'Email Address'),
-    postalCodeOptional: get('postalCodeOptional', 'Postal code (optional)'),
-    ownVitamix: get('doYouOwnAVitamix', 'Do you own a Vitamix?'),
-    yes: get('yes', 'Yes'),
-    no: get('no', 'No'),
-    communications: get('communications', 'Communications'),
-    newsletterQuestion: get(
-      'wouldYouLikeToReceivePeriodicEmailsAndNewslettersFromVitamix',
-      'Would you like to receive periodic emails and newsletters from Vitamix?',
-    ),
-    newsletterYes: get('yes', 'Yes'),
-    newsletterNo: get('noDoNotSendMeElectronicMail', 'No, do not send me electronic mail'),
-    emailConsentDisclaimer: get('emailConsentDisclaimer', ''),
-    saveChanges: get('saveChanges', 'Save changes'),
-    sending: get('sending', 'Sending...'),
-  };
+  header.querySelector('.edit-account-title').textContent = labels.accountInformation ?? 'Account Information';
+  header.querySelector('.edit-account-instruction').textContent = labels.allFieldsMandatory ?? 'All fields are mandatory unless otherwise indicated (optional).';
 
-  const placeholders = {
-    firstName: get('firstNamePlaceholder'),
-    lastName: get('lastNamePlaceholder'),
-    emailAddress: get('emailAddressPlaceholder'),
-    postalCode: get('postalCodePlaceholder'),
-  };
-
-  header.querySelector('.edit-account-title').textContent = labels.accountInformation;
-  header.querySelector('.edit-account-instruction').textContent = labels.allFieldsMandatory;
-
-  form.querySelector('[for="edit-account-first-name"] .label-text').textContent = labels.firstName;
-  form.querySelector('[for="edit-account-last-name"] .label-text').textContent = labels.lastName;
-  form.querySelector('[for="edit-account-email"] .label-text').textContent = labels.emailAddress;
-  form.querySelector('[for="edit-account-postal-code"] .label-text').textContent = labels.postalCodeOptional;
+  form.querySelector('[for="edit-account-first-name"] .label-text').textContent = labels.firstName ?? 'First Name';
+  form.querySelector('[for="edit-account-last-name"] .label-text').textContent = labels.lastName ?? 'Last Name';
+  form.querySelector('[for="edit-account-email"] .label-text').textContent = labels.emailAddress ?? 'Email Address';
+  form.querySelector('[for="edit-account-postal-code"] .label-text').textContent = labels.postalCodeOptional ?? 'Postal code (optional)';
 
   const ownLegend = form.querySelector('#edit-account-own-legend');
-  if (ownLegend) ownLegend.textContent = labels.ownVitamix;
+  if (ownLegend) ownLegend.textContent = labels.ownVitamix ?? 'Do you own a Vitamix?';
 
   const ownField = form.querySelector('#edit-account-own-legend')?.closest('.edit-account-field');
   const ownRadioLabels = ownField?.querySelectorAll('.radio-label') || [];
-  if (ownRadioLabels[0]) ownRadioLabels[0].textContent = labels.yes;
-  if (ownRadioLabels[1]) ownRadioLabels[1].textContent = labels.no;
+  if (ownRadioLabels[0]) ownRadioLabels[0].textContent = labels.yes ?? 'Yes';
+  if (ownRadioLabels[1]) ownRadioLabels[1].textContent = labels.no ?? 'No';
 
-  form.querySelector('.edit-account-section-title').textContent = labels.communications;
+  form.querySelector('.edit-account-section-title').textContent = labels.communications ?? 'Communications';
 
   const newsletterLegend = form.querySelector('#edit-account-newsletter-legend');
-  if (newsletterLegend) newsletterLegend.textContent = labels.newsletterQuestion;
+  if (newsletterLegend) newsletterLegend.textContent = labels.newsletterQuestion ?? 'Would you like to receive periodic emails and newsletters from Vitamix?';
 
   const newsletterField = form.querySelector('#edit-account-newsletter-legend')?.closest('.edit-account-field');
   const newsletterRadioLabels = newsletterField?.querySelectorAll('.radio-label') || [];
-  if (newsletterRadioLabels[0]) newsletterRadioLabels[0].textContent = labels.newsletterYes;
-  if (newsletterRadioLabels[1]) newsletterRadioLabels[1].textContent = labels.newsletterNo;
+  if (newsletterRadioLabels[0]) newsletterRadioLabels[0].textContent = labels.newsletterYes ?? 'Yes';
+  if (newsletterRadioLabels[1]) newsletterRadioLabels[1].textContent = labels.newsletterNo ?? 'No, do not send me electronic mail';
 
   const consentEl = form.querySelector('.edit-account-consent');
   if (consentEl && labels.emailConsentDisclaimer) {
@@ -89,12 +72,10 @@ export default async function decorate(widget) {
   if (firstNameInput && placeholders.firstName) firstNameInput.placeholder = placeholders.firstName;
   if (lastNameInput && placeholders.lastName) lastNameInput.placeholder = placeholders.lastName;
   if (emailInput && placeholders.emailAddress) emailInput.placeholder = placeholders.emailAddress;
-  if (postalCodeInput && placeholders.postalCode) {
-    postalCodeInput.placeholder = placeholders.postalCode;
-  }
+  if (postalCodeInput && placeholders.postalCode) postalCodeInput.placeholder = placeholders.postalCode;
 
   const submitBtn = form.querySelector('button[type="submit"]');
-  if (submitBtn) submitBtn.textContent = labels.saveChanges;
+  if (submitBtn) submitBtn.textContent = labels.saveChanges ?? 'Save changes';
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -107,7 +88,7 @@ export default async function decorate(widget) {
     [...form.elements].forEach((el) => { el.disabled = true; });
     if (submitButton) {
       submitButton.dataset.originalLabel = buttonLabel;
-      submitButton.textContent = labels.sending;
+      submitButton.textContent = labels.sending ?? 'Sending...';
     }
 
     try {

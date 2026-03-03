@@ -1,4 +1,3 @@
-import { fetchPlaceholders } from '../../scripts/aem.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 /** Sheet logger endpoint for login form */
@@ -7,7 +6,22 @@ const SHEET_LOGGER_URL = 'https://sheet-logger.david8603.workers.dev/vitamix.com
 const CODE_LENGTH = 4;
 
 /**
- * Decorates the login widget: applies placeholders and configures form.
+ * Loads form copy from the widget's local JSON (same name as the script).
+ * @param {string} lang - Language key (en, fr, es)
+ * @returns {Promise<Object>} Form copy for that language
+ */
+async function loadFormCopy(lang) {
+  const scriptPath = new URL(import.meta.url).pathname;
+  const jsonPath = scriptPath.replace(/\.js$/, '.json');
+  const url = `${window.hlx?.codeBasePath || ''}${jsonPath}`;
+  const resp = await fetch(url);
+  const data = await resp.json();
+  const key = data[lang] ? lang : 'en';
+  return data[key];
+}
+
+/**
+ * Decorates the login widget: applies copy from JSON and configures form.
  * On success, hides form and shows verification UI (code inputs, resend).
  * @param {HTMLElement} widget - The widget root element
  */
@@ -17,41 +31,23 @@ export default async function decorate(widget) {
   if (!form || !verifyEl) return;
 
   const { locale, language } = getLocaleAndLanguage();
-  const p = await fetchPlaceholders(`/${locale}/${language}`);
-  const get = (key, fallback = '') => (p[key] != null && p[key] !== '' ? p[key] : fallback);
+  const lang = (language || 'en_us').split('_')[0];
+  const copy = await loadFormCopy(lang);
+  const labels = copy.labels || {};
+  const placeholders = copy.placeholders || {};
 
-  const labels = {
-    emailAddress: get('emailAddress', 'Email Address'),
-    submit: get('submit', 'Submit'),
-    sending: get('sending', 'Sending...'),
-    verifyYourEmail: get('verifyYourEmail', 'Verify Your Email'),
-    enterVerificationCodeSent: get(
-      'enterVerificationCodeSent',
-      'Enter the verification code sent to your email:',
-    ),
-    didntReceiveCode: get('didntReceiveCode', 'Didn\'t receive the code?'),
-    resendCode: get('resendCode', 'Resend code'),
-  };
-
-  const placeholders = {
-    emailAddress: get('emailAddressPlaceholder'),
-  };
-
-  form.querySelector('[for="login-email"] .label-text').textContent = labels.emailAddress;
+  form.querySelector('[for="login-email"] .label-text').textContent = labels.emailAddress ?? 'Email Address';
 
   const emailInput = form.querySelector('#login-email');
-  if (emailInput && placeholders.emailAddress) {
-    emailInput.placeholder = placeholders.emailAddress;
-  }
+  if (emailInput) emailInput.placeholder = placeholders.emailAddress ?? '';
 
   const submitBtn = form.querySelector('button[type="submit"]');
-  if (submitBtn) submitBtn.textContent = labels.submit;
+  if (submitBtn) submitBtn.textContent = labels.submit ?? 'Submit';
 
-  // Verification block labels
-  verifyEl.querySelector('.login-verify-title').textContent = labels.verifyYourEmail;
-  verifyEl.querySelector('.login-verify-instruction').textContent = labels.enterVerificationCodeSent;
-  verifyEl.querySelector('.login-verify-didnt-receive').textContent = labels.didntReceiveCode;
-  verifyEl.querySelector('.login-verify-resend').textContent = labels.resendCode;
+  verifyEl.querySelector('.login-verify-title').textContent = labels.verifyYourEmail ?? 'Verify Your Email';
+  verifyEl.querySelector('.login-verify-instruction').textContent = labels.enterVerificationCodeSent ?? 'Enter the verification code sent to your email:';
+  verifyEl.querySelector('.login-verify-didnt-receive').textContent = labels.didntReceiveCode ?? "Didn't receive the code?";
+  verifyEl.querySelector('.login-verify-resend').textContent = labels.resendCode ?? 'Resend code';
 
   // Code inputs: single character each, auto-advance, paste support
   const codeInputs = [...verifyEl.querySelectorAll('.login-verify-input')];
@@ -81,14 +77,13 @@ export default async function decorate(widget) {
     });
   });
 
-  // Resend: re-submit email to sheet-logger (same payload)
   const resendBtn = verifyEl.querySelector('.login-verify-resend');
   resendBtn.addEventListener('click', async () => {
     const email = form.querySelector('#login-email').value;
     if (!email) return;
     resendBtn.disabled = true;
     const originalText = resendBtn.textContent;
-    resendBtn.textContent = labels.sending;
+    resendBtn.textContent = labels.sending ?? 'Sending...';
     try {
       const resp = await fetch(SHEET_LOGGER_URL, {
         method: 'POST',
@@ -115,7 +110,7 @@ export default async function decorate(widget) {
     [...form.elements].forEach((el) => { el.disabled = true; });
     if (submitButton) {
       submitButton.dataset.originalLabel = buttonLabel;
-      submitButton.textContent = labels.sending;
+      submitButton.textContent = labels.sending ?? 'Sending...';
     }
 
     try {

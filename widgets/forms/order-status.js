@@ -1,11 +1,25 @@
-import { fetchPlaceholders } from '../../scripts/aem.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 /** Sheet logger endpoint for order status lookup */
 const SHEET_LOGGER_URL = 'https://sheet-logger.david8603.workers.dev/vitamix.com/forms-testing/order-status';
 
 /**
- * Decorates the order-status widget: applies placeholders and configures form.
+ * Loads form copy from the widget's local JSON (same name as the script).
+ * @param {string} lang - Language key (en, fr, es)
+ * @returns {Promise<Object>} Form copy for that language
+ */
+async function loadFormCopy(lang) {
+  const scriptPath = new URL(import.meta.url).pathname;
+  const jsonPath = scriptPath.replace(/\.js$/, '.json');
+  const url = `${window.hlx?.codeBasePath || ''}${jsonPath}`;
+  const resp = await fetch(url);
+  const data = await resp.json();
+  const key = data[lang] ? lang : 'en';
+  return data[key];
+}
+
+/**
+ * Decorates the order-status widget: applies copy from JSON and configures form.
  * Submits POST with JSON to sheet-logger and displays the response JSON below the form.
  * @param {HTMLElement} widget - The widget root element
  */
@@ -15,27 +29,18 @@ export default async function decorate(widget) {
   if (!form || !resultEl) return;
 
   const { locale, language } = getLocaleAndLanguage();
-  const p = await fetchPlaceholders(`/${locale}/${language}`);
-  const get = (key, fallback = '') => (p[key] != null && p[key] !== '' ? p[key] : fallback);
+  const lang = (language || 'en_us').split('_')[0];
+  const copy = await loadFormCopy(lang);
+  const labels = copy.labels || {};
+  const placeholders = copy.placeholders || {};
 
-  // fetchPlaceholders stores by toCamelCase(Key), so we look up with camelCase keys
-  const labels = {
-    orderNumber: get('orderNumber', 'Order Number'),
-    submit: get('searchOrder', 'Search Order'),
-    sending: get('searching', 'Searching...'),
-  };
-  const placeholders = {
-    orderNumber: get('orderNumberPlaceholder'),
-  };
-
-  form.querySelector('[for="order-status-order-number"] .label-text').textContent = labels.orderNumber;
   const submitBtn = form.querySelector('button[type="submit"]');
-  if (submitBtn) submitBtn.textContent = labels.submit;
+
+  form.querySelector('[for="order-status-order-number"] .label-text').textContent = labels.orderNumber ?? 'Order Number';
+  if (submitBtn) submitBtn.textContent = labels.searchOrder ?? 'Search Order';
 
   const orderNumberInput = form.querySelector('#order-status-order-number');
-  if (orderNumberInput && placeholders.orderNumber) {
-    orderNumberInput.placeholder = placeholders.orderNumber;
-  }
+  if (orderNumberInput) orderNumberInput.placeholder = placeholders.orderNumber ?? '';
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -47,7 +52,7 @@ export default async function decorate(widget) {
     const originalSubmitText = submitBtn?.textContent;
     if (submitBtn) {
       submitBtn.dataset.originalLabel = originalSubmitText;
-      submitBtn.textContent = labels.sending;
+      submitBtn.textContent = labels.searching ?? 'Searching...';
     }
     resultEl.hidden = true;
     resultEl.textContent = '';

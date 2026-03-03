@@ -1,45 +1,41 @@
-import { fetchPlaceholders } from '../../scripts/aem.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 /** Sheet logger endpoint for manage-address form */
 const SHEET_LOGGER_URL = 'https://sheet-logger.david8603.workers.dev/vitamix.com/forms-testing/manage-address';
 
-/** Default Province/region options (Label=value). Overridden by placeholder provinceOptions. */
-const DEFAULT_PROVINCE_OPTIONS = [
-  'Alberta=AB',
-  'British Columbia=BC',
-  'Manitoba=MB',
-  'New Brunswick=NB',
-  'Newfoundland and Labrador=NL',
-  'Northwest Territories=NT',
-  'Nova Scotia=NS',
-  'Nunavut=NU',
-  'Ontario=ON',
-  'Prince Edward Island=PE',
-  'Quebec=QC',
-  'Saskatchewan=SK',
-  'Yukon=YT',
-].join(',');
+/**
+ * Loads form copy from the widget's local JSON (same name as the script).
+ * @param {string} lang - Language key (en, fr, es)
+ * @returns {Promise<Object>} Form copy for that language
+ */
+async function loadFormCopy(lang) {
+  const scriptPath = new URL(import.meta.url).pathname;
+  const jsonPath = scriptPath.replace(/\.js$/, '.json');
+  const url = `${window.hlx?.codeBasePath || ''}${jsonPath}`;
+  const resp = await fetch(url);
+  const data = await resp.json();
+  const key = data[lang] ? lang : 'en';
+  return data[key];
+}
 
 /**
- * Injects placeholder-driven options into a select (keeps first empty option).
+ * Injects options into a select (keeps first empty option).
  * @param {HTMLSelectElement} select - The select element
- * @param {string[]} options - Array of "Label" or "Label=value" strings
+ * @param {{ label: string, value: string }[]} options - Options array
  */
 function setSelectOptions(select, options) {
-  if (!select || !options || !options.length) return;
+  if (!select || !options?.length) return;
   while (select.options.length > 1) select.remove(1);
   options.forEach((opt) => {
-    const [label, value] = opt.includes('=') ? opt.split('=').map((s) => s.trim()) : [opt, opt];
     const option = document.createElement('option');
-    option.value = value || label;
-    option.textContent = label;
+    option.value = opt.value;
+    option.textContent = opt.label;
     select.appendChild(option);
   });
 }
 
 /**
- * Decorates the manage-address widget: applies placeholders and configures form.
+ * Decorates the manage-address widget: applies copy from JSON and configures form.
  * @param {HTMLElement} widget - The widget root element
  */
 export default async function decorate(widget) {
@@ -48,83 +44,43 @@ export default async function decorate(widget) {
   if (!header || !form) return;
 
   const { locale, language } = getLocaleAndLanguage();
-  const p = await fetchPlaceholders(`/${locale}/${language}`);
-  const get = (key, fallback = '') => (p[key] != null && p[key] !== '' ? p[key] : fallback);
+  const lang = (language || 'en_us').split('_')[0];
+  const copy = await loadFormCopy(lang);
+  const labels = copy.labels || {};
+  const placeholders = copy.placeholders || {};
+  const provinceOptions = copy.provinceOptions || [];
 
-  // Lookup keys match toCamelCase(Key) from spreadsheet; fallbacks for alternate Key phrasing
-  const labels = {
-    manageAddress: get('manageAddress', 'Manage address'),
-    contactInformation: get('contactInformation')
-      || get('contactInfo')
-      || get('coordonnEs', 'Contact Information'),
-    address: get('address', 'Address'),
-    firstName: get('firstName', 'First Name'),
-    lastName: get('lastName', 'Last Name'),
-    company: get('company', 'Company'),
-    phoneNumber: get('phoneNumber', 'Phone Number'),
-    phoneNumberHelp: get('phoneNumberHelp')
-      || get('pleaseEnterAValidPhoneNumber')
-      || get(
-        'pleaseEnterAValidPhoneNumberForExample207973782320797378232079737823',
-        'Please enter a valid phone number. For example (207)973-7823, (207) 973-7823, 2079737823.',
-      ),
-    addressLabel: get('address', 'Address'),
-    addressLine2: get('addressLine2', 'Address Line 2'),
-    city: get('city', 'City'),
-    province: get('province', 'Province'),
-    postalCode: get('postalCode', 'Postal code'),
-    provincePlaceholder: get('pleaseSelectAProvince')
-      || get('pleaseSelectRegionStateOrProvince', 'Please select a region, state or province'),
-    defaultBilling: get('useAsDefaultBillingAddress', 'Use as default billing address'),
-    defaultShipping: get('useAsDefaultShippingAddress', 'Use as default shipping address'),
-    saveAddress: get('saveAddress', 'Save address'),
-    cancel: get('cancel', 'Cancel'),
-    sending: get('sending', 'Sending...'),
-  };
+  header.querySelector('.manage-address-title').textContent = labels.manageAddress ?? 'Manage address';
 
-  const placeholders = {
-    firstName: get('firstNamePlaceholder'),
-    lastName: get('lastNamePlaceholder'),
-    company: get('companyPlaceholder'),
-    phone: get('phoneNumberPlaceholder'),
-    address: get('addressPlaceholder'),
-    addressLine2: get('addressLine2Placeholder'),
-    city: get('cityPlaceholder'),
-    postalCode: get('postalCodePlaceholder'),
-  };
+  form.querySelector('.manage-address-contact .contact-title').textContent = labels.contactInformation ?? 'Contact Information';
+  form.querySelector('.manage-address-address .address-title').textContent = labels.address ?? 'Address';
 
-  header.querySelector('.manage-address-title').textContent = labels.manageAddress;
-
-  form.querySelector('.manage-address-contact .contact-title').textContent = labels.contactInformation;
-  form.querySelector('.manage-address-address .address-title').textContent = labels.address;
-
-  form.querySelector('[for="manage-address-first-name"] .label-text').textContent = labels.firstName;
-  form.querySelector('[for="manage-address-last-name"] .label-text').textContent = labels.lastName;
-  form.querySelector('[for="manage-address-company"] .label-text').textContent = labels.company;
-  form.querySelector('[for="manage-address-phone"] .label-text').textContent = labels.phoneNumber;
+  form.querySelector('[for="manage-address-first-name"] .label-text').textContent = labels.firstName ?? 'First Name';
+  form.querySelector('[for="manage-address-last-name"] .label-text').textContent = labels.lastName ?? 'Last Name';
+  form.querySelector('[for="manage-address-company"] .label-text').textContent = labels.company ?? 'Company';
+  form.querySelector('[for="manage-address-phone"] .label-text').textContent = labels.phoneNumber ?? 'Phone Number';
 
   const phoneHelp = form.querySelector('#manage-address-phone-help');
-  if (phoneHelp) phoneHelp.textContent = labels.phoneNumberHelp;
+  if (phoneHelp) phoneHelp.textContent = labels.phoneNumberHelp ?? 'Please enter a valid phone number. For example (207)973-7823, (207) 973-7823, 2079737823.';
   form.querySelector('#manage-address-phone')?.setAttribute('aria-describedby', 'manage-address-phone-help');
 
-  form.querySelector('[for="manage-address-address"] .label-text').textContent = labels.addressLabel;
-  form.querySelector('[for="manage-address-address-line-2"] .label-text').textContent = labels.addressLine2;
-  form.querySelector('[for="manage-address-city"] .label-text').textContent = labels.city;
-  form.querySelector('[for="manage-address-province"] .label-text').textContent = labels.province;
-  form.querySelector('[for="manage-address-postal-code"] .label-text').textContent = labels.postalCode;
+  form.querySelector('[for="manage-address-address"] .label-text').textContent = labels.address ?? 'Address';
+  form.querySelector('[for="manage-address-address-line-2"] .label-text').textContent = labels.addressLine2 ?? 'Address Line 2';
+  form.querySelector('[for="manage-address-city"] .label-text').textContent = labels.city ?? 'City';
+  form.querySelector('[for="manage-address-province"] .label-text').textContent = labels.province ?? 'Province';
+  form.querySelector('[for="manage-address-postal-code"] .label-text').textContent = labels.postalCode ?? 'Postal code';
 
   const provinceSelect = form.querySelector('#manage-address-province');
   if (provinceSelect?.firstElementChild) {
-    provinceSelect.firstElementChild.textContent = labels.provincePlaceholder;
+    provinceSelect.firstElementChild.textContent = labels.provincePlaceholder ?? 'Please select a region, state or province';
   }
-  const provinceOptions = get('provinceOptions') || DEFAULT_PROVINCE_OPTIONS;
-  setSelectOptions(provinceSelect, provinceOptions.split(',').map((s) => s.trim()));
+  setSelectOptions(provinceSelect, provinceOptions);
 
   const billingCheckbox = form.querySelector('[name="defaultBilling"]')?.closest('.manage-address-checkbox');
-  if (billingCheckbox) billingCheckbox.querySelector('.checkbox-text').textContent = labels.defaultBilling;
+  if (billingCheckbox) billingCheckbox.querySelector('.checkbox-text').textContent = labels.defaultBilling ?? 'Use as default billing address';
 
   const shippingCheckbox = form.querySelector('[name="defaultShipping"]')?.closest('.manage-address-checkbox');
-  if (shippingCheckbox) shippingCheckbox.querySelector('.checkbox-text').textContent = labels.defaultShipping;
+  if (shippingCheckbox) shippingCheckbox.querySelector('.checkbox-text').textContent = labels.defaultShipping ?? 'Use as default shipping address';
 
   const inputs = {
     firstName: form.querySelector('#manage-address-first-name'),
@@ -138,13 +94,13 @@ export default async function decorate(widget) {
   };
   Object.entries(placeholders).forEach(([key, value]) => {
     const el = inputs[key];
-    if (el && value) el.placeholder = value;
+    if (el) el.placeholder = value ?? '';
   });
 
   const submitBtn = form.querySelector('button[type="submit"]');
   const cancelBtn = form.querySelector('.manage-address-cancel');
-  if (submitBtn) submitBtn.textContent = labels.saveAddress;
-  if (cancelBtn) cancelBtn.textContent = labels.cancel;
+  if (submitBtn) submitBtn.textContent = labels.saveAddress ?? 'Save address';
+  if (cancelBtn) cancelBtn.textContent = labels.cancel ?? 'Cancel';
 
   cancelBtn?.addEventListener('click', () => {
     if (window.history.length > 1) {
@@ -165,7 +121,7 @@ export default async function decorate(widget) {
     [...form.elements].forEach((el) => { el.disabled = true; });
     if (submitButton) {
       submitButton.dataset.originalLabel = buttonLabel;
-      submitButton.textContent = labels.sending;
+      submitButton.textContent = labels.sending ?? 'Sending...';
     }
 
     try {

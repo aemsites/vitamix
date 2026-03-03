@@ -1,0 +1,143 @@
+{
+  "en": {
+    "labels": {
+      "manageAddress": "Manage address",
+      "contactInformation": "Contact Information",
+      "address": "Address",
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "company": "Company",
+      "phoneNumber": "Phone Number",
+      "phoneNumberHelp": "Please enter a valid phone number. For example (207)973-7823, (207) 973-7823, 2079737823.",
+      "addressLine2": "Address Line 2",
+      "city": "City",
+      "province": "Province",
+      "postalCode": "Postal code",
+      "provincePlaceholder": "Please select a region, state or province",
+      "defaultBilling": "Use as default billing address",
+      "defaultShipping": "Use as default shipping address",
+      "saveAddress": "Save address",
+      "cancel": "Cancel",
+      "sending": "Sending..."
+    },
+    "placeholders": {
+      "firstName": "",
+      "lastName": "",
+      "company": "",
+      "phone": "",
+      "address": "",
+      "addressLine2": "",
+      "city": "",
+      "postalCode": ""
+    },
+    "provinceOptions": [
+      { "label": "Alberta", "value": "AB" },
+      { "label": "British Columbia", "value": "BC" },
+      { "label": "Manitoba", "value": "MB" },
+      { "label": "New Brunswick", "value": "NB" },
+      { "label": "Newfoundland and Labrador", "value": "NL" },
+      { "label": "Northwest Territories", "value": "NT" },
+      { "label": "Nova Scotia", "value": "NS" },
+      { "label": "Nunavut", "value": "NU" },
+      { "label": "Ontario", "value": "ON" },
+      { "label": "Prince Edward Island", "value": "PE" },
+      { "label": "Quebec", "value": "QC" },
+      { "label": "Saskatchewan", "value": "SK" },
+      { "label": "Yukon", "value": "YT" }
+    ]
+  },
+  "fr": {
+    "labels": {
+      "manageAddress": "Gérer l'adresse",
+      "contactInformation": "Coordonnées",
+      "address": "Adresse",
+      "firstName": "Prénom",
+      "lastName": "Nom de famille",
+      "company": "Entreprise",
+      "phoneNumber": "Numéro de téléphone",
+      "phoneNumberHelp": "Veuillez entrer un numéro de téléphone valide. Par ex. (207)973-7823, (207) 973-7823, 2079737823.",
+      "addressLine2": "Ligne d'adresse 2",
+      "city": "Ville",
+      "province": "Province",
+      "postalCode": "Code postal",
+      "provincePlaceholder": "Veuillez sélectionner une région, un état ou une province",
+      "defaultBilling": "Utiliser comme adresse de facturation par défaut",
+      "defaultShipping": "Utiliser comme adresse de livraison par défaut",
+      "saveAddress": "Enregistrer l'adresse",
+      "cancel": "Annuler",
+      "sending": "Envoi en cours..."
+    },
+    "placeholders": {
+      "firstName": "",
+      "lastName": "",
+      "company": "",
+      "phone": "",
+      "address": "",
+      "addressLine2": "",
+      "city": "",
+      "postalCode": ""
+    },
+    "provinceOptions": [
+      { "label": "Alberta", "value": "AB" },
+      { "label": "Colombie-Britannique", "value": "BC" },
+      { "label": "Manitoba", "value": "MB" },
+      { "label": "Nouveau-Brunswick", "value": "NB" },
+      { "label": "Terre-Neuve-et-Labrador", "value": "NL" },
+      { "label": "Territoires du Nord-Ouest", "value": "NT" },
+      { "label": "Nouvelle-Écosse", "value": "NS" },
+      { "label": "Nunavut", "value": "NU" },
+      { "label": "Ontario", "value": "ON" },
+      { "label": "Île-du-Prince-Édouard", "value": "PE" },
+      { "label": "Québec", "value": "QC" },
+      { "label": "Saskatchewan", "value": "SK" },
+      { "label": "Yukon", "value": "YT" }
+    ]
+  },
+  "es": {
+    "labels": {
+      "manageAddress": "Gestionar dirección",
+      "contactInformation": "Información de contacto",
+      "address": "Dirección",
+      "firstName": "Nombre",
+      "lastName": "Apellido",
+      "company": "Empresa",
+      "phoneNumber": "Número de teléfono",
+      "phoneNumberHelp": "Ingrese un número de teléfono válido. Por ejemplo (207)973-7823, (207) 973-7823, 2079737823.",
+      "addressLine2": "Línea de dirección 2",
+      "city": "Ciudad",
+      "province": "Provincia",
+      "postalCode": "Código postal",
+      "provincePlaceholder": "Seleccione una región, estado o provincia",
+      "defaultBilling": "Usar como dirección de facturación predeterminada",
+      "defaultShipping": "Usar como dirección de envío predeterminada",
+      "saveAddress": "Guardar dirección",
+      "cancel": "Cancelar",
+      "sending": "Enviando..."
+    },
+    "placeholders": {
+      "firstName": "",
+      "lastName": "",
+      "company": "",
+      "phone": "",
+      "address": "",
+      "addressLine2": "",
+      "city": "",
+      "postalCode": ""
+    },
+    "provinceOptions": [
+      { "label": "Alberta", "value": "AB" },
+      { "label": "Columbia Británica", "value": "BC" },
+      { "label": "Manitoba", "value": "MB" },
+      { "label": "Nuevo Brunswick", "value": "NB" },
+      { "label": "Terranova y Labrador", "value": "NL" },
+      { "label": "Territorios del Noroeste", "value": "NT" },
+      { "label": "Nueva Escocia", "value": "NS" },
+      { "label": "Nunavut", "value": "NU" },
+      { "label": "Ontario", "value": "ON" },
+      { "label": "Isla del Príncipe Eduardo", "value": "PE" },
+      { "label": "Quebec", "value": "QC" },
+      { "label": "Saskatchewan", "value": "SK" },
+      { "label": "Yukón", "value": "YT" }
+    ]
+  }
+}

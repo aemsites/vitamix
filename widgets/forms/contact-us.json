@@ -1,0 +1,116 @@
+{
+  "en": {
+    "labels": {
+      "select": "Select",
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "emailAddress": "Email Address",
+      "typeOfRequest": "Type of request",
+      "domestic": "Domestic",
+      "commercial": "Commercial",
+      "reasonForCommunication": "Reason for communication",
+      "submit": "Submit",
+      "sending": "Sending..."
+    },
+    "placeholders": {
+      "firstName": "",
+      "lastName": "",
+      "emailAddress": ""
+    },
+    "reasonOptions": [
+      { "label": "Check the status of my order", "value": "order-status" },
+      { "label": "Where to get a Vitamix product", "value": "where-to-buy" },
+      { "label": "Get help with warranty registration", "value": "warranty-registration" },
+      { "label": "Get help choosing the Vitamix product that best suits my business", "value": "business-product-help" },
+      { "label": "Request a brochure", "value": "request-brochure" },
+      { "label": "Get help with recipes", "value": "recipe-help" },
+      { "label": "Know when my order will be shipped", "value": "shipment-date" },
+      { "label": "Request my order tracking number", "value": "tracking-number" },
+      { "label": "Learn more about the exchange program", "value": "exchange-program" },
+      { "label": "Ask a technical question", "value": "technical-question" },
+      { "label": "Find a store or live demonstration", "value": "find-store-demo" },
+      { "label": "Resolve a product-related issue", "value": "product-issue" },
+      { "label": "Get help comparing Vitamix appliances and sets", "value": "compare-products" },
+      { "label": "Become a retailer", "value": "become-retailer" },
+      { "label": "Request help to buy directly from Vitamix", "value": "buy-direct" },
+      { "label": "Product discount program", "value": "discount-program" },
+      { "label": "General inquiry", "value": "general-inquiry" }
+    ]
+  },
+  "fr": {
+    "labels": {
+      "select": "Sélectionner",
+      "firstName": "Prénom",
+      "lastName": "Nom de famille",
+      "emailAddress": "Adresse courriel",
+      "typeOfRequest": "Type de demande",
+      "domestic": "Domestique",
+      "commercial": "Commercial",
+      "reasonForCommunication": "Raison de la communication",
+      "submit": "Soumettre",
+      "sending": "Envoi en cours..."
+    },
+    "placeholders": {
+      "firstName": "",
+      "lastName": "",
+      "emailAddress": ""
+    },
+    "reasonOptions": [
+      { "label": "Vérifier le statut de ma commande", "value": "order-status" },
+      { "label": "Où acheter un produit Vitamix", "value": "where-to-buy" },
+      { "label": "Aide pour l'enregistrement de la garantie", "value": "warranty-registration" },
+      { "label": "Choisir le produit Vitamix qui convient à mon entreprise", "value": "business-product-help" },
+      { "label": "Demander une brochure", "value": "request-brochure" },
+      { "label": "Aide avec les recettes", "value": "recipe-help" },
+      { "label": "Date d'expédition de ma commande", "value": "shipment-date" },
+      { "label": "Numéro de suivi de ma commande", "value": "tracking-number" },
+      { "label": "En savoir plus sur le programme d'échange", "value": "exchange-program" },
+      { "label": "Question technique", "value": "technical-question" },
+      { "label": "Trouver un magasin ou une démonstration", "value": "find-store-demo" },
+      { "label": "Résoudre un problème lié au produit", "value": "product-issue" },
+      { "label": "Comparer les appareils et ensembles Vitamix", "value": "compare-products" },
+      { "label": "Devenir détaillant", "value": "become-retailer" },
+      { "label": "Acheter directement chez Vitamix", "value": "buy-direct" },
+      { "label": "Programme de rabais sur les produits", "value": "discount-program" },
+      { "label": "Demande générale", "value": "general-inquiry" }
+    ]
+  },
+  "es": {
+    "labels": {
+      "select": "Seleccionar",
+      "firstName": "Nombre",
+      "lastName": "Apellido",
+      "emailAddress": "Correo electrónico",
+      "typeOfRequest": "Tipo de solicitud",
+      "domestic": "Doméstico",
+      "commercial": "Comercial",
+      "reasonForCommunication": "Motivo de la comunicación",
+      "submit": "Enviar",
+      "sending": "Enviando..."
+    },
+    "placeholders": {
+      "firstName": "",
+      "lastName": "",
+      "emailAddress": ""
+    },
+    "reasonOptions": [
+      { "label": "Consultar el estado de mi pedido", "value": "order-status" },
+      { "label": "Dónde comprar un producto Vitamix", "value": "where-to-buy" },
+      { "label": "Ayuda con el registro de garantía", "value": "warranty-registration" },
+      { "label": "Elegir el producto Vitamix adecuado para mi negocio", "value": "business-product-help" },
+      { "label": "Solicitar un folleto", "value": "request-brochure" },
+      { "label": "Ayuda con recetas", "value": "recipe-help" },
+      { "label": "Cuándo se enviará mi pedido", "value": "shipment-date" },
+      { "label": "Número de seguimiento de mi pedido", "value": "tracking-number" },
+      { "label": "Más información sobre el programa de intercambio", "value": "exchange-program" },
+      { "label": "Pregunta técnica", "value": "technical-question" },
+      { "label": "Buscar una tienda o demostración", "value": "find-store-demo" },
+      { "label": "Resolver un problema con el producto", "value": "product-issue" },
+      { "label": "Comparar aparatos y conjuntos Vitamix", "value": "compare-products" },
+      { "label": "Ser minorista", "value": "become-retailer" },
+      { "label": "Comprar directamente a Vitamix", "value": "buy-direct" },
+      { "label": "Programa de descuento en productos", "value": "discount-program" },
+      { "label": "Consulta general", "value": "general-inquiry" }
+    ]
+  }
+}
