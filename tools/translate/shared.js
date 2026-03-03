@@ -346,11 +346,11 @@ const removeDnt = (html) => {
 };
 
 const adjustURLs = (html, context) => {
-  const { path } = context;
+  const { sourcePath } = context;
   // test if path starts with /<lang>/<locale>.
   const pathPrefixRegex = /^\/?[a-z]{2}\/[a-z]{2}[-_][a-z]{2}(?=\/|$)/;
-  const isLocalPath = pathPrefixRegex.test(path);
-  const pathSegments = path.replace(/^\/+/, '').split('/');
+  const isLocalPath = pathPrefixRegex.test(sourcePath);
+  const pathSegments = sourcePath.replace(/^\/+/, '').split('/');
   const basePrefix = pathSegments.length >= 2 ? `/${pathSegments[0]}/${pathSegments[1]}` : '';
   if (isLocalPath && basePrefix) {
     html.querySelectorAll('a[href]').forEach((element) => {
@@ -429,5 +429,5 @@ const translate = async (htmlInput, language, context, format, daFetch, skipPrep
 };
 
 export {
-  adjustURLs, postProcess, preprocess, translate, EDITOR_FORMAT, ADMIN_FORMAT, ADMIN_URL,
+  preprocess, translate, EDITOR_FORMAT, ADMIN_FORMAT, ADMIN_URL,
 };

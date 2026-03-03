@@ -783,6 +783,7 @@ export async function bulkSyncWithDA() {
       const processPage = async (root, translateLocale) => {
         let html = htmlContent;
         if (translateLocale) {
+          context.sourcePath = `/${root}/recipes/${filename}`;
           // eslint-disable-next-line max-len
           html = await translate(htmlContent, translateLocale, context, undefined, daFetch);
         }
