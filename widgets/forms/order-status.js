@@ -28,7 +28,7 @@ export default async function decorate(widget) {
   const resultEl = widget.querySelector('.order-status-result');
   if (!form || !resultEl) return;
 
-  const { locale, language } = getLocaleAndLanguage();
+  const { language } = getLocaleAndLanguage();
   const lang = (language || 'en_us').split('_')[0];
   const copy = await loadFormCopy(lang);
   const labels = copy.labels || {};

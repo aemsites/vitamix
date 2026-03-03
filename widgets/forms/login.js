@@ -30,7 +30,7 @@ export default async function decorate(widget) {
   const verifyEl = widget.querySelector('.login-verify');
   if (!form || !verifyEl) return;
 
-  const { locale, language } = getLocaleAndLanguage();
+  const { language } = getLocaleAndLanguage();
   const lang = (language || 'en_us').split('_')[0];
   const copy = await loadFormCopy(lang);
   const labels = copy.labels || {};

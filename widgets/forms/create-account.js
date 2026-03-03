@@ -64,7 +64,9 @@ export default async function decorate(widget) {
   if (lastNameInput) lastNameInput.placeholder = placeholders.lastName ?? '';
   if (emailInput) emailInput.placeholder = placeholders.emailAddress ?? '';
   if (confirmEmailInput) confirmEmailInput.placeholder = placeholders.confirmEmailAddress ?? '';
-  if (postalCodeInput && placeholders.postalCode) postalCodeInput.placeholder = placeholders.postalCode;
+  if (postalCodeInput && placeholders.postalCode) {
+    postalCodeInput.placeholder = placeholders.postalCode;
+  }
 
   const submitBtn = form.querySelector('button[type="submit"]');
   if (submitBtn) submitBtn.textContent = labels.createAccount ?? 'Create account';

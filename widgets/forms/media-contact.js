@@ -62,8 +62,12 @@ export default async function decorate(widget) {
 
   const businessLineSelect = form.querySelector('#media-contact-business-line');
   const reasonSelect = form.querySelector('#media-contact-reason');
-  if (businessLineSelect?.firstElementChild) businessLineSelect.firstElementChild.textContent = selectOption;
-  if (reasonSelect?.firstElementChild) reasonSelect.firstElementChild.textContent = selectOption;
+  if (businessLineSelect?.firstElementChild) {
+    businessLineSelect.firstElementChild.textContent = selectOption;
+  }
+  if (reasonSelect?.firstElementChild) {
+    reasonSelect.firstElementChild.textContent = selectOption;
+  }
   setSelectOptions(businessLineSelect, businessLineOptions);
   setSelectOptions(reasonSelect, reasonForContactOptions);
 

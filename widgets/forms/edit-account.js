@@ -72,7 +72,9 @@ export default async function decorate(widget) {
   if (firstNameInput && placeholders.firstName) firstNameInput.placeholder = placeholders.firstName;
   if (lastNameInput && placeholders.lastName) lastNameInput.placeholder = placeholders.lastName;
   if (emailInput && placeholders.emailAddress) emailInput.placeholder = placeholders.emailAddress;
-  if (postalCodeInput && placeholders.postalCode) postalCodeInput.placeholder = placeholders.postalCode;
+  if (postalCodeInput && placeholders.postalCode) {
+    postalCodeInput.placeholder = placeholders.postalCode;
+  }
 
   const submitBtn = form.querySelector('button[type="submit"]');
   if (submitBtn) submitBtn.textContent = labels.saveChanges ?? 'Save changes';
