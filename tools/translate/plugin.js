@@ -46,6 +46,7 @@ import { preprocess, translate, EDITOR_FORMAT } from './shared.js';
       errorMessage.style.display = 'none';
     }
     let translation = '';
+    context.sourcePath = context.path;
     try {
       translation = await translate(
         inputTextarea.value,
