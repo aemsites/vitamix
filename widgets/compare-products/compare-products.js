@@ -88,9 +88,8 @@ function t(key) {
   return comparisonTranslations[key] ?? key;
 }
 
-/** SVG path for checkmark icon in comparison table */
-const CHECK_ICON_PATH = 'M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293'
-  + 'a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z';
+/** Path to checkmark icon SVG (comparison table). */
+const CHECK_ICON_SVG = '/widgets/compare-products/icon-check.svg';
 
 /**
  * Get features-by-product config path for current locale.
@@ -837,9 +836,7 @@ function replaceColumnWithProduct(
         const featuresRow = getFeaturesRowByPath(featuresByProduct, product.path);
         const value = getFeatureDisplayFromRow(featuresRow, featureKey);
         if (value === 'Yes') {
-          const checkHtml = '<p><span class="icon icon-check"><svg xmlns="http://www.w3.org/2000/svg" '
-            + `viewBox="0 0 20 20" fill="currentColor" width="20" height="20"><title>${t('Check')}</title>`
-            + `<path fill-rule="evenodd" d="${CHECK_ICON_PATH}" clip-rule="evenodd"></path></svg></span></p>`;
+          const checkHtml = `<p><span class="icon icon-check"><img src="${CHECK_ICON_SVG}" width="20" height="20" alt="${t('Check')}"></span></p>`;
           cell.innerHTML = checkHtml;
         } else {
           cell.textContent = value || '—';
