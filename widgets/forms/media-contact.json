@@ -1,0 +1,101 @@
+{
+  "en": {
+    "labels": {
+      "businessLine": "Business Line",
+      "publicationCompanyOptional": "Publication / Company (Optional)",
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "emailAddress": "Email Address",
+      "phoneNumber": "Phone Number",
+      "reasonForContact": "Reason for Contact",
+      "additionalCommentsOptional": "Additional Comments (Optional)",
+      "submit": "Submit",
+      "sending": "Sending..."
+    },
+    "placeholders": {
+      "publicationCompany": "",
+      "firstName": "",
+      "lastName": "",
+      "emailAddress": "",
+      "phoneNumber": "",
+      "additionalComments": ""
+    },
+    "selectOption": "Select an option",
+    "businessLineOptions": [
+      { "label": "Domestic", "value": "domestic" },
+      { "label": "Commercial", "value": "commercial" }
+    ],
+    "reasonForContactOptions": [
+      { "label": "Product inquiry", "value": "product-inquiry" },
+      { "label": "Media request", "value": "media-request" },
+      { "label": "Partnership", "value": "partnership" },
+      { "label": "Other", "value": "other" }
+    ]
+  },
+  "fr": {
+    "labels": {
+      "businessLine": "Secteur d'activité",
+      "publicationCompanyOptional": "Publication / Entreprise (optionnel)",
+      "firstName": "Prénom",
+      "lastName": "Nom de famille",
+      "emailAddress": "Adresse courriel",
+      "phoneNumber": "Numéro de téléphone",
+      "reasonForContact": "Raison du contact",
+      "additionalCommentsOptional": "Commentaires additionnels (optionnel)",
+      "submit": "Soumettre",
+      "sending": "Envoi en cours..."
+    },
+    "placeholders": {
+      "publicationCompany": "",
+      "firstName": "",
+      "lastName": "",
+      "emailAddress": "",
+      "phoneNumber": "",
+      "additionalComments": ""
+    },
+    "selectOption": "Sélectionner une option",
+    "businessLineOptions": [
+      { "label": "Domestique", "value": "domestic" },
+      { "label": "Commercial", "value": "commercial" }
+    ],
+    "reasonForContactOptions": [
+      { "label": "Demande produit", "value": "product-inquiry" },
+      { "label": "Demande médias", "value": "media-request" },
+      { "label": "Partenariat", "value": "partnership" },
+      { "label": "Autre", "value": "other" }
+    ]
+  },
+  "es": {
+    "labels": {
+      "businessLine": "Línea de negocio",
+      "publicationCompanyOptional": "Publicación / Empresa (opcional)",
+      "firstName": "Nombre",
+      "lastName": "Apellido",
+      "emailAddress": "Correo electrónico",
+      "phoneNumber": "Número de teléfono",
+      "reasonForContact": "Motivo del contacto",
+      "additionalCommentsOptional": "Comentarios adicionales (opcional)",
+      "submit": "Enviar",
+      "sending": "Enviando..."
+    },
+    "placeholders": {
+      "publicationCompany": "",
+      "firstName": "",
+      "lastName": "",
+      "emailAddress": "",
+      "phoneNumber": "",
+      "additionalComments": ""
+    },
+    "selectOption": "Seleccionar una opción",
+    "businessLineOptions": [
+      { "label": "Doméstico", "value": "domestic" },
+      { "label": "Comercial", "value": "commercial" }
+    ],
+    "reasonForContactOptions": [
+      { "label": "Consulta sobre producto", "value": "product-inquiry" },
+      { "label": "Solicitud de medios", "value": "media-request" },
+      { "label": "Asociación", "value": "partnership" },
+      { "label": "Otro", "value": "other" }
+    ]
+  }
+}

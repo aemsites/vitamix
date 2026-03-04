@@ -1,0 +1,57 @@
+<form class="media-contact-form" method="post" action="" aria-label="Media contact">
+  <div class="media-contact-field">
+    <label for="media-contact-business-line">
+      <span class="label-text">Business Line</span><span class="required" aria-hidden="true">*</span>
+    </label>
+    <select id="media-contact-business-line" name="businessLine" required aria-required="true">
+      <option value="">Select an option</option>
+    </select>
+  </div>
+  <div class="media-contact-field">
+    <label for="media-contact-publication-company">
+      <span class="label-text">Publication / Company (Optional)</span>
+    </label>
+    <input id="media-contact-publication-company" type="text" name="publicationCompany" placeholder="" autocomplete="organization">
+  </div>
+  <div class="media-contact-field">
+    <label for="media-contact-first-name">
+      <span class="label-text">First Name</span><span class="required" aria-hidden="true">*</span>
+    </label>
+    <input id="media-contact-first-name" type="text" name="firstName" required aria-required="true" placeholder="" autocomplete="given-name">
+  </div>
+  <div class="media-contact-field">
+    <label for="media-contact-last-name">
+      <span class="label-text">Last Name</span><span class="required" aria-hidden="true">*</span>
+    </label>
+    <input id="media-contact-last-name" type="text" name="lastName" required aria-required="true" placeholder="" autocomplete="family-name">
+  </div>
+  <div class="media-contact-field">
+    <label for="media-contact-email">
+      <span class="label-text">Email Address</span><span class="required" aria-hidden="true">*</span>
+    </label>
+    <input id="media-contact-email" type="email" name="email" required aria-required="true" placeholder="" autocomplete="email">
+  </div>
+  <div class="media-contact-field">
+    <label for="media-contact-phone">
+      <span class="label-text">Phone Number</span><span class="required" aria-hidden="true">*</span>
+    </label>
+    <input id="media-contact-phone" type="tel" name="phone" required aria-required="true" placeholder="" autocomplete="tel">
+  </div>
+  <div class="media-contact-field">
+    <label for="media-contact-reason">
+      <span class="label-text">Reason for Contact</span><span class="required" aria-hidden="true">*</span>
+    </label>
+    <select id="media-contact-reason" name="reasonForContact" required aria-required="true">
+      <option value="">Select an option</option>
+    </select>
+  </div>
+  <div class="media-contact-field">
+    <label for="media-contact-comments">
+      <span class="label-text">Additional Comments (Optional)</span>
+    </label>
+    <textarea id="media-contact-comments" name="additionalComments" rows="5" placeholder=""></textarea>
+  </div>
+  <div class="media-contact-actions">
+    <button type="submit" class="button emphasis">Submit</button>
+  </div>
+</form>

@@ -1,0 +1,20 @@
+{
+  "en": {
+    "labels": {
+      "search": "Search",
+      "go": "Go"
+    }
+  },
+  "fr": {
+    "labels": {
+      "search": "Rechercher",
+      "go": "Aller"
+    }
+  },
+  "es": {
+    "labels": {
+      "search": "Buscar",
+      "go": "Ir"
+    }
+  }
+}
