@@ -10,6 +10,9 @@ const LOCALES = [{
 }, {
   root: 'ca/fr_ca',
   translateLocale: 'fr-CA',
+}, {
+  root: 'mx/es_mx',
+  translateLocale: 'es-MX',
 }];
 
 const { context, token, actions } = await DA_SDK;
