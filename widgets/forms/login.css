@@ -92,9 +92,9 @@
 }
 
 .forms-login .login-verify-input:focus {
-  outline: 2px solid var(--color-link, #0066cc);
+  outline: 2px solid var(--color-link, #06c);
   outline-offset: 2px;
-  border-color: var(--color-link, #0066cc);
+  border-color: var(--color-link, #06c);
 }
 
 .forms-login .login-verify-didnt-receive {

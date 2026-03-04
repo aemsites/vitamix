@@ -30,7 +30,7 @@
   gap: var(--spacing-300);
 }
 
-@media (max-width: 699px) {
+@media (width <= 699px) {
   .forms-manage-address .manage-address-columns {
     grid-template-columns: 1fr;
   }
@@ -109,7 +109,7 @@
 .forms-manage-address .manage-address-cancel.link-style {
   background: none;
   border: none;
-  color: var(--color-link, #0066cc);
+  color: var(--color-link, #06c);
   text-decoration: underline;
   padding: 0;
   font: inherit;
