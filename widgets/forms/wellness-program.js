@@ -88,7 +88,7 @@ export default async function decorate(widget) {
         body: JSON.stringify(payload),
       });
       if (!resp.ok) {
-        throw new Error(`Sheet logger responded with ${resp.status}`);
+        throw new Error(`Forms API submission failed with ${resp.status}`);
       }
       const thankYouPath = `/${locale}/${language}/wellness-program-thankyou`;
       window.location.href = thankYouPath;
