@@ -49,26 +49,19 @@ const HELPERS = {
 const ICONS_RULE = {
   description: 'Icon names should be not translated',
   apply: (html) => {
-    const ps = html.querySelectorAll('p');
-    ps.forEach((p) => {
-      // ignore p if one parent has a translate="no" attribute
-      if (p.closest('[translate="no"]')) {
-        return;
-      }
-      const text = p.textContent;
-      const regex = /:([a-zA-Z0-9-_]+):/g;
-      const matches = text.match(regex);
+    const text = html.body.textContent;
+    const regex = /:([a-zA-Z0-9-_]+):/g;
+    const matches = text.match(regex);
 
-      if (matches) {
-        matches.forEach((match) => {
-          // ignore if only digits (could be a timestamp)
-          if (/^:[\d:]+:$/i.test(match)) {
-            return;
-          }
-          p.innerHTML = p.innerHTML.replace(match, `<span translate="no">${match}</span>`);
-        });
-      }
-    });
+    if (matches) {
+      matches.forEach((match) => {
+        // ignore if only digits (could be a timestamp)
+        if (/^:[\d:]+:$/i.test(match)) {
+          return;
+        }
+        html.body.innerHTML = html.body.innerHTML.replace(match, `<span translate="no">${match}</span>`);
+      });
+    }
     return html;
   },
 };
@@ -93,6 +86,9 @@ const CONTENT_DNT_RULE = {
     return html;
   },
 };
+
+/** Rules applied once in all cases (editor and admin format). */
+const GENERIC_RULES = [ICONS_RULE, CONTENT_DNT_RULE];
 
 const RULES = {
   [EDITOR_FORMAT]: [{
@@ -150,7 +146,7 @@ const RULES = {
       });
       return html;
     },
-  }, ICONS_RULE, CONTENT_DNT_RULE],
+  }],
   [ADMIN_FORMAT]: [{
     description: 'First column of all rows in "metadata" block should be not translated',
     apply: (html, config) => {
@@ -185,7 +181,7 @@ const RULES = {
       });
       return html;
     },
-  }, ICONS_RULE, CONTENT_DNT_RULE],
+  }],
 };
 
 const FORMAT_RULES = {
@@ -281,6 +277,13 @@ const getConfig = async (context, daFetch) => {
 const addDnt = async (html, format, context, daFetch) => {
   let result = html;
   const config = await getConfig(context, daFetch);
+
+  // Generic rules: applied once in all cases
+  GENERIC_RULES.forEach((rule) => {
+    result = rule.apply(result, config);
+  });
+
+  // Format-specific rules
   let rules;
   if (format) {
     rules = RULES[format];
