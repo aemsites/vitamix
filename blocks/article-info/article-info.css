@@ -1,0 +1,78 @@
+.article-info  {
+  max-width: calc(800px - (2 * var(--horizontal-spacing)));
+  margin: 0 auto;
+  text-align: center;
+}
+
+.article-info p,
+.article-info ul {
+  margin-top: 1em;
+}
+
+.article-info a {
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.article-info a:hover,
+.article-info a:focus-visible {
+  text-decoration: underline;
+}
+
+.article-info .tags {
+  font-size: var(--body-size-s);
+  text-transform: uppercase;
+}
+
+.article-info .tags a {
+  color: var(--color-blue);
+}
+
+.article-info .tags a:hover,
+.article-info .tags a:focus-visible {
+  color: var(--color-link);
+}
+
+.article-info .byline {
+  font-size: var(--body-size-m);
+}
+
+.article-info .byline span + span::before {
+  content: '|';
+  margin: 0 0.5ch;
+}
+
+.article-info ul.share {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  gap: var(--spacing-xs);
+}
+
+.article-info ul.share button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  padding: 0;
+  background-color: var(--color-charcoal);
+  color: var(--color-white);
+  line-height: 0;
+  transition: background-color 0.2s;
+  cursor: pointer;
+}
+
+.article-info ul.share button:hover,
+.article-info ul.share button:focus-visible {
+  background-color: var(--color-link);
+}
+
+.article-info ul.share button .icon img,
+.article-info ul.share button .icon svg {
+  width: 28px;
+  height: 28px;
+}

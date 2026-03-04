@@ -18,7 +18,11 @@ export default async function decorate(block) {
   footer.id = 'footer';
   while (fragment.firstElementChild) footer.append(fragment.firstElementChild);
 
-  const classes = ['form', 'social', 'links', 'copyright'];
+  const classes = ['ribbon', 'form', 'social', 'links', 'copyright'];
+  const children = footer.children.length;
+  // legacy footer
+  if (children < 5) classes.splice(0, 1); // remove ribbon
+  else footer.classList.add('ribbon');
   classes.forEach((c, i) => {
     const section = footer.children[i];
     if (section) {
@@ -26,6 +30,21 @@ export default async function decorate(block) {
       section.classList.add(`footer-${c}`);
     }
   });
+
+  // decorate ribbon
+  const ribbon = footer.querySelector('.footer-ribbon');
+  if (ribbon) {
+    ribbon.querySelectorAll('ul > li').forEach((li) => {
+      const icon = li.querySelector('.icon');
+      if (icon) {
+        const content = document.createElement('div');
+        [...li.childNodes].forEach((node) => {
+          if (node !== icon) content.append(node);
+        });
+        li.append(content);
+      }
+    });
+  }
 
   // decorate social
   const social = footer.querySelector('.footer-social');

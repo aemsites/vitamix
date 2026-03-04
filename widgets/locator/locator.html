@@ -1,0 +1,73 @@
+<div class="section banner dark form-container" data-background>
+  <picture class="section-background-image">
+    <img loading="eager" alt="" src="/widgets/locator/locator.jpeg">
+  </picture>
+
+  <div class="default-content-wrapper">
+    <h1 id="find-locally">Find Locally</h1>
+  </div>
+  <div class="form-wrapper">
+    <div class="form">
+      <form>
+        <div class="form-field text-field" data-name="location">
+          <label for="location">Your Location</label>
+          <input
+            type="text" id="address" name="address" placeholder="Address, City, or Zipcode" required>
+        </div>
+        <div class="form-field select-field" data-name="productType">
+          <label for="productType">What are you looking for?</label>
+            <select id="productType" name="productType">
+              <option value="HH" selected>Household Products</option>
+              <option value="COMM">Commercial Products</option>
+              <option value="EVENTS">Demonstrations</option>
+            </select>
+          </div>
+        <div class="button-wrapper">
+          <button class="button ghost" type="submit">Search</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<div class="section">
+  <div class="locator-results-wrapper">
+    <!-- Household -->
+    <div class="locator-results locator-hh-results" aria-hidden="true">
+      <div class="locator-results-tablist" role="tablist">
+        <button role="tab" aria-selected="true" aria-controls="locator-hh-retailers-tabpanel" id="locator-hh-retailers-tab" class="locator-retailers">Retailers</button>
+        <button role="tab" aria-selected="false" aria-controls="locator-hh-online-tabpanel" id="locator-hh-online-tab" class="locator-online">Online Retailers</button>
+        <button role="tab" aria-selected="false" aria-controls="locator-hh-distributors-tabpanel" id="locator-hh-distributors-tab" class="locator-distributors">Distributors</button>
+      </div>
+      <div class="locator-tabpanels">
+        <div class="locator-tabpanel locator-retailers" role="tabpanel" aria-labelledby="locator-hh-retailers-tab" aria-hidden="false" id="locator-hh-retailers-tabpanel"></div>
+        <div class="locator-tabpanel locator-online" role="tabpanel" aria-labelledby="locator-hh-online-tab" aria-hidden="true" id="locator-hh-online-tabpanel"></div>
+        <div class="locator-tabpanel locator-distributors" role="tabpanel" aria-labelledby="locator-hh-distributors-tab" aria-hidden="true" id="locator-hh-distributors-tabpanel"></div>
+      </div>
+    </div>
+
+    <!-- Commercial -->
+    <div class="locator-results locator-comm-results" aria-hidden="true">
+      <div class="locator-results-tablist" role="tablist">
+        <button role="tab" aria-selected="true" aria-controls="locator-comm-distributors-tabpanel" id="locator-comm-distributors-tab" class="locator-distributors">Distributors</button>
+        <button role="tab" aria-selected="false" aria-controls="locator-comm-localrep-tabpanel" id="locator-comm-localrep-tab" class="locator-online">Local Representatives</button>
+      </div>
+      <div class="locator-tabpanels">
+        <div class="locator-tabpanel locator-distributors" role="tabpanel" aria-labelledby="locator-comm-distributors-tab" id="locator-comm-distributors-tabpanel"></div>
+        <div class="locator-tabpanel locator-online" role="tabpanel" aria-labelledby="locator-comm-localrep-tab" aria-hidden="true" id="locator-comm-localrep-tabpanel"></div>
+      </div>
+    </div>
+
+    <!-- Events -->
+    <div class="locator-results locator-events-results" aria-hidden="true">
+      <div class="locator-results-tablist" role="tablist">
+        <button role="tab" aria-selected="true" aria-controls="locator-events-hh-tabpanel" id="locator-events-hh-tab" class="locator-events">Household Events</button>
+        <button role="tab" aria-selected="false" aria-controls="locator-events-comm-tabpanel" id="locator-events-comm-tab" class="locator-events">Commercial Events</button>
+      </div>
+      <div class="locator-tabpanels">
+        <div class="locator-tabpanel locator-events" role="tabpanel" aria-labelledby="locator-events-hh-tab" id="locator-events-hh-tabpanel"></div>
+        <div class="locator-tabpanel locator-events" role="tabpanel" aria-labelledby="locator-events-comm-tab" aria-hidden="true" id="locator-events-comm-tabpanel"></div>
+      </div>
+    </div>
+
+  </div>  
+</div>

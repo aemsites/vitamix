@@ -9,7 +9,7 @@ import {
   loadBlock,
 } from '../../scripts/aem.js';
 
-import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { getLocaleAndLanguage, formatPrice } from '../../scripts/scripts.js';
 
 /**
  * Constructs a localized product URL path.
@@ -68,11 +68,19 @@ function parseData(data, locale, language) {
  * @returns {Promise<Array<Object>>} Array of filtered parent product objects (with nested variants)
  */
 export async function lookupProducts(config, facets = {}) {
-  const { locale, language } = await getLocaleAndLanguage();
+  const { locale, language } = getLocaleAndLanguage();
+  const corsProxyFetch = async (url) => {
+    const corsProxy = 'https://fcors.org/?url=';
+    const corsKey = '&key=Mg23N96GgR8O3NjU';
+    const fullUrl = `https://main--vitamix--aemsites.aem.network${url}`;
+    return fetch(`${corsProxy}${encodeURIComponent(fullUrl)}${corsKey}`);
+  };
 
   if (!window.productIndex) {
     // fetch the main product index
-    const resp = await fetch(`/${locale}/${language}/products/index.json?include=all`);
+    const isProd = window.location.hostname.includes('vitamix.com') || window.location.hostname.includes('.aem.network');
+    const pathname = `/${locale}/${language}/products/index.json?include=all`;
+    const resp = await (isProd ? fetch(pathname) : corsProxyFetch(pathname));
     const { data } = await resp.json();
 
     // separate products into parents (standalone products) and variants (color/style options)
@@ -267,10 +275,10 @@ function createProductTitle(product, h = 'h4') {
  * @param {Object} product - Product data object
  * @returns {HTMLParagraphElement} Product price element
  */
-function createProductPrice(product) {
+function createProductPrice(product, ph) {
   const price = document.createElement('p');
   price.className = 'plp-price';
-  price.textContent = product.price ? `$${product.price}` : '';
+  price.textContent = product.price ? formatPrice(product.price, ph) : '';
   return price;
 }
 
@@ -280,14 +288,58 @@ function createProductPrice(product) {
  * @returns {HTMLDivElement} Container element with color swatches
  */
 function createProductColors(product) {
+  const COLOR_ORDER = {
+    /* black */
+    black: 1,
+    'shadow-black': 1,
+    1100001: 1,
+    1100002: 1,
+    'black-stainless-metal-finish': 1,
+    /* red */
+    red: 2,
+    'candy-apple': 2,
+    'candy-apple-red': 2,
+    ruby: 2,
+    /* white */
+    white: 3,
+    'polar-white': 3,
+    /* gray */
+    onyx: 4,
+    'abalone-grey': 4,
+    graphite: 4,
+    'nano-gray': 4,
+    'graphite-metal-finish': 4,
+    slate: 4,
+    'pearl-gray': 4,
+    'black-diamond': 4,
+    'brushed-stainless': 4,
+    grey: 4,
+    platinum: 4,
+    /* tan */
+    espresso: 5,
+    'copper-metal-finish': 5,
+    reflection: 5,
+    'brushed-stainless-metal-finish': 5,
+    'brushed-gold': 5,
+    cream: 5,
+  };
+
   const colors = document.createElement('div');
   colors.className = 'plp-colors';
   if (hasVariants(product)) {
-    product.variants.forEach((variant) => {
+    const sortedVariants = [...product.variants].sort((a, b) => {
+      const colorA = COLOR_ORDER[toClassName(a.color)] ?? 9;
+      const colorB = COLOR_ORDER[toClassName(b.color)] ?? 9;
+      return colorA - colorB;
+    });
+
+    sortedVariants.forEach((variant) => {
       const { color, availability } = variant;
       if (color) {
         const colorSwatch = document.createElement('div');
         colorSwatch.className = 'plp-color-swatch';
+        colorSwatch.title = color;
+        colorSwatch.dataset.color = toClassName(color);
         const colorInner = document.createElement('div');
         colorInner.className = 'plp-color-inner';
         colorInner.style.backgroundColor = `var(--color-${toClassName(color)})`;
@@ -330,14 +382,23 @@ function createProductCard(product, ph) {
 
   const image = createProductImage(product);
   const title = createProductTitle(product);
-  const price = createProductPrice(product);
+  const price = createProductPrice(product, ph);
   const colors = createProductColors(product);
   const viewDetails = createProductButton(product, ph, 'View Details', 'emphasis');
   const compare = createProductButton(product, ph, 'Compare');
 
   card.append(image, title, price, colors, viewDetails, compare);
-  card.addEventListener('click', () => {
-    viewDetails.querySelector('a').click();
+  card.addEventListener('click', (e) => {
+    const { target } = e;
+    const color = target.closest('[data-color]');
+    if (color) {
+      const { href } = viewDetails.querySelector('a');
+      const url = new URL(href, window.location.origin);
+      url.searchParams.set('color', color.dataset.color);
+      window.location.href = url.href;
+    } else {
+      viewDetails.querySelector('a').click();
+    }
   });
 
   return card;
@@ -380,29 +441,34 @@ async function styleRowAsSlide(content, ph) {
     body.insertBefore(colors, colorOptions.nextSibling);
   }
 
+  // footer
+  const footer = document.createElement('div');
+  footer.className = 'slide-footer';
+
   // starting at price
   if (product.price) {
     const startingAt = document.createElement('p');
     startingAt.className = 'eyebrow';
     startingAt.textContent = ph.startingAt || 'Starting at';
 
-    const price = createProductPrice(product);
+    const price = createProductPrice(product, ph);
     if (product.regularPrice && product.regularPrice > product.price) {
       const savings = (product.regularPrice - product.price).toFixed(2);
       const saleInfo = document.createElement('span');
-      saleInfo.textContent = `| ${ph.save || 'Save'} $${savings}`;
+      saleInfo.textContent = `| ${ph.save || 'Save'} ${formatPrice(savings, ph)}`;
       const regularPrice = document.createElement('del');
-      regularPrice.textContent = `$${product.regularPrice}`;
+      regularPrice.textContent = formatPrice(product.regularPrice, ph);
       saleInfo.prepend(regularPrice);
       price.append(saleInfo);
     }
 
-    body.append(startingAt, price);
+    footer.append(startingAt, price);
   }
 
   // "Shop Now" button
   const shopNow = createProductButton(product, ph, 'Shop Now');
-  body.append(shopNow);
+  footer.append(shopNow);
+  body.append(footer);
 }
 
 /**
@@ -424,6 +490,21 @@ async function buildProductCarousel(block, ph) {
   block.replaceWith(carousel);
   decorateBlock(carousel);
   await loadBlock(carousel);
+  carousel.addEventListener('click', (e) => {
+    const { target } = e;
+    const slide = target.closest('li.carousel-slide');
+    if (slide) {
+      const link = slide.querySelector('a[href]');
+      const color = target.closest('[data-color]');
+      if (color) {
+        const url = new URL(link.href, window.location.origin);
+        url.searchParams.set('color', color.dataset.color);
+        window.location.href = url.href;
+      } else if (link) {
+        link.click();
+      }
+    }
+  });
 }
 
 /**
@@ -641,7 +722,7 @@ function buildFiltering(block, ph, config) {
 }
 
 export default async function decorate(block) {
-  const { locale, language } = await getLocaleAndLanguage();
+  const { locale, language } = getLocaleAndLanguage();
   const ph = await fetchPlaceholders(`/${locale}/${language}/products/config`);
   const config = readBlockConfig(block);
   const isCarousel = block.classList.contains('carousel');

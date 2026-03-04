@@ -1,0 +1,19 @@
+<script type="module" src="/widgets/search-results/search-results.js"></script>
+<div class="search-results">
+  <form class="controls" aria-label="Search">
+    <div class="search">
+      <input id="fulltext" type="search" aria-label="Search" placeholder="">
+      <button type="submit" class="search-btn" aria-label="Search">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"/>
+        </svg>
+      </button>
+    </div>
+  </form>
+  <div class="type-filters" role="group" aria-label="Filter by type"></div>
+  <div class="info">
+    <p><span class="showing-label"></span> <span id="results-start">1</span>-<span id="results-end">12</span> <span class="of-label"></span> <span id="results-count">0</span></p>
+  </div>
+  <ul class="results"></ul>
+  <nav class="pagination"></nav>
+</div>

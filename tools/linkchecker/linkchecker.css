@@ -1,0 +1,17 @@
+.linkchecker-invalid-link {
+  outline: 3px solid red;
+  outline-offset: 2px;
+  animation: linkchecker-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes linkchecker-pulse {
+  0%, 100% {
+    outline-color: #f00;
+    outline-offset: 2px;
+  }
+
+  50% {
+    outline-color: #f60;
+    outline-offset: 6px;
+  }
+}

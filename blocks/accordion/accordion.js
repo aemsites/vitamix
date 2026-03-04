@@ -30,15 +30,17 @@ function openAccordion(body, details) {
  * @param {HTMLDetailsElement} details - Details wrapper element
  */
 function closeAccordion(body, details) {
+  details.dataset.closing = true;
   body.style.height = `${body.scrollHeight}px`;
   // eslint-disable-next-line no-unused-expressions
   body.offsetHeight; // force reflow
-  body.style.height = '0px';
+  body.style.height = '0';
 
   // cleanup after animation
   const onEnd = (e) => {
     if (e.propertyName !== 'height') return;
     details.open = false;
+    details.removeAttribute('data-closing');
     body.removeEventListener('transitionend', onEnd);
   };
   body.addEventListener('transitionend', onEnd);

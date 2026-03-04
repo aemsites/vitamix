@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Translation plugin</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <link rel="stylesheet" href="./plugin.css">
+    <!-- Project App Logic -->
+    <script src="./plugin.js" type="module"></script>
+  </head>
+  <body>
+    <div class="translate-container">
+      <form class="translate-form">
+        <div class="translate-input">
+          <textarea name="input"></textarea>
+          <select name="language">
+            <option value="en">English</option>
+            <option value="fr-CA" selected>French</option>
+            <option value="es-MX">Spanish</option>
+          </select>
+        </div>
+        <div class="translate-error" aria-live="polite"></div>
+        <button name="translate">Translate</button>
+        <div class="translate-output">
+          <textarea name="output"></textarea>
+        </div>
+        <button name="replace">Replace</button>
+      </form>
+    </div>
+  </body>
+</html>

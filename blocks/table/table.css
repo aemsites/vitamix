@@ -1,0 +1,35 @@
+.table {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.table table {
+  width: 100%;
+  min-width: 900px;
+  border-collapse: collapse;
+}
+
+.table table th,
+.table table td {
+  padding: 0 var(--spacing-s);
+  text-align: left;
+  vertical-align: top;
+}
+
+.table table th {
+  border-bottom: 1px solid;
+  font-weight: normal;
+}
+
+.table.fixed table {
+  table-layout: fixed;
+}
+
+.table.row-headers table th {
+  border-bottom: none;
+  border-right: 1px solid;
+}
+
+.table.striped tbody tr:nth-child(odd) {
+  background-color: var(--color-gray-200);
+}
