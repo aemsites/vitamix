@@ -31,7 +31,7 @@ export default async function decorate(widget) {
   const lang = (language || 'en_us').split('_')[0];
   const copy = await loadFormCopy(lang);
   const labels = copy.labels || {};
-  const placeholders = copy.placeholders || {};
+  const inputHints = copy.inputPlaceholders || {};
 
   form.querySelector('[for="create-account-first-name"] .label-text').textContent = labels.firstName ?? 'First Name';
   form.querySelector('[for="create-account-last-name"] .label-text').textContent = labels.lastName ?? 'Last Name';
@@ -60,12 +60,12 @@ export default async function decorate(widget) {
   const emailInput = form.querySelector('#create-account-email');
   const confirmEmailInput = form.querySelector('#create-account-confirm-email');
   const postalCodeInput = form.querySelector('#create-account-postal-code');
-  if (firstNameInput) firstNameInput.placeholder = placeholders.firstName ?? '';
-  if (lastNameInput) lastNameInput.placeholder = placeholders.lastName ?? '';
-  if (emailInput) emailInput.placeholder = placeholders.emailAddress ?? '';
-  if (confirmEmailInput) confirmEmailInput.placeholder = placeholders.confirmEmailAddress ?? '';
-  if (postalCodeInput && placeholders.postalCode) {
-    postalCodeInput.placeholder = placeholders.postalCode;
+  if (firstNameInput) firstNameInput.placeholder = inputHints.firstName ?? '';
+  if (lastNameInput) lastNameInput.placeholder = inputHints.lastName ?? '';
+  if (emailInput) emailInput.placeholder = inputHints.emailAddress ?? '';
+  if (confirmEmailInput) confirmEmailInput.placeholder = inputHints.confirmEmailAddress ?? '';
+  if (postalCodeInput && inputHints.postalCode) {
+    postalCodeInput.placeholder = inputHints.postalCode;
   }
 
   const submitBtn = form.querySelector('button[type="submit"]');

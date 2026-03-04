@@ -9,7 +9,7 @@
       "didntReceiveCode": "Didn't receive the code?",
       "resendCode": "Resend code"
     },
-    "placeholders": {
+    "inputPlaceholders": {
       "emailAddress": ""
     }
   },
@@ -23,7 +23,7 @@
       "didntReceiveCode": "Vous n'avez pas reçu le code?",
       "resendCode": "Renvoyer le code"
     },
-    "placeholders": {
+    "inputPlaceholders": {
       "emailAddress": ""
     }
   },
@@ -37,7 +37,7 @@
       "didntReceiveCode": "¿No recibió el código?",
       "resendCode": "Reenviar código"
     },
-    "placeholders": {
+    "inputPlaceholders": {
       "emailAddress": ""
     }
   }

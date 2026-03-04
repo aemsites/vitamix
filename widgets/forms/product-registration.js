@@ -46,7 +46,7 @@ export default async function decorate(widget) {
   const lang = (language || 'en_us').split('_')[0];
   const copy = await loadFormCopy(lang);
   const labels = copy.labels || {};
-  const placeholders = copy.placeholders || {};
+  const inputHints = copy.inputPlaceholders || {};
   const purchasedFromOptions = copy.purchasedFromOptions || [];
   const provinceOptions = copy.provinceOptions || [];
 
@@ -59,7 +59,7 @@ export default async function decorate(widget) {
   const hintEl = form.querySelector('#product-registration-serial-number-hint');
   if (hintEl) hintEl.textContent = labels.serialNumberHint ?? '(18 digits)';
   const serialInput = form.querySelector('#product-registration-serial-number');
-  if (serialInput) serialInput.placeholder = placeholders.serialNumber ?? '';
+  if (serialInput) serialInput.placeholder = inputHints.serialNumber ?? '';
 
   const findLink = form.querySelector('.find-serial-link');
   if (findLink) findLink.textContent = labels.findYourSerialNumber ?? 'Find your serial number';
@@ -74,7 +74,7 @@ export default async function decorate(widget) {
   if (purchasedFromLabel) purchasedFromLabel.textContent = labels.purchasedFrom ?? 'Purchased from';
   const purchasedFromSelect = form.querySelector('#product-registration-purchased-from');
   if (purchasedFromSelect?.firstElementChild) {
-    purchasedFromSelect.firstElementChild.textContent = placeholders.selectOption ?? 'Select an option';
+    purchasedFromSelect.firstElementChild.textContent = inputHints.selectOption ?? 'Select an option';
   }
   setSelectOptions(purchasedFromSelect, purchasedFromOptions);
 
@@ -93,7 +93,7 @@ export default async function decorate(widget) {
 
   const provinceSelect = form.querySelector('#product-registration-province');
   if (provinceSelect?.firstElementChild) {
-    provinceSelect.firstElementChild.textContent = placeholders.province ?? 'Choose your province';
+    provinceSelect.firstElementChild.textContent = inputHints.province ?? 'Choose your province';
   }
   setSelectOptions(provinceSelect, provinceOptions);
 
@@ -107,17 +107,17 @@ export default async function decorate(widget) {
     phone: form.querySelector('#product-registration-phone'),
     email: form.querySelector('#product-registration-email'),
   };
-  if (inputs.firstName) inputs.firstName.placeholder = placeholders.firstName ?? '';
-  if (inputs.lastName) inputs.lastName.placeholder = placeholders.lastName ?? '';
-  if (inputs.address) inputs.address.placeholder = placeholders.address ?? '';
-  if (inputs.addressLine2) inputs.addressLine2.placeholder = placeholders.addressLine2 ?? '';
-  if (inputs.city) inputs.city.placeholder = placeholders.city ?? '';
-  if (inputs.postalCode) inputs.postalCode.placeholder = placeholders.postalCode ?? '';
-  if (inputs.phone) inputs.phone.placeholder = placeholders.phone ?? '';
-  if (inputs.email) inputs.email.placeholder = placeholders.email ?? '';
+  if (inputs.firstName) inputs.firstName.placeholder = inputHints.firstName ?? '';
+  if (inputs.lastName) inputs.lastName.placeholder = inputHints.lastName ?? '';
+  if (inputs.address) inputs.address.placeholder = inputHints.address ?? '';
+  if (inputs.addressLine2) inputs.addressLine2.placeholder = inputHints.addressLine2 ?? '';
+  if (inputs.city) inputs.city.placeholder = inputHints.city ?? '';
+  if (inputs.postalCode) inputs.postalCode.placeholder = inputHints.postalCode ?? '';
+  if (inputs.phone) inputs.phone.placeholder = inputHints.phone ?? '';
+  if (inputs.email) inputs.email.placeholder = inputHints.email ?? '';
 
   const purchasedOnInput = form.querySelector('#product-registration-purchased-on');
-  if (purchasedOnInput && placeholders.date) purchasedOnInput.setAttribute('placeholder', placeholders.date);
+  if (purchasedOnInput && inputHints.date) purchasedOnInput.setAttribute('placeholder', inputHints.date);
 
   const marketingCheckboxText = form.querySelector('.product-registration-consent .checkbox-text');
   if (marketingCheckboxText) marketingCheckboxText.textContent = labels.sendNewsPromotionsOptional ?? 'Please send the latest Vitamix news and promotions to my email address. (optional)';

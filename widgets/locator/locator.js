@@ -1,4 +1,20 @@
 import { loadCSS } from '../../scripts/aem.js';
+import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+
+/**
+ * Load widget copy from the widget's local JSON (same name as the script).
+ * @param {string} lang - Language key (e.g. en, fr)
+ * @returns {Promise<Object>} Copy for that language (e.g. { labels: { ... } })
+ */
+async function loadWidgetCopy(lang) {
+  const scriptPath = new URL(import.meta.url).pathname;
+  const jsonPath = scriptPath.replace(/\.js$/, '.json');
+  const url = `${window.hlx?.codeBasePath || ''}${jsonPath}`;
+  const resp = await fetch(url);
+  const data = await resp.json();
+  const key = data[lang] ? lang : 'en';
+  return data[key] || {};
+}
 
 const MAX_DISTANCE = 100;
 
@@ -141,7 +157,7 @@ function findHHResults(data, location, country) {
   return { retailers, distributors, online };
 }
 
-function displayCommResults(results, location) {
+function displayCommResults(results, location, labels = {}) {
   const { distributors, localRep } = results;
 
   const createDistributorResult = (result) => {
@@ -151,7 +167,8 @@ function displayCommResults(results, location) {
     li.append(title);
 
     const distance = document.createElement('span');
-    distance.textContent = `${haversineDistance(location.lat, location.lng, result.lat, result.lng).toFixed(1)} miles away`;
+    const milesAway = (labels.milesAway ?? 'miles away');
+    distance.textContent = `${haversineDistance(location.lat, location.lng, result.lat, result.lng).toFixed(1)} ${milesAway}`;
     distance.classList.add('locator-distance');
     li.append(distance);
 
@@ -200,7 +217,8 @@ function displayCommResults(results, location) {
     li.append(title);
 
     const distance = document.createElement('span');
-    distance.textContent = `${haversineDistance(location.lat, location.lng, result.lat, result.lng).toFixed(1)} miles away`;
+    const milesAway = (labels.milesAway ?? 'miles away');
+    distance.textContent = `${haversineDistance(location.lat, location.lng, result.lat, result.lng).toFixed(1)} ${milesAway}`;
     distance.classList.add('locator-distance');
     li.append(distance);
 
@@ -209,7 +227,7 @@ function displayCommResults(results, location) {
       const phoneWrapper = document.createElement('span');
       phoneWrapper.classList.add('locator-phone');
       const phoneLabel = document.createElement('strong');
-      phoneLabel.textContent = 'Phone: ';
+      phoneLabel.textContent = labels.phone ?? 'Phone: ';
       phoneWrapper.append(phoneLabel);
 
       const phoneLink = document.createElement('a');
@@ -226,7 +244,7 @@ function displayCommResults(results, location) {
       webWrapper.classList.add('locator-web');
 
       const webLabel = document.createElement('strong');
-      webLabel.textContent = 'Website: ';
+      webLabel.textContent = labels.website ?? 'Website: ';
       webWrapper.append(webLabel);
 
       const webLink = document.createElement('a');
@@ -253,7 +271,7 @@ function displayCommResults(results, location) {
     commDistributorsResults.textContent = '';
     commDistributorsResults.appendChild(distributorList);
   } else {
-    commDistributorsResults.innerHTML = '<p>No distributors found</p>';
+    commDistributorsResults.innerHTML = `<p>${labels.noDistributorsFound ?? 'No distributors found'}</p>`;
   }
 
   if (localRep && localRep.length > 0) {
@@ -264,11 +282,11 @@ function displayCommResults(results, location) {
     commLocalrepResults.textContent = '';
     commLocalrepResults.appendChild(localRepList);
   } else {
-    commLocalrepResults.innerHTML = '<p>No local representatives found</p>';
+    commLocalrepResults.innerHTML = `<p>${labels.noLocalRepFound ?? 'No local representatives found'}</p>`;
   }
 }
 
-function displayEventsResults(results, location) {
+function displayEventsResults(results, location, labels = {}) {
   const { hhEvents, commEvents } = results;
   const formatDate = (excelDate) => {
     // Excel dates are the number of days since January 1, 1900
@@ -294,7 +312,8 @@ function displayEventsResults(results, location) {
     li.append(date);
 
     const distance = document.createElement('span');
-    distance.textContent = `${haversineDistance(location.lat, location.lng, result.lat, result.lng).toFixed(1)} miles away`;
+    const milesAway = (labels.milesAway ?? 'miles away');
+    distance.textContent = `${haversineDistance(location.lat, location.lng, result.lat, result.lng).toFixed(1)} ${milesAway}`;
     distance.classList.add('locator-distance');
     li.append(distance);
 
@@ -322,7 +341,8 @@ function displayEventsResults(results, location) {
     li.append(date);
 
     const distance = document.createElement('span');
-    distance.textContent = `${haversineDistance(location.lat, location.lng, result.lat, result.lng).toFixed(1)} miles away`;
+    const milesAway = (labels.milesAway ?? 'miles away');
+    distance.textContent = `${haversineDistance(location.lat, location.lng, result.lat, result.lng).toFixed(1)} ${milesAway}`;
     distance.classList.add('locator-distance');
     li.append(distance);
 
@@ -346,7 +366,7 @@ function displayEventsResults(results, location) {
     eventsHHResults.textContent = '';
     eventsHHResults.appendChild(hhEventList);
   } else {
-    eventsHHResults.innerHTML = '<p>No household events found</p>';
+    eventsHHResults.innerHTML = `<p>${labels.noHouseholdEventsFound ?? 'No household events found'}</p>`;
   }
 
   if (commEvents && commEvents.length > 0) {
@@ -357,11 +377,11 @@ function displayEventsResults(results, location) {
     eventsCommResults.textContent = '';
     eventsCommResults.appendChild(commEventList);
   } else {
-    eventsCommResults.innerHTML = '<p>No commercial events found</p>';
+    eventsCommResults.innerHTML = `<p>${labels.noCommercialEventsFound ?? 'No commercial events found'}</p>`;
   }
 }
 
-function displayHHResults(results, location) {
+function displayHHResults(results, location, labels = {}) {
   const { retailers, distributors, online } = results;
 
   const createOnlineResult = (result) => {
@@ -371,7 +391,7 @@ function displayHHResults(results, location) {
     li.append(title);
     if (result.WEB_ADDRESS) {
       const label = document.createElement('span');
-      label.textContent = 'Website: ';
+      label.textContent = labels.website ?? 'Website: ';
       label.classList.add('locator-website-label');
 
       const website = document.createElement('a');
@@ -393,7 +413,8 @@ function displayHHResults(results, location) {
     li.append(title);
 
     const distance = document.createElement('span');
-    distance.textContent = `${haversineDistance(location.lat, location.lng, result.lat, result.lng).toFixed(1)} miles away`;
+    const milesAway = (labels.milesAway ?? 'miles away');
+    distance.textContent = `${haversineDistance(location.lat, location.lng, result.lat, result.lng).toFixed(1)} ${milesAway}`;
     distance.classList.add('locator-distance');
     li.append(distance);
 
@@ -416,7 +437,8 @@ function displayHHResults(results, location) {
     li.append(title);
 
     const distance = document.createElement('span');
-    distance.textContent = `${haversineDistance(location.lat, location.lng, result.lat, result.lng).toFixed(1)} miles away`;
+    const milesAway = (labels.milesAway ?? 'miles away');
+    distance.textContent = `${haversineDistance(location.lat, location.lng, result.lat, result.lng).toFixed(1)} ${milesAway}`;
     distance.classList.add('locator-distance');
     li.append(distance);
 
@@ -431,7 +453,7 @@ function displayHHResults(results, location) {
 
     if (result.WEB_ADDRESS) {
       const label = document.createElement('span');
-      label.textContent = 'Website: ';
+      label.textContent = labels.website ?? 'Website: ';
       label.classList.add('locator-website-label');
 
       const website = document.createElement('a');
@@ -446,7 +468,7 @@ function displayHHResults(results, location) {
 
     if (result.PHONE_NUMBER) {
       const label = document.createElement('span');
-      label.textContent = 'Phone: ';
+      label.textContent = labels.phone ?? 'Phone: ';
       label.classList.add('locator-phone-label');
 
       const phone = document.createElement('a');
@@ -469,7 +491,7 @@ function displayHHResults(results, location) {
     hhRetailersResults.textContent = '';
     hhRetailersResults.appendChild(retailerList);
   } else {
-    hhRetailersResults.innerHTML = '<p>No retailers found</p>';
+    hhRetailersResults.innerHTML = `<p>${labels.noRetailersFound ?? 'No retailers found'}</p>`;
   }
 
   if (distributors && distributors.length > 0) {
@@ -480,7 +502,7 @@ function displayHHResults(results, location) {
     hhDistributorsResults.textContent = '';
     hhDistributorsResults.appendChild(distributorList);
   } else {
-    hhDistributorsResults.innerHTML = '<p>No distributors found</p>';
+    hhDistributorsResults.innerHTML = `<p>${labels.noDistributorsFound ?? 'No distributors found'}</p>`;
   }
 
   if (online && online.length > 0) {
@@ -491,15 +513,51 @@ function displayHHResults(results, location) {
     hhOnlineResults.textContent = '';
     hhOnlineResults.appendChild(onlineList);
   } else {
-    hhOnlineResults.innerHTML = '<p>No online retailers found</p>';
+    hhOnlineResults.innerHTML = `<p>${labels.noOnlineFound ?? 'No online retailers found'}</p>`;
   }
 }
 
-export default function decorate(widget) {
+export default async function decorate(widget) {
   widget.style.visibility = 'hidden';
   loadCSS('/blocks/form/form.css').then(() => widget.removeAttribute('style'));
 
+  const { language } = getLocaleAndLanguage();
+  const lang = (language || 'en_us').split('_')[0];
+  const copy = await loadWidgetCopy(lang);
+  const labels = copy.labels || {};
+
   const form = widget.querySelector('form');
+
+  // Apply copy to static form and headings
+  const h1 = widget.querySelector('#find-locally');
+  if (h1) h1.textContent = labels.findLocally ?? 'Find Locally';
+  const locationLabel = widget.querySelector('label[for="location"]');
+  if (locationLabel) locationLabel.textContent = labels.yourLocation ?? 'Your Location';
+  const addressInput = widget.querySelector('#address');
+  if (addressInput) addressInput.placeholder = labels.addressHint ?? 'Address, City, or Zipcode';
+  const productTypeLabel = widget.querySelector('label[for="productType"]');
+  if (productTypeLabel) productTypeLabel.textContent = labels.whatAreYouLookingFor ?? 'What are you looking for?';
+  const productTypeSelect = widget.querySelector('#productType');
+  if (productTypeSelect) {
+    const opts = productTypeSelect.querySelectorAll('option');
+    if (opts[0]) opts[0].textContent = labels.householdProducts ?? 'Household Products';
+    if (opts[1]) opts[1].textContent = labels.commercialProducts ?? 'Commercial Products';
+    if (opts[2]) opts[2].textContent = labels.demonstrations ?? 'Demonstrations';
+  }
+  const submitBtn = widget.querySelector('form button[type="submit"]');
+  if (submitBtn) submitBtn.textContent = labels.search ?? 'Search';
+
+  // Tab button labels (HH: Retailers, Online Retailers, Distributors; COMM: Distributors, Local Rep; Events: Household Events, Commercial Events)
+  const hhTabs = widget.querySelectorAll('.locator-hh-results .locator-results-tablist button');
+  if (hhTabs[0]) hhTabs[0].textContent = labels.retailers ?? 'Retailers';
+  if (hhTabs[1]) hhTabs[1].textContent = labels.onlineRetailers ?? 'Online Retailers';
+  if (hhTabs[2]) hhTabs[2].textContent = labels.distributors ?? 'Distributors';
+  const commTabs = widget.querySelectorAll('.locator-comm-results .locator-results-tablist button');
+  if (commTabs[0]) commTabs[0].textContent = labels.distributors ?? 'Distributors';
+  if (commTabs[1]) commTabs[1].textContent = labels.localRepresentatives ?? 'Local Representatives';
+  const eventsTabs = widget.querySelectorAll('.locator-events-results .locator-results-tablist button');
+  if (eventsTabs[0]) eventsTabs[0].textContent = labels.householdEvents ?? 'Household Events';
+  if (eventsTabs[1]) eventsTabs[1].textContent = labels.commercialEvents ?? 'Commercial Events';
 
   // set initial values from query params
   const queryParams = Object.fromEntries(new URLSearchParams(window.location.search));
@@ -511,14 +569,13 @@ export default function decorate(widget) {
   // load results data
   setTimeout(() => fetchData(form), 300);
 
-  const tabpanels = widget.querySelectorAll('.locator-tabpanels .locator-tabpanel');
   const tablistButtons = widget.querySelectorAll('.locator-results-tablist button');
   const showTab = (tabButton) => {
     tablistButtons.forEach((b) => b.removeAttribute('aria-selected'));
-    tabpanels.forEach((panel) => panel.setAttribute('aria-hidden', true));
+    widget.querySelectorAll('.locator-tabpanels .locator-tabpanel').forEach((panel) => panel.setAttribute('aria-hidden', true));
     tabButton.setAttribute('aria-selected', 'true');
     const tabpanel = document.getElementById(tabButton.getAttribute('aria-controls'));
-    tabpanel.setAttribute('aria-hidden', false);
+    if (tabpanel) tabpanel.setAttribute('aria-hidden', false);
   };
 
   const showType = (type) => {
@@ -538,9 +595,9 @@ export default function decorate(widget) {
     if (data.productType === 'HH') {
       if (location) {
         const results = findHHResults(window.locatorData.HH, location, country?.short);
-        displayHHResults(results, location);
+        displayHHResults(results, location, labels);
       } else {
-        displayHHResults({});
+        displayHHResults({}, null, labels);
       }
       showType('hh');
     }
@@ -553,9 +610,9 @@ export default function decorate(widget) {
           country?.short,
           region?.short,
         );
-        displayCommResults(results, location);
+        displayCommResults(results, location, labels);
       } else {
-        displayCommResults({});
+        displayCommResults({}, null, labels);
       }
       showType('comm');
     }
@@ -563,9 +620,9 @@ export default function decorate(widget) {
     if (data.productType === 'EVENTS') {
       if (location) {
         const results = findEventsResults(window.locatorData.EVENTS, location);
-        displayEventsResults(results, location);
+        displayEventsResults(results, location, labels);
       } else {
-        displayEventsResults({});
+        displayEventsResults({}, null, labels);
       }
       showType('events');
     }

@@ -12,7 +12,7 @@
       "submit": "Submit",
       "sending": "Sending..."
     },
-    "placeholders": {
+    "inputPlaceholders": {
       "publicationCompany": "",
       "firstName": "",
       "lastName": "",
@@ -45,7 +45,7 @@
       "submit": "Soumettre",
       "sending": "Envoi en cours..."
     },
-    "placeholders": {
+    "inputPlaceholders": {
       "publicationCompany": "",
       "firstName": "",
       "lastName": "",
@@ -78,7 +78,7 @@
       "submit": "Enviar",
       "sending": "Enviando..."
     },
-    "placeholders": {
+    "inputPlaceholders": {
       "publicationCompany": "",
       "firstName": "",
       "lastName": "",

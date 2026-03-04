@@ -47,7 +47,7 @@ export default async function decorate(widget) {
   const lang = (language || 'en_us').split('_')[0];
   const copy = await loadFormCopy(lang);
   const labels = copy.labels || {};
-  const placeholders = copy.placeholders || {};
+  const inputHints = copy.inputPlaceholders || {};
   const provinceOptions = copy.provinceOptions || [];
 
   header.querySelector('.manage-address-title').textContent = labels.manageAddress ?? 'Manage address';
@@ -92,7 +92,7 @@ export default async function decorate(widget) {
     city: form.querySelector('#manage-address-city'),
     postalCode: form.querySelector('#manage-address-postal-code'),
   };
-  Object.entries(placeholders).forEach(([key, value]) => {
+  Object.entries(inputHints).forEach(([key, value]) => {
     const el = inputs[key];
     if (el) el.placeholder = value ?? '';
   });

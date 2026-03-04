@@ -1,7 +1,22 @@
 /* eslint-disable max-len */
 
-import { loadCSS, fetchPlaceholders } from '../../scripts/aem.js';
+import { loadCSS } from '../../scripts/aem.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+
+/**
+ * Load widget copy from the widget's local JSON (same name as the script).
+ * @param {string} lang - Language key (e.g. en, fr)
+ * @returns {Promise<Object>} Copy for that language (flat key-value)
+ */
+async function loadWidgetCopy(lang) {
+  const scriptPath = new URL(import.meta.url).pathname;
+  const jsonPath = scriptPath.replace(/\.js$/, '.json');
+  const url = `${window.hlx?.codeBasePath || ''}${jsonPath}`;
+  const resp = await fetch(url);
+  const data = await resp.json();
+  const key = data[lang] ? lang : 'en';
+  return data[key] || {};
+}
 
 /**
  * Parses a publication date string (MM.DD.YYYY) into a Date object.
@@ -143,10 +158,10 @@ function getRelativeImagePath(imageUrl) {
 /**
  * Creates an article card DOM element for display in the article listing.
  * @param {Object} article - Article data object with title, image, description, etc.
- * @param {Object} placeholders - Placeholders object for i18n
+ * @param {Object} copy - Widget copy (i18n labels)
  * @returns {HTMLElement} Article card element
  */
-function createArticleCard(article, placeholders = {}) {
+function createArticleCard(article, copy = {}) {
   const li = document.createElement('li');
   li.className = 'card';
 
@@ -191,7 +206,7 @@ function createArticleCard(article, placeholders = {}) {
     const authorDisplay = article.matchedAuthor && article.searchTerm
       ? highlightMatch(article.author, article.searchTerm)
       : article.author;
-    const byLabel = placeholders.by || 'By';
+    const byLabel = copy.by || 'By';
     metaParts.push(`${byLabel}: <a href="#">${authorDisplay}</a>`);
   }
   meta.innerHTML = metaParts.join(' | ');
@@ -266,9 +281,9 @@ function updateURL(filterConfig) {
  * Builds complete article listing with search and sorting functionality.
  * @param {HTMLElement} container - Container element to transform into an article listing
  * @param {Object} config - Initial filter configuration
- * @param {Object} placeholders - Placeholders object for i18n
+ * @param {Object} copy - Widget copy (i18n labels)
  */
-function buildArticleFiltering(container, config = {}, placeholders = {}) {
+function buildArticleFiltering(container, config = {}, copy = {}) {
   const ITEMS_PER_PAGE = 12;
   let currentPage = 1;
 
@@ -320,7 +335,7 @@ function buildArticleFiltering(container, config = {}, placeholders = {}) {
     const paginatedResults = results.slice(startIndex, endIndex);
 
     paginatedResults.forEach((article) => {
-      resultsElement.append(createArticleCard(article, placeholders));
+      resultsElement.append(createArticleCard(article, copy));
     });
     highlightResults(resultsElement);
 
@@ -340,7 +355,7 @@ function buildArticleFiltering(container, config = {}, placeholders = {}) {
     if (totalPages <= 1) return;
 
     const prevBtn = document.createElement('button');
-    prevBtn.textContent = placeholders.previous || 'Previous';
+    prevBtn.textContent = copy.previous || 'Previous';
     prevBtn.disabled = page <= 1;
     if (page > 1) prevBtn.dataset.page = page - 1;
     paginationElement.appendChild(prevBtn);
@@ -385,7 +400,7 @@ function buildArticleFiltering(container, config = {}, placeholders = {}) {
     paginationElement.appendChild(pages);
 
     const nextBtn = document.createElement('button');
-    nextBtn.textContent = placeholders.next || 'Next';
+    nextBtn.textContent = copy.next || 'Next';
     nextBtn.disabled = page >= totalPages;
     if (page < totalPages) nextBtn.dataset.page = page + 1;
     paginationElement.appendChild(nextBtn);
@@ -562,8 +577,9 @@ function buildArticleFiltering(container, config = {}, placeholders = {}) {
 async function init() {
   const articleCenter = document.querySelector('.article-center');
   if (articleCenter) {
-    const { locale, language } = getLocaleAndLanguage();
-    const placeholders = await fetchPlaceholders(`/${locale}/${language}`);
+    const { language } = getLocaleAndLanguage();
+    const lang = (language || 'en_us').split('_')[0];
+    const copy = await loadWidgetCopy(lang);
 
     // Move existing H1 into article-center if it exists
     const existingH1 = document.querySelector('main h1');
@@ -572,50 +588,50 @@ async function init() {
       articleCenter.insertBefore(existingH1, articleCenter.firstChild);
     }
 
-    // Populate placeholder text in HTML
+    // Apply copy to HTML
     const searchInput = articleCenter.querySelector('#fulltext');
     if (searchInput) {
-      searchInput.placeholder = placeholders.search || 'Search';
+      searchInput.placeholder = copy.search || 'Search';
     }
 
     const showingLabel = articleCenter.querySelector('.showing-label');
     if (showingLabel) {
-      showingLabel.textContent = placeholders.showing || 'Showing';
+      showingLabel.textContent = copy.showing || 'Showing';
     }
 
     const ofLabel = articleCenter.querySelector('.of-label');
     if (ofLabel) {
-      ofLabel.textContent = placeholders.of || 'of';
+      ofLabel.textContent = copy.of || 'of';
     }
 
     const sortByLabel = articleCenter.querySelector('.sort-by-label');
     if (sortByLabel) {
-      sortByLabel.textContent = `${placeholders.sortBy || 'Sort by'}:`;
+      sortByLabel.textContent = `${copy.sortBy || 'Sort by'}:`;
     }
 
     // Populate sort options
     const sortLabel = articleCenter.querySelector('#sortby');
     if (sortLabel) {
-      sortLabel.textContent = placeholders.newestArticles || 'Newest Articles';
+      sortLabel.textContent = copy.newestArticles || 'Newest Articles';
     }
 
     const sortButtons = articleCenter.querySelectorAll('.sort menu button');
     sortButtons.forEach((btn) => {
       const sortType = btn.dataset.sort;
       if (sortType === 'default') {
-        btn.textContent = placeholders.default || 'Default';
+        btn.textContent = copy.default || 'Default';
       } else if (sortType === 'newest') {
-        btn.textContent = placeholders.newestArticles || 'Newest Articles';
+        btn.textContent = copy.newestArticles || 'Newest Articles';
       } else if (sortType === 'oldest') {
-        btn.textContent = placeholders.oldestArticles || 'Oldest Articles';
+        btn.textContent = copy.oldestArticles || 'Oldest Articles';
       } else if (sortType === 'name-asc') {
-        btn.textContent = placeholders.nameAZ || 'Name A-Z';
+        btn.textContent = copy.nameAZ || 'Name A-Z';
       } else if (sortType === 'name-desc') {
-        btn.textContent = placeholders.nameZA || 'Name Z-A';
+        btn.textContent = copy.nameZA || 'Name Z-A';
       }
     });
 
-    buildArticleFiltering(articleCenter, {}, placeholders);
+    buildArticleFiltering(articleCenter, {}, copy);
   }
 }
 

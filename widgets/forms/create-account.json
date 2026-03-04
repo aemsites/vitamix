@@ -19,7 +19,7 @@
       "createAccount": "Create account",
       "sending": "Sending..."
     },
-    "placeholders": {
+    "inputPlaceholders": {
       "firstName": "e.g. Johnny",
       "lastName": "e.g. Appleseed",
       "emailAddress": "e.g. email@example.com",
@@ -47,7 +47,7 @@
       "createAccount": "Créer un compte",
       "sending": "Envoi en cours..."
     },
-    "placeholders": {
+    "inputPlaceholders": {
       "firstName": "p. ex. Jean",
       "lastName": "p. ex. Dupont",
       "emailAddress": "p. ex. courriel@exemple.com",
@@ -75,7 +75,7 @@
       "createAccount": "Crear cuenta",
       "sending": "Enviando..."
     },
-    "placeholders": {
+    "inputPlaceholders": {
       "firstName": "ej. Juan",
       "lastName": "ej. García",
       "emailAddress": "ej. correo@ejemplo.com",

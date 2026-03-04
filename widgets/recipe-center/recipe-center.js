@@ -1,8 +1,22 @@
 /* eslint-disable max-len */
 
-import { loadCSS, fetchPlaceholders } from '../../scripts/aem.js';
+import { loadCSS } from '../../scripts/aem.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
-import { normalizeCompatibleContainers, isFrenchContainerLocale } from '../../blocks/recipe/recipe-containers.js';
+
+/**
+ * Load widget copy from the widget's local JSON (same name as the script).
+ * @param {string} lang - Language key (e.g. en, fr)
+ * @returns {Promise<Object>} Copy for that language (flat key-value)
+ */
+async function loadWidgetCopy(lang) {
+  const scriptPath = new URL(import.meta.url).pathname;
+  const jsonPath = scriptPath.replace(/\.js$/, '.json');
+  const url = `${window.hlx?.codeBasePath || ''}${jsonPath}`;
+  const resp = await fetch(url);
+  const data = await resp.json();
+  const key = data[lang] ? lang : 'en';
+  return data[key] || {};
+}
 
 /**
  * Parses raw recipe data from index and transforms values.
@@ -63,15 +77,6 @@ async function lookupRecipes(config = {}, facets = {}) {
         const status = recipe.status ? recipe.status.toLowerCase() : '';
         return status === 'updated' || status === 'new';
       });
-
-    // Normalize compatible-containers for French only (translation artifacts → canonical, display in French)
-    if (isFrenchContainerLocale(locale, language)) {
-      recipes.forEach((recipe) => {
-        if (recipe['compatible-containers']) {
-          recipe['compatible-containers'] = normalizeCompatibleContainers(recipe['compatible-containers'], true);
-        }
-      });
-    }
 
     window.recipeIndex = {
       data: recipes,
@@ -368,7 +373,7 @@ function createRecipeCard(recipe) {
   const link = document.createElement('a');
   link.href = recipe.path || '#';
 
-  // Check if image is the default-meta-image and use placeholder instead
+  // Check if image is the default-meta-image and use fallback instead
   const imagePath = new URL(recipe.image).pathname || '';
   const isDefaultImage = imagePath.includes('default-meta-image');
 
@@ -475,19 +480,19 @@ function hasActiveFilters(filterConfig) {
  * Builds complete recipe listing with filtering, sorting, and search functionality.
  * @param {HTMLElement} container - Container element to transform into a recipe listing
  * @param {Object} config - Initial filter configuration
- * @param {Object} placeholders - Placeholders object for i18n
+ * @param {Object} copy - Widget copy (i18n labels)
  * @returns {void}
  */
-function buildRecipeFiltering(container, config = {}, placeholders = {}) {
+function buildRecipeFiltering(container, config = {}, copy = {}) {
   const ITEMS_PER_PAGE = 12;
   let currentPage = 1;
 
-  const facetPlaceholders = {
-    difficulty: placeholders.difficulty || 'Difficulty',
-    'compatible-containers': placeholders.compatibleContainers || 'Compatible Containers',
-    'dietary-interests': placeholders.dietaryInterests || 'Dietary Interests',
-    course: placeholders.course || 'Course',
-    'recipe-type': placeholders.recipeType || 'Recipe Type',
+  const facetLabels = {
+    difficulty: copy.difficulty || 'Difficulty',
+    'compatible-containers': copy.compatibleContainers || 'Compatible Containers',
+    'dietary-interests': copy.dietaryInterests || 'Dietary Interests',
+    course: copy.course || 'Course',
+    'recipe-type': copy.recipeType || 'Recipe Type',
   };
 
   // Reference existing DOM elements from static HTML
@@ -587,7 +592,7 @@ function buildRecipeFiltering(container, config = {}, placeholders = {}) {
     if (totalPages <= 1) return;
 
     const prevBtn = document.createElement('button');
-    prevBtn.textContent = placeholders.previous || 'Previous';
+    prevBtn.textContent = copy.previous || 'Previous';
     prevBtn.disabled = page <= 1;
     if (page > 1) prevBtn.dataset.page = page - 1;
     paginationElement.appendChild(prevBtn);
@@ -632,7 +637,7 @@ function buildRecipeFiltering(container, config = {}, placeholders = {}) {
     paginationElement.appendChild(pages);
 
     const nextBtn = document.createElement('button');
-    nextBtn.textContent = placeholders.next || 'Next';
+    nextBtn.textContent = copy.next || 'Next';
     nextBtn.disabled = page >= totalPages;
     if (page < totalPages) nextBtn.dataset.page = page + 1;
     paginationElement.appendChild(nextBtn);
@@ -718,7 +723,7 @@ function buildRecipeFiltering(container, config = {}, placeholders = {}) {
     if (selected.length > 0) {
       const clearButton = document.createElement('button');
       clearButton.className = 'clear';
-      clearButton.textContent = placeholders.clearAll || 'Clear All';
+      clearButton.textContent = copy.clearAll || 'Clear All';
       clearButton.addEventListener('click', () => {
         selected.forEach((tag) => {
           const checkbox = container.querySelector(`[id="filter-${tag}"]`);
@@ -747,7 +752,7 @@ function buildRecipeFiltering(container, config = {}, placeholders = {}) {
       }
 
       const summary = document.createElement('summary');
-      summary.textContent = facetPlaceholders[facetKey] || facetKey;
+      summary.textContent = facetLabels[facetKey] || facetKey;
       details.append(summary);
 
       const facetValues = Object.keys(facets[facetKey]).sort((a, b) => a.localeCompare(b));
@@ -788,7 +793,7 @@ function buildRecipeFiltering(container, config = {}, placeholders = {}) {
     const filterValues = filterConfig[facetKey] ? filterConfig[facetKey].split(',').map((t) => t.trim()) : [];
     const filterValuesLower = filterValues.map((v) => v.toLowerCase());
 
-    // Keep the first option (placeholder)
+    // Keep the first option (empty/default)
     const firstOption = select.options[0];
     select.innerHTML = '';
     select.appendChild(firstOption);
@@ -1010,8 +1015,9 @@ function buildRecipeFiltering(container, config = {}, placeholders = {}) {
 async function init() {
   const recipeCenter = document.querySelector('.recipe-center');
   if (recipeCenter) {
-    const { locale, language } = getLocaleAndLanguage();
-    const placeholders = await fetchPlaceholders(`/${locale}/${language}`);
+    const { language } = getLocaleAndLanguage();
+    const lang = (language || 'en_us').split('_')[0];
+    const copy = await loadWidgetCopy(lang);
 
     // Move existing H1 into recipe-center if it exists
     const existingH1 = document.querySelector('main h1');
@@ -1020,33 +1026,33 @@ async function init() {
       recipeCenter.insertBefore(existingH1, recipeCenter.firstChild);
     }
 
-    // Populate placeholder text in HTML
+    // Apply copy to HTML
     const searchInput = recipeCenter.querySelector('#fulltext');
     if (searchInput) {
-      searchInput.placeholder = placeholders.searchRecipes || 'Type to search recipes';
+      searchInput.placeholder = copy.searchRecipes || 'Type to search recipes';
     }
 
     const goButton = recipeCenter.querySelector('.go');
     if (goButton) {
-      goButton.textContent = placeholders.go || 'Go';
+      goButton.textContent = copy.go || 'Go';
     }
 
     const itemsLabel = recipeCenter.querySelector('.info > p');
     if (itemsLabel) {
       // Keep the structure but update the text nodes
-      itemsLabel.childNodes[0].textContent = `${placeholders.items || 'Items'} `;
+      itemsLabel.childNodes[0].textContent = `${copy.items || 'Items'} `;
       itemsLabel.childNodes[2].textContent = ' - ';
-      itemsLabel.childNodes[4].textContent = ` ${placeholders.of || 'of'} `;
+      itemsLabel.childNodes[4].textContent = ` ${copy.of || 'of'} `;
     }
 
     const sortLabel = recipeCenter.querySelector('#sortby');
     if (sortLabel) {
-      sortLabel.textContent = placeholders.featured || 'Featured';
+      sortLabel.textContent = copy.featured || 'Featured';
     }
 
     const sortSummary = recipeCenter.querySelector('.sort summary');
     if (sortSummary) {
-      sortSummary.childNodes[0].textContent = `${placeholders.sortBy || 'Sort By'}: `;
+      sortSummary.childNodes[0].textContent = `${copy.sortBy || 'Sort By'}: `;
     }
 
     // Populate sort options
@@ -1054,50 +1060,50 @@ async function init() {
     sortButtons.forEach((btn) => {
       const sortType = btn.dataset.sort;
       if (sortType === 'featured') {
-        btn.textContent = placeholders.featured || 'Featured';
+        btn.textContent = copy.featured || 'Featured';
       } else if (sortType === 'name-asc') {
-        btn.textContent = placeholders.nameAZ || 'Name (A-Z)';
+        btn.textContent = copy.nameAZ || 'Name (A-Z)';
       } else if (sortType === 'name-desc') {
-        btn.textContent = placeholders.nameZA || 'Name (Z-A)';
+        btn.textContent = copy.nameZA || 'Name (Z-A)';
       } else if (sortType === 'time-asc') {
-        btn.textContent = placeholders.timeLowToHigh || 'Time (Low to High)';
+        btn.textContent = copy.timeLowToHigh || 'Time (Low to High)';
       } else if (sortType === 'time-desc') {
-        btn.textContent = placeholders.timeHighToLow || 'Time (High to Low)';
+        btn.textContent = copy.timeHighToLow || 'Time (High to Low)';
       }
     });
 
     const refineHeading = recipeCenter.querySelector('.facets h2');
     if (refineHeading) {
-      refineHeading.textContent = placeholders.refineYourRecipe || 'Refine Your Recipe';
+      refineHeading.textContent = copy.refineYourRecipe || 'Refine Your Recipe';
     }
 
     const applyButton = recipeCenter.querySelector('.facets .apply');
     if (applyButton) {
-      applyButton.textContent = placeholders.seeResults || 'See Results';
+      applyButton.textContent = copy.seeResults || 'See Results';
     }
 
     const legend = recipeCenter.querySelector('legend');
     if (legend) {
-      legend.textContent = placeholders.refineYourSearch || 'Refine Your Search';
+      legend.textContent = copy.refineYourSearch || 'Refine Your Search';
     }
 
-    // Update select dropdown placeholders
+    // Update select dropdown labels
     const dietarySelect = recipeCenter.querySelector('#dietary-interests option[value=""]');
     if (dietarySelect) {
-      dietarySelect.textContent = placeholders.dietary || 'Dietary';
+      dietarySelect.textContent = copy.dietary || 'Dietary';
     }
 
     const courseOption = recipeCenter.querySelector('#course option[value=""]');
     if (courseOption) {
-      courseOption.textContent = placeholders.course || 'Course';
+      courseOption.textContent = copy.course || 'Course';
     }
 
     const recipeTypeOption = recipeCenter.querySelector('#recipe-type option[value=""]');
     if (recipeTypeOption) {
-      recipeTypeOption.textContent = placeholders.recipeType || 'Recipe Type';
+      recipeTypeOption.textContent = copy.recipeType || 'Recipe Type';
     }
 
-    buildRecipeFiltering(recipeCenter, {}, placeholders);
+    buildRecipeFiltering(recipeCenter, {}, copy);
   }
 }
 

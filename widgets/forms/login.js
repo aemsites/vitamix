@@ -34,12 +34,12 @@ export default async function decorate(widget) {
   const lang = (language || 'en_us').split('_')[0];
   const copy = await loadFormCopy(lang);
   const labels = copy.labels || {};
-  const placeholders = copy.placeholders || {};
+  const inputHints = copy.inputPlaceholders || {};
 
   form.querySelector('[for="login-email"] .label-text').textContent = labels.emailAddress ?? 'Email Address';
 
   const emailInput = form.querySelector('#login-email');
-  if (emailInput) emailInput.placeholder = placeholders.emailAddress ?? '';
+  if (emailInput) emailInput.placeholder = inputHints.emailAddress ?? '';
 
   const submitBtn = form.querySelector('button[type="submit"]');
   if (submitBtn) submitBtn.textContent = labels.submit ?? 'Submit';

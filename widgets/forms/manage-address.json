@@ -20,7 +20,7 @@
       "cancel": "Cancel",
       "sending": "Sending..."
     },
-    "placeholders": {
+    "inputPlaceholders": {
       "firstName": "",
       "lastName": "",
       "company": "",
@@ -67,7 +67,7 @@
       "cancel": "Annuler",
       "sending": "Envoi en cours..."
     },
-    "placeholders": {
+    "inputPlaceholders": {
       "firstName": "",
       "lastName": "",
       "company": "",
@@ -114,7 +114,7 @@
       "cancel": "Cancelar",
       "sending": "Enviando..."
     },
-    "placeholders": {
+    "inputPlaceholders": {
       "firstName": "",
       "lastName": "",
       "company": "",
