@@ -1,10 +1,6 @@
 import { loadScript, getMetadata } from './aem.js';
 import './consented/newsletter.js';
 
-if (getMetadata('target').toLowerCase() === 'on') {
-  import('./consented/adobe-target.js');
-}
-
 // add delayed functionality here
 window.config = {
   POOLID: 'us-east-1:d54ecd7d-db6e-456d-bf35-d26346122a63',
@@ -32,7 +28,11 @@ await loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clie
 await loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-analytics.lc-26814920488a848ff91c1f425646d010-lc.min.js');
 loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-base.lc-daf5b8dac79e9cf7cb1c0b30d8372e7a-lc.min.js');
 
-loadScript('https://assets.adobedtm.com/launch-EN40f2d69539754c3ea73511e70c65c801.min.js');
+await loadScript('https://assets.adobedtm.com/launch-EN40f2d69539754c3ea73511e70c65c801.min.js');
+
+if (getMetadata('target').toLowerCase() === 'on') {
+  import('./consented/adobe-target.js');
+}
 
 /* eslint-disable */
 
