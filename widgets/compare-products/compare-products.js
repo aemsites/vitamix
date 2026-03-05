@@ -40,7 +40,6 @@ const FEATURES_BY_PRODUCT_PATH_DEFAULT = '/us/en_us/products/config/features-by-
 let comparisonTranslations = {};
 /** Normalize terms merged from all locales (for regex matching). */
 let mergedNormalize = null;
-
 /** Default normalize literals when JSON has no normalize key or before load. */
 const DEFAULT_NORMALIZE = {
   trailingSeries: ['series', 'série'],
@@ -243,7 +242,7 @@ function getFeatureValueFromRow(featuresRow, jsonKey) {
 
 /**
  * Get display value from a features-by-product row for a feature key.
- * :check: -> 'Yes', - or empty -> '—', else verbatim.
+ * Passes through :check: for UI to render as checkmark; - or empty -> '—'; else verbatim.
  * @param {Object} featuresRow - Row from features-by-product.data
  * @param {string} featureKey - Our feature key (e.g. 'Blending Programs')
  * @returns {string}
@@ -254,7 +253,6 @@ function getFeatureDisplayFromRow(featuresRow, featureKey) {
   const raw = getFeatureValueFromRow(featuresRow, jsonKey) ?? featuresRow[featureKey];
   if (raw == null || String(raw).trim() === '') return '—';
   const s = String(raw).trim();
-  if (s === ':check:') return t('Yes');
   if (s === '-') return '—';
   return s;
 }
@@ -860,7 +858,7 @@ function replaceColumnWithProduct(
       if (featureKey && featuresByProduct?.data) {
         const featuresRow = getFeaturesRowByPath(featuresByProduct, product.path);
         const value = getFeatureDisplayFromRow(featuresRow, featureKey);
-        if (value === 'Yes') {
+        if (value === ':check:') {
           const checkHtml = `<p><span class="icon icon-check"><img src="${CHECK_ICON_SVG}" width="20" height="20" alt="${t('Check')}"></span></p>`;
           cell.innerHTML = checkHtml;
         } else {
@@ -1168,7 +1166,7 @@ function buildFeaturesTable(slots, tableEl, featuresByProduct) {
       } else if (slot.product) {
         value = '—';
       }
-      if (value === 'Yes') {
+      if (value === ':check:') {
         const check = document.createElement('span');
         check.className = 'compare-products-features-cell-check';
         check.setAttribute('aria-hidden', 'true');
