@@ -547,7 +547,8 @@ export default async function decorate(widget) {
   const submitBtn = widget.querySelector('form button[type="submit"]');
   if (submitBtn) submitBtn.textContent = labels.search ?? 'Search';
 
-  // Tab button labels (HH: Retailers, Online Retailers, Distributors; COMM: Distributors, Local Rep; Events: Household Events, Commercial Events)
+  // Tab labels: HH = Retailers, Online Retailers, Distributors; COMM = Distributors, Local Rep;
+  // Events = Household Events, Commercial Events
   const hhTabs = widget.querySelectorAll('.locator-hh-results .locator-results-tablist button');
   if (hhTabs[0]) hhTabs[0].textContent = labels.retailers ?? 'Retailers';
   if (hhTabs[1]) hhTabs[1].textContent = labels.onlineRetailers ?? 'Online Retailers';
