@@ -62,12 +62,23 @@
     return p.startsWith('/') ? p : `/${p}`;
   }
 
+  const EXCLUDED_LINK_PATH_PREFIX = '/content/dam/vitamix';
+
   function pathMatchesFilter(path, filterValue) {
     if (!filterValue.trim()) return true;
     const pathNorm = normalizedPath(path);
     let filterNorm = filterValue.trim();
     if (filterNorm && !filterNorm.startsWith('/')) filterNorm = `/${filterNorm}`;
     return pathNorm.startsWith(filterNorm);
+  }
+
+  function isExcludedLinkUrl(url) {
+    try {
+      const { pathname } = new URL(url);
+      return pathname.startsWith(EXCLUDED_LINK_PATH_PREFIX);
+    } catch (_) {
+      return false;
+    }
   }
 
   function getFilteredPaths() {
@@ -340,6 +351,7 @@
         appendStatus({ text: `  Found ${links.length} link(s) on this page.`, type: 'page-links' });
 
         links.forEach((linkUrl) => {
+          if (isExcludedLinkUrl(linkUrl)) return;
           if (!allLinks.has(linkUrl)) {
             allLinks.set(linkUrl, { status: null, fromPages: new Set() });
           }
