@@ -35,7 +35,7 @@ function showMinimizedTeaser(text, newsletterLink) {
 }
 
 async function initNewsletterPrompt() {
-  if (localStorage.getItem('newsletter-popped-up') === 'true') return;
+  if (localStorage.getItem('newsletter-signed-up') === 'true') return;
 
   const pathSegments = window.location.pathname.split('/').filter(Boolean);
   const locale = pathSegments[0] || 'us';
@@ -47,10 +47,9 @@ async function initNewsletterPrompt() {
 
   if (minimizedText && newsletterLink) {
     showMinimizedTeaser(minimizedText, newsletterLink);
-    return;
   }
 
-  if (newsletterLink) {
+  if (newsletterLink && !localStorage.getItem('newsletter-signed-up') && !localStorage.getItem('newsletter-popped-up')) {
     localStorage.setItem('newsletter-popped-up', 'true');
     setTimeout(() => newsletterLink.click(), 5000);
   }
