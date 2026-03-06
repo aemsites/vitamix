@@ -32,7 +32,7 @@ export default async function decorate(widget) {
   const lang = (language || 'en_us').split('_')[0];
   const copy = await loadFormCopy(lang);
   const labels = copy.labels || {};
-  const placeholders = copy.placeholders || {};
+  const inputHints = copy.inputPlaceholders || {};
 
   header.querySelector('.edit-account-title').textContent = labels.accountInformation ?? 'Account Information';
   header.querySelector('.edit-account-instruction').textContent = labels.allFieldsMandatory ?? 'All fields are mandatory unless otherwise indicated (optional).';
@@ -69,11 +69,11 @@ export default async function decorate(widget) {
   const lastNameInput = form.querySelector('#edit-account-last-name');
   const emailInput = form.querySelector('#edit-account-email');
   const postalCodeInput = form.querySelector('#edit-account-postal-code');
-  if (firstNameInput && placeholders.firstName) firstNameInput.placeholder = placeholders.firstName;
-  if (lastNameInput && placeholders.lastName) lastNameInput.placeholder = placeholders.lastName;
-  if (emailInput && placeholders.emailAddress) emailInput.placeholder = placeholders.emailAddress;
-  if (postalCodeInput && placeholders.postalCode) {
-    postalCodeInput.placeholder = placeholders.postalCode;
+  if (firstNameInput && inputHints.firstName) firstNameInput.placeholder = inputHints.firstName;
+  if (lastNameInput && inputHints.lastName) lastNameInput.placeholder = inputHints.lastName;
+  if (emailInput && inputHints.emailAddress) emailInput.placeholder = inputHints.emailAddress;
+  if (postalCodeInput && inputHints.postalCode) {
+    postalCodeInput.placeholder = inputHints.postalCode;
   }
 
   const submitBtn = form.querySelector('button[type="submit"]');

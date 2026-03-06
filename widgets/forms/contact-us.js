@@ -46,7 +46,7 @@ export default async function decorate(widget) {
   const lang = (language || 'en_us').split('_')[0];
   const copy = await loadFormCopy(lang);
   const labels = copy.labels || {};
-  const placeholders = copy.placeholders || {};
+  const inputHints = copy.inputPlaceholders || {};
   const reasonOptions = copy.reasonOptions || [];
 
   form.querySelector('[for="contact-us-first-name"] .label-text').textContent = labels.firstName ?? 'First Name';
@@ -69,9 +69,9 @@ export default async function decorate(widget) {
   const firstInput = form.querySelector('#contact-us-first-name');
   const lastInput = form.querySelector('#contact-us-last-name');
   const emailInput = form.querySelector('#contact-us-email');
-  if (firstInput) firstInput.placeholder = placeholders.firstName ?? '';
-  if (lastInput) lastInput.placeholder = placeholders.lastName ?? '';
-  if (emailInput) emailInput.placeholder = placeholders.emailAddress ?? '';
+  if (firstInput) firstInput.placeholder = inputHints.firstName ?? '';
+  if (lastInput) lastInput.placeholder = inputHints.lastName ?? '';
+  if (emailInput) emailInput.placeholder = inputHints.emailAddress ?? '';
 
   const submitBtn = form.querySelector('button[type="submit"]');
   if (submitBtn) submitBtn.textContent = labels.submit ?? 'Submit';

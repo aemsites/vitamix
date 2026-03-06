@@ -31,7 +31,7 @@
       "clearForm": "Clear form",
       "sending": "Sending..."
     },
-    "placeholders": {
+    "inputPlaceholders": {
       "selectOption": "Select an option",
       "serialNumber": "",
       "date": "mm/dd/yyyy",
@@ -101,7 +101,7 @@
       "clearForm": "Effacer le formulaire",
       "sending": "Envoi en cours..."
     },
-    "placeholders": {
+    "inputPlaceholders": {
       "selectOption": "Sélectionner une option",
       "serialNumber": "",
       "date": "aaaa-mm-jj",
@@ -171,7 +171,7 @@
       "clearForm": "Borrar formulario",
       "sending": "Enviando..."
     },
-    "placeholders": {
+    "inputPlaceholders": {
       "selectOption": "Seleccionar una opción",
       "serialNumber": "",
       "date": "aaaa-mm-dd",

@@ -32,13 +32,13 @@ export default async function decorate(widget) {
   const copy = await loadFormCopy(lang);
   const labels = copy.labels || {};
 
-  const searchPlaceholder = labels.search ?? 'Search';
+  const searchHint = labels.search ?? 'Search';
   const goLabel = labels.go ?? 'Go';
 
-  input.placeholder = searchPlaceholder;
-  input.setAttribute('aria-label', searchPlaceholder);
+  input.placeholder = searchHint;
+  input.setAttribute('aria-label', searchHint);
   if (submitBtn) submitBtn.textContent = goLabel;
-  if (label) label.textContent = searchPlaceholder;
+  if (label) label.textContent = searchHint;
 
   form.action = `/${locale}/${language}/search-result`;
   form.method = 'get';

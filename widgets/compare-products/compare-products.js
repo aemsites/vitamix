@@ -36,56 +36,69 @@ const FEATURE_KEYS = [
 
 const FEATURES_BY_PRODUCT_PATH_DEFAULT = '/us/en_us/products/config/features-by-product.json';
 
-/** Merged Key->Text from translations + placeholders (locale config) */
+/** Merged Key->Text from locale JSON (translations) */
 let comparisonTranslations = {};
+/** Normalize terms merged from all locales (for regex matching). */
+let mergedNormalize = null;
+/** Default normalize literals when JSON has no normalize key or before load. */
+const DEFAULT_NORMALIZE = {
+  trailingSeries: ['series', 'série'],
+  leadingSeries: ['series', 'séries'],
+  brandName: 'Vitamix',
+  warrantyHeading: 'warranty',
+};
 
 /**
- * Get products config base path for current locale (e.g. /ca/fr_ca/products/config).
- * @returns {string}
- */
-function getConfigBasePath() {
-  const match = window.location.pathname.match(/^(\/[^/]+\/[^/]+)\//);
-  if (match) return `${match[1]}/products/config`;
-  return '/us/en_us/products/config';
-}
-
-/**
- * Load translations + placeholders from config (Key/Text sheets); set comparisonTranslations.
- * Call once before rendering; safe to call multiple times (overwrites).
+ * Load translations from the widget's local JSON (same name as the script).
+ * Sets comparisonTranslations. Call once before rendering; safe to call multiple times.
  */
 async function loadComparisonTranslations() {
-  const base = getConfigBasePath();
-  const urls = [
-    `${base}/translations.json`,
-    `${base}/placeholders.json`,
-  ];
-  const map = {};
-  await Promise.all(urls.map(async (url) => {
-    try {
-      const resp = await fetch(new URL(url, window.location.origin).href);
-      if (!resp.ok) return;
-      const json = await resp.json();
-      const data = json?.data;
-      if (Array.isArray(data)) {
-        data.forEach((entry) => {
-          if (entry?.Key != null) map[entry.Key] = entry.Text ?? entry.Key;
-        });
-      }
-    } catch {
-      // ignore
-    }
-  }));
-  comparisonTranslations = map;
+  const { language } = getLocaleAndLanguage();
+  const lang = (language || 'en_us').split('_')[0];
+  const scriptPath = new URL(import.meta.url).pathname;
+  const jsonPath = scriptPath.replace(/\.js$/, '.json');
+  const url = `${window.hlx?.codeBasePath || ''}${jsonPath}`;
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const key = data[lang] ? lang : 'en';
+    comparisonTranslations = data[key] || {};
+    // Merge normalize terms from all locales so regex matches any language
+    const localeKeys = ['en', 'fr', 'es'].filter((k) => data[k]?.normalize);
+    const normalizeKeys = ['trailingSeries', 'leadingSeries', 'brandName', 'warrantyHeading'];
+    mergedNormalize = {};
+    normalizeKeys.forEach((nk) => {
+      const values = localeKeys
+        .map((lk) => data[lk].normalize[nk])
+        .filter((v) => v != null && String(v).trim() !== '');
+      const unique = [...new Set(values)];
+      mergedNormalize[nk] = unique.length > 0 ? unique : DEFAULT_NORMALIZE[nk];
+    });
+  } catch {
+    comparisonTranslations = {};
+    mergedNormalize = null;
+  }
 }
 
 /**
- * Translate a key if present in loaded translations/placeholders; otherwise return key.
+ * Translate a key if present in loaded translations; otherwise return key.
  * @param {string} key - English (or source) string
  * @returns {string}
  */
 function t(key) {
   if (!key || typeof key !== 'string') return key;
   return comparisonTranslations[key] ?? key;
+}
+
+/** Escape string for safe use in RegExp. */
+function escapeRegex(s) {
+  return String(s).replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
+}
+
+function getNormalizeConfig() {
+  if (mergedNormalize && typeof mergedNormalize === 'object') return mergedNormalize;
+  return DEFAULT_NORMALIZE;
 }
 
 /** Path to checkmark icon SVG (comparison table). */
@@ -172,15 +185,22 @@ function getFeaturesRowByPath(featuresByProduct, productPath) {
  */
 function normalizeSeriesForMatch(s) {
   if (!s || typeof s !== 'string') return '';
+  const cfg = getNormalizeConfig();
+  const trailingArr = cfg.trailingSeries ?? DEFAULT_NORMALIZE.trailingSeries;
+  const leadingArr = cfg.leadingSeries ?? DEFAULT_NORMALIZE.leadingSeries;
+  const brandRaw = cfg.brandName ?? DEFAULT_NORMALIZE.brandName;
+  const trailing = (Array.isArray(trailingArr) ? trailingArr : [trailingArr]).map(escapeRegex).join('|');
+  const leading = (Array.isArray(leadingArr) ? leadingArr : [leadingArr]).map(escapeRegex).join('|');
+  const brand = (Array.isArray(brandRaw) ? brandRaw : [brandRaw]).map(escapeRegex).join('|');
   let norm = s
     .replace(/\s*®\s*|\s*™\s*/gi, ' ')
-    .replace(/\bVitamix\b/gi, '')
-    .replace(/\s+series\s*$/gi, '')
-    .replace(/\s+série\s*$/gi, '')
+    .replace(new RegExp(`\\b${brand}\\b`, 'gi'), '')
+    .replace(new RegExp(`\\s+(${trailing})\\s*$`, 'gi'), '')
     .replace(/\s+/g, ' ')
     .trim();
-  // Strip leading "Séries" / "Series" so "Séries Ascent et Venturist" matches "venturist"
-  norm = norm.replace(/^\s*séries\s+/gi, '').replace(/^\s*series\s+/gi, '').trim();
+  if (leading) {
+    norm = norm.replace(new RegExp(`^\\s*(${leading})\\s+`, 'gi'), '').trim();
+  }
   return norm;
 }
 
@@ -222,7 +242,7 @@ function getFeatureValueFromRow(featuresRow, jsonKey) {
 
 /**
  * Get display value from a features-by-product row for a feature key.
- * :check: -> 'Yes', - or empty -> '—', else verbatim.
+ * Passes through :check: for UI to render as checkmark; - or empty -> '—'; else verbatim.
  * @param {Object} featuresRow - Row from features-by-product.data
  * @param {string} featureKey - Our feature key (e.g. 'Blending Programs')
  * @returns {string}
@@ -233,7 +253,6 @@ function getFeatureDisplayFromRow(featuresRow, featureKey) {
   const raw = getFeatureValueFromRow(featuresRow, jsonKey) ?? featuresRow[featureKey];
   if (raw == null || String(raw).trim() === '') return '—';
   const s = String(raw).trim();
-  if (s === ':check:') return t('Yes');
   if (s === '-') return '—';
   return s;
 }
@@ -421,8 +440,12 @@ function parseSpecsFromPage(doc) {
  * @returns {string} Warranty text or ''
  */
 function parseWarrantyFromPage(doc) {
+  const cfg = getNormalizeConfig();
+  const warrantyHeadings = cfg.warrantyHeading ?? DEFAULT_NORMALIZE.warrantyHeading;
+  const warrantyPattern = (Array.isArray(warrantyHeadings) ? warrantyHeadings : [warrantyHeadings]).map(escapeRegex).join('|');
+  const warrantyRe = new RegExp(warrantyPattern, 'i');
   const headings = [...doc.querySelectorAll('main h3')];
-  const h = headings.find((el) => /warranty/i.test(el.textContent || ''));
+  const h = headings.find((el) => warrantyRe.test(el.textContent || ''));
   if (!h) return '';
   const strong = h.querySelector('strong');
   return (strong?.textContent || h.textContent || '').trim();
@@ -835,7 +858,7 @@ function replaceColumnWithProduct(
       if (featureKey && featuresByProduct?.data) {
         const featuresRow = getFeaturesRowByPath(featuresByProduct, product.path);
         const value = getFeatureDisplayFromRow(featuresRow, featureKey);
-        if (value === 'Yes') {
+        if (value === ':check:') {
           const checkHtml = `<p><span class="icon icon-check"><img src="${CHECK_ICON_SVG}" width="20" height="20" alt="${t('Check')}"></span></p>`;
           cell.innerHTML = checkHtml;
         } else {
@@ -997,7 +1020,7 @@ async function handleCompareProductsParam(widget) {
 }
 
 /**
- * Build a placeholder card when a product failed to load.
+ * Build an empty-state card when a product failed to load.
  * @param {string} path - Product path (for link)
  * @param {number} index - Index (for remove)
  * @param {Function} onRemove - Callback when remove is clicked
@@ -1143,7 +1166,7 @@ function buildFeaturesTable(slots, tableEl, featuresByProduct) {
       } else if (slot.product) {
         value = '—';
       }
-      if (value === 'Yes') {
+      if (value === ':check:') {
         const check = document.createElement('span');
         check.className = 'compare-products-features-cell-check';
         check.setAttribute('aria-hidden', 'true');
