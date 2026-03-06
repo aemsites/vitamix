@@ -611,10 +611,8 @@ function buildFiltering(block, ph, config) {
   const syncFilterConfigToUrl = (filterConfig) => {
     const params = new URLSearchParams();
     Object.entries(filterConfig).forEach(([key, value]) => {
-      let v = value != null ? String(value).trim() : '';
-      if (v && key === 'category') {
-        v = v.split(',').map((t) => toClassName(t.trim())).join(',');
-      }
+      if (key === 'category') return;
+      const v = value != null ? String(value).trim() : '';
       if (v) params.set(key, v);
     });
     const search = params.toString();
