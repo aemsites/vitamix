@@ -214,7 +214,7 @@ export function showError(message) {
  */
 export function updateProgress(current, total, text) {
   const progressBar = document.getElementById('progressBar');
-  const progressText = document.getElementById('progressText');
+  const progressText = document.getElementById('progress-text');
   const pct = total > 0 ? Math.round((current / total) * 100) : 0;
   progressBar.style.width = `${pct}%`;
   progressText.textContent = text ?? `Looking up coordinates... ${current} of ${total}`;

@@ -8,6 +8,16 @@
   margin-bottom: 10px;
 }
 
+.sync-success h3,
+.sync-error h3 {
+  margin: 0.5rem 0;
+}
+
+.sync-success p,
+.sync-error p {
+  margin: 0.5rem 0;
+  font-size: 0.9rem;
+}
 
 .modal#sync dialog .modal-content h3 {
   padding-top: 0;
@@ -182,17 +192,6 @@
   font-size: 3rem;
   display: block;
   margin-bottom: 1rem;
-}
-
-.sync-success h3,
-.sync-error h3 {
-  margin: 0.5rem 0;
-}
-
-.sync-success p,
-.sync-error p {
-  margin: 0.5rem 0;
-  font-size: 0.9rem;
 }
 
 .reload-button {

@@ -243,6 +243,35 @@
         ul.appendChild(li);
       });
       fragment.appendChild(ul);
+      const copyBlock = document.createElement('div');
+      copyBlock.className = 'copy-404-block';
+      const copyLabel = document.createElement('p');
+      copyLabel.className = 'copy-404-label';
+      copyLabel.textContent = 'Copy for spreadsheet (one 404 per line):';
+      copyBlock.appendChild(copyLabel);
+      const copyText = byStatus[404].map(({ url }) => url).join('\n');
+      const copyTextarea = document.createElement('textarea');
+      copyTextarea.className = 'copy-404-textarea';
+      copyTextarea.readOnly = true;
+      copyTextarea.rows = Math.min(byStatus[404].length, 15);
+      copyTextarea.value = copyText;
+      copyBlock.appendChild(copyTextarea);
+      const copyBtn = document.createElement('button');
+      copyBtn.type = 'button';
+      copyBtn.className = 'copy-404-btn';
+      copyBtn.textContent = 'Copy 404 URLs';
+      copyBtn.addEventListener('click', () => {
+        navigator.clipboard.writeText(copyText).then(() => {
+          copyBtn.textContent = 'Copied!';
+          copyBtn.disabled = true;
+          setTimeout(() => {
+            copyBtn.textContent = 'Copy 404 URLs';
+            copyBtn.disabled = false;
+          }, 2000);
+        });
+      });
+      copyBlock.appendChild(copyBtn);
+      fragment.appendChild(copyBlock);
     }
     if (byStatus.other.length) {
       const h3 = document.createElement('h3');

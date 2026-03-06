@@ -31,7 +31,7 @@ h1 {
   background: white;
   padding: 25px;
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px rgb(0 0 0 / 10%);
   margin-bottom: 20px;
 }
 
@@ -93,7 +93,7 @@ button:disabled {
   background: white;
   padding: 25px;
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px rgb(0 0 0 / 10%);
   margin-bottom: 20px;
 }
 
@@ -118,7 +118,7 @@ button:disabled {
   transition: width 0.2s ease;
 }
 
-#progressText {
+#progress-text {
   margin: 0;
   color: #666;
   font-size: 14px;
@@ -142,7 +142,7 @@ button:disabled {
   background: white;
   padding: 25px;
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px rgb(0 0 0 / 10%);
   display: none;
 }
 
@@ -195,6 +195,16 @@ button:disabled {
   max-width: 0;
 }
 
+.maps-link {
+  color: #1a73e8;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.maps-link:hover {
+  text-decoration: underline;
+}
+
 .results-table .address-cell .maps-link {
   white-space: normal;
   word-break: break-word;
@@ -205,16 +215,6 @@ button:disabled {
   display: inline-block;
   margin-right: 8px;
   max-width: 100%;
-}
-
-.maps-link {
-  color: #1a73e8;
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.maps-link:hover {
-  text-decoration: underline;
 }
 
 .actions {
