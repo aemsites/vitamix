@@ -14,6 +14,11 @@
     </header>
 
     <section class="controls">
+      <div class="control-group control-group-full">
+        <label for="pasted-urls">Or paste URLs to check (one per line)</label>
+        <textarea id="pasted-urls" class="pasted-urls-input" rows="6" placeholder="Paste fully qualified URLs here. Leave empty to use sitemap + link scanning. Hostnames are rewritten to the current origin."></textarea>
+        <span class="hint">When pasting URLs, only 404 checks run; no link scanning.</span>
+      </div>
       <div class="control-group">
         <label for="path-filter">Path filter</label>
         <input type="text" id="path-filter" placeholder="e.g. /us/en_us" />

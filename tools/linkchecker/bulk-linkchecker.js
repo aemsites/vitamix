@@ -1,6 +1,7 @@
 (function initBulkLinkChecker() {
   const pageLimitInput = document.getElementById('page-limit');
   const pathFilterInput = document.getElementById('path-filter');
+  const pastedUrlsInput = document.getElementById('pasted-urls');
   const filterCountEl = document.getElementById('filter-count');
   const runBtn = document.getElementById('run-check');
   const cancelBtn = document.getElementById('cancel-check');
@@ -111,6 +112,23 @@
     } catch (_) {
       return url;
     }
+  }
+
+  function urlWithCurrentHost(urlString) {
+    try {
+      const u = new URL(urlString);
+      return new URL(u.pathname + u.search + u.hash, window.location.origin).href;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function getPastedUrls() {
+    const text = (pastedUrlsInput.value || '').trim();
+    if (!text) return [];
+    const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const result = lines.map((line) => urlWithCurrentHost(line)).filter(Boolean);
+    return [...new Set(result)];
   }
 
   function extractLinksFromHtml(html, pageUrl) {
@@ -332,66 +350,79 @@
     resultsSection.hidden = true;
     clearStatus();
     const baseUrl = window.location.origin;
-    const limit = Math.max(1, Math.min(500, parseInt(pageLimitInput.value, 10) || 10));
-    pageLimitInput.value = limit;
+    const pastedUrls = getPastedUrls();
     abortController = new AbortController();
     runBtn.disabled = true;
     cancelBtn.disabled = false;
 
+    const allLinks = new Map(); // url -> { status, fromPages: Set }
+    let pagesDone = 0;
+    let linkList;
+
     try {
-      let paths = allPaths.length ? allPaths : null;
-      if (!paths) {
-        appendStatus({ text: 'Fetching sitemap…', type: 'phase' });
+      if (pastedUrls.length > 0) {
         setProgress(5);
-        const sitemapUrl = `${baseUrl}/sitemap.json`;
-        const sitemapRes = await fetchWithTimeout(sitemapUrl, { signal: abortController.signal });
-        if (!sitemapRes.ok) {
-          throw new Error(`Sitemap failed: ${sitemapRes.status} ${sitemapRes.statusText}`);
-        }
-        const sitemap = await sitemapRes.json();
-        const rows = sitemap.data || [];
-        paths = rows.map((row) => (row.path != null ? row.path : row[0])).filter(Boolean);
-        allPaths = paths;
+        appendStatus({ text: `Using ${pastedUrls.length} pasted URL(s). Checking…`, type: 'phase' });
+        pastedUrls.forEach((url) => {
+          allLinks.set(url, { status: null, fromPages: new Set() });
+        });
+        linkList = pastedUrls;
       } else {
-        setProgress(5);
-      }
-      const filtered = paths.filter((p) => pathMatchesFilter(p, pathFilterInput.value || ''));
-      const toCheck = filtered.slice(0, limit);
-      appendStatus({ text: `Sitemap loaded. Checking ${toCheck.length} page(s).`, type: 'phase' });
-
-      const allLinks = new Map(); // url -> { status, fromPages: Set }
-      let pagesDone = 0;
-
-      await toCheck.reduce(async (prev, path, i) => {
-        await prev;
-        const pathNorm = path.startsWith('/') ? path : `/${path}`;
-        const pageUrl = `${baseUrl}${pathNorm}`;
-        appendStatus({
-          text: `Page ${i + 1}/${toCheck.length}: `,
-          type: 'page',
-          url: pageUrl,
-        });
-        setProgress(10 + (60 * (i + 1)) / toCheck.length);
-
-        const pageRes = await fetchWithTimeout(pageUrl, { signal: abortController.signal });
-        const html = await pageRes.text();
-        const links = extractLinksFromHtml(html, pageUrl);
-
-        appendStatus({ text: `  Found ${links.length} link(s) on this page.`, type: 'page-links' });
-
-        links.forEach((linkUrl) => {
-          if (isExcludedLinkUrl(linkUrl)) return;
-          if (!allLinks.has(linkUrl)) {
-            allLinks.set(linkUrl, { status: null, fromPages: new Set() });
+        const limit = Math.max(1, Math.min(500, parseInt(pageLimitInput.value, 10) || 10));
+        pageLimitInput.value = limit;
+        let paths = allPaths.length ? allPaths : null;
+        if (!paths) {
+          appendStatus({ text: 'Fetching sitemap…', type: 'phase' });
+          setProgress(5);
+          const sitemapUrl = `${baseUrl}/sitemap.json`;
+          const sitemapRes = await fetchWithTimeout(sitemapUrl, { signal: abortController.signal });
+          if (!sitemapRes.ok) {
+            throw new Error(`Sitemap failed: ${sitemapRes.status} ${sitemapRes.statusText}`);
           }
-          allLinks.get(linkUrl).fromPages.add(pageUrl);
-        });
-        pagesDone += 1;
-      }, Promise.resolve());
+          const sitemap = await sitemapRes.json();
+          const rows = sitemap.data || [];
+          paths = rows.map((row) => (row.path != null ? row.path : row[0])).filter(Boolean);
+          allPaths = paths;
+        } else {
+          setProgress(5);
+        }
+        const filtered = paths.filter((p) => pathMatchesFilter(p, pathFilterInput.value || ''));
+        const toCheck = filtered.slice(0, limit);
+        appendStatus({ text: `Sitemap loaded. Checking ${toCheck.length} page(s).`, type: 'phase' });
 
-      const linkList = [...allLinks.keys()];
-      appendStatus({ text: `Checking ${linkList.length} unique link(s)…`, type: 'phase' });
+        await toCheck.reduce(async (prev, path, i) => {
+          await prev;
+          const pathNorm = path.startsWith('/') ? path : `/${path}`;
+          const pageUrl = `${baseUrl}${pathNorm}`;
+          appendStatus({
+            text: `Page ${i + 1}/${toCheck.length}: `,
+            type: 'page',
+            url: pageUrl,
+          });
+          setProgress(10 + (60 * (i + 1)) / toCheck.length);
 
+          const pageRes = await fetchWithTimeout(pageUrl, { signal: abortController.signal });
+          const html = await pageRes.text();
+          const links = extractLinksFromHtml(html, pageUrl);
+
+          appendStatus({ text: `  Found ${links.length} link(s) on this page.`, type: 'page-links' });
+
+          links.forEach((linkUrl) => {
+            if (isExcludedLinkUrl(linkUrl)) return;
+            if (!allLinks.has(linkUrl)) {
+              allLinks.set(linkUrl, { status: null, fromPages: new Set() });
+            }
+            allLinks.get(linkUrl).fromPages.add(pageUrl);
+          });
+          pagesDone += 1;
+        }, Promise.resolve());
+
+        linkList = [...allLinks.keys()];
+        appendStatus({ text: `Checking ${linkList.length} unique link(s)…`, type: 'phase' });
+      }
+
+      const progressStart = pastedUrls.length > 0 ? 10 : 70;
+      const progressSpan = pastedUrls.length > 0 ? 85 : 25;
       await linkList.reduce(async (prev, url, i) => {
         await prev;
         const info = allLinks.get(url);
@@ -424,7 +455,7 @@
           badge: String(info.status),
           badgeClass,
         });
-        setProgress(70 + (25 * (i + 1)) / linkList.length);
+        setProgress(progressStart + (progressSpan * (i + 1)) / linkList.length);
       }, Promise.resolve());
 
       appendStatus({ text: 'Done.', type: 'phase' });

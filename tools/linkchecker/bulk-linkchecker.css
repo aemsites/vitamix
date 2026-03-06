@@ -66,6 +66,22 @@
   min-width: 12rem;
 }
 
+.control-group-full {
+  flex-basis: 100%;
+}
+
+.pasted-urls-input {
+  width: 100%;
+  min-height: 8rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
 .filter-count {
   display: block;
   margin-top: 0.25rem;
