@@ -158,14 +158,15 @@ export async function lookupProducts(config, facets = {}) {
 
   // map singular filter names to their plural product property names
   const cleanKeys = {
-    category: 'categories',
+    category: 'categoriesUrlKey',
     collection: 'collections',
   };
 
   // parse comma-separated filter values into trimmed token arrays for matching
   const tokens = {};
   filterKeys.forEach((key) => {
-    tokens[key] = config[key].split(',').map((t) => t.trim());
+    const raw = config[key].split(',').map((t) => t.trim());
+    tokens[key] = key === 'category' ? raw.map((t) => toClassName(t)) : raw;
   });
   // filter products based on all configured criteria (must match ALL filters)
   const results = window.productIndex.parents.filter((product) => {
@@ -596,6 +597,31 @@ function buildFiltering(block, ph, config) {
     highlightResults(resultsElement);
   };
 
+  // merge URL query params into config so shared links load pre-filtered
+  const mergeParamsFromUrl = (base) => {
+    const params = new URLSearchParams(window.location.search);
+    const urlConfig = { ...base };
+    params.forEach((value, key) => {
+      urlConfig[key] = value.trim();
+    });
+    return urlConfig;
+  };
+
+  // sync current filter state to URL for shareable links
+  const syncFilterConfigToUrl = (filterConfig) => {
+    const params = new URLSearchParams();
+    Object.entries(filterConfig).forEach(([key, value]) => {
+      let v = value != null ? String(value).trim() : '';
+      if (v && key === 'category') {
+        v = v.split(',').map((t) => toClassName(t.trim())).join(',');
+      }
+      if (v) params.set(key, v);
+    });
+    const search = params.toString();
+    const url = `${window.location.pathname}${search ? `?${search}` : ''}`;
+    window.history.replaceState(null, '', url);
+  };
+
   // gets all currently selected filter checkboxes
   const getSelectedFilters = () => [...block.querySelectorAll('input[type="checkbox"]:checked')];
 
@@ -711,6 +737,7 @@ function buildFiltering(block, ph, config) {
     block.querySelector('#plp-results-count').textContent = results.length;
     displayResults(results, null);
     displayFacets(facets, filterConfig);
+    syncFilterConfigToUrl(filterConfig);
   };
 
   const fulltextElement = block.querySelector('#fulltext');
@@ -722,7 +749,9 @@ function buildFiltering(block, ph, config) {
     fulltextElement.style.display = 'none';
   }
 
-  runSearch(config);
+  const initialConfig = mergeParamsFromUrl(config);
+  if (initialConfig.fulltext) fulltextElement.value = initialConfig.fulltext;
+  runSearch(initialConfig);
 }
 
 export default async function decorate(block) {
