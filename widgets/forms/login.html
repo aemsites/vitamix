@@ -1,0 +1,23 @@
+<form class="login-form" method="post" action="" aria-label="Login">
+  <div class="login-field">
+    <label for="login-email">
+      <span class="label-text">Email Address</span><span class="required" aria-hidden="true">*</span>
+    </label>
+    <input id="login-email" type="email" name="email" required aria-required="true" placeholder="" autocomplete="email">
+  </div>
+  <div class="login-actions">
+    <button type="submit" class="button emphasis">Submit</button>
+  </div>
+</form>
+<div class="login-verify" aria-live="polite" hidden>
+  <h3 class="login-verify-title"></h3>
+  <p class="login-verify-instruction"></p>
+  <div class="login-verify-inputs" role="group" aria-label="Verification code">
+    <input type="text" inputmode="numeric" pattern="[0-9A-Za-z]" maxlength="1" class="login-verify-input" data-index="0" aria-label="Code digit 1">
+    <input type="text" inputmode="numeric" pattern="[0-9A-Za-z]" maxlength="1" class="login-verify-input" data-index="1" aria-label="Code digit 2">
+    <input type="text" inputmode="numeric" pattern="[0-9A-Za-z]" maxlength="1" class="login-verify-input" data-index="2" aria-label="Code digit 3">
+    <input type="text" inputmode="numeric" pattern="[0-9A-Za-z]" maxlength="1" class="login-verify-input" data-index="3" aria-label="Code digit 4">
+  </div>
+  <p class="login-verify-didnt-receive"></p>
+  <button type="button" class="button emphasis login-verify-resend">Resend code</button>
+</div>

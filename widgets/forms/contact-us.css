@@ -1,0 +1,69 @@
+/* Contact us form – vertical stack, labels above, uses global form/input styles */
+.forms-contact-us {
+  background-color: var(--color-gray-100);
+  padding: var(--spacing-300);
+  border-radius: var(--rounding-m);
+  max-width: 100%;
+}
+
+.forms-contact-us .contact-us-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-200);
+  max-width: 32rem;
+}
+
+.forms-contact-us .contact-us-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
+}
+
+.forms-contact-us .contact-us-field label {
+  margin-bottom: 0;
+}
+
+.forms-contact-us .contact-us-field .required {
+  color: var(--color-red);
+  margin-left: 0.15em;
+}
+
+.forms-contact-us .contact-us-actions {
+  margin-top: var(--spacing-100);
+}
+
+.forms-contact-us .contact-us-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+}
+
+.forms-contact-us .contact-us-radio-group .radio-legend {
+  font-weight: var(--font-weight-medium, 500);
+  display: block;
+}
+
+.forms-contact-us .radio-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
+}
+
+.forms-contact-us .radio-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  cursor: pointer;
+}
+
+.forms-contact-us .contact-us-form button[type="submit"] {
+  background-color: var(--color-charcoal);
+  border-color: var(--color-charcoal);
+  color: var(--color-white);
+}
+
+.forms-contact-us .contact-us-form button[type="submit"]:hover,
+.forms-contact-us .contact-us-form button[type="submit"]:focus {
+  background-color: var(--color-gray-900);
+  border-color: var(--color-gray-900);
+}

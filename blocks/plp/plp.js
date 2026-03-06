@@ -413,9 +413,13 @@ function createProductCard(product, ph) {
 async function styleRowAsSlide(content, ph) {
   const [image, body] = content.children;
   const link = body.querySelector('a[href]');
-  link.parentElement.remove();
   const { pathname } = new URL(link.href);
   const [product] = await lookupProducts([pathname]);
+  if (!product) {
+    link.classList.add('linkchecker-invalid-link');
+    return;
+  }
+  link.parentElement.remove();
 
   // replace or add product image with lazy loading
   let img = image.querySelector('picture');

@@ -1,0 +1,88 @@
+<div class="manage-address-header">
+  <h2 class="manage-address-title"></h2>
+</div>
+<form class="manage-address-form" method="post" action="" aria-label="Manage address">
+  <div class="manage-address-columns">
+    <div class="manage-address-column manage-address-contact">
+      <h3 class="manage-address-section-title contact-title"></h3>
+      <div class="manage-address-field">
+        <label for="manage-address-first-name">
+          <span class="label-text">First Name</span><span class="required" aria-hidden="true">*</span>
+        </label>
+        <input id="manage-address-first-name" type="text" name="firstName" required aria-required="true" placeholder="" autocomplete="given-name">
+      </div>
+      <div class="manage-address-field">
+        <label for="manage-address-last-name">
+          <span class="label-text">Last Name</span><span class="required" aria-hidden="true">*</span>
+        </label>
+        <input id="manage-address-last-name" type="text" name="lastName" required aria-required="true" placeholder="" autocomplete="family-name">
+      </div>
+      <div class="manage-address-field">
+        <label for="manage-address-company">
+          <span class="label-text">Company</span>
+        </label>
+        <input id="manage-address-company" type="text" name="company" placeholder="" autocomplete="organization">
+      </div>
+      <div class="manage-address-field">
+        <label for="manage-address-phone">
+          <span class="label-text">Phone Number</span><span class="required" aria-hidden="true">*</span>
+        </label>
+        <input id="manage-address-phone" type="tel" name="phone" required aria-required="true" placeholder="" autocomplete="tel">
+        <p id="manage-address-phone-help" class="manage-address-field-help"></p>
+      </div>
+    </div>
+    <div class="manage-address-column manage-address-address">
+      <h3 class="manage-address-section-title address-title"></h3>
+      <div class="manage-address-field">
+        <label for="manage-address-address">
+          <span class="label-text">Address</span><span class="required" aria-hidden="true">*</span>
+        </label>
+        <input id="manage-address-address" type="text" name="address" required aria-required="true" placeholder="" autocomplete="street-address">
+      </div>
+      <div class="manage-address-field">
+        <label for="manage-address-address-line-2">
+          <span class="label-text">Address Line 2</span>
+        </label>
+        <input id="manage-address-address-line-2" type="text" name="addressLine2" placeholder="" autocomplete="address-line2">
+      </div>
+      <div class="manage-address-field">
+        <label for="manage-address-city">
+          <span class="label-text">City</span><span class="required" aria-hidden="true">*</span>
+        </label>
+        <input id="manage-address-city" type="text" name="city" required aria-required="true" placeholder="" autocomplete="address-level2">
+      </div>
+      <div class="manage-address-field">
+        <label for="manage-address-province">
+          <span class="label-text">Province</span><span class="required" aria-hidden="true">*</span>
+        </label>
+        <select id="manage-address-province" name="province" required aria-required="true">
+          <option value="">Please select a region, state or province</option>
+        </select>
+      </div>
+      <div class="manage-address-field">
+        <label for="manage-address-postal-code">
+          <span class="label-text">Postal code</span><span class="required" aria-hidden="true">*</span>
+        </label>
+        <input id="manage-address-postal-code" type="text" name="postalCode" required aria-required="true" placeholder="" autocomplete="postal-code">
+      </div>
+      <div class="manage-address-checkboxes">
+        <div class="manage-address-field manage-address-checkbox">
+          <label class="checkbox-label">
+            <input type="checkbox" name="defaultBilling" value="yes">
+            <span class="checkbox-text"></span>
+          </label>
+        </div>
+        <div class="manage-address-field manage-address-checkbox">
+          <label class="checkbox-label">
+            <input type="checkbox" name="defaultShipping" value="yes">
+            <span class="checkbox-text"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="manage-address-actions">
+    <button type="submit" class="button emphasis">Save address</button>
+    <button type="button" class="button link-style manage-address-cancel">Cancel</button>
+  </div>
+</form>

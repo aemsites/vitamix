@@ -1,6 +1,5 @@
 import { getMetadata, toClassName, fetchPlaceholders } from '../../scripts/aem.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
-import { normalizeCompatibleContainers, isFrenchContainerLocale } from './recipe-containers.js';
 
 function wrapInDiv(element, className) {
   if (!element) return;
@@ -359,16 +358,14 @@ export default async function decorate(block) {
       // Find all recipes with the same title
       const sameRecipes = data.data.filter((recipe) => recipe.title === recipeTitle);
 
-      // Build container display names (alias + French if needed) and map to a recipe path
-      const useFrenchDisplay = isFrenchContainerLocale(locale, language);
+      // Build container names from index and map to a recipe path
       const containerMap = new Map();
       sameRecipes.forEach((recipe) => {
         if (recipe['compatible-containers']) {
-          const raw = recipe['compatible-containers'].split(',').map((c) => c.trim()).filter(Boolean);
-          const displayNames = normalizeCompatibleContainers(raw, useFrenchDisplay);
-          displayNames.forEach((displayName) => {
-            if (!containerMap.has(displayName)) {
-              containerMap.set(displayName, recipe.path);
+          const names = recipe['compatible-containers'].split(',').map((c) => c.trim()).filter(Boolean);
+          names.forEach((name) => {
+            if (!containerMap.has(name)) {
+              containerMap.set(name, recipe.path);
             }
           });
         }

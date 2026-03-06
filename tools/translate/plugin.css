@@ -1,0 +1,122 @@
+@import url('./shared.css');
+
+.translate-container {
+  width: min(560px, 100%);
+}
+
+.translate-form {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 16px;
+}
+
+.translate-input,
+.translate-output {
+  display: grid;
+  gap: 12px;
+}
+
+.translate-error {
+  color: #c62828;
+  font-size: 13px;
+  min-height: 16px;
+  display: none;
+}
+
+.translate-input {
+  grid-template-columns: minmax(0, 1fr) 200px;
+  align-items: start;
+}
+
+textarea {
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text);
+  background: #fff;
+  box-shadow: none;
+}
+
+textarea[name="output"] {
+  background: #f7f8fa;
+}
+
+select {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-size: 14px;
+  color: var(--text);
+  background: #fff;
+  box-shadow: none;
+}
+
+textarea:focus,
+select:focus,
+button:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+button {
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.08s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+button[name="translate"] {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: none;
+}
+
+button[name="translate"]:hover {
+  background: var(--primary-dark);
+}
+
+button[name="replace"] {
+  background: #f3f4f6;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+button[name="replace"]:hover {
+  background: #e7eaee;
+}
+
+@media (width <= 720px) {
+  .translate-form {
+    padding: 20px;
+  }
+
+  .translate-input {
+    grid-template-columns: 1fr;
+  }
+
+  button {
+    width: 100%;
+  }
+}
+
+@media (width <= 500px) {
+  .translate-input textarea,
+  .translate-output textarea,
+  button[name="replace"] {
+    display: none;
+  }
+}

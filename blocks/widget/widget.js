@@ -6,8 +6,8 @@ import { loadCSS } from '../../scripts/aem.js';
  * @param {string} extension - File extension
  * @returns {string} Complete URL path to widget resource
  */
-function writeUrl(widget, extension) {
-  return `${window.hlx.codeBasePath}/widgets/${widget}/${widget}.${extension}`;
+function writeUrl(widgetPath, widgetName, extension) {
+  return `${window.hlx.codeBasePath}/widgets/${widgetPath}/${widgetName}.${extension}`;
 }
 
 /**
@@ -20,29 +20,35 @@ export default async function decorate(widget) {
   const source = widget.querySelector('a[href]');
   const { pathname, searchParams } = new URL(source.href);
   const pathSegments = pathname.split('/').filter((p) => p);
-  const widgetName = pathSegments[1]; // extract widget name (after '/widgets/')
+  const widgetPath = pathSegments[1]; // extract widget name (after '/widgets/')
+  const widgetName = pathSegments[2].split('.')[0]; // extract widget name (after '/widgets/')
 
   try {
     // load and populate html
-    const resp = await fetch(writeUrl(widgetName, 'html'));
+    const resp = await fetch(writeUrl(widgetPath, widgetName, 'html'));
     widget.innerHTML = await resp.text();
 
     // load css asynchronously
-    const cssLoaded = loadCSS(writeUrl(widgetName, 'css'));
+    const cssLoaded = loadCSS(writeUrl(widgetPath, widgetName, 'css'));
 
     // load and execute js
     const decorationComplete = (async () => {
-      const mod = await import(writeUrl(widgetName, 'js'));
+      const mod = await import(writeUrl(widgetPath, widgetName, 'js'));
       if (mod.default) await mod.default(widget);
     })();
     await Promise.all([cssLoaded, decorationComplete]);
 
+    let cssPrefix = widgetName;
+    if (widgetPath !== widgetName) {
+      cssPrefix = `${widgetPath}-${widgetName}`;
+    }
+
     // apply widget styling and metadata
     const wrapper = widget.closest('.widget-wrapper');
-    wrapper.classList.add(`${widgetName}-wrapper`);
+    wrapper.classList.add(`${cssPrefix}-wrapper`);
     const container = wrapper.closest('.widget-container');
-    container.classList.add(`${widgetName}-container`);
-    widget.classList.add(widgetName);
+    container.classList.add(`${cssPrefix}-container`);
+    widget.classList.add(cssPrefix);
     widget.dataset.source = source.href;
     const params = new URLSearchParams(searchParams);
     params.forEach((value, key) => {
