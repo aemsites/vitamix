@@ -21,7 +21,7 @@ const { hostname } = window.location;
 
 export const ORDERS_API_ORIGIN = 'https://vitamix-api.adobeaem.workers.dev';
 
-window.cartMode = hostname.includes('localhost') || hostname.includes('edge-orders--') ? 'edge' : 'legacy';
+window.cartMode = hostname.includes('localhost') || hostname.startsWith('edge-orders-') ? 'edge' : 'legacy';
 if (['edge', 'legacy'].includes(localStorage.getItem('cartMode'))) {
   window.cartMode = localStorage.getItem('cartMode');
 }
