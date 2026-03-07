@@ -7,12 +7,29 @@ import {
 import { getFirstName } from './user-identity.js';
 
 const AEM_BASE = 'https://main--vitamix--aemsites.aem.network';
-const PRODUCT_JSON_BASE = `${AEM_BASE}/us/en_us/products/`;
-const PRODUCTS_BASE_URL = `${AEM_BASE}/us/en_us/products/`;
-const INDEX_URL = `${AEM_BASE}/us/en_us/products/index.json?include=all`;
 const IMAGE_QUERY = '?width=750&format=webply&optimize=medium';
 const CORS_PROXY = 'https://fcors.org/?url=';
 const CORS_KEY = '&key=Mg23N96GgR8O3NjU';
+
+const CATALOG_PARAM = 'catalog';
+const DEFAULT_CATALOG = 'us/en_us';
+
+function getCatalogFromParams() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get(CATALOG_PARAM) || DEFAULT_CATALOG;
+}
+
+function getProductJsonBase() {
+  return `${AEM_BASE}/${getCatalogFromParams()}/products/`;
+}
+
+function getProductsBaseUrl() {
+  return `${AEM_BASE}/${getCatalogFromParams()}/products/`;
+}
+
+function getIndexUrl() {
+  return `${AEM_BASE}/${getCatalogFromParams()}/products/index.json?include=all`;
+}
 
 let currentProductData = null;
 let currentIndexByUrlKey = {};
@@ -56,7 +73,7 @@ function resolveImageUrl(imagePath) {
   const path = typeof imagePath === 'string' ? imagePath : imagePath?.url || '';
   if (path.startsWith('http://') || path.startsWith('https://')) return path;
   const normalized = path.startsWith('./') ? path.slice(2) : path;
-  return normalized ? PRODUCTS_BASE_URL + normalized + IMAGE_QUERY : '';
+  return normalized ? getProductsBaseUrl() + normalized + IMAGE_QUERY : '';
 }
 
 function escapeHtml(str) {
@@ -73,7 +90,7 @@ function showError(message) {
 }
 
 async function fetchProductJson(urlKey) {
-  const url = `${PRODUCT_JSON_BASE}${encodeURIComponent(urlKey)}.json`;
+  const url = `${getProductJsonBase()}${encodeURIComponent(urlKey)}.json`;
   const fetchUrl = CORS_PROXY + encodeURIComponent(url) + CORS_KEY;
   const response = await fetch(fetchUrl);
   if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -84,7 +101,7 @@ async function fetchProductJson(urlKey) {
 }
 
 async function fetchProductsIndex() {
-  const fetchUrl = CORS_PROXY + encodeURIComponent(INDEX_URL) + CORS_KEY;
+  const fetchUrl = CORS_PROXY + encodeURIComponent(getIndexUrl()) + CORS_KEY;
   const response = await fetch(fetchUrl);
   if (!response.ok) throw new Error(`Index: HTTP ${response.status}`);
   const json = await response.json();
@@ -113,7 +130,7 @@ function resolveIndexImageUrl(imagePath) {
   const path = typeof imagePath === 'string' ? imagePath : imagePath?.url || '';
   if (path.startsWith('http://') || path.startsWith('https://')) return path;
   const normalized = path.startsWith('./') ? path.slice(2) : path;
-  return normalized ? PRODUCTS_BASE_URL + normalized + IMAGE_QUERY : '';
+  return normalized ? getProductsBaseUrl() + normalized + IMAGE_QUERY : '';
 }
 
 function renderValue(label, value, path, isEditMode) {
@@ -182,7 +199,8 @@ function renderLinkedProducts(paths, indexByUrlKey, sectionTitle, pathKey, isEdi
   const cards = list.map((path, i) => {
     const urlKey = pathToUrlKey(path);
     const product = indexByUrlKey[urlKey];
-    const detailHref = `detail.html?product=${encodeURIComponent(urlKey)}`;
+        const catalog = getCatalogFromParams();
+    const detailHref = `detail.html?catalog=${encodeURIComponent(catalog)}&product=${encodeURIComponent(urlKey)}`;
     const name = product ? (product.title || product.name || product.sku || urlKey) : urlKey;
     const imgSrc = product && product.image ? resolveIndexImageUrl(product.image) : '';
     const delBtn = isEditMode ? `<button type="button" class="pim-edit-delete" data-edit-path="${escapeHtml(pathKey)}" data-edit-index="${i}" aria-label="Delete">×</button>` : '';
@@ -419,7 +437,7 @@ function arrayAdd(path) {
   let template;
   if (path === 'images') template = { url: './media_new.jpg' };
   else if (path === 'custom.resources') template = { name: 'New resource', type: 'pdf', url: 'https://' };
-  else if (path === 'custom.crosssellSkus' || path === 'custom.relatedSkus') template = '/us/en_us/products/new-product';
+  else if (path === 'custom.crosssellSkus' || path === 'custom.relatedSkus') template = `/${getCatalogFromParams()}/products/new-product`;
   else template = {};
   const arr = getByPath(currentProductData, path) || [];
   const next = Array.isArray(arr) ? [...arr, template] : [template];
@@ -572,6 +590,8 @@ async function init() {
     reviewHistory = getReviewHistoryForProduct(reviewEvents, urlKey);
     loading.classList.remove('active');
     toolbar.style.display = 'flex';
+    const backLink = toolbar.querySelector('.pim-detail-back-link');
+    if (backLink) backLink.href = `../product-admin.html?catalog=${encodeURIComponent(getCatalogFromParams())}`;
 
     editCheckbox.addEventListener('change', () => {
       editMode = editCheckbox.checked;

@@ -374,14 +374,16 @@ export async function init() {
     document.getElementById('productList').addEventListener('click', (e) => {
       const row = e.target.closest('tr.pim-row');
       if (!row || !row.dataset.urlkey) return;
-      window.location.href = `product-admin/detail.html?product=${encodeURIComponent(row.dataset.urlkey)}`;
+      const catalog = currentLocalePath ? `catalog=${encodeURIComponent(currentLocalePath)}&` : '';
+        window.location.href = `product-admin/detail.html?${catalog}product=${encodeURIComponent(row.dataset.urlkey)}`;
     });
     document.getElementById('productList').addEventListener('keydown', (e) => {
       const row = e.target.closest('tr.pim-row');
       if (!row || !row.dataset.urlkey) return;
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
-        window.location.href = `product-admin/detail.html?product=${encodeURIComponent(row.dataset.urlkey)}`;
+        const catalog = currentLocalePath ? `catalog=${encodeURIComponent(currentLocalePath)}&` : '';
+        window.location.href = `product-admin/detail.html?${catalog}product=${encodeURIComponent(row.dataset.urlkey)}`;
       }
     });
 
