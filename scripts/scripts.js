@@ -1115,7 +1115,8 @@ async function simulatePDPPreview() {
     return fetch(`${corsProxy}${encodeURIComponent(fullUrl)}${corsKey}`);
   };
   const { pathname } = new URL(window.location.href);
-  const resp = await corsProxyFetch(pathname);
+  const prefixedPathname = `/stage${pathname}`;
+  const resp = await corsProxyFetch(prefixedPathname);
   const html = await resp.text();
   const dom = new DOMParser().parseFromString(html, 'text/html');
   const stashedMain = document.querySelector('main');
