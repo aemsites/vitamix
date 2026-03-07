@@ -9,7 +9,7 @@ import {
   loadBlock,
 } from '../../scripts/aem.js';
 
-import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { getLocaleAndLanguage, formatPrice } from '../../scripts/scripts.js';
 
 /**
  * Constructs a localized product URL path.
@@ -68,11 +68,19 @@ function parseData(data, locale, language) {
  * @returns {Promise<Array<Object>>} Array of filtered parent product objects (with nested variants)
  */
 export async function lookupProducts(config, facets = {}) {
-  const { locale, language } = await getLocaleAndLanguage();
+  const { locale, language } = getLocaleAndLanguage();
+  const corsProxyFetch = async (url) => {
+    const corsProxy = 'https://fcors.org/?url=';
+    const corsKey = '&key=Mg23N96GgR8O3NjU';
+    const fullUrl = `https://main--vitamix--aemsites.aem.network${url}`;
+    return fetch(`${corsProxy}${encodeURIComponent(fullUrl)}${corsKey}`);
+  };
 
   if (!window.productIndex) {
     // fetch the main product index
-    const resp = await fetch(`/${locale}/${language}/products/index.json?include=all`);
+    const isProd = window.location.hostname.includes('vitamix.com') || window.location.hostname.includes('.aem.network');
+    const pathname = `/${locale}/${language}/products/index.json?include=all`;
+    const resp = await (isProd ? fetch(pathname) : corsProxyFetch(pathname));
     const { data } = await resp.json();
 
     // separate products into parents (standalone products) and variants (color/style options)
@@ -150,14 +158,15 @@ export async function lookupProducts(config, facets = {}) {
 
   // map singular filter names to their plural product property names
   const cleanKeys = {
-    category: 'categories',
+    category: 'categoriesUrlKey',
     collection: 'collections',
   };
 
   // parse comma-separated filter values into trimmed token arrays for matching
   const tokens = {};
   filterKeys.forEach((key) => {
-    tokens[key] = config[key].split(',').map((t) => t.trim());
+    const raw = config[key].split(',').map((t) => t.trim());
+    tokens[key] = key === 'category' ? raw.map((t) => toClassName(t)) : raw;
   });
   // filter products based on all configured criteria (must match ALL filters)
   const results = window.productIndex.parents.filter((product) => {
@@ -267,10 +276,10 @@ function createProductTitle(product, h = 'h4') {
  * @param {Object} product - Product data object
  * @returns {HTMLParagraphElement} Product price element
  */
-function createProductPrice(product) {
+function createProductPrice(product, ph) {
   const price = document.createElement('p');
   price.className = 'plp-price';
-  price.textContent = product.price ? `$${product.price}` : '';
+  price.textContent = product.price ? formatPrice(product.price, ph) : '';
   return price;
 }
 
@@ -374,7 +383,7 @@ function createProductCard(product, ph) {
 
   const image = createProductImage(product);
   const title = createProductTitle(product);
-  const price = createProductPrice(product);
+  const price = createProductPrice(product, ph);
   const colors = createProductColors(product);
   const viewDetails = createProductButton(product, ph, 'View Details', 'emphasis');
   const compare = createProductButton(product, ph, 'Compare');
@@ -405,9 +414,13 @@ function createProductCard(product, ph) {
 async function styleRowAsSlide(content, ph) {
   const [image, body] = content.children;
   const link = body.querySelector('a[href]');
-  link.parentElement.remove();
   const { pathname } = new URL(link.href);
   const [product] = await lookupProducts([pathname]);
+  if (!product) {
+    link.classList.add('linkchecker-invalid-link');
+    return;
+  }
+  link.parentElement.remove();
 
   // replace or add product image with lazy loading
   let img = image.querySelector('picture');
@@ -443,13 +456,13 @@ async function styleRowAsSlide(content, ph) {
     startingAt.className = 'eyebrow';
     startingAt.textContent = ph.startingAt || 'Starting at';
 
-    const price = createProductPrice(product);
+    const price = createProductPrice(product, ph);
     if (product.regularPrice && product.regularPrice > product.price) {
       const savings = (product.regularPrice - product.price).toFixed(2);
       const saleInfo = document.createElement('span');
-      saleInfo.textContent = `| ${ph.save || 'Save'} $${savings}`;
+      saleInfo.textContent = `| ${ph.save || 'Save'} ${formatPrice(savings, ph)}`;
       const regularPrice = document.createElement('del');
-      regularPrice.textContent = `$${product.regularPrice}`;
+      regularPrice.textContent = formatPrice(product.regularPrice, ph);
       saleInfo.prepend(regularPrice);
       price.append(saleInfo);
     }
@@ -584,6 +597,29 @@ function buildFiltering(block, ph, config) {
     highlightResults(resultsElement);
   };
 
+  // merge URL query params into config so shared links load pre-filtered
+  const mergeParamsFromUrl = (base) => {
+    const params = new URLSearchParams(window.location.search);
+    const urlConfig = { ...base };
+    params.forEach((value, key) => {
+      urlConfig[key] = value.trim();
+    });
+    return urlConfig;
+  };
+
+  // sync current filter state to URL for shareable links
+  const syncFilterConfigToUrl = (filterConfig) => {
+    const params = new URLSearchParams();
+    Object.entries(filterConfig).forEach(([key, value]) => {
+      if (key === 'category') return;
+      const v = value != null ? String(value).trim() : '';
+      if (v) params.set(key, v);
+    });
+    const search = params.toString();
+    const url = `${window.location.pathname}${search ? `?${search}` : ''}`;
+    window.history.replaceState(null, '', url);
+  };
+
   // gets all currently selected filter checkboxes
   const getSelectedFilters = () => [...block.querySelectorAll('input[type="checkbox"]:checked')];
 
@@ -699,6 +735,7 @@ function buildFiltering(block, ph, config) {
     block.querySelector('#plp-results-count').textContent = results.length;
     displayResults(results, null);
     displayFacets(facets, filterConfig);
+    syncFilterConfigToUrl(filterConfig);
   };
 
   const fulltextElement = block.querySelector('#fulltext');
@@ -710,11 +747,13 @@ function buildFiltering(block, ph, config) {
     fulltextElement.style.display = 'none';
   }
 
-  runSearch(config);
+  const initialConfig = mergeParamsFromUrl(config);
+  if (initialConfig.fulltext) fulltextElement.value = initialConfig.fulltext;
+  runSearch(initialConfig);
 }
 
 export default async function decorate(block) {
-  const { locale, language } = await getLocaleAndLanguage();
+  const { locale, language } = getLocaleAndLanguage();
   const ph = await fetchPlaceholders(`/${locale}/${language}/products/config`);
   const config = readBlockConfig(block);
   const isCarousel = block.classList.contains('carousel');

@@ -1,0 +1,32 @@
+{
+  "en": {
+    "labels": {
+      "orderNumber": "Order Number",
+      "searchOrder": "Search Order",
+      "searching": "Searching..."
+    },
+    "inputPlaceholders": {
+      "orderNumber": ""
+    }
+  },
+  "fr": {
+    "labels": {
+      "orderNumber": "Numéro de commande",
+      "searchOrder": "Rechercher la commande",
+      "searching": "Recherche en cours..."
+    },
+    "inputPlaceholders": {
+      "orderNumber": ""
+    }
+  },
+  "es": {
+    "labels": {
+      "orderNumber": "Número de pedido",
+      "searchOrder": "Buscar pedido",
+      "searching": "Buscando..."
+    },
+    "inputPlaceholders": {
+      "orderNumber": ""
+    }
+  }
+}

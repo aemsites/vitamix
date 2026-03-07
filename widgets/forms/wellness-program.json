@@ -1,0 +1,83 @@
+{
+  "en": {
+    "labels": {
+      "title": "Let's get started",
+      "introText": "Are you a human resources representative? If not, ",
+      "introLink": "send this page",
+      "introSuffix": " to someone who is.",
+      "requiredLegend": "All fields are mandatory unless otherwise indicated (optional).",
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "companyName": "Company Name",
+      "jobTitle": "Job Title",
+      "phoneNumber": "Phone Number",
+      "emailAddress": "Email Address",
+      "otherRemarks": "Other Remarks",
+      "submit": "Submit",
+      "sending": "Sending..."
+    },
+    "inputPlaceholders": {
+      "firstName": "",
+      "lastName": "",
+      "companyName": "",
+      "jobTitle": "",
+      "phoneNumber": "",
+      "emailAddress": "",
+      "otherRemarks": ""
+    }
+  },
+  "fr": {
+    "labels": {
+      "title": "Commençons",
+      "introText": "Êtes-vous un représentant des ressources humaines? Si vous ne l'êtes pas, ",
+      "introLink": "envoyez cette page",
+      "introSuffix": " à quelqu'un qui l'est.",
+      "requiredLegend": "Tous les champs sont obligatoires sauf indication contraire (optionnel)",
+      "firstName": "Prénom",
+      "lastName": "Nom",
+      "companyName": "Nom de l'entreprise",
+      "jobTitle": "Titre de poste",
+      "phoneNumber": "Numéro de téléphone",
+      "emailAddress": "Adresse courriel",
+      "otherRemarks": "Autres remarques",
+      "submit": "Soumettre",
+      "sending": "Envoi en cours..."
+    },
+    "inputPlaceholders": {
+      "firstName": "",
+      "lastName": "",
+      "companyName": "",
+      "jobTitle": "",
+      "phoneNumber": "",
+      "emailAddress": "",
+      "otherRemarks": ""
+    }
+  },
+  "es": {
+    "labels": {
+      "title": "Comencemos",
+      "introText": "¿Es usted un representante de recursos humanos? Si no, ",
+      "introLink": "envíe esta página",
+      "introSuffix": " a alguien que lo sea.",
+      "requiredLegend": "Todos los campos son obligatorios salvo que se indique lo contrario (opcional).",
+      "firstName": "Nombre",
+      "lastName": "Apellido",
+      "companyName": "Nombre de la empresa",
+      "jobTitle": "Cargo",
+      "phoneNumber": "Número de teléfono",
+      "emailAddress": "Correo electrónico",
+      "otherRemarks": "Otros comentarios",
+      "submit": "Enviar",
+      "sending": "Enviando..."
+    },
+    "inputPlaceholders": {
+      "firstName": "",
+      "lastName": "",
+      "companyName": "",
+      "jobTitle": "",
+      "phoneNumber": "",
+      "emailAddress": "",
+      "otherRemarks": ""
+    }
+  }
+}

@@ -433,6 +433,10 @@
   background-color: var(--color-charcoal);
 }
 
+.banner.split.charcoal .eyebrow {
+  color: var(--color-gray-100)
+}
+
 .banner.split.transparent > div {
   background-color: transparent;
   color: var(--color-charcoal);

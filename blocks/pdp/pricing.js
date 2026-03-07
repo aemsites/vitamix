@@ -1,46 +1,31 @@
-/**
- * Extracts pricing information from a given element.
- * @param {Element} element - The element containing the pricing information.
- * @returns {Object} An object containing the final price and regular price.
- */
-export function extractPricing(element) {
-  if (!element) return null;
-
-  const pricingText = element.textContent.trim();
-
-  // Matches price values in the format $XXX.XX (e.g. $399.95, $1,299.99)
-  // \$ - matches literal dollar sign
-  // ([\d,]+) - matches one or more digits or commas (for thousands)
-  // \.\d{2} - matches decimal point followed by exactly 2 digits
-  const priceMatch = pricingText.match(/\$([\d,]+\.\d{2})/g);
-
-  if (!priceMatch) return null;
-
-  const finalPrice = parseFloat(priceMatch[0].replace(/[$,]/g, ''));
-  const regularPrice = priceMatch[1] ? parseFloat(priceMatch[1].replace(/[$,]/g, '')) : null;
-
-  return {
-    final: finalPrice,
-    regular: regularPrice,
-  };
-}
+import { formatPrice, getOfferPricing } from '../../scripts/scripts.js';
 
 /**
  * Renders the pricing section of the PDP block.
  * @param {Element} block - The PDP block element
  * @returns {Element} The pricing container element
  */
-export default function renderPricing(block, variant) {
+export default function renderPricing(ph, block, variant) {
   const pricingContainer = document.createElement('div');
   pricingContainer.classList.add('pricing');
 
-  const pricingElement = block.querySelector('p:nth-of-type(1)');
-  const pricing = variant ? variant.price : extractPricing(pricingElement);
+  // Don't render pricing if addToCart is set to No
+  if (window.jsonLdData?.custom?.addToCart === 'No') {
+    return pricingContainer;
+  }
+
+  const pricing = variant
+    ? variant.price
+    : getOfferPricing(window.jsonLdData?.offers?.[0]);
   if (!pricing) {
     return null;
   }
 
-  if (!variant) pricingElement.remove();
+  // remove the pipeline-rendered pricing text from the DOM
+  if (!variant) {
+    const pricingElement = block.querySelector('p:nth-of-type(1)');
+    if (pricingElement) pricingElement.remove();
+  }
 
   // Check if the product is reconditioned
   // If the variant is not null, check if the item condition is refurbished
@@ -51,13 +36,13 @@ export default function renderPricing(block, variant) {
   if (pricing.regular && pricing.regular > pricing.final) {
     const nowLabel = document.createElement('div');
     nowLabel.className = 'pricing-now';
-    nowLabel.textContent = isReconditioned ? 'Recon Price' : 'Now';
+    nowLabel.textContent = isReconditioned ? (ph.reconPrice || 'Recon Price') : (ph.now || 'Now');
     pricingContainer.appendChild(nowLabel);
   }
 
   const finalPrice = document.createElement('div');
   finalPrice.className = 'pricing-final';
-  finalPrice.textContent = `$${pricing.final.toFixed(2)}`;
+  finalPrice.textContent = formatPrice(pricing.final, ph);
   pricingContainer.appendChild(finalPrice);
 
   if (pricing.regular && pricing.regular > pricing.final) {
@@ -67,11 +52,13 @@ export default function renderPricing(block, variant) {
     const savingsAmount = pricing.regular - pricing.final;
     const saveText = document.createElement('span');
     saveText.className = 'pricing-save';
-    saveText.textContent = isReconditioned ? `Save $${savingsAmount.toFixed(2)} | New ` : `Save $${savingsAmount.toFixed(2)} | Was `;
+    saveText.textContent = isReconditioned
+      ? `${ph.save || 'Save'} ${formatPrice(savingsAmount, ph)} | ${ph.new || 'New'} `
+      : `${ph.save || 'Save'} ${formatPrice(savingsAmount, ph)} | ${ph.was || 'Was'} `;
 
     const regularPrice = document.createElement('del');
     regularPrice.className = 'pricing-regular';
-    regularPrice.textContent = `$${pricing.regular.toFixed(2)}`;
+    regularPrice.textContent = formatPrice(pricing.regular, ph);
 
     savingsContainer.appendChild(saveText);
     savingsContainer.appendChild(regularPrice);
@@ -97,8 +84,8 @@ export default function renderPricing(block, variant) {
       window._affirm_config = {
         public_api_key: '6PJNMXGC9XLXNFHX',
         script: 'https://cdn1.affirm.com/js/v2/affirm.js',
-        locale: 'en_US',
-        country_code: 'USA',
+        locale: ph.languageCode || 'en_US',
+        country_code: ph.countryCode || 'USA',
         logo: 'blue',
         min_order_total: '50.00',
         max_order_total: '50000',

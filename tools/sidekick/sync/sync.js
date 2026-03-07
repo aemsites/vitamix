@@ -22,8 +22,12 @@ export async function createSyncModal() {
 
   // Expected format: /ca/en_us/products/ascent-x5
   const defaultStoreCode = pathParts[0] || '';
-  const defaultStoreViewCode = pathParts[1] || '';
+  let defaultStoreViewCode = pathParts[1] || '';
   const defaultUrlKey = pathParts[3] || '';
+
+  if (defaultStoreCode === 'ca' && defaultStoreViewCode === 'en_us') {
+    defaultStoreViewCode = 'en_ca';
+  }
 
   // pull the sku from the sku meta tag
   const skuMeta = document.querySelector('meta[name="sku"]');

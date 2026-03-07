@@ -252,6 +252,11 @@ main .plp-product-card p {
 }
 
 @media (min-width: 900px) {
+  main .plp:not(.carousel) {
+    display: grid;
+    grid-template-areas: '- controls sortby' 'facets results results';
+  }
+  
   main .plp-facets > div::after {
     display: none;
   }
@@ -294,11 +299,6 @@ main .plp-product-card p {
     display: unset;
     position: unset;
     width: 360px;
-  }
-
-  main .plp {
-    display: grid;
-    grid-template-areas: '- controls sortby' 'facets results results';
   }
 
   main .plp-sortby {
@@ -454,7 +454,6 @@ main .plp-product-card p {
     top: calc((100dvw - (2 * var(--carousel-gap))) / 6);
   }
 }
-
 
 .plp.carousel li.carousel-slide {
   cursor: pointer;

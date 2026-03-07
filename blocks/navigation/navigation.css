@@ -1,7 +1,27 @@
 main > .navigation-container.section {
   position: sticky;
-  top: 0;
-  z-index: 2;
+  top: var(--header-height); 
+  z-index: 9;
+}
+
+main > .navigation-container.section ~ .section h1,
+main > .navigation-container.section ~ .section h2,
+main > .navigation-container.section ~ .section h3,
+main > .navigation-container.section ~ .section h4,
+main > .navigation-container.section ~ .section h5,
+main > .navigation-container.section ~ .section h6 {
+  scroll-margin-top: calc(56px + 1em);
+}
+
+@media (width >= 800px) {
+  main > .navigation-container.section ~ .section h1,
+  main > .navigation-container.section ~ .section h2,
+  main > .navigation-container.section ~ .section h3,
+  main > .navigation-container.section ~ .section h4,
+  main > .navigation-container.section ~ .section h5,
+  main > .navigation-container.section ~ .section h6 {
+    scroll-margin-top: calc(83px + 1em);
+  }
 }
 
 .hero-container + .navigation-container {
@@ -44,13 +64,13 @@ main > .navigation-container.section {
   list-style: none;
   margin: 0;
   padding: 0;
-  cursor: pointer;
 }
 
 .navigation ul a:any-link {
   color: var(--color-white);
   text-decoration: none;
   font-weight: normal;
+  cursor: pointer;
 }
 
 .navigation nav ul a:any-link {
@@ -82,7 +102,6 @@ main > .navigation-container.section {
     overflow-x: auto;
     scroll-snap-type: x mandatory;
     max-width: 100%;
-    cursor: unset;
   }
 
   .navigation nav .navigation-list-wrapper {
@@ -199,8 +218,14 @@ main > .navigation-container.section {
   padding: var(--spacing-100) var(--spacing-400);
 }
 
+.navigation .navigation-popover a:focus-visible {
+  outline: 2px solid var(--color-gray);
+  outline-offset: -2px;
+  background-color: rgb(255 255 255 / 10%);
+}
+
 .navigation .navigation-popover a:hover {
-  color: var(--color-gray);
+  color: var(--color-white);
   text-decoration: underline;
 }
 

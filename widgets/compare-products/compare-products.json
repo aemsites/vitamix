@@ -1,0 +1,80 @@
+{
+  "en": {
+    "normalize": {
+      "trailingSeries": "series",
+      "leadingSeries": "series",
+      "brandName": "Vitamix",
+      "warrantyHeading": "warranty"
+    },
+    "View Details": "View Details",
+    "Add to comparison": "Add to comparison",
+    "Add a product to compare": "Add a product to compare",
+    "Remove": "Remove",
+    "from comparison": "from comparison",
+    "product": "product",
+    "Remove from comparison": "Remove from comparison",
+    "Product not found (404).": "Product not found (404).",
+    "Could not load this product.": "Could not load this product.",
+    "Yes": "Yes",
+    "Save": "Save",
+    "Was": "Was",
+    "Now": "Now",
+    "Starting at": "Starting at",
+    "En savoir plus": "Learn more",
+    "Check": "Check",
+    "All selected. Remove one to add another.": "All selected. Remove one to add another.",
+    "No countertop blenders found.": "No countertop blenders found."
+  },
+  "fr": {
+    "normalize": {
+      "trailingSeries": "série",
+      "leadingSeries": "séries",
+      "brandName": "Vitamix",
+      "warrantyHeading": "garantie"
+    },
+    "View Details": "Voir les détails",
+    "Add to comparison": "Ajouter à la comparaison",
+    "Add a product to compare": "Ajouter un produit à comparer",
+    "Remove": "Retirer",
+    "from comparison": "de la comparaison",
+    "product": "produit",
+    "Remove from comparison": "Retirer de la comparaison",
+    "Product not found (404).": "Produit introuvable (404).",
+    "Could not load this product.": "Impossible de charger ce produit.",
+    "Yes": "Oui",
+    "Save": "Économiser",
+    "Was": "Était",
+    "Now": "Maintenant",
+    "Starting at": "À partir de",
+    "En savoir plus": "En savoir plus",
+    "Check": "Coche",
+    "All selected. Remove one to add another.": "Tous sélectionnés. Retirez-en un pour en ajouter un autre.",
+    "No countertop blenders found.": "Aucun mélangeur de comptoir trouvé."
+  },
+  "es": {
+    "normalize": {
+      "trailingSeries": "serie",
+      "leadingSeries": "serie",
+      "brandName": "Vitamix",
+      "warrantyHeading": "garantía"
+    },
+    "View Details": "Ver detalles",
+    "Add to comparison": "Añadir a la comparación",
+    "Add a product to compare": "Añadir un producto para comparar",
+    "Remove": "Quitar",
+    "from comparison": "de la comparación",
+    "product": "producto",
+    "Remove from comparison": "Quitar de la comparación",
+    "Product not found (404).": "Producto no encontrado (404).",
+    "Could not load this product.": "No se pudo cargar este producto.",
+    "Yes": "Sí",
+    "Save": "Ahorrar",
+    "Was": "Era",
+    "Now": "Ahora",
+    "Starting at": "Desde",
+    "En savoir plus": "Saber más",
+    "Check": "Comprobar",
+    "All selected. Remove one to add another.": "Todos seleccionados. Quite uno para añadir otro.",
+    "No countertop blenders found.": "No se encontraron licuadoras de mostrador."
+  }
+}

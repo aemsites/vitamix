@@ -385,7 +385,7 @@ function toggleExplore(block, button, ph) {
  * @param {HTMLElement} block - Block element
  */
 async function buildExpand(block) {
-  const { locale, language } = await getLocaleAndLanguage();
+  const { locale, language } = getLocaleAndLanguage();
   const ph = await fetchPlaceholders(`/${locale}/${language}`);
 
   const svgWrapper = block.querySelector('.svg-wrapper');
