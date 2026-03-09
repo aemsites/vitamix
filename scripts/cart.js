@@ -192,8 +192,6 @@ export class Cart {
       Object.entries(shippingAddr).filter(([_, value]) => value !== ''),
     );
     const order = {
-      storeCode: 'main',
-      storeViewCode: 'default',
       customer: {
         firstName,
         lastName,
