@@ -96,7 +96,11 @@ export default function decorate(block) {
 
     // replace images with optimized versions
     li.querySelectorAll('picture > img').forEach((img) => img.closest('picture').replaceWith(
-      createOptimizedPicture(img.src, img.alt, false, [{ width: '900' }]),
+            createOptimizedPicture(img.src, img.alt, false, [
+              { media: '(min-width: 1200px)', width: '2000' },
+              { media: '(min-width: 600px)', width: '1200' },
+              { width: '750' }
+            ]),
     ));
     ul.append(li);
     buildVideo(li);
