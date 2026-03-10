@@ -99,7 +99,7 @@ export default function decorate(block) {
             createOptimizedPicture(img.src, img.alt, false, [
               { media: '(min-width: 1200px)', width: '2000' },
               { media: '(min-width: 600px)', width: '1200' },
-              { width: '750' }
+              { width: '750' },
             ]),
     ));
     ul.append(li);
