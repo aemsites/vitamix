@@ -1,4 +1,4 @@
-import { loadScript, getMetadata } from './aem.js';
+import { loadScript } from './aem.js';
 import './consented/newsletter.js';
 
 // add delayed functionality here
