@@ -32,9 +32,7 @@ await loadScript('https://assets.adobedtm.com/launch-EN40f2d69539754c3ea73511e70
 
 const { pathname } = window.location;
 
-if (
-  pathname.includes('us/en_us')
-) {
+if (pathname.startsWith('/us/en_us/')) {
   import('./consented/adobe-target.js');
 }
 
