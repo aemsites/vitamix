@@ -34,7 +34,6 @@ const { pathname } = window.location;
 
 if (
   pathname.includes('us/en_us')
-  && getMetadata('target').toLowerCase() === 'on'
 ) {
   import('./consented/adobe-target.js');
 }
