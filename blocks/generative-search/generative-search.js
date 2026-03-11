@@ -229,11 +229,11 @@ async function handleGeneration(query, resultsContainer) {
  * @param {HTMLElement} block - The block element
  */
 export default async function decorate(block) {
+  // Get optional title from block content BEFORE clearing
+  const title = block.textContent.trim() || 'AI-Powered Content Generator';
+
   // Clear existing content
   block.innerHTML = '';
-
-  // Get optional title from block content
-  const title = block.textContent.trim() || 'AI-Powered Content Generator';
 
   // Create title
   const titleEl = document.createElement('h2');
