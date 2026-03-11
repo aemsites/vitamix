@@ -79,7 +79,8 @@ export async function lookupProducts(config, facets = {}) {
   if (!window.productIndex) {
     // fetch the main product index
     const isProd = window.location.hostname.includes('vitamix.com') || window.location.hostname.includes('.aem.network');
-    const pathname = `/${locale}/${language}/products/index.json?include=all`;
+    const indexPath = window.location.pathname.includes('/commercial/') ? 'commercial' : 'products';
+    const pathname = `/${locale}/${language}/${indexPath}/index.json?include=all`;
     const resp = await (isProd ? fetch(pathname) : corsProxyFetch(pathname));
     const { data } = await resp.json();
     if (!isProd && resp.ok) {
@@ -128,7 +129,10 @@ export async function lookupProducts(config, facets = {}) {
     const urlLookup = {};
 
     Object.values(parentProductsBySKU).forEach((product) => {
-      if (product.urlKey) {
+      if (product.url) {
+        const url = new URL(product.url);
+        product.url = url.pathname;
+      } else if (product.urlKey) {
         const url = buildProductsUrl(locale, language, product.urlKey);
         urlLookup[url] = product;
         product.url = url;
