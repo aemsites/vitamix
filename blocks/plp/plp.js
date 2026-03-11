@@ -685,16 +685,21 @@ function buildFiltering(block, ph, config) {
 
     // build facet filter lists
     const facetsList = block.querySelector('.plp-filters-facetlist');
+    const hiddenCategories = ['Products', 'Commercial', 'Shop'];
     const facetKeys = Object.keys(facets);
     facetKeys.forEach((facetKey) => {
       const filter = filters[facetKey];
       const filterValues = filter ? filter.split(',').map((t) => t.trim()) : [];
+      let facetValues = Object.keys(facets[facetKey]).sort((a, b) => a.localeCompare(b));
+      if (facetKey === 'categories') {
+        facetValues = facetValues.filter((v) => !hiddenCategories.includes(v));
+      }
+      if (facetValues.length === 0) return;
       const div = document.createElement('div');
       div.className = 'plp-facet';
       const h3 = document.createElement('h3');
       h3.textContent = ph[facetKey];
       div.append(h3);
-      const facetValues = Object.keys(facets[facetKey]).sort((a, b) => a.localeCompare(b));
       facetValues.forEach((facetValue) => {
         const input = document.createElement('input');
         input.type = 'checkbox';
