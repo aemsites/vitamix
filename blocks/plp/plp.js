@@ -82,6 +82,11 @@ export async function lookupProducts(config, facets = {}) {
     const pathname = `/${locale}/${language}/products/index.json?include=all`;
     const resp = await (isProd ? fetch(pathname) : corsProxyFetch(pathname));
     const { data } = await resp.json();
+    if (!isProd && resp.ok) {
+      data.forEach((product) => {
+        if (product.image) product.image = `https://main--vitamix--aemsites.aem.network/${locale}/${language}/products/${product.image.substring(2)}`;
+      });
+    }
 
     // separate products into parents (standalone products) and variants (color/style options)
     const parentProductsBySKU = {};
