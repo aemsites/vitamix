@@ -79,7 +79,7 @@ export async function lookupProducts(config, facets = {}) {
   if (!window.productIndex) {
     // fetch the main product index
     const isProd = window.location.hostname.includes('vitamix.com') || window.location.hostname.includes('.aem.network');
-    const indexPath = window.location.pathname.includes('/commercial/') ? 'commercial' : 'products';
+    const indexPath = window.location.pathname.includes('/commercial/') ? 'commercial/products' : 'products';
     const pathname = `/${locale}/${language}/${indexPath}/index.json?include=all`;
     const resp = await (isProd ? fetch(pathname) : corsProxyFetch(pathname));
     const { data } = await resp.json();
@@ -165,9 +165,8 @@ export async function lookupProducts(config, facets = {}) {
   // extract all filter criteria keys from the config object
   const filterKeys = Object.keys(config);
 
-  // map singular filter names to their plural product property names
+  // map filter key to product property when different (e.g. collection -> collections)
   const cleanKeys = {
-    category: 'categoriesUrlKey',
     collection: 'collections',
   };
 
@@ -175,7 +174,7 @@ export async function lookupProducts(config, facets = {}) {
   const tokens = {};
   filterKeys.forEach((key) => {
     const raw = config[key].split(',').map((t) => t.trim());
-    tokens[key] = key === 'category' ? raw.map((t) => toClassName(t)) : raw;
+    tokens[key] = raw;
   });
   // filter products based on all configured criteria (must match ALL filters)
   const results = window.productIndex.parents.filter((product) => {
@@ -184,7 +183,6 @@ export async function lookupProducts(config, facets = {}) {
 
     // check if this product matches ALL the filter criteria
     const matchedAll = filterKeys.every((filterKey) => {
-      // map the filter key to the actual product property name (e.g., category -> categories)
       const key = cleanKeys[filterKey] || filterKey;
       let matched = false;
 
@@ -216,19 +214,14 @@ export async function lookupProducts(config, facets = {}) {
       });
 
       // if this product qualifies for inclusion in the facet counts
-      if (includeInFacet) {
-        // check if the product has any values for this facet field
-        if (product[facetKey]) {
-          product[facetKey].forEach((val) => {
-            if (facets[facetKey][val]) {
-              // increment existing count
-              facets[facetKey][val] += 1;
-            } else {
-              // initialize count for a new facet value
-              facets[facetKey][val] = 1;
-            }
-          });
-        }
+      if (includeInFacet && product[facetKey]) {
+        product[facetKey].forEach((val) => {
+          if (facets[facetKey][val]) {
+            facets[facetKey][val] += 1;
+          } else {
+            facets[facetKey][val] = 1;
+          }
+        });
       }
     });
 
@@ -620,7 +613,6 @@ function buildFiltering(block, ph, config) {
   const syncFilterConfigToUrl = (filterConfig) => {
     const params = new URLSearchParams();
     Object.entries(filterConfig).forEach(([key, value]) => {
-      if (key === 'category') return;
       const v = value != null ? String(value).trim() : '';
       if (v) params.set(key, v);
     });
@@ -730,7 +722,7 @@ function buildFiltering(block, ph, config) {
   // main search function that filters, sorts, and displays products
   const runSearch = async (filterConfig = config) => {
     const facets = {
-      series: {}, collection: {}, colors: {}, productType: {},
+      series: {}, collection: {}, colors: {}, productType: {}, categories: {},
     };
     const sorts = {
       name: (a, b) => a.title.localeCompare(b.title),
