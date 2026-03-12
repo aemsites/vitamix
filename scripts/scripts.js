@@ -17,6 +17,11 @@ import {
   getMetadata,
 } from './aem.js';
 
+const isProdHost = window.location.hostname.includes('vitamix.com');
+export const FORMS_ENDPOINT = isProdHost
+  ? ''
+  : 'https://main--vitamix--aemsites.aem.network';
+
 /**
  * Load fonts.css and set a session storage flag.
  */
@@ -71,6 +76,15 @@ export function getLocaleAndLanguage(forceEnCA = false) {
   }
 
   return { locale, language };
+}
+
+/**
+ * Gets the form submission URL for the current locale and language.
+ * @returns {string} The form submission URL
+ */
+export function getFormSubmissionUrl() {
+  const { locale, language } = getLocaleAndLanguage();
+  return `${FORMS_ENDPOINT}/${locale}/${language}/forms`;
 }
 
 /**
@@ -1253,7 +1267,7 @@ async function loadLazy(doc) {
   } else {
     // wait for sidekick to be loaded
     document.addEventListener('sidekick-ready', () => {
-    // sidekick now loaded
+      // sidekick now loaded
       addSidekickListeners(document.querySelector('aem-sidekick'));
     }, { once: true });
   }

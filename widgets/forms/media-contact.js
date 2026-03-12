@@ -1,7 +1,4 @@
-import { getLocaleAndLanguage } from '../../scripts/scripts.js';
-
-/** Endpoint for submissions */
-const SUBMISSION_URL = 'https://60038-161ivoryjackal-stage.adobeioruntime.net/api/v1/web/forms/submit';
+import { getFormSubmissionUrl, getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 /**
  * Loads form copy from the widget's local JSON (same name as the script).
@@ -103,7 +100,7 @@ export default async function decorate(widget) {
     }
 
     try {
-      const resp = await fetch(SUBMISSION_URL, {
+      const resp = await fetch(getFormSubmissionUrl(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
