@@ -1,8 +1,8 @@
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 import getStatesProvincesOptions from './states-provinces.js';
 
-/** Endpoint for submissions */
-const SUBMISSION_URL = 'https://60038-161ivoryjackal-stage.adobeioruntime.net/api/v1/web/forms/submit';
+/** Sheet logger endpoint for product registration form */
+const SHEET_LOGGER_URL = 'https://sheet-logger.david8603.workers.dev/vitamix.com/forms-testing/product-registration';
 
 /**
  * Loads form copy from the widget's local JSON (same name as the script).
@@ -154,7 +154,7 @@ export default async function decorate(widget) {
     }
 
     try {
-      const resp = await fetch(SUBMISSION_URL, {
+      const resp = await fetch(SHEET_LOGGER_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
