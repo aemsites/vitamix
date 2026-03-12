@@ -1242,9 +1242,15 @@ async function loadLazy(doc) {
     initQuickEdit(...args);
   };
 
+  const initContentScore = async () => {
+    const { init } = await import('../tools/content-score/scripts.js');
+    await init();
+  };
+
   const addSidekickListeners = (sk) => {
     sk.addEventListener('custom:sync', syncSku);
     sk.addEventListener('custom:quick-edit', loadQuickEdit);
+    initContentScore();
   };
 
   const sk = document.querySelector('aem-sidekick');
