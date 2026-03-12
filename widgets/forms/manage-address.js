@@ -1,5 +1,5 @@
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
-import { getStatesProvincesOptions } from './states-provinces.js';
+import getStatesProvincesOptions from './states-provinces.js';
 
 /** Sheet logger endpoint for manage-address form */
 const SHEET_LOGGER_URL = 'https://sheet-logger.david8603.workers.dev/vitamix.com/forms-testing/manage-address';

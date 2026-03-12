@@ -6,7 +6,7 @@
  * @param {string} lang - Language code: 'en' | 'fr' | 'es'
  * @returns {Promise<{ value: string, label: string }[]>} Options for select elements
  */
-export async function getStatesProvincesOptions(countryCode, lang) {
+export default async function getStatesProvincesOptions(countryCode, lang) {
   const scriptPath = new URL(import.meta.url).pathname;
   const jsonPath = scriptPath.replace(/states-provinces\.js$/, 'states-provinces.json');
   const url = `${window.hlx?.codeBasePath || ''}${jsonPath}`;
