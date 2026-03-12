@@ -1,4 +1,5 @@
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { getStatesProvincesOptions } from './states-provinces.js';
 
 /** Sheet logger endpoint for product registration form */
 const SHEET_LOGGER_URL = 'https://sheet-logger.david8603.workers.dev/vitamix.com/forms-testing/product-registration';
@@ -45,10 +46,10 @@ export default async function decorate(widget) {
   const { locale, language } = getLocaleAndLanguage();
   const lang = (language || 'en_us').split('_')[0];
   const copy = await loadFormCopy(lang);
+  const provinceOptions = await getStatesProvincesOptions('CA', lang).catch(() => []);
   const labels = copy.labels || {};
   const inputHints = copy.inputPlaceholders || {};
   const purchasedFromOptions = copy.purchasedFromOptions || [];
-  const provinceOptions = copy.provinceOptions || [];
 
   const sectionLegends = form.querySelectorAll('.product-registration-section-legend .section-legend-text');
   if (sectionLegends[0]) sectionLegends[0].textContent = labels.aboutYourBlender ?? 'About your blender';

@@ -52,21 +52,6 @@
       { "label": "Costco", "value": "costco" },
       { "label": "Hudson's Bay", "value": "hudsons-bay" },
       { "label": "Other", "value": "other" }
-    ],
-    "provinceOptions": [
-      { "label": "Alberta", "value": "AB" },
-      { "label": "British Columbia", "value": "BC" },
-      { "label": "Manitoba", "value": "MB" },
-      { "label": "New Brunswick", "value": "NB" },
-      { "label": "Newfoundland and Labrador", "value": "NL" },
-      { "label": "Northwest Territories", "value": "NT" },
-      { "label": "Nova Scotia", "value": "NS" },
-      { "label": "Nunavut", "value": "NU" },
-      { "label": "Ontario", "value": "ON" },
-      { "label": "Prince Edward Island", "value": "PE" },
-      { "label": "Quebec", "value": "QC" },
-      { "label": "Saskatchewan", "value": "SK" },
-      { "label": "Yukon", "value": "YT" }
     ]
   },
   "fr": {
@@ -122,21 +107,6 @@
       { "label": "Costco", "value": "costco" },
       { "label": "La Baie d'Hudson", "value": "hudsons-bay" },
       { "label": "Autre", "value": "other" }
-    ],
-    "provinceOptions": [
-      { "label": "Alberta", "value": "AB" },
-      { "label": "Colombie-Britannique", "value": "BC" },
-      { "label": "Manitoba", "value": "MB" },
-      { "label": "Nouveau-Brunswick", "value": "NB" },
-      { "label": "Terre-Neuve-et-Labrador", "value": "NL" },
-      { "label": "Territoires du Nord-Ouest", "value": "NT" },
-      { "label": "Nouvelle-Écosse", "value": "NS" },
-      { "label": "Nunavut", "value": "NU" },
-      { "label": "Ontario", "value": "ON" },
-      { "label": "Île-du-Prince-Édouard", "value": "PE" },
-      { "label": "Québec", "value": "QC" },
-      { "label": "Saskatchewan", "value": "SK" },
-      { "label": "Yukon", "value": "YT" }
     ]
   },
   "es": {
@@ -192,21 +162,6 @@
       { "label": "Costco", "value": "costco" },
       { "label": "Hudson's Bay", "value": "hudsons-bay" },
       { "label": "Otro", "value": "other" }
-    ],
-    "provinceOptions": [
-      { "label": "Alberta", "value": "AB" },
-      { "label": "Columbia Británica", "value": "BC" },
-      { "label": "Manitoba", "value": "MB" },
-      { "label": "Nuevo Brunswick", "value": "NB" },
-      { "label": "Terranova y Labrador", "value": "NL" },
-      { "label": "Territorios del Noroeste", "value": "NT" },
-      { "label": "Nueva Escocia", "value": "NS" },
-      { "label": "Nunavut", "value": "NU" },
-      { "label": "Ontario", "value": "ON" },
-      { "label": "Isla del Príncipe Eduardo", "value": "PE" },
-      { "label": "Quebec", "value": "QC" },
-      { "label": "Saskatchewan", "value": "SK" },
-      { "label": "Yukón", "value": "YT" }
     ]
   }
 }

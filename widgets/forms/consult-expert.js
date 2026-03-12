@@ -1,4 +1,5 @@
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { getStatesProvincesOptions } from './states-provinces.js';
 
 /** Sheet logger endpoint for consult-expert form */
 const SHEET_LOGGER_URL = 'https://sheet-logger.david8603.workers.dev/vitamix.com/forms-testing/consult-expert';
@@ -19,7 +20,6 @@ async function loadFormCopy(lang) {
   const en = data.en || {};
   return {
     ...copy,
-    stateOptions: copy.stateOptions ?? en.stateOptions ?? [],
     typeOfBusinessOptions: copy.typeOfBusinessOptions ?? en.typeOfBusinessOptions ?? [],
     numberOfLocationsOptions: copy.numberOfLocationsOptions ?? en.numberOfLocationsOptions ?? [],
   };
@@ -56,6 +56,7 @@ export default async function decorate(widget) {
   const { locale, language } = getLocaleAndLanguage();
   const lang = (language || 'en_us').split('_')[0];
   const copy = await loadFormCopy(lang).catch(() => ({}));
+  const stateOptions = await getStatesProvincesOptions('US', lang).catch(() => []);
   const labels = copy.labels || {};
   const placeholders = copy.placeholders || {};
 
@@ -88,7 +89,7 @@ export default async function decorate(widget) {
 
   setSelectOptions(
     form.querySelector('#consult-expert-state'),
-    copy.stateOptions,
+    stateOptions,
     placeholders.state ?? labels.pleaseSelect ?? 'Please Select',
   );
   setSelectOptions(
