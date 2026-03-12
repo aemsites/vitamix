@@ -5,7 +5,7 @@
       "searchOrder": "Search Order",
       "searching": "Searching..."
     },
-    "placeholders": {
+    "inputPlaceholders": {
       "orderNumber": ""
     }
   },
@@ -15,7 +15,7 @@
       "searchOrder": "Rechercher la commande",
       "searching": "Recherche en cours..."
     },
-    "placeholders": {
+    "inputPlaceholders": {
       "orderNumber": ""
     }
   },
@@ -25,7 +25,7 @@
       "searchOrder": "Buscar pedido",
       "searching": "Buscando..."
     },
-    "placeholders": {
+    "inputPlaceholders": {
       "orderNumber": ""
     }
   }

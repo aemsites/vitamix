@@ -332,6 +332,16 @@ const unformat = (html, format) => {
 
 const preprocess = async (text, format, context, daFetch) => {
   let html = new DOMParser().parseFromString(text, 'text/html');
+
+  // if body has one single table, with one single row and one single cell, unwrap the cell
+  // most likely a cell content selection (read as a single cell table)
+  const { body } = html;
+  const table = body.querySelector('table');
+  if (table && table.rows.length === 1 && table.rows[0].cells.length === 1) {
+    const cell = table.rows[0].cells[0];
+    body.innerHTML = cell.innerHTML;
+  }
+
   html = await addDnt(html, format, context, daFetch);
   html = reformat(html, format);
   return html.documentElement.outerHTML;

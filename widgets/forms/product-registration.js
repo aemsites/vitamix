@@ -1,4 +1,5 @@
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import getStatesProvincesOptions from './states-provinces.js';
 
 /** Endpoint for submissions */
 const SUBMISSION_URL = 'https://60038-161ivoryjackal-stage.adobeioruntime.net/api/v1/web/forms/submit';
@@ -44,11 +45,12 @@ export default async function decorate(widget) {
 
   const { locale, language } = getLocaleAndLanguage();
   const lang = (language || 'en_us').split('_')[0];
+  const countryCode = (locale || 'us').toUpperCase();
   const copy = await loadFormCopy(lang);
+  const provinceOptions = await getStatesProvincesOptions(countryCode, lang).catch(() => []);
   const labels = copy.labels || {};
-  const placeholders = copy.placeholders || {};
+  const inputHints = copy.inputPlaceholders || {};
   const purchasedFromOptions = copy.purchasedFromOptions || [];
-  const provinceOptions = copy.provinceOptions || [];
 
   const sectionLegends = form.querySelectorAll('.product-registration-section-legend .section-legend-text');
   if (sectionLegends[0]) sectionLegends[0].textContent = labels.aboutYourBlender ?? 'About your blender';
@@ -59,7 +61,7 @@ export default async function decorate(widget) {
   const hintEl = form.querySelector('#product-registration-serial-number-hint');
   if (hintEl) hintEl.textContent = labels.serialNumberHint ?? '(18 digits)';
   const serialInput = form.querySelector('#product-registration-serial-number');
-  if (serialInput) serialInput.placeholder = placeholders.serialNumber ?? '';
+  if (serialInput) serialInput.placeholder = inputHints.serialNumber ?? '';
 
   const findLink = form.querySelector('.find-serial-link');
   if (findLink) findLink.textContent = labels.findYourSerialNumber ?? 'Find your serial number';
@@ -74,7 +76,7 @@ export default async function decorate(widget) {
   if (purchasedFromLabel) purchasedFromLabel.textContent = labels.purchasedFrom ?? 'Purchased from';
   const purchasedFromSelect = form.querySelector('#product-registration-purchased-from');
   if (purchasedFromSelect?.firstElementChild) {
-    purchasedFromSelect.firstElementChild.textContent = placeholders.selectOption ?? 'Select an option';
+    purchasedFromSelect.firstElementChild.textContent = inputHints.selectOption ?? 'Select an option';
   }
   setSelectOptions(purchasedFromSelect, purchasedFromOptions);
 
@@ -86,14 +88,16 @@ export default async function decorate(widget) {
   form.querySelector('[for="product-registration-address"] .label-text').textContent = labels.address ?? 'Address';
   form.querySelector('[for="product-registration-address-line-2"] .label-text').textContent = labels.addressLine2 ?? 'Address Line 2';
   form.querySelector('[for="product-registration-city"] .label-text').textContent = labels.city ?? 'City';
-  form.querySelector('[for="product-registration-province"] .label-text').textContent = labels.province ?? 'Province';
+  const regionLabel = countryCode === 'CA' ? (labels.province ?? 'Province') : (labels.state ?? 'State');
+  form.querySelector('[for="product-registration-province"] .label-text').textContent = regionLabel;
   form.querySelector('[for="product-registration-postal-code"] .label-text').textContent = labels.postalCode ?? 'Postal code';
   form.querySelector('[for="product-registration-phone"] .label-text').textContent = labels.phoneNumber ?? 'Phone Number';
   form.querySelector('[for="product-registration-email"] .label-text').textContent = labels.emailAddress ?? 'Email Address';
 
   const provinceSelect = form.querySelector('#product-registration-province');
+  const regionPlaceholder = countryCode === 'CA' ? (inputHints.province ?? 'Choose your province') : (inputHints.state ?? 'Choose your state');
   if (provinceSelect?.firstElementChild) {
-    provinceSelect.firstElementChild.textContent = placeholders.province ?? 'Choose your province';
+    provinceSelect.firstElementChild.textContent = regionPlaceholder;
   }
   setSelectOptions(provinceSelect, provinceOptions);
 
@@ -107,17 +111,17 @@ export default async function decorate(widget) {
     phone: form.querySelector('#product-registration-phone'),
     email: form.querySelector('#product-registration-email'),
   };
-  if (inputs.firstName) inputs.firstName.placeholder = placeholders.firstName ?? '';
-  if (inputs.lastName) inputs.lastName.placeholder = placeholders.lastName ?? '';
-  if (inputs.address) inputs.address.placeholder = placeholders.address ?? '';
-  if (inputs.addressLine2) inputs.addressLine2.placeholder = placeholders.addressLine2 ?? '';
-  if (inputs.city) inputs.city.placeholder = placeholders.city ?? '';
-  if (inputs.postalCode) inputs.postalCode.placeholder = placeholders.postalCode ?? '';
-  if (inputs.phone) inputs.phone.placeholder = placeholders.phone ?? '';
-  if (inputs.email) inputs.email.placeholder = placeholders.email ?? '';
+  if (inputs.firstName) inputs.firstName.placeholder = inputHints.firstName ?? '';
+  if (inputs.lastName) inputs.lastName.placeholder = inputHints.lastName ?? '';
+  if (inputs.address) inputs.address.placeholder = inputHints.address ?? '';
+  if (inputs.addressLine2) inputs.addressLine2.placeholder = inputHints.addressLine2 ?? '';
+  if (inputs.city) inputs.city.placeholder = inputHints.city ?? '';
+  if (inputs.postalCode) inputs.postalCode.placeholder = inputHints.postalCode ?? '';
+  if (inputs.phone) inputs.phone.placeholder = inputHints.phone ?? '';
+  if (inputs.email) inputs.email.placeholder = inputHints.email ?? '';
 
   const purchasedOnInput = form.querySelector('#product-registration-purchased-on');
-  if (purchasedOnInput && placeholders.date) purchasedOnInput.setAttribute('placeholder', placeholders.date);
+  if (purchasedOnInput && inputHints.date) purchasedOnInput.setAttribute('placeholder', inputHints.date);
 
   const marketingCheckboxText = form.querySelector('.product-registration-consent .checkbox-text');
   if (marketingCheckboxText) marketingCheckboxText.textContent = labels.sendNewsPromotionsOptional ?? 'Please send the latest Vitamix news and promotions to my email address. (optional)';

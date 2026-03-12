@@ -55,7 +55,6 @@ export default async function decorate(widget) {
       widget.dataset[key] = value;
     });
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error(`Failed to load ${widgetName} widget:`, error);
+    // fail gracefully
   }
 }

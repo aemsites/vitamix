@@ -18,7 +18,7 @@
       "saveChanges": "Save changes",
       "sending": "Sending..."
     },
-    "placeholders": {
+    "inputPlaceholders": {
       "firstName": "",
       "lastName": "",
       "emailAddress": "",
@@ -44,7 +44,7 @@
       "saveChanges": "Enregistrer les modifications",
       "sending": "Envoi en cours..."
     },
-    "placeholders": {
+    "inputPlaceholders": {
       "firstName": "",
       "lastName": "",
       "emailAddress": "",
@@ -70,7 +70,7 @@
       "saveChanges": "Guardar cambios",
       "sending": "Enviando..."
     },
-    "placeholders": {
+    "inputPlaceholders": {
       "firstName": "",
       "lastName": "",
       "emailAddress": "",

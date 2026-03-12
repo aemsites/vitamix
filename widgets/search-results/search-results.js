@@ -1,5 +1,20 @@
-import { loadCSS, fetchPlaceholders } from '../../scripts/aem.js';
+import { loadCSS } from '../../scripts/aem.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+
+/**
+ * Load widget copy from the widget's local JSON (same name as the script).
+ * @param {string} lang - Language key (e.g. en, fr)
+ * @returns {Promise<Object>} Copy for that language (flat key-value)
+ */
+async function loadWidgetCopy(lang) {
+  const scriptPath = new URL(import.meta.url).pathname;
+  const jsonPath = scriptPath.replace(/\.js$/, '.json');
+  const url = `${window.hlx?.codeBasePath || ''}${jsonPath}`;
+  const resp = await fetch(url);
+  const data = await resp.json();
+  const key = data[lang] ? lang : 'en';
+  return data[key] || {};
+}
 
 /**
  * Normalize a single article from the articles query index.
@@ -298,7 +313,7 @@ function isUsableImageUrl(url) {
 
 /**
  * Get image src for a result card. Product images use .aem.network on preview origins.
- * Query index: only https:// URLs; others use placeholder. Rest: reject data:/invalid.
+ * Query index: only https:// URLs; others use fallback. Rest: reject data:/invalid.
  * @param {Object} item - Normalized search item
  * @returns {string}
  */
@@ -354,10 +369,10 @@ function highlightMatch(text, searchTerm) {
 /**
  * Create a result card DOM element.
  * @param {Object} item - Normalized search item
- * @param {Object} placeholders - i18n placeholders
+ * @param {Object} copy - Widget copy (i18n labels)
  * @returns {HTMLElement}
  */
-function createResultCard(item, placeholders = {}) {
+function createResultCard(item, copy = {}) {
   const li = document.createElement('li');
   li.className = 'card';
 
@@ -381,10 +396,10 @@ function createResultCard(item, placeholders = {}) {
 
   // Type badges: use sheet keys Item, Recipe, Page, Product (e.g. Product => Produit for FR).
   const typeLabels = {
-    article: placeholders.typeArticle || placeholders.item || 'Article',
-    recipe: placeholders.typeRecipe || placeholders.recipe || 'Recipe',
-    query: placeholders.typeQuery || placeholders.page || 'Page',
-    product: placeholders.typeProduct || placeholders.product || 'Product',
+    article: copy.typeArticle || copy.item || 'Article',
+    recipe: copy.typeRecipe || copy.recipe || 'Recipe',
+    query: copy.typeQuery || copy.page || 'Page',
+    product: copy.typeProduct || copy.product || 'Product',
   };
   const typeBadge = document.createElement('span');
   typeBadge.className = 'type-badge';
@@ -435,7 +450,7 @@ function updateURL(filterConfig) {
   window.history.pushState({ filterConfig }, '', newURL);
 }
 
-/** Type filter options (value '' = all). Uses same placeholder keys as card badges. */
+/** Type filter options (value '' = all). Uses same copy keys as card badges. */
 const FILTER_TYPES = [
   {
     value: '', labelKey: 'filterAll', fallbackKey: null, defaultLabel: 'All',
@@ -458,9 +473,9 @@ const FILTER_TYPES = [
  * Build search UI and wire search/pagination.
  * @param {HTMLElement} container - .search-results root
  * @param {Object} config - Initial config
- * @param {Object} placeholders - i18n placeholders
+ * @param {Object} copy - Widget copy (i18n labels)
  */
-function buildSearchFiltering(container, config = {}, placeholders = {}) {
+function buildSearchFiltering(container, config = {}, copy = {}) {
   const ITEMS_PER_PAGE = 12;
   let currentPage = 1;
   let currentTypeFilter = '';
@@ -482,7 +497,7 @@ function buildSearchFiltering(container, config = {}, placeholders = {}) {
     const start = (page - 1) * ITEMS_PER_PAGE;
     const end = start + ITEMS_PER_PAGE;
     const pageResults = results.slice(start, end);
-    pageResults.forEach((item) => resultsElement.append(createResultCard(item, placeholders)));
+    pageResults.forEach((item) => resultsElement.append(createResultCard(item, copy)));
     if (page > 1) container.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
@@ -495,7 +510,7 @@ function buildSearchFiltering(container, config = {}, placeholders = {}) {
     if (totalPages <= 1) return;
 
     const prevBtn = document.createElement('button');
-    prevBtn.textContent = placeholders.previous || 'Previous';
+    prevBtn.textContent = copy.previous || 'Previous';
     prevBtn.disabled = pageNum <= 1;
     if (pageNum > 1) prevBtn.dataset.page = pageNum - 1;
     paginationElement.appendChild(prevBtn);
@@ -532,7 +547,7 @@ function buildSearchFiltering(container, config = {}, placeholders = {}) {
     paginationElement.appendChild(pages);
 
     const nextBtn = document.createElement('button');
-    nextBtn.textContent = placeholders.next || 'Next';
+    nextBtn.textContent = copy.next || 'Next';
     nextBtn.disabled = pageNum >= totalPages;
     if (pageNum < totalPages) nextBtn.dataset.page = pageNum + 1;
     paginationElement.appendChild(nextBtn);
@@ -595,8 +610,8 @@ function buildSearchFiltering(container, config = {}, placeholders = {}) {
       btn.type = 'button';
       btn.className = 'type-filter';
       btn.dataset.type = value;
-      const label = placeholders[labelKey]
-        || (fallbackKey ? placeholders[fallbackKey] : null)
+      const label = copy[labelKey]
+        || (fallbackKey ? copy[fallbackKey] : null)
         || defaultLabel;
       btn.textContent = label;
       btn.setAttribute('aria-pressed', currentTypeFilter === value ? 'true' : 'false');
@@ -656,8 +671,9 @@ async function init() {
   const container = document.querySelector('.search-results');
   if (!container) return;
 
-  const { locale, language } = getLocaleAndLanguage();
-  const placeholders = await fetchPlaceholders(`/${locale}/${language}`);
+  const { language } = getLocaleAndLanguage();
+  const lang = (language || 'en_us').split('_')[0];
+  const copy = await loadWidgetCopy(lang);
 
   const existingH1 = document.querySelector('main h1');
   if (existingH1 && !container.contains(existingH1)) {
@@ -666,13 +682,13 @@ async function init() {
   }
 
   const searchInput = container.querySelector('#fulltext');
-  if (searchInput) searchInput.placeholder = placeholders.search || 'Search';
+  if (searchInput) searchInput.placeholder = copy.search || 'Search';
   const showingLabel = container.querySelector('.showing-label');
-  if (showingLabel) showingLabel.textContent = placeholders.showing || 'Showing';
+  if (showingLabel) showingLabel.textContent = copy.showing || 'Showing';
   const ofLabel = container.querySelector('.of-label');
-  if (ofLabel) ofLabel.textContent = placeholders.of || 'of';
+  if (ofLabel) ofLabel.textContent = copy.of || 'of';
 
-  buildSearchFiltering(container, {}, placeholders);
+  buildSearchFiltering(container, {}, copy);
 }
 
 if (document.readyState === 'loading') {

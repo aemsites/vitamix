@@ -1,0 +1,50 @@
+{
+  "en": {
+    "search": "Search",
+    "showing": "Showing",
+    "of": "of",
+    "previous": "Previous",
+    "next": "Next",
+    "filterAll": "All",
+    "typeProduct": "Product",
+    "product": "Product",
+    "typeRecipe": "Recipe",
+    "recipe": "Recipe",
+    "typeArticle": "Article",
+    "item": "Article",
+    "typeQuery": "Page",
+    "page": "Page"
+  },
+  "fr": {
+    "search": "Rechercher",
+    "showing": "Affichage",
+    "of": "sur",
+    "previous": "Précédent",
+    "next": "Suivant",
+    "filterAll": "Tout",
+    "typeProduct": "Produit",
+    "product": "Produit",
+    "typeRecipe": "Recette",
+    "recipe": "Recette",
+    "typeArticle": "Article",
+    "item": "Article",
+    "typeQuery": "Page",
+    "page": "Page"
+  },
+  "es": {
+    "search": "Buscar",
+    "showing": "Mostrando",
+    "of": "de",
+    "previous": "Anterior",
+    "next": "Siguiente",
+    "filterAll": "Todo",
+    "typeProduct": "Producto",
+    "product": "Producto",
+    "typeRecipe": "Receta",
+    "recipe": "Receta",
+    "typeArticle": "Artículo",
+    "item": "Artículo",
+    "typeQuery": "Página",
+    "page": "Página"
+  }
+}

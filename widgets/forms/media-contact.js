@@ -46,7 +46,7 @@ export default async function decorate(widget) {
   const lang = (language || 'en_us').split('_')[0];
   const copy = await loadFormCopy(lang);
   const labels = copy.labels || {};
-  const placeholders = copy.placeholders || {};
+  const inputHints = copy.inputPlaceholders || {};
   const selectOption = copy.selectOption ?? 'Select an option';
   const businessLineOptions = copy.businessLineOptions || [];
   const reasonForContactOptions = copy.reasonForContactOptions || [];
@@ -77,12 +77,12 @@ export default async function decorate(widget) {
   const emailInput = form.querySelector('#media-contact-email');
   const phoneInput = form.querySelector('#media-contact-phone');
   const commentsTextarea = form.querySelector('#media-contact-comments');
-  if (pubInput) pubInput.placeholder = placeholders.publicationCompany ?? '';
-  if (firstInput) firstInput.placeholder = placeholders.firstName ?? '';
-  if (lastInput) lastInput.placeholder = placeholders.lastName ?? '';
-  if (emailInput) emailInput.placeholder = placeholders.emailAddress ?? '';
-  if (phoneInput) phoneInput.placeholder = placeholders.phoneNumber ?? '';
-  if (commentsTextarea) commentsTextarea.placeholder = placeholders.additionalComments ?? '';
+  if (pubInput) pubInput.placeholder = inputHints.publicationCompany ?? '';
+  if (firstInput) firstInput.placeholder = inputHints.firstName ?? '';
+  if (lastInput) lastInput.placeholder = inputHints.lastName ?? '';
+  if (emailInput) emailInput.placeholder = inputHints.emailAddress ?? '';
+  if (phoneInput) phoneInput.placeholder = inputHints.phoneNumber ?? '';
+  if (commentsTextarea) commentsTextarea.placeholder = inputHints.additionalComments ?? '';
 
   const submitBtn = form.querySelector('button[type="submit"]');
   if (submitBtn) submitBtn.textContent = labels.submit ?? 'Submit';

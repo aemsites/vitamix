@@ -5,35 +5,37 @@ await loadCSS(new URL('./newsletter.css', import.meta.url).href);
 function showMinimizedTeaser(text, newsletterLink) {
   const teaser = document.createElement('div');
   teaser.className = 'newsletter-minimized-teaser';
-  teaser.innerHTML = `
-    <span class="newsletter-minimized-teaser-text">${text}</span>
-    <span class="newsletter-minimized-teaser-divider" aria-hidden="true"></span>
-    <button type="button" class="newsletter-minimized-teaser-close" aria-label="Close">×</button>
-  `;
+  teaser.innerHTML = `<span class="newsletter-minimized-teaser-text">${text}</span>`;
   document.body.appendChild(teaser);
 
   const textEl = teaser.querySelector('.newsletter-minimized-teaser-text');
-  const closeBtn = teaser.querySelector('.newsletter-minimized-teaser-close');
 
-  const markShown = () => {
+  const markSignedUp = () => {
     localStorage.setItem('newsletter-popped-up', 'true');
+    teaser.remove();
+  };
+
+  const attachFormSubmitListener = () => {
+    const form = document.querySelector('form.footer-sign-up');
+    if (form && !form.dataset.newsletterTeaserListener) {
+      form.dataset.newsletterTeaserListener = 'true';
+      form.addEventListener('submit', () => markSignedUp(), { once: true });
+      return true;
+    }
+    return false;
   };
 
   textEl.addEventListener('click', (e) => {
     e.stopPropagation();
     window.leadSourceOverride = 'minimizedmodal';
-    markShown();
     newsletterLink.click();
-  });
-  closeBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    markShown();
-    teaser.remove();
+    attachFormSubmitListener();
+    setTimeout(() => attachFormSubmitListener(), 1000);
   });
 }
 
 async function initNewsletterPrompt() {
-  if (localStorage.getItem('newsletter-popped-up') === 'true') return;
+  if (localStorage.getItem('newsletter-signed-up') === 'true') return;
 
   const pathSegments = window.location.pathname.split('/').filter(Boolean);
   const locale = pathSegments[0] || 'us';
@@ -45,10 +47,9 @@ async function initNewsletterPrompt() {
 
   if (minimizedText && newsletterLink) {
     showMinimizedTeaser(minimizedText, newsletterLink);
-    return;
   }
 
-  if (newsletterLink) {
+  if (newsletterLink && !localStorage.getItem('newsletter-signed-up') && !localStorage.getItem('newsletter-popped-up')) {
     localStorage.setItem('newsletter-popped-up', 'true');
     setTimeout(() => newsletterLink.click(), 5000);
   }

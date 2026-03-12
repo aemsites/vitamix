@@ -1,4 +1,5 @@
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import getStatesProvincesOptions from './states-provinces.js';
 
 /** Sheet logger endpoint for manage-address form */
 const SHEET_LOGGER_URL = 'https://sheet-logger.david8603.workers.dev/vitamix.com/forms-testing/manage-address';
@@ -45,10 +46,11 @@ export default async function decorate(widget) {
 
   const { locale, language } = getLocaleAndLanguage();
   const lang = (language || 'en_us').split('_')[0];
+  const countryCode = (locale || 'us').toUpperCase();
   const copy = await loadFormCopy(lang);
+  const provinceOptions = await getStatesProvincesOptions(countryCode, lang).catch(() => []);
   const labels = copy.labels || {};
-  const placeholders = copy.placeholders || {};
-  const provinceOptions = copy.provinceOptions || [];
+  const inputHints = copy.inputPlaceholders || {};
 
   header.querySelector('.manage-address-title').textContent = labels.manageAddress ?? 'Manage address';
 
@@ -92,7 +94,7 @@ export default async function decorate(widget) {
     city: form.querySelector('#manage-address-city'),
     postalCode: form.querySelector('#manage-address-postal-code'),
   };
-  Object.entries(placeholders).forEach(([key, value]) => {
+  Object.entries(inputHints).forEach(([key, value]) => {
     const el = inputs[key];
     if (el) el.placeholder = value ?? '';
   });

@@ -1,7 +1,7 @@
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 
-/** Endpoint for submissions */
-const SUBMISSION_URL = 'https://60038-161ivoryjackal-stage.adobeioruntime.net/api/v1/web/forms/submit';
+/** Sheet logger endpoint for contact-foundation form */
+const SHEET_LOGGER_URL = 'https://sheet-logger.david8603.workers.dev/vitamix.com/forms-testing/contact-foundation';
 
 /**
  * Loads form copy from the widget's local JSON (same name as the script).
@@ -35,11 +35,11 @@ function setSelectOptions(select, options) {
 }
 
 /**
- * Decorates the contact-us widget: applies copy from JSON and configures form.
+ * Decorates the contact-foundation widget: applies copy from JSON and configures form.
  * @param {HTMLElement} widget - The widget root element
  */
 export default async function decorate(widget) {
-  const form = widget.querySelector('.contact-us-form');
+  const form = widget.querySelector('.contact-foundation-form');
   if (!form) return;
 
   const { locale, language } = getLocaleAndLanguage();
@@ -47,41 +47,45 @@ export default async function decorate(widget) {
   const copy = await loadFormCopy(lang);
   const labels = copy.labels || {};
   const inputHints = copy.inputPlaceholders || {};
-  const reasonOptions = copy.reasonOptions || [];
+  const selectOption = copy.selectOption ?? 'Select an option';
+  const focusAreaOptions = copy.focusAreaOptions || [];
 
-  form.querySelector('[for="contact-us-first-name"] .label-text').textContent = labels.firstName ?? 'First Name';
-  form.querySelector('[for="contact-us-last-name"] .label-text').textContent = labels.lastName ?? 'Last Name';
-  form.querySelector('[for="contact-us-email"] .label-text').textContent = labels.emailAddress ?? 'Email Address';
+  form.querySelector('[for="contact-foundation-first-name"] .label-text').textContent = labels.firstName ?? 'First Name';
+  form.querySelector('[for="contact-foundation-last-name"] .label-text').textContent = labels.lastName ?? 'Last Name';
+  form.querySelector('[for="contact-foundation-title"] .label-text').textContent = labels.title ?? 'Title';
+  form.querySelector('[for="contact-foundation-organization"] .label-text').textContent = labels.organization ?? 'Organization';
+  form.querySelector('[for="contact-foundation-email"] .label-text').textContent = labels.emailAddress ?? 'Email Address';
+  form.querySelector('[for="contact-foundation-focus-area"] .label-text').textContent = labels.focusArea ?? 'Focus Area';
+  form.querySelector('[for="contact-foundation-message"] .label-text').textContent = labels.message ?? 'Message';
 
-  const radioLegend = form.querySelector('.contact-us-radio-group .radio-legend');
-  if (radioLegend) radioLegend.textContent = labels.typeOfRequest ?? 'Type of request';
-  const radioLabels = form.querySelectorAll('.contact-us-radio-group .radio-label');
-  if (radioLabels[0]) radioLabels[0].textContent = labels.domestic ?? 'Domestic';
-  if (radioLabels[1]) radioLabels[1].textContent = labels.commercial ?? 'Commercial';
-
-  form.querySelector('[for="contact-us-reason"] .label-text').textContent = labels.reasonForCommunication ?? 'Reason for communication';
-  const reasonSelect = form.querySelector('#contact-us-reason');
-  if (reasonSelect?.firstElementChild) {
-    reasonSelect.firstElementChild.textContent = labels.select ?? 'Select';
+  const focusAreaSelect = form.querySelector('#contact-foundation-focus-area');
+  if (focusAreaSelect?.firstElementChild) {
+    focusAreaSelect.firstElementChild.textContent = selectOption;
   }
-  setSelectOptions(reasonSelect, reasonOptions);
+  setSelectOptions(focusAreaSelect, focusAreaOptions);
 
-  const firstInput = form.querySelector('#contact-us-first-name');
-  const lastInput = form.querySelector('#contact-us-last-name');
-  const emailInput = form.querySelector('#contact-us-email');
+  const firstInput = form.querySelector('#contact-foundation-first-name');
+  const lastInput = form.querySelector('#contact-foundation-last-name');
+  const titleInput = form.querySelector('#contact-foundation-title');
+  const orgInput = form.querySelector('#contact-foundation-organization');
+  const emailInput = form.querySelector('#contact-foundation-email');
+  const messageTextarea = form.querySelector('#contact-foundation-message');
   if (firstInput) firstInput.placeholder = inputHints.firstName ?? '';
   if (lastInput) lastInput.placeholder = inputHints.lastName ?? '';
+  if (titleInput) titleInput.placeholder = inputHints.title ?? '';
+  if (orgInput) orgInput.placeholder = inputHints.organization ?? '';
   if (emailInput) emailInput.placeholder = inputHints.emailAddress ?? '';
+  if (messageTextarea) messageTextarea.placeholder = inputHints.message ?? '';
 
   const submitBtn = form.querySelector('button[type="submit"]');
-  if (submitBtn) submitBtn.textContent = labels.submit ?? 'Submit';
+  if (submitBtn) submitBtn.textContent = labels.submit ?? 'SUBMIT';
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const data = new FormData(form);
     const payload = Object.fromEntries(data.entries());
     payload.pageUrl = window.location.href;
-    payload.formId = `${locale}/${language}/contact-us`;
+    payload.formId = `${locale}/${language}/contact-foundation`;
 
     const submitButton = form.querySelector('button[type="submit"]');
     const buttonLabel = submitButton?.textContent;
@@ -92,19 +96,19 @@ export default async function decorate(widget) {
     }
 
     try {
-      const resp = await fetch(SUBMISSION_URL, {
+      const resp = await fetch(SHEET_LOGGER_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       if (!resp.ok) {
-        throw new Error(`Forms API submission failed with ${resp.status}`);
+        throw new Error(`Sheet logger responded with ${resp.status}`);
       }
-      const thankYouPath = `/${locale}/${language}/contact-us-thankyou`;
+      const thankYouPath = `/${locale}/${language}/contact-foundation-thankyou`;
       window.location.href = thankYouPath;
     } catch (err) {
       // eslint-disable-next-line no-console
-      console.error('Contact us form submission failed', err);
+      console.error('Contact foundation form submission failed', err);
       [...form.elements].forEach((el) => { el.disabled = false; });
       if (submitButton) {
         submitButton.textContent = submitButton.dataset.originalLabel || buttonLabel;

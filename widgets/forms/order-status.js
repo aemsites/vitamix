@@ -32,7 +32,7 @@ export default async function decorate(widget) {
   const lang = (language || 'en_us').split('_')[0];
   const copy = await loadFormCopy(lang);
   const labels = copy.labels || {};
-  const placeholders = copy.placeholders || {};
+  const inputHints = copy.inputPlaceholders || {};
 
   const submitBtn = form.querySelector('button[type="submit"]');
 
@@ -40,7 +40,7 @@ export default async function decorate(widget) {
   if (submitBtn) submitBtn.textContent = labels.searchOrder ?? 'Search Order';
 
   const orderNumberInput = form.querySelector('#order-status-order-number');
-  if (orderNumberInput) orderNumberInput.placeholder = placeholders.orderNumber ?? '';
+  if (orderNumberInput) orderNumberInput.placeholder = inputHints.orderNumber ?? '';
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();

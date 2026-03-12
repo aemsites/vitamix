@@ -30,7 +30,7 @@ export default async function decorate(widget) {
   const lang = (language || 'en_us').split('_')[0];
   const copy = await loadFormCopy(lang);
   const labels = copy.labels || {};
-  const placeholders = copy.placeholders || {};
+  const inputHints = copy.inputPlaceholders || {};
 
   const fieldLabels = [
     ['wellness-program-first-name', labels.firstName ?? 'First Name'],
@@ -55,13 +55,13 @@ export default async function decorate(widget) {
     email: form.querySelector('#wellness-program-email'),
     remarks: form.querySelector('#wellness-program-remarks'),
   };
-  if (inputs.firstName) inputs.firstName.placeholder = placeholders.firstName ?? '';
-  if (inputs.lastName) inputs.lastName.placeholder = placeholders.lastName ?? '';
-  if (inputs.companyName) inputs.companyName.placeholder = placeholders.companyName ?? '';
-  if (inputs.jobTitle) inputs.jobTitle.placeholder = placeholders.jobTitle ?? '';
-  if (inputs.phone) inputs.phone.placeholder = placeholders.phoneNumber ?? '';
-  if (inputs.email) inputs.email.placeholder = placeholders.emailAddress ?? '';
-  if (inputs.remarks) inputs.remarks.placeholder = placeholders.otherRemarks ?? '';
+  if (inputs.firstName) inputs.firstName.placeholder = inputHints.firstName ?? '';
+  if (inputs.lastName) inputs.lastName.placeholder = inputHints.lastName ?? '';
+  if (inputs.companyName) inputs.companyName.placeholder = inputHints.companyName ?? '';
+  if (inputs.jobTitle) inputs.jobTitle.placeholder = inputHints.jobTitle ?? '';
+  if (inputs.phone) inputs.phone.placeholder = inputHints.phoneNumber ?? '';
+  if (inputs.email) inputs.email.placeholder = inputHints.emailAddress ?? '';
+  if (inputs.remarks) inputs.remarks.placeholder = inputHints.otherRemarks ?? '';
 
   const submitBtn = form.querySelector('button[type="submit"]');
   if (submitBtn) submitBtn.textContent = labels.submit ?? 'Submit';
