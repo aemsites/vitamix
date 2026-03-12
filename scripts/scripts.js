@@ -394,11 +394,11 @@ function parsePDPContentSections(sections) {
   sections.forEach((section) => {
     const h3 = section.querySelector('h3')?.textContent.toLowerCase();
     if (h3) {
-      if (h3.includes('features') || h3.includes('caractéristiques')) {
+      if (h3.includes('features') || h3.includes('caractéristiques') || h3.includes('características')) {
         window.features = section;
-      } else if (h3.includes('specifications') || h3.includes('spécifications')) {
+      } else if (h3.includes('specifications') || h3.includes('spécifications') || h3.includes('especificaciones')) {
         window.specifications = section;
-      } else if (h3.includes('warranty') || h3.includes('garantie')) {
+      } else if (h3.includes('warranty') || h3.includes('garantie') || h3.includes('garantía')) {
         window.warranty = section;
       }
     }
