@@ -1,4 +1,5 @@
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import getStatesProvincesOptions from './states-provinces.js';
 
 /** Sheet logger endpoint for consult-expert form */
 const SHEET_LOGGER_URL = 'https://sheet-logger.david8603.workers.dev/vitamix.com/forms-testing/consult-expert';
@@ -19,7 +20,6 @@ async function loadFormCopy(lang) {
   const en = data.en || {};
   return {
     ...copy,
-    stateOptions: copy.stateOptions ?? en.stateOptions ?? [],
     typeOfBusinessOptions: copy.typeOfBusinessOptions ?? en.typeOfBusinessOptions ?? [],
     numberOfLocationsOptions: copy.numberOfLocationsOptions ?? en.numberOfLocationsOptions ?? [],
   };
@@ -54,8 +54,10 @@ export default async function decorate(widget) {
   if (!form) return;
 
   const { locale, language } = getLocaleAndLanguage();
+  const countryCode = (locale || 'us').toUpperCase();
   const lang = (language || 'en_us').split('_')[0];
   const copy = await loadFormCopy(lang).catch(() => ({}));
+  const stateOptions = await getStatesProvincesOptions(countryCode, lang).catch(() => []);
   const labels = copy.labels || {};
   const placeholders = copy.placeholders || {};
 
@@ -66,7 +68,7 @@ export default async function decorate(widget) {
     ['consult-expert-address-line-1', labels.businessAddressLine1 ?? 'Business Address Line 1'],
     ['consult-expert-address-line-2', labels.businessAddressLine2Optional ?? 'Business Address Line 2 (Optional)'],
     ['consult-expert-city', labels.city ?? 'City'],
-    ['consult-expert-state', labels.state ?? 'State'],
+    ['consult-expert-state', (countryCode === 'CA' ? labels.province : labels.state) ?? (countryCode === 'CA' ? 'Province' : 'State')],
     ['consult-expert-zip', labels.zipCode ?? 'Zip Code'],
     ['consult-expert-email', labels.emailAddress ?? 'Email Address'],
     ['consult-expert-phone', labels.phoneNumber ?? 'Phone Number'],
@@ -79,16 +81,24 @@ export default async function decorate(widget) {
     if (label) label.textContent = text;
   });
 
+  const countryNames = {
+    US: labels.unitedStates ?? 'United States',
+    CA: labels.canada ?? 'Canada',
+    MX: labels.mexico ?? 'Mexico',
+  };
+  const countryName = countryNames[countryCode] ?? countryNames.US;
   const countryLabel = form.querySelector('.consult-expert-country-field .label-text');
   if (countryLabel) countryLabel.textContent = labels.country ?? 'Country';
   const countryDisplay = form.querySelector('.country-display');
-  if (countryDisplay) countryDisplay.textContent = labels.unitedStates ?? 'United States';
+  if (countryDisplay) countryDisplay.textContent = countryName;
+  const countryInput = form.querySelector('input[name="country"]');
+  if (countryInput) countryInput.value = countryName;
   const countryLink = form.querySelector('.country-change-link');
   if (countryLink) countryLink.textContent = labels.notYourCountry ?? 'Not your country?';
 
   setSelectOptions(
     form.querySelector('#consult-expert-state'),
-    copy.stateOptions,
+    stateOptions,
     placeholders.state ?? labels.pleaseSelect ?? 'Please Select',
   );
   setSelectOptions(
