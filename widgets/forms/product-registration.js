@@ -88,14 +88,16 @@ export default async function decorate(widget) {
   form.querySelector('[for="product-registration-address"] .label-text').textContent = labels.address ?? 'Address';
   form.querySelector('[for="product-registration-address-line-2"] .label-text').textContent = labels.addressLine2 ?? 'Address Line 2';
   form.querySelector('[for="product-registration-city"] .label-text').textContent = labels.city ?? 'City';
-  form.querySelector('[for="product-registration-province"] .label-text').textContent = labels.province ?? 'Province';
+  const regionLabel = countryCode === 'CA' ? (labels.province ?? 'Province') : (labels.state ?? 'State');
+  form.querySelector('[for="product-registration-province"] .label-text').textContent = regionLabel;
   form.querySelector('[for="product-registration-postal-code"] .label-text').textContent = labels.postalCode ?? 'Postal code';
   form.querySelector('[for="product-registration-phone"] .label-text').textContent = labels.phoneNumber ?? 'Phone Number';
   form.querySelector('[for="product-registration-email"] .label-text').textContent = labels.emailAddress ?? 'Email Address';
 
   const provinceSelect = form.querySelector('#product-registration-province');
+  const regionPlaceholder = countryCode === 'CA' ? (inputHints.province ?? 'Choose your province') : (inputHints.state ?? 'Choose your state');
   if (provinceSelect?.firstElementChild) {
-    provinceSelect.firstElementChild.textContent = inputHints.province ?? 'Choose your province';
+    provinceSelect.firstElementChild.textContent = regionPlaceholder;
   }
   setSelectOptions(provinceSelect, provinceOptions);
 

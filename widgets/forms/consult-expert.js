@@ -54,8 +54,8 @@ export default async function decorate(widget) {
   if (!form) return;
 
   const { locale, language } = getLocaleAndLanguage();
-  const lang = (language || 'en_us').split('_')[0];
   const countryCode = (locale || 'us').toUpperCase();
+  const lang = (language || 'en_us').split('_')[0];
   const copy = await loadFormCopy(lang).catch(() => ({}));
   const stateOptions = await getStatesProvincesOptions(countryCode, lang).catch(() => []);
   const labels = copy.labels || {};
