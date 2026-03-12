@@ -1,7 +1,4 @@
-import { getLocaleAndLanguage } from '../../scripts/scripts.js';
-
-/** Sheet logger endpoint for wellness-program form */
-const SHEET_LOGGER_URL = 'https://sheet-logger.david8603.workers.dev/vitamix.com/forms-testing/wellness-program';
+import { getFormSubmissionUrl, getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 /**
  * Loads form copy from the widget's local JSON (same name as the script).
@@ -82,13 +79,13 @@ export default async function decorate(widget) {
     }
 
     try {
-      const resp = await fetch(SHEET_LOGGER_URL, {
+      const resp = await fetch(getFormSubmissionUrl(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       if (!resp.ok) {
-        throw new Error(`Sheet logger responded with ${resp.status}`);
+        throw new Error(`Forms API submission failed with ${resp.status}`);
       }
       const thankYouPath = `/${locale}/${language}/wellness-program-thankyou`;
       window.location.href = thankYouPath;
