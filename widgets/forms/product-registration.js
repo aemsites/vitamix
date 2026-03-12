@@ -45,8 +45,9 @@ export default async function decorate(widget) {
 
   const { locale, language } = getLocaleAndLanguage();
   const lang = (language || 'en_us').split('_')[0];
+  const countryCode = (locale || 'us').toUpperCase();
   const copy = await loadFormCopy(lang);
-  const provinceOptions = await getStatesProvincesOptions('CA', lang).catch(() => []);
+  const provinceOptions = await getStatesProvincesOptions(countryCode, lang).catch(() => []);
   const labels = copy.labels || {};
   const inputHints = copy.inputPlaceholders || {};
   const purchasedFromOptions = copy.purchasedFromOptions || [];
