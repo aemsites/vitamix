@@ -741,6 +741,26 @@ function displayHHResults(results, location, labels = {}) {
     li.append(phoneWrapper);
   };
 
+  const appendEmail = (li, result) => {
+    if (!result.EMAIL) return;
+
+    const emailWrapper = document.createElement('span');
+    emailWrapper.classList.add('locator-email');
+
+    const emailLabel = document.createElement('strong');
+    emailLabel.textContent = 'Email: ';
+    emailWrapper.append(emailLabel);
+
+    const emailLink = document.createElement('a');
+    emailLink.href = `mailto:${result.EMAIL}`;
+    emailLink.textContent = result.EMAIL;
+    emailLink.target = '_blank';
+    emailLink.rel = 'noopener noreferrer';
+
+    emailWrapper.append(emailLink);
+    li.append(emailWrapper);
+  };
+
   const appendDistance = (li, result) => {
     if (!location?.lat || !location?.lng || result.lat == null || result.lng == null) return;
 
@@ -761,6 +781,7 @@ function displayHHResults(results, location, labels = {}) {
     appendAddress(li, result);
     appendWebsite(li, result);
     appendPhone(li, result);
+    appendEmail(li, result);
 
     return li;
   };
@@ -776,6 +797,7 @@ function displayHHResults(results, location, labels = {}) {
     appendAddress(li, result);
     appendWebsite(li, result);
     appendPhone(li, result);
+    appendEmail(li, result);
 
     return li;
   };
@@ -791,6 +813,7 @@ function displayHHResults(results, location, labels = {}) {
     appendAddress(li, result);
     appendWebsite(li, result);
     appendPhone(li, result);
+    appendEmail(li, result);
 
     return li;
   };
