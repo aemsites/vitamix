@@ -130,8 +130,9 @@ export async function lookupProducts(config, facets = {}) {
 
     Object.values(parentProductsBySKU).forEach((product) => {
       if (product.url) {
-        const url = new URL(product.url);
+        const url = new URL(product.url, window.location.origin);
         product.url = url.pathname;
+        urlLookup[url.pathname] = product;
       } else if (product.urlKey) {
         const url = buildProductsUrl(locale, language, product.urlKey);
         urlLookup[url] = product;
@@ -415,8 +416,18 @@ function createProductCard(product, ph) {
  */
 async function styleRowAsSlide(content, ph) {
   const [image, body] = content.children;
+  if (!body) return;
+
   const link = body.querySelector('a[href]');
-  const { pathname } = new URL(link.href);
+  if (!link) return;
+
+  let pathname;
+  try {
+    pathname = new URL(link.href, window.location.origin).pathname;
+  } catch {
+    return;
+  }
+
   const [product] = await lookupProducts([pathname]);
   if (!product) {
     link.classList.add('linkchecker-invalid-link');
