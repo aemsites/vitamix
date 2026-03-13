@@ -1,4 +1,3 @@
-import { createOptimizedPicture } from '../../scripts/aem.js';
 import { buildVideo } from '../../scripts/scripts.js';
 
 /**
@@ -90,17 +89,17 @@ export default function decorate(block) {
 
   // build list structure
   [...block.children].forEach((row) => {
-    // move all children from row into list item
     const li = document.createElement('li');
-    while (row.firstElementChild) li.append(row.firstElementChild);
+    // move all children from row into list item  
+    while (row.firstElementChild) {
+      li.append(row.firstElementChild);
+    }
 
-    // replace images with optimized versions
-    li.querySelectorAll('picture > img').forEach((img) => img.closest('picture').replaceWith(
-      createOptimizedPicture(img.src, img.alt, false, [{ width: '900' }]),
-    ));
     ul.append(li);
-    buildVideo(li);
 
+    // build videos if present
+    buildVideo(li);
+    
     // assign classes based on content
     [...li.children].forEach((child) => {
       const picture = child.querySelector('picture');
@@ -109,12 +108,14 @@ export default function decorate(block) {
 
       if (hasMedia) {
         const textContent = child.textContent.trim();
+
         if (textContent) {
           child.className = 'card-captioned';
           stripButtonClasses(child);
         } else {
           child.className = 'card-image';
         }
+
         if (video) child.classList.add('vid-wrapper');
       } else {
         child.className = 'card-body';
@@ -129,6 +130,7 @@ export default function decorate(block) {
   }
 
   const clickable = ['knockout', 'articles', 'linked', 'overlay'];
+
   if (variants.some((v) => clickable.includes(v))) {
     enableClick(ul);
   }
