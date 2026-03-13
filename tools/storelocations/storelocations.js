@@ -34,6 +34,8 @@ let rawPayload = null;
 let columns = [];
 let viewData = [];
 let currentPage = 1;
+/** Set of row object references (from rawPayload.data) for bulk actions */
+const selectedRows = new Set();
 
 function getTypeOptions() {
   const fromData = rawPayload?.data
@@ -311,6 +313,56 @@ function getPageSlice() {
   return viewData.slice(start, start + PAGE_SIZE);
 }
 
+function updateBulkActionsState() {
+  const count = selectedRows.size;
+  const exportBtn = document.getElementById('exportTsvBtn');
+  const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+  if (exportBtn) exportBtn.disabled = viewData.length === 0;
+  if (bulkDeleteBtn) {
+    bulkDeleteBtn.disabled = count === 0 || isReadOnly();
+  }
+}
+
+function escapeTsvCell(val) {
+  if (val == null) return '';
+  const s = String(val);
+  if (s.includes('\t') || s.includes('\n') || s.includes('"')) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
+function exportToTsv() {
+  const rows = selectedRows.size > 0 ? Array.from(selectedRows) : viewData;
+  if (rows.length === 0) return;
+  const header = columns.join('\t');
+  const lines = rows.map((row) => columns.map((col) => escapeTsvCell(row[col])).join('\t'));
+  const tsv = [header, ...lines].join('\n');
+  const blob = new Blob([tsv], { type: 'text/tab-separated-values;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const config = getSourceConfig();
+  a.download = `${config.value}-${new Date().toISOString().slice(0, 10)}.tsv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function bulkDelete() {
+  if (selectedRows.size === 0) return;
+  // eslint-disable-next-line no-alert -- intentional confirm for destructive action
+  if (!window.confirm(`Delete ${selectedRows.size} selected record(s)?`)) return;
+  rawPayload.data = rawPayload.data.filter((row) => !selectedRows.has(row));
+  rawPayload.total = rawPayload.data.length;
+  selectedRows.clear();
+  applySearchFilterSort();
+  if (daToken) {
+    saveToAdmin();
+  } else {
+    showError('Sign in via DA to save changes.');
+  }
+}
+
 function renderPager(totalFiltered, totalPages) {
   const pager = document.getElementById('pager');
   if (totalFiltered <= PAGE_SIZE) {
@@ -346,6 +398,27 @@ function renderTable() {
   if (!columns.length) return;
 
   const trHead = document.createElement('tr');
+  const thSelect = document.createElement('th');
+  thSelect.scope = 'col';
+  thSelect.className = 'th-select';
+  const selectAllCheckbox = document.createElement('input');
+  selectAllCheckbox.type = 'checkbox';
+  selectAllCheckbox.setAttribute('aria-label', 'Select all filtered rows');
+  const allFiltered = viewData.length > 0 && viewData.every((r) => selectedRows.has(r));
+  const someFiltered = viewData.some((r) => selectedRows.has(r));
+  selectAllCheckbox.checked = allFiltered;
+  selectAllCheckbox.indeterminate = someFiltered && !allFiltered;
+  selectAllCheckbox.addEventListener('change', () => {
+    if (selectAllCheckbox.checked) {
+      viewData.forEach((r) => selectedRows.add(r));
+    } else {
+      viewData.forEach((r) => selectedRows.delete(r));
+    }
+    renderTable();
+    updateBulkActionsState();
+  });
+  thSelect.appendChild(selectAllCheckbox);
+  trHead.appendChild(thSelect);
   trHead.appendChild(document.createElement('th')); // row action
   columns.forEach((col) => {
     const th = document.createElement('th');
@@ -358,6 +431,20 @@ function renderTable() {
   const pageRows = getPageSlice();
   pageRows.forEach((row) => {
     const tr = document.createElement('tr');
+    const selectCell = document.createElement('td');
+    selectCell.className = 'td-select';
+    const rowCheckbox = document.createElement('input');
+    rowCheckbox.type = 'checkbox';
+    rowCheckbox.setAttribute('aria-label', 'Select row');
+    rowCheckbox.checked = selectedRows.has(row);
+    rowCheckbox.addEventListener('change', () => {
+      if (rowCheckbox.checked) selectedRows.add(row);
+      else selectedRows.delete(row);
+      renderTable();
+      updateBulkActionsState();
+    });
+    selectCell.appendChild(rowCheckbox);
+    tr.appendChild(selectCell);
     const editCell = document.createElement('td');
     const editBtn = document.createElement('button');
     editBtn.type = 'button';
@@ -374,6 +461,8 @@ function renderTable() {
     });
     tbody.appendChild(tr);
   });
+
+  updateBulkActionsState();
 }
 
 function openEditModal(row) {
@@ -769,6 +858,7 @@ export async function loadSource() {
       throw new Error('Invalid response: expected { data: [] }');
     }
     rawPayload = payload;
+    selectedRows.clear();
     columns = buildColumns(payload.data);
     fillFilterSortOptions();
     viewData = [...payload.data];
@@ -877,6 +967,8 @@ function bindEvents() {
   document.getElementById('bulkAddBtn').addEventListener('click', openBulkModal);
   document.getElementById('bulkCancelBtn').addEventListener('click', closeBulkModal);
   document.getElementById('bulkImportBtn').addEventListener('click', bulkImport);
+  document.getElementById('exportTsvBtn').addEventListener('click', exportToTsv);
+  document.getElementById('bulkDeleteBtn').addEventListener('click', bulkDelete);
   document.getElementById('editModal').addEventListener('cancel', closeEditModal);
   document.getElementById('bulkModal').addEventListener('cancel', closeBulkModal);
 }
