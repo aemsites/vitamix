@@ -134,7 +134,7 @@ main > .locator-container.section {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-60);
+  gap: var(--spacing-100);
   margin-bottom: var(--spacing-200);
   padding: var(--spacing-200);
   background-color: var(--color-white);
@@ -207,3 +207,126 @@ main > .locator-container.section {
 .locator .locator-results[aria-hidden='true'] {
   display: none;
 }
+
+.locator-events-layout{
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: var(--spacing-300);
+  background: var(--color-white);
+}
+
+.locator-events-layout .locator-tabpanels{
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.locator-events-calendar{
+  flex: 0 0 360px;
+  max-width: 360px;
+  background: var(--color-white);
+  padding: var(--spacing-200);
+  border-radius: 8px;
+}
+
+.locator-cal-header{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.locator-cal-title{
+  font-weight: 600;
+}
+
+.locator-cal-grid{
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.locator-cal-dow{
+  font-size: 12px;
+  opacity: 0.8;
+  text-align: center;
+  padding: 6px 0;
+}
+
+.locator-cal-cell{
+  height: 40px;
+  border: 1px solid rgba(0,0,0,.15);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.locator-cal-cell.is-blank{
+  border: none;
+  background: transparent;
+  cursor: default;
+}
+
+.locator-cal-cell.has-event{
+  outline: 2px solid rgba(180,0,60,.6);
+}
+
+.locator-cal-cell.is-selected{
+  outline: 2px solid rgba(180,0,60,1);
+}
+.locator-hh-layout,
+.locator-comm-layout{
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: var(--spacing-300);
+  background-color: var(--color-white);
+}
+
+/* IMPORTANT: override global .locator-tabpanels styles INSIDE these layouts */
+.locator-hh-layout .locator-tabpanels,
+.locator-comm-layout .locator-tabpanels{
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+
+/* Mobile */
+@media (max-width: 900px){
+  .locator-events-layout{
+    flex-direction: column;
+  }
+  .locator-events-calendar{
+    flex: 1 1 auto;
+    max-width: 100%;
+    width: 100%;
+  }
+  .locator-hh-layout,
+  .locator-comm-layout{
+    flex-direction: column;
+  }
+
+  .locator-hh-side,
+  .locator-comm-side{
+    max-width: 100%;
+    width: 100%;
+  }
+}
+
+
+
