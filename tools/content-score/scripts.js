@@ -511,7 +511,7 @@ function checkLinks(doc, config) {
 
     const tag = link.tagName.toLowerCase();
     if (genericRule && genericRule.patterns && genericRule.patterns.length > 0) {
-      const found = genericRule.patterns.filter((term) => normalizedText.includes(term));
+      const found = genericRule.patterns.filter((term) => normalizedText === term);
       if (found.length > 0) {
         const msg = formatMessage(getProblemMessage(genericRule), { found: found.join(', ') });
         issues.push(issueFromRule(genericRule, msg, null, link, { tag, text }));
