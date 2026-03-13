@@ -93,18 +93,7 @@ export default function decorate(block) {
     // move all children from row into list item
     const li = document.createElement('li');
     while (row.firstElementChild) li.append(row.firstElementChild);
-
-    // replace images with optimized versions
-    li.querySelectorAll('picture > img').forEach((img) => img.closest('picture').replaceWith(
-      createOptimizedPicture(img.src, img.alt, false, [
-        { media: '(min-width: 1200px)', width: '2000' },
-        { media: '(min-width: 600px)', width: '1200' },
-        { width: '750' },
-      ]),
-    ));
-    ul.append(li);
-    buildVideo(li);
-
+  
     // assign classes based on content
     [...li.children].forEach((child) => {
       const picture = child.querySelector('picture');
