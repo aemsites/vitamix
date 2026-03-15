@@ -276,13 +276,25 @@ function createProductTitle(product, h = 'h4') {
 
 /**
  * Creates a product price display element.
+ * When product is on sale (regularPrice > price), shows sale price with struck-through
+ * regular price and savings, matching the carousel layout.
  * @param {Object} product - Product data object
+ * @param {Object} ph - Placeholder object with localized text strings
  * @returns {HTMLParagraphElement} Product price element
  */
 function createProductPrice(product, ph) {
   const price = document.createElement('p');
   price.className = 'plp-price';
   price.textContent = product.price ? formatPrice(product.price, ph) : '';
+  if (product.regularPrice && product.regularPrice > product.price) {
+    const savings = (product.regularPrice - product.price).toFixed(2);
+    const saleInfo = document.createElement('span');
+    saleInfo.textContent = `| ${ph.save || 'Save'} ${formatPrice(savings, ph)}`;
+    const regularPrice = document.createElement('del');
+    regularPrice.textContent = formatPrice(product.regularPrice, ph);
+    saleInfo.prepend(regularPrice);
+    price.append(' ', saleInfo);
+  }
   return price;
 }
 
@@ -380,7 +392,7 @@ function createProductButton(product, ph, label, btnClass) {
  * @param {Object} ph - Placeholder object with localized text strings
  * @returns {HTMLElement} Product card element
  */
-function createProductCard(product, ph) {
+export function createProductCard(product, ph) {
   const card = document.createElement('div');
   card.className = 'plp-product-card';
 

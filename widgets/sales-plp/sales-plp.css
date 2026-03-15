@@ -1,0 +1,20 @@
+/* Sales PLP widget – reuses plp-results grid (see blocks/plp/plp.css) */
+.sales-plp-wrapper .sales-plp {
+  padding: var(--spacing-m, 1rem) 0;
+}
+
+.sales-plp-results-count {
+  text-align: center;
+  font-size: var(--body-size-s, 0.875rem);
+  margin-bottom: var(--spacing-m, 1rem);
+}
+
+.sales-plp-empty {
+  text-align: center;
+  padding: var(--spacing-l, 1.5rem);
+  color: var(--color-gray-700, #374151);
+}
+
+.sales-plp-empty[hidden] {
+  display: none;
+}
