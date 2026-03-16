@@ -1176,7 +1176,7 @@ async function loadEager(doc) {
   }
 
   /* adjust shop images to locale root path, util all of shop is mapped */
-  if (window.location.pathname.includes('/shop/')) {
+  if (window.location.pathname.includes('/shop/') || window.location.pathname.includes('/commercial/')) {
     const images = doc.querySelectorAll('img[src^="./media_"]');
     images.forEach((img) => {
       img.setAttribute('src', img.getAttribute('src').replace('./media_', '/us/en_us/media_'));
