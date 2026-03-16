@@ -399,10 +399,10 @@ async function addToCartLegacy(sku, options, quantity) {
     } else if (type === 'bundle') {
       // Use array notation for multi-value bundle options (checkbox type) so PHP
       // receives all selections instead of only the last one
-      const formKey = bundleOptionsByKey[key].length > 1
+      const bundleFormKey = bundleOptionsByKey[key].length > 1
         ? `bundle_option[${key}][]`
         : `bundle_option[${key}]`;
-      formData.append(formKey, value);
+      formData.append(bundleFormKey, value);
     }
   });
 
