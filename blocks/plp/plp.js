@@ -475,23 +475,12 @@ async function styleRowAsSlide(content, ph) {
   const footer = document.createElement('div');
   footer.className = 'slide-footer';
 
-  // starting at price
+  // starting at price (createProductPrice already includes sale info when on sale)
   if (product.price) {
     const startingAt = document.createElement('p');
     startingAt.className = 'eyebrow';
     startingAt.textContent = ph.startingAt || 'Starting at';
-
     const price = createProductPrice(product, ph);
-    if (product.regularPrice && product.regularPrice > product.price) {
-      const savings = (product.regularPrice - product.price).toFixed(2);
-      const saleInfo = document.createElement('span');
-      saleInfo.textContent = `| ${ph.save || 'Save'} ${formatPrice(savings, ph)}`;
-      const regularPrice = document.createElement('del');
-      regularPrice.textContent = formatPrice(product.regularPrice, ph);
-      saleInfo.prepend(regularPrice);
-      price.append(saleInfo);
-    }
-
     footer.append(startingAt, price);
   }
 
