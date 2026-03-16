@@ -1,4 +1,3 @@
-import { createOptimizedPicture } from '../../scripts/aem.js';
 import { buildVideo } from '../../scripts/scripts.js';
 
 /**
@@ -93,11 +92,6 @@ export default function decorate(block) {
     // move all children from row into list item
     const li = document.createElement('li');
     while (row.firstElementChild) li.append(row.firstElementChild);
-
-    // replace images with optimized versions
-    li.querySelectorAll('picture > img').forEach((img) => img.closest('picture').replaceWith(
-      createOptimizedPicture(img.src, img.alt, false, [{ width: '900' }]),
-    ));
     ul.append(li);
     buildVideo(li);
 
