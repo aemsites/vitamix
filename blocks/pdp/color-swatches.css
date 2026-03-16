@@ -1,6 +1,7 @@
-/* product swatches colors */
+/* product swatches colors (PDP, PLP block, and sales-plp widget) */
 .pdp .pdp-color-swatch,
-.plp .plp-color-swatch {
+.plp .plp-color-swatch,
+.sales-plp .plp-color-swatch {
   /* blacks */
   --color-black: #000;
   --color-shadow-black: #000;
