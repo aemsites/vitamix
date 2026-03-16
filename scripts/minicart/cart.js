@@ -373,6 +373,17 @@ async function addToCartLegacy(sku, options, quantity) {
   formData.append('qty', quantity);
   formData.append('vitamixProductId', productId);
 
+  // Group bundle options by key first to detect multi-value (checkbox) bundle options
+  const bundleOptionsByKey = {};
+  options.forEach((option) => {
+    const decoded = atob(option);
+    const [type, key, value] = decoded.split('/');
+    if (type === 'bundle') {
+      if (!bundleOptionsByKey[key]) bundleOptionsByKey[key] = [];
+      bundleOptionsByKey[key].push(value);
+    }
+  });
+
   const warrantyIdsAdded = new Set();
   options.forEach((option) => {
     const decoded = atob(option);
@@ -386,7 +397,12 @@ async function addToCartLegacy(sku, options, quantity) {
       formData.append('warranty_sku', window.selectedWarranty.sku);
       warrantyIdsAdded.add(value);
     } else if (type === 'bundle') {
-      formData.append(`bundle_option[${key}]`, value);
+      // Use array notation for multi-value bundle options (checkbox type) so PHP
+      // receives all selections instead of only the last one
+      const bundleFormKey = bundleOptionsByKey[key].length > 1
+        ? `bundle_option[${key}][]`
+        : `bundle_option[${key}]`;
+      formData.append(bundleFormKey, value);
     }
   });
 
