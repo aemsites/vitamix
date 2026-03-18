@@ -353,7 +353,7 @@ function createProductColors(product) {
       const { color, availability } = variant;
       if (color) {
         const colorSwatch = document.createElement('div');
-        colorSwatch.className = 'plp-color-swatch';
+        colorSwatch.className = 'color-swatch';
         colorSwatch.title = color;
         colorSwatch.dataset.color = toClassName(color);
         const colorInner = document.createElement('div');
