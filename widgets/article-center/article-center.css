@@ -289,8 +289,17 @@
 .article-center .card .matched-tags {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--spacing-60);
   margin-top: var(--spacing-80);
+}
+
+.article-center .card .matched-tags .matched-tags-label {
+  flex: 1 0 100%;
+  margin: 0;
+  font-size: var(--body-size-xs);
+  font-weight: 600;
+  color: var(--color-charcoal);
 }
 
 .article-center .card .matched-tags .tag {

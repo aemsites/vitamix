@@ -11,7 +11,8 @@
     "nameZA": "Name Z-A",
     "previous": "Previous",
     "next": "Next",
-    "by": "By"
+    "by": "By",
+    "matchingTags": "Matching tags"
   },
   "fr": {
     "search": "Rechercher",
@@ -25,7 +26,8 @@
     "nameZA": "Nom Z-A",
     "previous": "Précédent",
     "next": "Suivant",
-    "by": "Par"
+    "by": "Par",
+    "matchingTags": "Étiquettes correspondantes"
   },
   "es": {
     "search": "Buscar",
@@ -39,6 +41,7 @@
     "nameZA": "Nombre Z-A",
     "previous": "Anterior",
     "next": "Siguiente",
-    "by": "Por"
+    "by": "Por",
+    "matchingTags": "Etiquetas coincidentes"
   }
 }
