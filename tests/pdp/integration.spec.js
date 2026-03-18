@@ -253,7 +253,7 @@ test.describe('PDP Integration Tests', () => {
       await page.waitForLoadState('networkidle');
 
       // Look for variant options
-      const variantOptions = page.locator('.pdp-color-options .pdp-color-swatch');
+      const variantOptions = page.locator('.pdp-color-options .color-swatch');
 
       if (await variantOptions.count() > 0) {
         await variantOptions.nth(1).click();
@@ -446,7 +446,7 @@ test.describe('PDP Integration Tests', () => {
       await page.waitForLoadState('networkidle');
 
       // Look for variant options
-      const variantOptions = page.locator('.pdp-color-options .pdp-color-swatch');
+      const variantOptions = page.locator('.pdp-color-options .color-swatch');
 
       if (await variantOptions.count() > 0) {
         await variantOptions.nth(1).click();
