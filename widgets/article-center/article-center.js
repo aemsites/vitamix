@@ -48,13 +48,18 @@ function formatPublicationDate(dateString) {
 }
 
 /**
- * Parses tags from a comma-separated string into an array.
- * @param {string} tagsString - Comma-separated tags
+ * Normalizes tags from query-index: comma-separated string or array of strings.
+ * @param {string|string[]|unknown} tags - Tags from index
  * @returns {Array<string>} Array of trimmed tag strings
  */
-function parseTags(tagsString) {
-  if (!tagsString || !tagsString.trim()) return [];
-  return tagsString.split(',').map((tag) => tag.trim()).filter((tag) => tag);
+function parseTags(tags) {
+  if (tags == null) return [];
+  if (Array.isArray(tags)) {
+    return tags.map((t) => String(t).trim()).filter(Boolean);
+  }
+  const s = String(tags).trim();
+  if (!s) return [];
+  return s.split(',').map((tag) => tag.trim()).filter((tag) => tag);
 }
 
 /**
@@ -77,7 +82,7 @@ async function lookupArticles(config = {}) {
         description: article.description || '',
         author: article.author || '',
         'publication-date': article['publication-date'] || '',
-        tags: parseTags(article.tags || ''),
+        tags: parseTags(article.tags),
       })),
     };
   }
@@ -217,10 +222,18 @@ function createArticleCard(article, copy = {}) {
 
   content.append(title, meta, description);
 
-  // Display matched tags if any, with matching portion highlighted
-  if (article.matchedTags && article.matchedTags.length > 0) {
+  // Display tags that matched the search, with matching substring highlighted
+  if (article.matchedTags && article.matchedTags.length > 0 && article.searchTerm) {
     const tagsContainer = document.createElement('div');
     tagsContainer.className = 'matched-tags';
+    tagsContainer.setAttribute('role', 'group');
+    tagsContainer.setAttribute('aria-label', copy.matchingTags || 'Matching tags');
+    if (copy.matchingTags) {
+      const label = document.createElement('span');
+      label.className = 'matched-tags-label';
+      label.textContent = `${copy.matchingTags}:`;
+      tagsContainer.appendChild(label);
+    }
     article.matchedTags.forEach((tag) => {
       const tagSpan = document.createElement('span');
       tagSpan.className = 'tag';
