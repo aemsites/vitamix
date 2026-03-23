@@ -775,34 +775,23 @@
   left: 14px;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  background: rgb(10 10 10 / 85%);
-  color: #fff;
+  background: #fff;
+  color: var(--color-charcoal, #1a1a1a);
   font-size: 0.65rem;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  padding: 5px 10px 5px 0;
-  border-radius: 3px;
-  backdrop-filter: blur(4px);
-  line-height: 1;
+  padding: 0 10px;
+  line-height: 2;
+  border-left: 4px solid var(--recipe-badge-intermediate);
 }
 
-.cards.recipes .recipe-badge::before {
-  content: '';
-  display: block;
-  width: 4px;
-  align-self: stretch;
-  border-radius: 3px 0 0 3px;
-  background: var(--recipe-badge-intermediate);
+.cards.recipes .recipe-badge[data-difficulty="simple"] {
+  border-left-color: var(--recipe-badge-simple);
 }
 
-.cards.recipes .recipe-badge[data-difficulty="simple"]::before {
-  background: var(--recipe-badge-simple);
-}
-
-.cards.recipes .recipe-badge[data-difficulty="advanced"]::before {
-  background: var(--recipe-badge-advanced);
+.cards.recipes .recipe-badge[data-difficulty="advanced"] {
+  border-left-color: var(--recipe-badge-advanced);
 }
 
 /* Card body */
@@ -969,3 +958,4 @@
     --grid-cols: 2;
   }
 }
+      
