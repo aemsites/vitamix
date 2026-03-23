@@ -717,17 +717,15 @@
 /* Card base */
 .cards.recipes > ul > li {
   background: var(--color-white, #fff);
-  border-radius: var(--rounding-m, 8px);
-  box-shadow: 0 1px 4px rgb(0 0 0 / 8%), 0 2px 12px rgb(0 0 0 / 5%);
+  border: 1px solid #e5e5e5;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  transition: box-shadow 0.25s;
   cursor: pointer;
 }
 
 .cards.recipes > ul > li:hover {
-  box-shadow: 0 4px 16px rgb(0 0 0 / 14%), 0 2px 6px rgb(0 0 0 / 8%);
+  border-color: #ccc;
 }
 
 /* Image */
