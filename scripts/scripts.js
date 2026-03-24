@@ -17,11 +17,6 @@ import {
   getMetadata,
 } from './aem.js';
 
-const isProdHost = window.location.hostname.includes('vitamix.com');
-export const FORMS_ENDPOINT = isProdHost
-  ? 'https://main--vitamix--aemsites.aem.network' // TODO: make empty string when Akamai ready
-  : 'https://main--vitamix--aemsites.aem.network';
-
 /**
  * Load fonts.css and set a session storage flag.
  */
@@ -76,15 +71,6 @@ export function getLocaleAndLanguage(forceEnCA = false) {
   }
 
   return { locale, language };
-}
-
-/**
- * Gets the form submission URL for the current locale and language.
- * @returns {string} The form submission URL
- */
-export function getFormSubmissionUrl() {
-  const { locale, language } = getLocaleAndLanguage();
-  return `${FORMS_ENDPOINT}/${locale}/${language}/forms`;
 }
 
 /**
@@ -408,11 +394,11 @@ function parsePDPContentSections(sections) {
   sections.forEach((section) => {
     const h3 = section.querySelector('h3')?.textContent.toLowerCase();
     if (h3) {
-      if (h3.includes('features') || h3.includes('caractéristiques') || h3.includes('características')) {
+      if (h3.includes('features') || h3.includes('caractéristiques')) {
         window.features = section;
-      } else if (h3.includes('specifications') || h3.includes('spécifications') || h3.includes('especificaciones')) {
+      } else if (h3.includes('specifications') || h3.includes('spécifications')) {
         window.specifications = section;
-      } else if (h3.includes('warranty') || h3.includes('garantie') || h3.includes('garantía')) {
+      } else if (h3.includes('warranty') || h3.includes('garantie')) {
         window.warranty = section;
       }
     }
@@ -1176,7 +1162,7 @@ async function loadEager(doc) {
   }
 
   /* adjust shop images to locale root path, util all of shop is mapped */
-  if (window.location.pathname.includes('/shop/') || window.location.pathname.includes('/commercial/')) {
+  if (window.location.pathname.includes('/shop/')) {
     const images = doc.querySelectorAll('img[src^="./media_"]');
     images.forEach((img) => {
       img.setAttribute('src', img.getAttribute('src').replace('./media_', '/us/en_us/media_'));
