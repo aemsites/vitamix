@@ -759,7 +759,7 @@
   }
 
   .cards.recipes > ul > li:first-child .card-image {
-    flex: 2;
+    flex: 1;
     min-height: 400px;
   }
 }
@@ -807,7 +807,7 @@
 .cards.recipes .card-body h3 {
   font-family: var(--serif-font-family, Georgia, serif);
   font-size: var(--font-size-500, 1.2rem);
-  font-weight: 500;
+  font-weight: 700;
   line-height: 1.25;
   margin: 0;
   color: var(--color-charcoal, #1a1a1a);
@@ -817,28 +817,6 @@
 .cards.recipes > ul > li:first-child .card-body h2,
 .cards.recipes > ul > li:first-child .card-body h3 {
   font-size: clamp(1.5rem, 2.5vw, 2rem);
-}
-
-/* Star rating row */
-.cards.recipes .recipe-rating {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.85rem;
-  color: var(--color-gray, #666);
-  margin: 0;
-}
-
-.cards.recipes .recipe-stars {
-  display: inline-flex;
-  gap: 1px;
-  color: #e8a020;
-  font-size: 1rem;
-}
-
-.cards.recipes .recipe-score {
-  font-weight: 600;
-  color: var(--color-charcoal, #1a1a1a);
 }
 
 /* Meta row (time, serves) */
