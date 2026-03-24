@@ -1,0 +1,44 @@
+{
+  "en": {
+    "labels": {
+      "emailAddress": "Email Address",
+      "submit": "Submit",
+      "sending": "Sending...",
+      "verifyYourEmail": "Verify Your Email",
+      "enterVerificationCodeSent": "Enter the verification code sent to your email:",
+      "didntReceiveCode": "Didn't receive the code?",
+      "resendCode": "Resend code"
+    },
+    "inputPlaceholders": {
+      "emailAddress": ""
+    }
+  },
+  "fr": {
+    "labels": {
+      "emailAddress": "Adresse courriel",
+      "submit": "Soumettre",
+      "sending": "Envoi en cours...",
+      "verifyYourEmail": "Vérifiez votre courriel",
+      "enterVerificationCodeSent": "Entrez le code de vérification envoyé à votre courriel :",
+      "didntReceiveCode": "Vous n'avez pas reçu le code?",
+      "resendCode": "Renvoyer le code"
+    },
+    "inputPlaceholders": {
+      "emailAddress": ""
+    }
+  },
+  "es": {
+    "labels": {
+      "emailAddress": "Correo electrónico",
+      "submit": "Enviar",
+      "sending": "Enviando...",
+      "verifyYourEmail": "Verifique su correo",
+      "enterVerificationCodeSent": "Ingrese el código de verificación enviado a su correo:",
+      "didntReceiveCode": "¿No recibió el código?",
+      "resendCode": "Reenviar código"
+    },
+    "inputPlaceholders": {
+      "emailAddress": ""
+    }
+  }
+}

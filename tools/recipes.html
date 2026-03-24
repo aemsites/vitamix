@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <script src="https://da.live/nx/utils/sdk.js" type="module"></script>
+    <script src="/tools/recipes/recipes.js" type="module"></script>
+    <meta name="Description" content="Vitamix Recipes API Tool" />
+    <meta name="robots" content="noindex" />
+    <title>Vitamix Recipes Tool</title>
+    <link rel="stylesheet" href="./recipes/recipes.css" />
+  </head>
+
+  <body>
+    <div class="container">
+      <h1>Vitamix Recipes Tool</h1>
+      <p class="subtitle">Fetch updated recipes from Vitamix CalcMenu API</p>
+
+      <div class="credentials-notice" id="credentialsNotice">
+        <strong>Credentials required:</strong> Add <code>?user=YOUR_USER&pw=YOUR_PASSWORD</code> to the URL
+      </div>
+
+      <div class="form-section">
+        <form id="recipesForm" method="GET">
+          <div class="form-group">
+            <label for="userId">User ID</label>
+            <input type="text" id="userId" name="user" required />
+            <div class="help-text">From query parameter: ?user=...</div>
+          </div>
+
+          <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="pw" required />
+            <div class="help-text">From query parameter: ?pw=...</div>
+          </div>
+
+          <div class="form-group">
+            <label for="dateUpdated">Date Updated</label>
+            <input type="date" id="dateUpdated" name="date" />
+            <div class="help-text">Leave empty to get all recipes, or specify a date to get recipes updated since that date</div>
+          </div>
+
+          <button type="submit" id="submitBtn">Fetch Recipes</button>
+        </form>
+      </div>
+
+      <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <p>Fetching recipes from API...</p>
+      </div>
+
+      <div class="error" id="error"></div>
+
+      <div class="results" id="results">
+        <h2>Results</h2>
+        <div class="recipe-count" id="recipeCount"></div>
+        <div class="actions">
+          <button id="toggleBtn">Show Raw XML</button>
+          <button id="copyBtn">Copy XML</button>
+          <button id="downloadBtn" class="btn-secondary">Download XML</button>
+        </div>
+        <div id="recipeList" class="recipe-list"></div>
+        <pre id="responseData" style="display: none;"></pre>
+      </div>
+    </div>
+  </body>
+</html>
+

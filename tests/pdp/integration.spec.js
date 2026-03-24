@@ -24,9 +24,9 @@ test.describe('PDP Integration Tests', () => {
   });
 
   test.describe('Configurable Product Page', () => {
-    const productPath = '/us/en_us/products/ascent-x3';
+    const productPath = '/us/en_us/products/ascent-x2';
 
-    test('should load Ascent X3 product page with all required elements', async ({ page }) => {
+    test('should load Ascent X2 product page with all required elements', async ({ page }) => {
       const productUrl = buildProductUrl(productPath, currentBranch);
       console.log(`Testing URL: ${productUrl}`);
 
@@ -35,13 +35,13 @@ test.describe('PDP Integration Tests', () => {
       // Wait for page to load
       await page.waitForLoadState('networkidle');
 
-      await expect(page).toHaveTitle(/Ascent X3/i);
+      await expect(page).toHaveTitle(/Ascent X2/i);
       await assertPDPElements(page);
       await assertSaleableElements(page);
       await assertOptionElements(page);
     });
 
-    test('should deeplink to Ascent X3 variant', async ({ page }) => {
+    test('should deeplink to Ascent X2 variant', async ({ page }) => {
       const productUrl = buildProductUrl(productPath, currentBranch, {
         color: 'polar-white',
       });
@@ -53,7 +53,7 @@ test.describe('PDP Integration Tests', () => {
       // Wait for page to load
       await page.waitForLoadState('networkidle');
 
-      await expect(page).toHaveTitle(/Ascent X3/i);
+      await expect(page).toHaveTitle(/Ascent X2/i);
       await assertPDPElements(page);
       await assertPDPElements(page);
       await assertSaleableElements(page);
@@ -68,11 +68,11 @@ test.describe('PDP Integration Tests', () => {
         expect(requestBody.variables).toEqual({
           cartItems: [
             {
-              sku: 'Ascent X3',
+              sku: 'Ascent X2',
               quantity: '1',
               selected_options: [
                 'Y29uZmlndXJhYmxlLzkzLzUzNA==',
-                'Y3VzdG9tLW9wdGlvbi8zMDAyLzM5NDE=',
+                'Y3VzdG9tLW9wdGlvbi8zMDAwLzM5Mzk=',
               ],
             },
           ],
@@ -88,7 +88,7 @@ test.describe('PDP Integration Tests', () => {
                 cart: {
                   items: [
                     {
-                      sku: 'Ascent X3',
+                      sku: 'Ascent X2',
                       quantity: '1',
                     },
                   ],
@@ -126,11 +126,11 @@ test.describe('PDP Integration Tests', () => {
         expect(requestBody.variables).toEqual({
           cartItems: [
             {
-              sku: 'Ascent X3',
+              sku: 'Ascent X2',
               quantity: '1',
               selected_options: [
                 'Y29uZmlndXJhYmxlLzkzLzUzNA==',
-                'Y3VzdG9tLW9wdGlvbi8zMDAyLzM5NDE=',
+                'Y3VzdG9tLW9wdGlvbi8zMDAwLzM5Mzk=',
               ],
             },
           ],
@@ -205,15 +205,17 @@ test.describe('PDP Integration Tests', () => {
         });
         expect(data).toEqual({
           index_id: '534',
-          product: '3641',
-          item: '3641',
+          product: '3627',
+          selected_configurable_option: '',
+          related_product: '',
+          item: '3627',
           form_key: 'null',
           qty: '1',
           'super_attribute[93]': '534',
-          vitamixProductId: '3641',
-          'options[3002]': '3941',
+          vitamixProductId: '3627',
+          'options[3000]': '3939',
           warranty_sku: 'sku-10-year-standard-warranty',
-          'warranty_skus[3941]': 'sku-10-year-standard-warranty',
+          'warranty_skus[3939]': 'sku-10-year-standard-warranty',
         });
 
         // Log the arguments that were passed to addToCart
@@ -251,7 +253,7 @@ test.describe('PDP Integration Tests', () => {
       await page.waitForLoadState('networkidle');
 
       // Look for variant options
-      const variantOptions = page.locator('.pdp-color-options .pdp-color-swatch');
+      const variantOptions = page.locator('.pdp-color-options .color-swatch');
 
       if (await variantOptions.count() > 0) {
         await variantOptions.nth(1).click();
@@ -387,10 +389,14 @@ test.describe('PDP Integration Tests', () => {
         });
         expect(data).toEqual({
           product: '3701',
+          selected_configurable_option: '',
+          related_product: '',
           item: '3701',
           form_key: 'null',
           qty: '1',
           vitamixProductId: '3701',
+          'bundle_option[41][]': '221',
+          'bundle_option[43]': '223',
           'options[3023]': '3965',
           'warranty_skus[3965]': '001314',
           warranty_sku: '001314',
@@ -440,7 +446,7 @@ test.describe('PDP Integration Tests', () => {
       await page.waitForLoadState('networkidle');
 
       // Look for variant options
-      const variantOptions = page.locator('.pdp-color-options .pdp-color-swatch');
+      const variantOptions = page.locator('.pdp-color-options .color-swatch');
 
       if (await variantOptions.count() > 0) {
         await variantOptions.nth(1).click();
@@ -453,6 +459,60 @@ test.describe('PDP Integration Tests', () => {
       } else {
         console.log('No variant options found for this product');
       }
+    });
+  });
+
+  test.describe('Propel 750 Classic Bundle - multi-item bundle with extended warranty', () => {
+    const productPath = '/us/en_us/products/propel-750-classic-bundle';
+
+    // Regression test: both requiredBundleOptions decode to bundle/20/83/1 and bundle/20/86/1 —
+    // the same option ID (20). Before the fix, formData.append('bundle_option[20]', value) was
+    // called twice and PHP only kept the last value (86), silently dropping selection 83.
+    // The fix uses bundle_option[20][] so PHP receives both values as an array.
+    test('both bundle items are sent in cart form when extended warranty is selected', async ({ page }) => {
+      // Use an entries array instead of a plain object so duplicate keys (bundle_option[20][])
+      // are not overwritten and both values can be asserted.
+      let formEntries = null;
+
+      await page.route('**/us/en_us/checkout/cart/add/**', async (route) => {
+        expect(new URL(route.request().url()).pathname).toContain('/product/3407/');
+
+        const requestBody = route.request().postData();
+        const boundary = requestBody.split('\n')[0];
+        const parts = requestBody.split(boundary).filter(Boolean);
+        formEntries = parts.map((part) => [
+          part.split('\n')[1].split('name="')[1].split('"')[0],
+          part.split('\n')[3].trim(),
+        ]);
+
+        await route.fulfill({ status: 200 });
+      });
+
+      const productUrl = buildProductUrl(productPath, currentBranch);
+      await page.goto(productUrl);
+      await waitForElement(page, '.quantity-container button');
+
+      // Select "Extended Warranty, add 3 yrs" (index 1, $75)
+      const warrantyOptions = page.locator('.pdp-warranty-option');
+      await warrantyOptions.nth(1).locator('input[type="radio"]').click();
+      await page.waitForTimeout(500);
+
+      await page.locator('.quantity-container button').click();
+      await page.waitForURL('**/checkout/cart/**');
+
+      // Both bundle selections for option ID 20 must be present — before the fix only 86
+      // (the last appended value) survived because PHP discards duplicate non-array keys.
+      const bundleValues = formEntries
+        .filter(([name]) => name === 'bundle_option[20][]')
+        .map(([, value]) => value);
+      expect(bundleValues).toEqual(expect.arrayContaining(['83', '86']));
+      console.log(`✓ Both bundle items present: bundle_option[20][] = ${bundleValues.join(', ')}`);
+
+      // Extended warranty must also be present alongside both bundle items
+      const warrantyEntry = formEntries.find(([name]) => name === 'options[2900]');
+      expect(warrantyEntry?.[1]).toBe('3818');
+      expect(formEntries.find(([name]) => name === 'warranty_sku')?.[1]).toBe('001314');
+      console.log('✓ Extended warranty present: options[2900] = 3818, warranty_sku = 001314');
     });
   });
 
@@ -541,7 +601,7 @@ test.describe('PDP Integration Tests', () => {
       {
         modal: false,
         smsOptin: true,
-        leadSource: 'sub-emsms-footer-us',
+        leadSource: 'sub-em-footer-us',
         pageUrl: '/us/en_us/products/20-ounce-travel-cup',
       },
       {
@@ -553,7 +613,7 @@ test.describe('PDP Integration Tests', () => {
       {
         modal: true,
         smsOptin: true,
-        leadSource: 'sub-emsms-modal-us',
+        leadSource: 'sub-em-modal-us',
         pageUrl: '/us/en_us/products/20-ounce-travel-cup',
       },
     ];

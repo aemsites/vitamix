@@ -9,7 +9,7 @@ import {
   loadBlock,
 } from '../../scripts/aem.js';
 
-import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { getLocaleAndLanguage, formatPrice } from '../../scripts/scripts.js';
 
 /**
  * Constructs a localized product URL path.
@@ -68,12 +68,26 @@ function parseData(data, locale, language) {
  * @returns {Promise<Array<Object>>} Array of filtered parent product objects (with nested variants)
  */
 export async function lookupProducts(config, facets = {}) {
-  const { locale, language } = await getLocaleAndLanguage();
+  const { locale, language } = getLocaleAndLanguage();
+  const corsProxyFetch = async (url) => {
+    const corsProxy = 'https://fcors.org/?url=';
+    const corsKey = '&key=Mg23N96GgR8O3NjU';
+    const fullUrl = `https://main--vitamix--aemsites.aem.network${url}`;
+    return fetch(`${corsProxy}${encodeURIComponent(fullUrl)}${corsKey}`);
+  };
 
   if (!window.productIndex) {
     // fetch the main product index
-    const resp = await fetch(`/${locale}/${language}/products/index.json?include=all`);
+    const isProd = window.location.hostname.includes('vitamix.com') || window.location.hostname.includes('.aem.network');
+    const indexPath = window.location.pathname.includes('/commercial/') ? 'commercial/products' : 'products';
+    const pathname = `/${locale}/${language}/${indexPath}/index.json?include=all`;
+    const resp = await (isProd ? fetch(pathname) : corsProxyFetch(pathname));
     const { data } = await resp.json();
+    if (!isProd && resp.ok) {
+      data.forEach((product) => {
+        if (product.image) product.image = `https://main--vitamix--aemsites.aem.network/${locale}/${language}/products/${product.image.substring(2)}`;
+      });
+    }
 
     // separate products into parents (standalone products) and variants (color/style options)
     const parentProductsBySKU = {};
@@ -115,7 +129,11 @@ export async function lookupProducts(config, facets = {}) {
     const urlLookup = {};
 
     Object.values(parentProductsBySKU).forEach((product) => {
-      if (product.urlKey) {
+      if (product.url) {
+        const url = new URL(product.url, window.location.origin);
+        product.url = url.pathname;
+        urlLookup[url.pathname] = product;
+      } else if (product.urlKey) {
         const url = buildProductsUrl(locale, language, product.urlKey);
         urlLookup[url] = product;
         product.url = url;
@@ -148,16 +166,16 @@ export async function lookupProducts(config, facets = {}) {
   // extract all filter criteria keys from the config object
   const filterKeys = Object.keys(config);
 
-  // map singular filter names to their plural product property names
+  // map filter key to product property when different (e.g. collection -> collections)
   const cleanKeys = {
-    category: 'categories',
     collection: 'collections',
   };
 
   // parse comma-separated filter values into trimmed token arrays for matching
   const tokens = {};
   filterKeys.forEach((key) => {
-    tokens[key] = config[key].split(',').map((t) => t.trim());
+    const raw = config[key].split(',').map((t) => t.trim());
+    tokens[key] = raw;
   });
   // filter products based on all configured criteria (must match ALL filters)
   const results = window.productIndex.parents.filter((product) => {
@@ -166,7 +184,6 @@ export async function lookupProducts(config, facets = {}) {
 
     // check if this product matches ALL the filter criteria
     const matchedAll = filterKeys.every((filterKey) => {
-      // map the filter key to the actual product property name (e.g., category -> categories)
       const key = cleanKeys[filterKey] || filterKey;
       let matched = false;
 
@@ -198,19 +215,14 @@ export async function lookupProducts(config, facets = {}) {
       });
 
       // if this product qualifies for inclusion in the facet counts
-      if (includeInFacet) {
-        // check if the product has any values for this facet field
-        if (product[facetKey]) {
-          product[facetKey].forEach((val) => {
-            if (facets[facetKey][val]) {
-              // increment existing count
-              facets[facetKey][val] += 1;
-            } else {
-              // initialize count for a new facet value
-              facets[facetKey][val] = 1;
-            }
-          });
-        }
+      if (includeInFacet && product[facetKey]) {
+        product[facetKey].forEach((val) => {
+          if (facets[facetKey][val]) {
+            facets[facetKey][val] += 1;
+          } else {
+            facets[facetKey][val] = 1;
+          }
+        });
       }
     });
 
@@ -264,13 +276,25 @@ function createProductTitle(product, h = 'h4') {
 
 /**
  * Creates a product price display element.
+ * When product is on sale (regularPrice > price), shows sale price with struck-through
+ * regular price and savings, matching the carousel layout.
  * @param {Object} product - Product data object
+ * @param {Object} ph - Placeholder object with localized text strings
  * @returns {HTMLParagraphElement} Product price element
  */
-function createProductPrice(product) {
+function createProductPrice(product, ph) {
   const price = document.createElement('p');
   price.className = 'plp-price';
-  price.textContent = product.price ? `$${product.price}` : '';
+  price.textContent = product.price ? formatPrice(product.price, ph) : '';
+  if (product.regularPrice && product.regularPrice > product.price) {
+    const savings = (product.regularPrice - product.price).toFixed(2);
+    const saleInfo = document.createElement('span');
+    saleInfo.textContent = `| ${ph.save || 'Save'} ${formatPrice(savings, ph)}`;
+    const regularPrice = document.createElement('del');
+    regularPrice.textContent = formatPrice(product.regularPrice, ph);
+    saleInfo.prepend(regularPrice);
+    price.append(' ', saleInfo);
+  }
   return price;
 }
 
@@ -280,14 +304,58 @@ function createProductPrice(product) {
  * @returns {HTMLDivElement} Container element with color swatches
  */
 function createProductColors(product) {
+  const COLOR_ORDER = {
+    /* black */
+    black: 1,
+    'shadow-black': 1,
+    1100001: 1,
+    1100002: 1,
+    'black-stainless-metal-finish': 1,
+    /* red */
+    red: 2,
+    'candy-apple': 2,
+    'candy-apple-red': 2,
+    ruby: 2,
+    /* white */
+    white: 3,
+    'polar-white': 3,
+    /* gray */
+    onyx: 4,
+    'abalone-grey': 4,
+    graphite: 4,
+    'nano-gray': 4,
+    'graphite-metal-finish': 4,
+    slate: 4,
+    'pearl-gray': 4,
+    'black-diamond': 4,
+    'brushed-stainless': 4,
+    grey: 4,
+    platinum: 4,
+    /* tan */
+    espresso: 5,
+    'copper-metal-finish': 5,
+    reflection: 5,
+    'brushed-stainless-metal-finish': 5,
+    'brushed-gold': 5,
+    cream: 5,
+  };
+
   const colors = document.createElement('div');
   colors.className = 'plp-colors';
   if (hasVariants(product)) {
-    product.variants.forEach((variant) => {
+    const sortedVariants = [...product.variants].sort((a, b) => {
+      const colorA = COLOR_ORDER[toClassName(a.color)] ?? 9;
+      const colorB = COLOR_ORDER[toClassName(b.color)] ?? 9;
+      return colorA - colorB;
+    });
+
+    sortedVariants.forEach((variant) => {
       const { color, availability } = variant;
       if (color) {
         const colorSwatch = document.createElement('div');
-        colorSwatch.className = 'plp-color-swatch';
+        colorSwatch.className = 'color-swatch';
+        colorSwatch.title = color;
+        colorSwatch.dataset.color = toClassName(color);
         const colorInner = document.createElement('div');
         colorInner.className = 'plp-color-inner';
         colorInner.style.backgroundColor = `var(--color-${toClassName(color)})`;
@@ -324,20 +392,29 @@ function createProductButton(product, ph, label, btnClass) {
  * @param {Object} ph - Placeholder object with localized text strings
  * @returns {HTMLElement} Product card element
  */
-function createProductCard(product, ph) {
+export function createProductCard(product, ph) {
   const card = document.createElement('div');
   card.className = 'plp-product-card';
 
   const image = createProductImage(product);
   const title = createProductTitle(product);
-  const price = createProductPrice(product);
+  const price = createProductPrice(product, ph);
   const colors = createProductColors(product);
   const viewDetails = createProductButton(product, ph, 'View Details', 'emphasis');
   const compare = createProductButton(product, ph, 'Compare');
 
   card.append(image, title, price, colors, viewDetails, compare);
-  card.addEventListener('click', () => {
-    viewDetails.querySelector('a').click();
+  card.addEventListener('click', (e) => {
+    const { target } = e;
+    const color = target.closest('[data-color]');
+    if (color) {
+      const { href } = viewDetails.querySelector('a');
+      const url = new URL(href, window.location.origin);
+      url.searchParams.set('color', color.dataset.color);
+      window.location.href = url.href;
+    } else {
+      viewDetails.querySelector('a').click();
+    }
   });
 
   return card;
@@ -351,9 +428,24 @@ function createProductCard(product, ph) {
  */
 async function styleRowAsSlide(content, ph) {
   const [image, body] = content.children;
+  if (!body) return;
+
   const link = body.querySelector('a[href]');
-  const { pathname } = new URL(link.href);
+  if (!link) return;
+
+  let pathname;
+  try {
+    pathname = new URL(link.href, window.location.origin).pathname;
+  } catch {
+    return;
+  }
+
   const [product] = await lookupProducts([pathname]);
+  if (!product) {
+    link.classList.add('linkchecker-invalid-link');
+    return;
+  }
+  link.parentElement.remove();
 
   // replace or add product image with lazy loading
   let img = image.querySelector('picture');
@@ -369,45 +461,33 @@ async function styleRowAsSlide(content, ph) {
     body.prepend(title);
   }
 
-  // authored content
-  const ps = body.querySelectorAll('p');
-  ps.forEach((p) => {
-    const a = p.querySelector('a[href]');
-    if (a) p.remove();
-  });
-
   // color options
   const colors = createProductColors(product);
   if (colors && colors.children.length > 0) {
     const colorOptions = document.createElement('p');
     colorOptions.className = 'eyebrow';
     colorOptions.textContent = ph.colorOptions || 'Color options';
-    body.append(colorOptions, colors);
+    body.insertBefore(colorOptions, title.nextSibling);
+    body.insertBefore(colors, colorOptions.nextSibling);
   }
 
-  // starting at price
+  // footer
+  const footer = document.createElement('div');
+  footer.className = 'slide-footer';
+
+  // starting at price (createProductPrice already includes sale info when on sale)
   if (product.price) {
     const startingAt = document.createElement('p');
     startingAt.className = 'eyebrow';
     startingAt.textContent = ph.startingAt || 'Starting at';
-
-    const price = createProductPrice(product);
-    if (product.regularPrice && product.regularPrice > product.price) {
-      const savings = (product.regularPrice - product.price).toFixed(2);
-      const saleInfo = document.createElement('span');
-      saleInfo.textContent = `| ${ph.save || 'Save'} $${savings}`;
-      const regularPrice = document.createElement('del');
-      regularPrice.textContent = `$${product.regularPrice}`;
-      saleInfo.prepend(regularPrice);
-      price.append(saleInfo);
-    }
-
-    body.append(startingAt, price);
+    const price = createProductPrice(product, ph);
+    footer.append(startingAt, price);
   }
 
   // "Shop Now" button
   const shopNow = createProductButton(product, ph, 'Shop Now');
-  body.appendChild(shopNow);
+  footer.append(shopNow);
+  body.append(footer);
 }
 
 /**
@@ -421,12 +501,29 @@ async function buildProductCarousel(block, ph) {
   const rows = [...block.children];
   await Promise.all(rows.map((row) => styleRowAsSlide(row, ph)));
 
-  const elems = [...block.children].map((c) => [...c.children]);
+  const elems = [...block.children].map((row) => (
+    [...row.children].map((cell) => ({ elems: [...cell.children] }))
+  ));
   const carousel = buildBlock('carousel', elems);
   carousel.classList.add(...block.classList);
   block.replaceWith(carousel);
   decorateBlock(carousel);
   await loadBlock(carousel);
+  carousel.addEventListener('click', (e) => {
+    const { target } = e;
+    const slide = target.closest('li.carousel-slide');
+    if (slide) {
+      const link = slide.querySelector('a[href]');
+      const color = target.closest('[data-color]');
+      if (color) {
+        const url = new URL(link.href, window.location.origin);
+        url.searchParams.set('color', color.dataset.color);
+        window.location.href = url.href;
+      } else if (link) {
+        link.click();
+      }
+    }
+  });
 }
 
 /**
@@ -514,6 +611,28 @@ function buildFiltering(block, ph, config) {
     highlightResults(resultsElement);
   };
 
+  // merge URL query params into config so shared links load pre-filtered
+  const mergeParamsFromUrl = (base) => {
+    const params = new URLSearchParams(window.location.search);
+    const urlConfig = { ...base };
+    params.forEach((value, key) => {
+      urlConfig[key] = value.trim();
+    });
+    return urlConfig;
+  };
+
+  // sync current filter state to URL for shareable links
+  const syncFilterConfigToUrl = (filterConfig) => {
+    const params = new URLSearchParams();
+    Object.entries(filterConfig).forEach(([key, value]) => {
+      const v = value != null ? String(value).trim() : '';
+      if (v) params.set(key, v);
+    });
+    const search = params.toString();
+    const url = `${window.location.pathname}${search ? `?${search}` : ''}`;
+    window.history.replaceState(null, '', url);
+  };
+
   // gets all currently selected filter checkboxes
   const getSelectedFilters = () => [...block.querySelectorAll('input[type="checkbox"]:checked')];
 
@@ -578,16 +697,21 @@ function buildFiltering(block, ph, config) {
 
     // build facet filter lists
     const facetsList = block.querySelector('.plp-filters-facetlist');
+    const hiddenCategories = ['Products', 'Commercial', 'Shop'];
     const facetKeys = Object.keys(facets);
     facetKeys.forEach((facetKey) => {
       const filter = filters[facetKey];
       const filterValues = filter ? filter.split(',').map((t) => t.trim()) : [];
+      let facetValues = Object.keys(facets[facetKey]).sort((a, b) => a.localeCompare(b));
+      if (facetKey === 'categories') {
+        facetValues = facetValues.filter((v) => !hiddenCategories.includes(v));
+      }
+      if (facetValues.length === 0) return;
       const div = document.createElement('div');
       div.className = 'plp-facet';
       const h3 = document.createElement('h3');
       h3.textContent = ph[facetKey];
       div.append(h3);
-      const facetValues = Object.keys(facets[facetKey]).sort((a, b) => a.localeCompare(b));
       facetValues.forEach((facetValue) => {
         const input = document.createElement('input');
         input.type = 'checkbox';
@@ -615,7 +739,7 @@ function buildFiltering(block, ph, config) {
   // main search function that filters, sorts, and displays products
   const runSearch = async (filterConfig = config) => {
     const facets = {
-      series: {}, collection: {}, colors: {}, productType: {},
+      series: {}, collection: {}, colors: {}, productType: {}, categories: {},
     };
     const sorts = {
       name: (a, b) => a.title.localeCompare(b.title),
@@ -629,6 +753,7 @@ function buildFiltering(block, ph, config) {
     block.querySelector('#plp-results-count').textContent = results.length;
     displayResults(results, null);
     displayFacets(facets, filterConfig);
+    syncFilterConfigToUrl(filterConfig);
   };
 
   const fulltextElement = block.querySelector('#fulltext');
@@ -640,12 +765,14 @@ function buildFiltering(block, ph, config) {
     fulltextElement.style.display = 'none';
   }
 
-  runSearch(config);
+  const initialConfig = mergeParamsFromUrl(config);
+  if (initialConfig.fulltext) fulltextElement.value = initialConfig.fulltext;
+  runSearch(initialConfig);
 }
 
 export default async function decorate(block) {
-  const { locale, language } = await getLocaleAndLanguage();
-  const ph = await fetchPlaceholders(`/${locale}/${language}`);
+  const { locale, language } = getLocaleAndLanguage();
+  const ph = await fetchPlaceholders(`/${locale}/${language}/products/config`);
   const config = readBlockConfig(block);
   const isCarousel = block.classList.contains('carousel');
 

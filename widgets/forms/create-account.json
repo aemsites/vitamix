@@ -1,0 +1,86 @@
+{
+  "en": {
+    "labels": {
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "emailAddress": "Email Address",
+      "confirmEmailAddress": "Confirm Email Address",
+      "emailsMustMatch": "Emails must match",
+      "postalCode": "Postal code",
+      "accountUseReasons": "For what reasons will you use this account?",
+      "domesticProducts": "For domestic products",
+      "commercialProducts": "For commercial products",
+      "ownVitamix": "Do you currently own a Vitamix?",
+      "yes": "Yes",
+      "no": "No",
+      "acceptTermsPrefix": "I accept the ",
+      "termsLinkText": "terms and conditions of Vitamix",
+      "requiredFieldsLegend": "* Required fields",
+      "createAccount": "Create account",
+      "sending": "Sending..."
+    },
+    "inputPlaceholders": {
+      "firstName": "e.g. Johnny",
+      "lastName": "e.g. Appleseed",
+      "emailAddress": "e.g. email@example.com",
+      "confirmEmailAddress": "Must be the same as the email above",
+      "postalCode": ""
+    }
+  },
+  "fr": {
+    "labels": {
+      "firstName": "Prénom",
+      "lastName": "Nom de famille",
+      "emailAddress": "Adresse courriel",
+      "confirmEmailAddress": "Confirmer l'adresse courriel",
+      "emailsMustMatch": "Les adresses courriel doivent correspondre",
+      "postalCode": "Code postal",
+      "accountUseReasons": "Pour quelles raisons utiliserez-vous ce compte?",
+      "domesticProducts": "Pour les produits domestiques",
+      "commercialProducts": "Pour les produits commerciaux",
+      "ownVitamix": "Possédez-vous actuellement un Vitamix?",
+      "yes": "Oui",
+      "no": "Non",
+      "acceptTermsPrefix": "J'accepte les ",
+      "termsLinkText": "conditions générales de Vitamix",
+      "requiredFieldsLegend": "* Champs obligatoires",
+      "createAccount": "Créer un compte",
+      "sending": "Envoi en cours..."
+    },
+    "inputPlaceholders": {
+      "firstName": "p. ex. Jean",
+      "lastName": "p. ex. Dupont",
+      "emailAddress": "p. ex. courriel@exemple.com",
+      "confirmEmailAddress": "Doit être identique à l'adresse ci-dessus",
+      "postalCode": ""
+    }
+  },
+  "es": {
+    "labels": {
+      "firstName": "Nombre",
+      "lastName": "Apellido",
+      "emailAddress": "Correo electrónico",
+      "confirmEmailAddress": "Confirmar correo electrónico",
+      "emailsMustMatch": "Los correos deben coincidir",
+      "postalCode": "Código postal",
+      "accountUseReasons": "¿Para qué usará esta cuenta?",
+      "domesticProducts": "Para productos domésticos",
+      "commercialProducts": "Para productos comerciales",
+      "ownVitamix": "¿Tiene actualmente un Vitamix?",
+      "yes": "Sí",
+      "no": "No",
+      "acceptTermsPrefix": "Acepto los ",
+      "termsLinkText": "términos y condiciones de Vitamix",
+      "requiredFieldsLegend": "* Campos obligatorios",
+      "createAccount": "Crear cuenta",
+      "sending": "Enviando..."
+    },
+    "inputPlaceholders": {
+      "firstName": "ej. Juan",
+      "lastName": "ej. García",
+      "emailAddress": "ej. correo@ejemplo.com",
+      "confirmEmailAddress": "Debe ser igual al correo anterior",
+      "postalCode": ""
+    }
+  }
+}

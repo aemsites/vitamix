@@ -121,10 +121,11 @@ export function getSignInToken() {
 
 export async function performMonolithGraphQLQuery(query, variables, GET = true, USE_TOKEN = false) {
   const GRAPHQL_ENDPOINT = `${window.location.origin}/graphql`;
+  const { language } = getLocaleAndLanguage(true);
 
   const headers = {
     'Content-Type': 'application/json',
-    Store: 'en_us',
+    Store: language,
   };
 
   if (USE_TOKEN) {
@@ -238,7 +239,7 @@ export async function resolveSessionCartDrift(options) {
     return;
   }
 
-  let done = () => {};
+  let done = () => { };
   if (options.waitForCart) {
     done = waitForCart();
   }
@@ -262,7 +263,7 @@ export async function resolveSessionCartDrift(options) {
 }
 
 export function updateCartFromLocalStorage(options) {
-  let done = () => {};
+  let done = () => { };
   if (options.waitForCart) {
     done = waitForCart();
   }
@@ -310,7 +311,8 @@ function shouldUseLegacyAddToCart() {
 let pformKey;
 async function getFormKey() {
   if (!pformKey) {
-    const resp = await fetch('/us/en_us/checkout/cart/');
+    const { locale, language } = getLocaleAndLanguage();
+    const resp = await fetch(`/${locale}/${language}/checkout/cart/`);
     const txt = await resp.text();
     const input = txt.match(/<input name="form_key" type="hidden" value="([^"]+)"/);
     pformKey = input ? input[1] : null;
@@ -354,18 +356,33 @@ function getProductID(sku) {
  * @param {number} quantity
  */
 async function addToCartLegacy(sku, options, quantity) {
-  const uenc = window.location.href.includes('?')
+  const { locale, language } = getLocaleAndLanguage();
+  const uenc = encodeURIComponent(window.location.href.includes('?')
     ? window.location.href.split('?').map(btoa).join('_')
-    : btoa(window.location.href);
+    : btoa(window.location.href));
   const [productId, formKey] = await Promise.all([getProductID(sku), getFormKey()]);
-  const url = `/us/en_us/checkout/cart/add/uenc/${uenc}/product/${productId}/`;
+  const url = `/${locale}/${language}/checkout/cart/add/uenc/${uenc}/product/${productId}/`;
 
   const formData = new FormData();
+
   formData.append('product', productId);
+  formData.append('selected_configurable_option', '');
+  formData.append('related_product', '');
   formData.append('item', productId);
   formData.append('form_key', formKey);
   formData.append('qty', quantity);
   formData.append('vitamixProductId', productId);
+
+  // Group bundle options by key first to detect multi-value (checkbox) bundle options
+  const bundleOptionsByKey = {};
+  options.forEach((option) => {
+    const decoded = atob(option);
+    const [type, key, value] = decoded.split('/');
+    if (type === 'bundle') {
+      if (!bundleOptionsByKey[key]) bundleOptionsByKey[key] = [];
+      bundleOptionsByKey[key].push(value);
+    }
+  });
 
   const warrantyIdsAdded = new Set();
   options.forEach((option) => {
@@ -379,6 +396,13 @@ async function addToCartLegacy(sku, options, quantity) {
       formData.append(`warranty_skus[${value}]`, window.selectedWarranty.sku);
       formData.append('warranty_sku', window.selectedWarranty.sku);
       warrantyIdsAdded.add(value);
+    } else if (type === 'bundle') {
+      // Use array notation for multi-value bundle options (checkbox type) so PHP
+      // receives all selections instead of only the last one
+      const bundleFormKey = bundleOptionsByKey[key].length > 1
+        ? `bundle_option[${key}][]`
+        : `bundle_option[${key}]`;
+      formData.append(bundleFormKey, value);
     }
   });
 
@@ -400,7 +424,6 @@ async function addToCartLegacy(sku, options, quantity) {
   if (!resp.ok) {
     console.error('Failed to add item to cart', resp);
     // Generic error modal
-    const { locale, language } = await getLocaleAndLanguage();
     await openModal(`/${locale}/${language}/products/modals/atc-error`);
     throw new Error('Failed to add item to cart');
   }
@@ -439,7 +462,7 @@ export async function addToCart(sku, options, quantity) {
 
       const { cart, user_errors: userErrors } = data.addProductsToCart;
       if (userErrors && userErrors.length > 0) {
-        const { locale, language } = await getLocaleAndLanguage();
+        const { locale, language } = getLocaleAndLanguage();
 
         console.error('User errors while adding item to cart', userErrors);
         const { code } = userErrors[0];

@@ -1,14 +1,5 @@
 import { loadScript } from './aem.js';
-
-if (localStorage.getItem('newsletter-popped-up') !== 'true') {
-  localStorage.setItem('newsletter-popped-up', 'true');
-  const newsletterLink = document.querySelector('a[href*="/modals/sign-up"]');
-  if (newsletterLink) {
-    setTimeout(() => {
-      newsletterLink.click();
-    }, 5000);
-  }
-}
+import './consented/newsletter.js';
 
 // add delayed functionality here
 window.config = {
@@ -30,14 +21,20 @@ const chatbot = document.createElement('div');
 chatbot.id = 'chatbot-container';
 document.body.appendChild(chatbot);
 
-loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-chatbot.lc-d95b877a5e0c2ce39cd26f0aa190faef-lc.min.js');
+loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-chatbot.lc-dd65664b07118365206104c205ccc20e-lc.min.js');
 loadScript('https://www.vitamix.com/etc.clientlibs/core/wcm/components/commons/site/clientlibs/container.lc-0a6aff292f5cc42142779cde92054524-lc.min.js');
 
 await loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-library.lc-259cf15444c5fe1f89e5c54df7b6e1e9-lc.min.js');
 await loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-analytics.lc-26814920488a848ff91c1f425646d010-lc.min.js');
 loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-base.lc-daf5b8dac79e9cf7cb1c0b30d8372e7a-lc.min.js');
 
-loadScript('https://assets.adobedtm.com/launch-EN40f2d69539754c3ea73511e70c65c801.min.js');
+await loadScript('https://assets.adobedtm.com/launch-EN40f2d69539754c3ea73511e70c65c801.min.js');
+
+const { pathname } = window.location;
+
+if (pathname.startsWith('/us/en_us/')) {
+  import('./consented/adobe-target.js');
+}
 
 /* eslint-disable */
 
@@ -51,8 +48,32 @@ loadScript('https://www.googletagmanager.com/gtag/js?id=G-XJB3SPQE38');
 gtag('js', new Date());
 gtag('config', 'G-XJB3SPQE38');
 
+// Replace Innovid Conversion Tag with Google Consent Mode
 
-loadScript('https://s-a.innovid.com/conversion/1hk0tl');
+loadScript('https://www.googletagmanager.com/gtag/js?id=DC-15266370');
+gtag('js', new Date());
+gtag('config', 'DC-15266370');
+
+const path = window.location.pathname;
+const isHome = path === '/us/en_us/';
+const isAscentXcategory = path === '/us/en_us/shop/ascent-x-series-blenders';
+
+if (isHome) {
+  gtag('event', 'conversion', {
+    allow_custom_scripts: true,
+    send_to: 'DC-15266370/2026u0/vitam0+standard',
+  });
+}
+
+if (isAscentXcategory) {
+  gtag('event', 'conversion', {
+    allow_custom_scripts: true,
+    send_to: 'DC-15266370/2026u0/vitam00+standard',
+  });
+}
+
+//End Floodlight tag
+
 loadScript('https://arttrk.com/pixel/?ad_log=referer&action=content&pixid=82dc3545-14a0-41d8-9870-2156059087d9');
 loadScript('https://cdn.evgnet.com/beacon/vitamixmgmtcorp/vitamix_us/scripts/evergage.min.js');
 
@@ -76,20 +97,18 @@ fbq('track', 'PageView');
 
 // End Facebook Pixel Code
 
-// Snap Pixel Code
-try {
-  (function(e,t,n){if(e.snaptr)return;var a=e.snaptr=function()
-    {a.handleRequest?a.handleRequest.apply(a,arguments):a.queue.push(arguments)};
-    a.queue=[];var s='script';const r=t.createElement(s);r.async=!0;
-    r.src=n;var u=t.getElementsByTagName(s)[0];
-    u.parentNode.insertBefore(r,u);})
-    (window,document,'https://sc-static.net/scevent.min.js');
-    snaptr('init', '308aeb00-4528-4312-b257-3d04cbdc93a0', {'user_email': 'email_variable'});
-    snaptr('track', 'PAGE_VIEW');
-} catch (error) {
-  console.error('Snap Pixel Code failed to load', error);
-}
-// End of Snap Pixel Code
+// Amazon DSP
+!function(w,d,s,t,a){
+if(w.amzn)return;w.amzn=a=function(){w.amzn.q.push([arguments,(new
+Date).getTime()])};a.q=[];a.version="0.0";s=d.createElement("script");
+s.src="https://c.amazon-adsystem.com/aat/amzn.js";s.id="amznpixel";
+s.async=true;t=d.getElementsByTagName("script")[0];
+t.parentNode.insertBefore(s,t)
+}(window,document); amzn("setRegion", "NA");
+amzn("addTag", "56d3e600-30c0-4b2fb290-4e44c553d164");
+amzn("trackEvent", "PageView");
+// End of Amazon DSP
+
 
 // Pinterest Tag
 !function(e){
@@ -119,29 +138,6 @@ try {
 // End of LinkedIn Insight Tag
 
 /* eslint-disable */
-
-// Big Happy Tag add 11-17-25 end 12-28-25
-try {
-  const adentifiAccountId = 26653;
-  const pageUrl = encodeURIComponent(window.location.href);
-  const uqNum = Math.random() * 10000000000000;
-
-  const pixelUrl =
-    'https://px.adentifi.com/Pixels?a_id=' + adentifiAccountId +
-    ';p_url=' + pageUrl +
-    ';uq=' + uqNum;
-
-  const img = document.createElement('img');
-  img.src = pixelUrl;
-  img.height = 1;
-  img.width = 1;
-  img.style.display = 'none';
-
-  document.body.appendChild(img);
-} catch (error) {
-  console.error('Adentifi pixel failed to load', error);
-}
-// End of Big Happy Tag
 
 // TV Scientific Pixel Code
 try {

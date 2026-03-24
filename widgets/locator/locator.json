@@ -1,0 +1,83 @@
+{
+  "en": {
+    "labels": {
+      "findLocally": "Find Locally",
+      "yourLocation": "Your Location",
+      "addressHint": "Address, City, or Zipcode",
+      "whatAreYouLookingFor": "What are you looking for?",
+      "householdProducts": "Household Products",
+      "commercialProducts": "Commercial Products",
+      "demonstrations": "Demonstrations",
+      "search": "Search",
+      "retailers": "Retailers",
+      "onlineRetailers": "Online Retailers",
+      "distributors": "Distributors",
+      "localRepresentatives": "Local Representatives",
+      "householdEvents": "Household Events",
+      "commercialEvents": "Commercial Events",
+      "milesAway": "miles away",
+      "phone": "Phone: ",
+      "website": "Website: ",
+      "noDistributorsFound": "No distributors found",
+      "noLocalRepFound": "No local representatives found",
+      "noHouseholdEventsFound": "No household events found",
+      "noCommercialEventsFound": "No commercial events found",
+      "noRetailersFound": "No retailers found",
+      "noOnlineFound": "No online retailers found"
+    }
+  },
+  "fr": {
+    "labels": {
+      "findLocally": "Trouver près de chez vous",
+      "yourLocation": "Votre emplacement",
+      "addressHint": "Adresse, ville ou code postal",
+      "whatAreYouLookingFor": "Que recherchez-vous?",
+      "householdProducts": "Produits grand public",
+      "commercialProducts": "Produits commerciaux",
+      "demonstrations": "Démonstrations",
+      "search": "Rechercher",
+      "retailers": "Détaillants",
+      "onlineRetailers": "Détaillants en ligne",
+      "distributors": "Distributeurs",
+      "localRepresentatives": "Représentants locaux",
+      "householdEvents": "Événements grand public",
+      "commercialEvents": "Événements commerciaux",
+      "milesAway": "miles",
+      "phone": "Téléphone : ",
+      "website": "Site Web : ",
+      "noDistributorsFound": "Aucun distributeur trouvé",
+      "noLocalRepFound": "Aucun représentant local trouvé",
+      "noHouseholdEventsFound": "Aucun événement grand public trouvé",
+      "noCommercialEventsFound": "Aucun événement commercial trouvé",
+      "noRetailersFound": "Aucun détaillant trouvé",
+      "noOnlineFound": "Aucun détaillant en ligne trouvé"
+    }
+  },
+  "es": {
+    "labels": {
+      "findLocally": "Encuéntralo cerca",
+      "yourLocation": "Su ubicación",
+      "addressHint": "Dirección, ciudad o código postal",
+      "whatAreYouLookingFor": "¿Qué está buscando?",
+      "householdProducts": "Productos para el hogar",
+      "commercialProducts": "Productos comerciales",
+      "demonstrations": "Demostraciones",
+      "search": "Buscar",
+      "retailers": "Minoristas",
+      "onlineRetailers": "Minoristas en línea",
+      "distributors": "Distribuidores",
+      "localRepresentatives": "Representantes locales",
+      "householdEvents": "Eventos para el hogar",
+      "commercialEvents": "Eventos comerciales",
+      "milesAway": "millas",
+      "phone": "Teléfono: ",
+      "website": "Sitio web: ",
+      "noDistributorsFound": "No se encontraron distribuidores",
+      "noLocalRepFound": "No se encontraron representantes locales",
+      "noHouseholdEventsFound": "No se encontraron eventos para el hogar",
+      "noCommercialEventsFound": "No se encontraron eventos comerciales",
+      "noRetailersFound": "No se encontraron minoristas",
+      "noOnlineFound": "No se encontraron minoristas en línea"
+    }
+  }
+}

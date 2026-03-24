@@ -1,0 +1,96 @@
+/* Create account form – same pattern as contact-us / login */
+.forms-create-account {
+  background-color: var(--color-gray-100);
+  padding: var(--spacing-300);
+  border-radius: var(--rounding-m);
+  max-width: 100%;
+}
+
+.forms-create-account .create-account-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-200);
+  max-width: 32rem;
+}
+
+.forms-create-account .create-account-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
+}
+
+.forms-create-account .create-account-field label {
+  margin-bottom: 0;
+}
+
+.forms-create-account .create-account-field .required {
+  color: var(--color-red);
+  margin-left: 0.15em;
+}
+
+.forms-create-account .create-account-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+}
+
+.forms-create-account .create-account-radio-group .radio-legend {
+  font-weight: var(--font-weight-medium, 500);
+  display: block;
+}
+
+.forms-create-account .create-account-radio-group .radio-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
+}
+
+.forms-create-account .create-account-radio-group .radio-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  cursor: pointer;
+}
+
+.forms-create-account .create-account-checkbox .checkbox-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5em;
+  cursor: pointer;
+}
+
+.forms-create-account .create-account-checkbox input[type="checkbox"] {
+  margin-top: 0.25em;
+  flex-shrink: 0;
+}
+
+.forms-create-account .create-account-checkbox .terms-link {
+  text-decoration: underline;
+}
+
+.forms-create-account .create-account-required-legend {
+  margin: 0;
+  font-size: var(--font-size-20);
+  color: var(--color-gray-700);
+}
+
+.forms-create-account .create-account-required-legend::before {
+  content: '* ';
+  color: var(--color-red);
+}
+
+.forms-create-account .create-account-actions {
+  margin-top: var(--spacing-100);
+}
+
+.forms-create-account .create-account-form button[type="submit"] {
+  background-color: var(--color-charcoal);
+  border-color: var(--color-charcoal);
+  color: var(--color-white);
+}
+
+.forms-create-account .create-account-form button[type="submit"]:hover,
+.forms-create-account .create-account-form button[type="submit"]:focus {
+  background-color: var(--color-gray-900);
+  border-color: var(--color-gray-900);
+}

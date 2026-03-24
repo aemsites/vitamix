@@ -7,8 +7,33 @@
     window.isErrorPage = true;
     window.errorCode = '404';
   </script>
+    
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta property="og:title" content="Page not found">
+  <script>
+    function getCountryAndLanguage() {
+      if (!window.location.pathname.match(/^\/[a-z]{2}\/[a-z]{2}_[a-z]{2}\//)) {
+        return { locale: 'us', language: 'en_us' };
+      }
+      const pathSegments = window.location.pathname.split('/').filter(Boolean);
+      const locale = pathSegments[0] || 'us';
+      const language = pathSegments[1] || 'en_us';
+      return { locale, language };
+    }
+
+    function setMetadata(name, content) {
+      const meta = document.createElement('meta');
+      meta.name = name;
+      meta.content = content;
+      document.head.append(meta);
+    }
+    const { locale, language } = getCountryAndLanguage();
+    setMetadata('nav', `/${locale}/${language}/nav/nav`);
+    setMetadata('footer', `/${locale}/${language}/footer/footer`);
+    setMetadata('nav-banners', `/${locale}/${language}/nav/nav-banners`);
+    setMetadata('theme', 'text-center');
+    
+  </script>
   <script src="/scripts/scripts.js" type="module"></script>
   <script type="module">
     window.addEventListener('load', () => {
@@ -30,22 +55,13 @@
     import { sampleRUM } from '/scripts/aem.js';
     sampleRUM('404', { source: document.referrer });
   </script>
-  <link rel="stylesheet" href="/styles/styles.css">
   <style>
-    main.error {
+    main.error div.section {
       min-height: calc(100vh - var(--nav-height));
-      display: flex;
       align-items: center;
     }
-
-    main.error .error-number {
-      width: 100%;
-    }
-
-    main.error .error-number text {
-      font-family: monospace;
-    }
   </style>
+  <link rel="stylesheet" href="/styles/styles.css">
   <link rel="stylesheet" href="/styles/lazy-styles.css">
 </head>
 
@@ -53,16 +69,61 @@
   <header></header>
   <main class="error">
     <div class="section">
-      <svg viewBox="1 0 38 18" class="error-number">
-        <text x="0" y="17">404</text>
-      </svg>
-      <h2 class="error-message">Page Not Found</h2>
-      <p class="button-container">
-        <a href="/" class="button secondary error-button-home">Go home</a>
-      </p>
+      <h2 class="error-message">We're sorry that page is missing.</h2>
+      <div class="fragment" style="display: none;">
+        <a href="" data-fragment-path="/footer/404"></a>
+      </div>
     </div>
   </main>
   <footer></footer>
 </body>
+<script>
+  function getCountryAndLanguage() {
+    const pathSegments = window.location.pathname.split('/').filter(Boolean);
+    const country = pathSegments[0] || 'us';
+    const language = pathSegments[1] || 'en_us';
+    return { country, language };
+  }
+
+  function localizeErrorMessage() {
+    const pathSegments = window.location.pathname.split('/').filter(Boolean);
+    const language = (pathSegments[1] || navigator.language || '').toLowerCase();
+    const lang = language.startsWith('fr') ? 'fr' : language.startsWith('es') ? 'es' : null;
+    const el = document.querySelector('.error-message');
+    if (!el || !lang) return;
+    const messages = {
+      es: "Lo sentimos, esa página no existe.",
+      fr: "Nous sommes désolés, cette page est introuvable."
+    };
+    el.textContent = messages[lang];
+  }
+  localizeErrorMessage();
+
+  (function setFragmentPath() {
+    const { country, language } = getCountryAndLanguage();
+    const path = `/${country}/${language}/footer/404`;
+    const link = document.querySelector('.fragment a[data-fragment-path]');
+    if (link) {
+      link.href = path;
+      link.textContent = path;
+    }
+  })();
+
+  (function observeFragmentLoad() {
+    const fragment = document.querySelector('.fragment');
+    if (!fragment) return;
+    const observer = new MutationObserver(function (mutations) {
+      for (const mutation of mutations) {
+        if (mutation.addedNodes.length) {
+          fragment.style.display = '';
+          observer.disconnect();
+          return;
+        }
+      }
+    });
+    observer.observe(fragment, { childList: true, subtree: true });
+  })();
+
+</script>
 
 </html>
