@@ -157,10 +157,6 @@ function decorateRecipes(ul) {
     const image = li.querySelector('.card-image');
     if (image) image.append(badge);
 
-    body.innerHTML = `
-      <h2>${title}</h2>
-      ${metaRow}
-    `;
     const timeItem = timeText
       ? `<span class="recipe-meta-item">${clockIcon} <span>${timeText}</span></span>`
       : '';
