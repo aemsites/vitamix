@@ -106,13 +106,13 @@ const servesIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" 
  *
  * Expected authoring columns in the DA table (recipes variant):
  *   Col 1 – image
- *   Col 2 – recipe data as paragraphs in this order:
- *     1. Recipe title (heading or bold paragraph)
- *     2. Difficulty level keyword: Simple | Intermediate | Advanced
- *     3. Rating: "4.7 · 98 reviews" (or just "4.7")
- *     4. Time:  "~12 min" or "~1 hr"
- *     5. Serves (optional): "Serves 2"
- *     6. CTA link (optional): anchor element
+ *   Col 2 – recipe data as paragraphs (order-independent, detected by content):
+ *     - Recipe title (heading element, or first paragraph)
+ *     - Difficulty keyword: Simple | Intermediate | Advanced (standalone word)
+ *     - Rating (optional): contains a number + "reviews", e.g. "4.7 · 98 reviews"
+ *     - Time: starts with ~ or contains "min"/"hr"/"hour"
+ *     - Serves (optional): contains "serves" or "servings"
+ *     - CTA link (optional): anchor element
  *
  * @param {HTMLUListElement} ul - The decorated card list element
  */
@@ -124,32 +124,52 @@ function decorateRecipes(ul) {
     const paragraphs = [...body.querySelectorAll('p, h1, h2, h3, h4')];
     if (!paragraphs.length) return;
 
-    // Extract each data field from authored paragraphs by position
-    const titleEl = paragraphs[0];
-    const title = titleEl ? titleEl.textContent.trim() : '';
+    const difficulties = ['simple', 'intermediate', 'advanced'];
 
-    const difficultyEl = paragraphs[1];
-    const difficulty = difficultyEl ? difficultyEl.textContent.trim().toLowerCase() : 'intermediate';
-
-    const ratingEl = paragraphs[2];
-    const ratingText = ratingEl ? ratingEl.textContent.trim() : '';
-    const ratingMatch = ratingText.match(/([\d.]+)\s*[·•]\s*(\d+)\s*reviews?/i);
-    const score = ratingMatch ? parseFloat(ratingMatch[1]) : null;
-    const reviewCount = ratingMatch ? ratingMatch[2] : null;
-
-    const timeEl = paragraphs[3];
-    const timeText = timeEl ? timeEl.textContent.trim() : '';
-
-    const servesEl = paragraphs[4];
-    const servesText = servesEl ? servesEl.textContent.trim() : '';
-
-    // CTA – look for a link in any remaining paragraph
+    let title = '';
+    let difficulty = 'intermediate';
+    let score = null;
+    let reviewCount = null;
+    let timeText = '';
+    let servesText = '';
     let ctaHref = '';
-    let ctaLabel = 'View Recipe';
-    for (let i = 5; i < paragraphs.length; i++) {
-      const a = paragraphs[i].querySelector('a[href]');
-      if (a) { ctaHref = a.href; ctaLabel = a.textContent.trim() || ctaLabel; break; }
-    }
+
+    paragraphs.forEach((p, i) => {
+      const text = p.textContent.trim();
+      const lowerText = text.toLowerCase();
+
+      // CTA link
+      const a = p.querySelector('a[href]');
+      if (a) { ctaHref = a.href; return; }
+
+      // Difficulty keyword
+      if (difficulties.includes(lowerText)) {
+        difficulty = lowerText;
+        return;
+      }
+
+      // Rating: contains a decimal number followed by "review"
+      if (/[\d.]+\s*[·•]\s*\d+\s*reviews?/i.test(text)) {
+        const m = text.match(/([\d.]+)\s*[·•]\s*(\d+)\s*reviews?/i);
+        if (m) { score = parseFloat(m[1]); reviewCount = m[2]; }
+        return;
+      }
+
+      // Serves: contains "serves" or "servings"
+      if (/serves|servings/i.test(text)) {
+        servesText = text;
+        return;
+      }
+
+      // Time: starts with ~ or contains min/hr/hour/minute
+      if (/^~|min|hr\b|hour|minute/i.test(text)) {
+        timeText = text;
+        return;
+      }
+
+      // First unparsed paragraph (or heading) becomes the title
+      if (!title) title = text;
+    });
 
     // Build the badge
     const badge = document.createElement('span');
@@ -157,11 +177,10 @@ function decorateRecipes(ul) {
     badge.dataset.difficulty = difficulty;
     badge.textContent = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
 
-    // Inject badge into card-image
     const image = li.querySelector('.card-image');
     if (image) image.append(badge);
 
-    // Build rating HTML
+    // Build rating HTML (optional)
     const ratingHTML = score !== null
       ? `<p class="recipe-rating">
           <span class="recipe-stars" aria-label="${score} out of 5 stars">${renderStars(score)}</span>
@@ -188,7 +207,6 @@ function decorateRecipes(ul) {
          </div>`
       : '';
 
-    // Replace card body content
     body.innerHTML = `
       <h2>${title}</h2>
       ${ratingHTML}
