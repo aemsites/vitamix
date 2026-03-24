@@ -808,6 +808,7 @@
   line-height: 1.25;
   margin: 0;
   color: var(--color-charcoal, #1a1a1a);
+  font-size: var(--font-size-500);
 }
 
 /* Featured card gets bigger title */
