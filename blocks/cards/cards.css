@@ -708,10 +708,25 @@
   }
 
   /* Remaining 4 cards fill cols 2 & 3, rows 1 & 2 */
-  .cards.recipes > ul > li:nth-child(2) { grid-column: 2; grid-row: 1; }
-  .cards.recipes > ul > li:nth-child(3) { grid-column: 3; grid-row: 1; }
-  .cards.recipes > ul > li:nth-child(4) { grid-column: 2; grid-row: 2; }
-  .cards.recipes > ul > li:nth-child(5) { grid-column: 3; grid-row: 2; }
+  .cards.recipes > ul > li:nth-child(2) {
+    grid-column: 2;
+    grid-row: 1;
+  }
+ 
+  .cards.recipes > ul > li:nth-child(3) {
+    grid-column: 3;
+    grid-row: 1;
+  }
+ 
+  .cards.recipes > ul > li:nth-child(4) {
+    grid-column: 2;
+    grid-row: 2;
+  }
+ 
+  .cards.recipes > ul > li:nth-child(5) {
+    grid-column: 3;
+    grid-row: 2;
+  }
 }
 
 /* Card base */
