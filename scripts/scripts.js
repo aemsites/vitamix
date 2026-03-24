@@ -1317,19 +1317,6 @@ async function loadDelayed() {
     }
   }
 
-  const initContentScore = async () => {
-    const CONTENT_SCORE = 'https://tools.aem.live/tools/content-score/src/scripts.js';
-    const { init } = await import(CONTENT_SCORE);
-    await init();
-  };
-
-  const sk = document.querySelector('aem-sidekick');
-
-  if (sk) initContentScore();
-  else {
-    document.addEventListener('sidekick-ready', initContentScore, { once: true });
-  }
-
   try {
     if (window.location.origin.endsWith('.aem.page') || window.location.origin === 'http://localhost:3000') {
       import('../tools/linkchecker/linkchecker.js');
