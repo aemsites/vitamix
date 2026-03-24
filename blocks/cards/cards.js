@@ -134,9 +134,16 @@ function decorateRecipes(ul) {
     let servesText = '';
     let ctaHref = '';
 
-    paragraphs.forEach((p, i) => {
+    paragraphs.forEach((p) => {
       const text = p.textContent.trim();
       const lowerText = text.toLowerCase();
+      const isHeading = /^h[1-4]$/i.test(p.tagName);
+
+      // Headings are always the title
+      if (isHeading) {
+        title = text;
+        return;
+      }
 
       // CTA link
       const a = p.querySelector('a[href]');
@@ -167,7 +174,7 @@ function decorateRecipes(ul) {
         return;
       }
 
-      // First unparsed paragraph (or heading) becomes the title
+      // First unmatched paragraph becomes the title if no heading found yet
       if (!title) title = text;
     });
 
