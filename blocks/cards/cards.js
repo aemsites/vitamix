@@ -128,8 +128,6 @@ function decorateRecipes(ul) {
 
     let title = '';
     let difficulty = 'intermediate';
-    let score = null;
-    let reviewCount = null;
     let timeText = '';
     let servesText = '';
     let ctaHref = '';
@@ -152,13 +150,6 @@ function decorateRecipes(ul) {
       // Difficulty keyword
       if (difficulties.includes(lowerText)) {
         difficulty = lowerText;
-        return;
-      }
-
-      // Rating: contains a decimal number followed by "review"
-      if (/[\d.]+\s*[·•]\s*\d+\s*reviews?/i.test(text)) {
-        const m = text.match(/([\d.]+)\s*[·•]\s*(\d+)\s*reviews?/i);
-        if (m) { score = parseFloat(m[1]); reviewCount = m[2]; }
         return;
       }
 
@@ -187,16 +178,10 @@ function decorateRecipes(ul) {
     const image = li.querySelector('.card-image');
     if (image) image.append(badge);
 
-    // Build rating HTML (optional)
-    const ratingHTML = score !== null
-      ? `<p class="recipe-rating">
-          <span class="recipe-stars" aria-label="${score} out of 5 stars">${renderStars(score)}</span>
-          <span class="recipe-score">${score}</span>
-          <span>· ${reviewCount} reviews</span>
-         </p>`
-      : '';
-
-    // Build meta row
+    body.innerHTML = `
+      <h2>${title}</h2>
+      ${metaRow}
+    `;
     const timeItem = timeText
       ? `<span class="recipe-meta-item">${clockIcon} <span>${timeText}</span></span>`
       : '';
@@ -216,7 +201,6 @@ function decorateRecipes(ul) {
 
     body.innerHTML = `
       <h2>${title}</h2>
-      ${ratingHTML}
       ${metaRow}
     `;
   });
