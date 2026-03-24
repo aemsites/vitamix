@@ -1242,15 +1242,9 @@ async function loadLazy(doc) {
     initQuickEdit(...args);
   };
 
-  const initContentScore = async () => {
-    const { init } = await import('../tools/content-score/scripts.js');
-    await init();
-  };
-
   const addSidekickListeners = (sk) => {
     sk.addEventListener('custom:sync', syncSku);
     sk.addEventListener('custom:quick-edit', loadQuickEdit);
-    initContentScore();
   };
 
   const sk = document.querySelector('aem-sidekick');
@@ -1307,6 +1301,19 @@ async function loadDelayed() {
         }
       });
     }
+  }
+
+  const initContentScore = async () => {
+    const CONTENT_SCORE = 'https://tools.aem.live/tools/content-score/src/scripts.js';
+    const { init } = await import(CONTENT_SCORE);
+    await init();
+  };
+
+  const sk = document.querySelector('aem-sidekick');
+
+  if (sk) initContentScore();
+  else {
+    document.addEventListener('sidekick-ready', initContentScore, { once: true });
   }
 
   try {
