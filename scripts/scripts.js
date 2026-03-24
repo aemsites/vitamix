@@ -17,6 +17,11 @@ import {
   getMetadata,
 } from './aem.js';
 
+const isProdHost = window.location.hostname.includes('vitamix.com');
+export const FORMS_ENDPOINT = isProdHost
+  ? 'https://main--vitamix--aemsites.aem.network' // TODO: make empty string when Akamai ready
+  : 'https://main--vitamix--aemsites.aem.network';
+
 /**
  * Load fonts.css and set a session storage flag.
  */
@@ -71,6 +76,15 @@ export function getLocaleAndLanguage(forceEnCA = false) {
   }
 
   return { locale, language };
+}
+
+/**
+ * Gets the form submission URL for the current locale and language.
+ * @returns {string} The form submission URL
+ */
+export function getFormSubmissionUrl() {
+  const { locale, language } = getLocaleAndLanguage();
+  return `${FORMS_ENDPOINT}/${locale}/${language}/forms`;
 }
 
 /**
@@ -394,11 +408,11 @@ function parsePDPContentSections(sections) {
   sections.forEach((section) => {
     const h3 = section.querySelector('h3')?.textContent.toLowerCase();
     if (h3) {
-      if (h3.includes('features') || h3.includes('caractéristiques')) {
+      if (h3.includes('features') || h3.includes('caractéristiques') || h3.includes('características')) {
         window.features = section;
-      } else if (h3.includes('specifications') || h3.includes('spécifications')) {
+      } else if (h3.includes('specifications') || h3.includes('spécifications') || h3.includes('especificaciones')) {
         window.specifications = section;
-      } else if (h3.includes('warranty') || h3.includes('garantie')) {
+      } else if (h3.includes('warranty') || h3.includes('garantie') || h3.includes('garantía')) {
         window.warranty = section;
       }
     }
@@ -1162,7 +1176,7 @@ async function loadEager(doc) {
   }
 
   /* adjust shop images to locale root path, util all of shop is mapped */
-  if (window.location.pathname.includes('/shop/')) {
+  if (window.location.pathname.includes('/shop/') || window.location.pathname.includes('/commercial/')) {
     const images = doc.querySelectorAll('img[src^="./media_"]');
     images.forEach((img) => {
       img.setAttribute('src', img.getAttribute('src').replace('./media_', '/us/en_us/media_'));
@@ -1242,15 +1256,9 @@ async function loadLazy(doc) {
     initQuickEdit(...args);
   };
 
-  const initContentScore = async () => {
-    const { init } = await import('../tools/content-score/scripts.js');
-    await init();
-  };
-
   const addSidekickListeners = (sk) => {
     sk.addEventListener('custom:sync', syncSku);
     sk.addEventListener('custom:quick-edit', loadQuickEdit);
-    initContentScore();
   };
 
   const sk = document.querySelector('aem-sidekick');
@@ -1259,7 +1267,7 @@ async function loadLazy(doc) {
   } else {
     // wait for sidekick to be loaded
     document.addEventListener('sidekick-ready', () => {
-    // sidekick now loaded
+      // sidekick now loaded
       addSidekickListeners(document.querySelector('aem-sidekick'));
     }, { once: true });
   }
@@ -1316,6 +1324,19 @@ async function loadDelayed() {
   } catch (e) {
     // eslint-disable-next-line no-console
     console.error('Error loading link checker', e);
+  }
+
+  const initContentScore = async () => {
+    const CONTENT_SCORE = 'https://content-score--helix-tools-website--adobe.aem.live/tools/content-score/src/scripts.js';
+    const { init } = await import(CONTENT_SCORE);
+    await init();
+  };
+
+  const sk = document.querySelector('aem-sidekick');
+
+  if (sk) initContentScore();
+  else {
+    document.addEventListener('sidekick-ready', initContentScore, { once: true });
   }
 
   setTimeout(decorateExternalLinks, 1000);
