@@ -759,7 +759,7 @@
   }
 
   .cards.recipes > ul > li:first-child .card-image {
-    flex: 1;
+    flex: 2;
     min-height: 400px;
   }
 }
