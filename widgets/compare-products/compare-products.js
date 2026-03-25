@@ -804,7 +804,6 @@ function replaceColumnWithProduct(
         const picture = document.createElement('picture');
         const img = document.createElement('img');
         img.loading = 'lazy';
-        img.alt = product.name || '';
         img.src = imageUrl;
         img.width = 320;
         img.height = 440;
