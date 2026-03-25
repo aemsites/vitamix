@@ -17,14 +17,10 @@ import {
   getMetadata,
 } from './aem.js';
 
-const { hostname } = window.location;
-
-export const ORDERS_API_ORIGIN = 'https://vitamix-api.adobeaem.workers.dev';
-
-window.cartMode = hostname.includes('localhost') || hostname.startsWith('edge-orders-') ? 'edge' : 'legacy';
-if (['edge', 'legacy'].includes(localStorage.getItem('cartMode'))) {
-  window.cartMode = localStorage.getItem('cartMode');
-}
+const isProdHost = window.location.hostname.includes('vitamix.com');
+export const FORMS_ENDPOINT = isProdHost
+  ? 'https://main--vitamix--aemsites.aem.network' // TODO: make empty string when Akamai ready
+  : 'https://main--vitamix--aemsites.aem.network';
 
 /**
  * Load fonts.css and set a session storage flag.
@@ -80,6 +76,15 @@ export function getLocaleAndLanguage(forceEnCA = false) {
   }
 
   return { locale, language };
+}
+
+/**
+ * Gets the form submission URL for the current locale and language.
+ * @returns {string} The form submission URL
+ */
+export function getFormSubmissionUrl() {
+  const { locale, language } = getLocaleAndLanguage();
+  return `${FORMS_ENDPOINT}/${locale}/${language}/forms`;
 }
 
 /**
@@ -403,11 +408,11 @@ function parsePDPContentSections(sections) {
   sections.forEach((section) => {
     const h3 = section.querySelector('h3')?.textContent.toLowerCase();
     if (h3) {
-      if (h3.includes('features') || h3.includes('caractéristiques')) {
+      if (h3.includes('features') || h3.includes('caractéristiques') || h3.includes('características')) {
         window.features = section;
-      } else if (h3.includes('specifications') || h3.includes('spécifications')) {
+      } else if (h3.includes('specifications') || h3.includes('spécifications') || h3.includes('especificaciones')) {
         window.specifications = section;
-      } else if (h3.includes('warranty') || h3.includes('garantie')) {
+      } else if (h3.includes('warranty') || h3.includes('garantie') || h3.includes('garantía')) {
         window.warranty = section;
       }
     }
@@ -1171,7 +1176,9 @@ async function loadEager(doc) {
   }
 
   /* adjust shop images to locale root path, util all of shop is mapped */
-  if (window.location.pathname.includes('/shop/')) {
+  if (window.location.pathname.includes('/shop/')
+    || window.location.pathname.includes('/commercial/')
+    || window.location.pathname.includes('/catalog/product_compare/')) {
     const images = doc.querySelectorAll('img[src^="./media_"]');
     images.forEach((img) => {
       img.setAttribute('src', img.getAttribute('src').replace('./media_', '/us/en_us/media_'));
@@ -1251,9 +1258,15 @@ async function loadLazy(doc) {
     initQuickEdit(...args);
   };
 
+  const initContentScore = async () => {
+    const { init } = await import('../tools/content-score/scripts.js');
+    await init();
+  };
+
   const addSidekickListeners = (sk) => {
     sk.addEventListener('custom:sync', syncSku);
     sk.addEventListener('custom:quick-edit', loadQuickEdit);
+    initContentScore();
   };
 
   const sk = document.querySelector('aem-sidekick');
@@ -1262,7 +1275,7 @@ async function loadLazy(doc) {
   } else {
     // wait for sidekick to be loaded
     document.addEventListener('sidekick-ready', () => {
-    // sidekick now loaded
+      // sidekick now loaded
       addSidekickListeners(document.querySelector('aem-sidekick'));
     }, { once: true });
   }
@@ -1271,8 +1284,8 @@ async function loadLazy(doc) {
 function decorateExternalLinks() {
   const externalLinks = document.querySelectorAll('a[href^="https://"]');
   externalLinks.forEach((link) => {
-    const linkHostname = new URL(link.href).hostname;
-    if (!link.href.includes('vitamix') || linkHostname === 'localhost') {
+    const { hostname } = new URL(link.href);
+    if (!link.href.includes('vitamix') || hostname === 'localhost') {
       link.setAttribute('target', '_blank');
       link.setAttribute('rel', 'noopener');
     }

@@ -1,40 +1,5 @@
 import { toClassName } from '../../scripts/aem.js';
 
-const COLOR_SWATCHES_CSS_PATH = '/blocks/pdp/color-swatches.css';
-
-/**
- * Fetch color-swatches.css, parse --color-* names and the rule body, inject a scoped
- * <style> so .table.comparison .table-comparison-color-swatch gets the same variables,
- * and return the set of color names for matching.
- * @returns {Promise<Set<string>>}
- */
-async function loadColorSwatchesForTable() {
-  const base = typeof window.hlx?.codeBasePath === 'string' ? window.hlx.codeBasePath : '';
-  const url = `${base}${COLOR_SWATCHES_CSS_PATH}`;
-  const res = await fetch(url);
-  if (!res.ok) return new Set();
-  const css = await res.text();
-
-  const names = new Set([...css.matchAll(/--color-([a-z0-9-]+):/g)].map((m) => m[1]));
-
-  const open = css.indexOf('{');
-  if (open === -1) return names;
-  let depth = 1;
-  let pos = open + 1;
-  while (depth && pos < css.length) {
-    if (css[pos] === '{') depth += 1;
-    else if (css[pos] === '}') depth -= 1;
-    pos += 1;
-  }
-  const body = css.slice(open + 1, pos - 1);
-
-  const style = document.createElement('style');
-  style.textContent = `.table.comparison .table-comparison-color-swatch { ${body} }`;
-  document.head.appendChild(style);
-
-  return names;
-}
-
 function buildRow(row, cellType = 'td') {
   const tr = document.createElement('tr');
   [...row.children].forEach((col) => {
@@ -115,31 +80,49 @@ function buildComparisonTable(rows) {
 
 function createColorSwatch(slug, label) {
   const swatch = document.createElement('div');
-  swatch.className = 'table-comparison-color-swatch';
+  swatch.className = 'table-comparison-color-swatch color-swatch';
   swatch.title = label || slug;
-  const inner = document.createElement('div');
-  inner.className = 'table-comparison-color-inner';
-  inner.style.backgroundColor = `var(--color-${slug})`;
-  swatch.appendChild(inner);
+  swatch.style.backgroundColor = `var(--color-${slug})`;
   return swatch;
 }
 
-function replaceColorsRowWithSwatches(table, colorNames) {
-  if (!colorNames?.size) return;
+/**
+ * Replace color name text in comparison table cells with visual swatches.
+ * Uses a hidden .color-swatch probe element so getComputedStyle can resolve
+ * --color-* variables defined in styles/color-swatches.css (imported via table.css).
+ * @param {HTMLTableElement} table
+ */
+function replaceColorsRowWithSwatches(table) {
   const tbody = table.querySelector('tbody');
   if (!tbody) return;
+
+  const probe = document.createElement('div');
+  probe.className = 'color-swatch';
+  probe.style.display = 'none';
+  document.body.appendChild(probe);
+
+  const colorCache = {};
+  const isKnownColor = (slug) => {
+    if (slug in colorCache) return colorCache[slug];
+    const el = document.createElement('div');
+    el.style.backgroundColor = `var(--color-${slug})`;
+    probe.appendChild(el);
+    const bg = getComputedStyle(el).backgroundColor;
+    probe.removeChild(el);
+    colorCache[slug] = bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent';
+    return colorCache[slug];
+  };
+
   tbody.querySelectorAll('tr').forEach((tr) => {
     tr.querySelectorAll('td').forEach((td) => {
-      const text = td.textContent.trim();
-      const tokens = text.split(',').map((t) => t.trim()).filter(Boolean);
-      if (tokens.length === 0) return;
-      const hasMatchingColor = tokens.some((t) => colorNames.has(toClassName(t)));
-      if (!hasMatchingColor) return;
+      const tokens = td.textContent.trim().split(',').map((t) => t.trim()).filter(Boolean);
+      if (!tokens.length) return;
+      if (!tokens.some((t) => isKnownColor(toClassName(t)))) return;
       const swatchContainer = document.createElement('div');
       swatchContainer.className = 'table-comparison-color-swatches';
       tokens.forEach((token) => {
         const slug = toClassName(token);
-        if (colorNames.has(slug)) {
+        if (isKnownColor(slug)) {
           swatchContainer.appendChild(createColorSwatch(slug, token));
         } else {
           const span = document.createElement('span');
@@ -152,6 +135,8 @@ function replaceColorsRowWithSwatches(table, colorNames) {
       td.appendChild(swatchContainer);
     });
   });
+
+  probe.remove();
 }
 
 export default function decorate(block) {
@@ -162,13 +147,11 @@ export default function decorate(block) {
 
   if (isComparison) {
     const comparisonTable = buildComparisonTable(rows);
-    loadColorSwatchesForTable().then((colorNames) => {
-      replaceColorsRowWithSwatches(comparisonTable, colorNames);
-    });
     const scrollWrapper = document.createElement('div');
     scrollWrapper.className = 'table-comparison-scroll';
     scrollWrapper.appendChild(comparisonTable);
     block.replaceChildren(scrollWrapper);
+    replaceColorsRowWithSwatches(comparisonTable);
   } else if (hasRowHeaders) {
     // build table with row headers (first column is header)
     const tbody = document.createElement('tbody');

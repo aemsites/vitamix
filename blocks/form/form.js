@@ -176,6 +176,44 @@ function buildSelect(field) {
 }
 
 /**
+ * Decodes option string into text and value pair
+ * @param {string} option - Option string
+ * @returns {Array<string>} Text and value pair
+ */
+function decodeOption(option) {
+  return option.split('=').map((o) => o.trim());
+}
+
+/**
+ * Creates a select element with options
+ * @param {Object} field - Field configuration object
+ * @returns {HTMLSelectElement} Select element
+ */
+function buildSelect(field) {
+  const {
+    field: fieldName, required, default: defaultValue, options,
+  } = field;
+
+  const select = createElement('select');
+  select.id = generateId(fieldName);
+  select.name = select.id;
+  select.required = required === 'true';
+
+  if (options) {
+    options.split(',').forEach((o) => {
+      const [text, value] = decodeOption(o);
+      const option = createElement('option');
+      option.value = value || text;
+      option.textContent = text;
+      if (text === defaultValue) option.selected = true;
+      select.appendChild(option);
+    });
+  }
+
+  return select;
+}
+
+/**
  * Creates a radio/checkbox input for an option
  * @param {Object} field - Field configuration object
  * @param {string} option - Option value

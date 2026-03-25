@@ -745,3 +745,9 @@
     padding:  var(--spacing-400);
   }
 }
+
+@media (width >= 1200px) {
+  .cards.horizontal > ul.rows-2 {
+    --grid-cols: 2;
+  }
+}

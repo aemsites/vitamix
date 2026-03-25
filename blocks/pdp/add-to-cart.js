@@ -80,6 +80,10 @@ function toggleFixedAddToCart(container) {
  * @returns {boolean} True if the variant is available for sale, false otherwise
  */
 export function isVariantAvailableForSale(variant) {
+  if (getMetadata('addToCart') === 'No') {
+    return false;
+  }
+
   const { managedStock, addToCart } = variant.custom;
   if (!variant || addToCart === 'No') {
     return false;

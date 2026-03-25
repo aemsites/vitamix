@@ -1,0 +1,47 @@
+/* Contact foundation form – vertical stack, labels above, uses global form/input styles */
+.forms-contact-foundation {
+  background-color: var(--color-gray-100);
+  padding: var(--spacing-300);
+  border-radius: var(--rounding-m);
+  max-width: 100%;
+}
+
+.forms-contact-foundation .contact-foundation-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-200);
+  max-width: 32rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.forms-contact-foundation .contact-foundation-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
+}
+
+.forms-contact-foundation .contact-foundation-field label {
+  margin-bottom: 0;
+}
+
+.forms-contact-foundation .contact-foundation-field .required {
+  color: var(--color-red);
+  margin-left: 0.15em;
+}
+
+.forms-contact-foundation .contact-foundation-actions {
+  margin-top: var(--spacing-100);
+}
+
+.forms-contact-foundation .contact-foundation-form button[type="submit"] {
+  background-color: var(--color-charcoal);
+  border-color: var(--color-charcoal);
+  color: var(--color-white);
+}
+
+.forms-contact-foundation .contact-foundation-form button[type="submit"]:hover,
+.forms-contact-foundation .contact-foundation-form button[type="submit"]:focus {
+  background-color: var(--color-gray-900);
+  border-color: var(--color-gray-900);
+}

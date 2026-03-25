@@ -79,9 +79,15 @@ export async function lookupProducts(config, facets = {}) {
   if (!window.productIndex) {
     // fetch the main product index
     const isProd = window.location.hostname.includes('vitamix.com') || window.location.hostname.includes('.aem.network');
-    const pathname = `/${locale}/${language}/products/index.json?include=all`;
+    const indexPath = window.location.pathname.includes('/commercial/') ? 'commercial/products' : 'products';
+    const pathname = `/${locale}/${language}/${indexPath}/index.json?include=all`;
     const resp = await (isProd ? fetch(pathname) : corsProxyFetch(pathname));
     const { data } = await resp.json();
+    if (!isProd && resp.ok) {
+      data.forEach((product) => {
+        if (product.image) product.image = `https://main--vitamix--aemsites.aem.network/${locale}/${language}/products/${product.image.substring(2)}`;
+      });
+    }
 
     // separate products into parents (standalone products) and variants (color/style options)
     const parentProductsBySKU = {};
@@ -123,7 +129,11 @@ export async function lookupProducts(config, facets = {}) {
     const urlLookup = {};
 
     Object.values(parentProductsBySKU).forEach((product) => {
-      if (product.urlKey) {
+      if (product.url) {
+        const url = new URL(product.url, window.location.origin);
+        product.url = url.pathname;
+        urlLookup[url.pathname] = product;
+      } else if (product.urlKey) {
         const url = buildProductsUrl(locale, language, product.urlKey);
         urlLookup[url] = product;
         product.url = url;
@@ -156,9 +166,8 @@ export async function lookupProducts(config, facets = {}) {
   // extract all filter criteria keys from the config object
   const filterKeys = Object.keys(config);
 
-  // map singular filter names to their plural product property names
+  // map filter key to product property when different (e.g. collection -> collections)
   const cleanKeys = {
-    category: 'categoriesUrlKey',
     collection: 'collections',
   };
 
@@ -166,7 +175,7 @@ export async function lookupProducts(config, facets = {}) {
   const tokens = {};
   filterKeys.forEach((key) => {
     const raw = config[key].split(',').map((t) => t.trim());
-    tokens[key] = key === 'category' ? raw.map((t) => toClassName(t)) : raw;
+    tokens[key] = raw;
   });
   // filter products based on all configured criteria (must match ALL filters)
   const results = window.productIndex.parents.filter((product) => {
@@ -175,7 +184,6 @@ export async function lookupProducts(config, facets = {}) {
 
     // check if this product matches ALL the filter criteria
     const matchedAll = filterKeys.every((filterKey) => {
-      // map the filter key to the actual product property name (e.g., category -> categories)
       const key = cleanKeys[filterKey] || filterKey;
       let matched = false;
 
@@ -207,19 +215,14 @@ export async function lookupProducts(config, facets = {}) {
       });
 
       // if this product qualifies for inclusion in the facet counts
-      if (includeInFacet) {
-        // check if the product has any values for this facet field
-        if (product[facetKey]) {
-          product[facetKey].forEach((val) => {
-            if (facets[facetKey][val]) {
-              // increment existing count
-              facets[facetKey][val] += 1;
-            } else {
-              // initialize count for a new facet value
-              facets[facetKey][val] = 1;
-            }
-          });
-        }
+      if (includeInFacet && product[facetKey]) {
+        product[facetKey].forEach((val) => {
+          if (facets[facetKey][val]) {
+            facets[facetKey][val] += 1;
+          } else {
+            facets[facetKey][val] = 1;
+          }
+        });
       }
     });
 
@@ -273,13 +276,25 @@ function createProductTitle(product, h = 'h4') {
 
 /**
  * Creates a product price display element.
+ * When product is on sale (regularPrice > price), shows sale price with struck-through
+ * regular price and savings, matching the carousel layout.
  * @param {Object} product - Product data object
+ * @param {Object} ph - Placeholder object with localized text strings
  * @returns {HTMLParagraphElement} Product price element
  */
 function createProductPrice(product, ph) {
   const price = document.createElement('p');
   price.className = 'plp-price';
   price.textContent = product.price ? formatPrice(product.price, ph) : '';
+  if (product.regularPrice && product.regularPrice > product.price) {
+    const savings = (product.regularPrice - product.price).toFixed(2);
+    const saleInfo = document.createElement('span');
+    saleInfo.textContent = `| ${ph.save || 'Save'} ${formatPrice(savings, ph)}`;
+    const regularPrice = document.createElement('del');
+    regularPrice.textContent = formatPrice(product.regularPrice, ph);
+    saleInfo.prepend(regularPrice);
+    price.append(' ', saleInfo);
+  }
   return price;
 }
 
@@ -338,7 +353,7 @@ function createProductColors(product) {
       const { color, availability } = variant;
       if (color) {
         const colorSwatch = document.createElement('div');
-        colorSwatch.className = 'plp-color-swatch';
+        colorSwatch.className = 'color-swatch';
         colorSwatch.title = color;
         colorSwatch.dataset.color = toClassName(color);
         const colorInner = document.createElement('div');
@@ -377,7 +392,7 @@ function createProductButton(product, ph, label, btnClass) {
  * @param {Object} ph - Placeholder object with localized text strings
  * @returns {HTMLElement} Product card element
  */
-function createProductCard(product, ph) {
+export function createProductCard(product, ph) {
   const card = document.createElement('div');
   card.className = 'plp-product-card';
 
@@ -413,8 +428,18 @@ function createProductCard(product, ph) {
  */
 async function styleRowAsSlide(content, ph) {
   const [image, body] = content.children;
+  if (!body) return;
+
   const link = body.querySelector('a[href]');
-  const { pathname } = new URL(link.href);
+  if (!link) return;
+
+  let pathname;
+  try {
+    pathname = new URL(link.href, window.location.origin).pathname;
+  } catch {
+    return;
+  }
+
   const [product] = await lookupProducts([pathname]);
   if (!product) {
     link.classList.add('linkchecker-invalid-link');
@@ -450,23 +475,12 @@ async function styleRowAsSlide(content, ph) {
   const footer = document.createElement('div');
   footer.className = 'slide-footer';
 
-  // starting at price
+  // starting at price (createProductPrice already includes sale info when on sale)
   if (product.price) {
     const startingAt = document.createElement('p');
     startingAt.className = 'eyebrow';
     startingAt.textContent = ph.startingAt || 'Starting at';
-
     const price = createProductPrice(product, ph);
-    if (product.regularPrice && product.regularPrice > product.price) {
-      const savings = (product.regularPrice - product.price).toFixed(2);
-      const saleInfo = document.createElement('span');
-      saleInfo.textContent = `| ${ph.save || 'Save'} ${formatPrice(savings, ph)}`;
-      const regularPrice = document.createElement('del');
-      regularPrice.textContent = formatPrice(product.regularPrice, ph);
-      saleInfo.prepend(regularPrice);
-      price.append(saleInfo);
-    }
-
     footer.append(startingAt, price);
   }
 
@@ -611,7 +625,6 @@ function buildFiltering(block, ph, config) {
   const syncFilterConfigToUrl = (filterConfig) => {
     const params = new URLSearchParams();
     Object.entries(filterConfig).forEach(([key, value]) => {
-      if (key === 'category') return;
       const v = value != null ? String(value).trim() : '';
       if (v) params.set(key, v);
     });
@@ -684,16 +697,21 @@ function buildFiltering(block, ph, config) {
 
     // build facet filter lists
     const facetsList = block.querySelector('.plp-filters-facetlist');
+    const hiddenCategories = ['Products', 'Commercial', 'Shop'];
     const facetKeys = Object.keys(facets);
     facetKeys.forEach((facetKey) => {
       const filter = filters[facetKey];
       const filterValues = filter ? filter.split(',').map((t) => t.trim()) : [];
+      let facetValues = Object.keys(facets[facetKey]).sort((a, b) => a.localeCompare(b));
+      if (facetKey === 'categories') {
+        facetValues = facetValues.filter((v) => !hiddenCategories.includes(v));
+      }
+      if (facetValues.length === 0) return;
       const div = document.createElement('div');
       div.className = 'plp-facet';
       const h3 = document.createElement('h3');
       h3.textContent = ph[facetKey];
       div.append(h3);
-      const facetValues = Object.keys(facets[facetKey]).sort((a, b) => a.localeCompare(b));
       facetValues.forEach((facetValue) => {
         const input = document.createElement('input');
         input.type = 'checkbox';
@@ -721,7 +739,7 @@ function buildFiltering(block, ph, config) {
   // main search function that filters, sorts, and displays products
   const runSearch = async (filterConfig = config) => {
     const facets = {
-      series: {}, collection: {}, colors: {}, productType: {},
+      series: {}, collection: {}, colors: {}, productType: {}, categories: {},
     };
     const sorts = {
       name: (a, b) => a.title.localeCompare(b.title),

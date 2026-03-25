@@ -225,7 +225,7 @@ export function renderOptions(ph, block, variants, custom, isParentOutOfStock) {
   const colorOptions = colors.map((color, index) => {
     const { sku } = variants[index];
     const colorOption = document.createElement('div');
-    colorOption.classList.add('pdp-color-swatch');
+    colorOption.classList.add('color-swatch');
 
     const colorSwatch = document.createElement('div');
     colorSwatch.classList.add('pdp-color-inner');

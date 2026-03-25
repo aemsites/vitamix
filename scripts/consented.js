@@ -1,4 +1,4 @@
-import { loadScript, getMetadata } from './aem.js';
+import { loadScript } from './aem.js';
 import './consented/newsletter.js';
 
 // add delayed functionality here
@@ -30,7 +30,9 @@ loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-
 
 await loadScript('https://assets.adobedtm.com/launch-EN40f2d69539754c3ea73511e70c65c801.min.js');
 
-if (getMetadata('target').toLowerCase() === 'on') {
+const { pathname } = window.location;
+
+if (pathname.startsWith('/us/en_us/')) {
   import('./consented/adobe-target.js');
 }
 

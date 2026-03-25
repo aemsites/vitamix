@@ -32,11 +32,11 @@ function setSelectOptions(select, options) {
 }
 
 /**
- * Decorates the media-contact widget: applies copy from JSON and configures form.
+ * Decorates the contact-foundation widget: applies copy from JSON and configures form.
  * @param {HTMLElement} widget - The widget root element
  */
 export default async function decorate(widget) {
-  const form = widget.querySelector('.media-contact-form');
+  const form = widget.querySelector('.contact-foundation-form');
   if (!form) return;
 
   const { locale, language } = getLocaleAndLanguage();
@@ -45,51 +45,44 @@ export default async function decorate(widget) {
   const labels = copy.labels || {};
   const inputHints = copy.inputPlaceholders || {};
   const selectOption = copy.selectOption ?? 'Select an option';
-  const businessLineOptions = copy.businessLineOptions || [];
-  const reasonForContactOptions = copy.reasonForContactOptions || [];
+  const focusAreaOptions = copy.focusAreaOptions || [];
 
-  form.querySelector('[for="media-contact-business-line"] .label-text').textContent = labels.businessLine ?? 'Business Line';
-  form.querySelector('[for="media-contact-publication-company"] .label-text').textContent = labels.publicationCompanyOptional ?? 'Publication / Company (Optional)';
-  form.querySelector('[for="media-contact-first-name"] .label-text').textContent = labels.firstName ?? 'First Name';
-  form.querySelector('[for="media-contact-last-name"] .label-text').textContent = labels.lastName ?? 'Last Name';
-  form.querySelector('[for="media-contact-email"] .label-text').textContent = labels.emailAddress ?? 'Email Address';
-  form.querySelector('[for="media-contact-phone"] .label-text').textContent = labels.phoneNumber ?? 'Phone Number';
-  form.querySelector('[for="media-contact-reason"] .label-text').textContent = labels.reasonForContact ?? 'Reason for Contact';
-  form.querySelector('[for="media-contact-comments"] .label-text').textContent = labels.additionalCommentsOptional ?? 'Additional Comments (Optional)';
+  form.querySelector('[for="contact-foundation-first-name"] .label-text').textContent = labels.firstName ?? 'First Name';
+  form.querySelector('[for="contact-foundation-last-name"] .label-text').textContent = labels.lastName ?? 'Last Name';
+  form.querySelector('[for="contact-foundation-title"] .label-text').textContent = labels.title ?? 'Title';
+  form.querySelector('[for="contact-foundation-organization"] .label-text').textContent = labels.organization ?? 'Organization';
+  form.querySelector('[for="contact-foundation-email"] .label-text').textContent = labels.emailAddress ?? 'Email Address';
+  form.querySelector('[for="contact-foundation-focus-area"] .label-text').textContent = labels.focusArea ?? 'Focus Area';
+  form.querySelector('[for="contact-foundation-message"] .label-text').textContent = labels.message ?? 'Message';
 
-  const businessLineSelect = form.querySelector('#media-contact-business-line');
-  const reasonSelect = form.querySelector('#media-contact-reason');
-  if (businessLineSelect?.firstElementChild) {
-    businessLineSelect.firstElementChild.textContent = selectOption;
+  const focusAreaSelect = form.querySelector('#contact-foundation-focus-area');
+  if (focusAreaSelect?.firstElementChild) {
+    focusAreaSelect.firstElementChild.textContent = selectOption;
   }
-  if (reasonSelect?.firstElementChild) {
-    reasonSelect.firstElementChild.textContent = selectOption;
-  }
-  setSelectOptions(businessLineSelect, businessLineOptions);
-  setSelectOptions(reasonSelect, reasonForContactOptions);
+  setSelectOptions(focusAreaSelect, focusAreaOptions);
 
-  const pubInput = form.querySelector('#media-contact-publication-company');
-  const firstInput = form.querySelector('#media-contact-first-name');
-  const lastInput = form.querySelector('#media-contact-last-name');
-  const emailInput = form.querySelector('#media-contact-email');
-  const phoneInput = form.querySelector('#media-contact-phone');
-  const commentsTextarea = form.querySelector('#media-contact-comments');
-  if (pubInput) pubInput.placeholder = inputHints.publicationCompany ?? '';
+  const firstInput = form.querySelector('#contact-foundation-first-name');
+  const lastInput = form.querySelector('#contact-foundation-last-name');
+  const titleInput = form.querySelector('#contact-foundation-title');
+  const orgInput = form.querySelector('#contact-foundation-organization');
+  const emailInput = form.querySelector('#contact-foundation-email');
+  const messageTextarea = form.querySelector('#contact-foundation-message');
   if (firstInput) firstInput.placeholder = inputHints.firstName ?? '';
   if (lastInput) lastInput.placeholder = inputHints.lastName ?? '';
+  if (titleInput) titleInput.placeholder = inputHints.title ?? '';
+  if (orgInput) orgInput.placeholder = inputHints.organization ?? '';
   if (emailInput) emailInput.placeholder = inputHints.emailAddress ?? '';
-  if (phoneInput) phoneInput.placeholder = inputHints.phoneNumber ?? '';
-  if (commentsTextarea) commentsTextarea.placeholder = inputHints.additionalComments ?? '';
+  if (messageTextarea) messageTextarea.placeholder = inputHints.message ?? '';
 
   const submitBtn = form.querySelector('button[type="submit"]');
-  if (submitBtn) submitBtn.textContent = labels.submit ?? 'Submit';
+  if (submitBtn) submitBtn.textContent = labels.submit ?? 'SUBMIT';
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const data = new FormData(form);
     const payload = Object.fromEntries(data.entries());
     payload.pageUrl = window.location.href;
-    payload.formId = `${locale}/${language}/media-contact`;
+    payload.formId = `${locale}/${language}/contact-foundation`;
 
     const submitButton = form.querySelector('button[type="submit"]');
     const buttonLabel = submitButton?.textContent;
@@ -106,13 +99,13 @@ export default async function decorate(widget) {
         body: JSON.stringify(payload),
       });
       if (!resp.ok) {
-        throw new Error(`Forms API submission failed with ${resp.status}`);
+        throw new Error(`Sheet logger responded with ${resp.status}`);
       }
-      const thankYouPath = `/${locale}/${language}/corporate-information/media-center/media-request-thankyou`;
+      const thankYouPath = `/${locale}/${language}/contact-foundation-thankyou`;
       window.location.href = thankYouPath;
     } catch (err) {
       // eslint-disable-next-line no-console
-      console.error('Media contact form submission failed', err);
+      console.error('Contact foundation form submission failed', err);
       [...form.elements].forEach((el) => { el.disabled = false; });
       if (submitButton) {
         submitButton.textContent = submitButton.dataset.originalLabel || buttonLabel;

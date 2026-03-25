@@ -1,4 +1,5 @@
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import getStatesProvincesOptions from './states-provinces.js';
 
 /** Sheet logger endpoint for product registration form */
 const SHEET_LOGGER_URL = 'https://sheet-logger.david8603.workers.dev/vitamix.com/forms-testing/product-registration';
@@ -44,11 +45,12 @@ export default async function decorate(widget) {
 
   const { locale, language } = getLocaleAndLanguage();
   const lang = (language || 'en_us').split('_')[0];
+  const countryCode = (locale || 'us').toUpperCase();
   const copy = await loadFormCopy(lang);
+  const provinceOptions = await getStatesProvincesOptions(countryCode, lang).catch(() => []);
   const labels = copy.labels || {};
   const inputHints = copy.inputPlaceholders || {};
   const purchasedFromOptions = copy.purchasedFromOptions || [];
-  const provinceOptions = copy.provinceOptions || [];
 
   const sectionLegends = form.querySelectorAll('.product-registration-section-legend .section-legend-text');
   if (sectionLegends[0]) sectionLegends[0].textContent = labels.aboutYourBlender ?? 'About your blender';
@@ -86,14 +88,16 @@ export default async function decorate(widget) {
   form.querySelector('[for="product-registration-address"] .label-text').textContent = labels.address ?? 'Address';
   form.querySelector('[for="product-registration-address-line-2"] .label-text').textContent = labels.addressLine2 ?? 'Address Line 2';
   form.querySelector('[for="product-registration-city"] .label-text').textContent = labels.city ?? 'City';
-  form.querySelector('[for="product-registration-province"] .label-text').textContent = labels.province ?? 'Province';
+  const regionLabel = countryCode === 'CA' ? (labels.province ?? 'Province') : (labels.state ?? 'State');
+  form.querySelector('[for="product-registration-province"] .label-text').textContent = regionLabel;
   form.querySelector('[for="product-registration-postal-code"] .label-text').textContent = labels.postalCode ?? 'Postal code';
   form.querySelector('[for="product-registration-phone"] .label-text').textContent = labels.phoneNumber ?? 'Phone Number';
   form.querySelector('[for="product-registration-email"] .label-text').textContent = labels.emailAddress ?? 'Email Address';
 
   const provinceSelect = form.querySelector('#product-registration-province');
+  const regionPlaceholder = countryCode === 'CA' ? (inputHints.province ?? 'Choose your province') : (inputHints.state ?? 'Choose your state');
   if (provinceSelect?.firstElementChild) {
-    provinceSelect.firstElementChild.textContent = inputHints.province ?? 'Choose your province';
+    provinceSelect.firstElementChild.textContent = regionPlaceholder;
   }
   setSelectOptions(provinceSelect, provinceOptions);
 

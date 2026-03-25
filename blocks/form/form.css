@@ -163,10 +163,6 @@
   }
 }
 
-fieldset.form-section h3 {
-  margin: 1em 0 0.5em;
-}
-
 .form i.symbol.symbol-loading {
   transform: scale(1.2);
   border: var(--border-m) solid;
