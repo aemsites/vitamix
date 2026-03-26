@@ -424,10 +424,10 @@ export async function fetchRecipeDetailsForSync(
     { name: 'Date Updated', value: dateUpdated ? new Date(dateUpdated).toISOString() : '' },
     { name: 'Dietary Interests', value: dietaryInterests.join(', ') },
   ].filter((row) => row.value).map((row) => `
-      <tr>
-        <td>${row.name}</td>
-        <td>${row.value}</td>
-      </tr>
+      <div>
+        <div><p>${row.name}</p></div>
+        <div><p>${row.value}</p></div>
+      </div>
     `).join('');
 
   // Extract ingredients
@@ -595,16 +595,9 @@ export async function fetchRecipeDetailsForSync(
     ${notesHtml}
     ${nutritionHtml}
     ${metadataRows ? `
-      <table>
-        <thead>
-          <tr>
-            <th colspan="2">Metadata</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${metadataRows}
-        </tbody>
-      </table>
+      <div class="metadata">
+${metadataRows}
+      </div>
     ` : ''}
   `;
 
@@ -1271,7 +1264,7 @@ export async function displayRecipeDetails(recipeNumber) {
     const recipeCreatedDate = params.dateCreated ? new Date(params.dateCreated).toISOString() : '';
     const recipeUpdatedDate = params.dateUpdated ? new Date(params.dateUpdated).toISOString() : '';
 
-    // Build metadata table rows
+    // Build metadata blocks (nested divs)
     const metadataRows = [
       { name: 'Total Time', value: totalTime },
       { name: 'Yield', value: recipeYield },
@@ -1285,10 +1278,10 @@ export async function displayRecipeDetails(recipeNumber) {
       { name: 'Date Updated', value: recipeUpdatedDate },
       { name: 'Dietary Interests', value: dietaryInterestsStr },
     ].filter((row) => row.value).map((row) => `
-      <tr>
-        <td>${row.name}</td>
-        <td>${row.value}</td>
-      </tr>
+      <div>
+        <div><p>${row.name}</p></div>
+        <div><p>${row.value}</p></div>
+      </div>
     `).join('');
 
     // Extract Ingredients
@@ -1460,16 +1453,9 @@ export async function displayRecipeDetails(recipeNumber) {
         ${notesHtml}
         ${nutritionHtml}
         ${metadataRows ? `
-          <table>
-            <thead>
-              <tr>
-                <th colspan="2">Metadata</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${metadataRows}
-            </tbody>
-          </table>
+          <div class="metadata">
+${metadataRows}
+          </div>
         ` : ''}
       </div>
       <textarea id="recipe-xml" readonly>${xmlResponse}</textarea>
