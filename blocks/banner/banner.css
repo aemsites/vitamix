@@ -424,7 +424,7 @@
 .banner.split > div a.button.link,
 .banner.split > div a.button.link:hover,
 .banner.split > div a.button.link:focus {
-  color: white;
+  color: var(--color-white);
 }
 
 .banner.split.square > div {
