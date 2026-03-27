@@ -21,7 +21,7 @@ const { hostname } = window.location;
 
 export const ORDERS_API_ORIGIN = 'https://api-stage.adobecommerce.live/aemsites/sites/vitamix';
 
-const isEdgeHost = hostname.includes('localhost') || hostname.includes('edge-orders--') || hostname.includes('uat.vitamix.com');
+const isEdgeHost = hostname.includes('localhost') || hostname.includes('edge-orders') || hostname.includes('uat.vitamix.com');
 const { locale } = getLocaleAndLanguage();
 window.cartMode = (isEdgeHost && locale === 'ca') ? 'edge' : 'legacy';
 if (['edge', 'legacy'].includes(localStorage.getItem('cartMode'))) {
