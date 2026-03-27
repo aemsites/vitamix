@@ -147,7 +147,7 @@ function decorateGrids(ul) {
       if (!title) title = text;
     });
 
-    // Build the badge
+    // Build the badge and inject into card image overlay
     const badge = document.createElement('span');
     badge.className = 'grids-badge';
     badge.dataset.difficulty = difficulty;
