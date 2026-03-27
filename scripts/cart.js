@@ -197,7 +197,7 @@ export class Cart {
       name: item.name,
       price: {
         final: String(item.price),
-        currency: 'USD',
+        currency: window.location.pathname.startsWith('/ca/') ? 'CAD' : 'USD',
       },
     }));
   }

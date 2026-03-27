@@ -127,6 +127,7 @@ async function appendSelectOptions(select, url) {
       return select;
     }
 
+    if (select.dataset.optionsOverridden) return select;
     data.forEach((option) => {
       const optionEl = createElement('option');
       optionEl.value = option.Value || option.value;

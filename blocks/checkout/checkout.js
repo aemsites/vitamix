@@ -210,7 +210,26 @@ async function updatePreview(form, formData, cart) {
  * Creates and decorates the checkout page with form and cart summary
  * @param {HTMLElement} block
  */
+function showEmptyCart(block) {
+  block.innerHTML = '';
+  const empty = document.createElement('div');
+  empty.className = 'checkout-empty';
+  empty.innerHTML = `
+    <h2>Your cart is empty</h2>
+    <p>Add some products to your cart to continue.</p>
+    <a href="/" class="button emphasis">Continue shopping</a>
+  `;
+  block.appendChild(empty);
+}
+
 export default async function decorate(block) {
+  // Check if cart has items
+  const { default: cartCheck } = await import('../../scripts/cart.js');
+  if (cartCheck.itemCount === 0) {
+    showEmptyCart(block);
+    return;
+  }
+
   // Create the checkout layout
   const checkoutContainer = document.createElement('div');
   checkoutContainer.className = 'checkout-container';
@@ -339,6 +358,7 @@ export default async function decorate(block) {
       ['SK', 'Saskatchewan'], ['YT', 'Yukon'],
     ];
     stateSelect.innerHTML = '';
+    stateSelect.dataset.optionsOverridden = 'true';
     provinces.forEach(([value, label]) => {
       const opt = document.createElement('option');
       opt.value = value;
@@ -363,6 +383,23 @@ export default async function decorate(block) {
   } else {
     console.warn('checkout: select#shipping-state not found in form');
   }
+
+  // Re-preview when cart items change (quantity update or item removed)
+  document.addEventListener('cart:change', async (e) => {
+    if (['update', 'remove'].includes(e.detail?.action)) {
+      // Show empty cart if all items removed
+      if (e.detail.cart.itemCount === 0) {
+        showEmptyCart(block);
+        return;
+      }
+      currentEstimateToken = null;
+      currentPreview = null;
+      if (selectedShippingMethodId) {
+        const formData = Object.fromEntries(new FormData(form).entries());
+        fetchAndPreview(form, formData, shippingMethodsContainer);
+      }
+    }
+  });
 
   // TODO: Remove test prefill before merging
   const prefill = {

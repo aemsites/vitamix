@@ -1,4 +1,10 @@
 import cart from '../../scripts/cart.js';
+import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+
+function getCurrency() {
+  const { locale } = getLocaleAndLanguage();
+  return (locale === 'ca' || locale === 'drafts') ? 'CAD' : 'USD';
+}
 
 const template = /* html */`
 <div class="cart-summary">
@@ -33,7 +39,7 @@ const template = /* html */`
       <div class="cart-summary-row cart-summary-final">
         <strong>Total</strong>
         <div class="cart-summary-final-amount">
-          <span class="currency">USD</span>
+          <span class="currency"></span>
           <strong class="cart-summary-grand-total"></strong>
         </div>
       </div>
@@ -46,11 +52,22 @@ const itemTemplate = /* html */`
 <div class="cart-summary-item">
   <div class="cart-summary-item-image-wrapper">
     <img class="cart-summary-item-image" src="" alt="">
-    <span class="cart-summary-item-quantity"></span>
   </div>
   <div class="cart-summary-item-details">
     <p class="cart-summary-item-name"></p>
     <p class="cart-summary-item-variant"></p>
+    <div class="cart-summary-item-actions">
+      <div class="cart-summary-qty-control">
+        <button class="qty-dec">&ndash;</button>
+        <input class="qty-input" type="number" value="1" min="1">
+        <button class="qty-inc">+</button>
+      </div>
+      <button class="cart-summary-item-remove" aria-label="Remove item">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14"/>
+        </svg>
+      </button>
+    </div>
   </div>
   <div class="cart-summary-item-price"></div>
 </div>
@@ -69,6 +86,8 @@ export default function decorate(block) {
   const taxesEl = block.querySelector('.cart-summary-taxes');
   const grandTotalEl = block.querySelector('.cart-summary-grand-total');
   const headerTotalEl = block.querySelector('.cart-summary-total');
+  const currencyEl = block.querySelector('.currency');
+  currencyEl.textContent = getCurrency();
 
   // Toggle expansion on mobile
   header.addEventListener('click', () => {
@@ -102,9 +121,6 @@ export default function decorate(block) {
       img.src = item.image;
       img.alt = item.name;
 
-      const quantity = itemEl.querySelector('.cart-summary-item-quantity');
-      quantity.textContent = item.quantity;
-
       const name = itemEl.querySelector('.cart-summary-item-name');
       name.textContent = item.name;
 
@@ -118,8 +134,28 @@ export default function decorate(block) {
       const price = itemEl.querySelector('.cart-summary-item-price');
       const itemPrice = typeof item.price === 'string'
         ? parseFloat(item.price)
-        : item.price / 100;
+        : item.price;
       price.textContent = `$${(itemPrice * item.quantity).toFixed(2)}`;
+
+      // quantity controls
+      const qtyInput = itemEl.querySelector('.qty-input');
+      qtyInput.value = item.quantity;
+
+      const updateQty = (newQty) => {
+        if (newQty < 1) {
+          cart.removeItem(item.sku);
+          return;
+        }
+        cart.updateItem(item.sku, newQty);
+      };
+
+      itemEl.querySelector('.qty-dec').addEventListener('click', () => updateQty(+qtyInput.value - 1));
+      itemEl.querySelector('.qty-inc').addEventListener('click', () => updateQty(+qtyInput.value + 1));
+      qtyInput.addEventListener('change', (e) => updateQty(+e.target.value));
+
+      itemEl.querySelector('.cart-summary-item-remove').addEventListener('click', () => {
+        cart.removeItem(item.sku);
+      });
 
       itemsList.appendChild(itemEl.firstElementChild);
     });
