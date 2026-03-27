@@ -19,6 +19,7 @@ async function loadWidgetCopy(lang) {
 const MAX_DISTANCE = 200;
 const EVENTS_MAX_DISTANCE = 100;
 const MAX_DISTANCE_COMM = 1000;
+const maxDistanceHhDistributors = 1500;
 
 const hhRetailersResults = document.querySelector('#locator-hh-retailers-tabpanel');
 const hhDistributorsResults = document.querySelector('#locator-hh-distributors-tabpanel');
@@ -334,7 +335,8 @@ function findHHResults(data, location, countryShort, countryLong) {
 
   const distributors = cleaned
     .filter((i) => i.TYPE === 'DEALER/DISTRIBUTOR'
-      && haversineDistance(location.lat, location.lng, i.lat, i.lng) <= MAX_DISTANCE)
+      && haversineDistance(location.lat, location.lng, i.lat, i.lng)
+        <= maxDistanceHhDistributors)
     .sort((a, b) => haversineDistance(location.lat, location.lng, a.lat, a.lng)
       - haversineDistance(location.lat, location.lng, b.lat, b.lng));
 
