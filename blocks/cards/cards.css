@@ -867,7 +867,7 @@
 /* "VIEW" CTA */
 .cards.grids .grids-cta {
   font-size: 0.75rem;
-  font-weight: 700;
+  font-weight: 500;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--color-red, #c0392b);
@@ -1015,7 +1015,7 @@
 /* Eyebrow */
 .cards.gift .gift-eyebrow {
   font-size: 0.65rem;
-  font-weight: 700;
+  font-weight: 500;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--color-red, #c0392b);
@@ -1027,7 +1027,7 @@
 .cards.gift .card-body h3 {
   font-family: var(--serif-font-family, Georgia, serif);
   font-size: var(--font-size-500, 1.2rem);
-  font-weight: 700;
+  font-weight: 500;
   line-height: 1.25;
   margin: 0;
   color: var(--color-charcoal, #1a1a1a);
@@ -1052,7 +1052,7 @@
   margin-top: auto;
   padding-top: 12px;
   font-size: 0.8rem;
-  font-weight: 700;
+  font-weight: 500;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--color-charcoal, #1a1a1a);
