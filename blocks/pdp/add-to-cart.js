@@ -191,16 +191,6 @@ export default function renderAddToCart(ph, block, parent) {
     addToCartButton.textContent = ph.adding || 'Adding...';
     addToCartButton.setAttribute('aria-disabled', 'true');
 
-    // import required modules for cart functionality
-    const { cartApi } = await import('../../scripts/minicart/api.js');
-    const { updateMagentoCacheSections, getMagentoCache } = await import('../../scripts/storage/util.js');
-
-    // cCheck and update customer cache if needed
-    const currentCache = getMagentoCache();
-    if (!currentCache?.customer) {
-      await updateMagentoCacheSections(['customer']);
-    }
-
     // get selected quantity and product SKU
     const quantity = document.querySelector('.quantity-container select')?.value || 1;
     const sku = getMetadata('sku');
@@ -224,6 +214,41 @@ export default function renderAddToCart(ph, block, parent) {
     }
 
     try {
+      if (window.cartMode === 'edge') {
+        const cartApi = (await import('../../scripts/cart.js')).default;
+
+        const { sku: variantSku, price, name } = selectedVariant;
+        const item = {
+          sku: variantSku ?? sku,
+          parentSku: variantSku ? sku : undefined,
+          quantity: parseInt(quantity, 10),
+          price,
+          name,
+          url: selectedVariant.url,
+          path: new URL(selectedVariant.url).pathname,
+          image: selectedVariant.image[0],
+          variant: window.selectedVariant?.options?.color || '',
+          selectedOptions,
+        };
+        await cartApi.addItem(item);
+
+        // reenable button
+        addToCartButton.textContent = 'Add to Cart';
+        addToCartButton.removeAttribute('aria-disabled');
+        document.dispatchEvent(new CustomEvent('pdp:add-to-cart', { detail: { item } }));
+        return;
+      }
+
+      // import required modules for cart functionality
+      const { cartApi } = await import('../../scripts/minicart/api.js');
+      const { updateMagentoCacheSections, getMagentoCache } = await import('../../scripts/storage/util.js');
+
+      // cCheck and update customer cache if needed
+      const currentCache = getMagentoCache();
+      if (!currentCache?.customer) {
+        await updateMagentoCacheSections(['customer']);
+      }
+
       // add product to cart with selected options and quantity
       await cartApi.addToCart(sku, selectedOptions, quantity);
 
