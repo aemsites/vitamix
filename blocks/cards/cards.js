@@ -147,7 +147,7 @@ function decorateGrids(ul) {
       if (!title) title = text;
     });
 
-    // Build the badge and inject into card image overlay
+    // Build the badge
     const badge = document.createElement('span');
     badge.className = 'grids-badge';
     badge.dataset.difficulty = difficulty;
@@ -176,6 +176,99 @@ function decorateGrids(ul) {
     body.innerHTML = `
       <h2>${title}</h2>
       ${metaRow}
+    `;
+  });
+}
+
+/**
+ * Decorates the gift variant cards.
+ *
+ * Expected authoring columns in the DA table (gift variant):
+ *   Col 1 – image
+ *   Col 2 – content paragraphs (order-independent, detected by content):
+ *     - Badge text (optional): any paragraph starting with "badge:" e.g. "badge: Most Popular"
+ *     - Eyebrow (optional): any paragraph starting with "eyebrow:" e.g. "eyebrow: Ascent X5"
+ *     - Title: heading element, or first unmatched paragraph
+ *     - Description: second unmatched paragraph
+ *     - CTA link: any paragraph containing an <a href>
+ *
+ * @param {HTMLUListElement} ul - The decorated card list element
+ */
+function decorateGift(ul) {
+  ul.querySelectorAll('li').forEach((li) => {
+    const body = li.querySelector('.card-body');
+    if (!body) return;
+
+    const paragraphs = [...body.querySelectorAll('p, h1, h2, h3, h4')];
+    if (!paragraphs.length) return;
+
+    let badgeText = '';
+    let eyebrowText = '';
+    let title = '';
+    let description = '';
+    let ctaHref = '';
+    let ctaLabel = 'Shop Now';
+
+    paragraphs.forEach((p) => {
+      const text = p.textContent.trim();
+      const lower = text.toLowerCase();
+      const isHeading = /^h[1-4]$/i.test(p.tagName);
+
+      // Badge prefix: "badge: Most Popular"
+      if (lower.startsWith('badge:')) {
+        badgeText = text.slice(text.indexOf(':') + 1).trim();
+        return;
+      }
+
+      // Eyebrow prefix: "eyebrow: Ascent X5 with Stainless Steel"
+      if (lower.startsWith('eyebrow:')) {
+        eyebrowText = text.slice(text.indexOf(':') + 1).trim();
+        return;
+      }
+
+      // CTA link
+      const a = p.querySelector('a[href]');
+      if (a) {
+        ctaHref = a.href;
+        ctaLabel = a.textContent.trim() || ctaLabel;
+        return;
+      }
+
+      // Headings are always the title
+      if (isHeading) {
+        title = text;
+        return;
+      }
+
+      // First unmatched paragraph = title, second = description
+      if (!title) { title = text; return; }
+      if (!description) { description = text; }
+    });
+
+    // Badge on image
+    if (badgeText) {
+      const badge = document.createElement('span');
+      badge.className = 'gift-badge';
+      badge.textContent = badgeText;
+      const image = li.querySelector('.card-image');
+      if (image) image.append(badge);
+    }
+
+    const eyebrowHTML = eyebrowText
+      ? `<p class="gift-eyebrow">${eyebrowText}</p>`
+      : '';
+    const descriptionHTML = description
+      ? `<p class="gift-description">${description}</p>`
+      : '';
+    const ctaHTML = ctaHref
+      ? `<a class="gift-cta" href="${ctaHref}">${ctaLabel}</a>`
+      : '';
+
+    body.innerHTML = `
+      ${eyebrowHTML}
+      <h2>${title}</h2>
+      ${descriptionHTML}
+      ${ctaHTML}
     `;
   });
 }
@@ -233,13 +326,17 @@ export default function decorate(block) {
     variants = setCardDefaults(block, ul, variants);
   }
 
-  const clickable = ['knockout', 'articles', 'linked', 'overlay', 'grids'];
+  const clickable = ['knockout', 'articles', 'linked', 'overlay', 'grids', 'gift'];
   if (variants.some((v) => clickable.includes(v))) {
     enableClick(ul);
   }
 
   if (variants.includes('grids')) {
     decorateGrids(ul);
+  }
+
+  if (variants.includes('gift')) {
+    decorateGift(ul);
   }
 
   // replace content with new list structure
