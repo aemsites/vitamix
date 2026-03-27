@@ -454,8 +454,14 @@ export default async function decorate(block) {
 
   // update cart qty bubble on change
   document.addEventListener('cart:change', (e) => {
-    cartLink.dataset.cartItems = e.detail.cart.itemCount;
-    cartLink.lastChild.textContent = `Cart (${e.detail.cart.itemCount})`;
+    const { itemCount } = e.detail.cart;
+    if (itemCount > 0) {
+      cartLink.dataset.cartItems = itemCount;
+      cartLink.lastChild.textContent = `Cart (${itemCount})`;
+    } else {
+      delete cartLink.dataset.cartItems;
+      cartLink.lastChild.textContent = 'Cart';
+    }
   });
 
   // change to edge cart link
@@ -502,9 +508,12 @@ export default async function decorate(block) {
       minicart.setAttribute('aria-expanded', false);
       block.append(minicart);
 
+      const headerRow = document.createElement('div');
+      headerRow.className = 'minicart-header';
+
       const cartTitle = document.createElement('h2');
       cartTitle.textContent = 'Cart';
-      minicart.append(cartTitle);
+      headerRow.append(cartTitle);
 
       const cartClose = document.createElement('button');
       cartClose.className = 'close';
@@ -512,7 +521,8 @@ export default async function decorate(block) {
       cartClose.addEventListener('click', () => {
         minicart.closeModal();
       });
-      minicart.append(cartClose);
+      headerRow.append(cartClose);
+      minicart.append(headerRow);
 
       const cartBlock = document.createElement('div');
       minicart.append(cartBlock);

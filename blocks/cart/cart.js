@@ -3,8 +3,20 @@ import cart from '../../scripts/cart.js';
 
 const itemTemplate = /* html */`
 <div class="cart-item">
-    <div class="cart-item-product"></div>
-    <div class="cart-item-quantity"></div>
+    <div class="cart-item-image"></div>
+    <div class="cart-item-details">
+        <div class="cart-item-name"></div>
+        <div class="cart-item-price"></div>
+        <div class="cart-item-variant"></div>
+        <div class="cart-item-actions">
+            <div class="cart-item-quantity"></div>
+            <button class="cart-item-remove" aria-label="Remove item">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14"/>
+                </svg>
+            </button>
+        </div>
+    </div>
     <div class="cart-item-total"></div>
 </div>`;
 
@@ -12,17 +24,17 @@ const template = /* html */`
 <div class="cart">
     <div class="cart-items">
         <div class="cart-items-header">
-            <h6 class="title-product">Product</h6>
-            <h6 class="title-quantity">Quantity</h6>
-            <h6 class="title-total">Total</h6>
+            <span>PRODUCT</span>
+            <span>TOTAL</span>
         </div>
         <div class="cart-items-list">
         </div>
         <div class="cart-items-footer">
             <div class="cart-footer-subtotal">
-                <h4>Subtotal</h4>
-                <p class="cart-footer-total"></p>
+                <span>Subtotal</span>
+                <span class="cart-footer-total"></span>
             </div>
+            <p class="cart-footer-note">Taxes and shipping calculated at checkout</p>
         </div>
     </div>
     <div class="cart-controls">
@@ -122,35 +134,85 @@ export default async function decorate(block, parent) {
       const cartItem = itemElement.querySelector('.cart-item');
       cartItem.classList.add(`cart-item-${item.sku}`);
 
-      // product element
-      const productEl = itemElement.querySelector('.cart-item-product');
-      const productPictureEl = createOptimizedPicture(item.image, '', true);
-      const productImgWrapper = document.createElement('span');
-      productImgWrapper.appendChild(productPictureEl);
-      productImgWrapper.classList.add('image');
+      // image
+      const imageEl = itemElement.querySelector('.cart-item-image');
+      const pictureEl = createOptimizedPicture(item.image, item.name || '', true);
+      imageEl.appendChild(pictureEl);
 
-      const productLinkEl = document.createElement('a');
-      productLinkEl.textContent = item.name;
+      // name as link
+      const nameEl = itemElement.querySelector('.cart-item-name');
+      const linkEl = document.createElement('a');
+      linkEl.textContent = item.name;
       let path;
       try {
         path = new URL(item.url).pathname;
       } catch (error) {
         path = item.url;
       }
-      productLinkEl.setAttribute('href', path);
+      linkEl.setAttribute('href', path);
+      nameEl.appendChild(linkEl);
 
-      const productPriceEl = document.createElement('span');
-      productPriceEl.classList.add('price');
-      productPriceEl.textContent = `$${item.price}`;
-      productPriceEl.setAttribute('data-price', item.price);
-      productEl.append(productImgWrapper, productLinkEl, productPriceEl);
+      // price
+      const priceEl = itemElement.querySelector('.cart-item-price');
+      priceEl.textContent = `$${item.price}`;
 
-      // total (qty*unit price)
+      // variant (e.g., color)
+      const variantEl = itemElement.querySelector('.cart-item-variant');
+      if (item.variant) {
+        variantEl.textContent = `Color: ${item.variant}`;
+      } else {
+        variantEl.remove();
+      }
+
+      // total (qty * unit price)
       const totalElement = itemElement.querySelector('.cart-item-total');
+      totalElement.textContent = `$${(item.price * item.quantity).toFixed(2)}`;
 
       // quantity picker
       const qtyElement = itemElement.querySelector('.cart-item-quantity');
-      renderQuantityPicker(item, qtyElement, totalElement);
+      const qtyControlEl = document.createElement('div');
+      qtyControlEl.classList.add('quantity-control');
+
+      const qtyInput = document.createElement('input');
+      qtyInput.type = 'number';
+      qtyInput.id = `qty-input-${item.sku}`;
+      qtyInput.value = item.quantity;
+      qtyInput.classList.add('quantity-input');
+
+      const decrementButton = document.createElement('button');
+      decrementButton.textContent = '\u2013';
+      decrementButton.classList.add('quantity-button');
+
+      const incrementButton = document.createElement('button');
+      incrementButton.textContent = '+';
+      incrementButton.classList.add('quantity-button');
+
+      qtyControlEl.append(decrementButton, qtyInput, incrementButton);
+      qtyElement.appendChild(qtyControlEl);
+
+      // remove button
+      const removeBtn = itemElement.querySelector('.cart-item-remove');
+
+      // event handlers
+      const updateQty = (newQty) => {
+        if (newQty < 1) {
+          cart.removeItem(item.sku);
+          itemElement.remove();
+          return;
+        }
+        cart.updateItem(item.sku, newQty);
+        qtyInput.value = newQty;
+        totalElement.textContent = `$${(item.price * newQty).toFixed(2)}`;
+      };
+
+      decrementButton.addEventListener('click', () => updateQty(+qtyInput.value - 1));
+      incrementButton.addEventListener('click', () => updateQty(+qtyInput.value + 1));
+      qtyInput.addEventListener('change', (e) => updateQty(+e.target.value));
+      removeBtn.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        cart.removeItem(item.sku);
+        itemElement.remove();
+      });
     });
   };
 
