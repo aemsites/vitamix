@@ -28,7 +28,7 @@ const template = /* html */`
       </div>
       <div class="cart-summary-row">
         <span>Estimated taxes</span>
-        <span class="cart-summary-taxes">$1.00</span>
+        <span class="cart-summary-taxes"></span>
       </div>
       <div class="cart-summary-row cart-summary-final">
         <strong>Total</strong>
@@ -66,6 +66,7 @@ export default function decorate(block) {
   const itemsList = block.querySelector('.cart-summary-items');
   const subtotalEl = block.querySelector('.cart-summary-subtotal');
   const shippingEl = block.querySelector('.cart-summary-shipping');
+  const taxesEl = block.querySelector('.cart-summary-taxes');
   const grandTotalEl = block.querySelector('.cart-summary-grand-total');
   const headerTotalEl = block.querySelector('.cart-summary-total');
 
@@ -88,7 +89,7 @@ export default function decorate(block) {
   };
 
   window.addEventListener('resize', handleResize);
-  handleResize(); // Initial check
+  handleResize();
 
   const renderItems = () => {
     itemsList.innerHTML = '';
@@ -108,7 +109,6 @@ export default function decorate(block) {
       name.textContent = item.name;
 
       const variant = itemEl.querySelector('.cart-summary-item-variant');
-      // Extract variant from item if available
       if (item.variant) {
         variant.textContent = item.variant;
       } else {
@@ -126,14 +126,12 @@ export default function decorate(block) {
   };
 
   const updateTotals = () => {
-    const { subtotal, shipping } = cart;
-    const taxes = 1.00; // Placeholder
-    const total = subtotal + shipping + taxes;
-
-    subtotalEl.textContent = `$${subtotal.toFixed(2)}`;
-    shippingEl.textContent = shipping === 0 ? 'Free' : `$${shipping.toFixed(2)}`;
-    grandTotalEl.textContent = `$${total.toFixed(2)}`;
-    headerTotalEl.textContent = `$${total.toFixed(2)}`;
+    subtotalEl.textContent = `$${cart.subtotal.toFixed(2)}`;
+    // show placeholder until real estimates arrive
+    shippingEl.textContent = '--';
+    taxesEl.textContent = '--';
+    grandTotalEl.textContent = `$${cart.subtotal.toFixed(2)}`;
+    headerTotalEl.textContent = `$${cart.subtotal.toFixed(2)}`;
   };
 
   // Initial render
@@ -144,5 +142,20 @@ export default function decorate(block) {
   document.addEventListener('cart:change', () => {
     renderItems();
     updateTotals();
+  });
+
+  // Listen for real estimates from checkout preview
+  document.addEventListener('checkout:preview', (e) => {
+    const { preview } = e.detail;
+    const subtotal = parseFloat(preview.subtotal) || cart.subtotal;
+    const taxAmount = parseFloat(preview.taxAmount) || 0;
+    const shippingRate = preview.shippingMethod?.rate ?? 0;
+    const total = parseFloat(preview.total) || (subtotal + taxAmount + shippingRate);
+
+    subtotalEl.textContent = `$${subtotal.toFixed(2)}`;
+    shippingEl.textContent = shippingRate === 0 ? 'Free' : `$${parseFloat(shippingRate).toFixed(2)}`;
+    taxesEl.textContent = `$${taxAmount.toFixed(2)}`;
+    grandTotalEl.textContent = `$${total.toFixed(2)}`;
+    headerTotalEl.textContent = `$${total.toFixed(2)}`;
   });
 }

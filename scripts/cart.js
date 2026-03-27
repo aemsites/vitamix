@@ -185,12 +185,32 @@ export class Cart {
    * }} shipping
    * @returns {Object}
    */
-  getOrderJSON(email, firstName, lastName, phone, shippingAddr) {
-    // remove empty string values
-    const shipping = Object.fromEntries(
+  /**
+   * Returns cart items in API-compatible format.
+   * @returns {Array<{sku: string, path: string, quantity: number, name: string, price: {final: string, currency: string}}>}
+   */
+  getItemsForAPI() {
+    return this.items.map((item) => ({
+      sku: item.sku,
+      path: item.path || new URL(item.url, window.location.origin).pathname,
+      quantity: item.quantity,
+      name: item.name,
+      price: {
+        final: String(item.price),
+        currency: 'USD',
+      },
+    }));
+  }
+
+  getOrderJSON(email, firstName, lastName, phone, shippingAddr, {
+    billingAddr, shippingMethod, estimateToken, locale, country,
+  } = {}) {
+    // remove empty string values from addresses
+    const cleanAddr = (addr) => Object.fromEntries(
       // eslint-disable-next-line no-unused-vars
-      Object.entries(shippingAddr).filter(([_, value]) => value !== ''),
+      Object.entries(addr).filter(([_, value]) => value !== ''),
     );
+
     const order = {
       customer: {
         firstName,
@@ -198,18 +218,26 @@ export class Cart {
         email,
         phone,
       },
-      shipping,
-      items: this.items.map((item) => ({
-        sku: item.sku,
-        urlKey: (item.url || '').split('/').pop() || '',
-        name: item.name,
-        quantity: item.quantity,
-        price: {
-          currency: 'USD',
-          final: item.price,
-        },
-      })),
+      shipping: cleanAddr(shippingAddr),
+      items: this.getItemsForAPI(),
     };
+
+    if (billingAddr) {
+      order.billing = cleanAddr(billingAddr);
+    }
+    if (shippingMethod) {
+      order.shippingMethod = { id: shippingMethod };
+    }
+    if (estimateToken) {
+      order.estimateToken = estimateToken;
+    }
+    if (locale) {
+      order.locale = locale;
+    }
+    if (country) {
+      order.country = country;
+    }
+
     return order;
   }
 

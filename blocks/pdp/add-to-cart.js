@@ -225,7 +225,9 @@ export default function renderAddToCart(ph, block, parent) {
           price,
           name,
           url: selectedVariant.url,
+          path: new URL(selectedVariant.url).pathname,
           image: selectedVariant.image[0],
+          variant: window.selectedVariant?.options?.color || '',
           selectedOptions,
         };
         await cartApi.addItem(item);

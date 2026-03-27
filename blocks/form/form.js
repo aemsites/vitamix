@@ -140,41 +140,6 @@ async function appendSelectOptions(select, url) {
   }
 }
 
-function buildSelect(field) {
-  const {
-    field: fieldName, required, default: defaultValue, placeholder, options,
-  } = field;
-  const select = createElement('select');
-  select.id = generateId(fieldName);
-  select.name = select.id;
-  select.required = required === 'true';
-  if (typeof options !== 'string') {
-    return select;
-  }
-
-  if (/^https?:\/\//.test(options)) {
-    if (placeholder) {
-      const optionEl = createElement('option');
-      if (defaultValue != null) {
-        optionEl.value = defaultValue;
-      }
-      optionEl.textContent = placeholder;
-      optionEl.setAttribute('disabled', 'true');
-      select.append(optionEl);
-    }
-    appendSelectOptions(select, options); // async
-  } else {
-    options.split(';').forEach((o) => {
-      const option = o.trim();
-      const optionEl = createElement('option');
-      optionEl.value = option;
-      optionEl.textContent = option;
-      select.append(optionEl);
-    });
-  }
-  return select;
-}
-
 /**
  * Decodes option string into text and value pair
  * @param {string} option - Option string
@@ -191,7 +156,7 @@ function decodeOption(option) {
  */
 function buildSelect(field) {
   const {
-    field: fieldName, required, default: defaultValue, options,
+    field: fieldName, required, default: defaultValue, placeholder, options,
   } = field;
 
   const select = createElement('select');
@@ -199,7 +164,20 @@ function buildSelect(field) {
   select.name = select.id;
   select.required = required === 'true';
 
-  if (options) {
+  if (options && /^https?:\/\//.test(options)) {
+    // URL-based options: fetch from JSON sheet
+    if (placeholder) {
+      const optionEl = createElement('option');
+      if (defaultValue != null) {
+        optionEl.value = defaultValue;
+      }
+      optionEl.textContent = placeholder;
+      optionEl.setAttribute('disabled', 'true');
+      select.append(optionEl);
+    }
+    appendSelectOptions(select, options);
+  } else if (options) {
+    // Inline comma-separated options
     options.split(',').forEach((o) => {
       const [text, value] = decodeOption(o);
       const option = createElement('option');
