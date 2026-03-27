@@ -1,9 +1,24 @@
 import { loadCSS } from '../../scripts/aem.js';
+import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+
+/**
+ * Load widget copy from the widget's local JSON (same name as the script).
+ * @param {string} lang - Language key (e.g. en, fr)
+ * @returns {Promise<Object>} Copy for that language (e.g. { labels: { ... } })
+ */
+async function loadWidgetCopy(lang) {
+  const scriptPath = new URL(import.meta.url).pathname;
+  const jsonPath = scriptPath.replace(/\.js$/, '.json');
+  const url = `${window.hlx?.codeBasePath || ''}${jsonPath}`;
+  const resp = await fetch(url);
+  const data = await resp.json();
+  const key = data[lang] ? lang : 'en';
+  return data[key] || {};
+}
 
 const MAX_DISTANCE = 200;
 const EVENTS_MAX_DISTANCE = 100;
-const MAX_DISTANCE_COMM = 50;
-const maxDistanceHhDistributors = 1500;
+const MAX_DISTANCE_COMM = 1000;
 
 const hhRetailersResults = document.querySelector('#locator-hh-retailers-tabpanel');
 const hhDistributorsResults = document.querySelector('#locator-hh-distributors-tabpanel');
@@ -31,8 +46,8 @@ async function fetchData(form) {
 
   form.dataset.status = 'loading';
   window.locatorData = {};
-  window.locatorData.HH = await fetchSheet('https://main--vitamix--aemsites.aem.network/us/en_us/where-to-buy/storelocations-hh.json');
-  window.locatorData.COMM = await fetchSheet('https://main--vitamix--aemsites.aem.live/us/en_us/where-to-buy/storelocations-comm.json?limit=10000');
+  window.locatorData.HH = await fetchSheet('https://main--vitamix--aemsites.aem.live/us/en_us/where-to-buy/storelocations-hh.json');
+  window.locatorData.COMM = await fetchSheet('https://main--vitamix--aemsites.aem.live/us/en_us/where-to-buy/storelocations-comm.json');
   window.locatorData.EVENTS = await fetchSheet('https://main--vitamix--aemsites.aem.live/us/en_us/where-to-buy/storelocations-events.json');
   form.dataset.status = 'loaded';
   return window.locatorData;
@@ -276,14 +291,7 @@ function findEventsResults(data, location) {
   };
 }
 
-function findCommResults(
-  data,
-  location,
-  countryShort,
-  countryLong,
-  stateShort,
-  stateLong,
-) {
+function findCommResults(data, location, countryShort, countryLong, stateShort, stateLong) {
   const allowedTypes = ['DEALER/DISTRIBUTOR', 'LOCAL REP'];
 
   const cleaned = applyAemRules(data, {
@@ -301,25 +309,9 @@ function findCommResults(
     .sort((a, b) => haversineDistance(location.lat, location.lng, a.lat, a.lng)
       - haversineDistance(location.lat, location.lng, b.lat, b.lng));
 
-  const hasState = !!(stateShort || stateLong);
-
   const localRep = cleaned
-    .filter((i) => i.TYPE === 'LOCAL REP')
-    .filter((i) => {
-    // If we have state info, filter by state
-      if (hasState) {
-        return (
-          norm(i.STATE_PROVINCE) === norm(stateShort)
-        || norm(i.STATE_NAME) === norm(stateLong)
-        );
-      }
-
-      // If no state info, fallback to country match (or return all LOCAL REP for that country)
-      return (
-        norm(i.COUNTRY_CODE) === norm(countryShort)
-      || norm(i.COUNTRY_NAME) === norm(countryLong)
-      );
-    });
+    .filter((i) => i.TYPE === 'LOCAL REP'
+    && (i.STATE_PROVINCE === stateShort || i.STATE_NAME === stateLong));
 
   return { distributors, localRep };
 }
@@ -342,8 +334,7 @@ function findHHResults(data, location, countryShort, countryLong) {
 
   const distributors = cleaned
     .filter((i) => i.TYPE === 'DEALER/DISTRIBUTOR'
-      && haversineDistance(location.lat, location.lng, i.lat, i.lng)
-        <= maxDistanceHhDistributors)
+      && haversineDistance(location.lat, location.lng, i.lat, i.lng) <= MAX_DISTANCE)
     .sort((a, b) => haversineDistance(location.lat, location.lng, a.lat, a.lng)
       - haversineDistance(location.lat, location.lng, b.lat, b.lng));
 
@@ -354,7 +345,7 @@ function findHHResults(data, location, countryShort, countryLong) {
   return { retailers, distributors, online };
 }
 
-function displayCommResults(results, location) {
+function displayCommResults(results, location, labels = {}) {
   const { distributors, localRep } = results;
 
   const createDistributorResult = (result) => {
@@ -422,24 +413,6 @@ function displayCommResults(results, location) {
       webWrapper.append(webLink);
       li.append(webWrapper);
     }
-    // Email
-    if (result.EMAIL) {
-      const emailWrapper = document.createElement('span');
-      emailWrapper.classList.add('locator-email');
-
-      const emailLabel = document.createElement('strong');
-      emailLabel.textContent = 'Email: ';
-      emailWrapper.append(emailLabel);
-
-      const emailLink = document.createElement('a');
-      emailLink.href = `mailto:${result.EMAIL}`;
-      emailLink.textContent = result.EMAIL;
-      emailLink.target = '_blank';
-      emailLink.rel = 'noopener noreferrer';
-
-      emailWrapper.append(emailLink);
-      li.append(emailWrapper);
-    }
 
     return li;
   };
@@ -449,13 +422,13 @@ function displayCommResults(results, location) {
     const title = document.createElement('h3');
     title.textContent = result.NAME;
     li.append(title);
-
+    
     // Phone number
     if (result.PHONE_NUMBER) {
       const phoneWrapper = document.createElement('span');
       phoneWrapper.classList.add('locator-phone');
       const phoneLabel = document.createElement('strong');
-      phoneLabel.textContent = 'Phone: ';
+      phoneLabel.textContent = labels.phone ?? 'Phone: ';
       phoneWrapper.append(phoneLabel);
 
       const phoneLink = document.createElement('a');
@@ -472,7 +445,7 @@ function displayCommResults(results, location) {
       webWrapper.classList.add('locator-web');
 
       const webLabel = document.createElement('strong');
-      webLabel.textContent = 'Website: ';
+      webLabel.textContent = labels.website ?? 'Website: ';
       webWrapper.append(webLabel);
 
       const webLink = document.createElement('a');
@@ -499,7 +472,7 @@ function displayCommResults(results, location) {
     commDistributorsResults.textContent = '';
     commDistributorsResults.appendChild(distributorList);
   } else {
-    commDistributorsResults.innerHTML = '<p>No distributors found</p>';
+    commDistributorsResults.innerHTML = `<p>${labels.noDistributorsFound ?? 'No distributors found'}</p>`;
   }
 
   if (localRep && localRep.length > 0) {
@@ -510,7 +483,7 @@ function displayCommResults(results, location) {
     commLocalrepResults.textContent = '';
     commLocalrepResults.appendChild(localRepList);
   } else {
-    commLocalrepResults.innerHTML = '<p>No local representatives found</p>';
+    commLocalrepResults.innerHTML = `<p>${labels.noLocalRepFound ?? 'No local representatives found'}</p>`;
   }
 }
 
@@ -698,7 +671,7 @@ function displayEventsResults(results, location) {
   renderCalendar();
 }
 
-function displayHHResults(results, location) {
+function displayHHResults(results, location, labels = {}) {
   const { retailers, distributors, online } = results;
 
   const cleanTel = (v) => (v || '').toString().replace(/[^\d+]/g, '');
@@ -792,7 +765,8 @@ function displayHHResults(results, location) {
     if (!location?.lat || !location?.lng || result.lat == null || result.lng == null) return;
 
     const distance = document.createElement('span');
-    distance.textContent = `${haversineDistance(location.lat, location.lng, result.lat, result.lng).toFixed(1)} miles away`;
+    const milesAway = (labels.milesAway ?? 'miles away');
+    distance.textContent = `${haversineDistance(location.lat, location.lng, result.lat, result.lng).toFixed(1)} ${milesAway}`;
     distance.classList.add('locator-distance');
     li.append(distance);
   };
@@ -853,7 +827,7 @@ function displayHHResults(results, location) {
     hhRetailersResults.textContent = '';
     hhRetailersResults.appendChild(retailerList);
   } else {
-    hhRetailersResults.innerHTML = '<p>No retailers found</p>';
+    hhRetailersResults.innerHTML = `<p>${labels.noRetailersFound ?? 'No retailers found'}</p>`;
   }
 
   // Distributors
@@ -865,7 +839,7 @@ function displayHHResults(results, location) {
     hhDistributorsResults.textContent = '';
     hhDistributorsResults.appendChild(distributorList);
   } else {
-    hhDistributorsResults.innerHTML = '<p>No distributors found</p>';
+    hhDistributorsResults.innerHTML = `<p>${labels.noDistributorsFound ?? 'No distributors found'}</p>`;
   }
 
   // Online
@@ -877,15 +851,52 @@ function displayHHResults(results, location) {
     hhOnlineResults.textContent = '';
     hhOnlineResults.appendChild(onlineList);
   } else {
-    hhOnlineResults.innerHTML = '<p>No online retailers found</p>';
+    hhOnlineResults.innerHTML = `<p>${labels.noOnlineFound ?? 'No online retailers found'}</p>`;
   }
 }
 
-export default function decorate(widget) {
+export default async function decorate(widget) {
   widget.style.visibility = 'hidden';
   loadCSS('/blocks/form/form.css').then(() => widget.removeAttribute('style'));
 
+  const { language } = getLocaleAndLanguage();
+  const lang = (language || 'en_us').split('_')[0];
+  const copy = await loadWidgetCopy(lang);
+  const labels = copy.labels || {};
+
   const form = widget.querySelector('form');
+
+  // Apply copy to static form and headings
+  const h1 = widget.querySelector('#find-locally');
+  if (h1) h1.textContent = labels.findLocally ?? 'Find Locally';
+  const locationLabel = widget.querySelector('label[for="location"]');
+  if (locationLabel) locationLabel.textContent = labels.yourLocation ?? 'Your Location';
+  const addressInput = widget.querySelector('#address');
+  if (addressInput) addressInput.placeholder = labels.addressHint ?? 'Address, City, or Zipcode';
+  const productTypeLabel = widget.querySelector('label[for="productType"]');
+  if (productTypeLabel) productTypeLabel.textContent = labels.whatAreYouLookingFor ?? 'What are you looking for?';
+  const productTypeSelect = widget.querySelector('#productType');
+  if (productTypeSelect) {
+    const opts = productTypeSelect.querySelectorAll('option');
+    if (opts[0]) opts[0].textContent = labels.householdProducts ?? 'Household Products';
+    if (opts[1]) opts[1].textContent = labels.commercialProducts ?? 'Commercial Products';
+    if (opts[2]) opts[2].textContent = labels.demonstrations ?? 'Demonstrations';
+  }
+  const submitBtn = widget.querySelector('form button[type="submit"]');
+  if (submitBtn) submitBtn.textContent = labels.search ?? 'Search';
+
+  // Tab labels: HH = Retailers, Online Retailers, Distributors; COMM = Distributors, Local Rep;
+  // Events = Household Events, Commercial Events
+  const hhTabs = widget.querySelectorAll('.locator-hh-results .locator-results-tablist button');
+  if (hhTabs[0]) hhTabs[0].textContent = labels.retailers ?? 'Retailers';
+  if (hhTabs[1]) hhTabs[1].textContent = labels.onlineRetailers ?? 'Online Retailers';
+  if (hhTabs[2]) hhTabs[2].textContent = labels.distributors ?? 'Distributors';
+  const commTabs = widget.querySelectorAll('.locator-comm-results .locator-results-tablist button');
+  if (commTabs[0]) commTabs[0].textContent = labels.distributors ?? 'Distributors';
+  if (commTabs[1]) commTabs[1].textContent = labels.localRepresentatives ?? 'Local Representatives';
+  const eventsTabs = widget.querySelectorAll('.locator-events-results .locator-results-tablist button');
+  if (eventsTabs[0]) eventsTabs[0].textContent = labels.householdEvents ?? 'Household Events';
+  if (eventsTabs[1]) eventsTabs[1].textContent = labels.commercialEvents ?? 'Commercial Events';
 
   // set initial values from query params
   const queryParams = Object.fromEntries(new URLSearchParams(window.location.search));
@@ -897,14 +908,13 @@ export default function decorate(widget) {
   // load results data
   setTimeout(() => fetchData(form), 300);
 
-  const tabpanels = widget.querySelectorAll('.locator-tabpanels .locator-tabpanel');
   const tablistButtons = widget.querySelectorAll('.locator-results-tablist button');
   const showTab = (tabButton) => {
     tablistButtons.forEach((b) => b.removeAttribute('aria-selected'));
-    tabpanels.forEach((panel) => panel.setAttribute('aria-hidden', true));
+    widget.querySelectorAll('.locator-tabpanels .locator-tabpanel').forEach((panel) => panel.setAttribute('aria-hidden', true));
     tabButton.setAttribute('aria-selected', 'true');
     const tabpanel = document.getElementById(tabButton.getAttribute('aria-controls'));
-    tabpanel.setAttribute('aria-hidden', false);
+    if (tabpanel) tabpanel.setAttribute('aria-hidden', false);
   };
 
   const showType = (type) => {
@@ -932,7 +942,7 @@ export default function decorate(widget) {
         const results = findHHResults(window.locatorData.HH, location, countryShort, countryLong);
         displayHHResults(results, location);
       } else {
-        displayHHResults({});
+        displayHHResults({}, null, labels);
       }
       showType('hh');
     }
@@ -947,9 +957,9 @@ export default function decorate(widget) {
           stateShort,
           stateLong,
         );
-        displayCommResults(results, location);
+        displayCommResults(results, location, labels);
       } else {
-        displayCommResults({});
+        displayCommResults({}, null, labels);
       }
       showType('comm');
     }
@@ -957,7 +967,7 @@ export default function decorate(widget) {
     if (data.productType === 'EVENTS') {
       if (location) {
         const results = findEventsResults(window.locatorData.EVENTS, location);
-        displayEventsResults(results, location);
+        displayEventsResults(results, location, labels);
       } else {
         displayEventsResults({ hhGrouped: [], commGrouped: [] }, location);
       }
