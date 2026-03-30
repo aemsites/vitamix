@@ -689,7 +689,7 @@
 
 .cards.grids > ul {
   display: grid;
-  gap: var(--spacing-400, 16px);
+  gap: var(--spacing-400);
   grid-template-columns: 1fr;
   align-items: start;
 }
@@ -731,7 +731,7 @@
 
 /* Card base */
 .cards.grids > ul > li {
-  background: var(--color-white, #fff);
+  background: var(--color-white);
   border: 1px solid #e5e5e5;
   overflow: hidden;
   display: flex;
@@ -790,8 +790,8 @@
   left: 14px;
   display: inline-flex;
   align-items: center;
-  background: #fff;
-  color: var(--color-charcoal, #1a1a1a);
+  background: var(--white);
+  color: var(--color-charcoal);
   font-size: 0.65rem;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -820,12 +820,12 @@
 
 .cards.grids .card-body h2,
 .cards.grids .card-body h3 {
-  font-family: var(--serif-font-family, Georgia, serif);
+  font-family: var(--serif-font-family);
   font-size: var(--font-size-500, 1.2rem);
   font-weight: 500;
   line-height: 1.25;
   margin: 0;
-  color: var(--color-charcoal, #1a1a1a);
+  color: var(--color-charcoal);
 }
 
 /* Featured card gets bigger title */
@@ -889,7 +889,7 @@
 /* gift variant */
 .cards.gift {
   --gift-badge-bg: #fff;
-  --gift-badge-color: var(--color-charcoal, #1a1a1a);
+  --gift-badge-color: var(--color-charcoal);
 }
 
 .cards.gift > ul {
@@ -934,7 +934,7 @@
 
 /* Card base */
 .cards.gift > ul > li {
-  background: var(--color-white, #fff);
+  background: var(--color-white);
   border: 1px solid #e5e5e5;
   overflow: hidden;
   display: flex;
@@ -1025,12 +1025,12 @@
 /* Title */
 .cards.gift .card-body h2,
 .cards.gift .card-body h3 {
-  font-family: var(--serif-font-family, Georgia, serif);
-  font-size: var(--font-size-500, 1.2rem);
+  font-family: var(--serif-font-family);
+  font-size: var(--font-size-500);
   font-weight: 500;
   line-height: 1.25;
   margin: 0;
-  color: var(--color-charcoal, #1a1a1a);
+  color: var(--color-charcoal);
 }
 
 .cards.gift > ul > li:first-child .card-body h2,
@@ -1055,7 +1055,7 @@
   font-weight: 500;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--color-charcoal, #1a1a1a);
+  color: var(--color-charcoal);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
