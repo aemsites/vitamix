@@ -1,7 +1,4 @@
-import { getLocaleAndLanguage } from '../../scripts/scripts.js';
-
-/** Sheet logger endpoint for order status lookup */
-const SHEET_LOGGER_URL = 'https://sheet-logger.david8603.workers.dev/vitamix.com/forms-testing/order-status';
+import { getLocaleAndLanguage, getFormSubmissionUrl } from '../../scripts/scripts.js';
 
 /**
  * Loads form copy from the widget's local JSON (same name as the script).
@@ -28,7 +25,7 @@ export default async function decorate(widget) {
   const resultEl = widget.querySelector('.order-status-result');
   if (!form || !resultEl) return;
 
-  const { language } = getLocaleAndLanguage();
+  const { locale, language } = getLocaleAndLanguage();
   const lang = (language || 'en_us').split('_')[0];
   const copy = await loadFormCopy(lang);
   const labels = copy.labels || {};
@@ -46,6 +43,7 @@ export default async function decorate(widget) {
     e.preventDefault();
     const data = new FormData(form);
     const payload = Object.fromEntries(data.entries());
+    payload.formId = `${locale}/${language}/order-status`;
     payload.pageUrl = window.location.href;
 
     [...form.elements].forEach((el) => { el.disabled = true; });
@@ -58,7 +56,7 @@ export default async function decorate(widget) {
     resultEl.textContent = '';
 
     try {
-      const resp = await fetch(SHEET_LOGGER_URL, {
+      const resp = await fetch(getFormSubmissionUrl(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
