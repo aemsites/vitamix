@@ -790,7 +790,7 @@
   left: 14px;
   display: inline-flex;
   align-items: center;
-  background: var(--white);
+  background: var(--color-white);
   color: var(--color-charcoal);
   font-size: 0.65rem;
   font-weight: 700;
