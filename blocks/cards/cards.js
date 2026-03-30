@@ -79,20 +79,14 @@ const clockIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" s
 const servesIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
 
 /**
- * Reads structured grid data from card-body and re-renders it with
- * the Vitamix grid card UI (badge, stars, meta row, optional CTA).
- *
  * Expected authoring columns in the DA table (grids variant):
  *   Col 1 – image
  *   Col 2 – grid data as paragraphs (order-independent, detected by content):
  *     - Grid item title (heading element, or first paragraph)
  *     - Difficulty keyword: Simple | Intermediate | Advanced (standalone word)
- *     - Rating (optional): contains a number + "reviews", e.g. "4.7 · 98 reviews"
  *     - Time: starts with ~ or contains "min"/"hr"/"hour"
  *     - Serves (optional): contains "serves" or "servings"
  *     - CTA link (optional): anchor element
- *
- * @param {HTMLUListElement} ul - The decorated card list element
  */
 function decorateGrids(ul) {
   ul.querySelectorAll('li').forEach((li) => {
@@ -180,9 +174,8 @@ function decorateGrids(ul) {
   });
 }
 
-/**
+/*
  * Decorates the gift variant cards.
- *
  * Expected authoring columns in the DA table (gift variant):
  *   Col 1 – image
  *   Col 2 – content paragraphs (order-independent, detected by content):
@@ -191,9 +184,8 @@ function decorateGrids(ul) {
  *     - Title: heading element, or first unmatched paragraph
  *     - Description: second unmatched paragraph
  *     - CTA link: any paragraph containing an <a href>
- *
- * @param {HTMLUListElement} ul - The decorated card list element
  */
+
 function decorateGift(ul) {
   ul.querySelectorAll('li').forEach((li) => {
     const body = li.querySelector('.card-body');
