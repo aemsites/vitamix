@@ -888,7 +888,7 @@
 
 /* gift variant */
 .cards.gift {
-  --gift-badge-bg: #fff;
+  --gift-badge-bg: var(--color-white);
   --gift-badge-color: var(--color-charcoal);
 }
 
