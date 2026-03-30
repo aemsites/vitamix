@@ -732,7 +732,7 @@
 /* Card base */
 .cards.grids > ul > li {
   background: var(--color-white);
-  border: 1px solid #e5e5e5;
+  border: 1px solid var(--color-gray-200);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -814,14 +814,14 @@
   padding: 16px 20px 20px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var( --spacing-60);
   flex: 1;
 }
 
 .cards.grids .card-body h2,
 .cards.grids .card-body h3 {
   font-family: var(--serif-font-family);
-  font-size: var(--font-size-500, 1.2rem);
+  font-size: var(--font-size-500);
   font-weight: 500;
   line-height: 1.25;
   margin: 0;
@@ -839,24 +839,24 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: var( --spacing-100);
   margin-top: auto;
   padding-top: 8px;
-  border-top: 1px solid var(--color-gray-300, #e8e8e8);
+  border-top: 1px solid var(--color-gray-300);
   font-size: 0.85rem;
-  color: var(--color-gray, #666);
+  color: var(--color-gray);
 }
 
 .cards.grids .grids-meta-left {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: var( --spacing-100);
 }
 
 .cards.grids .grids-meta-item {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: var( --spacing-40);
 }
 
 .cards.grids .grids-meta-item svg {
@@ -870,7 +870,7 @@
   font-weight: 500;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--color-red, #c0392b);
+  color: var(--color-red);
   text-decoration: none;
   white-space: nowrap;
   flex-shrink: 0;
@@ -894,7 +894,7 @@
 
 .cards.gift > ul {
   display: grid;
-  gap: var(--spacing-400, 16px);
+  gap: var(--spacing-400);
   grid-template-columns: 1fr;
   align-items: start;
 }
@@ -935,7 +935,7 @@
 /* Card base */
 .cards.gift > ul > li {
   background: var(--color-white);
-  border: 1px solid #e5e5e5;
+  border: 1px solid var(--color-gray-200);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -943,7 +943,7 @@
 }
 
 .cards.gift > ul > li:hover {
-  border-color: #ccc;
+  border-color: var(--color-gray-300);
 }
 
 /* Image */
@@ -1008,7 +1008,7 @@
   padding: 16px 20px 20px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--spacing-60);
   flex: 1;
 }
 
@@ -1018,7 +1018,7 @@
   font-weight: 500;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--color-red, #c0392b);
+  color: var(--color-red);
   margin: 0;
 }
 
@@ -1042,7 +1042,7 @@
 .cards.gift .gift-description {
   font-size: 0.9rem;
   line-height: 1.5;
-  color: var(--color-gray, #555);
+  color: var(--color-gray);
   margin: 0;
 }
 
@@ -1061,7 +1061,7 @@
 }
 
 .cards.gift .gift-cta:hover {
-  color: var(--color-red, #c0392b);
+  color: var(--color-red);
 }
 
 /* horizontal variant */
