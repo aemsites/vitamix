@@ -986,7 +986,7 @@
   transform: scale(1.04);
 }
 
-/* Badge (e.g. "MOST POPULAR") */
+/* Badge */
 .cards.gift .gift-badge {
   position: absolute;
   top: 14px;
