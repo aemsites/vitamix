@@ -1,8 +1,5 @@
-import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { getFormSubmissionUrl, getLocaleAndLanguage } from '../../scripts/scripts.js';
 import getStatesProvincesOptions from './states-provinces.js';
-
-/** Sheet logger endpoint for product registration form */
-const SHEET_LOGGER_URL = 'https://sheet-logger.david8603.workers.dev/vitamix.com/forms-testing/product-registration';
 
 /**
  * Loads form copy from the widget's local JSON (same name as the script).
@@ -143,6 +140,7 @@ export default async function decorate(widget) {
     e.preventDefault();
     const data = new FormData(form);
     const payload = Object.fromEntries(data.entries());
+    payload.formId = `${locale}/${language}/product-registration`;
     payload.pageUrl = window.location.href;
 
     const submitButton = form.querySelector('button[type="submit"]');
@@ -154,7 +152,7 @@ export default async function decorate(widget) {
     }
 
     try {
-      const resp = await fetch(SHEET_LOGGER_URL, {
+      const resp = await fetch(getFormSubmissionUrl(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
