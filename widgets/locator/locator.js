@@ -86,8 +86,12 @@ async function geoCode(address) {
 
   const getComponent = (type) => components.find((c) => c.types?.includes(type));
 
-  const countryComponent = getComponent('country');
+  let countryComponent = getComponent('country');
   const stateComponent = getComponent('administrative_area_level_1');
+
+  if (!countryComponent && components.length === 1) {
+    [countryComponent] = components;
+  }
 
   return {
     // Geo Location
