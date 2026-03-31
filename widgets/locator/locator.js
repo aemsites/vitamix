@@ -1,22 +1,9 @@
 import { loadCSS } from '../../scripts/aem.js';
-import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 
-/**
- * Load widget copy from the widget's local JSON (same name as the script).
- * @param {string} lang - Language key (e.g. en, fr)
- * @returns {Promise<Object>} Copy for that language (e.g. { labels: { ... } })
- */
-async function loadWidgetCopy(lang) {
-  const scriptPath = new URL(import.meta.url).pathname;
-  const jsonPath = scriptPath.replace(/\.js$/, '.json');
-  const url = `${window.hlx?.codeBasePath || ''}${jsonPath}`;
-  const resp = await fetch(url);
-  const data = await resp.json();
-  const key = data[lang] ? lang : 'en';
-  return data[key] || {};
-}
-
-const MAX_DISTANCE = 100;
+const MAX_DISTANCE = 200;
+const EVENTS_MAX_DISTANCE = 100;
+const MAX_DISTANCE_COMM = 1000;
+const maxDistanceHhDistributors = 1500;
 
 const hhRetailersResults = document.querySelector('#locator-hh-retailers-tabpanel');
 const hhDistributorsResults = document.querySelector('#locator-hh-distributors-tabpanel');
@@ -44,9 +31,9 @@ async function fetchData(form) {
 
   form.dataset.status = 'loading';
   window.locatorData = {};
-  window.locatorData.HH = await fetchSheet('https://main--thinktanked--davidnuescheler.aem.live/vitamix/storelocations-hh.json?limit=10000');
-  window.locatorData.COMM = await fetchSheet('https://main--thinktanked--davidnuescheler.aem.live/vitamix/storelocations-comm.json?limit=2000');
-  window.locatorData.EVENTS = await fetchSheet('https://main--thinktanked--davidnuescheler.aem.live/vitamix/storelocations-events.json');
+  window.locatorData.HH = await fetchSheet('https://main--vitamix--aemsites.aem.network/us/en_us/where-to-buy/storelocations-hh.json');
+  window.locatorData.COMM = await fetchSheet('https://main--vitamix--aemsites.aem.live/us/en_us/where-to-buy/storelocations-comm.json?limit=10000');
+  window.locatorData.EVENTS = await fetchSheet('https://main--vitamix--aemsites.aem.live/us/en_us/where-to-buy/storelocations-events.json');
   form.dataset.status = 'loaded';
   return window.locatorData;
 }
@@ -67,97 +54,311 @@ const haversineDistance = (lat1, lon1, lat2, lon2) => {
 };
 
 async function geoCode(address) {
-  const resp = await fetch(`https://helix-geocode.adobeaem.workers.dev/?address=${encodeURIComponent(address)}`);
-  const json = await resp.json();
-  const { results } = json;
-  const r0 = results?.[0];
+  const resp = await fetch(
+    `https://helix-geocode.adobeaem.workers.dev/?address=${encodeURIComponent(address)}`,
+  );
 
-  const comps = r0?.address_components || [];
-  const findType = (t) => comps.find((c) => Array.isArray(c.types) && c.types.includes(t));
-  const countryComp = findType('country');
-  const admin1Comp = findType('administrative_area_level_1');
+  const json = await resp.json();
+  const results = json?.results;
+
+  if (!results || !results.length) {
+    return null;
+  }
+
+  const result = results[0];
+  const components = result?.address_components || [];
+
+  const getComponent = (type) => components.find((c) => c.types?.includes(type));
+
+  let countryComponent = getComponent('country');
+  const stateComponent = getComponent('administrative_area_level_1');
+
+  if (!countryComponent && components.length === 1) {
+    [countryComponent] = components;
+  }
+
   return {
-    location: r0?.geometry?.location || null,
-    country: countryComp ? {
-      short: countryComp.short_name,
-      long: countryComp.long_name,
-      type: 'country',
-    } : null,
-    region: admin1Comp ? {
-      short: admin1Comp.short_name,
-      long: admin1Comp.long_name,
-      type: 'administrative_area_level_1',
-    } : null,
+    // Geo Location
+    location: result?.geometry?.location || null,
+
+    // Country
+    countryShort: countryComponent?.short_name || null,
+    countryLong: countryComponent?.long_name || null,
+
+    // State
+    stateShort: stateComponent?.short_name || null,
+    stateLong: stateComponent?.long_name || null,
+
   };
 }
 
-function findEventsResults(data, location) {
-  // Household Events
-  const filteredHHEvents = data.filter((item) => item.PRODUCT_TYPE === 'HH');
-  const hhEvents = filteredHHEvents.sort(
-    (a, b) => haversineDistance(location.lat, location.lng, a.lat, a.lng)
-      - haversineDistance(location.lat, location.lng, b.lat, b.lng),
-  );
-
-  // Commercial Events
-  const filteredCommEvents = data.filter((item) => item.PRODUCT_TYPE === 'COMM');
-  const commEvents = filteredCommEvents.sort(
-    (a, b) => haversineDistance(location.lat, location.lng, a.lat, a.lng)
-      - haversineDistance(location.lat, location.lng, b.lat, b.lng),
-  );
-
-  return { hhEvents, commEvents };
+// Common helpers
+function norm(v) {
+  return (v ?? '').toString().trim();
+}
+function normLower(v) {
+  return norm(v).toLowerCase();
+}
+function isEnabled(v) {
+  return ['true', '1', 'yes', 'y'].includes(normLower(v));
+}
+function countryMatches(itemCountry, countryShort, countryLong) {
+  const c = normLower(itemCountry);
+  return c && (c === normLower(countryShort) || c === normLower(countryLong));
+}
+function recordKey(item) {
+  return [
+    item.TYPE,
+    item.PRODUCT_TYPE,
+    item.NAME,
+    item.ADDRESS_1,
+    item.CITY,
+    item.STATE_PROVINCE,
+    item.POSTAL_CODE,
+    item.COUNTRY,
+  ].map(normLower).join('|');
 }
 
-function findCommResults(data, location, countryShort, regionShort) {
-  // Distributors
-  const filteredDistributors = data.filter(
-    (item) => item.TYPE === 'DEALER/DISTRIBUTOR' && haversineDistance(location.lat, location.lng, item.lat, item.lng) < MAX_DISTANCE,
-  );
-  const distributors = filteredDistributors.sort(
-    (a, b) => haversineDistance(location.lat, location.lng, a.lat, a.lng)
-      - haversineDistance(location.lat, location.lng, b.lat, b.lng),
-  );
+function applyAemRules(rows, {
+  countryShort, countryLong, productType, allowedTypes,
+}) {
+  const map = new Map();
 
-  // Local Representatives (country-based)
-  const wantCountry = (countryShort || '').toUpperCase();
-  const wantRegion = (regionShort || '').toUpperCase();
+  (rows || []).forEach((r) => {
+    if (!isEnabled(r.ENABLED)) return;
 
-  // Local Representatives (country + region match)
-  const localRep = data.filter((item) => {
-    if (item.TYPE !== 'LOCAL REP') return false;
-    const itemCountry = String(item.COUNTRY || '').toUpperCase();
-    const itemRegion = String(item.STATE_PROVINCE || item.STATE || item.PROVINCE || '').toUpperCase();
-    return itemCountry === wantCountry && itemRegion === wantRegion;
+    if (productType && normLower(r.PRODUCT_TYPE) !== normLower(productType)) return;
+
+    if (allowedTypes && !allowedTypes.includes(norm(r.TYPE))) return;
+
+    if (!countryMatches(r.COUNTRY, countryShort, countryLong)) return;
+
+    const action = normLower(r.ACTION);
+    const key = recordKey(r);
+
+    if (action === 'remove') {
+      map.delete(key);
+      return;
+    }
+
+    if (action === '' || action === 'add' || action === 'update') {
+      map.set(key, r);
+    }
   });
+
+  return Array.from(map.values());
+}
+
+// EVENTS helpers
+function excelSerialToDate(serial) {
+  const excelEpoch = new Date(1900, 0, 1);
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const adjusted = serial > 59 ? serial - 1 : serial; // Excel leap-year bug
+  return new Date(excelEpoch.getTime() + (adjusted - 1) * msPerDay);
+}
+
+function parseAnyDate(v) {
+  if (v == null || v === '') return null;
+
+  if (!Number.isNaN(Number(v)) && String(v).trim() !== '') {
+    return excelSerialToDate(Number(v));
+  }
+
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function ymdKey(d) {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function formatMDYFromKey(key) {
+  const [yyyy, mm, dd] = key.split('-');
+  return `${mm}/${dd}/${yyyy}`;
+}
+
+function eventKey(e) {
+  const s = parseAnyDate(e.START_DATE);
+  const startKey = s ? ymdKey(s) : '';
+  return [
+    normLower(e.PRODUCT_TYPE),
+    normLower(e.NAME),
+    normLower(e.ADDRESS_1),
+    normLower(e.CITY),
+    normLower(e.STATE_PROVINCE),
+    normLower(e.POSTAL_CODE),
+    normLower(e.COUNTRY),
+    startKey,
+  ].join('|');
+}
+
+function applyAemRulesEvents(rows, { productType }) {
+  const map = new Map();
+
+  (rows || []).forEach((r) => {
+    if (!isEnabled(r.ENABLED)) return;
+    if (productType && normLower(r.PRODUCT_TYPE) !== normLower(productType)) return;
+
+    const action = normLower(r.ACTION);
+    const key = eventKey(r);
+
+    if (action === 'remove') {
+      map.delete(key);
+      return;
+    }
+    if (action === '' || action === 'add' || action === 'update') {
+      map.set(key, r);
+    }
+  });
+
+  return Array.from(map.values());
+}
+
+function filterFutureEvents(rows) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return (rows || []).filter((e) => {
+    const start = parseAnyDate(e.START_DATE);
+    const end = parseAnyDate(e.END_DATE);
+    const compare = (end || start);
+    if (!compare) return false;
+
+    compare.setHours(0, 0, 0, 0);
+    return compare >= today;
+  });
+}
+
+function groupByStartDate(rows) {
+  const groups = new Map();
+
+  (rows || []).forEach((e) => {
+    const start = parseAnyDate(e.START_DATE);
+    if (!start) return;
+    start.setHours(0, 0, 0, 0);
+
+    const key = ymdKey(start);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(e);
+  });
+
+  return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+}
+
+function findEventsResults(data, location) {
+  const hhClean = applyAemRulesEvents(data, { productType: 'HH' });
+  const commClean = applyAemRulesEvents(data, { productType: 'COMM' });
+
+  const hhFuture = filterFutureEvents(hhClean);
+  const commFuture = filterFutureEvents(commClean);
+
+  const hhNearby = (hhFuture || []).filter(
+    (e) => haversineDistance(location.lat, location.lng, e.lat, e.lng) <= EVENTS_MAX_DISTANCE,
+  );
+  const commNearby = (commFuture || []).filter(
+    (e) => haversineDistance(location.lat, location.lng, e.lat, e.lng) <= EVENTS_MAX_DISTANCE,
+  );
+
+  const sortEvents = (arr) => {
+    arr.sort((a, b) => {
+      const ad = parseAnyDate(a.START_DATE)?.getTime() ?? 0;
+      const bd = parseAnyDate(b.START_DATE)?.getTime() ?? 0;
+      if (ad !== bd) return ad - bd;
+      return haversineDistance(location.lat, location.lng, a.lat, a.lng)
+        - haversineDistance(location.lat, location.lng, b.lat, b.lng);
+    });
+  };
+  sortEvents(hhNearby);
+  sortEvents(commNearby);
+
+  return {
+    hhGrouped: groupByStartDate(hhNearby),
+    commGrouped: groupByStartDate(commNearby),
+  };
+}
+
+function findCommResults(
+  data,
+  location,
+  countryShort,
+  countryLong,
+  stateShort,
+  stateLong,
+) {
+  const allowedTypes = ['DEALER/DISTRIBUTOR', 'LOCAL REP'];
+
+  const cleaned = applyAemRules(data, {
+    countryShort,
+    countryLong,
+    stateShort,
+    stateLong,
+    productType: 'COMM',
+    allowedTypes,
+  });
+
+  const distributors = cleaned
+    .filter((i) => i.TYPE === 'DEALER/DISTRIBUTOR'
+      && haversineDistance(location.lat, location.lng, i.lat, i.lng) <= MAX_DISTANCE_COMM)
+    .sort((a, b) => haversineDistance(location.lat, location.lng, a.lat, a.lng)
+      - haversineDistance(location.lat, location.lng, b.lat, b.lng));
+
+  const hasState = !!(stateShort || stateLong);
+
+  const localRep = cleaned
+    .filter((i) => i.TYPE === 'LOCAL REP')
+    .filter((i) => {
+    // If we have state info, filter by state
+      if (hasState) {
+        return (
+          norm(i.STATE_PROVINCE) === norm(stateShort)
+        || norm(i.STATE_NAME) === norm(stateLong)
+        );
+      }
+
+      // If no state info, fallback to country match (or return all LOCAL REP for that country)
+      return (
+        norm(i.COUNTRY_CODE) === norm(countryShort)
+      || norm(i.COUNTRY_NAME) === norm(countryLong)
+      );
+    });
 
   return { distributors, localRep };
 }
 
-function findHHResults(data, location, country) {
-  // Retailers
-  const filteredRetailers = data.filter(
-    (item) => item.TYPE === 'RETAILERS' && haversineDistance(location.lat, location.lng, item.lat, item.lng) < MAX_DISTANCE,
-  );
-  const retailers = filteredRetailers.sort(
-    (a, b) => haversineDistance(location.lat, location.lng, a.lat, a.lng)
-      - haversineDistance(location.lat, location.lng, b.lat, b.lng),
-  );
+function findHHResults(data, location, countryShort, countryLong) {
+  const allowedTypes = ['ONLINE', 'RETAILERS', 'DEALER/DISTRIBUTOR'];
 
-  // Distributors
-  const filteredDistributors = data.filter((item) => item.TYPE === 'DEALER/DISTRIBUTOR');
-  const distributors = filteredDistributors.sort(
-    (a, b) => haversineDistance(location.lat, location.lng, a.lat, a.lng)
-      - haversineDistance(location.lat, location.lng, b.lat, b.lng),
-  );
+  const cleaned = applyAemRules(data, {
+    countryShort,
+    countryLong,
+    productType: 'HH',
+    allowedTypes,
+  });
 
-  // Online
-  const online = data.filter((item) => item.TYPE === 'ONLINE' && item.COUNTRY === country);
+  const retailers = cleaned
+    .filter((i) => i.TYPE === 'RETAILERS'
+      && haversineDistance(location.lat, location.lng, i.lat, i.lng) <= MAX_DISTANCE)
+    .sort((a, b) => haversineDistance(location.lat, location.lng, a.lat, a.lng)
+      - haversineDistance(location.lat, location.lng, b.lat, b.lng));
+
+  const distributors = cleaned
+    .filter((i) => i.TYPE === 'DEALER/DISTRIBUTOR'
+      && haversineDistance(location.lat, location.lng, i.lat, i.lng)
+        <= maxDistanceHhDistributors)
+    .sort((a, b) => haversineDistance(location.lat, location.lng, a.lat, a.lng)
+      - haversineDistance(location.lat, location.lng, b.lat, b.lng));
+
+  const online = cleaned
+    .filter((i) => i.TYPE === 'ONLINE')
+    .sort((a, b) => normLower(a.NAME).localeCompare(normLower(b.NAME)));
 
   return { retailers, distributors, online };
 }
 
-function displayCommResults(results, location, labels = {}) {
+function displayCommResults(results) {
   const { distributors, localRep } = results;
 
   const createDistributorResult = (result) => {
@@ -166,28 +367,40 @@ function displayCommResults(results, location, labels = {}) {
     title.textContent = result.NAME;
     li.append(title);
 
-    const distance = document.createElement('span');
-    const milesAway = (labels.milesAway ?? 'miles away');
-    distance.textContent = `${haversineDistance(location.lat, location.lng, result.lat, result.lng).toFixed(1)} ${milesAway}`;
-    distance.classList.add('locator-distance');
-    li.append(distance);
+    if (result.ADDRESS_1) {
+      const addressWrapper = document.createElement('span');
+      addressWrapper.classList.add('locator-address');
 
-    const address = document.createElement('a');
-    const addressQuery = `${result.NAME} ${result.ADDRESS_1}, ${result.CITY}, ${result.STATE_PROVINCE} ${result.POSTAL_CODE}`;
-    address.href = `https://maps.google.com/?q=${encodeURIComponent(addressQuery)}`;
-    address.target = '_blank';
-    address.rel = 'noopener noreferrer';
-    address.textContent = addressQuery;
-    address.classList.add('locator-address');
-    li.append(address);
+      const addressLabel = document.createElement('strong');
+      addressLabel.textContent = 'Address: ';
+      addressWrapper.append(addressLabel);
+
+      const addressLink = document.createElement('a');
+      const addressQuery = `${result.ADDRESS_1}, ${result.CITY}, ${result.STATE_PROVINCE} ${result.POSTAL_CODE}`;
+      addressLink.href = `https://maps.google.com/?q=${encodeURIComponent(addressQuery)}`;
+      addressLink.target = '_blank';
+      addressLink.rel = 'noopener noreferrer';
+      addressLink.textContent = addressQuery;
+
+      addressWrapper.append(addressLink);
+      li.append(addressWrapper);
+    }
 
     // Phone number
     if (result.PHONE_NUMBER) {
       const phoneWrapper = document.createElement('span');
       phoneWrapper.classList.add('locator-phone');
+
+      const phoneLabel = document.createElement('strong');
+      phoneLabel.textContent = 'Phone: ';
+      phoneWrapper.append(phoneLabel);
+
       const phoneLink = document.createElement('a');
       phoneLink.href = `tel:${result.PHONE_NUMBER}`;
       phoneLink.textContent = result.PHONE_NUMBER;
+      phoneLink.target = '_blank';
+      phoneLink.rel = 'noopener noreferrer';
+
       phoneWrapper.append(phoneLink);
       li.append(phoneWrapper);
     }
@@ -195,18 +408,43 @@ function displayCommResults(results, location, labels = {}) {
     if (result.WEB_ADDRESS) {
       const webWrapper = document.createElement('span');
       webWrapper.classList.add('locator-web');
-      const webLink = document.createElement('a');
 
+      const webLabel = document.createElement('strong');
+      webLabel.textContent = 'Website: ';
+      webWrapper.append(webLabel);
+
+      const webLink = document.createElement('a');
       const webAddress = result.WEB_ADDRESS.startsWith('http')
         ? result.WEB_ADDRESS
         : `https://${result.WEB_ADDRESS}`;
 
       webLink.href = webAddress;
       webLink.target = '_blank';
+      webLink.rel = 'noopener noreferrer';
       webLink.textContent = result.WEB_ADDRESS_LINK_TEXT || result.WEB_ADDRESS;
+
       webWrapper.append(webLink);
       li.append(webWrapper);
     }
+    // Email
+    if (result.EMAIL) {
+      const emailWrapper = document.createElement('span');
+      emailWrapper.classList.add('locator-email');
+
+      const emailLabel = document.createElement('strong');
+      emailLabel.textContent = 'Email: ';
+      emailWrapper.append(emailLabel);
+
+      const emailLink = document.createElement('a');
+      emailLink.href = `mailto:${result.EMAIL}`;
+      emailLink.textContent = result.EMAIL;
+      emailLink.target = '_blank';
+      emailLink.rel = 'noopener noreferrer';
+
+      emailWrapper.append(emailLink);
+      li.append(emailWrapper);
+    }
+
     return li;
   };
 
@@ -216,18 +454,12 @@ function displayCommResults(results, location, labels = {}) {
     title.textContent = result.NAME;
     li.append(title);
 
-    const distance = document.createElement('span');
-    const milesAway = (labels.milesAway ?? 'miles away');
-    distance.textContent = `${haversineDistance(location.lat, location.lng, result.lat, result.lng).toFixed(1)} ${milesAway}`;
-    distance.classList.add('locator-distance');
-    li.append(distance);
-
     // Phone number
     if (result.PHONE_NUMBER) {
       const phoneWrapper = document.createElement('span');
       phoneWrapper.classList.add('locator-phone');
       const phoneLabel = document.createElement('strong');
-      phoneLabel.textContent = labels.phone ?? 'Phone: ';
+      phoneLabel.textContent = 'Phone: ';
       phoneWrapper.append(phoneLabel);
 
       const phoneLink = document.createElement('a');
@@ -244,7 +476,7 @@ function displayCommResults(results, location, labels = {}) {
       webWrapper.classList.add('locator-web');
 
       const webLabel = document.createElement('strong');
-      webLabel.textContent = labels.website ?? 'Website: ';
+      webLabel.textContent = 'Website: ';
       webWrapper.append(webLabel);
 
       const webLink = document.createElement('a');
@@ -271,7 +503,7 @@ function displayCommResults(results, location, labels = {}) {
     commDistributorsResults.textContent = '';
     commDistributorsResults.appendChild(distributorList);
   } else {
-    commDistributorsResults.innerHTML = `<p>${labels.noDistributorsFound ?? 'No distributors found'}</p>`;
+    commDistributorsResults.innerHTML = '<p>No distributors found</p>';
   }
 
   if (localRep && localRep.length > 0) {
@@ -282,207 +514,341 @@ function displayCommResults(results, location, labels = {}) {
     commLocalrepResults.textContent = '';
     commLocalrepResults.appendChild(localRepList);
   } else {
-    commLocalrepResults.innerHTML = `<p>${labels.noLocalRepFound ?? 'No local representatives found'}</p>`;
+    commLocalrepResults.innerHTML = '<p>No local representatives found</p>';
   }
 }
 
-function displayEventsResults(results, location, labels = {}) {
-  const { hhEvents, commEvents } = results;
-  const formatDate = (excelDate) => {
-    // Excel dates are the number of days since January 1, 1900
-    // JavaScript dates are milliseconds since January 1, 1970
-    // Excel has a bug where it treats 1900 as a leap year, so we adjust for that
-    const excelEpoch = new Date(1900, 0, 1); // January 1, 1900
-    const millisecondsPerDay = 24 * 60 * 60 * 1000;
-    // Adjust for Excel's leap year bug
-    const adjustedDays = excelDate > 59 ? excelDate - 1 : excelDate;
-    const date = new Date(excelEpoch.getTime() + (adjustedDays - 1) * millisecondsPerDay);
-    return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-  };
+function displayEventsResults(results, location) {
+  const { hhGrouped, commGrouped } = results;
 
-  const createHHEventResult = (result) => {
-    const li = document.createElement('li');
-    const title = document.createElement('h3');
-    title.textContent = result.NAME;
-    li.append(title);
+  const renderGroupedList = (container, grouped) => {
+    container.textContent = '';
 
-    const date = document.createElement('span');
-    date.textContent = `${formatDate(result.START_DATE)} - ${formatDate(result.END_DATE)}`;
-    date.classList.add('locator-date');
-    li.append(date);
+    if (!grouped || grouped.length === 0) {
+      container.innerHTML = '<p>No events found</p>';
+      return;
+    }
 
-    const distance = document.createElement('span');
-    const milesAway = (labels.milesAway ?? 'miles away');
-    distance.textContent = `${haversineDistance(location.lat, location.lng, result.lat, result.lng).toFixed(1)} ${milesAway}`;
-    distance.classList.add('locator-distance');
-    li.append(distance);
+    grouped.forEach(([dateKey, items]) => {
+      const heading = document.createElement('h4');
+      heading.classList.add('locator-events-dateheading');
+      heading.textContent = formatMDYFromKey(dateKey);
+      container.append(heading);
 
-    const address = document.createElement('a');
-    const addressQuery = `${result.NAME} ${result.ADDRESS_1}, ${result.CITY}, ${result.STATE_PROVINCE} ${result.POSTAL_CODE}`;
-    address.href = `https://maps.google.com/?q=${encodeURIComponent(addressQuery)}`;
-    address.target = '_blank';
-    address.rel = 'noopener noreferrer';
-    address.textContent = addressQuery;
-    address.classList.add('locator-address');
-    li.append(address);
+      const ol = document.createElement('ol');
+      ol.classList.add('locator-events-list');
 
-    return li;
-  };
+      items.forEach((e) => {
+        const li = document.createElement('li');
+        li.classList.add('locator-event-card');
 
-  const createCommEventResult = (result) => {
-    const li = document.createElement('li');
-    const title = document.createElement('h3');
-    title.textContent = result.NAME;
-    li.append(title);
+        const title = document.createElement('h3');
+        title.textContent = e.NAME;
+        li.append(title);
 
-    const date = document.createElement('span');
-    date.textContent = `${formatDate(result.START_DATE)} - ${formatDate(result.END_DATE)}`;
-    date.classList.add('locator-date');
-    li.append(date);
+        const start = parseAnyDate(e.START_DATE);
+        const end = parseAnyDate(e.END_DATE);
+        if (start) {
+          const dateLine = document.createElement('span');
+          dateLine.classList.add('locator-date');
+          const startTxt = start.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+          const endTxt = end
+            ? end.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+            : '';
+          dateLine.textContent = endTxt ? `${startTxt} - ${endTxt}` : startTxt;
+          li.append(dateLine);
+        }
 
-    const distance = document.createElement('span');
-    const milesAway = (labels.milesAway ?? 'miles away');
-    distance.textContent = `${haversineDistance(location.lat, location.lng, result.lat, result.lng).toFixed(1)} ${milesAway}`;
-    distance.classList.add('locator-distance');
-    li.append(distance);
+        const dist = document.createElement('span');
+        dist.classList.add('locator-distance');
+        dist.textContent = `${haversineDistance(location.lat, location.lng, e.lat, e.lng).toFixed(1)} miles away`;
+        li.append(dist);
 
-    const address = document.createElement('a');
-    const addressQuery = `${result.NAME} ${result.ADDRESS_1}, ${result.CITY}, ${result.STATE_PROVINCE} ${result.POSTAL_CODE}`;
-    address.href = `https://maps.google.com/?q=${encodeURIComponent(addressQuery)}`;
-    address.target = '_blank';
-    address.rel = 'noopener noreferrer';
-    address.textContent = addressQuery;
-    address.classList.add('locator-address');
-    li.append(address);
+        if (e.ADDRESS_1) {
+          const addressWrapper = document.createElement('span');
+          addressWrapper.classList.add('locator-address');
 
-    return li;
-  };
+          const addressLabel = document.createElement('strong');
+          addressLabel.textContent = 'Address: ';
+          addressWrapper.append(addressLabel);
 
-  if (hhEvents && hhEvents.length > 0) {
-    const hhEventList = document.createElement('ol');
-    hhEvents.forEach((event) => {
-      hhEventList.appendChild(createHHEventResult(event));
+          const addressLink = document.createElement('a');
+          const addressQuery = `${e.ADDRESS_1}, ${e.CITY}, ${e.STATE_PROVINCE} ${e.POSTAL_CODE}`.replace(/\s+/g, ' ').trim();
+          addressLink.href = `https://maps.google.com/?q=${encodeURIComponent(addressQuery)}`;
+          addressLink.target = '_blank';
+          addressLink.rel = 'noopener noreferrer';
+          addressLink.textContent = addressQuery;
+
+          addressWrapper.append(addressLink);
+          li.append(addressWrapper);
+        }
+
+        ol.append(li);
+      });
+
+      container.append(ol);
     });
-    eventsHHResults.textContent = '';
-    eventsHHResults.appendChild(hhEventList);
-  } else {
-    eventsHHResults.innerHTML = `<p>${labels.noHouseholdEventsFound ?? 'No household events found'}</p>`;
-  }
+  };
 
-  if (commEvents && commEvents.length > 0) {
-    const commEventList = document.createElement('ol');
-    commEvents.forEach((event) => {
-      commEventList.appendChild(createCommEventResult(event));
+  // render both tab panels
+  renderGroupedList(eventsHHResults, hhGrouped);
+  renderGroupedList(eventsCommResults, commGrouped);
+
+  // calendar (optional)
+  const calendarEl = document.querySelector('#locator-events-calendar');
+  if (!calendarEl) return;
+
+  const eventDates = new Set();
+  const addDatesFromGrouped = (grouped) => (grouped || []).forEach(([k]) => eventDates.add(k));
+  addDatesFromGrouped(hhGrouped);
+  addDatesFromGrouped(commGrouped);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  let viewYear = today.getFullYear();
+  let viewMonth = today.getMonth();
+  let activeDateKey = null;
+
+  const renderCalendar = () => {
+    calendarEl.textContent = '';
+
+    const header = document.createElement('div');
+    header.classList.add('locator-cal-header');
+
+    const prevBtn = document.createElement('button');
+    prevBtn.type = 'button';
+    prevBtn.textContent = '‹';
+    prevBtn.addEventListener('click', () => {
+      viewMonth -= 1;
+      if (viewMonth < 0) { viewMonth = 11; viewYear -= 1; }
+      renderCalendar();
     });
-    eventsCommResults.textContent = '';
-    eventsCommResults.appendChild(commEventList);
-  } else {
-    eventsCommResults.innerHTML = `<p>${labels.noCommercialEventsFound ?? 'No commercial events found'}</p>`;
-  }
+
+    const nextBtn = document.createElement('button');
+    nextBtn.type = 'button';
+    nextBtn.textContent = '›';
+    nextBtn.addEventListener('click', () => {
+      viewMonth += 1;
+      if (viewMonth > 11) { viewMonth = 0; viewYear += 1; }
+      renderCalendar();
+    });
+
+    const monthTitle = document.createElement('div');
+    monthTitle.classList.add('locator-cal-title');
+    monthTitle.textContent = new Date(viewYear, viewMonth, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+    header.append(prevBtn, monthTitle, nextBtn);
+    calendarEl.append(header);
+
+    const grid = document.createElement('div');
+    grid.classList.add('locator-cal-grid');
+
+    ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach((d) => {
+      const cell = document.createElement('div');
+      cell.classList.add('locator-cal-dow');
+      cell.textContent = d;
+      grid.append(cell);
+    });
+
+    const firstDay = new Date(viewYear, viewMonth, 1);
+    const startWeekday = firstDay.getDay();
+    const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+
+    for (let i = 0; i < startWeekday; i += 1) {
+      const blank = document.createElement('div');
+      blank.classList.add('locator-cal-cell', 'is-blank');
+      grid.append(blank);
+    }
+
+    const createCellClickHandler = (cellKey) => () => {
+      activeDateKey = activeDateKey === cellKey ? null : cellKey;
+
+      if (activeDateKey) {
+        const hhFiltered = (hhGrouped || []).filter(([k]) => k === activeDateKey);
+        const commFiltered = (commGrouped || []).filter(([k]) => k === activeDateKey);
+
+        renderGroupedList(eventsHHResults, hhFiltered);
+        renderGroupedList(eventsCommResults, commFiltered);
+      } else {
+        renderGroupedList(eventsHHResults, hhGrouped);
+        renderGroupedList(eventsCommResults, commGrouped);
+      }
+
+      renderCalendar();
+    };
+
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const d = new Date(viewYear, viewMonth, day);
+      d.setHours(0, 0, 0, 0);
+      const key = ymdKey(d);
+
+      const cell = document.createElement('button');
+      cell.type = 'button';
+      cell.classList.add('locator-cal-cell');
+      cell.textContent = String(day);
+
+      if (eventDates.has(key)) cell.classList.add('has-event');
+      if (activeDateKey === key) cell.classList.add('is-active');
+
+      cell.addEventListener('click', createCellClickHandler(key));
+
+      grid.append(cell);
+    }
+
+    calendarEl.append(grid);
+  };
+
+  renderCalendar();
 }
 
-function displayHHResults(results, location, labels = {}) {
+function displayHHResults(results, location) {
   const { retailers, distributors, online } = results;
+
+  const cleanTel = (v) => (v || '').toString().replace(/[^\d+]/g, '');
+
+  const appendAddress = (li, result) => {
+    if (!result.ADDRESS_1) return;
+
+    const addressWrapper = document.createElement('span');
+    addressWrapper.classList.add('locator-address');
+
+    const addressLabel = document.createElement('strong');
+    addressLabel.textContent = 'Address: ';
+    addressWrapper.append(addressLabel);
+
+    const addressLink = document.createElement('a');
+    const addressQuery = `${result.ADDRESS_1}, ${result.CITY}, ${result.STATE_PROVINCE} ${result.POSTAL_CODE}`.replace(/\s+/g, ' ').trim();
+    addressLink.href = `https://maps.google.com/?q=${encodeURIComponent(addressQuery)}`;
+    addressLink.target = '_blank';
+    addressLink.rel = 'noopener noreferrer';
+    addressLink.textContent = addressQuery;
+
+    addressWrapper.append(addressLink);
+    li.append(addressWrapper);
+  };
+
+  const appendWebsite = (li, result) => {
+    if (!result.WEB_ADDRESS) return;
+
+    const webWrapper = document.createElement('span');
+    webWrapper.classList.add('locator-web');
+
+    const webLabel = document.createElement('strong');
+    webLabel.textContent = 'Website: ';
+    webWrapper.append(webLabel);
+
+    const webLink = document.createElement('a');
+    const webAddress = result.WEB_ADDRESS.startsWith('http')
+      ? result.WEB_ADDRESS
+      : `https://${result.WEB_ADDRESS}`;
+
+    webLink.href = webAddress;
+    webLink.target = '_blank';
+    webLink.rel = 'noopener noreferrer';
+    webLink.textContent = result.WEB_ADDRESS_LINK_TEXT || result.WEB_ADDRESS;
+
+    webWrapper.append(webLink);
+    li.append(webWrapper);
+  };
+
+  const appendPhone = (li, result) => {
+    if (!result.PHONE_NUMBER) return;
+
+    const phoneWrapper = document.createElement('span');
+    phoneWrapper.classList.add('locator-phone');
+
+    const phoneLabel = document.createElement('strong');
+    phoneLabel.textContent = 'Phone: ';
+    phoneWrapper.append(phoneLabel);
+
+    const phoneLink = document.createElement('a');
+    phoneLink.href = `tel:${cleanTel(result.PHONE_NUMBER)}`;
+    phoneLink.textContent = result.PHONE_NUMBER;
+    phoneLink.target = '_blank';
+    phoneLink.rel = 'noopener noreferrer';
+
+    phoneWrapper.append(phoneLink);
+    li.append(phoneWrapper);
+  };
+
+  const appendEmail = (li, result) => {
+    if (!result.EMAIL) return;
+
+    const emailWrapper = document.createElement('span');
+    emailWrapper.classList.add('locator-email');
+
+    const emailLabel = document.createElement('strong');
+    emailLabel.textContent = 'Email: ';
+    emailWrapper.append(emailLabel);
+
+    const emailLink = document.createElement('a');
+    emailLink.href = `mailto:${result.EMAIL}`;
+    emailLink.textContent = result.EMAIL;
+    emailLink.target = '_blank';
+    emailLink.rel = 'noopener noreferrer';
+
+    emailWrapper.append(emailLink);
+    li.append(emailWrapper);
+  };
+
+  const appendDistance = (li, result) => {
+    if (!location?.lat || !location?.lng || result.lat == null || result.lng == null) return;
+
+    const distance = document.createElement('span');
+    distance.textContent = `${haversineDistance(location.lat, location.lng, result.lat, result.lng).toFixed(1)} miles away`;
+    distance.classList.add('locator-distance');
+    li.append(distance);
+  };
 
   const createOnlineResult = (result) => {
     const li = document.createElement('li');
+
     const title = document.createElement('h3');
     title.textContent = result.NAME;
     li.append(title);
-    if (result.WEB_ADDRESS) {
-      const label = document.createElement('span');
-      label.textContent = labels.website ?? 'Website: ';
-      label.classList.add('locator-website-label');
 
-      const website = document.createElement('a');
-      website.href = result.WEB_ADDRESS.startsWith('https://') ? result.WEB_ADDRESS : `https://${result.WEB_ADDRESS}`;
-      website.textContent = new URL(website.href).hostname;
-      website.target = '_blank';
-      website.rel = 'noopener noreferrer';
-      website.classList.add('locator-website');
-      label.append(website);
-      li.append(label);
-    }
+    appendAddress(li, result);
+    appendWebsite(li, result);
+    appendPhone(li, result);
+    appendEmail(li, result);
+
     return li;
   };
 
   const createDistributorResult = (result) => {
     const li = document.createElement('li');
+
     const title = document.createElement('h3');
     title.textContent = result.NAME;
     li.append(title);
 
-    const distance = document.createElement('span');
-    const milesAway = (labels.milesAway ?? 'miles away');
-    distance.textContent = `${haversineDistance(location.lat, location.lng, result.lat, result.lng).toFixed(1)} ${milesAway}`;
-    distance.classList.add('locator-distance');
-    li.append(distance);
-
-    const address = document.createElement('a');
-    const addressQuery = `${result.NAME} ${result.ADDRESS_1}, ${result.CITY}, ${result.STATE_PROVINCE} ${result.POSTAL_CODE}`;
-    address.href = `https://maps.google.com/?q=${encodeURIComponent(addressQuery)}`;
-    address.target = '_blank';
-    address.rel = 'noopener noreferrer';
-    address.textContent = addressQuery;
-    address.classList.add('locator-address');
-    li.append(address);
+    appendDistance(li, result);
+    appendAddress(li, result);
+    appendWebsite(li, result);
+    appendPhone(li, result);
+    appendEmail(li, result);
 
     return li;
   };
 
   const createRetailerResult = (result) => {
     const li = document.createElement('li');
+
     const title = document.createElement('h3');
     title.textContent = result.NAME;
     li.append(title);
 
-    const distance = document.createElement('span');
-    const milesAway = (labels.milesAway ?? 'miles away');
-    distance.textContent = `${haversineDistance(location.lat, location.lng, result.lat, result.lng).toFixed(1)} ${milesAway}`;
-    distance.classList.add('locator-distance');
-    li.append(distance);
+    appendDistance(li, result);
+    appendAddress(li, result);
+    appendWebsite(li, result);
+    appendPhone(li, result);
+    appendEmail(li, result);
 
-    const address = document.createElement('a');
-    const addressQuery = `${result.NAME} ${result.ADDRESS_1}, ${result.CITY}, ${result.STATE_PROVINCE} ${result.POSTAL_CODE}`;
-    address.href = `https://maps.google.com/?q=${encodeURIComponent(addressQuery)}`;
-    address.target = '_blank';
-    address.rel = 'noopener noreferrer';
-    address.textContent = addressQuery;
-    address.classList.add('locator-address');
-    li.append(address);
-
-    if (result.WEB_ADDRESS) {
-      const label = document.createElement('span');
-      label.textContent = labels.website ?? 'Website: ';
-      label.classList.add('locator-website-label');
-
-      const website = document.createElement('a');
-      website.href = result.WEB_ADDRESS.startsWith('https://') ? result.WEB_ADDRESS : `https://${result.WEB_ADDRESS}`;
-      website.textContent = new URL(website.href).hostname;
-      website.target = '_blank';
-      website.rel = 'noopener noreferrer';
-      website.classList.add('locator-website');
-      label.append(website);
-      li.append(label);
-    }
-
-    if (result.PHONE_NUMBER) {
-      const label = document.createElement('span');
-      label.textContent = labels.phone ?? 'Phone: ';
-      label.classList.add('locator-phone-label');
-
-      const phone = document.createElement('a');
-      phone.textContent = result.PHONE_NUMBER;
-      phone.href = `tel:${result.PHONE_NUMBER}`;
-      phone.target = '_blank';
-      phone.rel = 'noopener noreferrer';
-      phone.classList.add('locator-phone');
-      label.append(phone);
-      li.append(label);
-    }
     return li;
   };
 
+  // Retailers
   if (retailers && retailers.length > 0) {
     const retailerList = document.createElement('ol');
     retailers.forEach((retailer) => {
@@ -491,9 +857,10 @@ function displayHHResults(results, location, labels = {}) {
     hhRetailersResults.textContent = '';
     hhRetailersResults.appendChild(retailerList);
   } else {
-    hhRetailersResults.innerHTML = `<p>${labels.noRetailersFound ?? 'No retailers found'}</p>`;
+    hhRetailersResults.innerHTML = '<p>No retailers found</p>';
   }
 
+  // Distributors
   if (distributors && distributors.length > 0) {
     const distributorList = document.createElement('ol');
     distributors.forEach((distributor) => {
@@ -502,9 +869,10 @@ function displayHHResults(results, location, labels = {}) {
     hhDistributorsResults.textContent = '';
     hhDistributorsResults.appendChild(distributorList);
   } else {
-    hhDistributorsResults.innerHTML = `<p>${labels.noDistributorsFound ?? 'No distributors found'}</p>`;
+    hhDistributorsResults.innerHTML = '<p>No distributors found</p>';
   }
 
+  // Online
   if (online && online.length > 0) {
     const onlineList = document.createElement('ol');
     online.forEach((item) => {
@@ -513,52 +881,15 @@ function displayHHResults(results, location, labels = {}) {
     hhOnlineResults.textContent = '';
     hhOnlineResults.appendChild(onlineList);
   } else {
-    hhOnlineResults.innerHTML = `<p>${labels.noOnlineFound ?? 'No online retailers found'}</p>`;
+    hhOnlineResults.innerHTML = '<p>No online retailers found</p>';
   }
 }
 
-export default async function decorate(widget) {
+export default function decorate(widget) {
   widget.style.visibility = 'hidden';
   loadCSS('/blocks/form/form.css').then(() => widget.removeAttribute('style'));
 
-  const { language } = getLocaleAndLanguage();
-  const lang = (language || 'en_us').split('_')[0];
-  const copy = await loadWidgetCopy(lang);
-  const labels = copy.labels || {};
-
   const form = widget.querySelector('form');
-
-  // Apply copy to static form and headings
-  const h1 = widget.querySelector('#find-locally');
-  if (h1) h1.textContent = labels.findLocally ?? 'Find Locally';
-  const locationLabel = widget.querySelector('label[for="location"]');
-  if (locationLabel) locationLabel.textContent = labels.yourLocation ?? 'Your Location';
-  const addressInput = widget.querySelector('#address');
-  if (addressInput) addressInput.placeholder = labels.addressHint ?? 'Address, City, or Zipcode';
-  const productTypeLabel = widget.querySelector('label[for="productType"]');
-  if (productTypeLabel) productTypeLabel.textContent = labels.whatAreYouLookingFor ?? 'What are you looking for?';
-  const productTypeSelect = widget.querySelector('#productType');
-  if (productTypeSelect) {
-    const opts = productTypeSelect.querySelectorAll('option');
-    if (opts[0]) opts[0].textContent = labels.householdProducts ?? 'Household Products';
-    if (opts[1]) opts[1].textContent = labels.commercialProducts ?? 'Commercial Products';
-    if (opts[2]) opts[2].textContent = labels.demonstrations ?? 'Demonstrations';
-  }
-  const submitBtn = widget.querySelector('form button[type="submit"]');
-  if (submitBtn) submitBtn.textContent = labels.search ?? 'Search';
-
-  // Tab labels: HH = Retailers, Online Retailers, Distributors; COMM = Distributors, Local Rep;
-  // Events = Household Events, Commercial Events
-  const hhTabs = widget.querySelectorAll('.locator-hh-results .locator-results-tablist button');
-  if (hhTabs[0]) hhTabs[0].textContent = labels.retailers ?? 'Retailers';
-  if (hhTabs[1]) hhTabs[1].textContent = labels.onlineRetailers ?? 'Online Retailers';
-  if (hhTabs[2]) hhTabs[2].textContent = labels.distributors ?? 'Distributors';
-  const commTabs = widget.querySelectorAll('.locator-comm-results .locator-results-tablist button');
-  if (commTabs[0]) commTabs[0].textContent = labels.distributors ?? 'Distributors';
-  if (commTabs[1]) commTabs[1].textContent = labels.localRepresentatives ?? 'Local Representatives';
-  const eventsTabs = widget.querySelectorAll('.locator-events-results .locator-results-tablist button');
-  if (eventsTabs[0]) eventsTabs[0].textContent = labels.householdEvents ?? 'Household Events';
-  if (eventsTabs[1]) eventsTabs[1].textContent = labels.commercialEvents ?? 'Commercial Events';
 
   // set initial values from query params
   const queryParams = Object.fromEntries(new URLSearchParams(window.location.search));
@@ -570,13 +901,14 @@ export default async function decorate(widget) {
   // load results data
   setTimeout(() => fetchData(form), 300);
 
+  const tabpanels = widget.querySelectorAll('.locator-tabpanels .locator-tabpanel');
   const tablistButtons = widget.querySelectorAll('.locator-results-tablist button');
   const showTab = (tabButton) => {
     tablistButtons.forEach((b) => b.removeAttribute('aria-selected'));
-    widget.querySelectorAll('.locator-tabpanels .locator-tabpanel').forEach((panel) => panel.setAttribute('aria-hidden', true));
+    tabpanels.forEach((panel) => panel.setAttribute('aria-hidden', true));
     tabButton.setAttribute('aria-selected', 'true');
     const tabpanel = document.getElementById(tabButton.getAttribute('aria-controls'));
-    if (tabpanel) tabpanel.setAttribute('aria-hidden', false);
+    tabpanel.setAttribute('aria-hidden', false);
   };
 
   const showType = (type) => {
@@ -591,14 +923,20 @@ export default async function decorate(widget) {
     e.preventDefault();
     const formData = new FormData(form);
     const data = Object.fromEntries(formData);
-    const { location, country, region } = await geoCode(data.address);
+    const {
+      location,
+      countryShort,
+      countryLong,
+      stateShort,
+      stateLong,
+    } = await geoCode(data.address);
 
     if (data.productType === 'HH') {
       if (location) {
-        const results = findHHResults(window.locatorData.HH, location, country?.short);
-        displayHHResults(results, location, labels);
+        const results = findHHResults(window.locatorData.HH, location, countryShort, countryLong);
+        displayHHResults(results, location);
       } else {
-        displayHHResults({}, null, labels);
+        displayHHResults({});
       }
       showType('hh');
     }
@@ -608,12 +946,14 @@ export default async function decorate(widget) {
         const results = findCommResults(
           window.locatorData.COMM,
           location,
-          country?.short,
-          region?.short,
+          countryShort,
+          countryLong,
+          stateShort,
+          stateLong,
         );
-        displayCommResults(results, location, labels);
+        displayCommResults(results);
       } else {
-        displayCommResults({}, null, labels);
+        displayCommResults({});
       }
       showType('comm');
     }
@@ -621,9 +961,9 @@ export default async function decorate(widget) {
     if (data.productType === 'EVENTS') {
       if (location) {
         const results = findEventsResults(window.locatorData.EVENTS, location);
-        displayEventsResults(results, location, labels);
+        displayEventsResults(results, location);
       } else {
-        displayEventsResults({}, null, labels);
+        displayEventsResults({ hhGrouped: [], commGrouped: [] }, location);
       }
       showType('events');
     }
