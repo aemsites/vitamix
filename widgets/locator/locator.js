@@ -751,7 +751,7 @@ function displayHHResults(results, location, labels = {}) {
     webWrapper.classList.add('locator-web');
 
     const webLabel = document.createElement('strong');
-    webLabel.textContent = 'Website: ';
+    webLabel.textContent = labels.website ?? 'Website: ';
     webWrapper.append(webLabel);
 
     const webLink = document.createElement('a');
@@ -775,7 +775,7 @@ function displayHHResults(results, location, labels = {}) {
     phoneWrapper.classList.add('locator-phone');
 
     const phoneLabel = document.createElement('strong');
-    phoneLabel.textContent = 'Phone: ';
+    phoneLabel.textContent = labels.phone ?? 'Phone: ';
     phoneWrapper.append(phoneLabel);
 
     const phoneLink = document.createElement('a');
