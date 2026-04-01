@@ -19,7 +19,7 @@ import {
 
 const isProdHost = window.location.hostname.includes('vitamix.com');
 export const FORMS_ENDPOINT = isProdHost
-  ? ''
+  ? 'https://main--vitamix--aemsites.aem.network'
   : 'https://main--vitamix--aemsites.aem.network';
 
 /**
