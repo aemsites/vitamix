@@ -388,7 +388,7 @@ function displayCommResults(results, labels = {}) {
       addressWrapper.classList.add('locator-address');
 
       const addressLabel = document.createElement('strong');
-      addressLabel.textContent = 'Address: ';
+      addressLabel.textContent = labels.address ?? 'Address: ';
       addressWrapper.append(addressLabel);
 
       const addressLink = document.createElement('a');
@@ -585,7 +585,7 @@ function displayEventsResults(results, location, labels = {}) {
           addressWrapper.classList.add('locator-address');
 
           const addressLabel = document.createElement('strong');
-          addressLabel.textContent = 'Address: ';
+          addressLabel.textContent = labels.address ?? 'Address: ';
           addressWrapper.append(addressLabel);
 
           const addressLink = document.createElement('a');
@@ -730,7 +730,7 @@ function displayHHResults(results, location, labels = {}) {
     addressWrapper.classList.add('locator-address');
 
     const addressLabel = document.createElement('strong');
-    addressLabel.textContent = 'Address: ';
+    addressLabel.textContent = labels.address ?? 'Address: ';
     addressWrapper.append(addressLabel);
 
     const addressLink = document.createElement('a');
