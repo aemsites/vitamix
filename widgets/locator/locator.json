@@ -25,7 +25,8 @@
       "noHouseholdEventsFound": "No household events found",
       "noCommercialEventsFound": "No commercial events found",
       "noRetailersFound": "No retailers found",
-      "noOnlineFound": "No online retailers found"
+      "noOnlineFound": "No online retailers found",
+      "noEventsFound": "No events found"
     }
   },
   "fr": {
@@ -54,7 +55,8 @@
       "noHouseholdEventsFound": "Aucun événement grand public trouvé",
       "noCommercialEventsFound": "Aucun événement commercial trouvé",
       "noRetailersFound": "Aucun détaillant trouvé",
-      "noOnlineFound": "Aucun détaillant en ligne trouvé"
+      "noOnlineFound": "Aucun détaillant en ligne trouvé",
+      "noEventsFound": "Aucun événement trouvé"
     }
   },
   "es": {
@@ -83,7 +85,8 @@
       "noHouseholdEventsFound": "No se encontraron eventos para el hogar",
       "noCommercialEventsFound": "No se encontraron eventos comerciales",
       "noRetailersFound": "No se encontraron minoristas",
-      "noOnlineFound": "No se encontraron minoristas en línea"
+      "noOnlineFound": "No se encontraron minoristas en línea",
+      "noEventsFound": "No se encontraron eventos."
     }
   }
 }
