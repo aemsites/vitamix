@@ -448,7 +448,7 @@ function displayCommResults(results, labels = {}) {
       emailWrapper.classList.add('locator-email');
 
       const emailLabel = document.createElement('strong');
-      emailLabel.textContent = 'Email: ';
+      emailLabel.textContent = labels.email ?? 'Email: ';
       emailWrapper.append(emailLabel);
 
       const emailLink = document.createElement('a');
@@ -795,7 +795,7 @@ function displayHHResults(results, location, labels = {}) {
     emailWrapper.classList.add('locator-email');
 
     const emailLabel = document.createElement('strong');
-    emailLabel.textContent = 'Email: ';
+    emailLabel.textContent = labels.email ?? 'Email: ';
     emailWrapper.append(emailLabel);
 
     const emailLink = document.createElement('a');
