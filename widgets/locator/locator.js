@@ -541,7 +541,7 @@ function displayEventsResults(results, location, labels = {}) {
     container.textContent = '';
 
     if (!grouped || grouped.length === 0) {
-      container.innerHTML = `<p>${labels.noEventsFound ?? 'No events found</p>';
+      container.innerHTML = `<p>${labels.noEventsFound ?? 'No events found'}</p>`;
       return;
     }
 
