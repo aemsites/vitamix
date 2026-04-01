@@ -118,11 +118,13 @@ async function appendSelectOptions(select, url) {
     const { pathname } = new URL(url);
     const resp = await fetch(pathname);
     if (!resp.ok) {
+      // eslint-disable-next-line no-console
       console.error('Failed to fetch select options', resp.status);
       return select;
     }
     const { data } = await resp.json();
     if (!data || !Array.isArray(data)) {
+      // eslint-disable-next-line no-console
       console.error('Invalid select options JSON', data);
       return select;
     }
@@ -136,6 +138,7 @@ async function appendSelectOptions(select, url) {
     });
     return select;
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('Failed to parse select options', error);
     return select;
   }

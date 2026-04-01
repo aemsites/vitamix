@@ -96,6 +96,17 @@
   align-items: end;
 }
 
+/* Shipping methods */
+.shipping-methods {
+  border: none;
+  padding: 0;
+  width: 100%;
+}
+
+.shipping-methods h3 {
+  margin-bottom: var(--spacing-40);
+}
+
 .checkout-form-column .section-shipping h3,
 .checkout-form-column .section-billing h3 {
   grid-column: 1 / -1;
@@ -204,17 +215,6 @@ span.payment-button.paypal .button img {
 .checkout-form-column form > .form-field[data-name="email"] { order: 0; }
 .checkout-form-column form > .form-field[data-name="optIn"] { order: 0; }
 .checkout-form-column form .button-wrapper { order: 7; }
-
-/* Shipping methods */
-.shipping-methods {
-  border: none;
-  padding: 0;
-  width: 100%;
-}
-
-.shipping-methods h3 {
-  margin-bottom: var(--spacing-40);
-}
 
 .shipping-methods.loading {
   opacity: 0.5;

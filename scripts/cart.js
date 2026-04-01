@@ -7,7 +7,10 @@ const debounce = (func, wait) => {
 };
 
 export class Cart {
-  static STORAGE_KEY = 'cart';
+  static get STORAGE_KEY() {
+    const locale = window.location.pathname.split('/')[1] || 'default';
+    return `cart:${locale === 'drafts' ? 'ca' : locale}`;
+  }
 
   static STORAGE_VERSION = 1;
 
@@ -169,7 +172,8 @@ export class Cart {
 
   /**
    * Returns cart items in API-compatible format.
-   * @returns {Array<{sku: string, path: string, quantity: number, name: string, price: {final: string, currency: string}}>}
+   * @returns {Array<{sku: string, path: string, quantity: number, name: string,
+   *   price: {final: string, currency: string}}>}
    */
   getItemsForAPI() {
     return this.items.map((item) => ({

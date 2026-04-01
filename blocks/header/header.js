@@ -1,6 +1,7 @@
 import { getMetadata, toClassName } from '../../scripts/aem.js';
 import { swapIcons, getCookies } from '../../scripts/scripts.js';
 import { loadFragment } from '../fragment/fragment.js';
+import { AUTH_TOKEN_KEY } from '../../scripts/auth-api.js';
 
 const EDGE_CART_PATH = '/drafts/maxed/checkout/cart';
 // const EDGE_CART_PATH = '/checkout/cart';
@@ -438,10 +439,49 @@ export default async function decorate(block) {
     }
   }
 
+  const accountLink = block.querySelector('.icon-account').parentElement;
+
   const customer = cookies.vitamix_customer;
   if (customer) {
-    const account = block.querySelector('.icon-account').parentElement;
-    account.lastChild.textContent = `${customer}'s Account`;
+    accountLink.lastChild.textContent = `${customer}'s Account`;
+  }
+
+  // --- Auth state display (all pages) ---
+
+  const updateAuthUI = (loggedIn) => {
+    accountLink.classList.toggle('is-logged-in', !!loggedIn);
+  };
+
+  document.addEventListener('commerce:auth-state-changed', (ev) => {
+    updateAuthUI(ev.detail.loggedIn);
+  });
+
+  // restore auth UI on page load
+  try {
+    const hasToken = !!sessionStorage.getItem(AUTH_TOKEN_KEY);
+    if (hasToken) updateAuthUI(true);
+  } catch { /* ignore */ }
+
+  // --- Auth panel (edge cart mode only) ---
+  if (window.cartMode === 'edge') {
+    let authPanel = null;
+    const ensureAuthPanel = async () => {
+      if (authPanel) return authPanel;
+      const { default: createAuthPanel } = await import('./auth-panel.js');
+      authPanel = createAuthPanel();
+      block.append(authPanel.dialog);
+      return authPanel;
+    };
+
+    accountLink.addEventListener('click', async (e) => {
+      const hasToken = !!sessionStorage.getItem(AUTH_TOKEN_KEY);
+      if (!hasToken) {
+        e.preventDefault();
+        const panel = await ensureAuthPanel();
+        panel.showEmailStep();
+        panel.open();
+      }
+    });
   }
 
   const cartItems = cookies.cart_items_count;
@@ -567,7 +607,6 @@ export default async function decorate(block) {
       // scroll item into view
       scrollToItem();
     } catch (error) {
-      console.error('Error importing cart:', error);
       setTimeout(() => {
         // redirect to cart page
         window.location.href = EDGE_CART_PATH;

@@ -124,41 +124,6 @@ function renderShippingMethods(container, rates) {
 }
 
 /**
- * Fetch shipping rates and preview the order, dispatching an event with the results.
- */
-async function fetchAndPreview(form, formData, shippingMethodsContainer) {
-  const country = getCountry();
-  // Use the select value (province code like "QC") for API calls,
-  // not the display text ("Quebec") — the shipping sheet matches on codes
-  const stateValue = formData['shipping-state'] || '';
-
-  if (!stateValue) return;
-
-  const { default: cart } = await import('../../scripts/cart.js');
-  const items = cart.getItemsForAPI();
-  if (items.length === 0) return;
-
-  // fetch shipping rates
-  shippingMethodsContainer.classList.add('loading');
-  try {
-    const { rates } = await estimateShipping(country, stateValue, items);
-    renderShippingMethods(shippingMethodsContainer, rates);
-
-    // auto-select first rate and preview
-    const firstRate = shippingMethodsContainer.querySelector('input[name="shippingMethod"]:checked');
-    if (firstRate) {
-      selectedShippingMethodId = firstRate.value;
-      await updatePreview(form, formData, cart);
-    }
-  } catch (err) {
-    console.error('Failed to fetch shipping rates', err);
-    renderShippingMethods(shippingMethodsContainer, []);
-  } finally {
-    shippingMethodsContainer.classList.remove('loading');
-  }
-}
-
-/**
  * Call the order preview API to lock in estimates.
  */
 async function updatePreview(form, formData, cart) {
@@ -208,10 +173,43 @@ async function updatePreview(form, formData, cart) {
       detail: { preview },
     }));
   } catch (err) {
-    console.error('Failed to preview order', err);
     currentPreview = null;
     currentEstimateToken = null;
     document.dispatchEvent(new CustomEvent('checkout:preview'));
+  }
+}
+
+/**
+ * Fetch shipping rates and preview the order, dispatching an event with the results.
+ */
+async function fetchAndPreview(form, formData, shippingMethodsContainer) {
+  const country = getCountry();
+  // Use the select value (province code like "QC") for API calls,
+  // not the display text ("Quebec") — the shipping sheet matches on codes
+  const stateValue = formData['shipping-state'] || '';
+
+  if (!stateValue) return;
+
+  const { default: cart } = await import('../../scripts/cart.js');
+  const items = cart.getItemsForAPI();
+  if (items.length === 0) return;
+
+  // fetch shipping rates
+  shippingMethodsContainer.classList.add('loading');
+  try {
+    const { rates } = await estimateShipping(country, stateValue, items);
+    renderShippingMethods(shippingMethodsContainer, rates);
+
+    // auto-select first rate and preview
+    const firstRate = shippingMethodsContainer.querySelector('input[name="shippingMethod"]:checked');
+    if (firstRate) {
+      selectedShippingMethodId = firstRate.value;
+      await updatePreview(form, formData, cart);
+    }
+  } catch (err) {
+    renderShippingMethods(shippingMethodsContainer, []);
+  } finally {
+    shippingMethodsContainer.classList.remove('loading');
   }
 }
 
@@ -573,7 +571,6 @@ export default async function decorate(block) {
             reenableButton();
           }
         } catch (error) {
-          console.error('Checkout failed', error);
           const message = error.body?.message || error.message || 'Something went wrong. Please try again.';
           showError(formColumn, message);
           reenableButton();

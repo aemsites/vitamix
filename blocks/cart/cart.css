@@ -137,12 +137,12 @@ div.section.cart-section .cart-wrapper {
     font-size: 14px;
     font-weight: 600;
     padding-inline: 0;
-    -moz-appearance: textfield;
+    appearance: textfield;
 }
 
 .quantity-control input::-webkit-inner-spin-button,
 .quantity-control input::-webkit-outer-spin-button {
-    -webkit-appearance: none;
+    appearance: none;
     margin: 0;
 }
 
