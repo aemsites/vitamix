@@ -1,4 +1,4 @@
-/* stylelint-disable no-descending-specificity 12345 */
+/* stylelint-disable no-descending-specificity */
 header {
   max-width: var(--site-width);
   margin: 0 auto;

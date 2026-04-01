@@ -2,7 +2,7 @@ const debounce = (func, wait) => {
   let timeout;
   return (...args) => {
     clearTimeout(timeout);
-    timeout = setTimeout(() => func.apply(this, args), wait);
+    timeout = setTimeout(() => func(...args), wait);
   };
 };
 
@@ -152,12 +152,13 @@ export class Cart {
    * @param {string} sku
    */
   removeItem(sku) {
+    const item = this.#items[sku];
     delete this.#items[sku];
     document.dispatchEvent(
       new CustomEvent('cart:change', {
         detail: {
           cart: this,
-          item: this.#items[sku],
+          item,
           action: 'remove',
         },
       }),
@@ -166,25 +167,6 @@ export class Cart {
     this.#persist();
   }
 
-  /**
-   * @param {string} firstName
-   * @param {string} lastName
-   * @param {string} email
-   * @param {string} phone
-   * @param {{
-   *   name: string;
-   *   company: string;
-   *   address1: string;
-   *   address2: string;
-   *   city: string;
-   *   state: string;
-   *   zip: string;
-   *   country: string;
-   *   phone: string;
-   *   email: string;
-   * }} shipping
-   * @returns {Object}
-   */
   /**
    * Returns cart items in API-compatible format.
    * @returns {Array<{sku: string, path: string, quantity: number, name: string, price: {final: string, currency: string}}>}

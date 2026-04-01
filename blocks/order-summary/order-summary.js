@@ -11,13 +11,24 @@ export default async function decorate(block) {
 
   // cancelled or failed payment
   if (params.reason) {
-    block.innerHTML = `
-      <div class="order-result order-cancelled">
-        <h2>Payment not completed</h2>
-        <p>${params.reason === 'customer_cancelled' ? 'You cancelled the payment.' : `Payment could not be processed (${params.reason}).`}</p>
-        <p><a href="/drafts/maxed/checkout/start" class="button emphasis">Return to checkout</a></p>
-      </div>
-    `;
+    const container = document.createElement('div');
+    container.className = 'order-result order-cancelled';
+
+    const heading = document.createElement('h2');
+    heading.textContent = 'Payment not completed';
+    container.appendChild(heading);
+
+    const msg = document.createElement('p');
+    msg.textContent = params.reason === 'customer_cancelled'
+      ? 'You cancelled the payment.'
+      : 'Payment could not be processed. Please try again.';
+    container.appendChild(msg);
+
+    const link = document.createElement('p');
+    link.innerHTML = '<a href="/drafts/maxed/checkout/start" class="button emphasis">Return to checkout</a>';
+    container.appendChild(link);
+
+    block.replaceChildren(container);
     return;
   }
 
@@ -60,26 +71,50 @@ export default async function decorate(block) {
     // cart may not be available
   }
 
-  // build confirmation display
+  // build confirmation page
   const container = document.createElement('div');
   container.className = 'order-result order-confirmed';
 
+  // header section
+  const headerSection = document.createElement('div');
+  headerSection.className = 'order-header';
+
+  const checkmark = document.createElement('div');
+  checkmark.className = 'order-checkmark';
+  checkmark.innerHTML = '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#2e7d32" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-5"/></svg>';
+  headerSection.appendChild(checkmark);
+
   const heading = document.createElement('h2');
   heading.textContent = 'Thank you for your order!';
-  container.appendChild(heading);
+  headerSection.appendChild(heading);
 
   const orderIdEl = document.createElement('p');
   orderIdEl.className = 'order-id';
-  orderIdEl.innerHTML = `Order ID: <strong>${orderId}</strong>`;
-  container.appendChild(orderIdEl);
+  const orderIdLabel = document.createElement('span');
+  orderIdLabel.textContent = 'Order ID: ';
+  const orderIdValue = document.createElement('strong');
+  orderIdValue.textContent = orderId;
+  orderIdEl.append(orderIdLabel, orderIdValue);
+  headerSection.appendChild(orderIdEl);
 
   if (email) {
     const emailEl = document.createElement('p');
+    emailEl.className = 'order-email';
     emailEl.textContent = `A confirmation will be sent to ${email}.`;
-    container.appendChild(emailEl);
+    headerSection.appendChild(emailEl);
   }
 
-  // show order items — prefer cart items (has variant/image) over order items
+  container.appendChild(headerSection);
+
+  // two-column layout: items + totals on left, shipping on right
+  const detailsGrid = document.createElement('div');
+  detailsGrid.className = 'order-details';
+
+  // left column: items + totals
+  const leftCol = document.createElement('div');
+  leftCol.className = 'order-details-left';
+
+  // items
   const displayItems = cartItems || order?.items;
   if (displayItems?.length) {
     const itemsSection = document.createElement('div');
@@ -94,11 +129,13 @@ export default async function decorate(block) {
       itemEl.className = 'order-item';
 
       if (item.image) {
+        const imgWrapper = document.createElement('div');
+        imgWrapper.className = 'order-item-image';
         const img = document.createElement('img');
         img.src = item.image;
         img.alt = item.name || '';
-        img.className = 'order-item-image';
-        itemEl.appendChild(img);
+        imgWrapper.appendChild(img);
+        itemEl.appendChild(imgWrapper);
       }
 
       const details = document.createElement('div');
@@ -112,23 +149,29 @@ export default async function decorate(block) {
       if (item.variant) {
         const variant = document.createElement('p');
         variant.className = 'order-item-variant';
-        variant.textContent = `Color: ${item.variant}`;
+        variant.textContent = item.variant;
         details.appendChild(variant);
       }
 
       const qty = document.createElement('p');
       qty.className = 'order-item-qty';
-      const price = item.price?.final || item.price;
-      qty.textContent = `Qty: ${item.quantity} — $${price}`;
+      qty.textContent = `Qty: ${item.quantity}`;
       details.appendChild(qty);
 
       itemEl.appendChild(details);
+
+      const price = document.createElement('div');
+      price.className = 'order-item-price';
+      const unitPrice = parseFloat(item.price?.final || item.price) || 0;
+      price.textContent = `$${(unitPrice * item.quantity).toFixed(2)}`;
+      itemEl.appendChild(price);
+
       itemsSection.appendChild(itemEl);
     });
-    container.appendChild(itemsSection);
+    leftCol.appendChild(itemsSection);
   }
 
-  // show totals from preview if available
+  // totals
   if (preview) {
     const totalsSection = document.createElement('div');
     totalsSection.className = 'order-totals';
@@ -137,38 +180,97 @@ export default async function decorate(block) {
       ['Subtotal', `$${parseFloat(preview.subtotal).toFixed(2)}`],
       ['Shipping', preview.shippingMethod?.rate === 0 ? 'Free' : `$${parseFloat(preview.shippingMethod?.rate || 0).toFixed(2)}`],
       ['Tax', `$${parseFloat(preview.taxAmount).toFixed(2)}`],
-      ['Total', `$${parseFloat(preview.total).toFixed(2)}`],
     ];
 
     rows.forEach(([label, value]) => {
       const row = document.createElement('div');
-      row.className = `order-totals-row${label === 'Total' ? ' order-totals-total' : ''}`;
-      row.innerHTML = `<span>${label}</span><strong>${value}</strong>`;
+      row.className = 'order-totals-row';
+      const labelEl = document.createElement('span');
+      labelEl.textContent = label;
+      const valueEl = document.createElement('span');
+      valueEl.textContent = value;
+      row.append(labelEl, valueEl);
       totalsSection.appendChild(row);
     });
 
-    container.appendChild(totalsSection);
+    const totalRow = document.createElement('div');
+    totalRow.className = 'order-totals-row order-totals-total';
+    const totalLabel = document.createElement('strong');
+    totalLabel.textContent = 'Total';
+    const totalValue = document.createElement('strong');
+    totalValue.textContent = `$${parseFloat(preview.total).toFixed(2)}`;
+    totalRow.append(totalLabel, totalValue);
+    totalsSection.appendChild(totalRow);
+
+    leftCol.appendChild(totalsSection);
   }
 
-  // shipping address
+  detailsGrid.appendChild(leftCol);
+
+  // right column: shipping address
+  const rightCol = document.createElement('div');
+  rightCol.className = 'order-details-right';
+
   if (order?.shipping) {
     const addrSection = document.createElement('div');
     addrSection.className = 'order-shipping-address';
+
     const addrHeading = document.createElement('h3');
     addrHeading.textContent = 'Shipping address';
     addrSection.appendChild(addrHeading);
 
     const addr = order.shipping;
-    const addrLines = [addr.name, addr.address1, addr.address2, `${addr.city}, ${addr.state} ${addr.zip}`, addr.country].filter(Boolean);
-    const addrEl = document.createElement('p');
-    addrEl.innerHTML = addrLines.join('<br>');
-    addrSection.appendChild(addrEl);
-    container.appendChild(addrSection);
+    const lines = [
+      addr.name,
+      addr.company,
+      addr.address1,
+      addr.address2,
+      `${addr.city}, ${addr.state} ${addr.zip}`,
+      addr.country?.toUpperCase(),
+    ].filter(Boolean);
+
+    lines.forEach((line) => {
+      const p = document.createElement('p');
+      p.textContent = line;
+      addrSection.appendChild(p);
+    });
+
+    rightCol.appendChild(addrSection);
   }
 
-  const continueLink = document.createElement('p');
-  continueLink.innerHTML = '<a href="/" class="button emphasis">Continue shopping</a>';
-  container.appendChild(continueLink);
+  if (order?.customer) {
+    const contactSection = document.createElement('div');
+    contactSection.className = 'order-contact';
+
+    const contactHeading = document.createElement('h3');
+    contactHeading.textContent = 'Contact';
+    contactSection.appendChild(contactHeading);
+
+    const contactEmail = document.createElement('p');
+    contactEmail.textContent = order.customer.email;
+    contactSection.appendChild(contactEmail);
+
+    if (order.customer.phone) {
+      const contactPhone = document.createElement('p');
+      contactPhone.textContent = order.customer.phone;
+      contactSection.appendChild(contactPhone);
+    }
+
+    rightCol.appendChild(contactSection);
+  }
+
+  detailsGrid.appendChild(rightCol);
+  container.appendChild(detailsGrid);
+
+  // continue shopping
+  const actions = document.createElement('div');
+  actions.className = 'order-actions';
+  const continueLink = document.createElement('a');
+  continueLink.href = '/';
+  continueLink.className = 'button emphasis';
+  continueLink.textContent = 'Continue shopping';
+  actions.appendChild(continueLink);
+  container.appendChild(actions);
 
   block.replaceChildren(container);
 }

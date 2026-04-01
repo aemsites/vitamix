@@ -202,7 +202,7 @@ span.payment-button.paypal .button img {
 .checkout-form-column form .shipping-methods { order: 4; }
 .checkout-form-column form .section-payment { order: 5; }
 .checkout-form-column form > .form-field[data-name="email"] { order: 0; }
-.checkout-form-column form > .form-field[data-name="optIn"] { order: 6; }
+.checkout-form-column form > .form-field[data-name="optIn"] { order: 0; }
 .checkout-form-column form .button-wrapper { order: 7; }
 
 /* Shipping methods */
@@ -261,6 +261,19 @@ span.payment-button.paypal .button img {
 .shipping-methods-empty {
   color: #666;
   font-style: italic;
+}
+
+/* Required field indicator — label comes before input in the DOM */
+.checkout-form-column form .form-field:has(input[required]) > label::after,
+.checkout-form-column form .form-field:has(select[required]) > label::after {
+  content: ' *';
+  color: #c00;
+}
+
+/* Required field error state */
+.checkout-form-column form input.field-required,
+.checkout-form-column form select.field-required {
+  border-color: #c00;
 }
 
 /* Checkout error */

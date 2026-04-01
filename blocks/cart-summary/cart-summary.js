@@ -180,9 +180,18 @@ export default function decorate(block) {
     updateTotals();
   });
 
+  // Show loading state while preview is in flight
+  const summaryContent = block.querySelector('.cart-summary-content');
+  document.addEventListener('checkout:preview-loading', () => {
+    summaryContent?.classList.add('loading');
+  });
+
   // Listen for real estimates from checkout preview
   document.addEventListener('checkout:preview', (e) => {
-    const { preview } = e.detail;
+    summaryContent?.classList.remove('loading');
+    const { preview } = e.detail || {};
+    if (!preview) return;
+
     const subtotal = parseFloat(preview.subtotal) || cart.subtotal;
     const taxAmount = parseFloat(preview.taxAmount) || 0;
     const shippingRate = preview.shippingMethod?.rate ?? 0;

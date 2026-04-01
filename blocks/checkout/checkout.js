@@ -150,15 +150,6 @@ async function fetchAndPreview(form, formData, shippingMethodsContainer) {
       selectedShippingMethodId = firstRate.value;
       await updatePreview(form, formData, cart);
     }
-
-    // listen for rate changes
-    shippingMethodsContainer.addEventListener('change', async (e) => {
-      if (e.target.name === 'shippingMethod') {
-        selectedShippingMethodId = e.target.value;
-        const currentFormData = Object.fromEntries(new FormData(form).entries());
-        await updatePreview(form, currentFormData, cart);
-      }
-    });
   } catch (err) {
     console.error('Failed to fetch shipping rates', err);
     renderShippingMethods(shippingMethodsContainer, []);
@@ -174,12 +165,30 @@ async function updatePreview(form, formData, cart) {
   if (!selectedShippingMethodId) return;
 
   const email = formData.email || '';
+  const firstName = formData['shipping-firstname'] || '';
+  const lastName = formData['shipping-lastname'] || '';
+
+  // Skip preview if required fields are missing — highlight them
+  if (!firstName || !lastName || !email) {
+    ['shipping-firstname', 'shipping-lastname', 'email'].forEach((name) => {
+      const input = form.querySelector(`[name="${name}"]`);
+      if (input) {
+        if (!input.value) {
+          input.classList.add('field-required');
+        } else {
+          input.classList.remove('field-required');
+        }
+      }
+    });
+    return;
+  }
+
   const shipping = collectAddress(form, formData, 'shipping-', email);
 
   const previewBody = {
     customer: {
-      firstName: formData['shipping-firstname'] || '',
-      lastName: formData['shipping-lastname'] || '',
+      firstName,
+      lastName,
       email,
     },
     shipping,
@@ -190,9 +199,8 @@ async function updatePreview(form, formData, cart) {
   };
 
   try {
-    console.debug('updatePreview: calling previewOrder with', previewBody);
+    document.dispatchEvent(new CustomEvent('checkout:preview-loading'));
     const preview = await previewOrder(previewBody);
-    console.debug('updatePreview: got preview', preview);
     currentPreview = preview;
     currentEstimateToken = preview.estimateToken;
 
@@ -203,6 +211,7 @@ async function updatePreview(form, formData, cart) {
     console.error('Failed to preview order', err);
     currentPreview = null;
     currentEstimateToken = null;
+    document.dispatchEvent(new CustomEvent('checkout:preview'));
   }
 }
 
@@ -319,8 +328,13 @@ export default async function decorate(block) {
 
   // show billing address section when sameShipBill is unchecked
   sameShipBillCheckbox.addEventListener('change', () => {
-    billingAddressSection.setAttribute('aria-hidden', sameShipBillCheckbox.checked);
-    billingAddressSection.setAttribute('disabled', sameShipBillCheckbox.checked);
+    if (sameShipBillCheckbox.checked) {
+      billingAddressSection.setAttribute('aria-hidden', true);
+      billingAddressSection.setAttribute('disabled', '');
+    } else {
+      billingAddressSection.removeAttribute('aria-hidden');
+      billingAddressSection.removeAttribute('disabled');
+    }
   });
 
   // -- Shipping methods section --
@@ -336,6 +350,29 @@ export default async function decorate(block) {
     billingAddressSection.after(shippingMethodsContainer);
   }
 
+  // Listen for shipping method rate changes (registered once, not inside fetchAndPreview)
+  shippingMethodsContainer.addEventListener('change', async (e) => {
+    if (e.target.name === 'shippingMethod') {
+      selectedShippingMethodId = e.target.value;
+      const { default: cart } = await import('../../scripts/cart.js');
+      const currentFormData = Object.fromEntries(new FormData(formColumn.querySelector('form')).entries());
+      await updatePreview(formColumn.querySelector('form'), currentFormData, cart);
+    }
+  });
+
+  // Reorder DOM to match visual layout so tab order is correct
+  // The form JSON has fields in a different order than the CSS grid displays them
+  const fieldOrder = ['firstname', 'lastname', 'company', 'street-0', 'street-1', 'city', 'state', 'zip', 'telephone'];
+  [shippingAddressSection, billingAddressSection].forEach((section) => {
+    const h3 = section.querySelector('h3');
+    fieldOrder.forEach((name) => {
+      const field = section.querySelector(`.form-field[data-name="${name}"]`);
+      if (field) section.appendChild(field);
+    });
+    // Keep h3 heading first
+    if (h3) section.prepend(h3);
+  });
+
   // Invalidate estimates when address fields change
   const form = formColumn.querySelector('form');
   const shippingInputs = shippingAddressSection.querySelectorAll('input, select');
@@ -346,43 +383,58 @@ export default async function decorate(block) {
     });
   });
 
-  // Override state dropdown with Canadian provinces for CA locale
+  // Override state dropdowns with Canadian provinces for CA locale
   const stateSelect = form.querySelector('select#shipping-state');
-  if (stateSelect && getCountry() === 'ca') {
-    const provinces = [
-      ['', 'Select province...'],
-      ['AB', 'Alberta'], ['BC', 'British Columbia'], ['MB', 'Manitoba'],
-      ['NB', 'New Brunswick'], ['NL', 'Newfoundland and Labrador'],
-      ['NS', 'Nova Scotia'], ['NT', 'Northwest Territories'], ['NU', 'Nunavut'],
-      ['ON', 'Ontario'], ['PE', 'Prince Edward Island'], ['QC', 'Quebec'],
-      ['SK', 'Saskatchewan'], ['YT', 'Yukon'],
-    ];
-    stateSelect.innerHTML = '';
-    stateSelect.dataset.optionsOverridden = 'true';
-    provinces.forEach(([value, label]) => {
-      const opt = document.createElement('option');
-      opt.value = value;
-      opt.textContent = label;
-      if (!value) opt.disabled = true;
-      stateSelect.appendChild(opt);
+  if (getCountry() === 'ca') {
+    [stateSelect, form.querySelector('select#billing-state')].forEach((sel) => {
+      if (!sel) return;
+      const provinces = [
+        ['', 'Select province...'],
+        ['AB', 'Alberta'], ['BC', 'British Columbia'], ['MB', 'Manitoba'],
+        ['NB', 'New Brunswick'], ['NL', 'Newfoundland and Labrador'],
+        ['NS', 'Nova Scotia'], ['NT', 'Northwest Territories'], ['NU', 'Nunavut'],
+        ['ON', 'Ontario'], ['PE', 'Prince Edward Island'], ['QC', 'Quebec'],
+        ['SK', 'Saskatchewan'], ['YT', 'Yukon'],
+      ];
+      sel.innerHTML = '';
+      sel.dataset.optionsOverridden = 'true';
+      provinces.forEach(([value, label]) => {
+        const opt = document.createElement('option');
+        opt.value = value;
+        opt.textContent = label;
+        if (!value) opt.disabled = true;
+        sel.appendChild(opt);
+      });
+      const lbl = sel.previousElementSibling;
+      if (lbl?.tagName === 'LABEL') lbl.textContent = 'Province';
     });
-    // Update label
-    const stateLabel = stateSelect.previousElementSibling;
-    if (stateLabel?.tagName === 'LABEL') {
-      stateLabel.textContent = 'Province';
-    }
   }
 
   // Fetch shipping rates when state is selected
   if (stateSelect) {
     stateSelect.addEventListener('change', () => {
-      console.debug('checkout: state changed to', stateSelect.value);
       const formData = Object.fromEntries(new FormData(form).entries());
       fetchAndPreview(form, formData, shippingMethodsContainer);
     });
-  } else {
-    console.warn('checkout: select#shipping-state not found in form');
   }
+
+  // Retry preview when customer fields are filled, clear error styling
+  ['email', 'shipping-firstname', 'shipping-lastname'].forEach((name) => {
+    const input = form.querySelector(`[name="${name}"]`);
+    if (input) {
+      input.addEventListener('input', () => {
+        if (input.value) input.classList.remove('field-required');
+      });
+      input.addEventListener('blur', async () => {
+        if (input.value) input.classList.remove('field-required');
+        if (selectedShippingMethodId && !currentPreview) {
+          const { default: cart } = await import('../../scripts/cart.js');
+          const formData = Object.fromEntries(new FormData(form).entries());
+          await updatePreview(form, formData, cart);
+        }
+      });
+    }
+  });
 
   // Re-preview when cart items change (quantity update or item removed)
   document.addEventListener('cart:change', async (e) => {
@@ -400,28 +452,6 @@ export default async function decorate(block) {
       }
     }
   });
-
-  // TODO: Remove test prefill before merging
-  const prefill = {
-    email: 'test@example.com',
-    'shipping-firstname': 'Jean',
-    'shipping-lastname': 'Tremblay',
-    'shipping-telephone': '514-555-1234',
-    'shipping-street-0': '1234 Rue Sainte-Catherine',
-    'shipping-street-1': '',
-    'shipping-city': 'Montréal',
-    'shipping-zip': 'H3B 1A7',
-    'shipping-company': '',
-  };
-  Object.entries(prefill).forEach(([name, value]) => {
-    const input = form.querySelector(`[name="${name}"]`);
-    if (input) input.value = value;
-  });
-  // Prefill province — options are already loaded synchronously for CA
-  if (stateSelect) {
-    stateSelect.value = 'QC';
-    stateSelect.dispatchEvent(new Event('change', { bubbles: true }));
-  }
 
   // -- Pay buttons --
   const submitButtons = [...formColumn.querySelectorAll('form .button-wrapper button[type="submit"]')];
@@ -500,10 +530,11 @@ export default async function decorate(block) {
             billingAddr = collectAddress(form, formData, 'billing-', email);
           }
 
+          const { default: cart } = await import('../../scripts/cart.js');
+
           // if we don't have a fresh preview, try to get one now
           if (!currentEstimateToken) {
-            const { default: cartForPreview } = await import('../../scripts/cart.js');
-            await updatePreview(form, formData, cartForPreview);
+            await updatePreview(form, formData, cart);
           }
 
           // block checkout if preview/estimates failed
@@ -512,8 +543,6 @@ export default async function decorate(block) {
             reenableButton();
             return;
           }
-
-          const { default: cart } = await import('../../scripts/cart.js');
           const order = cart.getOrderJSON(email, firstName, lastName, phone, shipping, {
             billingAddr,
             shippingMethod: selectedShippingMethodId,
@@ -521,8 +550,6 @@ export default async function decorate(block) {
             locale: getLocale(),
             country,
           });
-
-          console.debug('creating order', order);
 
           // save checkout context for confirmation page
           sessionStorage.setItem('checkout_email', email);
@@ -533,14 +560,11 @@ export default async function decorate(block) {
 
           // create order
           const { order: createdOrder } = await createOrder(order);
-          console.debug('order created', createdOrder);
           sessionStorage.setItem('checkout_order', JSON.stringify(createdOrder));
 
           // initiate payment
           const idempotencyKey = crypto.randomUUID();
           const payment = await initiatePayment(createdOrder.id, idempotencyKey);
-          console.debug('payment initiated', payment);
-
           if (payment.action === 'redirect' && payment.redirectUrl) {
             // redirect to Chase hosted payment page
             window.location.href = payment.redirectUrl;
