@@ -781,11 +781,12 @@
 }
 
 /* Badge */
-.cards.highlight .highlight-badge {
+.cards.highlight .badge {
   position: absolute;
   top: 14px;
   left: 14px;
   display: inline-flex;
+  margin: 0;
   align-items: center;
   background: var(--highlight-badge-bg);
   color: var(--highlight-badge-color);
@@ -806,15 +807,6 @@
   flex: 1;
 }
 
-/* Eyebrow */
-.cards.highlight .highlight-eyebrow {
-  font-size: 0.65rem;
-  font-weight: 500;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--color-red);
-  margin: 0;
-}
 
 /* Title */
 .cards.highlight .card-body h2,

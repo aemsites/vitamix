@@ -78,91 +78,20 @@ function setCardDefaults(block, ul, variants) {
 /*
  * Decorates the highlight variant cards.
  * Expected authoring columns in the DA table (highlight variant):
- *   Col 1 – image
- *   Col 2 – content paragraphs (order-independent, detected by content):
- *     - Badge text (optional): any paragraph starting with "badge:" e.g. "badge: Most Popular"
- *     - Eyebrow (optional): any paragraph starting with "eyebrow:" e.g. "eyebrow: Ascent X5"
- *     - Title: heading element, or first unmatched paragraph
- *     - Description: second unmatched paragraph
- *     - CTA link: any paragraph containing an <a href>
+ *   Col 1 – image; optionally a paragraph for the badge
+ *   Col 2 – body: eyebrow paragraph before heading, heading, description, CTA link
  */
-
 function decorateFeatured(ul) {
   ul.querySelectorAll('li').forEach((li) => {
-    const body = li.querySelector('.card-body');
-    if (!body) return;
+    // Promote the first paragraph in a captioned image column to a badge
+    const captioned = li.querySelector('.card-captioned');
+    if (!captioned) return;
 
-    const paragraphs = [...body.querySelectorAll('p, h1, h2, h3, h4')];
-    if (!paragraphs.length) return;
+    const badgeP = [...captioned.querySelectorAll('p')].find((p) => !p.querySelector('picture, img'));
+    if (!badgeP) return;
 
-    let badgeText = '';
-    let eyebrowText = '';
-    let title = '';
-    let description = '';
-    let ctaHref = '';
-    let ctaLabel = 'Shop Now';
-
-    paragraphs.forEach((p) => {
-      const text = p.textContent.trim();
-      const lower = text.toLowerCase();
-      const isHeading = /^h[1-4]$/i.test(p.tagName);
-
-      // Badge prefix: "badge: Most Popular"
-      if (lower.startsWith('badge:')) {
-        badgeText = text.slice(text.indexOf(':') + 1).trim();
-        return;
-      }
-
-      // Eyebrow prefix: "eyebrow: Ascent X5 with Stainless Steel"
-      if (lower.startsWith('eyebrow:')) {
-        eyebrowText = text.slice(text.indexOf(':') + 1).trim();
-        return;
-      }
-
-      // CTA link
-      const a = p.querySelector('a[href]');
-      if (a) {
-        ctaHref = a.href;
-        ctaLabel = a.textContent.trim() || ctaLabel;
-        return;
-      }
-
-      // Headings are always the title
-      if (isHeading) {
-        title = text;
-        return;
-      }
-
-      // First unmatched paragraph = title, second = description
-      if (!title) { title = text; return; }
-      if (!description) { description = text; }
-    });
-
-    // Badge on image
-    if (badgeText) {
-      const badge = document.createElement('span');
-      badge.className = 'highlight-badge';
-      badge.textContent = badgeText;
-      const image = li.querySelector('.card-image');
-      if (image) image.append(badge);
-    }
-
-    const eyebrowHTML = eyebrowText
-      ? `<p class="highlight-eyebrow">${eyebrowText}</p>`
-      : '';
-    const descriptionHTML = description
-      ? `<p class="highlight-description">${description}</p>`
-      : '';
-    const ctaHTML = ctaHref
-      ? `<a class="highlight-cta" href="${ctaHref}">${ctaLabel}</a>`
-      : '';
-
-    body.innerHTML = `
-      ${eyebrowHTML}
-      <h2>${title}</h2>
-      ${descriptionHTML}
-      ${ctaHTML}
-    `;
+    badgeP.classList.add('badge');
+    captioned.className = captioned.className.replace('card-captioned', 'card-image');
   });
 }
 
