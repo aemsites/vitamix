@@ -1,4 +1,4 @@
-import { getMetadata } from '../../scripts/aem.js';
+import { getMetadata, toClassName } from '../../scripts/aem.js';
 import { buildCarousel, getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 const clockIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
@@ -191,11 +191,13 @@ function buildFeaturedList(recipes) {
       // use as-is
     }
 
-    const difficulty = recipe.difficulty || 'intermediate';
-    const timeText = recipe['total-time'] || recipe.time || '';
-    const servesText = recipe.serves || '';
+    const { difficulty } = recipe;
+    const timeText = recipe['total-time'] || '';
+    const servesText = recipe.yield || '';
 
-    const badge = `<span class="highlight-badge" data-difficulty="${difficulty}">${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}</span>`;
+    const badge = difficulty
+      ? `<span class="highlight-badge" data-difficulty="${toClassName(difficulty)}">${difficulty}</span>`
+      : '';
 
     const timeItem = timeText
       ? `<span class="highlight-meta-item">${clockIcon} <span>${timeText}</span></span>`
