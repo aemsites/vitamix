@@ -203,7 +203,11 @@
   gap: var(--spacing-40);
 }
 
+/* stylelint-disable-next-line no-descending-specificity */
+.related-recipes.highlight .highlight-meta-item img,
 .related-recipes.highlight .highlight-meta-item svg {
   flex-shrink: 0;
-  opacity: 0.6;
+  width: 1em;
+  height: 1em;
+  object-fit: contain;
 }

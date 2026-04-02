@@ -1,8 +1,7 @@
-import { getMetadata, toClassName } from '../../scripts/aem.js';
-import { buildCarousel, getLocaleAndLanguage } from '../../scripts/scripts.js';
-
-const clockIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
-const servesIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
+import { getMetadata, toClassName, fetchPlaceholders } from '../../scripts/aem.js';
+import {
+  buildCarousel, formatServings, formatTime, getLocaleAndLanguage,
+} from '../../scripts/scripts.js';
 
 const WEIGHTS = {
   titleWords: 4,
@@ -177,10 +176,9 @@ function findRelatedRecipes(target, allRecipes, max = 3) {
 }
 
 /**
- * Builds the highlight (1+4 asymmetric grid) recipe list.
- * Reads difficulty, total-time, and serves from query-index fields if present.
+ * Builds the highlight recipe list.
  */
-function buildFeaturedList(recipes) {
+function buildFeaturedList(recipes, placeholders) {
   const ul = document.createElement('ul');
   recipes.forEach((recipe) => {
     let imagePath = recipe.image;
@@ -192,18 +190,18 @@ function buildFeaturedList(recipes) {
     }
 
     const { difficulty } = recipe;
-    const timeText = recipe['total-time'] || '';
-    const servesText = recipe.yield || '';
+    const timeText = formatTime(recipe['total-time'], placeholders);
+    const servesText = formatServings(recipe.yield);
 
     const badge = difficulty
       ? `<span class="highlight-badge" data-difficulty="${toClassName(difficulty)}">${difficulty}</span>`
       : '';
 
     const timeItem = timeText
-      ? `<span class="highlight-meta-item">${clockIcon} <span>${timeText}</span></span>`
+      ? `<span class="highlight-meta-item"><img src="/blocks/recipe/time.svg" alt=""> <span>${timeText}</span></span>`
       : '';
     const servesItem = servesText
-      ? `<span class="highlight-meta-item">${servesIcon} <span>${servesText}</span></span>`
+      ? `<span class="highlight-meta-item"><img src="/blocks/recipe/yield.svg" alt=""> <span>${servesText}</span></span>`
       : '';
     const metaRow = (timeItem || servesItem)
       ? `<div class="highlight-meta"><div class="highlight-meta-left">${timeItem}${servesItem}</div></div>`
@@ -213,7 +211,7 @@ function buildFeaturedList(recipes) {
     li.innerHTML = `
       <a href="${recipe.path}">
         <div class="highlight-image">
-          <img src="${imagePath}" alt="${recipe.title}" loading="lazy" />
+          <img src="${imagePath}" alt="" loading="lazy" />
           ${badge}
         </div>
         <div class="highlight-body">
@@ -230,6 +228,7 @@ function buildFeaturedList(recipes) {
 export default async function decorate(block) {
   const isFeatured = block.classList.contains('highlight');
   const { locale, language } = getLocaleAndLanguage();
+  const placeholders = isFeatured ? await fetchPlaceholders(`/${locale}/${language}`) : {};
   const path = `/${locale}/${language}/recipes/query-index.json`;
   const resp = await fetch(path);
   if (!resp.ok) {
@@ -280,7 +279,7 @@ export default async function decorate(block) {
   }
 
   if (isFeatured) {
-    block.replaceChildren(buildFeaturedList(relatedRecipes));
+    block.replaceChildren(buildFeaturedList(relatedRecipes, placeholders));
     return;
   }
 
