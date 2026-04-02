@@ -1,0 +1,362 @@
+.checkout-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 32px 0 0;
+}
+
+/* Mobile: cart summary on top, form below */
+@media (width < 1000px) {
+  .checkout-container {
+    flex-direction: column;
+  }
+
+  .checkout-summary-column {
+    order: -1; /* Cart summary appears first on mobile */
+  }
+
+  .checkout-form-column {
+    order: 1;
+  }
+}
+
+/* Desktop: form on left, cart summary on right */
+@media (width >= 1000px) {
+  .checkout-container {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 40px;
+  }
+
+  .checkout-form-column {
+    flex: 1;
+    max-width: 600px;
+  }
+
+  .checkout-summary-column {
+    flex: 0 0 450px;
+    position: sticky;
+    top: 100px; /* Keeps it visible while scrolling */
+  }
+}
+
+/* Remove default block wrapper margins */
+.checkout .form-wrapper,
+.checkout .cart-summary-wrapper {
+  margin: 0;
+}
+
+/* Form styling adjustments for checkout context */
+.checkout-form-column .form {
+  background: transparent;
+}
+
+.checkout-form-column form {
+  display: grid;
+  gap: var(--spacing-80);
+}
+
+.checkout-form-column form input,
+.checkout-form-column form select {
+  font-weight: normal;
+  font-family: var(--sans-serif-font-family);
+  font-size: 16px;
+  box-sizing: border-box;
+  height: 48px;
+}
+
+.checkout-form-column .button-wrapper {
+  margin-top: var(--spacing-80);
+}
+
+.checkout-form-column .button {
+  width: 100%;
+}
+
+.checkout-form-column form .field-help-text {
+  font-size: var(--body-size-xs);
+  padding-left: 8px;
+}
+
+.checkout-form-column .form form fieldset[data-name="optIn"] {
+  margin-top: 0;
+}
+
+.checkout-form-column form fieldset[data-name="optIn"] legend {
+  display: none;
+}
+
+/* Shipping & billing address grid layout — 6-col grid for 2-col and 3-col rows */
+.checkout-form-column .section-shipping,
+.checkout-form-column .section-billing {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+  align-items: end;
+}
+
+/* Shipping methods */
+.shipping-methods {
+  border: none;
+  padding: 0;
+  width: 100%;
+}
+
+.shipping-methods h3 {
+  margin-bottom: var(--spacing-40);
+}
+
+.checkout-form-column .section-shipping h3,
+.checkout-form-column .section-billing h3 {
+  grid-column: 1 / -1;
+}
+
+/* Default: all fields full width */
+.checkout-form-column .section-shipping .form-field,
+.checkout-form-column .section-billing .form-field {
+  grid-column: 1 / -1;
+}
+
+.checkout-form-column .form .form-field + .form-field {
+  margin-top: 8px;
+}
+
+/* Company — full width, after lastname */
+.checkout-form-column .section-shipping .form-field[data-name="company"],
+.checkout-form-column .section-billing .form-field[data-name="company"] { order: 3; }
+
+/* Reorder fields: firstname(1) lastname(2) street-0(3) street-1(4) city(5) state(6) zip(7) phone(8) */
+.checkout-form-column .section-shipping .form-field[data-name="firstname"],
+.checkout-form-column .section-billing .form-field[data-name="firstname"] { order: 1; }
+
+.checkout-form-column .section-shipping .form-field[data-name="lastname"],
+.checkout-form-column .section-billing .form-field[data-name="lastname"] { order: 2; }
+
+.checkout-form-column .section-shipping .form-field[data-name="street-0"],
+.checkout-form-column .section-billing .form-field[data-name="street-0"] { order: 4; }
+
+.checkout-form-column .section-shipping .form-field[data-name="street-1"],
+.checkout-form-column .section-billing .form-field[data-name="street-1"] { order: 5; }
+
+.checkout-form-column .section-shipping .form-field[data-name="city"],
+.checkout-form-column .section-billing .form-field[data-name="city"] { order: 6; }
+
+.checkout-form-column .section-shipping .form-field[data-name="state"],
+.checkout-form-column .section-billing .form-field[data-name="state"] { order: 7; }
+
+.checkout-form-column .section-shipping .form-field[data-name="zip"],
+.checkout-form-column .section-billing .form-field[data-name="zip"] { order: 8; }
+
+.checkout-form-column .section-shipping .form-field[data-name="telephone"],
+.checkout-form-column .section-billing .form-field[data-name="telephone"] { order: 9; }
+
+/* Desktop layout — data-name uses original field names (without shipping-/billing- prefix) */
+@media (width >= 480px) {
+  /* First name / Last name — half width each */
+  .checkout-form-column .section-shipping .form-field[data-name="firstname"],
+  .checkout-form-column .section-billing .form-field[data-name="firstname"] {
+    grid-column: 1 / 4;
+  }
+
+  .checkout-form-column .section-shipping .form-field[data-name="lastname"],
+  .checkout-form-column .section-billing .form-field[data-name="lastname"] {
+    grid-column: 4 / 7;
+  }
+
+  /* City / Province / Postal code — thirds */
+  .checkout-form-column .section-shipping .form-field[data-name="city"],
+  .checkout-form-column .section-billing .form-field[data-name="city"] {
+    grid-column: 1 / 3;
+  }
+
+  .checkout-form-column .section-shipping .form-field[data-name="state"],
+  .checkout-form-column .section-billing .form-field[data-name="state"] {
+    grid-column: 3 / 5;
+  }
+
+  .checkout-form-column .section-shipping .form-field[data-name="zip"],
+  .checkout-form-column .section-billing .form-field[data-name="zip"] {
+    grid-column: 5 / 7;
+  }
+}
+
+.checkout-form-column .form form .form-field[data-name="street-1"] {
+  margin-top: -2px;
+}
+
+.checkout-form-column .form form .button-wrapper span.payment-button {
+  width: 100%;
+}
+
+apple-pay-button {
+  --apple-pay-button-width: 100%;
+  --apple-pay-button-height: 40px;
+  --apple-pay-button-border-radius: 5px;
+  --apple-pay-button-padding: 5px 0px;
+}
+
+.checkout-form-column .form form .button-wrapper span.payment-button.paypal .button {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  padding-top: 13px;
+  padding-bottom: 13px;
+  align-items: center;
+}
+
+span.payment-button.paypal .button img {
+  height: 24px;
+  width: 70px;
+}
+
+/* Form section ordering */
+.checkout-form-column form .section-shipping { order: 1; }
+.checkout-form-column form > .form-field[data-name="billingEqualsShipping"] { order: 2; }
+.checkout-form-column form .section-billing { order: 3; }
+.checkout-form-column form .shipping-methods { order: 4; }
+.checkout-form-column form .section-payment { order: 5; }
+.checkout-form-column form > .form-field[data-name="email"] { order: 0; }
+.checkout-form-column form > .form-field[data-name="optIn"] { order: 0; }
+.checkout-form-column form .button-wrapper { order: 7; }
+
+.shipping-methods.loading {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.shipping-method-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.shipping-method-option:hover {
+  border-color: #333;
+}
+
+.shipping-method-option:has(input:checked) {
+  border-color: #333;
+  background: #fafafa;
+}
+
+.shipping-method-option input[type="radio"] {
+  margin: 0;
+  width: 18px;
+  height: 18px;
+}
+
+.shipping-method-label {
+  flex: 1;
+}
+
+.shipping-method-price {
+  font-weight: 600;
+}
+
+.shipping-methods-empty {
+  color: #666;
+  font-style: italic;
+}
+
+/* Required indicator is now appended directly to the floating label text in JS */
+
+/* Required field error state */
+.checkout-form-column form input.field-required,
+.checkout-form-column form select.field-required {
+  border-color: #c00;
+}
+
+/* Checkout error */
+.checkout-error {
+  background: #fee;
+  border: 1px solid #c00;
+  color: #900;
+  padding: 12px 16px;
+  border-radius: 6px;
+  margin-bottom: var(--spacing-40);
+}
+
+.checkout-error[aria-hidden="true"] {
+  display: none;
+}
+
+/* Empty cart */
+.checkout-empty {
+  text-align: center;
+  padding: 80px 24px;
+}
+
+.checkout-empty h2 {
+  margin: 0 0 8px;
+}
+
+.checkout-empty p {
+  margin: 0 0 24px;
+  color: #555;
+}
+
+/* Loading state for pay button */
+.checkout-form-column .button.loading {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* Floating label */
+.checkout-form-column .floating-label-field {
+  position: relative;
+}
+
+.checkout-form-column .floating-label-field input,
+.checkout-form-column .floating-label-field select,
+.checkout-form-column .floating-label-field textarea {
+  padding-top: 20px;
+  padding-bottom: 4px;
+  height: 52px;
+}
+
+.checkout-form-column .floating-label-field select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23666' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 36px;
+}
+
+.checkout-form-column .floating-label-field textarea {
+  height: auto;
+  padding-top: 24px;
+}
+
+.checkout-form-column .floating-label-field label {
+  position: absolute;
+  left: var(--spacing-100);
+  top: 16px;
+  margin: 0;
+  font-size: 1rem;
+  color: #888;
+  pointer-events: none;
+  transition: top 0.15s ease, font-size 0.15s ease, color 0.15s ease;
+}
+
+/* Float label up when focused or filled */
+.checkout-form-column .floating-label-field:has(input:focus) label,
+.checkout-form-column .floating-label-field:has(input:not(:placeholder-shown)) label,
+.checkout-form-column .floating-label-field:has(select:focus) label,
+.checkout-form-column .floating-label-field:has(select.has-value) label,
+.checkout-form-column .floating-label-field:has(textarea:focus) label,
+.checkout-form-column .floating-label-field:has(textarea:not(:placeholder-shown)) label {
+  top: 8px;
+  transform: translateY(0);
+  font-size: 0.7rem;
+  color: #555;
+}

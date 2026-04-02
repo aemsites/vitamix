@@ -1,0 +1,240 @@
+const debounce = (func, wait) => {
+  let timeout;
+  return (...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
+};
+
+export class Cart {
+  static get STORAGE_KEY() {
+    const locale = window.location.pathname.split('/')[1] || 'default';
+    return `cart:${locale === 'drafts' ? 'ca' : locale}`;
+  }
+
+  static STORAGE_VERSION = 1;
+
+  static SHIPPING_THRESHOLD = 150;
+
+  /** @type {Record<string, CartItem>} */
+  #items = {};
+
+  constructor() {
+    this.#restore();
+    this.#persistNow();
+  }
+
+  #restore() {
+    const cart = localStorage.getItem(Cart.STORAGE_KEY);
+    if (cart) {
+      const parsed = JSON.parse(cart);
+      if (parsed.version !== Cart.STORAGE_VERSION) {
+        localStorage.removeItem(Cart.STORAGE_KEY);
+        return;
+      }
+      this.#items = parsed.items.reduce((acc, item) => {
+        acc[item.sku] = item;
+        return acc;
+      }, {});
+      document.dispatchEvent(
+        new CustomEvent('cart:change', {
+          detail: {
+            cart: this,
+            action: 'restore',
+          },
+        }),
+      );
+    }
+  }
+
+  #persistNow() {
+    const expires = new Date(Date.now() + 30 * 864e5).toUTCString();
+    document.cookie = `cart_items_count=${this.itemCount}; expires=${expires}; path=/`;
+    localStorage.setItem(Cart.STORAGE_KEY, JSON.stringify(this));
+  }
+
+  #persist = debounce(() => {
+    this.#persistNow();
+  }, 300);
+
+  #maybeSendEmptyEvent() {
+    if (this.itemCount === 0) {
+      document.dispatchEvent(
+        new CustomEvent('cart:change', {
+          detail: {
+            cart: this,
+            action: 'empty',
+          },
+        }),
+      );
+    }
+  }
+
+  get items() {
+    return Object.values(this.#items);
+  }
+
+  get itemCount() {
+    return Object.values(this.#items).reduce(
+      (acc, item) => acc + item.quantity,
+      0,
+    );
+  }
+
+  get subtotal() {
+    return Object.values(this.#items).reduce(
+      (acc, item) => acc + item.quantity * (typeof item.price === 'string'
+        ? parseFloat(item.price)
+        : item.price / 100),
+      0,
+    );
+  }
+
+  get shipping() {
+    return this.subtotal < Cart.SHIPPING_THRESHOLD ? 10 : 0;
+  }
+
+  clear() {
+    this.#items = {};
+    this.#persistNow();
+    document.dispatchEvent(
+      new CustomEvent('cart:change', {
+        detail: {
+          cart: this,
+          action: 'clear',
+        },
+      }),
+    );
+    this.#maybeSendEmptyEvent();
+  }
+
+  /**
+   * @param {CartItem} item
+   */
+  addItem(item) {
+    const existing = this.#items[item.sku];
+    if (existing) {
+      existing.quantity += item.quantity;
+    } else {
+      this.#items[item.sku] = item;
+    }
+    document.dispatchEvent(
+      new CustomEvent('cart:change', {
+        detail: {
+          cart: this,
+          item,
+          action: 'add',
+        },
+      }),
+    );
+    this.#persist();
+  }
+
+  /**
+   * @param {string} sku
+   * @param {number} quantity
+   */
+  updateItem(sku, quantity) {
+    if (!this.#items[sku]) {
+      throw new Error(`Item with sku ${sku} not found`);
+    }
+    this.#items[sku].quantity = quantity;
+    document.dispatchEvent(
+      new CustomEvent('cart:change', {
+        detail: {
+          cart: this,
+          item: this.#items[sku],
+          action: 'update',
+        },
+      }),
+    );
+    this.#maybeSendEmptyEvent();
+    this.#persist();
+  }
+
+  /**
+   * @param {string} sku
+   */
+  removeItem(sku) {
+    const item = this.#items[sku];
+    delete this.#items[sku];
+    document.dispatchEvent(
+      new CustomEvent('cart:change', {
+        detail: {
+          cart: this,
+          item,
+          action: 'remove',
+        },
+      }),
+    );
+    this.#maybeSendEmptyEvent();
+    this.#persist();
+  }
+
+  /**
+   * Returns cart items in API-compatible format.
+   * @returns {Array<{sku: string, path: string, quantity: number, name: string,
+   *   price: {final: string, currency: string}}>}
+   */
+  getItemsForAPI() {
+    return this.items.map((item) => ({
+      sku: item.sku,
+      path: item.path || new URL(item.url, window.location.origin).pathname,
+      quantity: item.quantity,
+      name: item.name,
+      price: {
+        final: String(item.price),
+        currency: window.location.pathname.startsWith('/ca/') ? 'CAD' : 'USD',
+      },
+    }));
+  }
+
+  getOrderJSON(email, firstName, lastName, phone, shippingAddr, {
+    billingAddr, shippingMethod, estimateToken, locale, country,
+  } = {}) {
+    // remove empty string values from addresses
+    const cleanAddr = (addr) => Object.fromEntries(
+      // eslint-disable-next-line no-unused-vars
+      Object.entries(addr).filter(([_, value]) => value !== ''),
+    );
+
+    const order = {
+      customer: {
+        firstName,
+        lastName,
+        email,
+        phone,
+      },
+      shipping: cleanAddr(shippingAddr),
+      items: this.getItemsForAPI(),
+    };
+
+    if (billingAddr) {
+      order.billing = cleanAddr(billingAddr);
+    }
+    if (shippingMethod) {
+      order.shippingMethod = { id: shippingMethod };
+    }
+    if (estimateToken) {
+      order.estimateToken = estimateToken;
+    }
+    if (locale) {
+      order.locale = locale;
+    }
+    if (country) {
+      order.country = country;
+    }
+
+    return order;
+  }
+
+  toJSON() {
+    return {
+      version: Cart.STORAGE_VERSION,
+      items: Object.values(this.#items),
+    };
+  }
+}
+
+window.cart = new Cart();
+export default window.cart;

@@ -70,6 +70,10 @@ body.pdp-template {
   --site-width: 1440px;
 }
 
+body.cart-template {
+  --site-width: 1440px;
+}
+
 @media (width >= 900px) {
   :root {
     /* widths and heights */

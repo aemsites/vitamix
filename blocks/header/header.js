@@ -1,6 +1,9 @@
 import { getMetadata, toClassName } from '../../scripts/aem.js';
-import { swapIcons, getCookies } from '../../scripts/scripts.js';
+import { swapIcons, getCookies, getOrderPath } from '../../scripts/scripts.js';
 import { loadFragment } from '../fragment/fragment.js';
+import { AUTH_TOKEN_KEY } from '../../scripts/auth-api.js';
+
+const EDGE_CART_PATH = () => getOrderPath('cart');
 
 // media query match that indicates desktop width
 const isDesktop = window.matchMedia('(width >= 1000px)');
@@ -435,16 +438,202 @@ export default async function decorate(block) {
     }
   }
 
+  const accountLink = block.querySelector('.icon-account').parentElement;
+
   const customer = cookies.vitamix_customer;
   if (customer) {
-    const account = block.querySelector('.icon-account').parentElement;
-    account.lastChild.textContent = `${customer}'s Account`;
+    accountLink.lastChild.textContent = `${customer}'s Account`;
   }
 
-  const cartItems = cookies.cart_items_count;
-  if (cartItems && +cartItems > 0) {
-    const cart = block.querySelector('.icon-cart').parentElement;
-    cart.dataset.cartItems = cartItems;
-    cart.lastChild.textContent = `Cart (${cartItems})`;
+  // --- Auth state display (all pages) ---
+
+  const updateAuthUI = (loggedIn) => {
+    accountLink.classList.toggle('is-logged-in', !!loggedIn);
+  };
+
+  document.addEventListener('commerce:auth-state-changed', (ev) => {
+    updateAuthUI(ev.detail.loggedIn);
+  });
+
+  // restore auth UI on page load
+  try {
+    const hasToken = !!sessionStorage.getItem(AUTH_TOKEN_KEY);
+    if (hasToken) updateAuthUI(true);
+  } catch { /* ignore */ }
+
+  // --- Auth panel (edge cart mode only) ---
+  if (window.cartMode === 'edge') {
+    let authPanel = null;
+    const ensureAuthPanel = async () => {
+      if (authPanel) return authPanel;
+      const { default: createAuthPanel } = await import('./auth-panel.js');
+      authPanel = createAuthPanel();
+      block.append(authPanel.dialog);
+      return authPanel;
+    };
+
+    accountLink.addEventListener('click', async (e) => {
+      const hasToken = !!sessionStorage.getItem(AUTH_TOKEN_KEY);
+      if (!hasToken) {
+        e.preventDefault();
+        const panel = await ensureAuthPanel();
+        panel.showEmailStep();
+        panel.open();
+      }
+    });
   }
+
+  const cartLink = block.querySelector('.icon-cart').parentElement;
+
+  // Read item count from locale-specific localStorage key (same logic as Cart.STORAGE_KEY)
+  // to avoid stale domain-wide cookie when switching between locales (e.g. CA → US).
+  const getStoredCartCount = () => {
+    try {
+      const locale = window.location.pathname.split('/')[1] || 'default';
+      const key = `cart:${locale === 'drafts' ? 'ca' : locale}`;
+      const stored = localStorage.getItem(key);
+      if (!stored) return 0;
+      const parsed = JSON.parse(stored);
+      return (parsed.items || []).reduce((acc, item) => acc + item.quantity, 0);
+    } catch {
+      return 0;
+    }
+  };
+
+  const initialCount = getStoredCartCount();
+  if (initialCount > 0) {
+    cartLink.dataset.cartItems = initialCount;
+    cartLink.lastChild.textContent = `Cart (${initialCount})`;
+  }
+
+  // update cart qty bubble on change
+  document.addEventListener('cart:change', (e) => {
+    const { itemCount } = e.detail.cart;
+    if (itemCount > 0) {
+      cartLink.dataset.cartItems = itemCount;
+      cartLink.lastChild.textContent = `Cart (${itemCount})`;
+    } else {
+      delete cartLink.dataset.cartItems;
+      cartLink.lastChild.textContent = 'Cart';
+    }
+  });
+
+  // change to edge cart link
+  if (window.cartMode === 'edge') {
+    cartLink.href = EDGE_CART_PATH();
+  }
+
+  const openOrRedirect = async (e) => {
+    // if already on cart page, do nothing
+    if (window.location.pathname.includes(EDGE_CART_PATH())) {
+      return;
+    }
+
+    // if on mobile or using legacy cart, redirect to cart page
+    if (window.cartMode === 'legacy' || window.innerWidth < 900) {
+      return;
+    }
+
+    // on desktop, open minicart popover
+    if (e) {
+      e.preventDefault();
+    }
+    /** @type {HTMLDialogElement} */
+    let minicart = document.querySelector('#minicart');
+
+    const scrollToItem = () => {
+      setTimeout(() => {
+        const addedItem = minicart.querySelector(`.cart-item-${e.detail.item.sku}`);
+        addedItem.scrollIntoView({ behavior: 'smooth' });
+      }, 300);
+    };
+
+    if (minicart) {
+      minicart.openModal();
+      scrollToItem();
+      return;
+    }
+
+    try {
+      const { default: decorateCart } = await import('../cart/cart.js');
+      minicart = document.createElement('dialog');
+      minicart.id = 'minicart';
+      minicart.className = 'minicart';
+      minicart.setAttribute('aria-expanded', false);
+      block.append(minicart);
+
+      const headerRow = document.createElement('div');
+      headerRow.className = 'slide-panel-header';
+
+      const cartTitle = document.createElement('h2');
+      cartTitle.textContent = 'Cart';
+      headerRow.append(cartTitle);
+
+      const cartClose = document.createElement('button');
+      cartClose.className = 'slide-panel-close';
+      cartClose.textContent = '\u00D7';
+      cartClose.setAttribute('aria-label', 'Close');
+      cartClose.addEventListener('click', () => {
+        minicart.closeModal();
+      });
+      headerRow.append(cartClose);
+      minicart.append(headerRow);
+
+      const cartBlock = document.createElement('div');
+      minicart.append(cartBlock);
+      decorateCart(cartBlock, cartLink);
+
+      minicart.addEventListener('click', (event) => {
+        const rect = minicart.getBoundingClientRect();
+        const isInDialog = (rect.top <= event.clientY
+          && event.clientY <= rect.top + rect.height
+          && rect.left <= event.clientX
+          && event.clientX <= rect.left + rect.width);
+        if (!isInDialog) {
+          minicart.closeModal();
+        }
+      });
+
+      const closeOnEmpty = (ev) => {
+        if (ev.detail.action === 'empty') {
+          minicart.closeModal();
+        }
+      };
+
+      // open/close methods to account for transitions
+      const open = () => {
+        minicart.showModal();
+        minicart.setAttribute('aria-expanded', true);
+        document.addEventListener('cart:change', closeOnEmpty);
+      };
+      minicart.openModal = open;
+
+      const close = () => {
+        minicart.setAttribute('aria-expanded', false);
+        document.removeEventListener('cart:change', closeOnEmpty);
+        setTimeout(() => {
+          minicart.close();
+        }, 300);
+      };
+      minicart.closeModal = close;
+
+      minicart.openModal();
+
+      // scroll item into view
+      scrollToItem();
+    } catch (error) {
+      setTimeout(() => {
+        // redirect to cart page
+        window.location.href = EDGE_CART_PATH();
+      }, 1000);
+    }
+  };
+
+  // handle cart click
+  cartLink.addEventListener('click', openOrRedirect);
+
+  // and when adding to cart from PDP
+  document.addEventListener('pdp:add-to-cart', (ev) => {
+    openOrRedirect(ev);
+  });
 }

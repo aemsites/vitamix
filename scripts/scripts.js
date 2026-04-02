@@ -17,7 +17,16 @@ import {
   getMetadata,
 } from './aem.js';
 
-const isProdHost = window.location.hostname.includes('vitamix.com');
+const { hostname } = window.location;
+
+export const ORDERS_API_ORIGIN = 'https://api-stage.adobecommerce.live/aemsites/sites/vitamix';
+
+// Locales enabled for edge cart on production.
+// Add locale codes here as each region goes live (e.g., 'ca', 'fr_ca').
+const EDGE_CART_LOCALES = [];
+
+const isEdgeHost = hostname.includes('localhost') || hostname.includes('edge-orders') || hostname.includes('uat.vitamix.com');
+const isProdHost = hostname.includes('vitamix.com');
 export const FORMS_ENDPOINT = isProdHost
   ? ''
   : 'https://main--vitamix--aemsites.aem.network';
@@ -76,6 +85,17 @@ export function getLocaleAndLanguage(forceEnCA = false) {
   }
 
   return { locale, language };
+}
+
+/**
+ * Returns the path for an order-flow page (cart, checkout, complete, cancel)
+ * scoped to the current locale and language.
+ * @param {'cart'|'checkout'|'complete'|'cancel'} page
+ * @returns {string}
+ */
+export function getOrderPath(page) {
+  const { locale, language } = getLocaleAndLanguage();
+  return `/${locale}/${language}/order/${page}`;
 }
 
 /**
@@ -1151,9 +1171,15 @@ async function simulatePDPPreview() {
  * @param {Element} doc The container element
  */
 async function loadEager(doc) {
-  const locale = window.location.pathname.split('/')[2];
-  const language = locale ? locale.split('_')[0] : 'en';
-  document.documentElement.lang = language;
+  const { locale, language } = getLocaleAndLanguage();
+  document.documentElement.lang = language ? language.split('_')[0] : 'en';
+
+  // Dev/staging hosts: edge cart enabled for all locales.
+  // Production: edge cart enabled only for locales listed in EDGE_CART_LOCALES.
+  window.cartMode = (isEdgeHost || EDGE_CART_LOCALES.includes(locale)) ? 'edge' : 'legacy';
+  if (['edge', 'legacy'].includes(localStorage.getItem('cartMode'))) {
+    window.cartMode = localStorage.getItem('cartMode');
+  }
 
   /* simulation date */
   const params = new URLSearchParams(window.location.search);
@@ -1284,8 +1310,8 @@ async function loadLazy(doc) {
 function decorateExternalLinks() {
   const externalLinks = document.querySelectorAll('a[href^="https://"]');
   externalLinks.forEach((link) => {
-    const { hostname } = new URL(link.href);
-    if (!link.href.includes('vitamix') || hostname === 'localhost') {
+    const { hostname: linkHostname } = new URL(link.href);
+    if (!link.href.includes('vitamix') || linkHostname === 'localhost') {
       link.setAttribute('target', '_blank');
       link.setAttribute('rel', 'noopener');
     }
@@ -1333,6 +1359,16 @@ async function loadDelayed() {
     // eslint-disable-next-line no-console
     console.error('Error loading link checker', e);
   }
+
+  const { default: injectForterSnippet } = await import('./forter-snippet.js');
+  injectForterSnippet();
+
+  document.addEventListener('ftr:tokenReady', (evt) => {
+    const token = evt.detail;
+    try {
+      sessionStorage.setItem('forter_token', token);
+    } catch { /* ignore */ }
+  });
 
   setTimeout(decorateExternalLinks, 1000);
 }
