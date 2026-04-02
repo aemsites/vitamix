@@ -603,9 +603,10 @@ export default async function decorate(block) {
           const { order: createdOrder } = await createOrder(order);
           sessionStorage.setItem('checkout_order', JSON.stringify(createdOrder));
 
-          // initiate payment
+          // initiate payment — include Forter fraud token if available
           const idempotencyKey = crypto.randomUUID();
-          const payment = await initiatePayment(createdOrder.id, idempotencyKey);
+          const fraudToken = sessionStorage.getItem('forter_token') || undefined;
+          const payment = await initiatePayment(createdOrder.id, idempotencyKey, fraudToken);
           if (payment.action === 'redirect' && payment.redirectUrl) {
             // redirect to Chase hosted payment page
             window.location.href = payment.redirectUrl;

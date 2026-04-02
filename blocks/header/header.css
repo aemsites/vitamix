@@ -577,7 +577,7 @@ header .minicart {
   width: min(400px, 100vw);
   min-height: 100vh;
   background: var(--layer-elevated);
-  padding: 2em 2em 2em;
+  padding: 2em;
   box-shadow: -4px 4px 18px rgb(0 0 0 / 20%);
   margin: 0 0 0 100%;
   border: none;
@@ -757,7 +757,7 @@ header .auth-panel {
   width: min(400px, 100vw);
   min-height: 100vh;
   background: var(--layer-elevated);
-  padding: 2em 2em 2em;
+  padding: 2em;
   box-shadow: -4px 4px 18px rgb(0 0 0 / 20%);
   margin: 0 0 0 100%;
   border: none;

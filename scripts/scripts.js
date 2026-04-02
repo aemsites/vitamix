@@ -1360,6 +1360,16 @@ async function loadDelayed() {
     console.error('Error loading link checker', e);
   }
 
+  const { default: injectForterSnippet } = await import('./forter-snippet.js');
+  injectForterSnippet();
+
+  document.addEventListener('ftr:tokenReady', (evt) => {
+    const token = evt.detail;
+    try {
+      sessionStorage.setItem('forter_token', token);
+    } catch { /* ignore */ }
+  });
+
   setTimeout(decorateExternalLinks, 1000);
 }
 

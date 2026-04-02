@@ -58,10 +58,6 @@
   gap: var(--spacing-80);
 }
 
-.checkout-form-column .form .form-field + .form-field {
-  margin-top: 8px;
-}
-
 .checkout-form-column form input,
 .checkout-form-column form select {
   font-weight: normal;
@@ -121,6 +117,10 @@
 .checkout-form-column .section-shipping .form-field,
 .checkout-form-column .section-billing .form-field {
   grid-column: 1 / -1;
+}
+
+.checkout-form-column .form .form-field + .form-field {
+  margin-top: 8px;
 }
 
 /* Company — full width, after lastname */
