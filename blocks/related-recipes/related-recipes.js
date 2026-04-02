@@ -1,6 +1,9 @@
 import { getMetadata } from '../../scripts/aem.js';
 import { buildCarousel, getLocaleAndLanguage } from '../../scripts/scripts.js';
 
+const clockIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+const servesIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
+
 const WEIGHTS = {
   titleWords: 4,
   recipeType: 3,
@@ -173,7 +176,57 @@ function findRelatedRecipes(target, allRecipes, max = 3) {
   }, []);
 }
 
+/**
+ * Builds the highlight (1+4 asymmetric grid) recipe list.
+ * Reads difficulty, total-time, and serves from query-index fields if present.
+ */
+function buildFeaturedList(recipes) {
+  const ul = document.createElement('ul');
+  recipes.forEach((recipe) => {
+    let imagePath = recipe.image;
+    try {
+      const imageUrl = new URL(imagePath, window.location.origin);
+      imagePath = imageUrl.pathname + imageUrl.search;
+    } catch (e) {
+      // use as-is
+    }
+
+    const difficulty = recipe.difficulty || 'intermediate';
+    const timeText = recipe['total-time'] || recipe.time || '';
+    const servesText = recipe.serves || '';
+
+    const badge = `<span class="highlight-badge" data-difficulty="${difficulty}">${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}</span>`;
+
+    const timeItem = timeText
+      ? `<span class="highlight-meta-item">${clockIcon} <span>${timeText}</span></span>`
+      : '';
+    const servesItem = servesText
+      ? `<span class="highlight-meta-item">${servesIcon} <span>${servesText}</span></span>`
+      : '';
+    const metaRow = (timeItem || servesItem)
+      ? `<div class="highlight-meta"><div class="highlight-meta-left">${timeItem}${servesItem}</div></div>`
+      : '';
+
+    const li = document.createElement('li');
+    li.innerHTML = `
+      <a href="${recipe.path}">
+        <div class="highlight-image">
+          <img src="${imagePath}" alt="${recipe.title}" loading="lazy" />
+          ${badge}
+        </div>
+        <div class="highlight-body">
+          <h2>${recipe.title}</h2>
+          ${metaRow}
+        </div>
+      </a>
+    `;
+    ul.append(li);
+  });
+  return ul;
+}
+
 export default async function decorate(block) {
+  const isFeatured = block.classList.contains('highlight');
   const { locale, language } = getLocaleAndLanguage();
   const path = `/${locale}/${language}/recipes/query-index.json`;
   const resp = await fetch(path);
@@ -216,11 +269,16 @@ export default async function decorate(block) {
       dietaryInterests,
     };
 
-    relatedRecipes = findRelatedRecipes(target, data);
+    relatedRecipes = findRelatedRecipes(target, data, isFeatured ? 5 : 3);
   }
 
   if (relatedRecipes.length < 1) {
     block.remove();
+    return;
+  }
+
+  if (isFeatured) {
+    block.replaceChildren(buildFeaturedList(relatedRecipes));
     return;
   }
 

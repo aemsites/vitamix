@@ -75,108 +75,9 @@ function setCardDefaults(block, ul, variants) {
   return variants;
 }
 
-const clockIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
-const servesIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
-
-/**
- * Expected authoring columns in the DA table (grids variant):
- *   Col 1 – image
- *   Col 2 – grid data as paragraphs (order-independent, detected by content):
- *     - Grid item title (heading element, or first paragraph)
- *     - Difficulty keyword: Simple | Intermediate | Advanced (standalone word)
- *     - Time: starts with ~ or contains "min"/"hr"/"hour"
- *     - Serves (optional): contains "serves" or "servings"
- *     - CTA link (optional): anchor element
- */
-function decorateGrids(ul) {
-  ul.querySelectorAll('li').forEach((li) => {
-    const body = li.querySelector('.card-body');
-    if (!body) return;
-
-    const paragraphs = [...body.querySelectorAll('p, h1, h2, h3, h4')];
-    if (!paragraphs.length) return;
-
-    const difficulties = ['simple', 'intermediate', 'advanced'];
-
-    let title = '';
-    let difficulty = 'intermediate';
-    let timeText = '';
-    let servesText = '';
-    let ctaHref = '';
-
-    paragraphs.forEach((p) => {
-      const text = p.textContent.trim();
-      const lowerText = text.toLowerCase();
-      const isHeading = /^h[1-4]$/i.test(p.tagName);
-
-      // Headings are always the title
-      if (isHeading) {
-        title = text;
-        return;
-      }
-
-      // CTA link
-      const a = p.querySelector('a[href]');
-      if (a) { ctaHref = a.href; return; }
-
-      // Difficulty keyword
-      if (difficulties.includes(lowerText)) {
-        difficulty = lowerText;
-        return;
-      }
-
-      // Serves: contains "serves" or "servings"
-      if (/serves|servings/i.test(text)) {
-        servesText = text;
-        return;
-      }
-
-      // Time: starts with ~ or contains min/hr/hour/minute
-      if (/^~|min|hr\b|hour|minute/i.test(text)) {
-        timeText = text;
-        return;
-      }
-
-      // First unmatched paragraph becomes the title if no heading found yet
-      if (!title) title = text;
-    });
-
-    // Build the badge
-    const badge = document.createElement('span');
-    badge.className = 'grids-badge';
-    badge.dataset.difficulty = difficulty;
-    badge.textContent = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
-
-    const image = li.querySelector('.card-image');
-    if (image) image.append(badge);
-
-    const timeItem = timeText
-      ? `<span class="grids-meta-item">${clockIcon} <span>${timeText}</span></span>`
-      : '';
-    const servesItem = servesText
-      ? `<span class="grids-meta-item">${servesIcon} <span>${servesText}</span></span>`
-      : '';
-    const ctaItem = ctaHref
-      ? `<a class="grids-cta" href="${ctaHref}">View →</a>`
-      : '';
-
-    const metaRow = (timeItem || servesItem || ctaItem)
-      ? `<div class="grids-meta">
-           <div class="grids-meta-left">${timeItem}${servesItem}</div>
-           ${ctaItem}
-         </div>`
-      : '';
-
-    body.innerHTML = `
-      <h2>${title}</h2>
-      ${metaRow}
-    `;
-  });
-}
-
 /*
- * Decorates the gift variant cards.
- * Expected authoring columns in the DA table (gift variant):
+ * Decorates the highlight variant cards.
+ * Expected authoring columns in the DA table (highlight variant):
  *   Col 1 – image
  *   Col 2 – content paragraphs (order-independent, detected by content):
  *     - Badge text (optional): any paragraph starting with "badge:" e.g. "badge: Most Popular"
@@ -186,7 +87,7 @@ function decorateGrids(ul) {
  *     - CTA link: any paragraph containing an <a href>
  */
 
-function decorateGift(ul) {
+function decorateFeatured(ul) {
   ul.querySelectorAll('li').forEach((li) => {
     const body = li.querySelector('.card-body');
     if (!body) return;
@@ -240,20 +141,20 @@ function decorateGift(ul) {
     // Badge on image
     if (badgeText) {
       const badge = document.createElement('span');
-      badge.className = 'gift-badge';
+      badge.className = 'highlight-badge';
       badge.textContent = badgeText;
       const image = li.querySelector('.card-image');
       if (image) image.append(badge);
     }
 
     const eyebrowHTML = eyebrowText
-      ? `<p class="gift-eyebrow">${eyebrowText}</p>`
+      ? `<p class="highlight-eyebrow">${eyebrowText}</p>`
       : '';
     const descriptionHTML = description
-      ? `<p class="gift-description">${description}</p>`
+      ? `<p class="highlight-description">${description}</p>`
       : '';
     const ctaHTML = ctaHref
-      ? `<a class="gift-cta" href="${ctaHref}">${ctaLabel}</a>`
+      ? `<a class="highlight-cta" href="${ctaHref}">${ctaLabel}</a>`
       : '';
 
     body.innerHTML = `
@@ -318,17 +219,13 @@ export default function decorate(block) {
     variants = setCardDefaults(block, ul, variants);
   }
 
-  const clickable = ['knockout', 'articles', 'linked', 'overlay', 'grids', 'gift'];
+  const clickable = ['knockout', 'articles', 'linked', 'overlay', 'highlight'];
   if (variants.some((v) => clickable.includes(v))) {
     enableClick(ul);
   }
 
-  if (variants.includes('grids')) {
-    decorateGrids(ul);
-  }
-
-  if (variants.includes('gift')) {
-    decorateGift(ul);
+  if (variants.includes('highlight')) {
+    decorateFeatured(ul);
   }
 
   // replace content with new list structure
