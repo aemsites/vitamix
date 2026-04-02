@@ -194,27 +194,27 @@ function buildFeaturedList(recipes, placeholders) {
     const servesText = formatServings(recipe.yield);
 
     const badge = difficulty
-      ? `<span class="highlight-badge" data-difficulty="${toClassName(difficulty)}">${difficulty}</span>`
+      ? `<span class="badge" data-difficulty="${toClassName(difficulty)}">${difficulty}</span>`
       : '';
 
     const timeItem = timeText
-      ? `<span class="highlight-meta-item"><img src="/blocks/recipe/time.svg" alt=""> <span>${timeText}</span></span>`
+      ? `<span><img src="/blocks/recipe/time.svg" alt=""> ${timeText}</span>`
       : '';
     const servesItem = servesText
-      ? `<span class="highlight-meta-item"><img src="/blocks/recipe/yield.svg" alt=""> <span>${servesText}</span></span>`
+      ? `<span><img src="/blocks/recipe/yield.svg" alt=""> ${servesText}</span>`
       : '';
     const metaRow = (timeItem || servesItem)
-      ? `<div class="highlight-meta"><div class="highlight-meta-left">${timeItem}${servesItem}</div></div>`
+      ? `<p class="meta">${timeItem}${servesItem}</p>`
       : '';
 
     const li = document.createElement('li');
     li.innerHTML = `
       <a href="${recipe.path}">
-        <div class="highlight-image">
+        <div class="image-wrapper">
           <img src="${imagePath}" alt="" loading="lazy" />
           ${badge}
         </div>
-        <div class="highlight-body">
+        <div class="body">
           <h2>${recipe.title}</h2>
           ${metaRow}
         </div>
@@ -226,9 +226,9 @@ function buildFeaturedList(recipes, placeholders) {
 }
 
 export default async function decorate(block) {
-  const isFeatured = block.classList.contains('highlight');
+  const hasHighlight = block.classList.contains('highlight');
   const { locale, language } = getLocaleAndLanguage();
-  const placeholders = isFeatured ? await fetchPlaceholders(`/${locale}/${language}`) : {};
+  const placeholders = hasHighlight ? await fetchPlaceholders(`/${locale}/${language}`) : {};
   const path = `/${locale}/${language}/recipes/query-index.json`;
   const resp = await fetch(path);
   if (!resp.ok) {
@@ -270,7 +270,7 @@ export default async function decorate(block) {
       dietaryInterests,
     };
 
-    relatedRecipes = findRelatedRecipes(target, data, isFeatured ? 5 : 3);
+    relatedRecipes = findRelatedRecipes(target, data, hasHighlight ? 5 : 3);
   }
 
   if (relatedRecipes.length < 1) {
@@ -278,7 +278,7 @@ export default async function decorate(block) {
     return;
   }
 
-  if (isFeatured) {
+  if (hasHighlight) {
     block.replaceChildren(buildFeaturedList(relatedRecipes, placeholders));
     return;
   }
