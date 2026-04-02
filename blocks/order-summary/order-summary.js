@@ -1,3 +1,5 @@
+import { getOrderPath } from '../../scripts/scripts.js';
+
 /**
  * Order confirmation / cancellation page.
  *
@@ -25,7 +27,11 @@ export default async function decorate(block) {
     container.appendChild(msg);
 
     const link = document.createElement('p');
-    link.innerHTML = '<a href="/drafts/maxed/checkout/start" class="button emphasis">Return to checkout</a>';
+    const returnLink = document.createElement('a');
+    returnLink.href = getOrderPath('checkout');
+    returnLink.className = 'button emphasis';
+    returnLink.textContent = 'Return to checkout';
+    link.appendChild(returnLink);
     container.appendChild(link);
 
     block.replaceChildren(container);

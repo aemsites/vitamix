@@ -88,6 +88,17 @@ export function getLocaleAndLanguage(forceEnCA = false) {
 }
 
 /**
+ * Returns the path for an order-flow page (cart, checkout, complete, cancel)
+ * scoped to the current locale and language.
+ * @param {'cart'|'checkout'|'complete'|'cancel'} page
+ * @returns {string}
+ */
+export function getOrderPath(page) {
+  const { locale, language } = getLocaleAndLanguage();
+  return `/${locale}/${language}/order/${page}`;
+}
+
+/**
  * Gets the form submission URL for the current locale and language.
  * @returns {string} The form submission URL
  */

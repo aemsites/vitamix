@@ -100,10 +100,11 @@ export async function createOrder(orderBody) {
  *   action: string, redirectUrl: string }>}
  * @throws {CommerceApiError}
  */
-export async function initiatePayment(orderId, idempotencyKey) {
+export async function initiatePayment(orderId, idempotencyKey, fraudToken) {
   return post(`/orders/${orderId}/payments`, {
     provider: 'chase',
     paymentMethod: 'card',
     idempotencyKey,
+    ...(fraudToken ? { fraudToken } : {}),
   });
 }

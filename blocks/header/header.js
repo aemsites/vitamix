@@ -1,10 +1,9 @@
 import { getMetadata, toClassName } from '../../scripts/aem.js';
-import { swapIcons, getCookies } from '../../scripts/scripts.js';
+import { swapIcons, getCookies, getOrderPath } from '../../scripts/scripts.js';
 import { loadFragment } from '../fragment/fragment.js';
 import { AUTH_TOKEN_KEY } from '../../scripts/auth-api.js';
 
-const EDGE_CART_PATH = '/drafts/maxed/checkout/cart';
-// const EDGE_CART_PATH = '/checkout/cart';
+const EDGE_CART_PATH = () => getOrderPath('cart');
 
 // media query match that indicates desktop width
 const isDesktop = window.matchMedia('(width >= 1000px)');
@@ -484,12 +483,27 @@ export default async function decorate(block) {
     });
   }
 
-  const cartItems = cookies.cart_items_count;
   const cartLink = block.querySelector('.icon-cart').parentElement;
 
-  if (cartItems && +cartItems > 0) {
-    cartLink.dataset.cartItems = cartItems;
-    cartLink.lastChild.textContent = `Cart (${cartItems})`;
+  // Read item count from locale-specific localStorage key (same logic as Cart.STORAGE_KEY)
+  // to avoid stale domain-wide cookie when switching between locales (e.g. CA → US).
+  const getStoredCartCount = () => {
+    try {
+      const locale = window.location.pathname.split('/')[1] || 'default';
+      const key = `cart:${locale === 'drafts' ? 'ca' : locale}`;
+      const stored = localStorage.getItem(key);
+      if (!stored) return 0;
+      const parsed = JSON.parse(stored);
+      return (parsed.items || []).reduce((acc, item) => acc + item.quantity, 0);
+    } catch {
+      return 0;
+    }
+  };
+
+  const initialCount = getStoredCartCount();
+  if (initialCount > 0) {
+    cartLink.dataset.cartItems = initialCount;
+    cartLink.lastChild.textContent = `Cart (${initialCount})`;
   }
 
   // update cart qty bubble on change
@@ -506,12 +520,12 @@ export default async function decorate(block) {
 
   // change to edge cart link
   if (window.cartMode === 'edge') {
-    cartLink.href = EDGE_CART_PATH;
+    cartLink.href = EDGE_CART_PATH();
   }
 
   const openOrRedirect = async (e) => {
     // if already on cart page, do nothing
-    if (window.location.pathname.includes(EDGE_CART_PATH)) {
+    if (window.location.pathname.includes(EDGE_CART_PATH())) {
       return;
     }
 
@@ -549,15 +563,16 @@ export default async function decorate(block) {
       block.append(minicart);
 
       const headerRow = document.createElement('div');
-      headerRow.className = 'minicart-header';
+      headerRow.className = 'slide-panel-header';
 
       const cartTitle = document.createElement('h2');
       cartTitle.textContent = 'Cart';
       headerRow.append(cartTitle);
 
       const cartClose = document.createElement('button');
-      cartClose.className = 'close';
-      cartClose.textContent = 'X';
+      cartClose.className = 'slide-panel-close';
+      cartClose.textContent = '\u00D7';
+      cartClose.setAttribute('aria-label', 'Close');
       cartClose.addEventListener('click', () => {
         minicart.closeModal();
       });
@@ -609,7 +624,7 @@ export default async function decorate(block) {
     } catch (error) {
       setTimeout(() => {
         // redirect to cart page
-        window.location.href = EDGE_CART_PATH;
+        window.location.href = EDGE_CART_PATH();
       }, 1000);
     }
   };

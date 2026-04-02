@@ -1,5 +1,6 @@
 import { loadCSS, createOptimizedPicture } from '../../scripts/aem.js';
 import cart from '../../scripts/cart.js';
+import { getOrderPath } from '../../scripts/scripts.js';
 
 const itemTemplate = /* html */`
 <div class="cart-item">
@@ -37,8 +38,11 @@ const template = /* html */`
             <p class="cart-footer-note">Taxes and shipping calculated at checkout</p>
         </div>
     </div>
+    <div class="cart-empty-message">
+        <p>Your cart is empty.</p>
+    </div>
     <div class="cart-controls">
-        <a href="/drafts/maxed/checkout/start" class="button emphasis cart-checkout">Checkout</a>
+        <a href="#" class="button emphasis cart-checkout">Checkout</a>
     </div>
 </div>`;
 
@@ -56,10 +60,17 @@ export default async function decorate(block, parent) {
   }
 
   block.innerHTML = template;
+  block.querySelector('.cart-checkout').href = getOrderPath('checkout');
   const itemList = block.querySelector('.cart-items-list');
+  const cartEl = block.querySelector('.cart');
+
+  const updateEmptyState = () => {
+    cartEl.classList.toggle('cart-is-empty', cart.items.length === 0);
+  };
 
   const populatelist = () => {
     itemList.innerHTML = '';
+    updateEmptyState();
 
     // add each item to the list
     cart.items.forEach((item) => {

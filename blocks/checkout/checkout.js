@@ -4,7 +4,7 @@ import {
   loadBlock,
   loadScript,
 } from '../../scripts/aem.js';
-import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { getLocaleAndLanguage, getOrderPath } from '../../scripts/scripts.js';
 import {
   estimateShipping,
   previewOrder,
@@ -12,7 +12,7 @@ import {
   initiatePayment,
 } from '../../scripts/commerce-api.js';
 
-const ADDRESS_FORM = 'https://main--vitamix--aemsites.aem.page/drafts/maxed/checkout/address-form.json';
+const ADDRESS_FORM = () => `https://main--vitamix--aemsites.aem.page${getOrderPath('address-form')}.json`;
 
 let currentEstimateToken = null;
 let currentPreview = null;
@@ -250,7 +250,7 @@ export default async function decorate(block) {
   summaryColumn.className = 'checkout-summary-column';
 
   // Build the form block
-  const formContent = [[`<a href="${ADDRESS_FORM}"></a>`]];
+  const formContent = [[`<a href="${ADDRESS_FORM()}"></a>`]];
   const formBlock = buildBlock('form', formContent);
   formColumn.appendChild(formBlock);
   decorateBlock(formBlock);

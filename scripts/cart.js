@@ -21,6 +21,7 @@ export class Cart {
 
   constructor() {
     this.#restore();
+    this.#persistNow();
   }
 
   #restore() {
