@@ -577,7 +577,7 @@ header .minicart {
   width: min(400px, 100vw);
   min-height: 100vh;
   background: var(--layer-elevated);
-  padding: 1em 2em 2em;
+  padding: 2em 2em 2em;
   box-shadow: -4px 4px 18px rgb(0 0 0 / 20%);
   margin: 0 0 0 100%;
   border: none;
@@ -594,7 +594,7 @@ header .minicart[aria-expanded="true"] {
 }
 
 
-header .minicart > div {
+header .minicart > div:not(.slide-panel-header) {
   margin-top: 1em;
 }
 
@@ -743,9 +743,7 @@ header.header-commercial .nav-sections .submenu-wrapper ul > li.submenu-wrapper 
 .slide-panel-close {
   padding: 0;
   cursor: pointer;
-  font-weight: 100;
-  transform: scaleX(1.3);
-  font-size: 1.3em;
+  font-size: 1.5rem;
   line-height: 1;
   margin-left: auto;
   border: none;
@@ -759,7 +757,7 @@ header .auth-panel {
   width: min(400px, 100vw);
   min-height: 100vh;
   background: var(--layer-elevated);
-  padding: 1em 2em 2em;
+  padding: 2em 2em 2em;
   box-shadow: -4px 4px 18px rgb(0 0 0 / 20%);
   margin: 0 0 0 100%;
   border: none;

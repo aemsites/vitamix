@@ -58,6 +58,10 @@
   gap: var(--spacing-80);
 }
 
+.checkout-form-column .form .form-field + .form-field {
+  margin-top: 8px;
+}
+
 .checkout-form-column form input,
 .checkout-form-column form select {
   font-weight: normal;
@@ -77,6 +81,7 @@
 
 .checkout-form-column form .field-help-text {
   font-size: var(--body-size-xs);
+  padding-left: 8px;
 }
 
 .checkout-form-column .form form fieldset[data-name="optIn"] {
@@ -263,12 +268,7 @@ span.payment-button.paypal .button img {
   font-style: italic;
 }
 
-/* Required field indicator — label comes before input in the DOM */
-.checkout-form-column form .form-field:has(input[required]) > label::after,
-.checkout-form-column form .form-field:has(select[required]) > label::after {
-  content: ' *';
-  color: #c00;
-}
+/* Required indicator is now appended directly to the floating label text in JS */
 
 /* Required field error state */
 .checkout-form-column form input.field-required,
@@ -309,4 +309,54 @@ span.payment-button.paypal .button img {
 .checkout-form-column .button.loading {
   opacity: 0.7;
   pointer-events: none;
+}
+
+/* Floating label */
+.checkout-form-column .floating-label-field {
+  position: relative;
+}
+
+.checkout-form-column .floating-label-field input,
+.checkout-form-column .floating-label-field select,
+.checkout-form-column .floating-label-field textarea {
+  padding-top: 20px;
+  padding-bottom: 4px;
+  height: 52px;
+}
+
+.checkout-form-column .floating-label-field select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23666' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 36px;
+}
+
+.checkout-form-column .floating-label-field textarea {
+  height: auto;
+  padding-top: 24px;
+}
+
+.checkout-form-column .floating-label-field label {
+  position: absolute;
+  left: var(--spacing-100);
+  top: 16px;
+  margin: 0;
+  font-size: 1rem;
+  color: #888;
+  pointer-events: none;
+  transition: top 0.15s ease, font-size 0.15s ease, color 0.15s ease;
+}
+
+/* Float label up when focused or filled */
+.checkout-form-column .floating-label-field:has(input:focus) label,
+.checkout-form-column .floating-label-field:has(input:not(:placeholder-shown)) label,
+.checkout-form-column .floating-label-field:has(select:focus) label,
+.checkout-form-column .floating-label-field:has(select.has-value) label,
+.checkout-form-column .floating-label-field:has(textarea:focus) label,
+.checkout-form-column .floating-label-field:has(textarea:not(:placeholder-shown)) label {
+  top: 8px;
+  transform: translateY(0);
+  font-size: 0.7rem;
+  color: #555;
 }

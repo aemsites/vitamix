@@ -273,6 +273,49 @@ export default async function decorate(block) {
     loadBlock(summaryBlock),
   ]);
 
+  // Floating label effect: label sits inside the input and floats up on focus/fill.
+  // Placeholder is set to a single space so :placeholder-shown can detect empty state.
+  formColumn.querySelectorAll('.form-field:not(.checkbox-field):not(.radio-field)').forEach((fieldEl) => {
+    const label = fieldEl.querySelector('label');
+    const input = fieldEl.querySelector('input:not([type="checkbox"]):not([type="radio"]), select, textarea');
+    if (!label || !input) return;
+    const required = input.required || input.hasAttribute('required');
+    // Append required indicator to label text
+    if (required && !label.textContent.endsWith('*')) {
+      label.textContent = `${label.textContent} *`;
+    }
+    // Single space placeholder enables :placeholder-shown to detect empty state
+    input.placeholder = ' ';
+    fieldEl.classList.add('floating-label-field');
+
+    // selects don't support :placeholder-shown — toggle a class instead
+    if (input.tagName === 'SELECT') {
+      const update = () => input.classList.toggle('has-value', input.value !== '');
+      input.addEventListener('change', update);
+
+      const ensureBlankSelected = () => {
+        if (input.options.length === 0) return;
+        // Remove any disabled placeholder text — the floating label serves as placeholder
+        input.querySelectorAll('option[disabled]').forEach((o) => o.remove());
+        if (!input.querySelector('option[value=""]')) {
+          const blank = document.createElement('option');
+          blank.value = '';
+          blank.hidden = true;
+          input.prepend(blank);
+        }
+        input.selectedIndex = 0;
+        update();
+      };
+
+      // Handle options already present (appendSelectOptions may have resolved before us)
+      ensureBlankSelected();
+
+      // Handle options loading asynchronously
+      const observer = new MutationObserver(ensureBlankSelected);
+      observer.observe(input, { childList: true });
+    }
+  });
+
   // The form JSON has two sections both named "shipping":
   // 1. Shipping Address (address fields)
   // 2. Payment Method (billingEquals checkbox + payment radios)
