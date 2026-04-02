@@ -1,3 +1,5 @@
+@import url('../../styles/color-swatches.css');
+
 .table {
   width: 100%;
   overflow-x: auto;
@@ -34,7 +36,7 @@
   background-color: var(--color-gray-200);
 }
 
-/* Comparison variant: heading row + heading column, 2x first column width */
+/* Comparison table */
 .table.comparison .table-comparison-scroll {
   width: 100%;
   overflow-x: auto;
@@ -123,7 +125,7 @@
   border-color: transparent;
 }
 
-/* Comparison table: colors row – round swatches from pdp/color-swatches.css */
+/* Comparison table: color swatches – background driven by .color-* classes from color-swatches.css */
 .table.comparison .table-comparison-scroll .table-comparison-color-swatches {
   display: flex;
   flex-wrap: wrap;
@@ -133,21 +135,10 @@
 }
 
 .table.comparison .table-comparison-scroll .table-comparison-color-swatch {
-  width: 24px;
-  height: 24px;
-  border: 1px solid #333f48;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   box-sizing: border-box;
-}
-
-.table.comparison .table-comparison-scroll .table-comparison-color-inner {
-  width: 16px;
-  height: 16px;
-  border: 1px solid #333f48;
-  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--color-charcoal);
 }
 
 .table.comparison .table-comparison-scroll .table-comparison-color-text {
