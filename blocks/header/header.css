@@ -282,7 +282,7 @@ header .nav-sections .submenu-wrapper ul > li.submenu-wrapper ul > li a:last-chi
     z-index: 2;
   }
 
-  header .nav-sections nav > ul > li.submenu-wrapper > [aria-expanded="true"] + ul:not(:has(li ul)) {
+  header .nav-sections nav > ul > li.submenu-wrapper:not([data-source="fragment"]) > [aria-expanded="true"] + ul {
     display: block;
   }
 
