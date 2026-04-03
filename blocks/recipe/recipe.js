@@ -17,7 +17,6 @@ function wrapInDiv(element, className) {
   );
 }
 
-
 function buildToolbar(placeholders = {}) {
   const toolbar = document.createElement('div');
   toolbar.classList.add('recipe-toolbar');
