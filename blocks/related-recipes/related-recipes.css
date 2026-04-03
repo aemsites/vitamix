@@ -160,18 +160,20 @@
   padding: var(--spacing-200);
 }
 
-.related-recipes.highlight .body h2 {
+.related-recipes.highlight .body h2,
+.related-recipes.highlight .body h3 {
   margin: 0;
   font-size: var(--font-size-500);
 }
 
-.related-recipes.highlight > ul > li:first-child .body h2 {
+.related-recipes.highlight > ul > li:first-child .body h2,
+.related-recipes.highlight > ul > li:first-child .body h3 {
   font-size: clamp(1.5rem, 2.5vw, 2rem);
 }
 
 .related-recipes.highlight .meta {
   align-items: center;
-  gap: var(--spacing-100);
+  gap: 1ch;
   display: flex;
   margin-bottom: 0;
   margin-top: auto;
