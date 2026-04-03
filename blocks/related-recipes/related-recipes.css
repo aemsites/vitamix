@@ -1,6 +1,7 @@
+/* stylelint-disable no-descending-specificity */
 .related-recipes > ul {
-  gap: var(--spacing-100);
   align-items: flex-start;
+  gap: var(--spacing-100);
 }
 
 .related-recipes.carousel.block ul > li {
@@ -17,7 +18,7 @@
 .related-recipes li a {
   display: block;
   width: 100%;
-  color: var(--text-color);
+  color: var(--color-text);
   font-family: var(--heading-font-family);
   font-size: var(--body-size-l);
   text-decoration: none;
@@ -31,14 +32,167 @@
 }
 
 .related-recipes nav {
-  position: static;
-  display: flex;
   justify-content: center;
   gap: var(--spacing-100);
+  display: flex;
+  position: static;
   margin-top: var(--spacing-100);
 }
 
 .related-recipes nav button.nav-arrow {
   position: relative;
   transform: none;
+}
+
+/* highlight variant */
+.related-recipes.highlight li img {
+  border-radius: 0;
+}
+
+.related-recipes.highlight > ul {
+  list-style: none;
+  grid-template-columns: 1fr;
+  align-items: start;
+  gap: var(--spacing-400);
+  display: grid;
+  margin: 0;
+  padding: 0;
+}
+
+@media (width >= 900px) {
+  .related-recipes.highlight > ul {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: stretch;
+  }
+
+  .related-recipes.highlight > ul > li:first-child {
+    grid-row: span 2;
+  }
+}
+
+.related-recipes.highlight > ul > li {
+  flex-direction: column;
+  display: flex;
+  border: 1px solid var(--color-gray-200);
+  overflow: hidden;
+  background: var(--color-white);
+}
+
+.related-recipes.highlight > ul > li:hover {
+  border-color: var(--color-gray-500);
+}
+
+.related-recipes.highlight > ul > li a {
+  flex: 1;
+  flex-direction: column;
+  display: flex;
+  color: inherit;
+}
+
+.related-recipes.highlight .image-wrapper {
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+  line-height: 0;
+}
+
+.related-recipes.highlight .image-wrapper img {
+  display: block;
+  height: 220px;
+  transition: transform 0.4s;
+}
+
+.related-recipes.highlight > ul > li:first-child .image-wrapper img {
+  height: 380px;
+}
+
+@media (width >= 900px) {
+  .related-recipes.highlight > ul > li:first-child .image-wrapper {
+    flex: 3;
+    min-height: 400px;
+  }
+
+  .related-recipes.highlight > ul > li:first-child .image-wrapper img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    min-height: 400px;
+    max-height: 620px;
+  }
+}
+
+.related-recipes.highlight > ul > li:hover .image-wrapper img {
+  transform: scale(1.04);
+}
+
+.related-recipes.highlight .badge {
+  align-items: center;
+  display: inline-flex;
+  position: absolute;
+  left: var(--spacing-80);
+  top: var(--spacing-80);
+  border-left: 4px solid #c89a2e;
+  padding: 0 var(--spacing-60);
+  background: var(--color-white);
+  color: var(--color-charcoal);
+  font-family: var(--body-font-family);
+  font-size: var(--font-size-40);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  line-height: 2;
+  text-transform: uppercase;
+}
+
+.related-recipes.highlight .badge[data-difficulty="simple"] {
+  border-left-color: #4a7c59;
+}
+
+.related-recipes.highlight .badge[data-difficulty="advanced"] {
+  border-left-color: #c0392b;
+}
+
+.related-recipes.highlight .body {
+  flex: 1;
+  flex-direction: column;
+  gap: var(--spacing-200);
+  display: flex;
+  padding: var(--spacing-200);
+}
+
+.related-recipes.highlight .body h2,
+.related-recipes.highlight .body h3 {
+  margin: 0;
+  font-size: var(--font-size-500);
+}
+
+.related-recipes.highlight > ul > li:first-child .body h2,
+.related-recipes.highlight > ul > li:first-child .body h3 {
+  font-size: clamp(1.5rem, 2.5vw, 2rem);
+}
+
+.related-recipes.highlight .meta {
+  align-items: center;
+  gap: 1ch;
+  display: flex;
+  margin-bottom: 0;
+  margin-top: auto;
+  border-top: 1px solid var(--color-gray-300);
+  padding-top: var(--spacing-100);
+  color: var(--color-gray);
+  font-family: var(--body-font-family);
+  font-size: var(--font-size-80);
+}
+
+.related-recipes.highlight .meta > span {
+  align-items: center;
+  gap: 1ch;
+}
+
+.related-recipes.highlight .meta img,
+.related-recipes.highlight .meta svg {
+  flex-shrink: 0;
+  width: 1em;
+  height: 1em;
+  object-fit: contain;
 }

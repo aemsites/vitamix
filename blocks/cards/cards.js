@@ -75,6 +75,34 @@ function setCardDefaults(block, ul, variants) {
   return variants;
 }
 
+/*
+ * Decorates the highlight variant cards.
+ * Expected authoring columns in the DA table (highlight variant):
+ *   Col 1 – image; optionally a paragraph for the badge
+ *   Col 2 – body: eyebrow paragraph before heading, heading, description, CTA link
+ */
+function decorateHighlight(ul) {
+  ul.querySelectorAll('li').forEach((li) => {
+    // set button styles
+    const buttonWrapper = li.querySelector('.button-wrapper');
+    if (buttonWrapper) {
+      buttonWrapper.querySelectorAll('a.button').forEach((button) => {
+        button.classList.add('link');
+      });
+    }
+
+    // promote the first paragraph in a captioned image column to a badge
+    const captioned = li.querySelector('.card-captioned');
+    if (!captioned) return;
+
+    const badgeP = [...captioned.querySelectorAll('p')].find((p) => !p.querySelector('picture, img'));
+    if (!badgeP) return;
+
+    badgeP.classList.add('badge');
+    captioned.className = captioned.className.replace('card-captioned', 'card-image');
+  });
+}
+
 export default function decorate(block) {
   // replace default div structure with ordered list
   const ul = document.createElement('ul');
@@ -128,9 +156,13 @@ export default function decorate(block) {
     variants = setCardDefaults(block, ul, variants);
   }
 
-  const clickable = ['knockout', 'articles', 'linked', 'overlay'];
+  const clickable = ['knockout', 'articles', 'linked', 'overlay', 'highlight'];
   if (variants.some((v) => clickable.includes(v))) {
     enableClick(ul);
+  }
+
+  if (variants.includes('highlight')) {
+    decorateHighlight(ul);
   }
 
   // replace content with new list structure

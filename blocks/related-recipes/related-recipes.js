@@ -1,5 +1,7 @@
-import { getMetadata } from '../../scripts/aem.js';
-import { buildCarousel, getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { getMetadata, toClassName, fetchPlaceholders } from '../../scripts/aem.js';
+import {
+  buildCarousel, formatServings, formatTime, getLocaleAndLanguage,
+} from '../../scripts/scripts.js';
 
 const WEIGHTS = {
   titleWords: 4,
@@ -173,8 +175,60 @@ function findRelatedRecipes(target, allRecipes, max = 3) {
   }, []);
 }
 
+/**
+ * Builds the highlight recipe list.
+ */
+function buildFeaturedList(recipes, placeholders) {
+  const ul = document.createElement('ul');
+  recipes.forEach((recipe) => {
+    let imagePath = recipe.image;
+    try {
+      const imageUrl = new URL(imagePath, window.location.origin);
+      imagePath = imageUrl.pathname + imageUrl.search;
+    } catch (e) {
+      // use as-is
+    }
+
+    const { difficulty } = recipe;
+    const timeText = formatTime(recipe['total-time'], placeholders);
+    const servesText = formatServings(recipe.yield);
+
+    const badge = difficulty
+      ? `<span class="badge" data-difficulty="${toClassName(difficulty)}">${difficulty}</span>`
+      : '';
+
+    const timeItem = timeText
+      ? `<span><img src="/blocks/recipe/time.svg" alt=""> ${timeText}</span>`
+      : '';
+    const servesItem = servesText
+      ? `<span><img src="/blocks/recipe/yield.svg" alt=""> ${servesText}</span>`
+      : '';
+    const metaRow = (timeItem || servesItem)
+      ? `<p class="meta">${timeItem}${servesItem}</p>`
+      : '';
+
+    const li = document.createElement('li');
+    li.innerHTML = `
+      <a href="${recipe.path}">
+        <div class="image-wrapper">
+          <img src="${imagePath}" alt="" loading="lazy" />
+          ${badge}
+        </div>
+        <div class="body">
+          <h2>${recipe.title}</h2>
+          ${metaRow}
+        </div>
+      </a>
+    `;
+    ul.append(li);
+  });
+  return ul;
+}
+
 export default async function decorate(block) {
+  const hasHighlight = block.classList.contains('highlight');
   const { locale, language } = getLocaleAndLanguage();
+  const placeholders = hasHighlight ? await fetchPlaceholders(`/${locale}/${language}`) : {};
   const path = `/${locale}/${language}/recipes/query-index.json`;
   const resp = await fetch(path);
   if (!resp.ok) {
@@ -216,11 +270,16 @@ export default async function decorate(block) {
       dietaryInterests,
     };
 
-    relatedRecipes = findRelatedRecipes(target, data);
+    relatedRecipes = findRelatedRecipes(target, data, hasHighlight ? 5 : 3);
   }
 
   if (relatedRecipes.length < 1) {
     block.remove();
+    return;
+  }
+
+  if (hasHighlight) {
+    block.replaceChildren(buildFeaturedList(relatedRecipes, placeholders));
     return;
   }
 
