@@ -81,9 +81,17 @@ function setCardDefaults(block, ul, variants) {
  *   Col 1 – image; optionally a paragraph for the badge
  *   Col 2 – body: eyebrow paragraph before heading, heading, description, CTA link
  */
-function decorateFeatured(ul) {
+function decorateHighlight(ul) {
   ul.querySelectorAll('li').forEach((li) => {
-    // Promote the first paragraph in a captioned image column to a badge
+    // set button styles
+    const buttonWrapper = li.querySelector('.button-wrapper');
+    if (buttonWrapper) {
+      buttonWrapper.querySelectorAll('a.button').forEach((button) => {
+        button.classList.add('link');
+      });
+    }
+
+    // promote the first paragraph in a captioned image column to a badge
     const captioned = li.querySelector('.card-captioned');
     if (!captioned) return;
 
@@ -154,7 +162,7 @@ export default function decorate(block) {
   }
 
   if (variants.includes('highlight')) {
-    decorateFeatured(ul);
+    decorateHighlight(ul);
   }
 
   // replace content with new list structure
