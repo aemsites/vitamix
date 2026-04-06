@@ -11,9 +11,9 @@ const WEIGHTS = {
 };
 
 /**
- * Strip trailing `-immersion-blender` from pathname for index matching.
- * @param {string} path - Pathname (no query)
- * @returns {string} Pathname without immersion-blender suffix when present
+ * Strips trailing `-immersion-blender` suffix off URL path.
+ * @param {string} path - Pathname, no query string
+ * @returns {string} Same path, or shorter if it ended with that segment
  */
 function stripImmersionBlenderSuffix(path) {
   if (!path) return path;
@@ -23,22 +23,24 @@ function stripImmersionBlenderSuffix(path) {
 }
 
 /**
- * `-immersion-blender` segment to put back on display href when the author pathname had it.
- * @param {string} path - Original author pathname
- * @returns {string} `'-immersion-blender'` or empty
+ * Uses the link the author provided (f `href` is empty, falls back to resolved pathname).
+ * @param {HTMLAnchorElement} anchor - Link picked up from the block
+ * @returns {string} What to put on the card's `<a href>`
  */
-function immersionBlenderSuffixFromAuthorPath(path) {
-  if (!path) return '';
-  const withoutImmersionBlender = stripImmersionBlenderSuffix(path);
-  if (withoutImmersionBlender === path) return '';
-  return path.slice(withoutImmersionBlender.length);
+function hrefFromAuthorLink(anchor) {
+  const attr = anchor.getAttribute('href');
+  if (attr !== null && attr.trim() !== '') {
+    return attr.trim();
+  }
+  const { pathname } = new URL(anchor.href);
+  return pathname;
 }
 
 /**
  * Find matching recipe in data by href path.
- * @param {string} href - Path to match
+ * @param {string} href - Pathname from the link (or current URL) to match
  * @param {Object[]} data - Array of all recipe objects
- * @returns {Object|undefined} Matching recipe or undefined
+ * @returns {Object|undefined} Matching recipe, or undefined
  */
 function findMatchingRecipe(href, data) {
   const pathForMatch = stripImmersionBlenderSuffix(href);
@@ -57,24 +59,12 @@ function findMatchingRecipe(href, data) {
 
 /**
  * Strip recipe id suffix (-r###, redirect resolves the canonical URL).
- * @param {string} path - Recipe path from query index
- * @returns {string} Path without suffix
+ * @param {string} path - Path from the index
+ * @returns {string} Path without the `-r###` suffix
  */
 function stripRecipeId(path) {
   if (!path) return path;
   return path.replace(/-r\d+$/, '');
-}
-
-/**
- * Write public anchor href: strip index `-r###`, then append optional pathname suffix.
- * @param {Object} recipe - Recipe from query index
- * @param {string} suffix - Trailing pathname segment to append, or empty string
- * @returns {string} href pathname for `<a href>`
- */
-function recipeHrefForDisplay(recipe, suffix) {
-  const baseWithoutRid = stripRecipeId(recipe.path);
-  if (!suffix) return baseWithoutRid;
-  return baseWithoutRid + suffix;
 }
 
 /**
@@ -226,12 +216,12 @@ function findRelatedRecipes(target, allRecipes, max = 3) {
 
 /**
  * Builds the highlight recipe list.
- * @param {Array<{ recipe: Object, suffix: string }>} rows - Display rows
+ * @param {Array<{ recipe: Object, href: string }>} rows - Recipe plus URL (author or generated)
  * @param {Object} placeholders - Placeholders for formatting
  */
 function buildFeaturedList(rows, placeholders) {
   const ul = document.createElement('ul');
-  rows.forEach(({ recipe, suffix }) => {
+  rows.forEach(({ recipe, href }) => {
     let imagePath = recipe.image;
     try {
       const imageUrl = new URL(imagePath, window.location.origin);
@@ -259,7 +249,6 @@ function buildFeaturedList(rows, placeholders) {
       : '';
 
     const li = document.createElement('li');
-    const href = recipeHrefForDisplay(recipe, suffix);
     li.innerHTML = `
       <a href="${href}">
         <div class="image-wrapper">
@@ -294,7 +283,7 @@ export default async function decorate(block) {
     return;
   }
 
-  // Manual links: match index, carry immersion-blender suffix
+  // Manual links: pathname + fuzzy strip for index match
   const links = [...block.querySelectorAll('a[href]')];
   const manualRows = links
     .map((anchor) => {
@@ -303,7 +292,7 @@ export default async function decorate(block) {
       if (!recipe) return null;
       return {
         recipe,
-        suffix: immersionBlenderSuffixFromAuthorPath(pathname),
+        href: hrefFromAuthorLink(anchor),
       };
     })
     .filter((row) => row);
@@ -332,7 +321,7 @@ export default async function decorate(block) {
     const algorithmic = findRelatedRecipes(target, data, hasHighlight ? 5 : 3);
     relatedRows = algorithmic.map((recipe) => ({
       recipe,
-      suffix: '',
+      href: stripRecipeId(recipe.path),
     }));
   }
 
@@ -349,7 +338,7 @@ export default async function decorate(block) {
   // Build the related recipes UI
   const ul = document.createElement('ul');
 
-  relatedRows.forEach(({ recipe, suffix }) => {
+  relatedRows.forEach(({ recipe, href }) => {
     const li = document.createElement('li');
     // Convert image URL to relative path (pathname + query params only)
     let imagePath = recipe.image;
@@ -359,7 +348,6 @@ export default async function decorate(block) {
     } catch (e) {
       // If URL parsing fails, use the path as-is
     }
-    const href = recipeHrefForDisplay(recipe, suffix);
     li.innerHTML = `
       <a href="${href}">
         <img src="${imagePath}" alt="" loading="lazy" />
