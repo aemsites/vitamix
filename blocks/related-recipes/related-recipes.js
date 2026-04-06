@@ -30,6 +30,16 @@ function findMatchingRecipe(href, data) {
 }
 
 /**
+ * Strip recipe id suffix (-r###, redirect resolves the canonical URL).
+ * @param {string} path - Recipe path from query index
+ * @returns {string} Path without suffix
+ */
+function stripRecipeId(path) {
+  if (!path) return path;
+  return path.replace(/-r\d+$/, '');
+}
+
+/**
  * Parse comma-separated string into trimmed array.
  * @param {string} str - String
  * @returns {string[]} Array of trimmed, non-empty values
@@ -139,8 +149,9 @@ function hasAnyOverlap(target, recipe) {
  */
 function findRelatedRecipes(target, allRecipes, max = 3) {
   // Pre-filter: only recipes with at least one overlapping attribute
+  const targetPath = stripRecipeId(target.path);
   const candidates = allRecipes.filter((recipe) => (
-    recipe.path !== target.path
+    stripRecipeId(recipe.path) !== targetPath
     && recipe.title !== target.title
     && recipe.status !== 'Deleted'
     && recipe.image
@@ -208,8 +219,9 @@ function buildFeaturedList(recipes, placeholders) {
       : '';
 
     const li = document.createElement('li');
+    const href = stripRecipeId(recipe.path);
     li.innerHTML = `
-      <a href="${recipe.path}">
+      <a href="${href}">
         <div class="image-wrapper">
           <img src="${imagePath}" alt="" loading="lazy" />
           ${badge}
@@ -296,8 +308,9 @@ export default async function decorate(block) {
     } catch (e) {
       // If URL parsing fails, use the path as-is
     }
+    const href = stripRecipeId(recipe.path);
     li.innerHTML = `
-      <a href="${recipe.path}">
+      <a href="${href}">
         <img src="${imagePath}" alt="" loading="lazy" />
         <span>${recipe.title}</span>
       </a>
