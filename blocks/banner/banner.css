@@ -32,12 +32,22 @@
   max-width: 600px;
 }
 
+.banner.inset > div {
+  min-width: 0;
+}
+
 .banner.inset .img-wrapper {
   display: flex;
   align-items: center;
+  min-width: 0;
   position: relative;
   width: 100%;
   z-index: 1;
+}
+
+.banner.inset .img-wrapper picture {
+  max-width: 100%;
+  min-width: 0;
 }
 
 .banner.inset .img-wrapper video,
@@ -77,10 +87,12 @@
 
   .banner.inset > div div {
     flex: 1 1 40%;
+    min-width: 0;
   }
 
   .banner.inset .img-wrapper {
     flex: 2 1 60%;
+    min-width: 0;
   }
 
   .banner.inset .img-wrapper video,
