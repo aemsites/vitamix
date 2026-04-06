@@ -54,7 +54,7 @@ function findMatchingRecipe(href, data) {
   return data.find((recipe) => {
     const lastIndex = recipe.path.lastIndexOf('-r');
     const recipePath = recipe.path.substring(0, lastIndex);
-    if (recipePath === pathForMatch) return true
+    if (recipePath === pathForMatch) return true;
     return stripEquipmentSuffix(recipePath) === pathForMatch;
   });
 }
