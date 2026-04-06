@@ -11,28 +11,56 @@ const WEIGHTS = {
 };
 
 /**
+ * Strips trailing `-immersion-blender` suffix off URL path.
+ * @param {string} path - Pathname, no query string
+ * @returns {string} Same path, or shorter if it ended with that segment
+ */
+function stripImmersionBlenderSuffix(path) {
+  if (!path) return path;
+  const suffix = '-immersion-blender';
+  if (!path.endsWith(suffix)) return path;
+  return path.slice(0, path.length - suffix.length);
+}
+
+/**
+ * Uses the link the author provided (f `href` is empty, falls back to resolved pathname).
+ * @param {HTMLAnchorElement} anchor - Link picked up from the block
+ * @returns {string} What to put on the card's `<a href>`
+ */
+function hrefFromAuthorLink(anchor) {
+  const attr = anchor.getAttribute('href');
+  if (attr !== null && attr.trim() !== '') {
+    return attr.trim();
+  }
+  const { pathname } = new URL(anchor.href);
+  return pathname;
+}
+
+/**
  * Find matching recipe in data by href path.
- * @param {string} href - href path to match
+ * @param {string} href - Pathname from the link (or current URL) to match
  * @param {Object[]} data - Array of all recipe objects
- * @returns {Object|undefined} Matching recipe or undefined
+ * @returns {Object|undefined} Matching recipe, or undefined
  */
 function findMatchingRecipe(href, data) {
-  if (href.match(/-r\d+$/)) {
-    return data.find((recipe) => recipe.path === href);
+  const pathForMatch = stripImmersionBlenderSuffix(href);
+
+  if (pathForMatch.match(/-r\d+$/)) {
+    return data.find((recipe) => recipe.path === pathForMatch);
   }
 
   // Match base path (without r-ID suffix)
   return data.find((recipe) => {
     const lastIndex = recipe.path.lastIndexOf('-r');
     const recipePath = recipe.path.substring(0, lastIndex);
-    return recipePath === href;
+    return recipePath === pathForMatch;
   });
 }
 
 /**
  * Strip recipe id suffix (-r###, redirect resolves the canonical URL).
- * @param {string} path - Recipe path from query index
- * @returns {string} Path without suffix
+ * @param {string} path - Path from the index
+ * @returns {string} Path without the `-r###` suffix
  */
 function stripRecipeId(path) {
   if (!path) return path;
@@ -149,7 +177,7 @@ function hasAnyOverlap(target, recipe) {
  */
 function findRelatedRecipes(target, allRecipes, max = 3) {
   // Pre-filter: only recipes with at least one overlapping attribute
-  const targetPath = stripRecipeId(target.path);
+  const targetPath = stripRecipeId(stripImmersionBlenderSuffix(target.path));
   const candidates = allRecipes.filter((recipe) => (
     stripRecipeId(recipe.path) !== targetPath
     && recipe.title !== target.title
@@ -188,10 +216,12 @@ function findRelatedRecipes(target, allRecipes, max = 3) {
 
 /**
  * Builds the highlight recipe list.
+ * @param {Array<{ recipe: Object, href: string }>} rows - Recipe plus URL (author or generated)
+ * @param {Object} placeholders - Placeholders for formatting
  */
-function buildFeaturedList(recipes, placeholders) {
+function buildFeaturedList(rows, placeholders) {
   const ul = document.createElement('ul');
-  recipes.forEach((recipe) => {
+  rows.forEach(({ recipe, href }) => {
     let imagePath = recipe.image;
     try {
       const imageUrl = new URL(imagePath, window.location.origin);
@@ -219,7 +249,6 @@ function buildFeaturedList(recipes, placeholders) {
       : '';
 
     const li = document.createElement('li');
-    const href = stripRecipeId(recipe.path);
     li.innerHTML = `
       <a href="${href}">
         <div class="image-wrapper">
@@ -254,17 +283,24 @@ export default async function decorate(block) {
     return;
   }
 
-  // Get links from block and find matching recipes in data
+  // Manual links: pathname + fuzzy strip for index match
   const links = [...block.querySelectorAll('a[href]')];
-  const hrefs = links.map((a) => new URL(a.href).pathname);
-  const matchingRecipes = hrefs
-    .map((href) => findMatchingRecipe(href, data))
-    .filter((r) => r);
+  const manualRows = links
+    .map((anchor) => {
+      const { pathname } = new URL(anchor.href);
+      const recipe = findMatchingRecipe(pathname, data);
+      if (!recipe) return null;
+      return {
+        recipe,
+        href: hrefFromAuthorLink(anchor),
+      };
+    })
+    .filter((row) => row);
 
   // If no manual links found, use algorithmic matching
-  let relatedRecipes;
-  if (matchingRecipes.length > 0) {
-    relatedRecipes = matchingRecipes;
+  let relatedRows;
+  if (manualRows.length > 0) {
+    relatedRows = manualRows;
   } else {
     // Get current recipe metadata
     const title = document.querySelector('h1').textContent.trim() || '';
@@ -282,23 +318,27 @@ export default async function decorate(block) {
       dietaryInterests,
     };
 
-    relatedRecipes = findRelatedRecipes(target, data, hasHighlight ? 5 : 3);
+    const algorithmic = findRelatedRecipes(target, data, hasHighlight ? 5 : 3);
+    relatedRows = algorithmic.map((recipe) => ({
+      recipe,
+      href: stripRecipeId(recipe.path),
+    }));
   }
 
-  if (relatedRecipes.length < 1) {
+  if (relatedRows.length < 1) {
     block.remove();
     return;
   }
 
   if (hasHighlight) {
-    block.replaceChildren(buildFeaturedList(relatedRecipes, placeholders));
+    block.replaceChildren(buildFeaturedList(relatedRows, placeholders));
     return;
   }
 
   // Build the related recipes UI
   const ul = document.createElement('ul');
 
-  relatedRecipes.forEach((recipe) => {
+  relatedRows.forEach(({ recipe, href }) => {
     const li = document.createElement('li');
     // Convert image URL to relative path (pathname + query params only)
     let imagePath = recipe.image;
@@ -308,7 +348,6 @@ export default async function decorate(block) {
     } catch (e) {
       // If URL parsing fails, use the path as-is
     }
-    const href = stripRecipeId(recipe.path);
     li.innerHTML = `
       <a href="${href}">
         <img src="${imagePath}" alt="" loading="lazy" />
