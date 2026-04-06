@@ -349,7 +349,10 @@ const removeDnt = (html) => {
 };
 
 const adjustURLs = (html, context) => {
-  const { sourcePath } = context;
+  const { sourcePath } = context || {};
+  if (!sourcePath) {
+    return html;
+  }
   // test if path starts with /<lang>/<locale>.
   const pathPrefixRegex = /^\/?[a-z]{2}\/[a-z]{2}[-_][a-z]{2}(?=\/|$)/;
   const isLocalPath = pathPrefixRegex.test(sourcePath);

@@ -926,6 +926,7 @@ ${recipeElement.innerHTML}
     const locale = LOCALES[l];
     let html = htmlContent;
     if (locale.translateLocale) {
+      context.sourcePath = `/${locale.root}/recipes/${filename}`;
       // eslint-disable-next-line no-await-in-loop
       html = await translate(htmlContent, locale.translateLocale, context, undefined, daFetch);
     }
