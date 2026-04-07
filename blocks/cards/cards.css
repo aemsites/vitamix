@@ -689,7 +689,7 @@
 /* Mobile: image left, text right for all cards except the first */
 .cards.highlight > ul > li:not(:first-child) {
   display: grid;
-  grid-template-columns: 160px 1fr;
+  grid-template-columns: 140px 1fr;
   align-items: stretch;
 }
 
