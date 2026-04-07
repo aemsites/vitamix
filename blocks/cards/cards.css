@@ -698,8 +698,8 @@
   min-height: 120px;
 }
 
-/* Hide description paragraph on mobile */
-.cards.highlight > ul > li:not(:first-child) .card-body p:not(.eyebrow) {
+/* Hide description paragraph on mobile, keep links */
+.cards.highlight > ul > li:not(:first-child) .card-body p:not(.eyebrow):not(:has(a)) {
   display: none;
 }
 
@@ -724,7 +724,7 @@
     min-height: unset;
   }
 
-  .cards.highlight > ul > li:not(:first-child) .card-body p:not(.eyebrow) {
+  .cards.highlight > ul > li:not(:first-child) .card-body p:not(.eyebrow):not(:has(a)) {
     display: block;
   }
 }
