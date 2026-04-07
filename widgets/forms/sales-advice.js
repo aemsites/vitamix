@@ -167,7 +167,7 @@ export default async function decorate(widget) {
       if (!resp.ok) {
         throw new Error(`Forms API submission failed with ${resp.status}`);
       }
-      const thankYouPath = `/${locale}/${language}/sales-advice-thankyou`;
+      const thankYouPath = `/${locale}/${language}/commercial/sales-advice-thankyou`;
       window.location.href = thankYouPath;
     } catch (err) {
       // eslint-disable-next-line no-console
