@@ -689,7 +689,7 @@
 /* Mobile: image left, text right for all cards except the first */
 .cards.highlight > ul > li:not(:first-child) {
   display: grid;
-  grid-template-columns: 130px 1fr;
+  grid-template-columns: 160px 1fr;
   align-items: stretch;
 }
 
@@ -828,9 +828,21 @@
   font-size: var(--font-size-500);
 }
 
+.cards.highlight > ul > li:not(:first-child) .card-body h2,
+.cards.highlight > ul > li:not(:first-child) .card-body h3 {
+  font-size: var(--font-size-300);
+}
+
 .cards.highlight > ul > li:first-child .card-body h2,
 .cards.highlight > ul > li:first-child .card-body h3 {
   font-size: clamp(1.5rem, 2.5vw, 2rem);
+}
+
+@media (width >= 900px) {
+  .cards.highlight > ul > li:not(:first-child) .card-body h2,
+  .cards.highlight > ul > li:not(:first-child) .card-body h3 {
+    font-size: var(--font-size-500);
+  }
 }
 
 /* horizontal variant */
