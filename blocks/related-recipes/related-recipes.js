@@ -15,10 +15,11 @@ const WEIGHTS = {
  * @param {string} path - Pathname, no query string
  * @returns {string} Same path, or shorter if it ended with that segment
  */
-function stripImmersionBlenderSuffix(path) {
+function stripEquipmentSuffix(path) {
   if (!path) return path;
-  const suffix = '-immersion-blender';
-  if (!path.endsWith(suffix)) return path;
+  const suffixes = ['-immersion-blender', '-food-processor-attachment'];
+  const suffix = suffixes.find((s) => path.endsWith(s));
+  if (!suffix) return path;
   return path.slice(0, path.length - suffix.length);
 }
 
@@ -43,7 +44,7 @@ function hrefFromAuthorLink(anchor) {
  * @returns {Object|undefined} Matching recipe, or undefined
  */
 function findMatchingRecipe(href, data) {
-  const pathForMatch = stripImmersionBlenderSuffix(href);
+  const pathForMatch = stripEquipmentSuffix(href);
 
   if (pathForMatch.match(/-r\d+$/)) {
     return data.find((recipe) => recipe.path === pathForMatch);
@@ -53,7 +54,8 @@ function findMatchingRecipe(href, data) {
   return data.find((recipe) => {
     const lastIndex = recipe.path.lastIndexOf('-r');
     const recipePath = recipe.path.substring(0, lastIndex);
-    return recipePath === pathForMatch;
+    if (recipePath === pathForMatch) return true;
+    return stripEquipmentSuffix(recipePath) === pathForMatch;
   });
 }
 
@@ -177,9 +179,9 @@ function hasAnyOverlap(target, recipe) {
  */
 function findRelatedRecipes(target, allRecipes, max = 3) {
   // Pre-filter: only recipes with at least one overlapping attribute
-  const targetPath = stripRecipeId(stripImmersionBlenderSuffix(target.path));
+  const targetPath = stripEquipmentSuffix(stripRecipeId(target.path));
   const candidates = allRecipes.filter((recipe) => (
-    stripRecipeId(recipe.path) !== targetPath
+    stripEquipmentSuffix(stripRecipeId(recipe.path)) !== targetPath
     && recipe.title !== target.title
     && recipe.status !== 'Deleted'
     && recipe.image
