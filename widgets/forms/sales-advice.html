@@ -1,0 +1,93 @@
+<form class="sales-advice-form" method="post" action="" aria-label="Sales advice">
+  <div class="sales-advice-field">
+    <label for="sales-advice-first-name">
+      <span class="label-text">First Name</span><span class="required" aria-hidden="true">*</span>
+    </label>
+    <input id="sales-advice-first-name" type="text" name="firstName" required aria-required="true" placeholder="" autocomplete="given-name">
+  </div>
+  <div class="sales-advice-field">
+    <label for="sales-advice-last-name">
+      <span class="label-text">Last Name</span><span class="required" aria-hidden="true">*</span>
+    </label>
+    <input id="sales-advice-last-name" type="text" name="lastName" required aria-required="true" placeholder="" autocomplete="family-name">
+  </div>
+  <div class="sales-advice-field">
+    <label for="sales-advice-professional-title">
+      <span class="label-text">Professional Title</span><span class="required" aria-hidden="true">*</span>
+    </label>
+    <input id="sales-advice-professional-title" type="text" name="professionalTitle" required aria-required="true" placeholder="" autocomplete="organization-title">
+  </div>
+  <div class="sales-advice-field">
+    <label for="sales-advice-email">
+      <span class="label-text">Email Address</span><span class="required" aria-hidden="true">*</span>
+    </label>
+    <input id="sales-advice-email" type="email" name="email" required aria-required="true" placeholder="" autocomplete="email">
+  </div>
+  <div class="sales-advice-field">
+    <label for="sales-advice-phone">
+      <span class="label-text">Phone Number</span><span class="required" aria-hidden="true">*</span>
+    </label>
+    <input id="sales-advice-phone" type="tel" name="phoneNumber" required aria-required="true" placeholder="" autocomplete="tel">
+  </div>
+  <div class="sales-advice-field">
+    <label for="sales-advice-business-name">
+      <span class="label-text">Business Name</span><span class="required" aria-hidden="true">*</span>
+    </label>
+    <input id="sales-advice-business-name" type="text" name="businessName" required aria-required="true" placeholder="" autocomplete="organization">
+  </div>
+  <div class="sales-advice-field">
+    <label for="sales-advice-type-of-business">
+      <span class="label-text">Type of Business</span><span class="required" aria-hidden="true">*</span>
+    </label>
+    <select id="sales-advice-type-of-business" name="typeOfBusiness" required aria-required="true">
+      <option value="">Select an option</option>
+    </select>
+  </div>
+  <div class="sales-advice-field">
+    <label for="sales-advice-number-of-locations">
+      <span class="label-text">Number of Locations</span><span class="required" aria-hidden="true">*</span>
+    </label>
+    <select id="sales-advice-number-of-locations" name="numberOfLocations" required aria-required="true">
+      <option value="">Select an option</option>
+    </select>
+  </div>
+  <div class="sales-advice-field">
+    <label for="sales-advice-state">
+      <span class="label-text">State</span><span class="required" aria-hidden="true">*</span>
+    </label>
+    <select id="sales-advice-state" name="state" required aria-required="true">
+      <option value="">Please Select</option>
+    </select>
+  </div>
+  <div class="sales-advice-field">
+    <label for="sales-advice-zip">
+      <span class="label-text">Zip Code</span><span class="required" aria-hidden="true">*</span>
+    </label>
+    <input id="sales-advice-zip" type="text" name="zipCode" required aria-required="true" placeholder="" autocomplete="postal-code" inputmode="text">
+  </div>
+  <div class="sales-advice-field sales-advice-country-field">
+    <span class="label-text">Country</span>
+    <div class="sales-advice-country-value">
+      <span class="country-display">United States</span>
+      <input type="hidden" name="country" value="United States">
+      <a href="#" class="country-change-link">Not your country?</a>
+    </div>
+  </div>
+  <div class="sales-advice-field">
+    <label for="sales-advice-reason">
+      <span class="label-text">Reason for Contacting a Vitamix Expert</span><span class="required" aria-hidden="true">*</span>
+    </label>
+    <select id="sales-advice-reason" name="reasonForExpert" required aria-required="true">
+      <option value="">Select an option</option>
+    </select>
+  </div>
+  <div class="sales-advice-field sales-advice-checkbox-field">
+    <label class="sales-advice-checkbox-label">
+      <input type="checkbox" name="marketingOptIn" value="yes">
+      <span class="checkbox-text"></span>
+    </label>
+  </div>
+  <div class="sales-advice-actions">
+    <button type="submit" class="button emphasis">Submit</button>
+  </div>
+</form>
