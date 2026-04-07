@@ -689,13 +689,18 @@
 /* Mobile: image left, text right for all cards except the first */
 .cards.highlight > ul > li:not(:first-child) {
   display: grid;
-  grid-template-columns: 120px 1fr;
+  grid-template-columns: 160px 1fr;
   align-items: stretch;
 }
 
 .cards.highlight > ul > li:not(:first-child) .card-image img {
   height: 100%;
   min-height: 120px;
+}
+
+/* Hide description paragraph on mobile */
+.cards.highlight > ul > li:not(:first-child) .card-body p:not(.eyebrow) {
+  display: none;
 }
 
 @media (width >= 900px) {
@@ -717,6 +722,10 @@
   .cards.highlight > ul > li:not(:first-child) .card-image img {
     height: 220px;
     min-height: unset;
+  }
+
+  .cards.highlight > ul > li:not(:first-child) .card-body p:not(.eyebrow) {
+    display: block;
   }
 }
 
