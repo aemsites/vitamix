@@ -1382,7 +1382,7 @@ async function loadDelayed() {
   }
 
   const initContentScore = async () => {
-    const CONTENT_SCORE = 'https://content-score--helix-tools-website--adobe.aem.live/tools/content-score/src/scripts.js';
+    const CONTENT_SCORE = 'https://tools.aem.live/tools/content-score/src/scripts.js';
     const { init } = await import(CONTENT_SCORE);
     await init();
   };
