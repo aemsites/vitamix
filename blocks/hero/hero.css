@@ -105,6 +105,8 @@ main > .hero-container.section {
 
 .hero.left-text,
 .hero.right-text {
+  --overlay-opacity: 0.66;
+
   text-align: left;
 }
 
@@ -112,12 +114,6 @@ main > .hero-container.section {
 .hero.left-text::after,
 .hero.right-text::after {
   display: none;
-}
-
-/* default overlay opacity (overridden by image-tone classes below) */
-.hero.left-text,
-.hero.right-text {
-  --overlay-opacity: 0.66;
 }
 
 .hero.left-text.image-darkest,
@@ -133,12 +129,14 @@ main > .hero-container.section {
 .hero.left-text.image-light,
 .hero.right-text.image-light {
   --overlay-opacity: 0.8;
+
   color: var(--color-charcoal);
 }
 
 .hero.left-text.image-lightest,
 .hero.right-text.image-lightest {
   --overlay-opacity: 0.2;
+
   color: var(--color-charcoal);
 }
 
