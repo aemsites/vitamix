@@ -53,6 +53,12 @@ main > .hero-container.section {
   z-index: -1;
 }
 
+.hero > picture img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .hero > div {
   position: relative;
   z-index: 1;
