@@ -10,13 +10,11 @@ export default function decorate(block) {
       const img = picture.querySelector('img');
       const optimized = createOptimizedPicture(img.src, img.alt, false, [{ width: '2000' }]);
 
-      // find the direct-child row of block that contains the picture
-      let imageRow = picture;
-      while (imageRow.parentElement !== block) imageRow = imageRow.parentElement;
-
-      // append optimized picture to block as background before removing the row
+      // picture lives in a cell (div), which lives in a row (div), which lives in block
+      // we only want to remove the cell, not the row
+      const imgCell = picture.parentElement;
       block.appendChild(optimized);
-      imageRow.remove();
+      imgCell.remove();
 
       const newImg = optimized.querySelector('img');
       if (newImg.complete) applyImgColor(block);
