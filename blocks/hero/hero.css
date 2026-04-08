@@ -94,3 +94,125 @@ main > .hero-container.section {
     max-width: 800px;
   }
 }
+
+/* ============================================================
+   left-aligned variant
+   Mirrors the banner.aligned pattern:
+   - no full ::after overlay
+   - ::before gradient on the picture, driven by --image-color
+   - text pinned to one side, left-aligned
+   ============================================================ */
+
+.hero.left-text,
+.hero.right-text {
+  text-align: left;
+}
+
+/* remove the default full-black overlay */
+.hero.left-text::after,
+.hero.right-text::after {
+  display: none;
+}
+
+/* default overlay opacity (overridden by image-tone classes below) */
+.hero.left-text,
+.hero.right-text {
+  --overlay-opacity: 0.66;
+}
+
+.hero.left-text.image-darkest,
+.hero.right-text.image-darkest {
+  --overlay-opacity: 0.2;
+}
+
+.hero.left-text.image-dark,
+.hero.right-text.image-dark {
+  --overlay-opacity: 0.8;
+}
+
+.hero.left-text.image-light,
+.hero.right-text.image-light {
+  --overlay-opacity: 0.8;
+  color: var(--color-charcoal);
+}
+
+.hero.left-text.image-lightest,
+.hero.right-text.image-lightest {
+  --overlay-opacity: 0.2;
+  color: var(--color-charcoal);
+}
+
+/* gradient overlay — same technique as banner.aligned ::before */
+.hero.left-text picture::after,
+.hero.right-text picture::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* text-on-right → gradient fades LEFT side of image */
+.hero.left-text picture::after {
+  background: linear-gradient(to right, var(--image-color, #000) 40%, transparent);
+  opacity: var(--overlay-opacity);
+}
+
+/* text-on-left → gradient fades RIGHT side of image */
+.hero.right-text picture::after {
+  background: linear-gradient(to left, var(--image-color, #000) 40%, transparent);
+  opacity: var(--overlay-opacity);
+}
+
+/* keep the picture container positioned so ::after sits over the image */
+.hero.left-text picture,
+.hero.right-text picture {
+  position: absolute;
+  inset: 0;
+}
+
+/* text content block */
+.hero.left-text > div,
+.hero.right-text > div {
+  align-items: center;
+  padding: 0 var(--horizontal-spacing);
+}
+
+.hero.left-text > div > div,
+.hero.right-text > div > div {
+  position: relative;
+  margin: 0;
+  max-width: 520px;
+  padding: var(--spacing-600) 0;
+  padding-top: 55px;
+  z-index: 1;
+}
+
+/* left-text: content sits on the left */
+.hero.left-text > div > div {
+  margin-right: auto;
+}
+
+/* right-text: content sits on the right */
+.hero.right-text > div > div {
+  margin-left: auto;
+}
+
+.hero.left-text .button-wrapper,
+.hero.right-text .button-wrapper {
+  justify-content: flex-start;
+}
+
+@media (width >= 800px) {
+  .hero.left-text > div > div,
+  .hero.right-text > div > div {
+    max-width: 600px;
+  }
+}
+
+@media (width >= 1200px) {
+  .hero.left-text > div > div,
+  .hero.right-text > div > div {
+    max-width: 700px;
+  }
+}
