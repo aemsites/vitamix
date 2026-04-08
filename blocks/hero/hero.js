@@ -19,4 +19,14 @@ export default function decorate(block) {
   if (disclaimer) {
     block.dataset.disclaimer = disclaimer.textContent;
   }
+
+  // left-aligned variant: determine text position relative to image
+  if (block.classList.contains('left')) {
+    block.classList.add('left-text');
+  } else if (block.classList.contains('right')) {
+    block.classList.add('right-text');
+  } else {
+    // default for the left-aligned variant: text on the right side
+    block.classList.add('left-text');
+  }
 }
