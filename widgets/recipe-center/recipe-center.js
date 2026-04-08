@@ -53,6 +53,28 @@ function capitalizeFirstLetter(str) {
 }
 
 /**
+ * Highlights matching substring within text (for container name pills).
+ * @param {string} text - The full text
+ * @param {string} searchTerm - The term to highlight
+ * @returns {string} HTML string with highlighted match
+ */
+function highlightMatch(text, searchTerm) {
+  if (!text || !searchTerm) return text;
+
+  const lowerText = text.toLowerCase();
+  const lowerSearch = searchTerm.toLowerCase();
+  const index = lowerText.indexOf(lowerSearch);
+
+  if (index === -1) return text;
+
+  const before = text.substring(0, index);
+  const match = text.substring(index, index + searchTerm.length);
+  const after = text.substring(index + searchTerm.length);
+
+  return `${before}<span class="highlight">${match}</span>${after}`;
+}
+
+/**
  * Fetches and filters recipes from the recipe index.
  * @param {Object} config - Object with filter criteria
  * @param {Object} facets - Optional object to populate with facet counts for UI filters.
@@ -137,13 +159,16 @@ async function lookupRecipes(config = {}, facets = {}) {
     filterKeys.forEach((filterKey) => {
       let matched = false;
 
-      // special case: full-text search on recipe title
+      // special case: full-text search on recipe title and compatible container names
       if (filterKey === 'fulltext') {
         // Only apply fulltext filter if it has actual content
         if (config.fulltext && config.fulltext.trim().length > 0) {
-          const titleLower = recipe.title.toLowerCase();
           const searchTerm = config.fulltext.toLowerCase().trim();
+          const titleLower = (recipe.title || '').toLowerCase();
           matched = titleLower.includes(searchTerm);
+          if (!matched && recipe['compatible-containers'] && Array.isArray(recipe['compatible-containers'])) {
+            matched = recipe['compatible-containers'].some((c) => c.toLowerCase().includes(searchTerm));
+          }
         } else {
           // Empty fulltext matches everything
           matched = true;
@@ -364,9 +389,10 @@ function collapseRecipesByTitle(recipes) {
 /**
  * Creates a recipe card DOM element for display in the recipe listing.
  * @param {Object} recipe - Recipe data object with title, image, time, etc.
+ * @param {Object} copy - Widget copy (i18n), optional aria for matched container pills
  * @returns {HTMLElement} Recipe card element
  */
-function createRecipeCard(recipe) {
+function createRecipeCard(recipe, copy = {}) {
   const li = document.createElement('li');
   li.className = 'card';
 
@@ -412,6 +438,24 @@ function createRecipeCard(recipe) {
   meta.textContent = metaParts.join(' • ');
 
   link.append(image, title, rating, meta);
+
+  if (recipe.matchedContainers && recipe.matchedContainers.length > 0 && recipe.fulltextHighlight) {
+    const tagsContainer = document.createElement('div');
+    tagsContainer.className = 'matched-tags';
+    tagsContainer.setAttribute('role', 'group');
+    tagsContainer.setAttribute(
+      'aria-label',
+      copy.matchingContainersAria || 'Matching containers',
+    );
+    recipe.matchedContainers.forEach((containerName) => {
+      const tagSpan = document.createElement('span');
+      tagSpan.className = 'tag';
+      tagSpan.innerHTML = highlightMatch(containerName, recipe.fulltextHighlight);
+      tagsContainer.appendChild(tagSpan);
+    });
+    link.appendChild(tagsContainer);
+  }
+
   li.appendChild(link);
 
   return li;
@@ -572,7 +616,7 @@ function buildRecipeFiltering(container, config = {}, copy = {}) {
     const paginatedResults = results.slice(startIndex, endIndex);
 
     paginatedResults.forEach((recipe) => {
-      resultsElement.append(createRecipeCard(recipe));
+      resultsElement.append(createRecipeCard(recipe, copy));
     });
     highlightResults(resultsElement);
 
@@ -852,6 +896,21 @@ function buildRecipeFiltering(container, config = {}, copy = {}) {
 
     // Collapse recipes with the same title
     results = collapseRecipesByTitle(results);
+
+    const fulltextTrimmed = filterConfig.fulltext && filterConfig.fulltext.trim();
+    if (fulltextTrimmed) {
+      const termLower = fulltextTrimmed.toLowerCase();
+      results.forEach((recipe) => {
+        const containers = recipe['compatible-containers'] || [];
+        recipe.matchedContainers = containers.filter((c) => c.toLowerCase().includes(termLower));
+        recipe.fulltextHighlight = fulltextTrimmed;
+      });
+    } else {
+      results.forEach((recipe) => {
+        recipe.matchedContainers = [];
+        recipe.fulltextHighlight = '';
+      });
+    }
 
     // Check for sort in filterConfig first, then fall back to UI element
     let sortBy = filterConfig.sort || 'featured';

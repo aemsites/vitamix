@@ -21,7 +21,8 @@
     "dietaryInterests": "Dietary Interests",
     "previous": "Previous",
     "next": "Next",
-    "clearAll": "Clear All"
+    "clearAll": "Clear All",
+    "matchingContainersAria": "Matching containers"
   },
   "fr": {
     "searchRecipes": "Rechercher des recettes",
@@ -45,7 +46,8 @@
     "dietaryInterests": "Régimes alimentaires",
     "previous": "Précédent",
     "next": "Suivant",
-    "clearAll": "Tout effacer"
+    "clearAll": "Tout effacer",
+    "matchingContainersAria": "Contenants correspondants"
   },
   "es": {
     "searchRecipes": "Buscar recetas",
@@ -69,6 +71,7 @@
     "dietaryInterests": "Preferencias dietéticas",
     "previous": "Anterior",
     "next": "Siguiente",
-    "clearAll": "Borrar todo"
+    "clearAll": "Borrar todo",
+    "matchingContainersAria": "Contenedores coincidentes"
   }
 }
