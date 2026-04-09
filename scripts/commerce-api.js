@@ -90,20 +90,23 @@ export async function createOrder(orderBody) {
 }
 
 /**
- * Initiates a Chase card payment for a placed order.
+ * Initiates a payment for a placed order.
  * The idempotency key ensures that retrying the same request (e.g. after a
  * network failure) does not result in a duplicate charge.
  *
  * @param {string} orderId - The order ID returned by `createOrder`
  * @param {string} idempotencyKey - A unique key for this payment attempt (e.g. a UUID)
+ * @param {string} [fraudToken] - Optional fraud provider session token
+ * @param {string} [provider='chase'] - Payment provider ('chase' or 'paypal')
+ * @param {string} [paymentMethod='card'] - Payment method ('card' or 'paypal')
  * @returns {Promise<{ orderId: string, paymentAttemptId: string, status: string,
  *   action: string, redirectUrl: string }>}
  * @throws {CommerceApiError}
  */
-export async function initiatePayment(orderId, idempotencyKey, fraudToken) {
+export async function initiatePayment(orderId, idempotencyKey, fraudToken, provider = 'chase', paymentMethod = 'card') {
   return post(`/orders/${orderId}/payments`, {
-    provider: 'chase',
-    paymentMethod: 'card',
+    provider,
+    paymentMethod,
     idempotencyKey,
     ...(fraudToken ? { fraudToken } : {}),
   });

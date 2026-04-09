@@ -517,6 +517,81 @@ export default async function decorate(block) {
     if (paymentMethod === 'PayPal') {
       span.classList.add('paypal');
       span.appendChild(button);
+      button.addEventListener('click', async (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+
+        if (!selectedShippingMethodId) {
+          showError(formColumn, 'Please select a shipping method.');
+          return;
+        }
+
+        const isValid = form.checkValidity();
+        if (!isValid) {
+          form.reportValidity();
+          return;
+        }
+
+        clearError(formColumn);
+        button.disabled = true;
+
+        const reenableButton = () => {
+          button.disabled = false;
+        };
+
+        try {
+          const formData = Object.fromEntries(new FormData(form).entries());
+          const {
+            email,
+            'shipping-firstname': firstName,
+            'shipping-lastname': lastName,
+            'shipping-telephone': phone,
+          } = formData;
+
+          const shipping = collectAddress(form, formData, 'shipping-', email);
+          const { default: cart } = await import('../../scripts/cart.js');
+
+          if (!currentEstimateToken) {
+            await updatePreview(form, formData, cart);
+          }
+
+          if (!currentEstimateToken || !currentPreview) {
+            showError(formColumn, 'Unable to calculate shipping and taxes. Please try again.');
+            reenableButton();
+            return;
+          }
+
+          const order = cart.getOrderJSON(email, firstName, lastName, phone, shipping, {
+            shippingMethod: selectedShippingMethodId,
+            estimateToken: currentEstimateToken,
+            locale: getLocale(),
+            country: getCountry(),
+          });
+
+          sessionStorage.setItem('checkout_email', email);
+          sessionStorage.setItem('checkout_cart_items', JSON.stringify(cart.items));
+          if (currentPreview) {
+            sessionStorage.setItem('checkout_preview', JSON.stringify(currentPreview));
+          }
+
+          const { order: createdOrder } = await createOrder(order);
+          sessionStorage.setItem('checkout_order', JSON.stringify(createdOrder));
+
+          const idempotencyKey = crypto.randomUUID();
+          const fraudToken = sessionStorage.getItem('forter_token') || undefined;
+          const payment = await initiatePayment(createdOrder.id, idempotencyKey, fraudToken, 'paypal', 'paypal');
+          if (payment.action === 'redirect' && payment.redirectUrl) {
+            window.location.href = payment.redirectUrl;
+          } else {
+            showError(formColumn, 'Unexpected payment response. Please try again.');
+            reenableButton();
+          }
+        } catch (error) {
+          const message = error.body?.message || error.message || 'Something went wrong. Please try again.';
+          showError(formColumn, message);
+          reenableButton();
+        }
+      });
     } else if (paymentMethod === 'Apple Pay') {
       span.classList.add('apple-pay');
       loadScript('https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js');
@@ -634,10 +709,14 @@ export default async function decorate(block) {
   paymentMethodGroup.addEventListener('change', () => {
     const paymentMethod = paymentMethodGroup.querySelector('input:checked').value;
 
-    if (sameShipBillCheckbox.checked || paymentMethod !== 'Credit Card') {
+    // PayPal collects billing address on their hosted page — hide the section entirely
+    const isPayPal = paymentMethod === 'PayPal';
+    if (isPayPal || sameShipBillCheckbox.checked) {
       billingAddressSection.setAttribute('aria-hidden', true);
+      billingAddressSection.setAttribute('disabled', '');
     } else {
       billingAddressSection.removeAttribute('aria-hidden');
+      billingAddressSection.removeAttribute('disabled');
     }
 
     payButtons.forEach((btn) => {

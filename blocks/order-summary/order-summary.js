@@ -3,10 +3,11 @@ import { getOrderPath } from '../../scripts/scripts.js';
 /**
  * Order confirmation / cancellation page.
  *
- * Success: Chase → API → redirect here with ?orderId=...
- * Cancel:  Chase → API → redirect here with ?orderId=...&reason=...
+ * Success: Chase / PayPal → API → redirect here with ?orderId=...
+ * Cancel:  Chase / PayPal → API → redirect here with ?orderId=...&reason=...
+ *   reason values: customer_cancelled | payment_failed | declined
  *
- * Order display data comes from sessionStorage (saved before Chase redirect).
+ * Order display data comes from sessionStorage (saved before the payment redirect).
  */
 export default async function decorate(block) {
   const params = Object.fromEntries(new URLSearchParams(window.location.search).entries());
