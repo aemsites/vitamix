@@ -1,0 +1,94 @@
+/* Sales advice form – same layout pattern as contact-us / consult-expert */
+.forms-sales-advice {
+  background-color: var(--color-gray-100);
+  padding: var(--spacing-300);
+  border-radius: var(--rounding-m);
+  max-width: 100%;
+}
+
+.forms-sales-advice .sales-advice-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-200);
+  max-width: 32rem;
+  width: 100%;
+  margin-inline: auto;
+}
+
+.forms-sales-advice .sales-advice-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
+}
+
+.forms-sales-advice .sales-advice-field label {
+  margin-bottom: 0;
+  font-weight: var(--font-weight-medium, 500);
+}
+
+.forms-sales-advice .sales-advice-field .required {
+  color: var(--color-red);
+  margin-left: 0.15em;
+}
+
+.forms-sales-advice .sales-advice-country-field .label-text {
+  font-weight: var(--font-weight-medium, 500);
+}
+
+.forms-sales-advice .sales-advice-country-value {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25em;
+}
+
+.forms-sales-advice .sales-advice-country-value .country-display {
+  color: var(--color-charcoal, #333);
+}
+
+.forms-sales-advice .sales-advice-country-value .country-change-link {
+  color: var(--color-link);
+  text-decoration: underline;
+  font-size: inherit;
+}
+
+.forms-sales-advice .sales-advice-country-value .country-change-link:hover,
+.forms-sales-advice .sales-advice-country-value .country-change-link:focus {
+  text-decoration-thickness: 2px;
+}
+
+.forms-sales-advice .sales-advice-checkbox-field .sales-advice-checkbox-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5em;
+  font-weight: var(--font-weight-regular, 400);
+  cursor: pointer;
+}
+
+.forms-sales-advice .sales-advice-checkbox-field input[type="checkbox"] {
+  margin-top: 0.2em;
+  flex-shrink: 0;
+}
+
+.forms-sales-advice .sales-advice-form select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23333' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--spacing-80) center;
+  padding-right: 2rem;
+}
+
+.forms-sales-advice .sales-advice-actions {
+  margin-top: var(--spacing-100);
+}
+
+.forms-sales-advice .sales-advice-form button[type="submit"] {
+  background-color: var(--color-charcoal);
+  border-color: var(--color-charcoal);
+  color: var(--color-white);
+}
+
+.forms-sales-advice .sales-advice-form button[type="submit"]:hover,
+.forms-sales-advice .sales-advice-form button[type="submit"]:focus {
+  background-color: var(--color-gray-900);
+  border-color: var(--color-gray-900);
+}

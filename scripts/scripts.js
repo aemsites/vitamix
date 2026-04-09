@@ -19,7 +19,7 @@ import {
 
 const isProdHost = window.location.hostname.includes('vitamix.com');
 export const FORMS_ENDPOINT = isProdHost
-  ? 'https://main--vitamix--aemsites.aem.network' // TODO: make empty string when Akamai ready
+  ? ''
   : 'https://main--vitamix--aemsites.aem.network';
 
 /**
@@ -58,6 +58,59 @@ export function formatPrice(value, ph) {
   const locale = (ph.languageCode || 'en_US').replace('_', '-');
   const currency = ph.currencyCode || 'USD';
   return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(value);
+}
+
+/**
+ * Formats a time string from HH:MM:SS to a human-readable string.
+ * @param {string} timeString - Time string in HH:MM:SS format
+ * @param {Object} [placeholders={}] - Localized labels for hours/minutes
+ * @returns {string} Formatted time string
+ */
+export function formatTime(timeString, placeholders = {}) {
+  if (!timeString) return '';
+
+  const parts = timeString.split(':');
+  if (parts.length !== 3) return timeString;
+
+  const hours = parseInt(parts[0], 10);
+  const minutes = parseInt(parts[1], 10);
+  const seconds = parseInt(parts[2], 10);
+
+  let totalMinutes = hours * 60 + minutes;
+  if (seconds > 0) totalMinutes += 1;
+
+  const finalHours = Math.floor(totalMinutes / 60);
+  const finalMinutes = totalMinutes % 60;
+
+  const result = [];
+  if (finalHours > 0) {
+    const hourLabel = finalHours !== 1 ? (placeholders.hours || 'Hours') : (placeholders.hour || 'Hour');
+    result.push(`${finalHours} ${hourLabel}`);
+  }
+  if (finalMinutes > 0) {
+    const minuteLabel = finalMinutes !== 1 ? (placeholders.minutes || 'Minutes') : (placeholders.minute || 'Minute');
+    result.push(`${finalMinutes} ${minuteLabel}`);
+  }
+
+  return result.length > 0 ? result.join(' ') : `0 ${placeholders.minutes || 'Minutes'}`;
+}
+
+/**
+ * Formats a servings string like "8.00 servings" to "8 servings".
+ * @param {string} servingsString - Raw servings string
+ * @returns {string} Formatted servings string
+ */
+export function formatServings(servingsString) {
+  if (!servingsString) return '';
+
+  const match = servingsString.match(/^([\d.]+)\s*(.*)$/);
+  if (!match) return servingsString;
+
+  const number = parseFloat(match[1]);
+  const unit = match[2];
+  const formattedNumber = number % 1 === 0 ? Math.floor(number) : number;
+
+  return unit ? `${formattedNumber} ${unit}` : `${formattedNumber}`;
 }
 
 /**
@@ -1258,15 +1311,9 @@ async function loadLazy(doc) {
     initQuickEdit(...args);
   };
 
-  const initContentScore = async () => {
-    const { init } = await import('../tools/content-score/scripts.js');
-    await init();
-  };
-
   const addSidekickListeners = (sk) => {
     sk.addEventListener('custom:sync', syncSku);
     sk.addEventListener('custom:quick-edit', loadQuickEdit);
-    initContentScore();
   };
 
   const sk = document.querySelector('aem-sidekick');
@@ -1332,6 +1379,19 @@ async function loadDelayed() {
   } catch (e) {
     // eslint-disable-next-line no-console
     console.error('Error loading link checker', e);
+  }
+
+  const initContentScore = async () => {
+    const CONTENT_SCORE = 'https://tools.aem.live/tools/content-score/src/scripts.js';
+    const { init } = await import(CONTENT_SCORE);
+    await init();
+  };
+
+  const sk = document.querySelector('aem-sidekick');
+
+  if (sk) initContentScore();
+  else {
+    document.addEventListener('sidekick-ready', initContentScore, { once: true });
   }
 
   setTimeout(decorateExternalLinks, 1000);

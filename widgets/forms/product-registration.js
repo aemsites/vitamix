@@ -47,7 +47,12 @@ export default async function decorate(widget) {
   const provinceOptions = await getStatesProvincesOptions(countryCode, lang).catch(() => []);
   const labels = copy.labels || {};
   const inputHints = copy.inputPlaceholders || {};
-  const purchasedFromOptions = copy.purchasedFromOptions || [];
+  const localeKey = (locale || 'us').toLowerCase();
+  const byCountry = copy.purchasedFromOptionsByCountry;
+  const purchasedFromOptions = byCountry?.[localeKey]
+    ?? byCountry?.us
+    ?? copy.purchasedFromOptions
+    ?? [];
 
   const sectionLegends = form.querySelectorAll('.product-registration-section-legend .section-legend-text');
   if (sectionLegends[0]) sectionLegends[0].textContent = labels.aboutYourBlender ?? 'About your blender';

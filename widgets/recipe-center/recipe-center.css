@@ -428,6 +428,29 @@
   font-size: var(--body-size-xs);
 }
 
+/* Fulltext matches on compatible container names (after meta / servings) */
+.recipe-center .card .matched-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-60);
+  margin: 0 var(--spacing-100) var(--spacing-100);
+}
+
+.recipe-center .card .matched-tags .tag {
+  display: inline-block;
+  padding: var(--spacing-40) var(--spacing-80);
+  border-radius: var(--rounding-s);
+  background-color: var(--color-gray-200);
+  color: var(--color-charcoal);
+  font-size: var(--body-size-xs);
+}
+
+.recipe-center .card .matched-tags .tag .highlight {
+  padding: 0 2px;
+  background-color: var(--color-yellow);
+}
+
 @media (width >= 600px) {
   .recipe-center .results {
     grid-template-columns: repeat(2, 1fr);
