@@ -46,7 +46,7 @@
   background-color: var(--color-white);
   border: 1px solid var(--color-gray-300);
   border-radius: var(--rounding-m);
-  font-size: var(--font-size-20);
+  font-size: var(--font-size-60);
 }
 
 .forms-order-status .order-status-result:empty {
