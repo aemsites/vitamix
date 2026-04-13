@@ -16,8 +16,58 @@ async function loadFormCopy(lang) {
 }
 
 /**
+ * Derives a status key from the API response.
+ * @param {Object|null} result - Parsed API response
+ * @returns {string} Status key matching a key in result.statuses
+ */
+function deriveStatus(result) {
+  if (!result?.succeeded) return 'unavailable';
+  if (result.outcome === 'Cancelled') return 'cancelled';
+  const deliveries = result.order?.delivery ?? [];
+  const shippedCount = deliveries.filter((d) => d.shipped).length;
+  if (shippedCount === 0) return deliveries.length ? 'processed' : 'received';
+  if (shippedCount < deliveries.length) return 'partiallyShipped';
+  return 'shipped';
+}
+
+/**
+ * Renders the order result as a formatted definition list into the given container.
+ * @param {Object|null} result - Parsed API response
+ * @param {Object} copy - Localised copy for the current language
+ * @param {HTMLElement} container - Element to render into
+ */
+function renderResult(result, copy, container) {
+  const resultLabels = copy.result?.labels ?? {};
+  const resultStatuses = copy.result?.statuses ?? {};
+
+  const orderNumber = result?.order?.key ?? '—';
+  const statusKey = deriveStatus(result);
+  const orderStatus = resultStatuses[statusKey] ?? statusKey;
+
+  const rows = [
+    [resultLabels.orderNumber ?? 'Order Number', orderNumber],
+    [resultLabels.orderStatus ?? 'Order Status', orderStatus],
+  ];
+
+  const dl = document.createElement('dl');
+  dl.className = 'order-status-result-list';
+  rows.forEach(([label, value]) => {
+    const div = document.createElement('div');
+    div.className = 'order-status-result-row';
+    const dt = document.createElement('dt');
+    dt.textContent = label;
+    const dd = document.createElement('dd');
+    dd.textContent = value;
+    div.append(dt, dd);
+    dl.append(div);
+  });
+
+  container.replaceChildren(dl);
+}
+
+/**
  * Decorates the order-status widget: applies copy from JSON and configures form.
- * Submits POST with JSON to sheet-logger and displays the response JSON below the form.
+ * Submits POST with JSON to sheet-logger and displays the order result below the form.
  * @param {HTMLElement} widget - The widget root element
  */
 export default async function decorate(widget) {
@@ -68,14 +118,14 @@ export default async function decorate(widget) {
       } catch {
         result = { status: resp.status, ok: resp.ok, body: text };
       }
+      renderResult(result, copy, resultEl);
       resultEl.hidden = false;
-      resultEl.textContent = JSON.stringify(result, null, 2);
       resultEl.classList.add('order-status-result-visible');
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Order status lookup failed', err);
+      renderResult(null, copy, resultEl);
       resultEl.hidden = false;
-      resultEl.textContent = JSON.stringify({ error: err.message }, null, 2);
       resultEl.classList.add('order-status-result-visible');
     } finally {
       [...form.elements].forEach((el) => { el.disabled = false; });
