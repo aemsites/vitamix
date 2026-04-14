@@ -161,7 +161,8 @@ p + .columns-container {
   margin: 0 auto;
 }
 
-.columns.icon-circle p.icon svg {
+.columns.icon-circle p.icon svg,
+.columns.icon-circle p.icon img {
   width: 3em;
   height: 3em;
 }
