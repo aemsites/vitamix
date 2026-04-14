@@ -40,7 +40,7 @@ export default function decorate(block) {
       [...row.children].forEach((col) => {
         const imgWrapper = col.querySelector('.img-wrapper');
         if (imgWrapper) {
-          imgWrapper.closest('p')?.classList.add('icon');
+          imgWrapper.closest('p')?.classList.add('icon-circle-wrapper');
         }
       });
     });
