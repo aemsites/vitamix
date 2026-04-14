@@ -129,6 +129,10 @@ p + .columns-container {
   text-align: center;
 }
 
+.columns.text-center .button-wrapper {
+  justify-content: center;
+}
+
 .columns .icon-circle-1 svg, .columns .icon-circle-2 svg, .columns .icon-circle-3 svg {
   height: 4em;
   width: 4em;
