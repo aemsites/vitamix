@@ -143,3 +143,21 @@ p + .columns-container {
   vertical-align: middle;
   flex-shrink: 0;
 }
+
+/* icon-circle variant - 150px circular outlined icon */
+.columns.icon-circle .icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 150px;
+  height: 150px;
+  border: 1px solid currentcolor;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin: 0 auto;
+}
+
+.columns.icon-circle .icon svg {
+  width: 48px;
+  height: 48px;
+}
