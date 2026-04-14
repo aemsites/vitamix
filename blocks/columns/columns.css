@@ -149,7 +149,7 @@ p + .columns-container {
 }
 
 /* icon-circle variant - 150px circular outlined icon */
-.columns.icon-circle p.icon {
+.columns.icon-circle p.icon-circle-wrapper {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -161,8 +161,8 @@ p + .columns-container {
   margin: 0 auto;
 }
 
-.columns.icon-circle p.icon svg,
-.columns.icon-circle p.icon img {
+.columns.icon-circle p.icon-circle-wrapper svg,
+.columns.icon-circle p.icon-circle-wrapper img {
   width: 3em;
   height: 3em;
 }
