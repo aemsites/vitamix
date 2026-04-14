@@ -134,3 +134,15 @@ p + .columns-container {
   height: 4em;
   width: 4em;
 }
+
+
+.columns .icon[class$="-circle"] svg {
+  height: 9em;
+  width: 9em;
+  fill: none;
+}
+
+.columns.text-center .button-wrapper {
+  justify-content: center;
+}
+
