@@ -37,15 +37,12 @@ export default function decorate(block) {
   // decorate icon-circle variant
   if (variants.includes('icon-circle')) {
     [...block.children].forEach((row) => {
-      const firstCol = row.children[0];
-      if (firstCol) {
-        const imgWrapper = firstCol.querySelector('.img-wrapper');
+      [...row.children].forEach((col) => {
+        const imgWrapper = col.querySelector('.img-wrapper');
         if (imgWrapper) {
           imgWrapper.closest('p')?.classList.add('icon');
-        } else {
-          firstCol.classList.add('icon');
         }
-      }
+      });
     });
   }
 }
