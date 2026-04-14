@@ -129,8 +129,17 @@ p + .columns-container {
   text-align: center;
 }
 
-
 .columns .icon-circle-1 svg, .columns .icon-circle-2 svg, .columns .icon-circle-3 svg {
   height: 4em;
   width: 4em;
+}
+
+/* icon variant */
+.columns .icon svg {
+  display: inline-block;
+  width: 2em;
+  height: 2em;
+  fill: currentcolor;
+  vertical-align: middle;
+  flex-shrink: 0;
 }
