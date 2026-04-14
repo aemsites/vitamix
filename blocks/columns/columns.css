@@ -129,8 +129,41 @@ p + .columns-container {
   text-align: center;
 }
 
+.columns.text-center .button-wrapper {
+  justify-content: center;
+}
 
 .columns .icon-circle-1 svg, .columns .icon-circle-2 svg, .columns .icon-circle-3 svg {
   height: 4em;
   width: 4em;
+}
+
+/* icon variant */
+.columns .icon svg {
+  display: inline-block;
+  width: 2em;
+  height: 2em;
+  fill: currentcolor;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+/* icon-circle variant - 150px circular outlined icon */
+.columns.icon-circle p.icon-circle-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 9em;
+  height: 9em;
+  border: 1px solid currentcolor;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin: 0 auto;
+  overflow: hidden;
+}
+
+.columns.icon-circle p.icon-circle-wrapper svg,
+.columns.icon-circle p.icon-circle-wrapper img {
+  width: 3em;
+  height: 3em;
 }
