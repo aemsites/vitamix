@@ -33,4 +33,12 @@ export default function decorate(block) {
       if (wrapper) wrapper.removeAttribute('class');
     });
   }
+
+  // decorate icon-circle variant
+if (variants.includes('icon-circle')) {
+  [...block.children].forEach((row) => {
+    const firstCol = row.children[0];
+    if (firstCol) firstCol.classList.add('icon');
+  });
+}
 }
