@@ -232,6 +232,43 @@ main .section.dark a:any-link:not(.button) {
   color: var(--color-gray-500);
 }
 
+main .section.deep-rust,
+main .section.xanadu,
+main .section.charcoal,
+main .section.dark-charcoal {
+  margin: 0;
+  padding-top: var(--spacing-80);
+  padding-bottom: var(--spacing-20);
+  color: var(--color-white);
+}
+
+main .section.deep-rust .eyebrow,
+main .section.xanadu .eyebrow,
+main .section.charcoal .eyebrow,
+main .section.dark-charcoal .eyebrow,
+main .section.deep-rust a:any-link:not(.button),
+main .section.xanadu a:any-link:not(.button),
+main .section.charcoal a:any-link:not(.button),
+main .section.dark-charcoal a:any-link:not(.button) {
+  color: var(--color-gray-500);
+}
+
+main .section.deep-rust {
+  background-color: var(--color-deep-rust);
+}
+
+main .section.xanadu {
+  background-color: var(--color-xanadu);
+}
+
+main .section.charcoal {
+  background-color: var(--color-charcoal);
+}
+
+main .section.dark-charcoal {
+  background-color: var(--color-dark-charcoal);
+}
+
 main .section[data-background] {
   position: relative;
 }
