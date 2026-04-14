@@ -33,4 +33,16 @@ export default function decorate(block) {
       if (wrapper) wrapper.removeAttribute('class');
     });
   }
+
+  // decorate icon-circle variant
+  if (variants.includes('icon-circle')) {
+    [...block.children].forEach((row) => {
+      [...row.children].forEach((col) => {
+        const imgWrapper = col.querySelector('.img-wrapper');
+        if (imgWrapper) {
+          imgWrapper.closest('p')?.classList.add('icon-circle-wrapper');
+        }
+      });
+    });
+  }
 }
