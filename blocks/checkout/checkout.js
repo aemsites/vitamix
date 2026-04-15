@@ -705,6 +705,9 @@ export default async function decorate(block) {
             /* eslint-enable */
             /* eslint-disable no-undef */
             affirm.ui.ready(() => {
+              affirm.ui.error.on('close', () => {
+                reenableButton();
+              });
               affirm.checkout(payment.checkoutObject);
               affirm.checkout.open();
             });
