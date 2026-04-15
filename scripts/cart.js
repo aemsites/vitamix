@@ -174,7 +174,7 @@ export class Cart {
   /**
    * Returns cart items in API-compatible format.
    * @returns {Array<{sku: string, path: string, quantity: number, name: string,
-   *   price: {final: string, currency: string}}>}
+   *   price: {final: string, currency: string}, imageUrl?: string, productUrl?: string}>}
    */
   getItemsForAPI() {
     return this.items.map((item) => ({
@@ -186,6 +186,8 @@ export class Cart {
         final: String(item.price),
         currency: window.location.pathname.startsWith('/ca/') ? 'CAD' : 'USD',
       },
+      ...(item.image ? { imageUrl: item.image } : {}),
+      ...(item.url ? { productUrl: item.url } : {}),
     }));
   }
 

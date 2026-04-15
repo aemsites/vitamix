@@ -495,6 +495,22 @@ export default async function decorate(block) {
   });
 
   // -- Pay buttons --
+  // If Affirm is offered as a payment option but no Affirm submit button exists in the form
+  // document, inject one programmatically so it goes through the standard button-wrapping flow.
+  const affirmPaymentOption = formColumn.querySelector('fieldset[data-name="paymentMethod"] input[value="Affirm"]');
+  const existingButtons = [...formColumn.querySelectorAll('form .button-wrapper button[type="submit"]')];
+  const hasAffirmButton = existingButtons.some((b) => b.textContent.toLowerCase().includes('affirm'));
+  if (affirmPaymentOption && !hasAffirmButton) {
+    const buttonWrapper = formColumn.querySelector('form .button-wrapper');
+    if (buttonWrapper) {
+      const affirmBtn = document.createElement('button');
+      affirmBtn.type = 'submit';
+      affirmBtn.textContent = 'Pay with Affirm';
+      affirmBtn.classList.add('button');
+      buttonWrapper.appendChild(affirmBtn);
+    }
+  }
+
   const submitButtons = [...formColumn.querySelectorAll('form .button-wrapper button[type="submit"]')];
   submitButtons.forEach((button) => {
     let paymentMethod = 'Credit Card';
@@ -505,6 +521,8 @@ export default async function decorate(block) {
       icon.src = `${window.hlx.codeBasePath}/icons/paypal.svg`;
       icon.classList.add('icon', 'icon-paypal');
       button.appendChild(icon);
+    } else if (button.textContent.toLowerCase().includes('affirm')) {
+      paymentMethod = 'Affirm';
     } else if (button.textContent.toLowerCase().includes('apple')) {
       paymentMethod = 'Apple Pay';
     }
@@ -588,6 +606,114 @@ export default async function decorate(block) {
           }
         } catch (error) {
           const message = error.body?.message || error.message || 'Something went wrong. Please try again.';
+          showError(formColumn, message);
+          reenableButton();
+        }
+      });
+    } else if (paymentMethod === 'Affirm') {
+      span.classList.add('affirm');
+      span.appendChild(button);
+      button.addEventListener('click', async (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+
+        if (!selectedShippingMethodId) {
+          showError(formColumn, 'Please select a shipping method.');
+          return;
+        }
+
+        const isValid = form.checkValidity();
+        if (!isValid) {
+          form.reportValidity();
+          return;
+        }
+
+        clearError(formColumn);
+        button.disabled = true;
+
+        const reenableButton = () => {
+          button.disabled = false;
+        };
+
+        try {
+          const formData = Object.fromEntries(new FormData(form).entries());
+          const {
+            email,
+            'shipping-firstname': firstName,
+            'shipping-lastname': lastName,
+            'shipping-telephone': phone,
+          } = formData;
+
+          const shipping = collectAddress(form, formData, 'shipping-', email);
+          const { default: cart } = await import('../../scripts/cart.js');
+
+          if (!currentEstimateToken) {
+            await updatePreview(form, formData, cart);
+          }
+
+          if (!currentEstimateToken || !currentPreview) {
+            showError(formColumn, 'Unable to calculate shipping and taxes. Please try again.');
+            reenableButton();
+            return;
+          }
+
+          const order = cart.getOrderJSON(email, firstName, lastName, phone, shipping, {
+            shippingMethod: selectedShippingMethodId,
+            estimateToken: currentEstimateToken,
+            locale: getLocale(),
+            country: getCountry(),
+          });
+
+          sessionStorage.setItem('checkout_email', email);
+          sessionStorage.setItem('checkout_cart_items', JSON.stringify(cart.items));
+          if (currentPreview) {
+            sessionStorage.setItem('checkout_preview', JSON.stringify(currentPreview));
+          }
+
+          const { order: createdOrder } = await createOrder(order);
+          sessionStorage.setItem('checkout_order', JSON.stringify(createdOrder));
+
+          const idempotencyKey = crypto.randomUUID();
+          const payment = await initiatePayment(createdOrder.id, idempotencyKey, undefined, 'affirm', 'bnpl');
+
+          if (payment.checkoutObject) {
+            // Load the Affirm JS SDK with the Global integration config, then
+            // pass the server-built checkout object to affirm.checkout() and open.
+            // On completion Affirm redirects the browser to our server's
+            // confirmation URL which handles authorization and redirects to the
+            // order-summary page.
+            const country = getCountry();
+            const affirmCountryCode = country === 'ca' ? 'CAN' : 'USA';
+            const { language } = getLocaleAndLanguage(true);
+            // Use the public key and JS SDK URL from the server response so they
+            // always match the environment and region of the merchant config.
+            // eslint-disable-next-line camelcase, no-underscore-dangle
+            window._affirm_config = {
+              public_api_key: payment.checkoutObject.merchant.public_api_key,
+              script: payment.affirmJsUrl,
+              locale: language,
+              country_code: affirmCountryCode,
+            };
+            // Bootstrap the Affirm JS SDK — this IIFE creates the global
+            // affirm object with stub methods, then loads the script from
+            // _affirm_config.script. Required before calling affirm.checkout().
+            /* eslint-disable */
+            (function(m,g,n,d,a,e,h,c){var b=m[n]||{},k=document.createElement(e),p=document.getElementsByTagName(e)[0],l=function(a,b,c){return function(){a[b]._.push([c,arguments])}};b[d]=l(b,d,"set");var f=b[d];b[a]={};b[a]._=[];f._=[];b._=[];b[a][h]=l(b,a,h);b[c]=function(){b._.push([h,arguments])};a=0;for(c="set add save post open empty reset on off trigger ready setProduct".split(" ");a<c.length;a++)f[c[a]]=l(b,d,c[a]);a=0;for(c=["get","token","url","items"];a<c.length;a++)f[c[a]]=function(){};k.async=!0;k.src=g[e];p.parentNode.insertBefore(k,p);delete g[e];f(g);m[n]=b})(window,_affirm_config,"affirm","checkout","ui","script","ready","jsReady");
+            /* eslint-enable */
+            /* eslint-disable no-undef */
+            affirm.ui.ready(() => {
+              affirm.checkout(payment.checkoutObject);
+              affirm.checkout.open();
+            });
+            /* eslint-enable no-undef */
+          } else {
+            showError(formColumn, 'Unexpected payment response. Please try again.');
+            reenableButton();
+          }
+        } catch (error) {
+          const message = error.body?.error === 'ORDER_TOTAL_OUT_OF_RANGE'
+            ? 'Affirm is not available for this order total.'
+            : error.body?.message || error.message || 'Something went wrong. Please try again.';
           showError(formColumn, message);
           reenableButton();
         }
@@ -709,9 +835,9 @@ export default async function decorate(block) {
   paymentMethodGroup.addEventListener('change', () => {
     const paymentMethod = paymentMethodGroup.querySelector('input:checked').value;
 
-    // PayPal collects billing address on their hosted page — hide the section entirely
-    const isPayPal = paymentMethod === 'PayPal';
-    if (isPayPal || sameShipBillCheckbox.checked) {
+    // PayPal and Affirm collect billing address on their hosted page — hide the section entirely
+    const hidesBilling = paymentMethod === 'PayPal' || paymentMethod === 'Affirm';
+    if (hidesBilling || sameShipBillCheckbox.checked) {
       billingAddressSection.setAttribute('aria-hidden', true);
       billingAddressSection.setAttribute('disabled', '');
     } else {
