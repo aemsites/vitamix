@@ -685,13 +685,16 @@ export default async function decorate(block) {
             const country = getCountry();
             const affirmCountryCode = country === 'ca' ? 'CAN' : 'USA';
             const { language } = getLocaleAndLanguage(true);
+            // Affirm expects locale as en_US, en_CA, or fr_CA (uppercase country suffix).
+            const [lang, region] = language.split('_');
+            const affirmLocale = region ? `${lang}_${region.toUpperCase()}` : language;
             // Use the public key and JS SDK URL from the server response so they
             // always match the environment and region of the merchant config.
             // eslint-disable-next-line camelcase, no-underscore-dangle
             window._affirm_config = {
               public_api_key: payment.checkoutObject.merchant.public_api_key,
               script: payment.affirmJsUrl,
-              locale: language,
+              locale: affirmLocale,
               country_code: affirmCountryCode,
             };
             // Bootstrap the Affirm JS SDK — this IIFE creates the global
