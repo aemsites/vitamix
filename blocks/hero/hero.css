@@ -31,7 +31,7 @@ main > .hero-container.section {
   inset: 0;
   background-color: black;
   opacity: 0.6;
-  z-index: 0;
+  z-index: -1;
   pointer-events: none;
 }
 
@@ -43,25 +43,6 @@ main > .hero-container.section {
   height: 100%;
   object-fit: cover;
   z-index: -1;
-}
-
-.hero picture {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  z-index: -1;
-}
-
-.hero > picture img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.hero > div {
-  position: relative;
-  z-index: 1;
 }
 
 .hero .eyebrow {
@@ -116,11 +97,10 @@ main > .hero-container.section {
 }
 
 /* ============================================================
-   left-aligned variant
-   Mirrors the banner.aligned pattern:
-   - no full ::after overlay
-   - ::before gradient on the picture, driven by --image-color
-   - text pinned to one side, left-aligned
+   left/right aligned variant
+   - picture hoisted to block level as full-bleed background
+   - ::after becomes a directional gradient using --image-color
+   - text pinned to left or right, constrained to ~50% width
    ============================================================ */
 
 .hero.left-text,
@@ -130,15 +110,40 @@ main > .hero-container.section {
   text-align: left;
 }
 
+/* picture is hoisted to a direct child of .hero in JS */
+.hero.left-text > picture,
+.hero.right-text > picture {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+}
+
+.hero.left-text > picture img,
+.hero.right-text > picture img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 /* replace solid black overlay with a directional gradient using --image-color */
 .hero.left-text::after {
   background: linear-gradient(to right, var(--image-color, #000) 40%, transparent 70%);
   opacity: var(--overlay-opacity);
+  z-index: 0;
 }
 
 .hero.right-text::after {
   background: linear-gradient(to left, var(--image-color, #000) 40%, transparent 70%);
   opacity: var(--overlay-opacity);
+  z-index: 0;
+}
+
+.hero.left-text > div,
+.hero.right-text > div {
+  position: relative;
+  z-index: 1;
 }
 
 .hero.left-text.image-darkest,
@@ -180,21 +185,17 @@ main > .hero-container.section {
 
 .hero.left-text > div > div,
 .hero.right-text > div > div {
-  position: relative;
   margin: 0;
   width: 50%;
   max-width: 520px;
   padding: var(--spacing-600) 0;
   padding-top: 55px;
-  z-index: 1;
 }
 
-/* left-text: content sits on the left */
 .hero.left-text > div > div {
   margin-right: auto;
 }
 
-/* right-text: content sits on the right */
 .hero.right-text > div > div {
   margin-left: auto;
 }
