@@ -9,9 +9,6 @@ export default function decorate(block) {
     if (picture) {
       const img = picture.querySelector('img');
       const optimized = createOptimizedPicture(img.src, img.alt, false, [{ width: '2000' }]);
-
-      // picture lives in a cell (div), which lives in a row (div), which lives in block
-      // we only want to remove the cell, not the row
       const imgCell = picture.parentElement;
       block.appendChild(optimized);
       imgCell.remove();
