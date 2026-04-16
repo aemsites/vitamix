@@ -15,7 +15,7 @@ main > .hero-container.section {
   align-items: center;
   position: relative;
   width: 100%;
-  min-height: 575px;
+  min-height: 480px;
 }
 
 .hero {
@@ -216,5 +216,19 @@ main > .hero-container.section {
   .hero.left-text > div > div,
   .hero.right-text > div > div {
     max-width: 700px;
+  }
+}
+
+@media (width >= 800px) {
+  .hero,
+  .hero > div {
+    min-height: 650px;
+  }
+}
+
+@media (width >= 1200px) {
+  .hero,
+  .hero > div {
+    min-height: 720px;
   }
 }
