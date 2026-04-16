@@ -140,10 +140,35 @@ main > .hero-container.section {
   z-index: 0;
 }
 
+/* text content block — constrained to ~50% so it stays in the gradient zone */
 .hero.left-text > div,
 .hero.right-text > div {
   position: relative;
+  align-items: center;
+  padding: 0 var(--horizontal-spacing);
   z-index: 1;
+}
+
+.hero.left-text > div > div,
+.hero.right-text > div > div {
+  margin: 0;
+  width: 50%;
+  max-width: 520px;
+  padding: var(--spacing-600) 0;
+  padding-top: 55px;
+}
+
+.hero.left-text > div > div {
+  margin-right: auto;
+}
+
+.hero.right-text > div > div {
+  margin-left: auto;
+}
+
+.hero.left-text .button-wrapper,
+.hero.right-text .button-wrapper {
+  justify-content: flex-start;
 }
 
 .hero.left-text.image-darkest,
@@ -174,35 +199,6 @@ main > .hero-container.section {
 .hero.left-text.image-lightest > div > div,
 .hero.right-text.image-lightest > div > div {
   color: var(--color-charcoal);
-}
-
-/* text content block — constrained to ~50% so it stays in the gradient zone */
-.hero.left-text > div,
-.hero.right-text > div {
-  align-items: center;
-  padding: 0 var(--horizontal-spacing);
-}
-
-.hero.left-text > div > div,
-.hero.right-text > div > div {
-  margin: 0;
-  width: 50%;
-  max-width: 520px;
-  padding: var(--spacing-600) 0;
-  padding-top: 55px;
-}
-
-.hero.left-text > div > div {
-  margin-right: auto;
-}
-
-.hero.right-text > div > div {
-  margin-left: auto;
-}
-
-.hero.left-text .button-wrapper,
-.hero.right-text .button-wrapper {
-  justify-content: flex-start;
 }
 
 @media (width >= 800px) {
