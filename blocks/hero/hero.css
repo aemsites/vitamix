@@ -247,6 +247,7 @@ main > .hero-container.section {
   .hero.left-text > div,
   .hero.right-text > div {
     position: relative;
+    min-height: unset;
     z-index: 0;
     padding: var(--spacing-200) var(--horizontal-spacing);
     background-color: var(--image-color, var(--color-charcoal));
