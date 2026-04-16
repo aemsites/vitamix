@@ -96,13 +96,7 @@ main > .hero-container.section {
   }
 }
 
-/* ============================================================
-   left/right aligned variant
-   - picture hoisted to block level as full-bleed background
-   - ::after becomes a directional gradient using --image-color
-   - text pinned to left or right, constrained to ~50% width
-   ============================================================ */
-
+/* left/right aligned variant */
 .hero.left-text,
 .hero.right-text {
   --overlay-opacity: 0.66;
@@ -110,7 +104,6 @@ main > .hero-container.section {
   text-align: left;
 }
 
-/* picture is hoisted to a direct child of .hero in JS */
 .hero.left-text > picture,
 .hero.right-text > picture {
   position: absolute;
@@ -127,7 +120,7 @@ main > .hero-container.section {
   object-fit: cover;
 }
 
-/* replace solid black overlay with a directional gradient using --image-color */
+/* directional gradient using --image-color */
 .hero.left-text::after {
   background: linear-gradient(to right, var(--image-color, #000) 40%, transparent 70%);
   opacity: var(--overlay-opacity);
@@ -140,7 +133,6 @@ main > .hero-container.section {
   z-index: 0;
 }
 
-/* text content block — constrained to ~50% so it stays in the gradient zone */
 .hero.left-text > div,
 .hero.right-text > div {
   position: relative;
