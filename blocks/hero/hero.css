@@ -213,6 +213,7 @@ main > .hero-container.section {
   }
 }
 
+
 /* mobile: stack image on top, text below on solid --image-color background */
 @media (width < 800px) {
   .hero.left-text,
@@ -231,14 +232,15 @@ main > .hero-container.section {
   .hero.right-text > picture {
     position: relative;
     inset: unset;
+    order: -1;
     width: 100%;
-    height: 280px;
+    height: 260px;
     z-index: 0;
   }
 
   .hero.left-text > picture img,
   .hero.right-text > picture img {
-    height: 280px;
+    height: 260px;
     object-fit: cover;
   }
 
@@ -246,7 +248,7 @@ main > .hero-container.section {
   .hero.right-text > div {
     position: relative;
     z-index: 0;
-    padding: var(--spacing-400) var(--horizontal-spacing);
+    padding: var(--spacing-200) var(--horizontal-spacing);
     background-color: var(--image-color, var(--color-charcoal));
   }
 
@@ -257,7 +259,6 @@ main > .hero-container.section {
     padding: 0;
   }
 
-  /* text color based on image tone */
   .hero.left-text.image-light > div,
   .hero.right-text.image-light > div,
   .hero.left-text.image-lightest > div,
