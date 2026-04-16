@@ -105,12 +105,12 @@
   min-height: 120px;
 }
 
-/* Hide description text on mobile for secondary cards, keep links */
-.related-recipes.highlight > ul > li:not(:first-child) .body > p:not(.eyebrow) {
+/* Hide description text on mobile for secondary cards, keep links and meta */
+.related-recipes.highlight > ul > li:not(:first-child) .body > p:not(.eyebrow):not(.meta) {
   display: none;
 }
 
-.related-recipes.highlight > ul > li:not(:first-child) .body > p:not(.eyebrow):has(a) {
+.related-recipes.highlight > ul > li:not(:first-child) .body > p:not(.eyebrow):not(.meta):has(a) {
   display: block;
 }
 
@@ -130,7 +130,7 @@
     min-height: unset;
   }
 
-  .related-recipes.highlight > ul > li:not(:first-child) .body > p:not(.eyebrow) {
+  .related-recipes.highlight > ul > li:not(:first-child) .body > p:not(.eyebrow):not(.meta) {
     display: block;
   }
 }
