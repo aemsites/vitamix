@@ -106,11 +106,11 @@
 }
 
 /* Hide description text on mobile for secondary cards, keep links and meta */
-.related-recipes.highlight > ul > li:not(:first-child) .body > p:not(.eyebrow):not(.meta) {
+.related-recipes.highlight > ul > li:not(:first-child) .body > p:not(.eyebrow, .meta) {
   display: none;
 }
 
-.related-recipes.highlight > ul > li:not(:first-child) .body > p:not(.eyebrow):not(.meta):has(a) {
+.related-recipes.highlight > ul > li:not(:first-child) .body > p:not(.eyebrow, .meta):has(a) {
   display: block;
 }
 
@@ -130,7 +130,7 @@
     min-height: unset;
   }
 
-  .related-recipes.highlight > ul > li:not(:first-child) .body > p:not(.eyebrow):not(.meta) {
+  .related-recipes.highlight > ul > li:not(:first-child) .body > p:not(.eyebrow, .meta) {
     display: block;
   }
 }
