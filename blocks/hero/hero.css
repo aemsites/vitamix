@@ -212,3 +212,70 @@ main > .hero-container.section {
     max-width: 700px;
   }
 }
+
+/* mobile: stack image on top, text below on solid --image-color background */
+@media (width < 800px) {
+  .hero.left-text,
+  .hero.right-text {
+    flex-direction: column;
+    align-items: stretch;
+    min-height: unset;
+  }
+
+  .hero.left-text::after,
+  .hero.right-text::after {
+    display: none;
+  }
+
+  .hero.left-text > picture,
+  .hero.right-text > picture {
+    position: relative;
+    inset: unset;
+    width: 100%;
+    height: 280px;
+    z-index: 0;
+  }
+
+  .hero.left-text > picture img,
+  .hero.right-text > picture img {
+    height: 280px;
+    object-fit: cover;
+  }
+
+  .hero.left-text > div,
+  .hero.right-text > div {
+    position: relative;
+    z-index: 0;
+    padding: var(--spacing-400) var(--horizontal-spacing);
+    background-color: var(--image-color, var(--color-charcoal));
+  }
+
+  .hero.left-text > div > div,
+  .hero.right-text > div > div {
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
+  }
+
+  /* text color based on image tone */
+  .hero.left-text.image-light > div,
+  .hero.right-text.image-light > div,
+  .hero.left-text.image-lightest > div,
+  .hero.right-text.image-lightest > div {
+    background-color: var(--image-color, var(--color-gray-200));
+  }
+
+  .hero.left-text.image-light > div > div,
+  .hero.right-text.image-light > div > div,
+  .hero.left-text.image-lightest > div > div,
+  .hero.right-text.image-lightest > div > div {
+    color: var(--color-charcoal);
+  }
+
+  .hero.left-text.image-dark > div > div,
+  .hero.right-text.image-dark > div > div,
+  .hero.left-text.image-darkest > div > div,
+  .hero.right-text.image-darkest > div > div {
+    color: var(--color-gray-100);
+  }
+}
