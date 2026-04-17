@@ -12,10 +12,11 @@ import {
 /**
  * @param {Node[]} contentNodes - Fragment child nodes for the modal body
  * @param {string} path - Modal path (for title and config)
- * @param {{ root?: ShadowRoot|DocumentFragment|Element }} [options] - Optional root to append modal to (e.g. embed shadow root)
+ * @param {{ root?: ShadowRoot|DocumentFragment|Element }} [options]
+ *   Optional root to append modal to (e.g. embed shadow root)
  */
 export async function createModal(contentNodes, path, options = {}) {
-  const root = options.root;
+  const { root } = options;
   const container = root || document.querySelector('main') || document.body;
   const modalOpenTarget = root?.host || document.body;
 
@@ -108,7 +109,8 @@ export async function createModal(contentNodes, path, options = {}) {
 
 /**
  * @param {string} fragmentUrl - URL or path of the modal fragment
- * @param {{ root?: ShadowRoot|DocumentFragment|Element }} [options] - Optional root (e.g. embed shadow root) to append modal to
+ * @param {{ root?: ShadowRoot|DocumentFragment|Element }} [options]
+ *   Optional root to append modal to (e.g. embed shadow root)
  */
 export async function openModal(fragmentUrl, options = {}) {
   const path = fragmentUrl.startsWith('http')
