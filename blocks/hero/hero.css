@@ -6,6 +6,7 @@ main > .hero-container.section {
 .hero-container .hero-wrapper {
   margin: 0;
   padding: 0;
+  overflow: hidden;
 }
 
 .hero,
@@ -14,7 +15,7 @@ main > .hero-container.section {
   align-items: center;
   position: relative;
   width: 100%;
-  min-height: 575px;
+  min-height: 480px;
 }
 
 .hero {
@@ -69,16 +70,16 @@ main > .hero-container.section {
   color: var(--color-gray-100);
 }
 
-.hero.image-light > div > div,
-.hero.image-lightest > div > div {
-  /* color: var(--color-charcoal); */
-}
-
 .hero > div > div h1 b {
   font-weight: 900;
 }
 
 @media (width >= 800px) {
+  .hero,
+  .hero > div {
+    min-height: 650px;
+  }
+
   .hero h1 {
     font-size: var(--font-size-950);
   }
@@ -90,7 +91,193 @@ main > .hero-container.section {
 }
 
 @media (width >= 1200px) {
+  .hero,
+  .hero > div {
+    min-height: 720px;
+  }
+
   .hero > div > div {
     max-width: 800px;
+  }
+}
+
+/* left/right aligned variant
+   JS hoists picture to a direct child of .hero as a full-bleed background,
+   then ::after becomes a directional gradient driven by --image-color */
+
+.hero.left-text,
+.hero.right-text {
+  --overlay-opacity: 0.66;
+
+  text-align: left;
+}
+
+.hero.left-text > picture,
+.hero.right-text > picture {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+}
+
+.hero.left-text > picture img,
+.hero.right-text > picture img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hero.left-text::after {
+  background: linear-gradient(to right, var(--image-color, #000) 40%, transparent 70%);
+  opacity: var(--overlay-opacity);
+  z-index: 0;
+}
+
+.hero.right-text::after {
+  background: linear-gradient(to left, var(--image-color, #000) 40%, transparent 70%);
+  opacity: var(--overlay-opacity);
+  z-index: 0;
+}
+
+.hero.left-text > div,
+.hero.right-text > div {
+  position: relative;
+  align-items: center;
+  padding: 0 var(--horizontal-spacing);
+  z-index: 1;
+}
+
+.hero.left-text > div > div,
+.hero.right-text > div > div {
+  margin: 0;
+  width: 50%;
+  max-width: 520px;
+  padding: var(--spacing-600) 0;
+  padding-top: 55px;
+}
+
+.hero.left-text > div > div {
+  margin-right: auto;
+}
+
+.hero.right-text > div > div {
+  margin-left: auto;
+}
+
+.hero.left-text .button-wrapper,
+.hero.right-text .button-wrapper {
+  justify-content: flex-start;
+}
+
+/* overlay opacity by image tone */
+.hero.left-text.image-darkest,
+.hero.right-text.image-darkest {
+  --overlay-opacity: 0.2;
+}
+
+.hero.left-text.image-dark,
+.hero.right-text.image-dark {
+  --overlay-opacity: 0.8;
+}
+
+.hero.left-text.image-light,
+.hero.right-text.image-light {
+  --overlay-opacity: 0.8;
+}
+
+.hero.left-text.image-lightest,
+.hero.right-text.image-lightest {
+  --overlay-opacity: 0.2;
+}
+
+/* switch to dark text on light backgrounds */
+.hero.left-text.image-light > div > div,
+.hero.right-text.image-light > div > div,
+.hero.left-text.image-lightest > div > div,
+.hero.right-text.image-lightest > div > div {
+  color: var(--color-charcoal);
+}
+
+@media (width >= 800px) {
+  .hero.left-text > div > div,
+  .hero.right-text > div > div {
+    max-width: 600px;
+  }
+}
+
+@media (width >= 1200px) {
+  .hero.left-text > div > div,
+  .hero.right-text > div > div {
+    max-width: 700px;
+  }
+}
+
+
+/* mobile: stack image on top, text below on solid --image-color background */
+@media (width < 800px) {
+  .hero.left-text,
+  .hero.right-text {
+    flex-direction: column;
+    align-items: stretch;
+    min-height: unset;
+  }
+
+  .hero.left-text::after,
+  .hero.right-text::after {
+    display: none;
+  }
+
+  .hero.left-text > picture,
+  .hero.right-text > picture {
+    position: relative;
+    inset: unset;
+    order: -1;
+    width: 100%;
+    height: 260px;
+    z-index: 0;
+  }
+
+  .hero.left-text > picture img,
+  .hero.right-text > picture img {
+    height: 260px;
+    object-fit: cover;
+  }
+
+  .hero.left-text > div,
+  .hero.right-text > div {
+    position: relative;
+    min-height: unset;
+    z-index: 0;
+    padding: var(--spacing-200) var(--horizontal-spacing);
+    background-color: var(--image-color, var(--color-charcoal));
+  }
+
+  .hero.left-text > div > div,
+  .hero.right-text > div > div {
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
+  }
+
+  .hero.left-text.image-light > div,
+  .hero.right-text.image-light > div,
+  .hero.left-text.image-lightest > div,
+  .hero.right-text.image-lightest > div {
+    background-color: var(--image-color, var(--color-gray-200));
+  }
+
+  .hero.left-text.image-light > div > div,
+  .hero.right-text.image-light > div > div,
+  .hero.left-text.image-lightest > div > div,
+  .hero.right-text.image-lightest > div > div {
+    color: var(--color-charcoal);
+  }
+
+  .hero.left-text.image-dark > div > div,
+  .hero.right-text.image-dark > div > div,
+  .hero.left-text.image-darkest > div > div,
+  .hero.right-text.image-darkest > div > div {
+    color: var(--color-gray-100);
   }
 }
