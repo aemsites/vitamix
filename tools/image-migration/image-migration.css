@@ -1,0 +1,346 @@
+:root {
+  --success: #d7f7e0;
+  --error: #ffd6d1;
+  --info: #caf8fa;
+}
+
+body {
+  padding: 1.5em;
+}
+
+.image-migration h1 {
+  margin-bottom: 0.2em;
+}
+
+.image-migration section {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* form */
+
+.image-migration form {
+  margin-top: 0.5em;
+}
+
+fieldset {
+  margin-bottom: 0.5em;
+  border: 2px solid var(--s2-gray-400);
+  border-radius: var(--s2-radius-200);
+  padding: 0.5em 1em 1em;
+}
+
+legend {
+  padding: 0 1ch;
+  font-size: var(--s2-body-xs-size);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.field + .field {
+  margin-top: 0.5em;
+}
+
+.field label {
+  display: block;
+  margin-bottom: 0.2em;
+  font-weight: 600;
+}
+
+fieldset p {
+  margin: 0.2em 0 0;
+  color: var(--s2-gray-600);
+  font-size: var(--s2-body-xs-size);
+}
+
+.mode-toggle {
+  gap: 2px;
+  display: inline-flex;
+  border-radius: var(--s2-radius-75);
+  background: var(--s2-gray-100);
+}
+
+.mode-toggle label {
+  display: block;
+  position: relative;
+  margin: 0;
+  border: 2px solid transparent;
+  border-radius: var(--s2-radius-75);
+  padding: 0 0.75em;
+  color: var(--s2-gray-700);
+  cursor: pointer;
+  font-size: var(--sl-field-font-size);
+  font-weight: 400;
+  line-height: var(--sl-field-height);
+}
+
+.mode-toggle input[type="radio"] {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+}
+
+.mode-toggle label:has(input:checked) {
+  border-color: currentcolor;
+  background: #fff;
+  color: var(--s2-gray-800);
+  font-weight: 600;
+}
+
+.mode-toggle label:has(input:focus-visible) {
+  outline: 2px solid var(--s2-blue-900);
+  outline-offset: 2px;
+}
+
+.button-wrapper {
+  gap: 1ch;
+  display: flex;
+  margin-top: 1em;
+}
+
+[data-hidden] {
+  display: none;
+}
+
+@media (width >= 900px) {
+  .image-migration form {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0 1em;
+  }
+
+  form .button-wrapper {
+    grid-column: span 3;
+  }
+}
+
+/* results */
+
+.results-container {
+  margin-top: 1.5em;
+}
+
+.results-container > [aria-hidden="true"],
+.empty[aria-hidden="true"] {
+  display: none;
+}
+
+.header {
+  align-items: center;
+  gap: 2em;
+  display: flex;
+  margin-bottom: 0.5em;
+  font-weight: 600;
+}
+
+.header sl-button {
+  margin-left: auto;
+}
+
+.result .rows > * + * {
+  margin-top: 0.5em;
+}
+
+/* expand/collapse pattern */
+
+.result details {
+  border-radius: var(--s2-radius-75);
+  background: var(--s2-gray-75);
+  font-size: var(--s2-body-s-size);
+}
+
+.result details summary {
+  list-style: none;
+  align-items: center;
+  gap: 1ch;
+  display: flex;
+  padding: 0.75em 1em;
+  cursor: pointer;
+  user-select: none;
+}
+
+.result details summary::-webkit-details-marker {
+  display: none;
+}
+
+.result details summary::before {
+  content: '▶';
+  flex-shrink: 0;
+  display: inline-block;
+  transition: transform 0.2s;
+}
+
+.result details[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.result details summary span:first-child {
+  flex: 1;
+}
+
+/* list styles inside expand/collapse items */
+
+.result .rows ul {
+  list-style: none;
+  margin: 0;
+  padding: 0 1em 1em 2.5em;
+  font-size: var(--s2-body-xs-size);
+  word-break: break-all;
+}
+
+.result .rows li {
+  border-radius: var(--s2-radius-75);
+  padding: 0.5em;
+  background: var(--s2-gray-100);
+}
+
+.result .rows li + li {
+  margin-top: 0.5em;
+}
+
+.result .rows a {
+  text-decoration: none;
+}
+
+.result .rows a:hover {
+  text-decoration: underline;
+}
+
+/* stylelint-disable-next-line no-descending-specificity */
+.result .rows li a {
+  color: var(--s2-gray-700);
+}
+
+/* scan results */
+.result.scan .group ul a,
+.result.scan .group summary a {
+  flex-shrink: 0;
+}
+
+/* preview results */
+
+.result.preview .group > * {
+  padding: 0.75em 1em;
+  font-size: var(--sl-field-font-size);
+  word-break: break-all;
+}
+
+.result.preview .from {
+  display: block;
+  border-radius: var(--s2-radius-75) var(--s2-radius-75) 0 0;
+  background: var(--s2-gray-100);
+  color: var(--s2-gray-700);
+}
+
+.result.preview .to {
+  border-radius: 0 0 var(--s2-radius-75) var(--s2-radius-75);
+  background: var(--s2-gray-75);
+}
+
+.result.preview .to::before {
+  content: '↳';
+  margin-right: 1ch;
+}
+
+.result.preview .origin {
+  display: none;
+}
+
+.result.preview[data-show="origins"] .origin {
+  display: inline;
+}
+
+/* run results */
+
+.result.run .stats {
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1ch;
+  display: grid;
+  margin-bottom: 1em;
+}
+
+.result.run .stat {
+  border-radius: var(--s2-radius-200);
+  padding: 1em;
+  background: var(--info);
+  font-size: var(--s2-body-l-size);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.result.run .stat[data-active] {
+  outline: 2px solid currentcolor;
+  outline-offset: 2px;
+}
+
+.result.run .stat.error {
+  background: var(--error);
+}
+
+.result.run .stat.success {
+  background: var(--success);
+}
+
+.result.run .stat p[id] {
+  font-size: var(--s2-body-xxxl-size);
+  font-weight: 400;
+}
+
+.result.run .rows .group {
+  border-radius: var(--s2-radius-200);
+  background: var(--s2-gray-75);
+  font-size: var(--s2-body-s-size);
+}
+
+.result.run .rows div.group {
+  padding: 0.5em 1em;
+  color: var(--s2-gray-600);
+}
+
+.result.run .row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1ch;
+  background: var(--info);
+}
+
+.result.run .row[data-status="error"] {
+  background: var(--error);
+}
+
+.result.run .row[data-status="success"] {
+  background: var(--success);
+}
+
+.result.run .status {
+  flex-shrink: 0;
+  border-radius: var(--s2-radius-75);
+  padding: 0.2em 0.5em;
+  background: #0007;
+  color: #fff;
+  font-weight: 600;
+}
+
+.result.run .src {
+  color: var(--s2-gray-600);
+}
+
+.result.run .rows[data-filter] .group,
+.result.run .rows[data-filter] .row {
+  display: none;
+}
+
+.result.run .rows[data-filter="remaining"] .group[data-status~="remaining"],
+.result.run .rows[data-filter="success"] .group[data-status~="success"],
+.result.run .rows[data-filter="error"] .group[data-status~="error"] {
+  display: block;
+}
+
+.result.run .rows[data-filter="success"] .row[data-status~="success"],
+.result.run .rows[data-filter="error"] .row[data-status~="error"] {
+  display: flex;
+}
