@@ -65,16 +65,58 @@ function extractErrorMessages(response, body) {
  * Finds the first input whose `name` attribute appears (case-insensitively)
  * inside one of the given messages.
  */
+/**
+ * Human-readable rewrites of field names: e.g. 'emailAddress' -> 'email address'.
+ */
+function splitCamel(name) {
+  return name
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .replace(/[-_]+/g, ' ')
+    .toLowerCase()
+    .trim();
+}
+
+/**
+ * Alternate phrases that may appear in error messages -> canonical input name.
+ */
+const FIELD_ALIASES = {
+  'purchase date': 'purchasedOn',
+  'date of purchase': 'purchasedOn',
+  'date purchased': 'purchasedOn',
+  'purchase location': 'purchasedFrom',
+  retailer: 'purchasedFrom',
+  store: 'purchasedFrom',
+  serial: 'serialNumber',
+  zip: 'zipCode',
+  postcode: 'postalCode',
+  surname: 'lastName',
+  'family name': 'lastName',
+  'given name': 'firstName',
+  forename: 'firstName',
+};
+
 function findMatchingInput(form, messages) {
-  const namedInputs = [...form.querySelectorAll('[name]')]
-    .filter((el) => el.name)
-    .sort((a, b) => b.name.length - a.name.length);
+  const namedInputs = [...form.querySelectorAll('[name]')].filter((el) => el.name);
+  const inputsByName = new Map(namedInputs.map((el) => [el.name, el]));
+  const candidates = [];
+  namedInputs.forEach((input) => {
+    const lower = input.name.toLowerCase();
+    candidates.push({ keyword: lower, input });
+    const split = splitCamel(input.name);
+    if (split && split !== lower) candidates.push({ keyword: split, input });
+  });
+  Object.entries(FIELD_ALIASES).forEach(([alias, fieldName]) => {
+    const input = inputsByName.get(fieldName);
+    if (input) candidates.push({ keyword: alias.toLowerCase(), input });
+  });
+  candidates.sort((a, b) => b.keyword.length - a.keyword.length);
   let match = null;
   messages.find((message) => {
     const lower = message.toLowerCase();
-    const input = namedInputs.find((el) => lower.includes(el.name.toLowerCase()));
-    if (input) match = { input, message };
-    return !!input;
+    const c = candidates.find((cand) => lower.includes(cand.keyword));
+    if (c) match = { input: c.input, message };
+    return !!c;
   });
   return match;
 }
