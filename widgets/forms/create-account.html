@@ -1,0 +1,68 @@
+<form class="create-account-form" method="post" action="" aria-label="Create account">
+  <div class="create-account-field">
+    <label for="create-account-first-name">
+      <span class="label-text">First Name</span><span class="required" aria-hidden="true">*</span>
+    </label>
+    <input id="create-account-first-name" type="text" name="firstName" required aria-required="true" placeholder="" autocomplete="given-name">
+  </div>
+  <div class="create-account-field">
+    <label for="create-account-last-name">
+      <span class="label-text">Last Name</span><span class="required" aria-hidden="true">*</span>
+    </label>
+    <input id="create-account-last-name" type="text" name="lastName" required aria-required="true" placeholder="" autocomplete="family-name">
+  </div>
+  <div class="create-account-field">
+    <label for="create-account-email">
+      <span class="label-text">Email Address</span><span class="required" aria-hidden="true">*</span>
+    </label>
+    <input id="create-account-email" type="email" name="email" required aria-required="true" placeholder="" autocomplete="email">
+  </div>
+  <div class="create-account-field">
+    <label for="create-account-confirm-email">
+      <span class="label-text">Confirm Email Address</span><span class="required" aria-hidden="true">*</span>
+    </label>
+    <input id="create-account-confirm-email" type="email" name="confirmEmail" required aria-required="true" placeholder="" autocomplete="email">
+  </div>
+  <div class="create-account-field">
+    <label for="create-account-postal-code">
+      <span class="label-text">Postal code</span><span class="required" aria-hidden="true">*</span>
+    </label>
+    <input id="create-account-postal-code" type="text" name="postalCode" required aria-required="true" placeholder="" autocomplete="postal-code">
+  </div>
+  <div class="create-account-field create-account-radio-group">
+    <span class="label-text radio-legend" id="create-account-use-legend"></span><span class="required" aria-hidden="true">*</span>
+    <div class="radio-options" role="radiogroup" aria-labelledby="create-account-use-legend">
+      <label class="radio-option">
+        <input type="radio" name="accountUse" value="domestic-products" required aria-required="true">
+        <span class="radio-label"></span>
+      </label>
+      <label class="radio-option">
+        <input type="radio" name="accountUse" value="commercial-products">
+        <span class="radio-label"></span>
+      </label>
+    </div>
+  </div>
+  <div class="create-account-field create-account-radio-group">
+    <span class="label-text radio-legend" id="create-account-own-legend"></span><span class="required" aria-hidden="true">*</span>
+    <div class="radio-options" role="radiogroup" aria-labelledby="create-account-own-legend">
+      <label class="radio-option">
+        <input type="radio" name="ownVitamix" value="yes" required aria-required="true">
+        <span class="radio-label"></span>
+      </label>
+      <label class="radio-option">
+        <input type="radio" name="ownVitamix" value="no">
+        <span class="radio-label"></span>
+      </label>
+    </div>
+  </div>
+  <div class="create-account-field create-account-checkbox">
+    <label class="checkbox-label">
+      <input type="checkbox" name="acceptTerms" value="yes" required aria-required="true">
+      <span class="checkbox-text"><span class="accept-prefix"></span><a href="#" class="terms-link"></a></span>
+    </label>
+  </div>
+  <p class="create-account-required-legend"></p>
+  <div class="create-account-actions">
+    <button type="submit" class="button emphasis">Create account</button>
+  </div>
+</form>

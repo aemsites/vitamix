@@ -1,5 +1,5 @@
 import { getMetadata, toClassName, fetchPlaceholders } from '../../scripts/aem.js';
-import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { formatTime, formatServings, getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 function wrapInDiv(element, className) {
   if (!element) return;
@@ -15,57 +15,6 @@ function wrapInDiv(element, className) {
     wrapper,
     previousSibling ? previousSibling.nextSibling : parentElement.firstElementChild,
   );
-}
-
-function formatTime(timeString, placeholders = {}) {
-  if (!timeString) return '';
-
-  // Parse HH:MM:SS format
-  const parts = timeString.split(':');
-  if (parts.length !== 3) return timeString;
-
-  const hours = parseInt(parts[0], 10);
-  const minutes = parseInt(parts[1], 10);
-  const seconds = parseInt(parts[2], 10);
-
-  // Round seconds up to next minute if > 0
-  let totalMinutes = hours * 60 + minutes;
-  if (seconds > 0) {
-    totalMinutes += 1;
-  }
-
-  // Convert back to hours and minutes
-  const finalHours = Math.floor(totalMinutes / 60);
-  const finalMinutes = totalMinutes % 60;
-
-  // Build readable string
-  const parts2 = [];
-  if (finalHours > 0) {
-    const hourLabel = finalHours !== 1 ? (placeholders.hours || 'Hours') : (placeholders.hour || 'Hour');
-    parts2.push(`${finalHours} ${hourLabel}`);
-  }
-  if (finalMinutes > 0) {
-    const minuteLabel = finalMinutes !== 1 ? (placeholders.minutes || 'Minutes') : (placeholders.minute || 'Minute');
-    parts2.push(`${finalMinutes} ${minuteLabel}`);
-  }
-
-  return parts2.length > 0 ? parts2.join(' ') : `0 ${placeholders.minutes || 'Minutes'}`;
-}
-
-function formatServings(servingsString) {
-  if (!servingsString) return '';
-
-  // Extract number from string like "8.00 servings"
-  const match = servingsString.match(/^([\d.]+)\s*(.*)$/);
-  if (!match) return servingsString;
-
-  const number = parseFloat(match[1]);
-  const unit = match[2];
-
-  // Remove decimals if not needed (e.g., 8.00 → 8, but 8.5 stays 8.5)
-  const formattedNumber = number % 1 === 0 ? Math.floor(number) : number;
-
-  return unit ? `${formattedNumber} ${unit}` : `${formattedNumber}`;
 }
 
 function buildToolbar(placeholders = {}) {
@@ -358,14 +307,14 @@ export default async function decorate(block) {
       // Find all recipes with the same title
       const sameRecipes = data.data.filter((recipe) => recipe.title === recipeTitle);
 
-      // Create a map of containers to recipe paths
+      // Build container names from index and map to a recipe path
       const containerMap = new Map();
       sameRecipes.forEach((recipe) => {
         if (recipe['compatible-containers']) {
-          const containers = recipe['compatible-containers'].split(',').map((c) => c.trim());
-          containers.forEach((container) => {
-            if (!containerMap.has(container)) {
-              containerMap.set(container, recipe.path);
+          const names = recipe['compatible-containers'].split(',').map((c) => c.trim()).filter(Boolean);
+          names.forEach((name) => {
+            if (!containerMap.has(name)) {
+              containerMap.set(name, recipe.path);
             }
           });
         }

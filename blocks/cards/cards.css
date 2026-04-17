@@ -61,6 +61,10 @@
   cursor: pointer;
 }
 
+.cards.text-center {
+  text-align: center;
+}
+
 /* default filled */
 .cards .filled {
   padding: var(--horizontal-spacing);
@@ -141,7 +145,7 @@
 }
 
 .cards.articles .card-body {
-  padding: var(--spacing-400) 0 0 var(--spacing-300);
+  padding: var(--spacing-400) var(--spacing-300) 0 var(--spacing-300);
 }
 
 .cards.articles .card-body p:not(.eyebrow) {
@@ -676,6 +680,171 @@
   }
 }
 
+/* highlight variant */
+.cards.highlight > ul {
+  grid-template-columns: 1fr;
+  align-items: start;
+}
+
+/* Mobile: image left, text right for all cards except the first */
+.cards.highlight > ul > li:not(:first-child) {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  align-items: stretch;
+}
+
+.cards.highlight > ul > li:not(:first-child) .card-image img {
+  height: 100%;
+  min-height: 120px;
+}
+
+/* Hide description paragraph on mobile, keep links */
+.cards.highlight > ul > li:not(:first-child) .card-body p:not(.eyebrow) {
+  display: none;
+}
+
+.cards.highlight > ul > li:not(:first-child) .card-body p:not(.eyebrow):has(a) {
+  display: block;
+}
+
+@media (width >= 900px) {
+  .cards.highlight > ul {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: stretch;
+  }
+
+  .cards.highlight > ul > li:first-child {
+    grid-row: span 2;
+  }
+
+  /* Reset mobile horizontal layout at desktop */
+  .cards.highlight > ul > li:not(:first-child) {
+    display: flex;
+    grid-template-columns: unset;
+  }
+
+  .cards.highlight > ul > li:not(:first-child) .card-image img {
+    height: 220px;
+    min-height: unset;
+  }
+
+  .cards.highlight > ul > li:not(:first-child) .card-body p:not(.eyebrow) {
+    display: block;
+  }
+}
+
+.cards.highlight > ul > li {
+  flex-direction: column;
+  display: flex;
+  border: 1px solid var(--color-gray-200);
+  overflow: hidden;
+  background: var(--color-white);
+}
+
+.cards.highlight > ul > li:hover {
+  border-color: var(--color-gray-500);
+}
+
+.cards.highlight .card-image {
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+  line-height: 0;
+}
+
+.cards.highlight .card-image img {
+  display: block;
+  width: 100%;
+  height: 220px;
+  object-fit: cover;
+  transition: transform 0.4s;
+}
+
+.cards.highlight > ul > li:first-child .card-image img {
+  height: 380px;
+}
+
+@media (width >= 900px) {
+  .cards.highlight > ul > li:first-child .card-image {
+    flex: 3;
+    min-height: 400px;
+  }
+
+  .cards.highlight > ul > li:first-child .card-image img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    min-height: 400px;
+  }
+}
+
+.cards.highlight > ul > li:hover .card-image img {
+  transform: scale(1.04);
+}
+
+.cards.highlight .badge {
+  align-items: center;
+  display: inline-flex;
+  position: absolute;
+  top: var(--spacing-80);
+  left: var(--spacing-80);
+  margin: 0;
+  padding: 0 var(--spacing-60);
+  background: var(--color-white);
+  color: var(--color-charcoal);
+  font-family: var(--body-font-family);
+  font-size: var(--font-size-40);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  line-height: 2;
+  text-transform: uppercase;
+}
+
+.cards.highlight .card-body {
+  flex: 1;
+  flex-direction: column;
+  display: flex;
+  padding: var(--spacing-200);
+}
+
+.cards.highlight .card-body .button-wrapper {
+  margin-top: auto;
+  margin-bottom: 0;
+}
+
+.cards.highlight .card-body .button-wrapper .button.link:hover,
+.cards.highlight .card-body .button-wrapper .button.link:focus-visible {
+  color: var(--color-red);
+}
+
+.cards.highlight .card-body .eyebrow {
+  margin-top: 0;
+}
+
+.cards.highlight .card-body h2,
+.cards.highlight .card-body h3 {
+  margin: 0;
+  font-size: var(--font-size-500);
+}
+
+.cards.highlight > ul > li:not(:first-child) .card-body h2,
+.cards.highlight > ul > li:not(:first-child) .card-body h3 {
+  font-size: var(--font-size-300);
+}
+
+.cards.highlight > ul > li:first-child .card-body h2,
+.cards.highlight > ul > li:first-child .card-body h3 {
+  font-size: clamp(1.5rem, 2.5vw, 2rem);
+}
+
+@media (width >= 900px) {
+  .cards.highlight > ul > li:not(:first-child) .card-body h2,
+  .cards.highlight > ul > li:not(:first-child) .card-body h3 {
+    font-size: var(--font-size-500);
+  }
+}
+
 /* horizontal variant */
 .cards.horizontal > ul > li {
   display: grid;
@@ -739,5 +908,11 @@
   .cards.horizontal > ul > li {
     gap: var(--spacing-400);
     padding:  var(--spacing-400);
+  }
+}
+
+@media (width >= 1200px) {
+  .cards.horizontal > ul.rows-2 {
+    --grid-cols: 2;
   }
 }

@@ -5,7 +5,7 @@
   "description": "Starter project for Adobe Helix",
   "scripts": {
     "lint:js": "eslint .",
-    "lint:css": "stylelint blocks/**/*.css styles/*.css",
+    "lint:css": "stylelint blocks/**/*.css styles/*.css widgets/**/*.css",
     "lint": "npm run lint:js && npm run lint:css",
     "build:json": "npm run build:json:models && npm run build:json:definitions && npm run build:json:filters",
     "build:json:models": "merge-json-cli -i \"ue/models/component-models.json\" -o \"component-models.json\"",

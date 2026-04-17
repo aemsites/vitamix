@@ -553,6 +553,12 @@
   justify-content: flex-start;
 }
 
+.carousel.expansion ul > li .img-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
 .carousel.expansion ul > li video,
 .carousel.expansion ul > li img {
   width: 180px;

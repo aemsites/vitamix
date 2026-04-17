@@ -1,6 +1,5 @@
-/* product swatches colors */
-.pdp .pdp-color-swatch,
-.plp .plp-color-swatch {
+/* product swatch color variables (PDP, PLP block, and sales-plp widget) */
+.color-swatch {
   /* blacks */
   --color-black: #000;
   --color-shadow-black: #000;
@@ -45,7 +44,7 @@
 
   /* yellows */
   --color-yellow: #f7f700;
-  
+
   /* greens */
   --color-sour-apple-green: #e3edb5;
   --color-turquoise: #30d5c7;

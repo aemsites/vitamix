@@ -1,0 +1,143 @@
+{
+  "en": {
+    "labels": {
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "businessName": "Business Name",
+      "businessAddressLine1": "Business Address Line 1",
+      "businessAddressLine2Optional": "Business Address Line 2 (Optional)",
+      "city": "City",
+      "state": "State",
+      "province": "Province",
+      "zipCode": "Zip Code",
+      "country": "Country",
+      "unitedStates": "United States",
+      "canada": "Canada",
+      "mexico": "Mexico",
+      "notYourCountry": "Not your country?",
+      "emailAddress": "Email Address",
+      "phoneNumber": "Phone Number",
+      "typeOfBusiness": "Type Of Business",
+      "numberOfLocations": "Number Of Locations",
+      "howMayWeHelpOptional": "How may we help you? (optional)",
+      "pleaseSelect": "Please Select",
+      "submit": "Submit",
+      "sending": "Sending..."
+    },
+    "placeholders": {
+      "state": "Please Select",
+      "typeOfBusiness": "Select an option",
+      "numberOfLocations": "Select an option"
+    },
+    "typeOfBusinessOptions": [
+      { "value": "bar-lounge", "label": "Bar & Lounge" },
+      { "value": "specialty-coffee-beverage", "label": "Specialty Coffee & Beverage Bar" },
+      { "value": "fast-food-quick-service", "label": "Fast Food & Quick Service" },
+      { "value": "casual-bar-dining", "label": "Casual & Bar Dining" },
+      { "value": "hospitality", "label": "Hospitality" },
+      { "value": "event-catering", "label": "Event Catering" },
+      { "value": "institutional", "label": "Institutional" },
+      { "value": "others", "label": "Others" }
+    ],
+    "numberOfLocationsOptions": [
+      { "value": "1-5", "label": "1-5" },
+      { "value": "6-10", "label": "6-10" },
+      { "value": "11-50", "label": "11-50" },
+      { "value": "50-more", "label": "50-more" }
+    ]
+  },
+  "fr": {
+    "labels": {
+      "firstName": "Prénom",
+      "lastName": "Nom de famille",
+      "businessName": "Nom de l'entreprise",
+      "businessAddressLine1": "Adresse de l'entreprise (ligne 1)",
+      "businessAddressLine2Optional": "Adresse de l'entreprise (ligne 2) (optionnel)",
+      "city": "Ville",
+      "state": "État",
+      "province": "Province",
+      "zipCode": "Code postal",
+      "country": "Pays",
+      "unitedStates": "États-Unis",
+      "canada": "Canada",
+      "mexico": "Mexique",
+      "notYourCountry": "Ce n'est pas votre pays?",
+      "emailAddress": "Adresse courriel",
+      "phoneNumber": "Numéro de téléphone",
+      "typeOfBusiness": "Type d'entreprise",
+      "numberOfLocations": "Nombre d'établissements",
+      "howMayWeHelpOptional": "Comment pouvons-nous vous aider? (optionnel)",
+      "pleaseSelect": "Veuillez sélectionner",
+      "submit": "Soumettre",
+      "sending": "Envoi en cours..."
+    },
+    "placeholders": {
+      "state": "Veuillez sélectionner",
+      "typeOfBusiness": "Sélectionnez une option",
+      "numberOfLocations": "Sélectionnez une option"
+    },
+    "typeOfBusinessOptions": [
+      { "value": "bar-lounge", "label": "Bar et lounge" },
+      { "value": "specialty-coffee-beverage", "label": "Café et bar à boissons spécialisées" },
+      { "value": "fast-food-quick-service", "label": "Restauration rapide" },
+      { "value": "casual-bar-dining", "label": "Restaurant décontracté et bar" },
+      { "value": "hospitality", "label": "Hôtellerie" },
+      { "value": "event-catering", "label": "Traiteur événementiel" },
+      { "value": "institutional", "label": "Restaurant collectif" },
+      { "value": "others", "label": "Autres" }
+    ],
+    "numberOfLocationsOptions": [
+      { "value": "1-5", "label": "1-5" },
+      { "value": "6-10", "label": "6-10" },
+      { "value": "11-50", "label": "11-50" },
+      { "value": "50-more", "label": "50 ou plus" }
+    ]
+  },
+  "es": {
+    "labels": {
+      "firstName": "Nombre",
+      "lastName": "Apellido",
+      "businessName": "Nombre del negocio",
+      "businessAddressLine1": "Dirección del negocio (línea 1)",
+      "businessAddressLine2Optional": "Dirección del negocio (línea 2) (opcional)",
+      "city": "Ciudad",
+      "state": "Estado",
+      "province": "Provincia",
+      "zipCode": "Código postal",
+      "country": "País",
+      "unitedStates": "Estados Unidos",
+      "canada": "Canadá",
+      "mexico": "México",
+      "notYourCountry": "¿No es su país?",
+      "emailAddress": "Correo electrónico",
+      "phoneNumber": "Número de teléfono",
+      "typeOfBusiness": "Tipo de negocio",
+      "numberOfLocations": "Número de ubicaciones",
+      "howMayWeHelpOptional": "¿Cómo podemos ayudarle? (opcional)",
+      "pleaseSelect": "Por favor seleccione",
+      "submit": "Enviar",
+      "sending": "Enviando..."
+    },
+    "placeholders": {
+      "state": "Por favor seleccione",
+      "typeOfBusiness": "Seleccione una opción",
+      "numberOfLocations": "Seleccione una opción"
+    },
+    "typeOfBusinessOptions": [
+      { "value": "bar-lounge", "label": "Bar y lounge" },
+      { "value": "specialty-coffee-beverage", "label": "Café y bar de bebidas especiales" },
+      { "value": "fast-food-quick-service", "label": "Comida rápida" },
+      { "value": "casual-bar-dining", "label": "Comida casual y bar" },
+      { "value": "hospitality", "label": "Hospitalidad" },
+      { "value": "event-catering", "label": "Catering para eventos" },
+      { "value": "institutional", "label": "Institucional" },
+      { "value": "others", "label": "Otros" }
+    ],
+    "numberOfLocationsOptions": [
+      { "value": "1-5", "label": "1-5" },
+      { "value": "6-10", "label": "6-10" },
+      { "value": "11-50", "label": "11-50" },
+      { "value": "50-more", "label": "50 o más" }
+    ]
+  }
+}

@@ -1,4 +1,4 @@
-@import url('../pdp/color-swatches.css');
+@import url('../../styles/color-swatches.css');
 
 /* stylelint-disable */
 main div.plp-container {
@@ -340,7 +340,7 @@ main .plp-product-card p {
   }
 }
 
-.plp-color-swatch {
+.plp .color-swatch {
   width: 36px;
   height: 36px;
   border: 1px solid var(--color-charcoal);
@@ -358,7 +358,7 @@ main .plp-product-card p {
   height: 100%;
 }
 
-.plp-color-swatch-oos.plp-color-inner::after {
+.plp .color-swatch-oos.plp-color-inner::after {
   content: '';
   position: absolute;
   top: 0;
@@ -386,6 +386,14 @@ main .plp-product-card p {
 
 .plp-price {
   font-weight: var(--weight-medium);
+}
+
+.plp-price del {
+  margin-right: 0.5ch;
+}
+
+.plp-price span {
+  display: inline;
 }
 
 .plp-compare {

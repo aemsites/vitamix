@@ -1,0 +1,825 @@
+<!-- 
+ WARNING: This widget is imported AS IS.
+ The code should be considered legacy tech debt
+ If there is significant use it should be refactored
+-->
+
+<div class="devrawblock">
+    <article class="tmpl-page tmpl-page--blender-recommender" x-data="alpineJsBlenderRecommender(window.location.pathname.includes('/fr_') ? 1 : 0, 1)">
+
+
+  <section class="ognm-blender-recommender tmpl-page__section clrs-light clrs-secondary is-loading" :class="(complete) ? 'is-complete' : ''" x-ref="componentbody" :style="minHeight">
+
+    <div class="ognm-blender-recommender__contents">
+
+      <!-- Start Intro -->
+      <div :class="['ognm-blender-recommender__panel', ((screen == 1) ? ' is-active': '' )]">
+        <div class="ognm-blender-recommender__intro">
+
+          <form x-on:submit="$event.preventDefault(); goNext()" :disabled="((screen != 1) ? 'disabled' : false)" class="ognm-blender-recommender__intro__container elmt-container">
+            <svg class="ognm-blender-recommender__intro__icon" width="42px" viewbox="0 0 125.635 125.667" xmlns="http://www.w3.org/2000/svg">
+              <path d="M33.859 7.118a59.27 59.27 0 0 0-1.43 43.87 49.86 49.86 0 0 0 27.26 28.62l-.08.33a58.9 58.9 0 0 1-28.31 7.74 45.84 45.84 0 0 1-29.67-10.59 62.9 62.9 0 0 1 .78-31.46c3.91 10.15 9.66 17.12 19.48 21.46l1.71.76-.94-1.61a59.84 59.84 0 0 1-5.61-46.38 63 63 0 0 1 16.81-12.74Zm50.46 104.74c5.61-14 4-30.63-4.42-45.8l-.32-.08c-8.17 19.05-26.75 30.88-48.58 30.88a59.86 59.86 0 0 1-23.86-5 63 63 0 0 0 12.69 16.76 58.67 58.67 0 0 0 16.58 2.39 59.89 59.89 0 0 0 29.85-8l1.6-.94-.75 1.7c-4.35 9.83-11.31 15.58-21.46 19.49a62.94 62.94 0 0 0 31.47.78 47.14 47.14 0 0 0 7.2-12.18Zm39.68-63.23a45.82 45.82 0 0 0-29.66-10.59 58.77 58.77 0 0 0-28.31 7.75c0 .1-.06.21-.08.31a49.92 49.92 0 0 1 27.25 28.63 59.3 59.3 0 0 1-1.43 43.88 63.46 63.46 0 0 0 16.84-12.75 59.92 59.92 0 0 0-5.61-46.38l-.94-1.62 1.7.76c9.82 4.34 15.58 11.31 19.49 21.45a63 63 0 0 0 .75-31.44Zm0 0a45.82 45.82 0 0 0-29.66-10.59 58.77 58.77 0 0 0-28.31 7.75c0 .1-.06.21-.08.31a49.92 49.92 0 0 1 27.25 28.63 59.3 59.3 0 0 1-1.43 43.88 63.46 63.46 0 0 0 16.84-12.75 59.92 59.92 0 0 0-5.61-46.38l-.94-1.62 1.7.76c9.82 4.34 15.58 11.31 19.49 21.45a63 63 0 0 0 .75-31.44Zm-5.43-14.77a63.14 63.14 0 0 0-12.68-16.76 58.83 58.83 0 0 0-16.61-2.39 59.91 59.91 0 0 0-29.83 7.95l-1.61.94.75-1.7c4.35-9.83 11.32-15.58 21.46-19.49a62.75 62.75 0 0 0-31.46-.77 46.69 46.69 0 0 0-7.25 12.22c-5.61 14-4 30.64 4.42 45.8l.31.08c8.17-19.05 26.76-30.88 48.63-30.88a59.94 59.94 0 0 1 23.87 5Z" fill="#A7A9AC" fill-rule="nonzero"></path>
+            </svg>
+            <p class="ognm-blender-recommender__intro__eyebrow atom-eyebrow" x-html="language[currentLanguage].intro.eyebrow">
+            </p>
+            <p class="ognm-blender-recommender__intro__title atom-heading" x-html="language[currentLanguage].intro.headline1">
+            </p>
+
+            <div class="ognm-blender-recommender__intro__form-group elmt-form-group" :class="(/*namefieldCanShowError &amp;&amp; namefieldError */ (0 == 1) ? 'is-error' : '')">
+              <div class="elmt-form-group__input-row">
+                <div class="elmt-form-group__inline-error elmt-form-group__inline-error--center">
+                  <div class="elmt-form-group__inline-error__input">
+                    <input aria-label="Name" x-model="namefieldValue" type="text" id="formfield-nameinput" name="nameinput" class="atom-input atom-input--large" :aria-label="language[currentLanguage].intro.nameLabel" :placeholder="language[currentLanguage].intro.nameLabel" x-on:focusout="namefieldCanShowError = true" />
+                  </div>
+                  <div class="elmt-form-group__inline-error__error">
+                    <span x-html="language[currentLanguage].intro.nameError">
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <p class="ognm-blender-recommender__intro__title atom-heading" x-html="language[currentLanguage].intro.headline2">
+            </p>
+
+            <div class="ognm-blender-recommender__intro__form-group elmt-form-group" :class="(/*emailfieldCanShowError &amp;&amp; emailfieldError */ (0 == 1) ? 'is-error' : '')">
+              <div class="elmt-form-group__input-row">
+                <div class="elmt-form-group__inline-error elmt-form-group__inline-error--center">
+                  <div class="elmt-form-group__inline-error__input">
+                    <input aria-label="Email Address" x-model="emailfieldValue" type="text" id="formfield-emailinput" name="emailinput" class="atom-input atom-input--large" :aria-label="language[currentLanguage].intro.emailLabel" :placeholder="language[currentLanguage].intro.emailLabel" x-on:focusout="emailfieldCanShowError = true" />
+                  </div>
+                  <div class="elmt-form-group__inline-error__error">
+                    <span x-html="language[currentLanguage].intro.emailError">
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="ognm-blender-recommender__intro__text atom-text atom-text--fine atom-textatom-text--wysiwyg">
+              <p x-html="language[currentLanguage].intro.promo">
+
+              </p>
+            </div>
+            <div class="ognm-blender-recommender__intro__actions">
+              <button type="submit" class="atom-button atom-button--secondary" :class="(/*namefieldError || emailfieldError */ (0 == 1) ? 'is-disabled' : '')">
+                <span x-html="(!emailfieldError) ? language[currentLanguage].intro.submitButton : language[currentLanguage].intro.skipButton">
+                </span>
+              </button>
+            </div>
+          </form>
+        </div>
+        <!-- End Intro -->
+
+      </div>
+      <!-- End of Intro Panel -->
+
+      <!-- Questions -->
+      <div :class="['ognm-blender-recommender__panel', ((screen == 2) ? ' is-active': '' )]">
+        <div class="ognm-blender-recommender__panel__inner">
+
+          <div class="ognm-blender-recommender__question-tabs">
+            <button type="button" :disabled="((screen != 2) ? 'disabled' : false)" :class="['ognm-blender-recommender__question-tabs__tab', ((question &gt;= 1) ? 'is-current': ''), ((question &gt;= 2) ? 'is-complete': '')]">
+              <span class="ognm-blender-recommender__question-tabs__tab__text" x-html="language[currentLanguage].questions.q1TabName">
+              </span>
+            </button>
+            <button type="button" :disabled="((screen != 2) ? 'disabled' : false)" :class="['ognm-blender-recommender__question-tabs__tab', ((question &gt;= 2) ? 'is-current': ''), ((question &gt;= 3) ? 'is-complete': ''), ((answers.question1.length &lt; 1) ? 'is-disabled' : '')]">
+              <span class="ognm-blender-recommender__question-tabs__tab__text" x-html="language[currentLanguage].questions.q2TabName">
+              </span>
+            </button>
+            <button type="button" :disabled="((screen != 2) ? 'disabled' : false)" :class="['ognm-blender-recommender__question-tabs__tab', ((question &gt;= 3) ? 'is-current': ''), ((screen &gt;= 3) ? 'is-complete': ''), ((answers.question1.length &lt; 1 || answers.question2.length &lt; 1) ? 'is-disabled' : '')]">
+              <span class="ognm-blender-recommender__question-tabs__tab__text" x-html="language[currentLanguage].questions.q3TabName">
+              </span>
+            </button>
+            <button style="display: none !important" type="button" :disabled="((screen != 2) ? 'disabled' : false)" :class="['ognm-blender-recommender__question-tabs__tab', ((question &gt;= 4) ? 'is-current': ''), ((screen &gt;= 3) ? 'is-complete': ''), ((answers.question1.length &lt; 1 || answers.question2.length &lt; 1 || answers.question3.length &lt; 1) ? 'is-disabled' : '')]">
+              <span class="ognm-blender-recommender__question-tabs__tab__text" x-html="language[currentLanguage].questions.q4TabName">
+              </span>
+            </button>
+          </div>
+
+          <!-- Question 1 -->
+          <form x-on:submit="$event.preventDefault(); goNext()" class="ognm-blender-recommender__question" :disabled="((screen != 2 || question != 1) ? 'disabled' : false)" :class="qPoz(1)">
+
+            <div class="ognm-blender-recommender__question__text">
+              <template x-if="typeof namefieldValue != 'undefined' &amp;&amp; namefieldValue.length &gt; 0">
+                <span class="atom-heading">
+                  <span x-html="namefieldValue + ', ' + language[currentLanguage].questions.q1QuestionText"></span>
+                </span>
+              </template>
+              <template x-if="typeof namefieldValue == 'undefined' || namefieldValue.length &lt; 1">
+                <span class="atom-heading">
+                  <span x-html="language[currentLanguage].questions.q1QuestionText.slice(0,1)" style="text-transform: uppercase;">
+                  </span><span x-html="language[currentLanguage].questions.q1QuestionText.slice(1,(language[currentLanguage].questions.q1QuestionText.length - 1))">
+                  </span>
+                </span>
+              </template>
+            </div>
+
+            <div class="ognm-blender-recommender__question__selections">
+              <div class="ognm-blender-recommender__question__flex">
+                <template x-for="(choice,index) in language[currentLanguage].choices.q1" :key="choice[0]">
+                  <div class="ognm-blender-recommender__question__flex__item">
+
+                    <div class="atom-large-toggle-box atom-large-toggle-box--icon atom-large-toggle-box--icon-mb-condensed atom-large-toggle-box--has-desc">
+                      <input :disabled="((screen != 2 || question != 1) ? 'disabled' : false)" x-model="answers.question1" type="radio" :id="'q1-'+index" name="q1" class="atom-large-toggle-box__input" :value="choice[0]" />
+
+                      <label class="atom-large-toggle-box__label" :for="'q1-'+index">
+                        <div class="atom-large-toggle-box__label__inner">
+                          <img class="atom-large-toggle-box__label__icon" aria-hidden="true" :src="'https://www.vitamix.com'+choice[3]" :aria-label="choice[1]" />
+                          <span class="atom-large-toggle-box__label__text">
+                            <span class="atom-large-toggle-box__label__name" x-html="choice[1]">
+                            </span>
+                            <span class="atom-large-toggle-box__label__desc atom-text atom-text--fine" x-html="choice[2]">
+                            </span>
+                          </span>
+                        </div>
+                      </label>
+                    </div>
+
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <div class="ognm-blender-recommender__question__buttons">
+              <button type="submit" class="atom-button atom-button--secondary" :disabled="(answers.question1.length &lt; 1) ? 'disabled' : false">
+                <span x-html="language[currentLanguage].questions.nextButton">
+                </span>
+              </button>
+            </div>
+
+          </form>
+
+          <!-- Question 2 -->
+          <form x-on:submit="$event.preventDefault(); goNext()" class="ognm-blender-recommender__question" :disabled="((screen != 2 || question != 2) ? 'disabled' : false)" :class="qPoz(2)">
+
+            <div class="ognm-blender-recommender__question__text">
+              <span class="atom-heading">
+                <span x-html="language[currentLanguage].questions.q2QuestionText">
+                </span>
+              </span>
+              <div class="atom-text atom-text--lrg atom-text--wysiwyg">
+                <p x-html="language[currentLanguage].questions.q2QuestionDesc">
+                </p>
+              </div>
+            </div>
+
+            <div class="ognm-blender-recommender__question__selections ognm-blender-recommender__question__selections--wide">
+
+              <div class="ognm-blender-recommender__question__flex ognm-blender-recommender__question__flex--narrow">
+                <template x-for="(choice,index) in language[currentLanguage].choices.q2" :key="choice[0]">
+                  <div class="ognm-blender-recommender__question__flex__item">
+
+                    <div class="atom-large-toggle-box">
+
+                      <input :disabled="((screen != 2 || question != 2) ? 'disabled' : false)" x-model="answers.question2" type="checkbox" :id="'q2-'+index" :name="'q2-'+index" class="atom-large-toggle-box__input" :value="choice[0]" />
+
+                      <label class="atom-large-toggle-box__label" :for="'q2-'+index">
+                        <div class="atom-large-toggle-box__label__inner">
+                          <span class="atom-large-toggle-box__label__name" x-html="choice[1]">
+                          </span>
+                          
+                        </div>
+                      </label>
+
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <div class="ognm-blender-recommender__question__buttons">
+              <button :disabled="((screen != 2 || question != 2) ? 'disabled' : false)" type="button" class="atom-button">
+                <span x-html="language[currentLanguage].questions.prevButton">
+                </span>
+              </button>
+              <button type="submit" class="atom-button atom-button--secondary" :disabled="(answers.question2.length &lt; 1 || screen != 2 || question != 2) ? 'disabled' : false">
+                <span x-html="language[currentLanguage].questions.nextButton">
+                </span>
+              </button>
+            </div>
+          </form>
+
+          <!-- Question 3 -->
+          <form x-on:submit="$event.preventDefault(); goNext()" class="ognm-blender-recommender__question" :disabled="((screen != 2 || question != 3) ? 'disabled' : false)" :class="qPoz(3)">
+
+            <div class="ognm-blender-recommender__question__text">
+              <span class="atom-heading">
+                <span x-html="language[currentLanguage].questions.q3QuestionText">
+                </span>
+              </span>
+            </div>
+
+            <div class="ognm-blender-recommender__question__selections">
+              <div class="ognm-blender-recommender__question__flex">
+                <template x-for="(choice,index) in language[currentLanguage].choices.q3" :key="choice[0]">
+                  <div class="ognm-blender-recommender__question__flex__item">
+
+                    <div class="atom-large-toggle-box atom-large-toggle-box--icon atom-large-toggle-box--icon-mb-condensed">
+                      <input :disabled="((screen != 2 || question != 3) ? 'disabled' : false)" x-model="answers.question3" type="radio" :id="'q3-'+index" name="q3" class="atom-large-toggle-box__input" :value="choice[0]" />
+
+                      <label class="atom-large-toggle-box__label" :for="'q3-'+index">
+                        <div class="atom-large-toggle-box__label__inner">
+                          <img class="atom-large-toggle-box__label__icon" aria-hidden="true" :src="'https://www.vitamix.com'+choice[3]" :aria-label="choice[1]" />
+                          <span class="atom-large-toggle-box__label__text">
+                            <span class="atom-large-toggle-box__label__name" x-html="choice[1]">
+                            </span>
+                          </span>
+                        </div>
+                      </label>
+                    </div>
+
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <div class="ognm-blender-recommender__question__buttons">
+              <button :disabled="((screen != 2 || question != 3) ? 'disabled' : false)" type="button" class="atom-button">
+                <span x-html="language[currentLanguage].questions.prevButton">
+                </span>
+              </button>
+              <button type="submit" class="atom-button atom-button--secondary" :disabled="(answers.question3.length &lt; 1 || screen != 2 || question != 3) ? 'disabled' : false">
+                <span x-html="language[currentLanguage].questions.nextButton">
+                </span>
+              </button>
+            </div>
+          </form>
+
+          <!-- Question 4 -->
+          <form x-on:submit="$event.preventDefault(); goNext()" class="ognm-blender-recommender__question" :disabled="((screen != 2 || question != 4) ? 'disabled' : false)" :class="qPoz(4)">
+
+            <div class="ognm-blender-recommender__question__text">
+              <span class="atom-heading">
+                <span x-html="language[currentLanguage].questions.q4QuestionText">
+                </span>
+              </span>
+            </div>
+
+            <div class="ognm-blender-recommender__question__selections">
+              <div class="ognm-blender-recommender__question__flex ognm-blender-recommender__question__flex--2-box">
+                <template x-for="(choice,index) in language[currentLanguage].choices.q4" :key="choice[0]">
+                  <div class="ognm-blender-recommender__question__flex__item">
+
+                    <div class="atom-large-toggle-box atom-large-toggle-box--icon">
+                      <input :disabled="((screen != 2 || question != 4) ? 'disabled' : false)" x-model="answers.question4" type="radio" :id="'q4-'+index" name="q4" class="atom-large-toggle-box__input" :value="choice[0]" />
+
+                      <label class="atom-large-toggle-box__label" :for="'q4-'+index">
+                        <div class="atom-large-toggle-box__label__inner">
+                          <img class="atom-large-toggle-box__label__icon" aria-hidden="true" :src="'https://www.vitamix.com'+choice[3]" :aria-label="choice[1]" />
+                          <span class="atom-large-toggle-box__label__text">
+                            <span class="atom-large-toggle-box__label__name" x-html="choice[1]">
+                            </span>
+                          </span>
+                        </div>
+                      </label>
+                    </div>
+
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <div class="ognm-blender-recommender__question__buttons">
+              <button :disabled="((screen != 2 || question != 4) ? 'disabled' : false)" type="button" class="atom-button">
+                <span x-html="language[currentLanguage].questions.prevButton">
+                </span>
+              </button>
+              <button type="submit" class="atom-button atom-button--secondary" :disabled="(answers.question4.length &lt; 1 || screen != 2 || question != 4) ? 'disabled' : false">
+                <span x-html="language[currentLanguage].questions.submitButton">
+                </span>
+              </button>
+            </div>
+          </form>
+        </div>
+
+
+        <div :class="['ognm-blender-recommender__question-popup', ((dykExpanded) ? 'is-expanded' : '')]">
+
+          <div class="ognm-blender-recommender__question-popup__box clrs-dark clrs-secondary">
+            <button x-on:click="$event.preventDefault(); dykExpanded = !dykExpanded" :disabled="((screen != 2 || dykExpanded) ? 'disabled' : false)" class="ognm-blender-recommender__question-popup__box__title atom-eyebrow">
+              <span x-html="language[currentLanguage].didYouKnow[(question - 1)].eyebrow" lang="fr-x-mtfrom-en">Lorem Ipsum</span>
+              <svg width="14.85" height="14.85" viewbox="0 0 14.85 14.85" xmlns="http://www.w3.org/2000/svg">
+                <path d="m6.087 1.338-.073.085-.07.105-.055.116A.929.929 0 0 0 5.82 2v3.82H2a.928.928 0 0 0-.937.917v1.376c0 .249.096.475.276.65l.079.07.108.072A.926.926 0 0 0 2 9.03h3.819l.002 3.832c0 .246.091.469.265.648.176.18.402.275.65.275h1.377c.25 0 .475-.095.65-.275l.07-.08.07-.103.057-.114a.886.886 0 0 0 .07-.35V9.03h3.833a.908.908 0 0 0 .65-.27.89.89 0 0 0 .273-.648V6.737a.893.893 0 0 0-.275-.65l-.08-.07-.106-.071a.899.899 0 0 0-.462-.125H9.03L9.031 2a.923.923 0 0 0-.27-.663.891.891 0 0 0-.648-.274H6.737a.893.893 0 0 0-.65.275Z" fill="#FFF" fill-rule="nonzero"></path>
+              </svg>
+            </button>
+            <button x-on:click="$event.preventDefault(); dykExpanded = !dykExpanded" :disabled="((screen != 2 || !dykExpanded) ? 'disabled' : false)" class="ognm-blender-recommender__question-popup__box__close">
+              <svg class="ognm-blender-recommender__question-popup__box__close__icon" width="11.112" height="11.111" viewbox="0 0 11.112 11.111" xmlns="http://www.w3.org/2000/svg">
+                <path d="M0 9.593a.369.369 0 0 1 .117-.269l3.769-3.768L.117 1.787l-.054-.065a.35.35 0 0 1-.058-.143L0 1.518a.328.328 0 0 1 .1-.25L1.267.1a.327.327 0 0 1 .25-.1c.108 0 .192.037.271.116l3.768 3.769L9.336.106A.351.351 0 0 1 9.593 0c.1-.001.18.031.25.1l1.167 1.168c.07.069.101.148.1.25 0 .107-.034.188-.105.26L7.228 5.555l3.778 3.778c.057.057.089.12.1.195l.006.079a.32.32 0 0 1-.101.235l-1.168 1.168a.327.327 0 0 1-.25.1.35.35 0 0 1-.258-.106L5.556 7.227l-3.768 3.768a.364.364 0 0 1-.27.116.328.328 0 0 1-.25-.1L.1 9.844a.328.328 0 0 1-.1-.25Z" fill="#FFF" fill-rule="nonzero"></path>
+              </svg>
+            </button>
+            <div class="ognm-blender-recommender__question-popup__box__icon">
+              <svg viewbox="0 0 21.27 25.5" xmlns="http://www.w3.org/2000/svg">
+                <g fill="none" fill-rule="evenodd">
+                  <path d="m9.92 0 1.628.002c2.3.003 5.117.008 8.45.016a1.275 1.275 0 0 1 1.224 1.62l-.256.911h-6.041a.9.9 0 0 0-.893.788l-.007.113v.75a.9.9 0 0 0 .9.9h5.327l-.715 2.55h-4.612a.9.9 0 0 0-.893.787l-.007.113v.75a.9.9 0 0 0 .9.9h3.898l-.715 2.55h-3.183a.9.9 0 0 0-.893.787l-.007.113v.75a.9.9 0 0 0 .9.9h2.468l-.817 2.915c-.154.55-.656.93-1.227.93H6.335c-.823 0-1.673-1.832-2.55-5.498C2.323 12.684 0 10.087 0 7.033 0 3.16 1.686.021 3.765.021c.03 0 .061 0 .092.002.034-.01.751-.018 2.151-.021L7.018 0H9.918ZM4.392 2.57C3.138 3.209 2.51 4.015 2.51 6.397c0 2.651 1.6 3.825 1.883 3.825V2.57Z" fill="#A2AAAD"></path>
+                  <path d="M16.785 20.4a2 2 0 0 1 2 2V25a.5.5 0 0 1-.5.5H3.305a.5.5 0 0 1-.5-.5v-2.6a2 2 0 0 1 2-2h11.98Zm-5.905 1.275a1.275 1.275 0 1 0 0 2.55 1.275 1.275 0 0 0 0-2.55Z" fill="#FFF"></path>
+                </g>
+              </svg>
+            </div>
+            <div class="ognm-blender-recommender__question-popup__box__contents">
+              <template x-for="(dykItem,dykIndex) in language[currentLanguage].didYouKnow">
+                <div class="ognm-blender-recommender__question-popup__item" :class="qPoz(dykIndex + 1)">
+                  <div class="ognm-blender-recommender__question-popup__item__inner">
+                    <p class="ognm-blender-recommender__question-popup__item__eyebrow atom-eyebrow">
+                      <span x-html="dykItem.eyebrow">
+                      </span>
+                    </p>
+                    <h3 class="ognm-blender-recommender__question-popup__item__title atom-heading atom-heading--sub-med">
+                      <span x-html="dykItem.title">
+                      </span>
+                    </h3>
+                    <div class="ognm-blender-recommender__question-popup__item__desc atom-text atom-text--wysiwyg">
+                      <p x-html="dykItem.desc">
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Results Screen -->
+      <div :class="['ognm-blender-recommender__panel', ((screen == 3) ? ' is-active': '' )]">
+        <div class="ognm-blender-recommender__panel__inner">
+          <div class="ognm-blender-recommender__awaiting-results">
+            <div class="ognm-blender-recommender__awaiting-results__loader">
+
+              <div class="atom-loader-check">
+                <svg viewbox="25 25 50 50" class="atom-loader-check__svg">
+                  <circle cx="50" cy="50" r="20" fill="none" stroke-width="2.75" stroke-miterlimit="10" class="atom-loader-check__svg__circle">
+                  </circle>
+                </svg>
+              </div>
+            </div>
+
+            <div class="ognm-blender-recommender__awaiting-results__caption">
+
+              <template x-if="typeof namefieldValue != 'undefined' &amp;&amp; namefieldValue.length &gt; 0">
+                <p class="ognm-blender-recommender__awaiting-results__title atom-heading">
+                  <span x-html="language[currentLanguage].results.loadingText1 + ', ' + namefieldValue + language[currentLanguage].results.loadingText2"></span>
+                </p>
+              </template>
+              <template x-if="typeof namefieldValue == 'undefined' || namefieldValue.length &lt; 1">
+
+                <p class="ognm-blender-recommender__awaiting-results__title atom-heading">
+                  <span x-html="language[currentLanguage].results.loadingText1 + language[currentLanguage].results.loadingText2">
+                  </span>
+                </p>
+              </template>
+
+
+            </div>
+
+            <div class="ognm-blender-recommender__awaiting-results__reviews">
+              <div class="ognm-blender-recommender__awaiting-results__reviews__scroller">
+                <template x-for="(item,index) in language[currentLanguage].reviews">
+                  <template x-for="(number, numberindex) in 2">
+                    <div class="ognm-blender-recommender__review clrs-light clrs-primary" :style="'order: '+((numberindex * 10) + index)+';'">
+                      <div class="ognm-blender-recommender__review__inner">
+                        <div class="ognm-blender-recommender__review__text">
+                          <p x-html="item.text + ' ”'">
+                          </p>
+                        </div>
+                        <div class="ognm-blender-recommender__review__attribution">
+                          <div class="ognm-blender-recommender__review__attribution__name">
+                            <span x-html="item.name">
+                            </span>
+                          </div>
+                          <div class="ognm-blender-recommender__review__attribution__company">
+                            <span x-html="item.title">
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+                </template>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <img class="ognm-blender-recommender__vortex-bg" src="https://www.vitamix.com/content/dam/vitamix/home/design-system/illustration/vortex-gray-medium.svg" alt="Watermark Image of Blender Blade" />
+
+
+    <div class="ognm-blender-recommender__loader">
+      <div class="ognm-blender-recommender__loader__graphic atom-loader-large">
+        <svg viewbox="25 25 50 50" class="atom-loader-large__svg">
+          <circle cx="50" cy="50" r="20" fill="none" stroke-width="2" stroke-miterlimit="10" class="atom-loader-large__svg__circle">
+          </circle>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <section x-show="(complete)" id="tmpl-page__blender-recommender01" class="ognm-banner-center-captioned tmpl-page__section clrs-dark clrs-secondary ognm-banner-center-captioned--color ognm-banner-center-captioned--full">
+
+    <div class="ognm-banner-center-captioned__container elmt-container">
+      <div class="ognm-banner-center-captioned__contents">
+        <div class="ognm-banner-center-captioned__caption">
+          <div class="ognm-banner-center-captioned__caption__inner">
+            <div class="ognm-banner-center-captioned__caption__desc-top">
+              <p class="ognm-banner-center-captioned__caption__eyebrow atom-eyebrow atom-eyebrow--mega">
+                <span x-html="((typeof namefieldValue != 'undefined' &amp;&amp; namefieldValue.length) ? (namefieldValue + ', '): '') + language[currentLanguage].results.title">
+                </span>
+              </p>
+              <h1 class="ognm-banner-center-captioned__caption__title atom-heading atom-heading--lrg">
+                <span x-html="language[currentLanguage].results.desc">
+                </span>
+              </h1>
+            </div>
+            <template x-if="(answers.question1.length &gt; 0 &amp;&amp; answers.question2.length &gt; 0 &amp;&amp; answers.question3.length &gt; 0)">
+              <div class="ognm-banner-center-captioned__caption__desc-btm">
+                <div class="ognm-banner-center-captioned__caption__desc">
+                  <div class="ognm-blender-recommender__summary">
+                    <span class="ognm-blender-recommender__summary__text" x-html="language[currentLanguage].results.summary1">
+                    </span>
+                    <button class="ognm-blender-recommender__summary__button" :aria-label="language[currentLanguage].questions.q1TabName" x-on:click="goToQuestion(1)">
+                      <span x-html="getChoice('q1',answers.question1)">
+                      </span>
+                    </button>
+
+                    <span class="ognm-blender-recommender__summary__text" x-html="language[currentLanguage].results.summary2">
+                    </span>
+                    <button class="ognm-blender-recommender__summary__button" :aria-label="language[currentLanguage].questions.q2TabName" x-on:click="goToQuestion(2)">
+                      <span x-html="getChoice('q2',answers.question2[0])">
+                      </span>
+                      <span x-show="answers.question2.length &gt; 1" lang="fr-x-mtfrom-en">+</span>
+                    </button>
+
+                    <span class="ognm-blender-recommender__summary__text" x-html="language[currentLanguage].results.summary3">
+                    </span>
+                    <button class="ognm-blender-recommender__summary__button" :aria-label="language[currentLanguage].questions.q3TabName" x-on:click="goToQuestion(3)">
+                      <span x-html="getChoice('q3',answers.question3)">
+                      </span>
+                    </button>
+
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <template x-if="weightedItems.length &gt; 1">
+    <section x-show="(complete)" id="tmpl-page__blender-recommender02" class="ognm-merchandising-product-mini-feature-inline tmpl-page__section clrs-light clrs-primary">
+      <div class="ognm-merchandising-product-mini-feature-inline__container elmt-container">
+        <div class="ognm-merchandising-product-mini-feature-inline__caption">
+          <div class="ognm-merchandising-product-mini-feature-inline__caption__inner">
+          </div>
+        </div>
+        <div class="ognm-merchandising-product-mini-feature-inline__prev-next">
+          <button x-on:click="$event.preventDefault(); carouselPrev()" class="ognm-merchandising-product-mini-feature-inline__prev-next__prev atom-button atom-button--secondary atom-button--prev" :label="language[currentLanguage].questions.prevButton">
+          </button>
+          <button x-on:click="$event.preventDefault(); carouselNext()" class="ognm-merchandising-product-mini-feature-inline__prev-next__next atom-button atom-button--secondary atom-button--next" :label="language[currentLanguage].questions.nextButton">
+          </button>
+        </div>
+        <div class="ognm-merchandising-product-mini-feature-inline__wrap">
+          <div class="ognm-merchandising-product-mini-feature-inline__flex" :style="'transform: translate(-'+carouselItemPosition+'px,0);'" id="resultCarouselScroller">
+
+            <template x-for="(designation, resultCarouselIndex) in ['primary','second']">
+              <div class="ognm-merchandising-product-mini-feature-inline__flex__item" :id="'resultCarouselScroller-item'+(resultCarouselIndex+1)">
+                <a :href="(linkPrefix1 + linkPrefix2) + weightedItems[0][designation + '_url'] + resultUtm[resultCarouselIndex]" :title="weightedItems[0][designation + '_name']" class="ognm-merchandising-product-mini-feature-inline__card clrs-light clrs-secondary">
+                  <div class="ognm-merchandising-product-mini-feature-inline__card__inner">
+                    <div class="ognm-merchandising-product-mini-feature-inline__card__image atom-image-zoom">
+                      <img class="ognm-merchandising-product-mini-feature-inline__card__image__img" :src="weightedItems[0][designation + '_img']" :alt="'Image of -' + weightedItems[0][designation + '_name']" />
+                    </div>
+                    <div class="ognm-merchandising-product-mini-feature-inline__card__details">
+                      <div class="ognm-merchandising-product-mini-feature-inline__card__swatches">
+                        <div class="elmt-swatches">
+                          <template x-for="(swatch, swatchIndex) in weightedItems[0][designation + '_colors'].split('|')">
+                            <div class="atom-swatch" :style="'background-color:'+swatch+';'">
+                            </div>
+                          </template>
+                        </div>
+                      </div>
+                      <div class="ognm-merchandising-product-mini-feature-inline__card__name atom-heading atom-heading--sub-med" x-html="weightedItems[0][designation + '_name']">
+
+                      </div>
+                      <div class="ognm-merchandising-product-mini-feature-inline__card__price" x-html="weightedItems[0][designation + '_price']">
+
+                      </div>
+                      <div class="ognm-merchandising-product-mini-feature-inline__card__cta">
+                        <span class="atom-button atom-button--secondary atom-button--full-width" x-html="language[currentLanguage].results.buttonTitle">
+                        </span>
+                      </div>
+                      <div class="ognm-merchandising-product-mini-feature-inline__card__list-title">
+                        <b x-html="language[currentLanguage].results.recommendationsTitle">
+                        </b>
+                      </div>
+
+                      <template x-if="weightedItems[0][designation + '_benefits'].split('|').length &gt; 0">
+                        <ul class="ognm-merchandising-product-mini-feature-inline__card__spec-list">
+                          <template x-for="(reasoning, reasoningIndex) in weightedItems[0][designation + '_benefits'].split('|')">
+                            <li class="ognm-merchandising-product-mini-feature-inline__card__spec-list__item" x-html="reasoning">
+
+                            </li>
+                          </template>
+                        </ul>
+                      </template>
+                    </div>
+                  </div>
+                </a>
+              </div>
+
+            </template>
+
+          </div>
+        </div>
+      </div>
+    </section>
+  </template>
+
+  <section x-show="(complete)" class="ognm-banner-center-captioned tmpl-page__section clrs-light clrs-primary ognm-banner-center-captioned--color ognm-banner-center-captioned--full">
+
+    <div class="ognm-banner-center-captioned__container elmt-container">
+      <div class="ognm-banner-center-captioned__contents">
+        <div class="ognm-banner-center-captioned__caption">
+          <div class="ognm-banner-center-captioned__caption__inner">
+            <div class="ognm-banner-center-captioned__caption__desc-top">
+              <svg class="ognm-banner-center-captioned__caption__eyebrow atom-eyebrow" width="30" height="30" viewbox="0 0 30 30" xmlns="http://www.w3.org/2000/svg">
+                <g fill="none" fill-rule="evenodd">
+                  <path d="M0 0h30v30H0z"></path>
+                  <path d="M13.92 2 15.547 2c2.3.003 5.117.009 8.45.017a1.275 1.275 0 0 1 1.224 1.619l-.256.912h-6.041a.9.9 0 0 0-.893.787l-.007.113v.75a.9.9 0 0 0 .9.9h5.327l-.715 2.55h-4.612a.9.9 0 0 0-.893.787l-.007.113v.75a.9.9 0 0 0 .9.9h3.898l-.715 2.55h-3.183a.9.9 0 0 0-.893.787l-.007.113v.75a.9.9 0 0 0 .9.9h2.468l-.817 2.915c-.154.55-.656.931-1.227.931h-9.014c-.823 0-1.673-1.833-2.55-5.499C6.323 14.683 4 12.086 4 9.033 4 5.16 5.686 2.02 7.765 2.02c.03 0 .061 0 .092.002.034-.01.751-.017 2.151-.02L11.018 2H13.918ZM8.392 4.57C7.138 5.208 6.51 6.014 6.51 8.395c0 2.652 1.6 3.825 1.883 3.825V4.57Z" fill="#333F48"></path>
+                  <path d="M20.785 22.4a2 2 0 0 1 2 2V27a.5.5 0 0 1-.5.5H7.305a.5.5 0 0 1-.5-.5v-2.6a2 2 0 0 1 2-2h11.98Zm-5.905 1.276a1.275 1.275 0 1 0 0 2.55 1.275 1.275 0 0 0 0-2.55Z" fill="#D6D6D6"></path>
+                </g>
+              </svg>
+              <p class="ognm-banner-center-captioned__caption__eyebrow atom-eyebrow" x-html="language[currentLanguage].results.startoverEyebrow">
+              </p>
+              <h1 class="ognm-banner-center-captioned__caption__title atom-heading" x-html="language[currentLanguage].results.startoverTitle">
+              </h1>
+            </div>
+            <div class="ognm-banner-center-captioned__caption__desc-btm">
+              <div class="ognm-banner-center-captioned__caption__ctas">
+                <div class="elmt-buttons elmt-buttons--centered">
+                  <button x-on:click="goToQuestion(1)" class="atom-button" x-html="language[currentLanguage].results.startoverButton">
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section x-show="(complete)" class="ognm-cardlist-icons tmpl-page__section clrs-light clrs-secondary">
+    <div class="ognm-cardlist-icons__container elmt-container">
+      <div class="elmt-caption elmt-caption--center">
+        <div class="elmt-caption__inner">
+          <p class="ognm-banner-inset-image__caption__eyebrow atom-eyebrow" x-html="language[currentLanguage].iconSection.eyebrow">
+          </p>
+          <h2 class="elmt-caption__title atom-heading" x-html="language[currentLanguage].iconSection.title">
+          </h2>
+          <div class="elmt-caption__desc atom-text atom-text--wysiwyg">
+            <p x-html="language[currentLanguage].iconSection.desc">
+            </p>
+          </div>
+        </div>
+      </div>
+      <div class="ognm-cardlist-icons__flex">
+        <template x-for="iconItem in language[currentLanguage].iconSection.items">
+          <div class="ognm-cardlist-icons__flex__item">
+            <div class="ognm-cardlist-icons__card">
+              <div class="ognm-cardlist-icons__card__inner">
+                <div class="ognm-cardlist-icons__card__image">
+                  <img class="ognm-cardlist-icons__card__image__img" :src="iconItem.icon + '?v=11-1-2023'" :alt="'Icon for ' + iconItem.title" />
+                </div>
+                <div class="ognm-cardlist-icons__card__name atom-eyebrow atom-eyebrow--mega atom-resp-adjusted">
+                  <span x-html="iconItem.title">
+                  </span>
+                </div>
+                <div class="ognm-cardlist-icons__card__desc atom-text atom-text--wysiwyg">
+                  <p x-html="iconItem.desc">
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <div class="elmt-caption__ctas">
+        <div class="elmt-buttons elmt-buttons--centered" style="margin-top: 24px;">
+          <a :href="(linkPrefix1 + linkPrefix2) + language[currentLanguage].iconSection.ctaLink" class="atom-button" x-html="language[currentLanguage].iconSection.ctaText">
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section x-show="(complete) &amp;&amp; false" class="ognm-cardlist-recipe-feature tmpl-page__section clrs-light clrs-primary ognm-cardlist-recipe-feature--mixed">
+    <div class="ognm-cardlist-recipe-feature__container elmt-container">
+      <div class="elmt-caption elmt-caption--split">
+        <div class="elmt-caption__inner">
+          <p class="ognm-banner-inset-image__caption__eyebrow atom-eyebrow" x-html="language[currentLanguage].recipeSection.eyebrow">
+          </p>
+          <h2 class="elmt-caption__title atom-heading" x-html="language[currentLanguage].recipeSection.title">
+          </h2>
+        </div>
+        <div class="elmt-caption__ctas">
+          <div class="elmt-buttons elmt-buttons--centered">
+            <a :href="(linkPrefix1 + linkPrefix2) + language[currentLanguage].recipeSection.ctaLink" class="atom-button-link" x-html="language[currentLanguage].recipeSection.ctaText">
+            </a>
+          </div>
+        </div>
+      </div>
+      <div class="ognm-cardlist-recipe-feature__flex">
+        <div class="ognm-cardlist-recipe-feature__flex__item">
+          <div class="mlcl-card-recipe clrs-light clrs-secondary">
+            <a :href="(linkPrefix1 + linkPrefix2) + language[currentLanguage].recipeSection.items[0].link" :title="language[currentLanguage].recipeSection.items[0].title" class="mlcl-card-recipe__image atom-image-zoom">
+              <picture class="mlcl-card-recipe__image__picture">
+                <img class="mlcl-card-recipe__image__img" :src="language[currentLanguage].recipeSection.items[0].image" loading="lazy" :alt="'Image of' + language[currentLanguage].recipeSection.items[0].title" />
+              </picture>
+            </a>
+            <div class="mlcl-card-recipe__caption">
+              <div class="mlcl-card-recipe__caption__flex-content">
+                <div class="mlcl-card-recipe__caption__eyebrow atom-eyebrow" x-html="language[currentLanguage].recipeSection.items[0].eyebrow">
+                </div>
+                <h3 class="mlcl-card-recipe__caption__title atom-heading atom-heading--sub-lrg">
+                  <a :title="language[currentLanguage].recipeSection.items[0].title" :href="(linkPrefix1 + linkPrefix2) + language[currentLanguage].recipeSection.items[0].link" x-html="language[currentLanguage].recipeSection.items[0].title">
+                  </a>
+                </h3>
+                <div class="mlcl-card-recipe__caption__desc">
+                  <div class="elmt-icon-items">
+                    <div class="atom-icon-item">
+                      <div class="atom-icon-item__icon">
+                        <img class="atom-icon-item__icon__img" src="https://www.vitamix.com/content/dam/vitamix/home/design-system/icon/difficulty.svg" aria-label="Levels Icon" />
+                      </div>
+                      <span class="atom-icon-item__label" x-html="language[currentLanguage].recipeSection.items[0].difficulty">
+                      </span>
+                    </div>
+                    <div class="atom-icon-item">
+                      <div class="atom-icon-item__icon">
+                        <img class="atom-icon-item__icon__img" src="https://www.vitamix.com/content/dam/vitamix/home/design-system/icon/time.svg" aria-label="Clock Icon" />
+                      </div>
+                      <span class="atom-icon-item__label" x-html="language[currentLanguage].recipeSection.items[0].time">
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="mlcl-card-recipe__caption__ctas">
+                <div class="elmt-buttons">
+                  <a title="Voir la recette : Titre du panier" aria-label="View Recipe: Cart Title" :href="(linkPrefix1 + linkPrefix2) + language[currentLanguage].recipeSection.items[0].link" class="atom-button atom-button--primary" x-html="language[currentLanguage].recipeSection.articleCTAText"></a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="ognm-cardlist-recipe-feature__flex__item ognm-cardlist-recipe-feature__flex__item--has-sub-items">
+          <template x-for="(recipeItem, recipeIndex) in (language[currentLanguage].recipeSection.items)">
+            <template x-if="recipeIndex &gt; 0">
+              <div class="ognm-cardlist-recipe-feature__flex__sub-item">
+                <div class="mlcl-card-recipe-condensed clrs-light clrs-secondary">
+                  <a :title="recipeItem.title" :href="(linkPrefix1 + linkPrefix2) + recipeItem.link" class="mlcl-card-recipe-condensed__image atom-image-zoom">
+                    <picture class="mlcl-card-recipe-condensed__image__picture">
+                      <img class="mlcl-card-recipe-condensed__image__img" :src="recipeItem.image" loading="lazy" :alt="'Image of ' + recipeItem.title" />
+                    </picture>
+                  </a>
+                  <div class="mlcl-card-recipe-condensed__caption">
+                    <div class="mlcl-card-recipe-condensed__caption__flex-content">
+                      <div class="mlcl-card-recipe-condensed__caption__eyebrow atom-eyebrow" x-html="recipeItem.eyebrow">
+                      </div>
+                      <h3 class="mlcl-card-recipe-condensed__caption__title atom-heading atom-heading--sub-med">
+                        <a :title="recipeItem.title" :href="(linkPrefix1 + linkPrefix2) + recipeItem.link" x-html="recipeItem.title">
+                        </a>
+                      </h3>
+                      <div class="mlcl-card-recipe-condensed__caption__desc">
+                        <div class="elmt-icon-items">
+                          <div class="atom-icon-item">
+                            <div class="atom-icon-item__icon">
+                              <img class="atom-icon-item__icon__img" src="https://www.vitamix.com/content/dam/vitamix/home/design-system/icon/difficulty.svg" aria-label="Levels Icon" />
+                            </div>
+                            <span class="atom-icon-item__label" x-html="recipeItem.difficulty">
+                            </span>
+                          </div>
+                          <div class="atom-icon-item">
+                            <div class="atom-icon-item__icon">
+                              <img class="atom-icon-item__icon__img" src="https://www.vitamix.com/content/dam/vitamix/home/design-system/icon/time.svg" aria-label="Clock Icon" />
+                            </div>
+                            <span class="atom-icon-item__label" x-html="recipeItem.time">Temps</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </template>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section x-show="(complete)" class="ognm-merchandising-banner-two-image tmpl-page__section clrs-light clrs-secondary">
+    <div class="ognm-merchandising-banner-two-image__container elmt-container">
+      <div class="ognm-merchandising-banner-two-image__image">
+        <div class="ognm-merchandising-banner-two-image__image__image-wrap">
+          <img class="ognm-merchandising-banner-two-image__image__image-wrap__img" :src="language[currentLanguage].warrantySection.image1" :alt="language[currentLanguage].warrantySection.image1Alt" />
+        </div>
+      </div>
+      <div class="ognm-merchandising-banner-two-image__caption">
+        <div class="ognm-merchandising-banner-two-image__caption__inner">
+          <p class="ognm-merchandising-banner-two-image__caption__eyebrow atom-eyebrow" x-html="language[currentLanguage].warrantySection.eyebrow"></p>
+          <h2 class="ognm-merchandising-banner-two-image__caption__title atom-heading atom-heading--sub-med" x-html="language[currentLanguage].warrantySection.title">
+          </h2>
+          <div class="ognm-merchandising-banner-two-image__caption__desc atom-text atom-text--wysiwyg">
+            <p x-html="language[currentLanguage].warrantySection.desc"></p>
+          </div>
+        </div>
+      </div>
+      <div class="ognm-merchandising-banner-two-image__image">
+        <div class="ognm-merchandising-banner-two-image__image__image-wrap">
+          <img class="ognm-merchandising-banner-two-image__image__image-wrap__img" :src="language[currentLanguage].warrantySection.image2" :alt="language[currentLanguage].warrantySection.image2Alt" />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section x-show="(complete)" class="ognm-cardlist-articles-featured tmpl-page__section clrs-light clrs-primary tmpl-page__section--pd-btm-xl">
+    <div class="ognm-cardlist-articles-featured__container elmt-container">
+      <div class="ognm-cardlist-articles-featured__flex">
+
+        <template x-for="(articleItem, articleIndex) in (language[currentLanguage].articleSection.items)">
+          <div class="ognm-cardlist-articles-featured__flex__item">
+            <div class="mlcl-card-article-featured">
+              <a :title="articleItem.title" :href="(linkPrefix1 + linkPrefix2) + articleItem.link" class="mlcl-card-article-featured__image atom-image-zoom">
+                <picture class="mlcl-card-article-featured__image__picture">
+                  <img class="mlcl-card-article-featured__image__img" :src="articleItem.image" loading="lazy" :alt="'Image of ' + articleItem.title" />
+                </picture>
+              </a>
+              <div class="mlcl-card-article-featured__caption">
+                <div class="mlcl-card-article-featured__caption__flex-content">
+                  <div class="mlcl-card-article-featured__caption__eyebrow atom-eyebrow" x-html="articleItem.eyebrow">
+                  </div>
+                  <h3 class="mlcl-card-article-featured__caption__title atom-resp-adjusted atom-heading atom-heading--sub-lrg">
+                    <a :title="articleItem.link" x-html="articleItem.title">
+                    </a>
+                  </h3>
+                  <div class="mlcl-card-article-featured__caption__desc atom-text atom-text--wysiwyg">
+                    <p x-html="articleItem.desc">
+                    </p>
+                  </div>
+                </div>
+                <div class="mlcl-card-article-featured__caption__ctas">
+                  <div class="elmt-buttons">
+                    <a :href="(linkPrefix1 + linkPrefix2) + articleItem.link" :title="'Read More About: ' + articleItem.title" aria-label="Read More About: Card Title" class="atom-button atom-button--primary" x-html="articleItem.ctaText">
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+
+      </div>
+    </div>
+  </section>
+
+
+</article>
+
+
+    
+</div>
+<div class="experiencefragment">
+<div id="experiencefragment-212f16bbad" class="cmp-experiencefragment cmp-experiencefragment--blender-recommender">
+
+
+    
+    <div id="container-ec5b24bf61" class="cmp-container   ">
+        
+
+
+<div class="aem-Grid aem-Grid--12 aem-Grid--default--12 ">
+    
+    <div class="devrawblock aem-GridColumn aem-GridColumn--default--12">  
+    </div>
+
+    
+</div>
+
+    </div>
+
+    
+</div>
+
+    
+</div>
+
+        
+</div>
+
+</div>

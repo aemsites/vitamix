@@ -1,5 +1,5 @@
 @import url('./gallery.css');
-@import url('./color-swatches.css');
+@import url('../../styles/color-swatches.css');
 
 /* stylelint-disable no-descending-specificity */
 .pdp-wrapper {
@@ -67,14 +67,13 @@
 .pdp-color-options {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: var(--spacing-s);
 }
 
 .pdp-color-swatch {
-  width: 24px;
-  height: 24px;
-  border: 1px solid #333f48;
-  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  border: 1px solid var(--color-charcoal);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -83,14 +82,13 @@
 }
 
 .pdp-color-inner {
-  width: 16px;
-  height: 16px;
-  border: 1px solid #333f48;
-  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  border: 1px solid var(--color-charcoal);
   position: relative;
 }
 
-.pdp-color-swatch-oos.pdp-color-inner::after {
+.pdp .color-swatch-oos.pdp-color-inner::after {
   content: '';
   position: absolute;
   top: 0;
@@ -137,20 +135,22 @@
 
 .add-to-cart.fixed {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  border-bottom: 1px solid var(--color-gray-400);
+  inset: auto 0 0;
+  border-top: 1px solid var(--color-gray-400); 
+  border-bottom: none;
   padding: var(--spacing-80) var(--horizontal-spacing);
   background-color: var(--color-gray-100);
+  z-index: 8;
+  box-shadow: 0 -2px 8px rgb(0 0 0 / 10%); 
 }
 
 @media (width >= 900px) {
   .add-to-cart.fixed {
     position: static;
-    border-bottom: 0;
+    border-top: 0;
     padding: 0;
     background-color: transparent;
+    box-shadow: none;
   }
 }
 

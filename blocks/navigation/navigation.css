@@ -1,7 +1,7 @@
 main > .navigation-container.section {
   position: sticky;
-  top: 0;
-  z-index: 2;
+  top: var(--header-height); 
+  z-index: 9;
 }
 
 main > .navigation-container.section ~ .section h1,
@@ -225,7 +225,7 @@ main > .navigation-container.section ~ .section h6 {
 }
 
 .navigation .navigation-popover a:hover {
-  color: var(--color-gray);
+  color: var(--color-white);
   text-decoration: underline;
 }
 

@@ -1,0 +1,47 @@
+{
+  "en": {
+    "search": "Search",
+    "showing": "Showing",
+    "of": "of",
+    "sortBy": "Sort by",
+    "newestArticles": "Newest Articles",
+    "default": "Default",
+    "oldestArticles": "Oldest Articles",
+    "nameAZ": "Name A-Z",
+    "nameZA": "Name Z-A",
+    "previous": "Previous",
+    "next": "Next",
+    "by": "By",
+    "matchingTags": "Matching tags"
+  },
+  "fr": {
+    "search": "Rechercher",
+    "showing": "Affichage",
+    "of": "sur",
+    "sortBy": "Trier par",
+    "newestArticles": "Articles les plus récents",
+    "default": "Par défaut",
+    "oldestArticles": "Articles les plus anciens",
+    "nameAZ": "Nom A-Z",
+    "nameZA": "Nom Z-A",
+    "previous": "Précédent",
+    "next": "Suivant",
+    "by": "Par",
+    "matchingTags": "Étiquettes correspondantes"
+  },
+  "es": {
+    "search": "Buscar",
+    "showing": "Mostrando",
+    "of": "de",
+    "sortBy": "Ordenar por",
+    "newestArticles": "Artículos más recientes",
+    "default": "Predeterminado",
+    "oldestArticles": "Artículos más antiguos",
+    "nameAZ": "Nombre A-Z",
+    "nameZA": "Nombre Z-A",
+    "previous": "Anterior",
+    "next": "Siguiente",
+    "by": "Por",
+    "matchingTags": "Etiquetas coincidentes"
+  }
+}

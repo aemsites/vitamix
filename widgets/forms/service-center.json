@@ -1,0 +1,35 @@
+{
+  "en": {
+    "labels": {
+      "title": "Locate a Commercial Service Center",
+      "stateLabel": "U.S. Service Centers",
+      "placeholder": "Please select",
+      "loading": "Loading service centers…",
+      "empty": "Select a state to see commercial service centers in that area.",
+      "noResults": "No commercial service centers were found for this state.",
+      "error": "Unable to load service centers. Please try again later."
+    }
+  },
+  "fr": {
+    "labels": {
+      "title": "Trouver un centre de service commercial",
+      "stateLabel": "Centres de service aux États-Unis",
+      "placeholder": "Veuillez sélectionner",
+      "loading": "Chargement des centres de service…",
+      "empty": "Sélectionnez un État pour voir les centres de service commerciaux desservant cette région.",
+      "noResults": "Aucun centre de service commercial trouvé pour cet État.",
+      "error": "Impossible de charger les centres de service. Veuillez réessayer plus tard."
+    }
+  },
+  "es": {
+    "labels": {
+      "title": "Localizar un centro de servicio comercial",
+      "stateLabel": "Centros de servicio en EE. UU.",
+      "placeholder": "Seleccione",
+      "loading": "Cargando centros de servicio…",
+      "empty": "Seleccione un estado para ver los centros de servicio comercial en esa zona.",
+      "noResults": "No se encontraron centros de servicio comercial para este estado.",
+      "error": "No se pudieron cargar los centros de servicio. Inténtelo de nuevo más tarde."
+    }
+  }
+}

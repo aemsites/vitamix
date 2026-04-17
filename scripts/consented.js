@@ -1,14 +1,5 @@
 import { loadScript } from './aem.js';
-
-if (localStorage.getItem('newsletter-popped-up') !== 'true') {
-  localStorage.setItem('newsletter-popped-up', 'true');
-  const newsletterLink = document.querySelector('a[href*="/modals/sign-up"]');
-  if (newsletterLink) {
-    setTimeout(() => {
-      newsletterLink.click();
-    }, 5000);
-  }
-}
+import './consented/newsletter.js';
 
 // add delayed functionality here
 window.config = {
@@ -37,7 +28,13 @@ await loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clie
 await loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-analytics.lc-26814920488a848ff91c1f425646d010-lc.min.js');
 loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-base.lc-daf5b8dac79e9cf7cb1c0b30d8372e7a-lc.min.js');
 
-loadScript('https://assets.adobedtm.com/launch-EN40f2d69539754c3ea73511e70c65c801.min.js');
+await loadScript('https://assets.adobedtm.com/launch-EN40f2d69539754c3ea73511e70c65c801.min.js');
+
+const { pathname } = window.location;
+
+if (pathname.startsWith('/us/en_us/')) {
+  import('./consented/adobe-target.js');
+}
 
 /* eslint-disable */
 
@@ -99,6 +96,18 @@ fbq('init', '1597403650511067');
 fbq('track', 'PageView');
 
 // End Facebook Pixel Code
+
+// Amazon DSP
+!function(w,d,s,t,a){
+if(w.amzn)return;w.amzn=a=function(){w.amzn.q.push([arguments,(new
+Date).getTime()])};a.q=[];a.version="0.0";s=d.createElement("script");
+s.src="https://c.amazon-adsystem.com/aat/amzn.js";s.id="amznpixel";
+s.async=true;t=d.getElementsByTagName("script")[0];
+t.parentNode.insertBefore(s,t)
+}(window,document); amzn("setRegion", "NA");
+amzn("addTag", "56d3e600-30c0-4b2f-b290-4e44c553d164");
+amzn("trackEvent", "PageView");
+// End of Amazon DSP
 
 
 // Pinterest Tag

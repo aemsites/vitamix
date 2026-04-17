@@ -1,4 +1,3 @@
-import { extractPricing } from '../blocks/pdp/pricing.js';
 import {
   loadHeader,
   loadFooter,
@@ -18,6 +17,11 @@ import {
   getMetadata,
 } from './aem.js';
 
+const isProdHost = window.location.hostname.includes('vitamix.com');
+export const FORMS_ENDPOINT = isProdHost
+  ? ''
+  : 'https://main--vitamix--aemsites.aem.network';
+
 /**
  * Load fonts.css and set a session storage flag.
  */
@@ -28,6 +32,85 @@ async function loadFonts() {
   } catch (e) {
     // do nothing
   }
+}
+
+/**
+ * Extracts pricing from a JSON-LD offer object.
+ * @param {Object} offer - A schema.org Offer from the JSON-LD data
+ * @returns {Object|null} An object containing the final and regular price.
+ */
+export function getOfferPricing(offer) {
+  if (!offer) return null;
+  return {
+    final: parseFloat(offer.price),
+    regular: offer.priceSpecification?.price || null,
+  };
+}
+
+/**
+ * Formats a price using the locale and currency from placeholders.
+ * Uses Intl.NumberFormat for locale-aware currency formatting.
+ * @param {number} value - The price value to format
+ * @param {Object} ph - Placeholders object containing languageCode and currencyCode
+ * @returns {string} The formatted price string (e.g., "$399.95" or "399,95 $")
+ */
+export function formatPrice(value, ph) {
+  const locale = (ph.languageCode || 'en_US').replace('_', '-');
+  const currency = ph.currencyCode || 'USD';
+  return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(value);
+}
+
+/**
+ * Formats a time string from HH:MM:SS to a human-readable string.
+ * @param {string} timeString - Time string in HH:MM:SS format
+ * @param {Object} [placeholders={}] - Localized labels for hours/minutes
+ * @returns {string} Formatted time string
+ */
+export function formatTime(timeString, placeholders = {}) {
+  if (!timeString) return '';
+
+  const parts = timeString.split(':');
+  if (parts.length !== 3) return timeString;
+
+  const hours = parseInt(parts[0], 10);
+  const minutes = parseInt(parts[1], 10);
+  const seconds = parseInt(parts[2], 10);
+
+  let totalMinutes = hours * 60 + minutes;
+  if (seconds > 0) totalMinutes += 1;
+
+  const finalHours = Math.floor(totalMinutes / 60);
+  const finalMinutes = totalMinutes % 60;
+
+  const result = [];
+  if (finalHours > 0) {
+    const hourLabel = finalHours !== 1 ? (placeholders.hours || 'Hours') : (placeholders.hour || 'Hour');
+    result.push(`${finalHours} ${hourLabel}`);
+  }
+  if (finalMinutes > 0) {
+    const minuteLabel = finalMinutes !== 1 ? (placeholders.minutes || 'Minutes') : (placeholders.minute || 'Minute');
+    result.push(`${finalMinutes} ${minuteLabel}`);
+  }
+
+  return result.length > 0 ? result.join(' ') : `0 ${placeholders.minutes || 'Minutes'}`;
+}
+
+/**
+ * Formats a servings string like "8.00 servings" to "8 servings".
+ * @param {string} servingsString - Raw servings string
+ * @returns {string} Formatted servings string
+ */
+export function formatServings(servingsString) {
+  if (!servingsString) return '';
+
+  const match = servingsString.match(/^([\d.]+)\s*(.*)$/);
+  if (!match) return servingsString;
+
+  const number = parseFloat(match[1]);
+  const unit = match[2];
+  const formattedNumber = number % 1 === 0 ? Math.floor(number) : number;
+
+  return unit ? `${formattedNumber} ${unit}` : `${formattedNumber}`;
 }
 
 /**
@@ -46,6 +129,15 @@ export function getLocaleAndLanguage(forceEnCA = false) {
   }
 
   return { locale, language };
+}
+
+/**
+ * Gets the form submission URL for the current locale and language.
+ * @returns {string} The form submission URL
+ */
+export function getFormSubmissionUrl() {
+  const { locale, language } = getLocaleAndLanguage();
+  return `${FORMS_ENDPOINT}/${locale}/${language}/forms`;
 }
 
 /**
@@ -322,10 +414,8 @@ function parseVariants(sections) {
 
     const imagesHTML = div.querySelectorAll('picture');
 
-    const priceHTML = div.querySelector('p:nth-of-type(1)');
-    const price = extractPricing(priceHTML);
-
     const ldVariant = window.jsonLdData.offers.find((offer) => offer.sku === metadata.sku);
+    const price = getOfferPricing(ldVariant);
     if (ldVariant) {
       metadata.itemCondition = ldVariant.itemCondition;
       metadata.availability = ldVariant.availability;
@@ -372,11 +462,11 @@ function parsePDPContentSections(sections) {
   sections.forEach((section) => {
     const h3 = section.querySelector('h3')?.textContent.toLowerCase();
     if (h3) {
-      if (h3.includes('features') || h3.includes('caractéristiques')) {
+      if (h3.includes('features') || h3.includes('caractéristiques') || h3.includes('características')) {
         window.features = section;
-      } else if (h3.includes('specifications') || h3.includes('spécifications')) {
+      } else if (h3.includes('specifications') || h3.includes('spécifications') || h3.includes('especificaciones')) {
         window.specifications = section;
-      } else if (h3.includes('warranty') || h3.includes('garantie')) {
+      } else if (h3.includes('warranty') || h3.includes('garantie') || h3.includes('garantía')) {
         window.warranty = section;
       }
     }
@@ -599,6 +689,7 @@ function decorateFullWidthBlocks(main) {
  */
 function decorateButtons(main) {
   main.querySelectorAll('p a[href]').forEach((a) => {
+    if (a.closest('[data-button-decoration="disabled"]')) return;
     a.title = a.title || a.textContent;
     const p = a.closest('p');
     const text = a.textContent.trim();
@@ -775,25 +866,16 @@ function autolinkModals(doc) {
 }
 
 async function decorateFragmentPreviews() {
-  const params = new URLSearchParams(window.location.search);
-  const fragmentPath = params.get('reloadFragment');
-  if (fragmentPath && fragmentPath.length < 200) {
-    const isValid = /^[a-zA-Z0-9-_/]+$/.test(fragmentPath);
-    if (!isValid) return;
-    const url = new URL(fragmentPath, window.location);
-    const { pathname } = url;
-    const resp = await fetch(`${pathname}.plain.html`, {
-      cache: 'reload',
-    });
-    await resp.text();
-  }
   const path = window.location.pathname;
-  if (path.includes('/nav/') || path.includes('/footer/')) {
-    if (window.location.search.includes('dapreview=on')) {
-      document.body.classList.add('fragment-preview');
+  if (path.includes('/nav/')) {
+    if (path.endsWith('/nav/nav') || path.endsWith('/nav/products')) {
+      document.body.classList.add('fragment-preview-nav');
     } else {
-      window.location.href = `/us/en_us/why-vitamix?reloadFragment=${path}`;
+      document.body.classList.add('fragment-preview');
     }
+  }
+  if (path.includes('/footer/')) {
+    document.body.classList.add('fragment-preview-footer');
   }
 }
 
@@ -1145,8 +1227,24 @@ async function loadEager(doc) {
     window.simulateDate = params.get('simulateDate');
   }
 
+  /* query param based redirects: comma-separated pairs of
+   * <queryparam>=<value>:<redirectPathname> (e.g. "product=123:/us/en_us/products/123")
+   */
+  const paramRedirects = getMetadata('param-redirects');
+  if (paramRedirects) {
+    paramRedirects.split(',').forEach((row) => {
+      const i = row.indexOf(':');
+      if (i === -1) return;
+      const matchParam = row.slice(0, i).trim();
+      const pathname = row.slice(i + 1).trim();
+      if (window.location.search.includes(matchParam)) window.location.pathname = pathname;
+    });
+  }
+
   /* adjust shop images to locale root path, util all of shop is mapped */
-  if (window.location.pathname.includes('/shop/')) {
+  if (window.location.pathname.includes('/shop/')
+    || window.location.pathname.includes('/commercial/')
+    || window.location.pathname.includes('/catalog/product_compare/')) {
     const images = doc.querySelectorAll('img[src^="./media_"]');
     images.forEach((img) => {
       img.setAttribute('src', img.getAttribute('src').replace('./media_', '/us/en_us/media_'));
@@ -1237,7 +1335,7 @@ async function loadLazy(doc) {
   } else {
     // wait for sidekick to be loaded
     document.addEventListener('sidekick-ready', () => {
-    // sidekick now loaded
+      // sidekick now loaded
       addSidekickListeners(document.querySelector('aem-sidekick'));
     }, { once: true });
   }
@@ -1294,6 +1392,19 @@ async function loadDelayed() {
   } catch (e) {
     // eslint-disable-next-line no-console
     console.error('Error loading link checker', e);
+  }
+
+  const initContentScore = async () => {
+    const CONTENT_SCORE = 'https://tools.aem.live/tools/content-score/src/scripts.js';
+    const { init } = await import(CONTENT_SCORE);
+    await init();
+  };
+
+  const sk = document.querySelector('aem-sidekick');
+
+  if (sk) initContentScore();
+  else {
+    document.addEventListener('sidekick-ready', initContentScore, { once: true });
   }
 
   setTimeout(decorateExternalLinks, 1000);

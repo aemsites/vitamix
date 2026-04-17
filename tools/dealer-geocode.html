@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <script src="https://da.live/nx/utils/sdk.js" type="module"></script>
+    <script src="/tools/dealer-geocode/dealer-geocode.js" type="module"></script>
+    <meta name="Description" content="Vitamix Dealer Geocode Tool" />
+    <meta name="robots" content="noindex" />
+    <title>Vitamix Dealer Geocode Tool</title>
+    <link rel="stylesheet" href="./dealer-geocode/dealer-geocode.css" />
+  </head>
+
+  <body>
+    <div class="container">
+      <h1>Vitamix Dealer Geocode Tool</h1>
+      <p class="subtitle">Paste dealer TSV data and look up lat/long for each row</p>
+
+      <div class="form-section">
+        <form id="geocodeForm">
+          <div class="form-group">
+            <label for="tsvInput">Dealer TSV Data</label>
+            <textarea
+              id="tsvInput"
+              name="tsv"
+              rows="12"
+              placeholder="Paste your spreadsheet TSV here (tab-separated, with header row: TYPE, ACTION, ENABLED, NAME, ADDRESS_1, ...)"
+            ></textarea>
+            <div class="help-text">
+              Paste tab-separated values from your spreadsheet. Header must include NAME, ADDRESS_1, ADDRESS_2, CITY, STATE_PROVINCE, POSTAL_CODE, COUNTY, COUNTRY, LAT, LONG.
+            </div>
+          </div>
+
+          <button type="submit" id="lookupBtn">Look up</button>
+        </form>
+      </div>
+
+      <div class="loading" id="loading">
+        <div class="progress-bar-container">
+          <div class="progress-bar" id="progressBar"></div>
+        </div>
+        <p id="progressText">Looking up coordinates...</p>
+      </div>
+
+      <div class="error" id="error"></div>
+
+      <div class="results" id="results">
+        <h2>Results</h2>
+        <div class="actions">
+          <button id="copyBtn">Copy TSV</button>
+        </div>
+        <div class="results-table-wrapper">
+          <table class="results-table" id="resultsTable">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Address</th>
+                <th>Lat / Long</th>
+              </tr>
+            </thead>
+            <tbody id="resultsTableBody"></tbody>
+          </table>
+        </div>
+        <textarea id="tsvOutput" class="sr-only" readonly aria-hidden="true"></textarea>
+      </div>
+    </div>
+  </body>
+</html>

@@ -4,14 +4,16 @@ import {
 import renderAddToCart from './add-to-cart.js';
 import renderGallery from './gallery.js';
 import renderSpecs from './specification-tabs.js';
-import renderPricing, { extractPricing } from './pricing.js';
+import renderPricing from './pricing.js';
 // eslint-disable-next-line import/no-cycle
 import { renderOptions, onOptionChange, updateFreeGiftVisibility } from './options.js';
 import {
+  getOfferPricing,
   checkVariantOutOfStock,
   isProductOutOfStock,
   parseEasternDateTime,
   getLocaleAndLanguage,
+  formatPrice,
 } from '../../scripts/scripts.js';
 import { openModal } from '../modal/modal.js';
 
@@ -184,9 +186,8 @@ function renderAlert(ph, block, custom) {
   }
 
   /* save now */
-  const pricingElement = block.querySelector('p:nth-of-type(1)');
-  const pricing = extractPricing(pricingElement);
-  if (pricing.regular && pricing.regular > pricing.final) {
+  const pricing = getOfferPricing(window.jsonLdData?.offers?.[0]);
+  if (pricing && pricing.regular && pricing.regular > pricing.final) {
     alertContainer.classList.add('pdp-promo-alert');
     alertContainer.innerText = ph.saveNow || 'Save Now!';
     return alertContainer;
@@ -221,7 +222,7 @@ function renderRelatedProducts(ph, custom) {
           const title = product.name;
           const image = new URL(product.images[0].url, window.location.href);
           const price = +product.price.final;
-          li.innerHTML = `<a href="${product.url}"><img src="${image}?width=750&#x26;format=webply&#x26;optimize=medium" alt="${title}" /><div><p>${title}</p><strong>$${price.toFixed(2)}</strong></div></a>`;
+          li.innerHTML = `<a href="${product.url}"><img src="${image}?width=750&#x26;format=webply&#x26;optimize=medium" alt="${title}" /><div><p>${title}</p><strong>${formatPrice(price, ph)}</strong></div></a>`;
           ul.appendChild(li);
         });
         relatedProductsContainer.appendChild(ul);
