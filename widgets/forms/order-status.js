@@ -111,6 +111,11 @@ export default async function decorate(widget) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+      if (resp.status === 400) {
+        const { handleFormSubmitError } = await import('./util.js');
+        await handleFormSubmitError(resp, form, labels.submissionFailed ?? 'Something went wrong. Please try again.');
+        return;
+      }
       const text = await resp.text();
       let result;
       try {
@@ -124,9 +129,8 @@ export default async function decorate(widget) {
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Order status lookup failed', err);
-      renderResult(null, copy, resultEl);
-      resultEl.hidden = false;
-      resultEl.classList.add('order-status-result-visible');
+      const { toast } = await import('./util.js');
+      toast(labels.networkError ?? 'Could not reach the server. Please try again.', 'error');
     } finally {
       [...form.elements].forEach((el) => { el.disabled = false; });
       if (submitBtn) submitBtn.textContent = submitBtn.dataset.originalLabel || originalSubmitText;
