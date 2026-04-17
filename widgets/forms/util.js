@@ -66,7 +66,9 @@ function extractErrorMessages(response, body) {
  * inside one of the given messages.
  */
 function findMatchingInput(form, messages) {
-  const namedInputs = [...form.querySelectorAll('[name]')].filter((el) => el.name);
+  const namedInputs = [...form.querySelectorAll('[name]')]
+    .filter((el) => el.name)
+    .sort((a, b) => b.name.length - a.name.length);
   let match = null;
   messages.find((message) => {
     const lower = message.toLowerCase();
