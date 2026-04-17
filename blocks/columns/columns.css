@@ -138,31 +138,11 @@ p + .columns-container {
   width: 4em;
 }
 
-/* icon variant */
-.columns .icon svg {
-  display: inline-block;
-  width: 2em;
-  height: 2em;
-  fill: currentcolor;
-  vertical-align: middle;
-  flex-shrink: 0;
-}
-
-/* icon-circle variant - 150px circular outlined icon */
-.columns.icon-circle p.icon-circle-wrapper {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 9em;
+.columns .icon[class$="-circle"] svg {
   height: 9em;
-  border: 1px solid currentcolor;
-  border-radius: 50%;
-  flex-shrink: 0;
-  margin: 0 auto;
+  width: 9em;
 }
 
-.columns.icon-circle p.icon-circle-wrapper svg,
-.columns.icon-circle p.icon-circle-wrapper img {
-  width: 3em;
-  height: 3em;
+.columns.text-center .button-wrapper {
+  justify-content: center;
 }

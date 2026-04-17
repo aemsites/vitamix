@@ -51,6 +51,7 @@ export default async function decorate(widget) {
   if (!form) return;
 
   const { locale, language } = getLocaleAndLanguage();
+  const vitamixInternationalPath = `/${locale}/${language}/vitamix-international`;
   const countryCode = (locale || 'us').toUpperCase();
   const lang = (language || 'en_us').split('_')[0];
   const copy = await loadFormCopy(lang).catch(() => ({}));
@@ -91,7 +92,10 @@ export default async function decorate(widget) {
   const countryInput = form.querySelector('input[name="country"]');
   if (countryInput) countryInput.value = countryName;
   const countryLink = form.querySelector('.country-change-link');
-  if (countryLink) countryLink.textContent = labels.notYourCountry ?? 'Not your country?';
+  if (countryLink) {
+    countryLink.textContent = labels.notYourCountry ?? 'Not your country?';
+    countryLink.href = vitamixInternationalPath;
+  }
 
   setSelectOptions(
     form.querySelector('#consult-expert-state'),
@@ -111,14 +115,6 @@ export default async function decorate(widget) {
 
   const submitBtn = form.querySelector('button[type="submit"]');
   if (submitBtn) submitBtn.textContent = labels.submit ?? 'Submit';
-
-  const countryChangeLink = form.querySelector('.country-change-link');
-  if (countryChangeLink) {
-    countryChangeLink.addEventListener('click', (e) => {
-      e.preventDefault();
-      // Placeholder for future country selector
-    });
-  }
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
