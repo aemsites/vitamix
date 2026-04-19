@@ -18,12 +18,22 @@ export class AEMEmbed extends HTMLElement {
 
     window.hlx = window.hlx || {};
     window.hlx.suppressLoadPage = true;
-    // codeBasePath is set in connectedCallback from the embed url (embedded site root)
+    // embedOrigin is set in connectedCallback; hlx.codeBasePath is synced after remote imports
+  }
+
+  /**
+   * Remote aem.js setup() clears codeBasePath; restore so icons/blocks use the embed host.
+   */
+  syncCodeBaseFromEmbed() {
+    if (this.embedOrigin) {
+      window.hlx.codeBasePath = this.embedOrigin;
+    }
   }
 
   // eslint-disable-next-line class-methods-use-this
-  async loadBlock(body, block, blockName, origin) {
-    const blockCss = `${origin}${window.hlx.codeBasePath}/blocks/${blockName}/${blockName}.css`;
+  async loadBlock(body, block, blockName) {
+    const base = this.embedOrigin;
+    const blockCss = `${base}/blocks/${blockName}/${blockName}.css`;
     if (!this.shadowRoot.querySelector(`link[href="${blockCss}"]`)) {
       const link = document.createElement('link');
       link.setAttribute('rel', 'stylesheet');
@@ -40,7 +50,7 @@ export class AEMEmbed extends HTMLElement {
     }
 
     try {
-      const blockScriptUrl = `${origin}${window.hlx.codeBasePath}/blocks/${blockName}/${blockName}.js`;
+      const blockScriptUrl = `${base}/blocks/${blockName}/${blockName}.js`;
       // eslint-disable-next-line no-await-in-loop
       const decorateBlock = await import(blockScriptUrl);
       if (decorateBlock.default) {
@@ -53,13 +63,14 @@ export class AEMEmbed extends HTMLElement {
     }
   }
 
-  async handleHeader(htmlText, body, origin) {
-    await this.pseudoDecorateMain(htmlText, body, origin);
+  async handleHeader(htmlText, body) {
+    await this.pseudoDecorateMain(htmlText, body);
 
     const main = body.querySelector('main');
     const header = document.createElement('header');
     body.append(header);
-    const { buildBlock } = await import(`${origin}${window.hlx.codeBasePath}/scripts/aem.js`);
+    const { buildBlock } = await import(`${this.embedOrigin}/scripts/aem.js`);
+    this.syncCodeBaseFromEmbed();
     const block = buildBlock('header', '');
     header.append(block);
 
@@ -69,22 +80,23 @@ export class AEMEmbed extends HTMLElement {
     while (main.firstElementChild) nav.append(main.firstElementChild);
     main.remove();
 
-    await this.loadBlock(body, block, 'header', origin);
+    await this.loadBlock(body, block, 'header');
 
     block.dataset.blockStatus = 'loaded';
 
     body.style.height = 'var(--nav-height)';
     body.classList.add('appear');
-    this.attachModalLinkHandler(origin);
+    this.attachModalLinkHandler();
   }
 
-  async handleFooter(htmlText, body, origin) {
-    await this.pseudoDecorateMain(htmlText, body, origin);
+  async handleFooter(htmlText, body) {
+    await this.pseudoDecorateMain(htmlText, body);
 
     const main = body.querySelector('main');
     const footer = document.createElement('footer');
     body.append(footer);
-    const { buildBlock } = await import(`${origin}${window.hlx.codeBasePath}/scripts/aem.js`);
+    const { buildBlock } = await import(`${this.embedOrigin}/scripts/aem.js`);
+    this.syncCodeBaseFromEmbed();
     const block = buildBlock('footer', '');
     footer.append(block);
 
@@ -94,19 +106,20 @@ export class AEMEmbed extends HTMLElement {
     while (main.firstElementChild) nav.append(main.firstElementChild);
     main.remove();
 
-    await this.loadBlock(body, block, 'footer', origin);
+    await this.loadBlock(body, block, 'footer');
 
     block.dataset.blockStatus = 'loaded';
     body.classList.add('appear');
-    this.attachModalLinkHandler(origin);
+    this.attachModalLinkHandler();
   }
 
-  async pseudoDecorateMain(htmlText, body, origin) {
+  async pseudoDecorateMain(htmlText, body) {
     const main = document.createElement('main');
     body.append(main);
     main.innerHTML = htmlText;
 
-    const { decorateMain } = await import(`${origin}${window.hlx.codeBasePath}/scripts/scripts.js`);
+    const { decorateMain } = await import(`${this.embedOrigin}/scripts/scripts.js`);
+    this.syncCodeBaseFromEmbed();
     if (decorateMain) {
       await decorateMain(main, true);
     }
@@ -125,7 +138,7 @@ export class AEMEmbed extends HTMLElement {
         const blockName = blocks[i];
         const block = blockElements[i];
         // eslint-disable-next-line no-await-in-loop
-        await this.loadBlock(body, block, blockName, origin);
+        await this.loadBlock(body, block, blockName);
       }
     }
 
@@ -136,21 +149,20 @@ export class AEMEmbed extends HTMLElement {
     });
   }
 
-  async handleMain(htmlText, body, origin) {
-    await this.pseudoDecorateMain(htmlText, body, origin);
+  async handleMain(htmlText, body) {
+    await this.pseudoDecorateMain(htmlText, body);
     body.classList.add('appear');
-    this.attachModalLinkHandler(origin);
+    this.attachModalLinkHandler();
   }
 
   /**
    * Listens for clicks on /modals/ links inside the shadow root and opens the modal
    * using the embedded site's modal block (so the host page doesn't need scripts.js).
-   * @param {string} origin - Embedded site origin (e.g. https://example.aem.live)
    */
-  attachModalLinkHandler(origin) {
+  attachModalLinkHandler() {
     if (this.modalHandlerAttached) return;
     this.modalHandlerAttached = true;
-    const base = `${origin}${window.hlx.codeBasePath || ''}`.replace(/\/?$/, '/');
+    const base = `${this.embedOrigin || ''}`.replace(/\/?$/, '/');
     const root = this.shadowRoot;
     this.shadowRoot.addEventListener('click', async (e) => {
       const path = e.composedPath ? e.composedPath() : [e.target];
@@ -189,10 +201,8 @@ export class AEMEmbed extends HTMLElement {
 
         const plainUrl = url.endsWith('/') ? `${url}index.plain.html` : `${url}.plain.html`;
         const { href, origin } = new URL(plainUrl);
-
-        // Load embedded site's assets from its root
-        // (works regardless of where aem-embed.js is hosted)
-        window.hlx.codeBasePath = '';
+        this.embedOrigin = origin;
+        this.syncCodeBaseFromEmbed();
 
         // Load fragment
         const resp = await fetch(href);
@@ -202,14 +212,14 @@ export class AEMEmbed extends HTMLElement {
 
         const styles = document.createElement('link');
         styles.setAttribute('rel', 'stylesheet');
-        styles.setAttribute('href', `${origin}${window.hlx.codeBasePath}/styles/styles.css`);
+        styles.setAttribute('href', `${this.embedOrigin}/styles/styles.css`);
         const stylesLoaded = new Promise((resolve) => {
           styles.onload = () => { body.style = ''; resolve(); };
           styles.onerror = () => { body.style = ''; resolve(); };
         });
         this.shadowRoot.appendChild(styles);
 
-        const fontsHref = `${origin}${window.hlx.codeBasePath}/styles/fonts.css`;
+        const fontsHref = `${this.embedOrigin}/styles/fonts.css`;
         const fonts = document.createElement('link');
         fonts.setAttribute('rel', 'stylesheet');
         fonts.setAttribute('href', fontsHref);
@@ -224,14 +234,14 @@ export class AEMEmbed extends HTMLElement {
         let htmlText = await resp.text();
         // Fix relative image urls
         const regex = /.\/media/g;
-        htmlText = htmlText.replace(regex, `${origin}/media`);
+        htmlText = htmlText.replace(regex, `${this.embedOrigin}/media`);
 
         // Set initialized to true so we don't run through this again
         this.initialized = true;
 
-        if (type === 'main') await this.handleMain(htmlText, body, origin);
-        if (type === 'header') await this.handleHeader(htmlText, body, origin);
-        if (type === 'footer') await this.handleFooter(htmlText, body, origin);
+        if (type === 'main') await this.handleMain(htmlText, body);
+        if (type === 'header') await this.handleHeader(htmlText, body);
+        if (type === 'footer') await this.handleFooter(htmlText, body);
       } catch (err) {
         // eslint-disable-next-line no-console
         console.log(err || 'An error occured while loading the content');
