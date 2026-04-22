@@ -75,21 +75,21 @@ function wirePlayBtn(btn, vid, block) {
       if (v !== vid) {
         v.pause();
         const b = v.closest('li')?.querySelector('.videos-play-btn');
-        if (b) b.classList.remove('is-playing');
+        if (b) b.setAttribute('aria-pressed', false);
       }
     });
     if (vid.paused) {
       vid.play();
-      btn.classList.add('is-playing');
+      btn.setAttribute('aria-pressed', true);
       btn.setAttribute('aria-label', 'Pause');
     } else {
       vid.pause();
-      btn.classList.remove('is-playing');
+      btn.setAttribute('aria-pressed', false);
       btn.setAttribute('aria-label', 'Play');
     }
   });
   ['ended', 'pause'].forEach((ev) => vid.addEventListener(ev, () => {
-    btn.classList.remove('is-playing');
+    btn.setAttribute('aria-pressed', false);
     btn.setAttribute('aria-label', 'Play');
   }));
 }
@@ -125,6 +125,7 @@ function decorateVideos(block) {
     playBtn.type = 'button';
     playBtn.className = 'videos-play-btn';
     playBtn.setAttribute('aria-label', 'Play');
+    playBtn.setAttribute('aria-pressed', false);
     playBtn.innerHTML = '<svg class="icon-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>'
       + '<svg class="icon-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
     mediaWrap.append(playBtn);
