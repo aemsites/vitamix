@@ -138,35 +138,15 @@ function decorateVideos(block) {
       });
     }
 
-    // Text overlay
-    const slideBody = document.createElement('div');
-    slideBody.className = 'videos-slide-body';
-    let titleText = '';
-    let linkHref = '';
-    let linkText = '';
-    [...(bodyCell?.children || [])].forEach((child) => {
-      const a = child.querySelector('a');
-      if (a) {
-        linkHref = a.href;
-        linkText = a.textContent.trim() || a.href;
-      } else if (!titleText) {
-        titleText = child.textContent.trim();
-      }
-    });
-    if (!titleText && bodyCell) titleText = bodyCell.textContent.trim();
-    const titleEl = document.createElement('p');
-    titleEl.className = 'slide-title';
-    titleEl.textContent = titleText || 'Title goes here...';
-    slideBody.append(titleEl);
-    if (linkHref || linkText) {
-      const linkEl = document.createElement('a');
-      linkEl.className = 'slide-link';
-      linkEl.href = linkHref || '#';
-      linkEl.textContent = linkText || linkHref;
-      slideBody.append(linkEl);
+    if (bodyCell) {
+      bodyCell.className = 'videos-slide-body';
+      bodyCell.querySelectorAll('.button').forEach((b) => {
+        b.removeAttribute('class');
+        b.parentElement.classList.remove('button-wrapper');
+      });
     }
 
-    li.append(mediaWrap, slideBody);
+    li.append(mediaWrap, ...(bodyCell ? [bodyCell] : []));
     track.append(li);
   });
 
