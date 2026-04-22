@@ -78,9 +78,19 @@ function buildInput(field) {
 
   if (fieldName === 'mobile') {
     input.setAttribute('maxlength', '14');
+    input.setAttribute('minlength', '10');
     input.setAttribute('inputmode', 'numeric');
+
     input.addEventListener('input', function () {
       this.value = this.value.replace(/[^0-9()\-\s]/g, '');
+
+      const digits = this.value.replace(/\D/g, '');
+
+      if (digits.length !== 10) {
+        this.setCustomValidity('Enter a valid 10 digit mobile number');
+      } else {
+        this.setCustomValidity('');
+      }
     });
   }
 
