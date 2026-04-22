@@ -629,40 +629,45 @@ function buildAutoBlocks(main) {
 /**
  * Replaces an MP4 anchor element with a <video> element.
  * @param {HTMLElement} el - Container element
+ * @param {boolean} [autoplay=true] - Whether to autoplay the video on intersection
  * @returns {HTMLVideoElement|null} Created <video> element (or `null` if no video link found)
  */
-export function buildVideo(el) {
+export function buildVideo(el, autoplay = true) {
   const vid = el.querySelector('a[href*=".mp4"]');
   if (vid) {
     const imgWrapper = vid.closest('.img-wrapper');
     if (imgWrapper) imgWrapper.classList.add('vid-wrapper');
     // create video element
     const video = document.createElement('video');
-    video.loop = true;
-    video.muted = true;
-    video.autoplay = true;
     video.playsInline = true;
-    video.setAttribute('autoplay', '');
-    video.setAttribute('muted', '');
-    video.setAttribute('preload', 'none');
+    video.setAttribute('preload', autoplay ? 'none' : 'metadata');
+    if (autoplay) {
+      video.loop = true;
+      video.muted = true;
+      video.autoplay = true;
+      video.setAttribute('autoplay', '');
+      video.setAttribute('muted', '');
+    }
     // create source element
     const source = document.createElement('source');
     source.type = 'video/mp4';
     source.dataset.src = vid.href;
     video.append(source);
-    // load and play video on observation
+    // load (and optionally play) video on observation
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting && !source.dataset.loaded) {
           source.src = source.dataset.src;
           video.load();
-          // handle play promise to catch autoplay blocks
-          const playPromise = video.play();
-          if (playPromise !== undefined) {
-            playPromise.catch((error) => {
-              // eslint-disable-next-line no-console
-              console.log('video autoplay prevented:', error);
-            });
+          if (autoplay) {
+            // handle play promise to catch autoplay blocks
+            const playPromise = video.play();
+            if (playPromise !== undefined) {
+              playPromise.catch((error) => {
+                // eslint-disable-next-line no-console
+                console.log('video autoplay prevented:', error);
+              });
+            }
           }
           source.dataset.loaded = true;
           observer.disconnect();
