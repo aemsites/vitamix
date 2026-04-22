@@ -156,7 +156,7 @@ export async function createSyncModal() {
     });
   });
 
-  // Function to call the worker
+  // Function to call the worker; returns true on success, false on failure
   async function performSync(data, syncType) {
     // Show spinner
     const syncingMessage = syncType === 'sync-all' ? 'Syncing stores...' : 'Syncing product...';
@@ -199,16 +199,18 @@ export async function createSyncModal() {
             window.location.reload(true); // true forces a hard reload from server
           });
         }
-      } else {
-        // Failure
-        statusContainer.innerHTML = `
-          <div class="sync-error">
-            <h3>Sync Failed</h3>
-            <p><strong>Error:</strong> ${result.error || 'Unknown error'}</p>
-            ${result.message ? `<p><strong>Details:</strong> ${result.message}</p>` : ''}
-          </div>
-        `;
+        return true;
       }
+
+      // Failure
+      statusContainer.innerHTML = `
+        <div class="sync-error">
+          <h3>Sync Failed</h3>
+          <p><strong>Error:</strong> ${result.error || 'Unknown error'}</p>
+          ${result.message ? `<p><strong>Details:</strong> ${result.message}</p>` : ''}
+        </div>
+      `;
+      return false;
     } catch (error) {
       // Network or other error
       statusContainer.innerHTML = `
@@ -218,6 +220,7 @@ export async function createSyncModal() {
           <p><strong>Details:</strong> ${error.message}</p>
         </div>
       `;
+      return false;
     }
   }
 
@@ -252,6 +255,9 @@ export async function createSyncModal() {
   // Handle Sync All form submission
   syncAllForm.addEventListener('submit', async (e) => {
     e.preventDefault();
+    const submitButton = syncAllForm.querySelector('.sync-submit-button');
+    submitButton.disabled = true;
+
     const formData = new FormData(syncAllForm);
     const syncAllMode = formData.get('syncAllMode');
 
@@ -269,6 +275,7 @@ export async function createSyncModal() {
             <p>Please provide both Store Code and Store View Code for single store sync.</p>
           </div>
         `;
+        submitButton.disabled = false;
         return;
       }
 
@@ -279,7 +286,10 @@ export async function createSyncModal() {
       };
     }
 
-    await performSync(data, 'sync-all');
+    const success = await performSync(data, 'sync-all');
+    if (!success) {
+      submitButton.disabled = false;
+    }
   });
 
   return {
