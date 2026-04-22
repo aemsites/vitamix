@@ -1,5 +1,5 @@
 import { toClassName } from '../../scripts/aem.js';
-import { buildCarousel, buildVideo } from '../../scripts/scripts.js';
+import { buildCarousel, buildIcon, buildVideo } from '../../scripts/scripts.js';
 
 /**
  * Calculates max height needed to display any slide in expanded state.
@@ -126,8 +126,7 @@ function decorateVideos(block) {
     playBtn.className = 'videos-play-btn';
     playBtn.setAttribute('aria-label', 'Play');
     playBtn.setAttribute('aria-pressed', false);
-    playBtn.innerHTML = '<svg class="icon-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>'
-      + '<svg class="icon-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
+    playBtn.append(buildIcon('play'), buildIcon('pause'));
     mediaWrap.append(playBtn);
     if (vid) {
       wirePlayBtn(playBtn, vid, block);
