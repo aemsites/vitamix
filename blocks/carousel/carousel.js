@@ -68,11 +68,6 @@ function autoRotate(carousel, interval = 6000) {
 
 // ── Videos variant ──────────────────────────────────────────────────────
 
-/**
- * Wire play/pause button to a video element.
- * @param {HTMLButtonElement} btn
- * @param {HTMLVideoElement} vid
- */
 function wirePlayBtn(btn, vid) {
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -99,10 +94,6 @@ function wirePlayBtn(btn, vid) {
   }));
 }
 
-/**
- * Decorate the Carousel Videos variant.
- * @param {HTMLElement} block
- */
 function decorateVideos(block) {
   const rows = [...block.children];
   block.innerHTML = '';
@@ -216,8 +207,6 @@ function decorateVideos(block) {
     sync();
   });
 }
-
-// ── Main decorate export ────────────────────────────────────────────────────
 
 export default function decorate(block) {
   const variants = [...block.classList].filter((c) => c !== 'block' && c !== 'carousel');
