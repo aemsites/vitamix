@@ -163,37 +163,45 @@ async function decorateVideos(block) {
   block.append(track);
   buildCarousel(block, true);
 
-  // Trim dots to page count and sync arrow disabled state
+  // Sync dots and arrow disabled state
   requestAnimationFrame(() => {
     const ul = block.querySelector('ul');
     const radioGroup = block.querySelector('[role="radiogroup"]');
     if (!ul || !radioGroup) return;
 
-    const slidesPerViewport = 3.5;
-    const pageCount = Math.ceil(ul.children.length / slidesPerViewport);
-    [...radioGroup.querySelectorAll('button')].forEach((d, i) => { if (i >= pageCount) d.remove(); });
-
-    const dots = [...radioGroup.querySelectorAll('button')];
+    const allDots = [...radioGroup.querySelectorAll('button')];
     const prev = block.querySelector('.nav-arrow-previous');
     const next = block.querySelector('.nav-arrow-next');
+
+    const getSlidesPerViewport = () => {
+      if (window.matchMedia('(width >= 1200px)').matches) return 3.5;
+      if (window.matchMedia('(width >= 900px)').matches) return 2.5;
+      if (window.matchMedia('(width >= 600px)').matches) return 1.5;
+      return 1;
+    };
 
     const getSlideW = () => (ul.children[0] ? ul.children[0].offsetWidth : 0) + parseFloat(getComputedStyle(ul).gap || '0');
 
     const sync = () => {
+      const spv = getSlidesPerViewport();
       const sw = getSlideW() || 1;
-      const page = Math.min(Math.round(ul.scrollLeft / (sw * slidesPerViewport)), dots.length - 1);
+      const pageCount = Math.ceil(ul.children.length / spv);
+      const dots = allDots.slice(0, pageCount);
+      allDots.forEach((d, i) => { d.hidden = i >= pageCount; });
+      const page = Math.min(Math.round(ul.scrollLeft / (sw * spv)), dots.length - 1);
       dots.forEach((d, i) => d.setAttribute('aria-checked', i === page ? 'true' : 'false'));
       if (prev) prev.disabled = ul.scrollLeft <= 0;
       if (next) next.disabled = ul.scrollLeft + ul.clientWidth >= ul.scrollWidth - 1;
     };
 
-    dots.forEach((d, i) => {
+    allDots.forEach((d, i) => {
       d.addEventListener('click', () => {
-        ul.scrollTo({ left: Math.round(i * slidesPerViewport) * getSlideW(), behavior: 'smooth' });
+        ul.scrollTo({ left: Math.round(i * getSlidesPerViewport()) * getSlideW(), behavior: 'smooth' });
       });
     });
 
     ul.addEventListener('scroll', sync);
+    window.addEventListener('resize', sync);
     sync();
   });
 }
