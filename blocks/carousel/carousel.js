@@ -1,5 +1,5 @@
-import { toClassName } from '../../scripts/aem.js';
-import { buildCarousel, buildIcon, buildVideo } from '../../scripts/scripts.js';
+import { fetchPlaceholders, toClassName } from '../../scripts/aem.js';
+import { buildCarousel, buildIcon, buildVideo, getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 /**
  * Calculates max height needed to display any slide in expanded state.
@@ -71,8 +71,9 @@ function autoRotate(carousel, interval = 6000) {
  * @param {HTMLButtonElement} btn - Play/pause button element
  * @param {HTMLVideoElement} vid - Video element controlled by the button
  * @param {HTMLElement} block - Carousel block, used to scope sibling video queries
+ * @param {{ play: string, pause: string }} labels - Localized button labels
  */
-function wirePlayBtn(btn, vid, block) {
+function wirePlayBtn(btn, vid, block, labels) {
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
     block.querySelectorAll('video').forEach((v) => {
@@ -85,16 +86,16 @@ function wirePlayBtn(btn, vid, block) {
     if (vid.paused) {
       vid.play();
       btn.setAttribute('aria-pressed', true);
-      btn.setAttribute('aria-label', 'Pause');
+      btn.setAttribute('aria-label', labels.pause);
     } else {
       vid.pause();
       btn.setAttribute('aria-pressed', false);
-      btn.setAttribute('aria-label', 'Play');
+      btn.setAttribute('aria-label', labels.play);
     }
   });
   ['ended', 'pause'].forEach((ev) => vid.addEventListener(ev, () => {
     btn.setAttribute('aria-pressed', false);
-    btn.setAttribute('aria-label', 'Play');
+    btn.setAttribute('aria-label', labels.play);
   }));
 }
 
@@ -102,7 +103,14 @@ function wirePlayBtn(btn, vid, block) {
  * Decorates the videos variant of the carousel block.
  * @param {HTMLElement} block - Carousel block element
  */
-function decorateVideos(block) {
+async function decorateVideos(block) {
+  const { locale, language } = getLocaleAndLanguage();
+  const ph = await fetchPlaceholders(`/${locale}/${language}`);
+  const labels = {
+    play: ph.play || 'Play',
+    pause: ph.pause || 'Pause',
+  };
+
   const rows = [...block.children];
   block.innerHTML = '';
   const track = document.createElement('ul');
@@ -130,16 +138,16 @@ function decorateVideos(block) {
     // Play button
     const playBtn = document.createElement('button');
     playBtn.type = 'button';
-    playBtn.setAttribute('aria-label', 'Play');
+    playBtn.setAttribute('aria-label', labels.play);
     playBtn.setAttribute('aria-pressed', false);
     playBtn.append(buildIcon('play'), buildIcon('pause'));
     mediaWrap.append(playBtn);
     if (vid) {
-      wirePlayBtn(playBtn, vid, block);
+      wirePlayBtn(playBtn, vid, block, labels);
     } else {
       requestAnimationFrame(() => {
         const lazyVid = li.querySelector('video');
-        if (lazyVid) wirePlayBtn(playBtn, lazyVid, block);
+        if (lazyVid) wirePlayBtn(playBtn, lazyVid, block, labels);
         else playBtn.style.display = 'none';
       });
     }
@@ -194,12 +202,12 @@ function decorateVideos(block) {
   });
 }
 
-export default function decorate(block) {
+export default async function decorate(block) {
   const variants = [...block.classList].filter((c) => c !== 'block' && c !== 'carousel');
 
   // Handle videos variant separately
   if (variants.includes('videos')) {
-    decorateVideos(block);
+    await decorateVideos(block);
     return;
   }
 
