@@ -814,23 +814,23 @@
 .carousel.videos.block ul::-webkit-scrollbar { display: none; }
 
 .carousel.videos.block ul > li {
-  flex: 0 0 calc((100% - 2.5 * 16px) / 3.5);
+  flex: 0 0 85%;
   scroll-snap-align: start;
   position: relative;
   overflow: hidden;
   cursor: pointer;
 }
 
-@media (width < 1000px) {
-  .carousel.videos.block ul > li { flex: 0 0 calc((100% - 1.5 * 16px) / 2.5); }
-}
-
-@media (width < 700px) {
+@media (width >= 600px) {
   .carousel.videos.block ul > li { flex: 0 0 calc((100% - 0.5 * 16px) / 1.5); }
 }
 
-@media (width < 480px) {
-  .carousel.videos.block ul > li { flex: 0 0 85%; }
+@media (width >= 900px) {
+  .carousel.videos.block ul > li { flex: 0 0 calc((100% - 1.5 * 16px) / 2.5); }
+}
+
+@media (width >= 1200px) {
+  .carousel.videos.block ul > li { flex: 0 0 calc((100% - 2.5 * 16px) / 3.5); }
 }
 
 /* Media */
