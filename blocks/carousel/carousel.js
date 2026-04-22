@@ -125,7 +125,7 @@ async function decorateVideos(block) {
     // Media
     const mediaWrap = document.createElement('div');
     mediaWrap.className = 'slide-media';
-    if (mediaCell) buildVideo(mediaCell);
+    if (mediaCell) buildVideo(mediaCell, false);
     const vid = mediaCell && mediaCell.querySelector('video');
     const img = mediaCell && mediaCell.querySelector('img, picture');
     if (vid) {
