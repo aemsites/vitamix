@@ -138,21 +138,14 @@ async function decorateVideos(block) {
       mediaWrap.append(img);
     }
 
-    // Play button
-    const playBtn = document.createElement('button');
-    playBtn.type = 'button';
-    playBtn.setAttribute('aria-label', labels.play);
-    playBtn.setAttribute('aria-pressed', false);
-    playBtn.append(buildIcon('play'), buildIcon('pause'));
-    mediaWrap.append(playBtn);
     if (vid) {
+      const playBtn = document.createElement('button');
+      playBtn.type = 'button';
+      playBtn.setAttribute('aria-label', labels.play);
+      playBtn.setAttribute('aria-pressed', false);
+      playBtn.append(buildIcon('play'), buildIcon('pause'));
+      mediaWrap.append(playBtn);
       wirePlayBtn(playBtn, vid, block, labels);
-    } else {
-      requestAnimationFrame(() => {
-        const lazyVid = li.querySelector('video');
-        if (lazyVid) wirePlayBtn(playBtn, lazyVid, block, labels);
-        else playBtn.style.display = 'none';
-      });
     }
 
     if (bodyCell) {
