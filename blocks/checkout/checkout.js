@@ -20,22 +20,19 @@ let selectedShippingMethodId = null;
 
 /**
  * Derive country code from the current locale.
- * TODO: Remove drafts fallback before merging
  */
 function getCountry() {
   const { locale } = getLocaleAndLanguage();
-  if (locale === 'drafts') return 'ca';
   return locale;
 }
 
 /**
- * Get the locale string for the API.
- * TODO: Remove drafts fallback before merging
+ * Get the BCP-47 locale string for the API (e.g. 'en-US', 'fr-CA').
  */
 function getLocale() {
-  const { locale, language } = getLocaleAndLanguage();
-  if (locale === 'drafts') return 'ca/fr_ca';
-  return `${locale}/${language}`;
+  const { language } = getLocaleAndLanguage();
+  const [lang, region] = language.split('_');
+  return region ? `${lang}-${region.toUpperCase()}` : lang;
 }
 
 /**
