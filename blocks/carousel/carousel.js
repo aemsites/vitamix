@@ -66,8 +66,168 @@ function autoRotate(carousel, interval = 6000) {
   }, interval);
 }
 
+// ── Videos variant ──────────────────────────────────────────────────────
+
+/**
+ * Wire play/pause button to a video element.
+ * @param {HTMLButtonElement} btn
+ * @param {HTMLVideoElement} vid
+ */
+function wirePlayBtn(btn, vid) {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    document.querySelectorAll('.carousel.videos video').forEach((v) => {
+      if (v !== vid) {
+        v.pause();
+        const b = v.closest('li')?.querySelector('.videos-play-btn');
+        if (b) b.classList.remove('is-playing');
+      }
+    });
+    if (vid.paused) {
+      vid.play();
+      btn.classList.add('is-playing');
+      btn.setAttribute('aria-label', 'Pause');
+    } else {
+      vid.pause();
+      btn.classList.remove('is-playing');
+      btn.setAttribute('aria-label', 'Play');
+    }
+  });
+  ['ended', 'pause'].forEach((ev) => vid.addEventListener(ev, () => {
+    btn.classList.remove('is-playing');
+    btn.setAttribute('aria-label', 'Play');
+  }));
+}
+
+/**
+ * Decorate the Carousel Videos variant.
+ * @param {HTMLElement} block
+ */
+function decorateVideos(block) {
+  const rows = [...block.children];
+  block.innerHTML = '';
+  const track = document.createElement('ul');
+
+  rows.forEach((row) => {
+    const [mediaCell, bodyCell] = [...row.children];
+    const li = document.createElement('li');
+    li.className = 'videos-carousel-slide';
+
+    // Media
+    const mediaWrap = document.createElement('div');
+    mediaWrap.className = 'videos-slide-media';
+    if (mediaCell) buildVideo(mediaCell);
+    const vid = mediaCell?.querySelector('video');
+    const img = mediaCell?.querySelector('img, picture');
+    if (vid) {
+      vid.removeAttribute('controls');
+      vid.setAttribute('playsinline', '');
+      vid.setAttribute('preload', 'metadata');
+      vid.loop = false;
+      mediaWrap.append(vid);
+    } else if (img) {
+      mediaWrap.append(img);
+    }
+
+    // Play button
+    const playBtn = document.createElement('button');
+    playBtn.type = 'button';
+    playBtn.className = 'videos-play-btn';
+    playBtn.setAttribute('aria-label', 'Play');
+    playBtn.innerHTML = '<svg class="icon-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>'
+      + '<svg class="icon-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
+    mediaWrap.append(playBtn);
+    if (vid) {
+      wirePlayBtn(playBtn, vid);
+    } else {
+      requestAnimationFrame(() => {
+        const lazyVid = li.querySelector('video');
+        if (lazyVid) wirePlayBtn(playBtn, lazyVid);
+        else playBtn.style.display = 'none';
+      });
+    }
+
+    // Text overlay
+    const slideBody = document.createElement('div');
+    slideBody.className = 'videos-slide-body';
+    let titleText = '';
+    let linkHref = '';
+    let linkText = '';
+    [...(bodyCell?.children || [])].forEach((child) => {
+      const a = child.querySelector('a');
+      if (a) {
+        linkHref = a.href;
+        linkText = a.textContent.trim() || a.href;
+      } else if (!titleText) {
+        titleText = child.textContent.trim();
+      }
+    });
+    if (!titleText && bodyCell) titleText = bodyCell.textContent.trim();
+    const titleEl = document.createElement('p');
+    titleEl.className = 'slide-title';
+    titleEl.textContent = titleText || 'Title goes here...';
+    slideBody.append(titleEl);
+    if (linkHref || linkText) {
+      const linkEl = document.createElement('a');
+      linkEl.className = 'slide-link';
+      linkEl.href = linkHref || '#';
+      linkEl.textContent = linkText || linkHref;
+      slideBody.append(linkEl);
+    }
+
+    li.append(mediaWrap, slideBody);
+    track.append(li);
+  });
+
+  block.append(track);
+  buildCarousel(block, true);
+
+  // Trim dots to page count and sync arrow disabled state
+  requestAnimationFrame(() => {
+    const ul = block.querySelector('ul');
+    const radioGroup = block.querySelector('[role="radiogroup"]');
+    if (!ul || !radioGroup) return;
+
+    const spv = 3.5;
+    const pageCount = Math.ceil(ul.children.length / spv);
+    [...radioGroup.querySelectorAll('button')].forEach((d, i) => { if (i >= pageCount) d.remove(); });
+
+    const dots = [...radioGroup.querySelectorAll('button')];
+    const prev = block.querySelector('.nav-arrow-previous');
+    const next = block.querySelector('.nav-arrow-next');
+
+    const getSlideW = () => (ul.children[0]?.offsetWidth || 0) + parseFloat(getComputedStyle(ul).gap || '0');
+
+    const sync = () => {
+      const sw = getSlideW() || 1;
+      const page = Math.min(Math.round(ul.scrollLeft / (sw * spv)), dots.length - 1);
+      dots.forEach((d, i) => d.setAttribute('aria-checked', i === page ? 'true' : 'false'));
+      if (prev) prev.disabled = ul.scrollLeft <= 0;
+      if (next) next.disabled = ul.scrollLeft + ul.clientWidth >= ul.scrollWidth - 1;
+    };
+
+    dots.forEach((d, i) => {
+      d.onclick = () => {
+        ul.scrollTo({ left: Math.round(i * spv) * getSlideW(), behavior: 'smooth' });
+      };
+    });
+
+    ul.addEventListener('scroll', sync);
+    sync();
+  });
+}
+
+// ── Main decorate export ────────────────────────────────────────────────────
+
 export default function decorate(block) {
   const variants = [...block.classList].filter((c) => c !== 'block' && c !== 'carousel');
+
+  // Handle videos variant separately
+  if (variants.includes('videos')) {
+    decorateVideos(block);
+    return;
+  }
+
   const indicatedSlides = variants.find((v) => v.startsWith('slides-'));
   if (indicatedSlides) {
     block.parentElement.classList.add('items');
