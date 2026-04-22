@@ -134,11 +134,7 @@ async function decorateVideos(block) {
       vid.setAttribute('preload', 'metadata');
       vid.loop = false;
       mediaWrap.append(vid);
-    } else if (img) {
-      mediaWrap.append(img);
-    }
-
-    if (vid) {
+      // Play button
       const playBtn = document.createElement('button');
       playBtn.type = 'button';
       playBtn.setAttribute('aria-label', labels.play);
@@ -146,6 +142,8 @@ async function decorateVideos(block) {
       playBtn.append(buildIcon('play'), buildIcon('pause'));
       mediaWrap.append(playBtn);
       wirePlayBtn(playBtn, vid, block, labels);
+    } else if (img) {
+      mediaWrap.append(img);
     }
 
     if (bodyCell) {
