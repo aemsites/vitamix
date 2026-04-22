@@ -58,7 +58,12 @@ function buildLabel(text, type = 'label', id = null) {
  */
 function buildInput(field) {
   const {
-    type, field: fieldName, required, default: defaultValue, placeholder,
+    type,
+    field: fieldName,
+    required,
+    default: defaultValue,
+    placeholder,
+    pattern
   } = field;
 
   const input = createElement('input');
@@ -66,8 +71,11 @@ function buildInput(field) {
   input.id = generateId(fieldName);
   input.name = input.id;
   input.required = required === 'true';
+
   if (defaultValue) input.value = defaultValue;
   if (placeholder) input.placeholder = placeholder;
+  if (pattern) input.pattern = pattern;
+
   return input;
 }
 
