@@ -199,9 +199,9 @@ function decorateVideos(block) {
     };
 
     dots.forEach((d, i) => {
-      d.onclick = () => {
+      d.addEventListener('click', () => {
         ul.scrollTo({ left: Math.round(i * spv) * getSlideW(), behavior: 'smooth' });
-      };
+      });
     });
 
     ul.addEventListener('scroll', sync);
