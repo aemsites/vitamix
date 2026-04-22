@@ -66,8 +66,12 @@ function autoRotate(carousel, interval = 6000) {
   }, interval);
 }
 
-// ── Videos variant ──────────────────────────────────────────────────────
-
+/**
+ * Wires play/pause toggle behaviour to a button for a given video.
+ * @param {HTMLButtonElement} btn - Play/pause button element
+ * @param {HTMLVideoElement} vid - Video element controlled by the button
+ * @param {HTMLElement} block - Carousel block, used to scope sibling video queries
+ */
 function wirePlayBtn(btn, vid, block) {
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -94,6 +98,10 @@ function wirePlayBtn(btn, vid, block) {
   }));
 }
 
+/**
+ * Decorates the videos variant of the carousel block.
+ * @param {HTMLElement} block - Carousel block element
+ */
 function decorateVideos(block) {
   const rows = [...block.children];
   block.innerHTML = '';
