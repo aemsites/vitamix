@@ -68,10 +68,10 @@ function autoRotate(carousel, interval = 6000) {
 
 // ── Videos variant ──────────────────────────────────────────────────────
 
-function wirePlayBtn(btn, vid) {
+function wirePlayBtn(btn, vid, block) {
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
-    document.querySelectorAll('.carousel.videos video').forEach((v) => {
+    block.querySelectorAll('video').forEach((v) => {
       if (v !== vid) {
         v.pause();
         const b = v.closest('li')?.querySelector('.videos-play-btn');
@@ -129,11 +129,11 @@ function decorateVideos(block) {
       + '<svg class="icon-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
     mediaWrap.append(playBtn);
     if (vid) {
-      wirePlayBtn(playBtn, vid);
+      wirePlayBtn(playBtn, vid, block);
     } else {
       requestAnimationFrame(() => {
         const lazyVid = li.querySelector('video');
-        if (lazyVid) wirePlayBtn(playBtn, lazyVid);
+        if (lazyVid) wirePlayBtn(playBtn, lazyVid, block);
         else playBtn.style.display = 'none';
       });
     }
