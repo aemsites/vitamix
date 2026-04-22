@@ -561,6 +561,12 @@ function buildAutoBlocks(main) {
       });
     }
 
+    // migrate aligned banners to hero blocks
+    const alignedBanners = main.querySelectorAll('.banner.aligned');
+    alignedBanners.forEach((banner) => {
+      banner.className = 'hero';
+    });
+
     // setup pdp
     const metaSku = document.querySelector('meta[name="sku"]');
     const pdpBlock = document.querySelector('.pdp');
@@ -913,7 +919,7 @@ export function applyImgColor(block) {
       const thumbnailImg = new Image();
       thumbnailImg.src = thumbnail;
       thumbnailImg.onload = () => {
-        const color = colorThief.getColor(thumbnailImg, 5, 10);
+        const color = colorThief.getColor(thumbnailImg, 50);
         const [r, g, b] = color;
         const y = Math.floor(r * 0.2126 + g * 0.7152 + b * 0.0722);
         const brightness = {
@@ -924,7 +930,8 @@ export function applyImgColor(block) {
         };
         const brightnessKey = Object.keys(brightness).find((key) => y <= brightness[key]);
         block.classList.add(`image-${brightnessKey}`);
-        block.style.setProperty('--image-color', `#${r.toString(16)}${g.toString(16)}${b.toString(16)}`);
+        const toHex = (n) => n.toString(16).padStart(2, '0');
+        block.style.setProperty('--image-color', `#${toHex(r)}${toHex(g)}${toHex(b)}`);
       };
     });
   }
