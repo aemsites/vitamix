@@ -1,5 +1,7 @@
 import { fetchPlaceholders, toClassName } from '../../scripts/aem.js';
-import { buildCarousel, buildIcon, buildVideo, getLocaleAndLanguage } from '../../scripts/scripts.js';
+import {
+  buildCarousel, buildIcon, buildVideo, getLocaleAndLanguage,
+} from '../../scripts/scripts.js';
 
 /**
  * Calculates max height needed to display any slide in expanded state.
@@ -79,7 +81,8 @@ function wirePlayBtn(btn, vid, block, labels) {
     block.querySelectorAll('video').forEach((v) => {
       if (v !== vid) {
         v.pause();
-        const b = v.closest('li')?.querySelector('button');
+        const li = v.closest('li');
+        const b = li && li.querySelector('button');
         if (b) b.setAttribute('aria-pressed', false);
       }
     });
@@ -93,7 +96,7 @@ function wirePlayBtn(btn, vid, block, labels) {
       btn.setAttribute('aria-label', labels.play);
     }
   });
-  ['ended', 'pause'].forEach((ev) => vid.addEventListener(ev, () => {
+  ['ended', 'pause'].forEach((e) => vid.addEventListener(e, () => {
     btn.setAttribute('aria-pressed', false);
     btn.setAttribute('aria-label', labels.play);
   }));
@@ -123,8 +126,8 @@ async function decorateVideos(block) {
     const mediaWrap = document.createElement('div');
     mediaWrap.className = 'slide-media';
     if (mediaCell) buildVideo(mediaCell);
-    const vid = mediaCell?.querySelector('video');
-    const img = mediaCell?.querySelector('img, picture');
+    const vid = mediaCell && mediaCell.querySelector('video');
+    const img = mediaCell && mediaCell.querySelector('img, picture');
     if (vid) {
       vid.removeAttribute('controls');
       vid.setAttribute('playsinline', '');
@@ -173,19 +176,19 @@ async function decorateVideos(block) {
     const radioGroup = block.querySelector('[role="radiogroup"]');
     if (!ul || !radioGroup) return;
 
-    const spv = 3.5;
-    const pageCount = Math.ceil(ul.children.length / spv);
+    const slidesPerViewport = 3.5;
+    const pageCount = Math.ceil(ul.children.length / slidesPerViewport);
     [...radioGroup.querySelectorAll('button')].forEach((d, i) => { if (i >= pageCount) d.remove(); });
 
     const dots = [...radioGroup.querySelectorAll('button')];
     const prev = block.querySelector('.nav-arrow-previous');
     const next = block.querySelector('.nav-arrow-next');
 
-    const getSlideW = () => (ul.children[0]?.offsetWidth || 0) + parseFloat(getComputedStyle(ul).gap || '0');
+    const getSlideW = () => (ul.children[0] ? ul.children[0].offsetWidth : 0) + parseFloat(getComputedStyle(ul).gap || '0');
 
     const sync = () => {
       const sw = getSlideW() || 1;
-      const page = Math.min(Math.round(ul.scrollLeft / (sw * spv)), dots.length - 1);
+      const page = Math.min(Math.round(ul.scrollLeft / (sw * slidesPerViewport)), dots.length - 1);
       dots.forEach((d, i) => d.setAttribute('aria-checked', i === page ? 'true' : 'false'));
       if (prev) prev.disabled = ul.scrollLeft <= 0;
       if (next) next.disabled = ul.scrollLeft + ul.clientWidth >= ul.scrollWidth - 1;
@@ -193,7 +196,7 @@ async function decorateVideos(block) {
 
     dots.forEach((d, i) => {
       d.addEventListener('click', () => {
-        ul.scrollTo({ left: Math.round(i * spv) * getSlideW(), behavior: 'smooth' });
+        ul.scrollTo({ left: Math.round(i * slidesPerViewport) * getSlideW(), behavior: 'smooth' });
       });
     });
 

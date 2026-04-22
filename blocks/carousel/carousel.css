@@ -792,33 +792,24 @@
   }
 }
 
-/* Carousel Videos variant */
+/* Videos variant */
 
 .carousel.videos.block {
   overflow: visible;
-  position: relative;
 }
 
 /* Track */
 .carousel.videos.block ul {
-  display: flex;
   gap: var(--spacing-100);
-  list-style: none;
   margin: 0 var(--spacing-800);
-  padding: 0;
   overflow-x: auto;
-  scroll-snap-type: x mandatory;
   scrollbar-width: none;
 }
 
-.carousel.videos.block ul::-webkit-scrollbar { display: none; }
-
 .carousel.videos.block ul > li {
   flex: 0 0 85%;
-  scroll-snap-align: start;
-  position: relative;
-  overflow: hidden;
   cursor: pointer;
+  overflow: hidden;
 }
 
 @media (width >= 600px) {
@@ -842,16 +833,16 @@
 /* Media */
 .carousel.videos.block .slide-media {
   position: relative;
-  width: 100%;
   aspect-ratio: 9 / 16;
+  width: 100%;
   overflow: hidden;
 }
 
 .carousel.videos.block .slide-media video,
 .carousel.videos.block .slide-media img {
   display: block;
-  width: 100%;
   height: 100%;
+  width: 100%;
   object-fit: cover;
   transition: transform 0.4s ease;
 }
@@ -865,28 +856,28 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(to bottom, transparent 40%, var(--color-charcoal) 100%);
+  background: linear-gradient(to bottom, transparent 40%, var(--color-charcoal));
   pointer-events: none;
 }
 
 /* Play button */
 .carousel.videos.block .slide-media button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   position: absolute;
   bottom: var(--spacing-100);
   right: var(--spacing-100);
   z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
   height: 44px;
+  width: 44px;
   border-radius: 50%;
   background: rgb(255 255 255 / 20%);
-  backdrop-filter: blur(4px);
-  cursor: pointer;
   color: var(--color-white);
+  backdrop-filter: blur(4px);
   font-size: var(--heading-size-l);
   line-height: 0;
+  cursor: pointer;
   transition: background 0.2s, transform 0.2s;
 }
 
@@ -918,16 +909,16 @@
 
 .carousel.videos.block .slide-body p {
   margin: 0 0 0.2em;
-  font-weight: 600;
-  white-space: nowrap;
   overflow: hidden;
+  font-weight: 600;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .carousel.videos.block .slide-body a {
+  color: var(--color-gray-500);
   font-size: var(--body-size-s);
   font-weight: 400;
-  color: var(--color-gray-500);
   text-decoration: none;
   pointer-events: all;
 }
@@ -939,46 +930,40 @@
 
 /* Nav */
 .carousel.videos.block nav {
-  position: static;
-  display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  height: auto;
-  top: unset;
-  bottom: unset;
-  left: unset;
-  right: unset;
+  display: flex;
+  position: static;
+  inset: unset;
   margin-top: var(--spacing-100);
+  height: auto;
 }
 
 .carousel.videos.block nav button.nav-arrow:disabled {
-  opacity: 0.35;
   cursor: not-allowed;
 }
 
 /* Dots */
 .carousel.videos.block nav [role='radiogroup'] {
   display: flex;
+  order: 1;
   justify-content: center;
   gap: var(--spacing-60);
   width: 100%;
   margin-top: var(--spacing-100);
-  order: 1;
 }
 
 .carousel.videos.block nav [role='radiogroup'] button {
-  width: 8px;
   height: 8px;
+  width: 8px;
   border-radius: 50%;
-  border: none;
-  padding: 0;
   background: var(--color-gray-500);
   cursor: pointer;
-  transition: background 0.2s, width 0.25s;
+  transition: background 0.2s, border-radius 0.2s, width 0.2s;
 }
 
 .carousel.videos.block nav [role='radiogroup'] button[aria-checked='true'] {
-  background: var(--color-charcoal);
   width: 22px;
   border-radius: var(--rounding-m);
+  background: var(--color-charcoal);
 }
