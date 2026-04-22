@@ -144,6 +144,10 @@ main > .hero-container.section {
   background-color: var(--image-color);
 }
 
+.hero.split .button-wrapper {
+  justify-content: unset;
+}
+
 @media (width >= 800px) {
   .hero.split {
     min-height: 575px;
