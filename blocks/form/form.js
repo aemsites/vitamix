@@ -63,7 +63,7 @@ function buildInput(field) {
     required,
     default: defaultValue,
     placeholder,
-    pattern
+    pattern,
   } = field;
 
   const input = createElement('input');
