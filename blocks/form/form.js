@@ -76,6 +76,14 @@ function buildInput(field) {
   if (placeholder) input.placeholder = placeholder;
   if (pattern) input.pattern = pattern;
 
+  if (fieldName === 'mobile') {
+    input.setAttribute('maxlength', '14');
+    input.setAttribute('inputmode', 'numeric');
+    input.addEventListener('input', function () {
+      this.value = this.value.replace(/[^0-9()\-\s]/g, '');
+    });
+  }
+
   return input;
 }
 
