@@ -74,7 +74,7 @@ function wirePlayBtn(btn, vid, block) {
     block.querySelectorAll('video').forEach((v) => {
       if (v !== vid) {
         v.pause();
-        const b = v.closest('li')?.querySelector('.videos-play-btn');
+        const b = v.closest('li')?.querySelector('button');
         if (b) b.setAttribute('aria-pressed', false);
       }
     });
@@ -102,11 +102,10 @@ function decorateVideos(block) {
   rows.forEach((row) => {
     const [mediaCell, bodyCell] = [...row.children];
     const li = document.createElement('li');
-    li.className = 'videos-carousel-slide';
 
     // Media
     const mediaWrap = document.createElement('div');
-    mediaWrap.className = 'videos-slide-media';
+    mediaWrap.className = 'slide-media';
     if (mediaCell) buildVideo(mediaCell);
     const vid = mediaCell?.querySelector('video');
     const img = mediaCell?.querySelector('img, picture');
@@ -123,7 +122,6 @@ function decorateVideos(block) {
     // Play button
     const playBtn = document.createElement('button');
     playBtn.type = 'button';
-    playBtn.className = 'videos-play-btn';
     playBtn.setAttribute('aria-label', 'Play');
     playBtn.setAttribute('aria-pressed', false);
     playBtn.append(buildIcon('play'), buildIcon('pause'));
@@ -139,7 +137,7 @@ function decorateVideos(block) {
     }
 
     if (bodyCell) {
-      bodyCell.className = 'videos-slide-body';
+      bodyCell.className = 'slide-body';
       bodyCell.querySelectorAll('.button').forEach((b) => {
         b.removeAttribute('class');
         b.parentElement.classList.remove('button-wrapper');
