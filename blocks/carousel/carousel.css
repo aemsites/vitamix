@@ -792,9 +792,7 @@
   }
 }
 
-/* ============================================================
-   Carousel Videos variant
-   ============================================================ */
+/* Carousel Videos variant */
 
 .carousel.videos.block {
   overflow: visible;
@@ -861,7 +859,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(to bottom, transparent 40%, var(--color-charcoal, #333f48) 100%);
+  background: linear-gradient(to bottom, transparent 40%, var(--color-charcoal) 100%);
   pointer-events: none;
 }
 
@@ -888,6 +886,7 @@
   background: rgb(255 255 255 / 35%);
   transform: scale(1.1);
 }
+
 .carousel.videos.block .videos-play-btn svg {
   width: 18px;
   height: 18px;
@@ -980,7 +979,7 @@
 }
 
 .carousel.videos.block nav [role='radiogroup'] button[aria-checked='true'] {
-  background: var(--color-charcoal, #333f48);
+  background: var(--color-charcoal);
   width: 22px;
   border-radius: 4px;
 }
