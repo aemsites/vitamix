@@ -81,7 +81,17 @@ function buildInput(field) {
     input.setAttribute('minlength', '10');
     input.setAttribute('inputmode', 'numeric');
 
-    input.addEventListener('input', function () {
+    input.addEventListener('input', ({ currentTarget }) => {
+      currentTarget.value = currentTarget.value.replace(/[^0-9()\-\s]/g, '');
+
+      const digits = currentTarget.value.replace(/\D/g, '');
+
+      if (digits.length !== 10) {
+        currentTarget.setCustomValidity('Enter a valid 10 digit mobile number');
+      } else {
+        currentTarget.setCustomValidity('');
+      }
+    });
       this.value = this.value.replace(/[^0-9()\-\s]/g, '');
 
       const digits = this.value.replace(/\D/g, '');
