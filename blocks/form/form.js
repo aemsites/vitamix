@@ -79,7 +79,7 @@ function buildInput(field) {
   if (fieldName === 'mobile') {
     input.setAttribute('maxlength', '14');
     input.setAttribute('minlength', '10');
-    input.setAttribute('inputmode', 'numeric');
+    input.setAttribute('inputmode', 'tel');
 
     input.addEventListener('input', ({ currentTarget }) => {
       currentTarget.value = currentTarget.value.replace(/[^0-9()\-\s]/g, '');
