@@ -92,16 +92,6 @@ function buildInput(field) {
         currentTarget.setCustomValidity('');
       }
     });
-      this.value = this.value.replace(/[^0-9()\-\s]/g, '');
-
-      const digits = this.value.replace(/\D/g, '');
-
-      if (digits.length !== 10) {
-        this.setCustomValidity('Enter a valid 10 digit mobile number');
-      } else {
-        this.setCustomValidity('');
-      }
-    });
   }
 
   return input;
