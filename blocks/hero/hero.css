@@ -160,6 +160,7 @@ main > .hero-container.section {
 
   .hero.split::after {
     content: '';
+    z-index: 1;
   }
 
   .hero.split > div {
@@ -174,6 +175,8 @@ main > .hero-container.section {
     width: 50%;
     padding-top: 55px;
     background-color: transparent;
+    position: relative;
+    z-index: 3;
   }
 
   .hero.split.left-text .text-wrapper {
