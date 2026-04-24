@@ -567,6 +567,23 @@ function buildAutoBlocks(main) {
       banner.className = 'hero';
     });
 
+    // migrate compact banners to hero blocks
+    const compactBanners = main.querySelectorAll('.banner.compact');
+    compactBanners.forEach((banner) => {
+      const row = banner.firstElementChild;
+      if (row) {
+        const cells = [...row.children];
+        const imgCell = cells.find((c) => c.querySelector('picture'));
+        const textCell = cells.find((c) => c !== imgCell);
+        if (imgCell && textCell) {
+          const picture = imgCell.querySelector('picture');
+          if (picture) textCell.prepend(picture);
+          imgCell.remove();
+        }
+      }
+      banner.className = banner.classList.contains('full-width') ? 'hero full-width' : 'hero';
+    });
+
     // setup pdp
     const metaSku = document.querySelector('meta[name="sku"]');
     const pdpBlock = document.querySelector('.pdp');
