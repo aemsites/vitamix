@@ -75,6 +75,10 @@ main > .hero-container.section {
   padding: var(--horizontal-spacing);
 }
 
+.hero .img-wrapper + h1 {
+  margin-top: 0.6em;
+}
+
 @media (width >= 800px) {
   .hero h1 {
     font-size: var(--font-size-950);
@@ -96,8 +100,18 @@ main > .hero-container.section {
 }
 
 .hero.image-light > div > div,
-.hero.image-lightest > div > div {
+.hero.image-lightest > div > div,
+.hero.light > div > div {
   color: var(--color-charcoal);
+}
+
+.hero.image-tint::after {
+  opacity: 0.7;
+}
+
+.hero.dark::after,
+.hero.light::after {
+  opacity: 0.6;
 }
 
 @media (width >= 1200px) {

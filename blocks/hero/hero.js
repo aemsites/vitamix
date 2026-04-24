@@ -50,10 +50,12 @@ export default function decorate(block) {
   detectLayout(block);
   buildVideo(block);
 
-  const override = [...block.classList].filter((c) => c === 'dark' || c === 'light')[0];
-  if (override) {
-    block.style.setProperty('--image-color', override === 'dark' ? 'black' : 'white');
-    block.classList.add(`image-${override}est`);
+  const colorOverride = [...block.classList].find(
+    (c) => getComputedStyle(document.documentElement).getPropertyValue(`--color-${c}`).trim(),
+  );
+  if (colorOverride) {
+    block.style.setProperty('--image-color', `var(--color-${colorOverride})`);
+    block.classList.add('image-tint');
   }
 
   const bgPicture = block.querySelector('picture[data-bg]');
@@ -62,7 +64,7 @@ export default function decorate(block) {
     const optimizedBg = createOptimizedPicture(bgImg.src, bgImg.alt, false, [{ width: '2000' }]);
     optimizedBg.dataset.bg = '';
     bgPicture.replaceWith(optimizedBg);
-    if (!override) {
+    if (!colorOverride) {
       const newImg = optimizedBg.querySelector('img');
       if (newImg.complete) applyImgColor(block);
       else newImg.addEventListener('load', () => applyImgColor(block));
