@@ -88,7 +88,7 @@ main > .hero-container.section {
   padding-top: 55px;
   color: var(--color-gray-100);
   position: relative;
-  z-index: 1;
+  z-index: 2;
 }
 
 .hero.image-light > div > div,
@@ -139,7 +139,7 @@ main > .hero-container.section {
 
 .hero.split .text-wrapper {
   position: relative;
-  z-index: 1; 
+  z-index: 2; 
   order: 1;
   margin: 0;
   max-width: unset;
