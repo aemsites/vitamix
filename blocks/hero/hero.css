@@ -43,14 +43,20 @@ main > .hero-container.section {
   opacity: 0.8;
 }
 
-.hero video,
-.hero img {
+.hero picture[data-bg] img,
+.hero video {
   position: absolute;
   inset: 0;
   z-index: -1;
   height: 100%;
   width: 100%;
   object-fit: cover;
+}
+
+.hero .icon svg {
+  width: 100%;
+  max-width: 300px;
+  height: unset;
 }
 
 .hero .eyebrow {
@@ -188,12 +194,6 @@ main > .hero-container.section {
   }
 
   .hero.split .img-wrapper {
-    position: absolute;
-    inset: 0;
-  }
-
-  .hero.split .img-wrapper img,
-  .hero.split .img-wrapper video {
     position: absolute;
     inset: 0;
   }

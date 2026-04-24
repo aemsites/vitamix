@@ -2,8 +2,24 @@ import { createOptimizedPicture } from '../../scripts/aem.js';
 import { buildVideo, applyImgColor } from '../../scripts/scripts.js';
 
 /**
- * Detects layout from column count.
- * @param {Element} block
+ * Returns `true` if a cell contains only pictures and/or video links, with no text content.
+ * @param {Element} cell - Direct child div of a block row
+ * @returns {boolean}
+ */
+function isMediaCell(cell) {
+  if (!cell.querySelector('picture') && !cell.querySelector('a[href*=".mp4"]')) return false;
+  return [...cell.children].every((child) => {
+    if (child.tagName === 'PICTURE') return true;
+    if (child.tagName !== 'P') return false;
+    const children = [...child.children];
+    if (children.length === 1 && children[0].tagName === 'PICTURE') return true;
+    return !!child.querySelector('a[href*=".mp4"]');
+  });
+}
+
+/**
+ * Detects layout from column count and marks background images with data-bg.
+ * @param {Element} block - Hero block element
  */
 function detectLayout(block) {
   const row = block.firstElementChild;
@@ -13,12 +29,19 @@ function detectLayout(block) {
   if (cells.length >= 2) {
     block.classList.add('split');
     cells.forEach((cell) => {
-      if (cell.querySelector('picture') || cell.querySelector('a[href*=".mp4"]')) {
+      if (isMediaCell(cell)) {
         cell.className = 'img-wrapper';
+        const bgPicture = cell.querySelector('picture');
+        if (bgPicture) bgPicture.dataset.bg = '';
       } else cell.classList.add('text-wrapper');
     });
     const imgIndex = cells.findIndex((c) => c.classList.contains('img-wrapper'));
     block.classList.add(imgIndex === 0 ? 'left-text' : 'right-text');
+  } else {
+    const cell = row.firstElementChild;
+    if (!cell) return;
+    const [picture] = [...cell.querySelectorAll('picture')];
+    if (picture) picture.dataset.bg = '';
   }
 }
 
@@ -33,12 +56,14 @@ export default function decorate(block) {
     block.classList.add(`image-${override}est`);
   }
 
-  const img = block.querySelector('picture img');
-  if (img) {
-    const picture = createOptimizedPicture(img.src, img.alt, false, [{ width: '2000' }]);
-    img.closest('picture').replaceWith(picture);
+  const bgPicture = block.querySelector('picture[data-bg]');
+  if (bgPicture) {
+    const bgImg = bgPicture.querySelector('img');
+    const optimizedBg = createOptimizedPicture(bgImg.src, bgImg.alt, false, [{ width: '2000' }]);
+    optimizedBg.dataset.bg = '';
+    bgPicture.replaceWith(optimizedBg);
     if (!override) {
-      const newImg = picture.querySelector('img');
+      const newImg = optimizedBg.querySelector('img');
       if (newImg.complete) applyImgColor(block);
       else newImg.addEventListener('load', () => applyImgColor(block));
     }
