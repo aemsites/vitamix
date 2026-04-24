@@ -87,8 +87,6 @@ main > .hero-container.section {
   padding: var(--horizontal-spacing);
   padding-top: 55px;
   color: var(--color-gray-100);
-  position: relative;
-  z-index: 3;
 }
 
 .hero.image-light > div > div,
