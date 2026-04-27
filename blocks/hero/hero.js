@@ -27,6 +27,12 @@ export default function decorate(block) {
   detectLayout(block);
   buildVideo(block);
 
+  if (!block.querySelector('h1')) {
+    block.classList.add('sub');
+    const wrapper = block.closest('.hero-wrapper');
+    if (wrapper) wrapper.classList.add('sub');
+  }
+
   const override = [...block.classList].filter((c) => c === 'dark' || c === 'light')[0];
   if (override) {
     block.style.setProperty('--image-color', override === 'dark' ? 'black' : 'white');
