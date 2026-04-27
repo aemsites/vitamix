@@ -400,7 +400,7 @@ function enableNavSearch(form) {
     const { search } = Object.fromEntries(data.entries()) || '';
     const { locale, language } = getLocaleAndLanguage();
     const basePath = `/${locale}/${language}`;
-    window.location.href = `https://www.vitamix.com${basePath}/search-result?search=${search}`;
+    window.location.href = `${basePath}/search-result?search=${search}`;
   });
 }
 
