@@ -561,6 +561,29 @@ function buildAutoBlocks(main) {
       });
     }
 
+    // migrate aligned banners to hero blocks
+    const alignedBanners = main.querySelectorAll('.banner.aligned');
+    alignedBanners.forEach((banner) => {
+      banner.className = 'hero';
+    });
+
+    // migrate compact banners to hero blocks
+    const compactBanners = main.querySelectorAll('.banner.compact');
+    compactBanners.forEach((banner) => {
+      const row = banner.firstElementChild;
+      if (row) {
+        const cells = [...row.children];
+        const imgCell = cells.find((c) => c.querySelector('picture'));
+        const textCell = cells.find((c) => c !== imgCell);
+        if (imgCell && textCell) {
+          const picture = imgCell.querySelector('picture');
+          if (picture) textCell.prepend(picture);
+          imgCell.remove();
+        }
+      }
+      banner.className = banner.classList.contains('full-width') ? 'hero full-width' : 'hero';
+    });
+
     // setup pdp
     const metaSku = document.querySelector('meta[name="sku"]');
     const pdpBlock = document.querySelector('.pdp');
@@ -913,7 +936,7 @@ export function applyImgColor(block) {
       const thumbnailImg = new Image();
       thumbnailImg.src = thumbnail;
       thumbnailImg.onload = () => {
-        const color = colorThief.getColor(thumbnailImg, 5, 10);
+        const color = colorThief.getColor(thumbnailImg, 50);
         const [r, g, b] = color;
         const y = Math.floor(r * 0.2126 + g * 0.7152 + b * 0.0722);
         const brightness = {
@@ -924,7 +947,8 @@ export function applyImgColor(block) {
         };
         const brightnessKey = Object.keys(brightness).find((key) => y <= brightness[key]);
         block.classList.add(`image-${brightnessKey}`);
-        block.style.setProperty('--image-color', `#${r.toString(16)}${g.toString(16)}${b.toString(16)}`);
+        const toHex = (n) => n.toString(16).padStart(2, '0');
+        block.style.setProperty('--image-color', `#${toHex(r)}${toHex(g)}${toHex(b)}`);
       };
     });
   }
@@ -1230,6 +1254,7 @@ async function loadEager(doc) {
 
   /* adjust shop images to locale root path, util all of shop is mapped */
   if (window.location.pathname.includes('/shop/')
+    || window.location.pathname.includes('/foundation/')
     || window.location.pathname.includes('/commercial/')
     || window.location.pathname.includes('/catalog/product_compare/')) {
     const images = doc.querySelectorAll('img[src^="./media_"]');
