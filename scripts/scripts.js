@@ -1254,6 +1254,7 @@ async function loadEager(doc) {
 
   /* adjust shop images to locale root path, util all of shop is mapped */
   if (window.location.pathname.includes('/shop/')
+    || window.location.pathname.includes('/foundation/')
     || window.location.pathname.includes('/commercial/')
     || window.location.pathname.includes('/catalog/product_compare/')) {
     const images = doc.querySelectorAll('img[src^="./media_"]');
