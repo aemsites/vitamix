@@ -1,0 +1,30 @@
+.otp-email-template {
+  max-width: 600px;
+  margin: 0 auto;
+  font-family: Arial, sans-serif;
+  background: #fff;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.otp-email-template > div:first-child {
+  background: #fff;
+  padding: 24px;
+}
+
+.otp-email-template > div:first-child picture,
+.otp-email-template > div:first-child img {
+  display: block;
+  max-height: 35px;
+  max-width: 200px;
+  width: auto;
+  height: auto;
+}
+
+/* Body row */
+.otp-email-template > div:last-child {
+  padding: 16px 24px;
+  color: #333;
+  font-size: 16px;
+  line-height: 1.5;
+}
