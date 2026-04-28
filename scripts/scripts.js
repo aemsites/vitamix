@@ -1274,13 +1274,13 @@ async function loadEager(doc) {
       || window.location.pathname.includes('/foundation/')
       || window.location.pathname.includes('/commercial/')
       || window.location.pathname.includes('/catalog/product_compare/')) {
-      const images = doc.querySelectorAll('img[src^="./media_"]');
+      const images = doc.querySelectorAll('img[src*="/media_"]');
       images.forEach((img) => {
-        img.setAttribute('src', img.getAttribute('src').replace('./media_', '/us/en_us/media_'));
+        img.setAttribute('src', `/us/en_us/media_${img.getAttribute('src').split('/media_').pop()}`);
       });
-      const sources = doc.querySelectorAll('source[srcset^="./media_"]');
+      const sources = doc.querySelectorAll('source[srcset*="/media_"]');
       sources.forEach((source) => {
-        source.setAttribute('srcset', source.getAttribute('srcset').replace('./media_', '/us/en_us/media_'));
+        source.setAttribute('srcset', `/us/en_us/media_${source.getAttribute('srcset').split('/media_').pop()}`);
       });
     }
 
