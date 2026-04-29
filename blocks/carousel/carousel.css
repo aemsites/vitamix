@@ -794,6 +794,18 @@
 
 /* Videos variant */
 
+.carousel-wrapper:has(.carousel.videos.block) {
+  margin-left: calc(-1 * var(--horizontal-spacing));
+  margin-right: calc(-1 * var(--horizontal-spacing));
+}
+
+@media (width >= 600px) {
+  .carousel-wrapper:has(.carousel.videos.block) {
+    margin-left: 0;
+    margin-right: 0;
+  }
+}
+
 .carousel.videos.block {
   overflow: visible;
 }
