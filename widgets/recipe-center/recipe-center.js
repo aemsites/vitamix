@@ -533,7 +533,7 @@ function buildRecipeFiltering(container, config = {}, copy = {}) {
 
   const facetLabels = {
     difficulty: copy.difficulty || 'Difficulty',
-    'compatible-containers': copy.compatibleContainers || 'Compatible Containers',
+    'compatible-containers': copy.compatibleContainers || 'Compatible Products or Containers',
     'dietary-interests': copy.dietaryInterests || 'Dietary Interests',
     course: copy.course || 'Course',
     'recipe-type': copy.recipeType || 'Recipe Type',
