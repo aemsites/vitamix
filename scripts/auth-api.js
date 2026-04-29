@@ -25,14 +25,16 @@ function dispatchAuthEvent(loggedIn, email) {
  * passed back to `verifyCode` to complete authentication.
  *
  * @param {string} email - The user's email address
+ * @param {string} [country] - ISO 3166-1 alpha-2 country code (e.g. 'us', 'ca')
+ * @param {string} [locale] - BCP-47 locale (e.g. 'en-US', 'fr-CA')
  * @returns {Promise<{ email: string, hash: string, exp: number }>}
  * @throws {Error} If the request fails or the API returns an error
  */
-export async function login(email) {
+export async function login(email, country, locale) {
   const resp = await fetch(`${ORDERS_API_ORIGIN}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, country, locale }),
   });
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({}));

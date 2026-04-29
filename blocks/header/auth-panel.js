@@ -1,5 +1,6 @@
 import createSlidePanel from '../../scripts/slide-panel.js';
 import { login, verifyCode } from '../../scripts/auth-api.js';
+import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 /**
  * Builds the first step of the auth flow: an email input form.
@@ -176,7 +177,8 @@ export default function createAuthPanel() {
       btn.textContent = 'Sending code\u2026';
 
       try {
-        otpState = await login(email);
+        const { locale: country, language: locale } = getLocaleAndLanguage(false, true);
+        otpState = await login(email, country, locale);
         // eslint-disable-next-line no-use-before-define
         showCodeStep(email);
       } catch (err) {
