@@ -1,16 +1,19 @@
 .otp-email-template {
+  background: #d8d8d8;
+  padding: 40px 16px;
+  font-family: Arial, sans-serif;
+}
+
+/* White card — both rows share the same background so they read as one panel */
+.otp-email-template > div {
+  background: #fff;
   max-width: 600px;
   margin: 0 auto;
-  font-family: Arial, sans-serif;
-  background: #fff;
-  border-radius: 4px;
-  overflow: hidden;
 }
 
 /* Header row — logo */
 .otp-email-template > div:first-child {
-  background: #fff;
-  padding: 24px;
+  padding: 24px 24px 0;
   text-align: left;
 }
 
@@ -44,7 +47,6 @@
   color: #c8102e;
   background: #f5f5f5;
   padding: 16px 24px;
-  border-radius: 4px;
   text-align: left;
   margin: 24px 0;
 }
