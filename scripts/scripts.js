@@ -590,6 +590,29 @@ function buildAutoBlocks(main) {
 
     buildWidgetAutoBlocks(main);
 
+    // migrate aligned banners to hero blocks
+    const alignedBanners = main.querySelectorAll('.banner.aligned');
+    alignedBanners.forEach((banner) => {
+      banner.className = 'hero';
+    });
+
+    // migrate compact banners to hero blocks
+    const compactBanners = main.querySelectorAll('.banner.compact');
+    compactBanners.forEach((banner) => {
+      const row = banner.firstElementChild;
+      if (row) {
+        const cells = [...row.children];
+        const imgCell = cells.find((c) => c.querySelector('picture'));
+        const textCell = cells.find((c) => c !== imgCell);
+        if (imgCell && textCell) {
+          const picture = imgCell.querySelector('picture');
+          if (picture) textCell.prepend(picture);
+          imgCell.remove();
+        }
+      }
+      banner.className = banner.classList.contains('full-width') ? 'hero full-width' : 'hero';
+    });
+
     // setup pdp
     const metaSku = document.querySelector('meta[name="sku"]');
     const pdpBlock = document.querySelector('.pdp');
@@ -821,7 +844,7 @@ function decorateSectionBackgrounds(main) {
         const video = buildVideo(section);
         video.classList.add('section-background-video');
       } else {
-        const backgroundPicture = createOptimizedPicture(href, '', false, [
+        const backgroundPicture = createOptimizedPicture(pathname, '', false, [
           { media: '(min-width: 800px)', width: '2880' },
           { width: '1600' },
         ]);
@@ -943,7 +966,7 @@ export function applyImgColor(block) {
       const thumbnailImg = new Image();
       thumbnailImg.src = thumbnail;
       thumbnailImg.onload = () => {
-        const color = colorThief.getColor(thumbnailImg, 5, 10);
+        const color = colorThief.getColor(thumbnailImg, 50);
         const [r, g, b] = color;
         const y = Math.floor(r * 0.2126 + g * 0.7152 + b * 0.0722);
         const brightness = {
@@ -954,7 +977,8 @@ export function applyImgColor(block) {
         };
         const brightnessKey = Object.keys(brightness).find((key) => y <= brightness[key]);
         block.classList.add(`image-${brightnessKey}`);
-        block.style.setProperty('--image-color', `#${r.toString(16)}${g.toString(16)}${b.toString(16)}`);
+        const toHex = (n) => n.toString(16).padStart(2, '0');
+        block.style.setProperty('--image-color', `#${toHex(r)}${toHex(g)}${toHex(b)}`);
       };
     });
   }
@@ -1258,20 +1282,6 @@ async function loadEager(doc) {
     });
   }
 
-  /* adjust shop images to locale root path, util all of shop is mapped */
-  if (window.location.pathname.includes('/shop/')
-    || window.location.pathname.includes('/commercial/')
-    || window.location.pathname.includes('/catalog/product_compare/')) {
-    const images = doc.querySelectorAll('img[src^="./media_"]');
-    images.forEach((img) => {
-      img.setAttribute('src', img.getAttribute('src').replace('./media_', '/us/en_us/media_'));
-    });
-    const sources = doc.querySelectorAll('source[srcset^="./media_"]');
-    sources.forEach((source) => {
-      source.setAttribute('srcset', source.getAttribute('srcset').replace('./media_', '/us/en_us/media_'));
-    });
-  }
-
   /* pdp simulation on localhost, aem.page and aem.live */
   const isProd = window.location.hostname.includes('vitamix.com') || window.location.hostname.includes('.aem.network');
   if (!isProd && window.location.pathname.includes('/products/')) {
@@ -1289,6 +1299,21 @@ async function loadEager(doc) {
   const main = doc.querySelector('main');
   if (main) {
     decorateMain(main);
+    /* adjust shop images to locale root path, util all of shop is mapped */
+    if (window.location.pathname.includes('/shop/')
+      || window.location.pathname.includes('/foundation/')
+      || window.location.pathname.includes('/commercial/')
+      || window.location.pathname.includes('/catalog/product_compare/')) {
+      const images = doc.querySelectorAll('img[src*="/media_"]');
+      images.forEach((img) => {
+        img.setAttribute('src', `/us/en_us/media_${img.getAttribute('src').split('/media_').pop()}`);
+      });
+      const sources = doc.querySelectorAll('source[srcset*="/media_"]');
+      sources.forEach((source) => {
+        source.setAttribute('srcset', `/us/en_us/media_${source.getAttribute('srcset').split('/media_').pop()}`);
+      });
+    }
+
     await loadNavBanner(main);
     document.body.classList.add('appear');
     await loadSection(main.querySelector('.section'), (section) => {

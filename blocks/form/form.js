@@ -58,7 +58,12 @@ function buildLabel(text, type = 'label', id = null) {
  */
 function buildInput(field) {
   const {
-    type, field: fieldName, required, default: defaultValue, placeholder,
+    type,
+    field: fieldName,
+    required,
+    default: defaultValue,
+    placeholder,
+    pattern,
   } = field;
 
   const input = createElement('input');
@@ -66,8 +71,29 @@ function buildInput(field) {
   input.id = generateId(fieldName);
   input.name = input.id;
   input.required = required === 'true';
+
   if (defaultValue) input.value = defaultValue;
   if (placeholder) input.placeholder = placeholder;
+  if (pattern) input.pattern = pattern;
+
+  if (fieldName === 'mobile') {
+    input.setAttribute('maxlength', '14');
+    input.setAttribute('minlength', '10');
+    input.setAttribute('inputmode', 'tel');
+
+    input.addEventListener('input', ({ currentTarget }) => {
+      currentTarget.value = currentTarget.value.replace(/[^0-9()\-\s]/g, '');
+
+      const digits = currentTarget.value.replace(/\D/g, '');
+
+      if (digits.length !== 10) {
+        currentTarget.setCustomValidity('Enter a valid 10 digit mobile number');
+      } else {
+        currentTarget.setCustomValidity('');
+      }
+    });
+  }
+
   return input;
 }
 
@@ -374,7 +400,7 @@ function enableNavSearch(form) {
     const { search } = Object.fromEntries(data.entries()) || '';
     const { locale, language } = getLocaleAndLanguage();
     const basePath = `/${locale}/${language}`;
-    window.location.href = `https://www.vitamix.com${basePath}/search-result?search=${search}`;
+    window.location.href = `${basePath}/search-result?search=${search}`;
   });
 }
 

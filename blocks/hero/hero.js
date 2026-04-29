@@ -1,17 +1,52 @@
 import { createOptimizedPicture } from '../../scripts/aem.js';
 import { buildVideo, applyImgColor } from '../../scripts/scripts.js';
 
+/**
+ * Detects layout from column count.
+ * @param {Element} block
+ */
+function detectLayout(block) {
+  const row = block.firstElementChild;
+  if (!row) return;
+  const cells = [...row.children];
+
+  if (cells.length >= 2) {
+    block.classList.add('split');
+    cells.forEach((cell) => {
+      if (cell.querySelector('picture') || cell.querySelector('a[href*=".mp4"]')) {
+        cell.className = 'img-wrapper';
+      } else cell.classList.add('text-wrapper');
+    });
+    const imgIndex = cells.findIndex((c) => c.classList.contains('img-wrapper'));
+    block.classList.add(imgIndex === 0 ? 'left-text' : 'right-text');
+  }
+}
+
+/** @param {Element} block */
 export default function decorate(block) {
-  // set background
+  detectLayout(block);
   buildVideo(block);
+
+  if (!block.querySelector('h1')) {
+    block.classList.add('sub');
+    const wrapper = block.closest('.hero-wrapper');
+    if (wrapper) wrapper.classList.add('sub');
+  }
+
+  const override = [...block.classList].filter((c) => c === 'dark' || c === 'light')[0];
+  if (override) {
+    block.style.setProperty('--image-color', override === 'dark' ? 'black' : 'white');
+    block.classList.add(`image-${override}est`);
+  }
+
   const img = block.querySelector('picture img');
   if (img) {
-    img.closest('picture').replaceWith(createOptimizedPicture(img.src, img.alt, false, [{ width: '2000' }]));
-    if (img.complete) applyImgColor(block);
-    else if (img.tagName === 'IMG') {
-      img.addEventListener('load', () => {
-        applyImgColor(block);
-      });
+    const picture = createOptimizedPicture(img.src, img.alt, false, [{ width: '2000' }]);
+    img.closest('picture').replaceWith(picture);
+    if (!override) {
+      const newImg = picture.querySelector('img');
+      if (newImg.complete) applyImgColor(block);
+      else newImg.addEventListener('load', () => applyImgColor(block));
     }
   }
 
