@@ -1,3 +1,7 @@
+.hero-container:not(:has(.hero-wrapper.sub)) {
+  margin-bottom: 0;
+}
+
 .hero-container .hero-wrapper:not(.sub) {
   margin: 0;
   padding: 0;
