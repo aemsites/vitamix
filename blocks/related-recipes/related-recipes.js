@@ -43,7 +43,7 @@ function hrefFromAuthorLink(anchor) {
  * @param {Object[]} data - Array of all recipe objects
  * @returns {Object|undefined} Matching recipe, or undefined
  */
-function findMatchingRecipe(href, data) {
+export function findMatchingRecipe(href, data) {
   const pathForMatch = stripEquipmentSuffix(href);
 
   if (pathForMatch.match(/-r\d+$/)) {
@@ -64,7 +64,7 @@ function findMatchingRecipe(href, data) {
  * @param {string} path - Path from the index
  * @returns {string} Path without the `-r###` suffix
  */
-function stripRecipeId(path) {
+export function stripRecipeId(path) {
   if (!path) return path;
   return path.replace(/-r\d+$/, '');
 }
@@ -177,7 +177,7 @@ function hasAnyOverlap(target, recipe) {
  * @param {number} [max=3] - Maximum number of related recipes
  * @returns {Object[]} Array of related recipe objects
  */
-function findRelatedRecipes(target, allRecipes, max = 3) {
+export function findRelatedRecipes(target, allRecipes, max = 3) {
   // Pre-filter: only recipes with at least one overlapping attribute
   const targetPath = stripEquipmentSuffix(stripRecipeId(target.path));
   const candidates = allRecipes.filter((recipe) => (
@@ -214,6 +214,23 @@ function findRelatedRecipes(target, allRecipes, max = 3) {
     }
     return results;
   }, []);
+}
+
+/**
+ * Builds the scoring target object used by {@link findRelatedRecipes} from a recipe index row.
+ * @param {Object} recipe - Recipe object from query-index.json
+ * @returns {Object} Target shape for findRelatedRecipes (path, title, parsed facets)
+ */
+export function createRelatedRecipeTarget(recipe) {
+  const title = recipe.title || '';
+  return {
+    path: recipe.path,
+    title,
+    titleWords: getTitleWords(title),
+    recipeType: parseList(recipe['recipe-type']),
+    course: parseList(recipe.course),
+    dietaryInterests: parseList(recipe['dietary-interests']),
+  };
 }
 
 /**

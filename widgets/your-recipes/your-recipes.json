@@ -1,0 +1,17 @@
+{
+  "en": {
+    "yourRecipes": "Your Recipes",
+    "recommendedForYou": "Recommended for you",
+    "empty": "Save recipes or browse the recipe collection to see them here."
+  },
+  "fr": {
+    "yourRecipes": "Vos recettes",
+    "recommendedForYou": "Recommandées pour vous",
+    "empty": "Enregistrez des recettes ou parcourez la collection pour les voir ici."
+  },
+  "es": {
+    "yourRecipes": "Sus recetas",
+    "recommendedForYou": "Recomendado para usted",
+    "empty": "Guarde recetas o explore la colección para verlas aquí."
+  }
+}

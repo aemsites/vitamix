@@ -1,0 +1,36 @@
+.your-recipes {
+  max-width: var(--max-width, 1200px);
+  margin-inline: auto;
+  padding: var(--spacing-400) var(--spacing-100);
+}
+
+.your-recipes-inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-600);
+}
+
+.your-recipes-empty {
+  margin: 0;
+  padding: var(--spacing-400);
+  text-align: center;
+  color: var(--color-text, inherit);
+}
+
+.your-recipes-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-200);
+}
+
+.your-recipes-group-title {
+  margin: 0;
+  font-family: var(--heading-font-family, inherit);
+  font-size: var(--heading-size-m, 1.25rem);
+  font-weight: 600;
+}
+
+.your-recipes-group .related-recipes-wrapper,
+.your-recipes-group .related-recipes {
+  width: 100%;
+}

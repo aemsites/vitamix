@@ -331,6 +331,10 @@ main > .recipe-container.section > .recipe-wrapper {
   height: 30px;
 }
 
+.recipe .recipe-toolbar .recipe-save.is-saved .recipe-save-label {
+  font-weight: 600;
+}
+
 @media (width >= 800px) {
   .recipe .recipe-toolbar {
     padding: var(--spacing-400);

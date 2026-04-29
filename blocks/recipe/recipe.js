@@ -1,5 +1,10 @@
 import { getMetadata, toClassName, fetchPlaceholders } from '../../scripts/aem.js';
 import { formatTime, formatServings, getLocaleAndLanguage } from '../../scripts/scripts.js';
+import {
+  recordRecipeView,
+  isRecipeSaved,
+  toggleSavedRecipe,
+} from '../../scripts/recipe-storage.js';
 
 function wrapInDiv(element, className) {
   if (!element) return;
@@ -17,6 +22,17 @@ function wrapInDiv(element, className) {
   );
 }
 
+function syncSaveButton(saveButton, placeholders) {
+  const { pathname } = window.location;
+  const labelEl = saveButton.querySelector('.recipe-save-label');
+  const saveLabel = placeholders.save || 'Save';
+  const removeLabel = placeholders.removeFromSaved || 'Remove from saved';
+  const saved = isRecipeSaved(pathname);
+  if (labelEl) labelEl.textContent = saved ? removeLabel : saveLabel;
+  saveButton.classList.toggle('is-saved', saved);
+  saveButton.setAttribute('aria-pressed', saved ? 'true' : 'false');
+}
+
 function buildToolbar(placeholders = {}) {
   const toolbar = document.createElement('div');
   toolbar.classList.add('recipe-toolbar');
@@ -30,7 +46,7 @@ function buildToolbar(placeholders = {}) {
   const shareEmailLabel = placeholders.shareViaEmail || 'Share via Email';
 
   toolbar.innerHTML = `
-    <button type="button" class="recipe-save"><img src="/blocks/recipe/save.svg" alt=""> ${saveLabel}</button>
+    <button type="button" class="recipe-save" aria-pressed="false"><img src="/blocks/recipe/save.svg" alt=""> <span class="recipe-save-label">${saveLabel}</span></button>
     <button type="button" class="recipe-print"><img src="/blocks/recipe/print.svg" alt=""> ${printLabel}</button>
     <div class="recipe-share-wrapper">
       <button type="button" class="recipe-share"><img src="/blocks/recipe/share.svg" alt=""> ${shareLabel}</button>
@@ -51,15 +67,13 @@ function buildToolbar(placeholders = {}) {
     </div>
   `;
 
-  // Save button
+  // Save / remove from saved (localStorage)
   const saveButton = toolbar.querySelector('.recipe-save');
+  syncSaveButton(saveButton, placeholders);
   saveButton.addEventListener('click', () => {
-    const { locale, language } = getLocaleAndLanguage();
-    const title = document.querySelector('h1').textContent.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-    const recipeId = `rcp${title}recipe`;
-    const returnUrl = `https://www.vitamix.com/${locale}/${language}/recipebook?recipe_id=${recipeId}`;
-    const encodedReturn = btoa(returnUrl);
-    window.location.href = `https://www.vitamix.com/${locale}/${language}/customer/account/login/referer/${encodeURIComponent(encodedReturn)}/`;
+    const { pathname } = window.location;
+    toggleSavedRecipe(pathname);
+    syncSaveButton(saveButton, placeholders);
   });
 
   // Print button
@@ -220,6 +234,8 @@ export default async function decorate(block) {
   recipeContainer.append(...block.children);
   block.prepend(recipeHeader);
   block.append(recipeContainer);
+
+  recordRecipeView(window.location.pathname);
 
   // Get section names from placeholders
   const sectionNames = {
