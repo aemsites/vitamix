@@ -201,6 +201,8 @@ async function decorateVideos(block) {
     ul.addEventListener('scroll', sync);
     window.addEventListener('resize', sync);
     sync();
+    // Re-sync after layout has fully settled to correct initial arrow disabled state
+    setTimeout(sync, 100);
   });
 }
 
