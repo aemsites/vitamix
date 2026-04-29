@@ -801,15 +801,21 @@
 /* Track */
 .carousel.videos.block ul {
   gap: var(--spacing-100);
-  margin: 0 var(--spacing-800);
+  margin: 0;
   overflow-x: auto;
   scrollbar-width: none;
 }
 
 .carousel.videos.block ul > li {
-  flex: 0 0 85%;
+  flex: 0 0 100%;
   cursor: pointer;
   overflow: hidden;
+}
+
+@media (width >= 600px) {
+  .carousel.videos.block ul {
+    margin: 0 var(--spacing-800);
+  }
 }
 
 @media (width >= 600px) {
@@ -939,8 +945,18 @@
   height: auto;
 }
 
+.carousel.videos.block nav button.nav-arrow {
+  display: none;
+}
+
 .carousel.videos.block nav button.nav-arrow:disabled {
   cursor: not-allowed;
+}
+
+@media (width >= 600px) {
+  .carousel.videos.block nav button.nav-arrow {
+    display: flex;
+  }
 }
 
 /* Dots */
