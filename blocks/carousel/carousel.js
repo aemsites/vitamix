@@ -1,5 +1,7 @@
-import { toClassName } from '../../scripts/aem.js';
-import { buildCarousel, buildVideo } from '../../scripts/scripts.js';
+import { fetchPlaceholders, toClassName } from '../../scripts/aem.js';
+import {
+  buildCarousel, buildIcon, buildVideo, getLocaleAndLanguage,
+} from '../../scripts/scripts.js';
 
 /**
  * Calculates max height needed to display any slide in expanded state.
@@ -66,8 +68,153 @@ function autoRotate(carousel, interval = 6000) {
   }, interval);
 }
 
-export default function decorate(block) {
+/**
+ * Wires play/pause toggle behaviour to a button for a given video.
+ * @param {HTMLButtonElement} btn - Play/pause button element
+ * @param {HTMLVideoElement} vid - Video element controlled by the button
+ * @param {HTMLElement} block - Carousel block, used to scope sibling video queries
+ * @param {{ play: string, pause: string }} labels - Localized button labels
+ */
+function wirePlayBtn(btn, vid, block, labels) {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    block.querySelectorAll('video').forEach((v) => {
+      if (v !== vid) {
+        v.pause();
+        const li = v.closest('li');
+        const b = li && li.querySelector('button');
+        if (b) b.setAttribute('aria-pressed', false);
+      }
+    });
+    if (vid.paused) {
+      vid.play();
+      btn.setAttribute('aria-pressed', true);
+      btn.setAttribute('aria-label', labels.pause);
+    } else {
+      vid.pause();
+      btn.setAttribute('aria-pressed', false);
+      btn.setAttribute('aria-label', labels.play);
+    }
+  });
+  ['ended', 'pause'].forEach((e) => vid.addEventListener(e, () => {
+    btn.setAttribute('aria-pressed', false);
+    btn.setAttribute('aria-label', labels.play);
+  }));
+}
+
+/**
+ * Decorates the videos variant of the carousel block.
+ * @param {HTMLElement} block - Carousel block element
+ */
+async function decorateVideos(block) {
+  const { locale, language } = getLocaleAndLanguage();
+  const ph = await fetchPlaceholders(`/${locale}/${language}`);
+  const labels = {
+    play: ph.play || 'Play',
+    pause: ph.pause || 'Pause',
+  };
+
+  const rows = [...block.children];
+  block.innerHTML = '';
+  const track = document.createElement('ul');
+
+  rows.forEach((row) => {
+    const [mediaCell, bodyCell] = [...row.children];
+    const li = document.createElement('li');
+
+    // Media
+    const mediaWrap = document.createElement('div');
+    mediaWrap.className = 'slide-media';
+    if (mediaCell) buildVideo(mediaCell, false);
+    const vid = mediaCell && mediaCell.querySelector('video');
+    const img = mediaCell && mediaCell.querySelector('img, picture');
+    if (vid) {
+      vid.removeAttribute('controls');
+      vid.setAttribute('playsinline', '');
+      vid.setAttribute('preload', 'metadata');
+      vid.loop = false;
+      mediaWrap.append(vid);
+      // Play button
+      const playBtn = document.createElement('button');
+      playBtn.type = 'button';
+      playBtn.setAttribute('aria-label', labels.play);
+      playBtn.setAttribute('aria-pressed', false);
+      playBtn.append(buildIcon('play'), buildIcon('pause'));
+      mediaWrap.append(playBtn);
+      wirePlayBtn(playBtn, vid, block, labels);
+    } else if (img) {
+      mediaWrap.append(img);
+    }
+
+    if (bodyCell) {
+      bodyCell.className = 'slide-body';
+      bodyCell.querySelectorAll('.button').forEach((b) => {
+        b.removeAttribute('class');
+        b.parentElement.classList.remove('button-wrapper');
+      });
+    }
+
+    li.append(mediaWrap, ...(bodyCell ? [bodyCell] : []));
+    track.append(li);
+  });
+
+  block.append(track);
+  buildCarousel(block, true);
+
+  // Sync dots and arrow disabled state
+  requestAnimationFrame(() => {
+    const ul = block.querySelector('ul');
+    const radioGroup = block.querySelector('[role="radiogroup"]');
+    if (!ul || !radioGroup) return;
+
+    const allDots = [...radioGroup.querySelectorAll('button')];
+    const prev = block.querySelector('.nav-arrow-previous');
+    const next = block.querySelector('.nav-arrow-next');
+
+    const getSlidesPerViewport = () => {
+      if (window.matchMedia('(width >= 1200px)').matches) return 3.5;
+      if (window.matchMedia('(width >= 900px)').matches) return 2.5;
+      if (window.matchMedia('(width >= 600px)').matches) return 1.5;
+      return 1;
+    };
+
+    const getSlideW = () => (ul.children[0] ? ul.children[0].offsetWidth : 0) + parseFloat(getComputedStyle(ul).gap || '0');
+
+    const sync = () => {
+      const spv = getSlidesPerViewport();
+      const sw = getSlideW() || 1;
+      const pageCount = Math.ceil(ul.children.length / spv);
+      const dots = allDots.slice(0, pageCount);
+      allDots.forEach((d, i) => { d.hidden = i >= pageCount; });
+      const page = Math.min(Math.round(ul.scrollLeft / (sw * spv)), dots.length - 1);
+      dots.forEach((d, i) => d.setAttribute('aria-checked', i === page ? 'true' : 'false'));
+      if (prev) prev.disabled = ul.scrollLeft <= 0;
+      if (next) next.disabled = ul.scrollLeft + ul.clientWidth >= ul.scrollWidth - 1;
+    };
+
+    allDots.forEach((d, i) => {
+      d.addEventListener('click', () => {
+        ul.scrollTo({ left: Math.round(i * getSlidesPerViewport()) * getSlideW(), behavior: 'smooth' });
+      });
+    });
+
+    ul.addEventListener('scroll', sync);
+    window.addEventListener('resize', sync);
+    sync();
+    // Re-sync after layout has fully settled to correct initial arrow disabled state
+    setTimeout(sync, 100);
+  });
+}
+
+export default async function decorate(block) {
   const variants = [...block.classList].filter((c) => c !== 'block' && c !== 'carousel');
+
+  // Handle videos variant separately
+  if (variants.includes('videos')) {
+    await decorateVideos(block);
+    return;
+  }
+
   const indicatedSlides = variants.find((v) => v.startsWith('slides-'));
   if (indicatedSlides) {
     block.parentElement.classList.add('items');
