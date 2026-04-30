@@ -42,14 +42,20 @@
   opacity: 0.8;
 }
 
-.hero video,
-.hero img {
+.hero picture[data-bg] img,
+.hero video {
   position: absolute;
   inset: 0;
   z-index: -1;
   height: 100%;
   width: 100%;
   object-fit: cover;
+}
+
+.hero .icon svg {
+  width: 100%;
+  max-width: 300px;
+  height: unset;
 }
 
 .hero .eyebrow {
@@ -66,6 +72,10 @@
   inset: 0;
   top: unset;
   padding: var(--horizontal-spacing);
+}
+
+.hero .img-wrapper + h1 {
+  margin-top: 0.6em;
 }
 
 @media (width >= 800px) {
@@ -89,8 +99,18 @@
 }
 
 .hero.image-light > div > div,
-.hero.image-lightest > div > div {
+.hero.image-lightest > div > div,
+.hero.light > div > div {
   color: var(--color-charcoal);
+}
+
+.hero.image-tint::after {
+  opacity: 0.7;
+}
+
+.hero.dark::after,
+.hero.light::after {
+  opacity: 0.6;
 }
 
 @media (width >= 1200px) {
@@ -187,12 +207,6 @@
   }
 
   .hero.split .img-wrapper {
-    position: absolute;
-    inset: 0;
-  }
-
-  .hero.split .img-wrapper img,
-  .hero.split .img-wrapper video {
     position: absolute;
     inset: 0;
   }
