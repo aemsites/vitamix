@@ -1,8 +1,5 @@
-import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { getFormSubmissionUrl, getLocaleAndLanguage } from '../../scripts/scripts.js';
 import getStatesProvincesOptions from './states-provinces.js';
-
-/** Sheet logger endpoint for product registration form */
-const SHEET_LOGGER_URL = 'https://sheet-logger.david8603.workers.dev/vitamix.com/forms-testing/product-registration';
 
 /**
  * Loads form copy from the widget's local JSON (same name as the script).
@@ -148,6 +145,7 @@ export default async function decorate(widget) {
     e.preventDefault();
     const data = new FormData(form);
     const payload = Object.fromEntries(data.entries());
+    payload.formId = `${locale}/${language}/product-registration`;
     payload.pageUrl = window.location.href;
 
     const submitButton = form.querySelector('button[type="submit"]');
@@ -158,23 +156,32 @@ export default async function decorate(widget) {
       submitButton.textContent = labels.sending ?? 'Sending...';
     }
 
+    let didNavigate = false;
     try {
-      const resp = await fetch(SHEET_LOGGER_URL, {
+      const resp = await fetch(getFormSubmissionUrl(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       if (!resp.ok) {
-        throw new Error(`Sheet logger responded with ${resp.status}`);
+        const { handleFormSubmitError } = await import('./util.js');
+        await handleFormSubmitError(resp, form, labels.submissionFailed ?? 'Something went wrong. Please try again.');
+        return;
       }
+      didNavigate = true;
       const thankYouPath = `/${locale}/${language}/product-registration-thankyou`;
       window.location.href = thankYouPath;
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Product registration form submission failed', err);
-      [...form.elements].forEach((el) => { el.disabled = false; });
-      if (submitButton) {
-        submitButton.textContent = submitButton.dataset.originalLabel || buttonLabel;
+      const { toast } = await import('./util.js');
+      toast(labels.networkError ?? 'Could not reach the server. Please try again.', 'error');
+    } finally {
+      if (!didNavigate) {
+        [...form.elements].forEach((el) => { el.disabled = false; });
+        if (submitButton) {
+          submitButton.textContent = submitButton.dataset.originalLabel || buttonLabel;
+        }
       }
     }
   });
