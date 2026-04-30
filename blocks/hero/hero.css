@@ -1,9 +1,8 @@
-main > .hero-container.section {
-  margin-top: 0;
+.hero-container:not(:has(.hero-wrapper.sub)) {
   margin-bottom: 0;
 }
 
-.hero-container .hero-wrapper {
+.hero-container .hero-wrapper:not(.sub) {
   margin: 0;
   padding: 0;
 }
@@ -84,8 +83,8 @@ main > .hero-container.section {
     font-size: var(--font-size-950);
   }
 
-  .hero .eyebrow,
-  .hero p {
+  .hero:not(.sub) .eyebrow,
+  .hero:not(.sub) p {
     font-size: 18px;
   }
 }
@@ -228,5 +227,52 @@ main > .hero-container.section {
 
   .hero.split.right-text::after {
     background: linear-gradient(to left, transparent, var(--image-color) calc(100dvw - 600px));
+  }
+}
+
+/* sub variant */
+
+.hero.sub,
+.hero.sub > div {
+  min-height: 430px;
+}
+
+.hero.sub > div > div {
+  max-width: 470px;
+}
+
+@media (width >= 800px) {
+  .hero.sub,
+  .hero.sub > div {
+    min-height: 478px;
+  }
+
+  .hero.sub > div > div {
+    max-width: 575px;
+  }
+
+  .hero.split.sub,
+  .hero.split.sub > div {
+    min-height: 430px;
+  }
+
+  .hero.split.sub .text-wrapper {
+    max-width: 330px;
+  }
+}
+
+@media (width >= 1000px) {
+  .hero.sub,
+  .hero.sub > div {
+    min-height: 510px;
+  }
+
+  .hero.split.sub,
+  .hero.split.sub > div {
+    min-height: 510px;
+  }
+
+  .hero.split.sub .text-wrapper {
+    max-width: 400px;
   }
 }

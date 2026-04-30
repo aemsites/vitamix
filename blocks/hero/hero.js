@@ -50,6 +50,12 @@ export default function decorate(block) {
   detectLayout(block);
   buildVideo(block);
 
+  if (!block.querySelector('h1')) {
+    block.classList.add('sub');
+    const wrapper = block.closest('.hero-wrapper');
+    if (wrapper) wrapper.classList.add('sub');
+  }
+
   const colorOverride = [...block.classList].find(
     (c) => getComputedStyle(document.documentElement).getPropertyValue(`--color-${c}`).trim(),
   );

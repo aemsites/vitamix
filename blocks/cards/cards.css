@@ -252,6 +252,10 @@
   color: var(--color-gray);
 }
 
+.cards.grid .card-body .button-wrapper {
+  justify-content: center;
+}
+
 @media (width >= 800px) {
   .cards.grid ul {
     max-width: 600px;
