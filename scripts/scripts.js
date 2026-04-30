@@ -4,6 +4,7 @@ import {
   decorateIcon,
   decorateIcons,
   decorateSections,
+  decorateBlock,
   decorateBlocks,
   decorateTemplateAndTheme,
   waitForFirstImage,
@@ -538,6 +539,32 @@ function buildPDPBlock(main) {
 }
 
 /**
+ * Turns `/widgets/...` links into widget block DOM (class `widget`, not yet `block`).
+ * Top-level widgets are decorated by {@link decorateBlocks}; nested ones are picked up afterward
+ * in {@link decorateMain} via `div.widget:not(.block)`.
+ * @param {Element} main The container element
+ */
+function buildWidgetAutoBlocks(main) {
+  const widgetLinks = [...main.querySelectorAll('a[href^="/widgets"]')];
+  widgetLinks.forEach((link) => {
+    if (link.closest('.widget')) return;
+    const newLink = link.cloneNode(true);
+    const widgetBlock = buildBlock('widget', { elems: [newLink] });
+    const p = link.closest('p');
+    if (
+      p
+      && p.querySelectorAll('a').length === 1
+      && p.querySelector('a') === link
+      && p.textContent.trim() === link.textContent.trim()
+    ) {
+      p.replaceWith(widgetBlock);
+    } else {
+      link.replaceWith(widgetBlock);
+    }
+  });
+}
+
+/**
  * Builds all synthetic blocks in a container element.
  * @param {Element} main The container element
  */
@@ -560,6 +587,8 @@ function buildAutoBlocks(main) {
         });
       });
     }
+
+    buildWidgetAutoBlocks(main);
 
     // migrate aligned banners to hero blocks
     const alignedBanners = main.querySelectorAll('.banner.aligned');
@@ -903,6 +932,7 @@ export function decorateMain(main) {
   decorateSectionAnchors(main);
   decorateSectionBackgrounds(main);
   decorateBlocks(main);
+  main.querySelectorAll('div.widget:not(.block)').forEach(decorateBlock);
   decorateFullWidthBlocks(main);
   decorateButtons(main);
   decorateEyebrows(main);
