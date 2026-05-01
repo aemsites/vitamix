@@ -15,7 +15,7 @@ p + .columns-container {
   flex-direction: column;
 }
 
-.columns img {
+.columns img:not(.icon img) {
   width: 100%;
 }
 
