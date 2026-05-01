@@ -130,6 +130,7 @@ p + .columns-container {
 }
 
 
+/* stylelint-disable-next-line no-descending-specificity */
 .columns .icon svg,
 .columns .icon img {
   height: 4em;
