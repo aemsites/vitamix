@@ -15,7 +15,7 @@ p + .columns-container {
   flex-direction: column;
 }
 
-.columns img:not(.icon img) {
+.columns img {
   width: 100%;
 }
 
@@ -132,7 +132,8 @@ p + .columns-container {
 
 /* stylelint-disable-next-line no-descending-specificity */
 .columns .icon svg,
-.columns .icon img {
+.columns .icon > img,
+.columns .icon picture img {
   height: 4em;
   width: 4em;
 }
