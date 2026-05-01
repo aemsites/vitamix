@@ -130,13 +130,14 @@ p + .columns-container {
 }
 
 
-/* stylelint-disable-next-line no-descending-specificity */
+/* stylelint-disable no-descending-specificity */
 .columns .icon svg,
 .columns .icon > img,
-.columns .icon picture img {
+.columns .icon .img-wrapper img {
   height: 4em;
   width: 4em;
 }
+/* stylelint-enable no-descending-specificity */
 
 .columns .icon[class$="-circle"] svg {
   height: 9em;
