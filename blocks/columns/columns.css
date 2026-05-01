@@ -130,7 +130,7 @@ p + .columns-container {
 }
 
 
-.columns .icon-circle-1 svg, .columns .icon-circle-2 svg, .columns .icon-circle-3 svg {
+.columns .icon svg {
   height: 4em;
   width: 4em;
 }
