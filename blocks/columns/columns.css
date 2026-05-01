@@ -19,6 +19,10 @@ p + .columns-container {
   width: 100%;
 }
 
+.columns .img-wrapper img {
+  width: auto;
+}
+
 .columns > div > div {
   order: 1;
 }
