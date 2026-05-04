@@ -1,0 +1,99 @@
+/*
+ * email-footer
+ *
+ * Three-row footer block authored as:
+ *   | email-footer                                                 |
+ *   | ---                                                          |
+ *   | **Having trouble? Contact us!**                              |
+ *   | ![📞](phone.png) [{{support.phone}}](tel:{{support.phone}}) | ![✉](mail.png) [{{{support.email}}}](mailto:{{{support.email}}}) |
+ *   | {{support.footerAddress}}                                    |
+ *
+ * Light grey background, centered. Contact row uses display:table /
+ * table-cell so phone and email render side by side without flexbox
+ * (helix-to-email strips flex). Icon images inline before the link text.
+ *
+ * Phone and email are authored as markdown links so they render as `tel:`
+ * and `mailto:` actions in email clients — that's also what gives them the
+ * default link colour.
+ */
+
+.email-footer {
+  background: #f9f9f9;
+  padding: 24px;
+  text-align: center;
+  font-size: 14px;
+  font-family: Arial, Helvetica, sans-serif;
+  color: #333;
+}
+
+/* Heading row — bold "Having trouble? Contact us!" */
+.email-footer > div:nth-child(1) {
+  font-weight: bold;
+  font-size: 14px;
+  color: #000;
+  padding-bottom: 12px;
+}
+
+/* Contact row — phone and email side by side */
+.email-footer > div:nth-child(2) {
+  display: table;
+  margin: 0 auto;
+  border-spacing: 16px 0;
+}
+
+.email-footer > div:nth-child(2) > div {
+  display: table-cell;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* Inline icons before contact links */
+.email-footer img {
+  vertical-align: middle;
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  display: inline-block;
+}
+
+/*
+ * Contact links — explicit reset so EDS's storefront button decoration
+ * (which auto-styles <p><a>...</a></p> patterns as filled buttons) doesn't
+ * apply here. Links render as plain inline text in the brand link colour.
+ */
+.email-footer a,
+.email-footer a.button,
+.email-footer .button-container a {
+  color: #0066cc;
+  text-decoration: none;
+  background: transparent;
+  background-color: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+  font-weight: inherit;
+  font-size: inherit;
+  text-transform: none;
+  display: inline;
+  box-shadow: none;
+}
+
+/*
+ * Some EDS sites wrap auto-button paragraphs in a .button-container div.
+ * Strip its layout/spacing so the wrapper doesn't introduce extra vertical
+ * gap inside the footer's contact row.
+ */
+.email-footer .button-container,
+.email-footer p {
+  margin: 0;
+  padding: 0;
+  display: inline;
+}
+
+/* Address row — lighter gray, smaller */
+.email-footer > div:nth-child(3) {
+  padding-top: 16px;
+  color: #999;
+  font-size: 13px;
+}
