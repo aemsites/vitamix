@@ -1,0 +1,211 @@
+/*
+ * email-header
+ *
+ * Flexible top-of-email block. The minimum content is a logo. Everything
+ * after the logo is optional, so the same block can be reused across
+ * different transactional emails (order confirmation, login OTP, password
+ * reset, etc.).
+ *
+ * Typical authoring shapes:
+ *
+ *   Logo only:
+ *     | email-header |
+ *     | --- |
+ *     | ![Logo]({{{branding.logoUrl}}}) |
+ *
+ *   Logo + greeting + promotional banner:
+ *     | email-header |
+ *     | --- |
+ *     | # ![Logo]({{{branding.logoUrl}}}) *Thank you for your purchase!* |
+ *     | ![Banner](banner.png) |
+ *
+ *   Logo + greeting + banner + order details (a second row in the block):
+ *     | email-header |
+ *     | --- |
+ *     | # ![Logo]() *Thank you for your purchase!* + banner |
+ *     | **Order Details** + Order #{{...}} + Placed on {{...}} |
+ *
+ * Each row of the block table renders as a direct child <div> of
+ * .email-header. The first row is centered marketing-style content; any
+ * subsequent rows get a top border and left alignment for context blocks
+ * (order summary, support callouts, etc.).
+ */
+
+/*
+ * Page-level overrides for email rendering. helix-to-email fetches block
+ * CSS files for blocks present in the page. email-header is always the
+ * first block on every email page, so rules dropped here are fetched and
+ * inlined exactly when an email is being rendered — never on storefront
+ * pages where they would interfere with the regular site layout.
+ *
+ * The styles below mirror the look of the API's built-in fallback (OTP /
+ * order-confirmation): gray viewport background with a centered white
+ * 600px-wide content card.
+ */
+
+body {
+  background: #f5f5f5;
+  margin: 0;
+  padding: 24px 16px;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+main {
+  max-width: 640px;
+  margin: 0 auto;
+  background: #fff;
+  padding: 32px;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+/*
+ * Override the storefront's section spacing and horizontal padding on
+ * email pages. styles/styles.css sets:
+ *
+ *   main > .section          { margin: 35px 0 }
+ *   main > .section > div    { margin: 32px auto; padding: 0 32px }
+ *
+ * Both add up to a lot of dead space inside the white email card. Reset
+ * them so blocks fill the card edge-to-edge — the card's own 8px padding
+ * and individual block padding handle whatever breathing room is needed.
+ */
+main > .section {
+  margin: 0;
+}
+
+main > .section > div {
+  margin: 0 auto;
+  padding: 0;
+}
+
+.email-header {
+  padding: 24px 0 0;
+  font-family: Arial, Helvetica, sans-serif;
+  text-align: left;
+}
+
+/*
+ * Logo / inline-heading images — constrained and forced onto their own line
+ * so the brand mark sits above the heading text rather than next to it.
+ * `display: block` with no auto margin keeps the image left-aligned with the
+ * rest of the header content.
+ */
+.email-header h1 img,
+.email-header h2 img,
+.email-header h3 img {
+  max-height: 50px;
+  max-width: 200px;
+  height: auto;
+  width: auto;
+  display: block;
+  margin: 0 0 16px;
+}
+
+/*
+ * Headings in subsequent rows (e.g. order ID, callout titles) — bold
+ * sans-serif, larger than body text. Used for "Your Order #{{...}}" or
+ * similar context-block headings.
+ */
+.email-header > div + div h1,
+.email-header > div + div h2,
+.email-header > div + div h3 {
+  font-family: Arial, Helvetica, sans-serif;
+  font-style: normal;
+  font-weight: bold;
+  font-size: 22px;
+  color: #000;
+  margin: 4px 0;
+}
+
+/*
+ * Greeting heading — italic serif. Scoped to the first row only so the
+ * style doesn't leak onto headings in subsequent rows (e.g. an h2 used for
+ * an order-ID line in the order-details row).
+ */
+.email-header > div:first-child h1,
+.email-header > div:first-child h2 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-weight: normal;
+  font-size: 24px;
+  color: #555;
+  margin: 16px 0;
+}
+
+/*
+ * Standalone images (e.g. promotional banner authored as a paragraph image)
+ * span the full container width.
+ */
+.email-header p img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 16px 0;
+}
+
+/*
+ * Link reset for linked banner images. EDS's storefront CSS auto-styles
+ * <p><a>...</a></p> patterns as filled buttons (border + padding + background),
+ * which puts an unwanted frame around a banner image authored as a link.
+ * Strip all of that so a linked banner renders as a plain clickable image.
+ */
+.email-header a,
+.email-header a.button,
+.email-header .button-container a {
+  background: transparent;
+  background-color: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+  text-decoration: none;
+  color: inherit;
+  font-weight: inherit;
+  display: inline-block;
+  box-shadow: none;
+}
+
+.email-header .button-container {
+  margin: 0;
+  padding: 0;
+  display: block;
+}
+
+/*
+ * When the banner image is wrapped in a link, the link's <a> wraps the
+ * picture/img directly — make the linked image behave the same as an
+ * unlinked one (full container width, block layout).
+ */
+.email-header a img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+/*
+ * Subsequent rows of the block — divider + left alignment so context blocks
+ * like order details or support links read as their own section.
+ */
+.email-header > div + div {
+  border-top: 1px solid #eee;
+  margin-top: 24px;
+  padding-top: 24px;
+  text-align: left;
+}
+
+.email-header > div + div p {
+  margin: 8px 0;
+  font-size: 14px;
+  color: #333;
+}
+
+.email-header strong {
+  font-weight: bold;
+}
+
+.email-header hr {
+  border: none;
+  border-top: 1px solid #eee;
+  margin: 12px 0;
+}
