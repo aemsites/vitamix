@@ -41,6 +41,13 @@
   border-spacing: 16px 0;
 }
 
+/* Address row — lighter gray, smaller */
+.email-footer > div:nth-child(3) {
+  padding-top: 16px;
+  color: #999;
+  font-size: 13px;
+}
+
 .email-footer > div:nth-child(2) > div {
   display: table-cell;
   vertical-align: middle;
@@ -64,7 +71,7 @@
 .email-footer a,
 .email-footer a.button,
 .email-footer .button-container a {
-  color: #0066cc;
+  color: #06c;
   text-decoration: none;
   background: transparent;
   background-color: transparent;
@@ -89,11 +96,4 @@
   margin: 0;
   padding: 0;
   display: inline;
-}
-
-/* Address row — lighter gray, smaller */
-.email-footer > div:nth-child(3) {
-  padding-top: 16px;
-  color: #999;
-  font-size: 13px;
 }

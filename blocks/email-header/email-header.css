@@ -53,7 +53,7 @@ body {
 main {
   max-width: 640px;
   margin: 0 auto;
-  background: #ffffff;
+  background: #fff;
   padding: 32px;
   border-radius: 4px;
   box-sizing: border-box;
@@ -103,21 +103,6 @@ main > .section > div {
 }
 
 /*
- * Greeting heading — italic serif. Scoped to the first row only so the
- * style doesn't leak onto headings in subsequent rows (e.g. an h2 used for
- * an order-ID line in the order-details row).
- */
-.email-header > div:first-child h1,
-.email-header > div:first-child h2 {
-  font-family: Georgia, 'Times New Roman', serif;
-  font-style: italic;
-  font-weight: normal;
-  font-size: 24px;
-  color: #555;
-  margin: 16px 0;
-}
-
-/*
  * Headings in subsequent rows (e.g. order ID, callout titles) — bold
  * sans-serif, larger than body text. Used for "Your Order #{{...}}" or
  * similar context-block headings.
@@ -131,6 +116,21 @@ main > .section > div {
   font-size: 22px;
   color: #000;
   margin: 4px 0;
+}
+
+/*
+ * Greeting heading — italic serif. Scoped to the first row only so the
+ * style doesn't leak onto headings in subsequent rows (e.g. an h2 used for
+ * an order-ID line in the order-details row).
+ */
+.email-header > div:first-child h1,
+.email-header > div:first-child h2 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-weight: normal;
+  font-size: 24px;
+  color: #555;
+  margin: 16px 0;
 }
 
 /*
