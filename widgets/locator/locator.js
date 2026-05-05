@@ -16,7 +16,7 @@ async function loadWidgetCopy(lang) {
   return data[key] || {};
 }
 
-const MAX_DISTANCE = 200;
+const MAX_DISTANCE = 500;
 const EVENTS_MAX_DISTANCE = 100;
 const MAX_DISTANCE_COMM = 1000;
 const maxDistanceHhDistributors = 1500;
