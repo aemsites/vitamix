@@ -32,15 +32,13 @@
  */
 
 /*
- * Page-level overrides for email rendering. helix-to-email fetches block
- * CSS files for blocks present in the page. email-header is always the
- * first block on every email page, so rules dropped here are fetched and
- * inlined exactly when an email is being rendered — never on storefront
- * pages where they would interfere with the regular site layout.
+ * Browser preview styles — DA authoring only.
  *
- * The styles below mirror the look of the API's built-in fallback (OTP /
- * order-confirmation): gray viewport background with a centered white
- * 600px-wide content card.
+ * helix-to-email strips <body> and <main> from its output, so these rules
+ * never reach an email client. The Commerce API wraps the rendered content
+ * in its own email-safe table shell (gray outer background, 640px white card)
+ * that matches these visual properties. The rules below exist solely so that
+ * DA authors see a faithful preview of the final email while editing.
  */
 
 body {
@@ -54,7 +52,6 @@ main {
   max-width: 640px;
   margin: 0 auto;
   background: #fff;
-  padding: 32px;
   border-radius: 4px;
   box-sizing: border-box;
 }
@@ -134,17 +131,6 @@ main > .section > div {
 }
 
 /*
- * Standalone images (e.g. promotional banner authored as a paragraph image)
- * span the full container width.
- */
-.email-header p img {
-  max-width: 100%;
-  height: auto;
-  display: block;
-  margin: 16px 0;
-}
-
-/*
  * Link reset for linked banner images. EDS's storefront CSS auto-styles
  * <p><a>...</a></p> patterns as filled buttons (border + padding + background),
  * which puts an unwanted frame around a banner image authored as a link.
@@ -181,6 +167,17 @@ main > .section > div {
   display: block;
   max-width: 100%;
   height: auto;
+}
+
+/*
+ * Standalone images (e.g. promotional banner authored as a paragraph image)
+ * span the full container width.
+ */
+.email-header p img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 16px 0;
 }
 
 /*
