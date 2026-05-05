@@ -97,17 +97,38 @@ export async function createOrder(orderBody) {
  * @param {string} orderId - The order ID returned by `createOrder`
  * @param {string} idempotencyKey - A unique key for this payment attempt (e.g. a UUID)
  * @param {string} [fraudToken] - Optional fraud provider session token
- * @param {string} [provider='chase'] - Payment provider ('chase' or 'paypal')
- * @param {string} [paymentMethod='card'] - Payment method ('card' or 'paypal')
+ * @param {string} [provider='chase'] - Payment provider ('chase', 'paypal', 'chase-wallet')
+ * @param {string} [paymentMethod='card'] - Payment method ('card', 'paypal', 'apple-pay')
+ * @param {Object} [extra={}] - Additional provider-specific fields (e.g. token, billingContact)
  * @returns {Promise<{ orderId: string, paymentAttemptId: string, status: string,
- *   action: string, redirectUrl: string }>}
+ *   action?: string, redirectUrl?: string, transactionId?: string, reason?: string }>}
  * @throws {CommerceApiError}
  */
-export async function initiatePayment(orderId, idempotencyKey, fraudToken, provider = 'chase', paymentMethod = 'card') {
+export async function initiatePayment(orderId, idempotencyKey, fraudToken, provider = 'chase', paymentMethod = 'card', extra = {}) {
   return post(`/orders/${orderId}/payments`, {
     provider,
     paymentMethod,
     idempotencyKey,
     ...(fraudToken ? { fraudToken } : {}),
+    ...extra,
+  });
+}
+
+/**
+ * Requests an Apple Pay merchant session from the Commerce API.
+ * Called inside `ApplePaySession.onvalidatemerchant` — the API makes a mutual-TLS
+ * POST to Apple's gateway and returns the opaque merchant session object.
+ *
+ * @param {string} validationUrl - The URL provided by Apple in the onvalidatemerchant event
+ * @param {string} [country] - ISO country code (e.g. 'us', 'ca') for provider config resolution
+ * @param {string} [locale] - BCP-47 locale string (e.g. 'en-US') for provider config resolution
+ * @returns {Promise<{ merchantSession: Object }>}
+ * @throws {CommerceApiError}
+ */
+export async function validateApplePayMerchant(validationUrl, country, locale) {
+  return post('/payments/apple-pay/validate-merchant', {
+    validationUrl,
+    ...(country ? { country } : {}),
+    ...(locale ? { locale } : {}),
   });
 }

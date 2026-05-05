@@ -10,6 +10,7 @@ import {
   previewOrder,
   createOrder,
   initiatePayment,
+  validateApplePayMerchant,
 } from '../../scripts/commerce-api.js';
 
 const ADDRESS_FORM = () => `https://main--vitamix--aemsites.aem.page${getOrderPath('address-form')}.json`;
@@ -724,7 +725,122 @@ export default async function decorate(block) {
     } else if (paymentMethod === 'Apple Pay') {
       span.classList.add('apple-pay');
       loadScript('https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js');
-      span.innerHTML = '<apple-pay-button buttonstyle="black" type="buy" locale="en-US"></apple-pay-button>';
+      span.innerHTML = `<apple-pay-button buttonstyle="black" type="buy" locale="${getLocale()}"></apple-pay-button>`;
+
+      const applePayBtn = span.querySelector('apple-pay-button');
+      applePayBtn.addEventListener('click', () => {
+        if (!selectedShippingMethodId) {
+          showError(formColumn, 'Please select a shipping method.');
+          return;
+        }
+        if (!form.checkValidity()) {
+          form.reportValidity();
+          return;
+        }
+        if (!currentEstimateToken || !currentPreview) {
+          showError(formColumn, 'Please wait for shipping and tax estimates to load.');
+          return;
+        }
+        if (!window.ApplePaySession?.canMakePayments()) {
+          showError(formColumn, 'Apple Pay is not available on this device or browser.');
+          return;
+        }
+
+        clearError(formColumn);
+
+        const country = getCountry();
+        const currencyCode = country === 'ca' ? 'CAD' : 'USD';
+        // Stable key for this session — reused on `onpaymentauthorized` retry
+        const idempotencyKey = crypto.randomUUID();
+        // Snapshot form state before async session callbacks run
+        const formData = Object.fromEntries(new FormData(form).entries());
+
+        const session = new window.ApplePaySession(3, {
+          countryCode: country.toUpperCase(),
+          currencyCode,
+          supportedNetworks: ['visa', 'masterCard', 'amex', 'discover'],
+          merchantCapabilities: ['supports3DS'],
+          total: {
+            label: 'Vitamix',
+            amount: parseFloat(currentPreview.total ?? 0).toFixed(2),
+          },
+        });
+
+        session.onvalidatemerchant = async (event) => {
+          try {
+            const { merchantSession } = await validateApplePayMerchant(
+              event.validationURL,
+              country,
+              getLocale(),
+            );
+            session.completeMerchantValidation(merchantSession);
+          } catch {
+            session.abort();
+            showError(formColumn, 'Apple Pay merchant validation failed. Please try again.');
+          }
+        };
+
+        session.onpaymentauthorized = async (event) => {
+          try {
+            const { token, billingContact } = event.payment;
+            const {
+              email,
+              'shipping-firstname': firstName,
+              'shipping-lastname': lastName,
+              'shipping-telephone': phone,
+            } = formData;
+            const shipping = collectAddress(form, formData, 'shipping-', email);
+
+            const { default: cart } = await import('../../scripts/cart.js');
+
+            const order = cart.getOrderJSON(email, firstName, lastName, phone, shipping, {
+              shippingMethod: selectedShippingMethodId,
+              estimateToken: currentEstimateToken,
+              locale: getLocale(),
+              country,
+            });
+
+            sessionStorage.setItem('checkout_email', email);
+            sessionStorage.setItem('checkout_cart_items', JSON.stringify(cart.items));
+            sessionStorage.setItem('checkout_preview', JSON.stringify(currentPreview));
+
+            const { order: createdOrder } = await createOrder(order);
+            sessionStorage.setItem('checkout_order', JSON.stringify(createdOrder));
+
+            const fraudToken = sessionStorage.getItem('forter_token') || undefined;
+            const payment = await initiatePayment(
+              createdOrder.id,
+              idempotencyKey,
+              fraudToken,
+              'chase-wallet',
+              'apple-pay',
+              { token, billingContact },
+            );
+
+            if (payment.status === 'completed') {
+              session.completePayment({ status: window.ApplePaySession.STATUS_SUCCESS });
+              window.location.href = `${getOrderPath('order-summary')}?orderId=${createdOrder.id}`;
+            } else {
+              session.completePayment({ status: window.ApplePaySession.STATUS_FAILURE });
+              const declineMessages = {
+                payment_declined: 'Your payment was declined. Please try a different card.',
+                fraud_declined: 'We were unable to process your payment. Please try again or contact support.',
+                token_already_used: 'This payment session has already been used. Please try again.',
+                provider_error: 'A payment error occurred. Please try again.',
+              };
+              showError(formColumn, declineMessages[payment.reason] || 'Your payment could not be processed. Please try again.');
+            }
+          } catch (err) {
+            session.completePayment({ status: window.ApplePaySession.STATUS_FAILURE });
+            const message = err.body?.message || err.message || 'Something went wrong. Please try again.';
+            showError(formColumn, message);
+          }
+        };
+
+        session.oncancel = () => {};
+
+        session.begin();
+      });
     } else {
       span.classList.add('credit-card');
       span.appendChild(button);
