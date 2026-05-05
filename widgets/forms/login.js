@@ -32,6 +32,7 @@ export default async function decorate(widget) {
 
   const { language } = getLocaleAndLanguage();
   const lang = (language || 'en_us').split('_')[0];
+  import('./util.js').then(({ setupFormValidation }) => setupFormValidation(form, lang));
   const copy = await loadFormCopy(lang);
   const labels = copy.labels || {};
   const inputHints = copy.inputPlaceholders || {};

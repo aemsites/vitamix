@@ -54,6 +54,7 @@ export default async function decorate(widget) {
   const vitamixInternationalPath = `/${locale}/${language}/vitamix-international`;
   const countryCode = (locale || 'us').toUpperCase();
   const lang = (language || 'en_us').split('_')[0];
+  import('./util.js').then(({ setupFormValidation }) => setupFormValidation(form, lang));
   const copy = await loadFormCopy(lang).catch(() => ({}));
   const stateOptions = await getStatesProvincesOptions(countryCode, lang).catch(() => []);
   const labels = copy.labels || {};

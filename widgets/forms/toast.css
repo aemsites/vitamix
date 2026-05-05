@@ -35,3 +35,14 @@
 .toast-info { background: #2f3e4e; }
 .toast-success { background: #2f7a4c; }
 .toast-error { background: #b3261e; }
+
+.form-field-error {
+  color: var(--color-red, #c8102e);
+  font-size: var(--font-size-20, 0.875rem);
+  margin: 0.25em 0 0;
+  line-height: 1.3;
+}
+
+[aria-invalid="true"] {
+  border-color: var(--color-red, #c8102e);
+}

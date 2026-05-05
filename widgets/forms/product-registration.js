@@ -42,6 +42,7 @@ export default async function decorate(widget) {
 
   const { locale, language } = getLocaleAndLanguage();
   const lang = (language || 'en_us').split('_')[0];
+  import('./util.js').then(({ setupFormValidation }) => setupFormValidation(form, lang));
   const countryCode = (locale || 'us').toUpperCase();
   const copy = await loadFormCopy(lang);
   const provinceOptions = await getStatesProvincesOptions(countryCode, lang).catch(() => []);
@@ -66,7 +67,14 @@ export default async function decorate(widget) {
   if (serialInput) serialInput.placeholder = inputHints.serialNumber ?? '';
 
   const findLink = form.querySelector('.find-serial-link');
-  if (findLink) findLink.textContent = labels.findYourSerialNumber ?? 'Find your serial number';
+  if (findLink) {
+    findLink.textContent = labels.findYourSerialNumber ?? 'Find your serial number';
+    findLink.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const { openModal } = await import('../../blocks/modal/modal.js');
+      await openModal(`/${locale}/${language}/customer-service/product-registration-find-serial`);
+    });
+  }
 
   const radioLegend = form.querySelector('.product-registration-radio-group .radio-legend');
   if (radioLegend) radioLegend.textContent = labels.iPlanToUseIt ?? 'I plan to use it';

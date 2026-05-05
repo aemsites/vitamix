@@ -4,13 +4,16 @@ const TOAST_DURATION_MS = 5000;
 const TOAST_EXIT_MS = 250;
 
 let toastContainer = null;
-let toastCssLoaded = false;
+let formStylesLoaded = false;
+
+function ensureFormStyles() {
+  if (formStylesLoaded) return;
+  loadCSS(`${window.hlx?.codeBasePath || ''}/widgets/forms/toast.css`);
+  formStylesLoaded = true;
+}
 
 function ensureToastContainer() {
-  if (!toastCssLoaded) {
-    loadCSS(`${window.hlx?.codeBasePath || ''}/widgets/forms/toast.css`);
-    toastCssLoaded = true;
-  }
+  ensureFormStyles();
   if (!toastContainer || !document.body.contains(toastContainer)) {
     toastContainer = document.createElement('div');
     toastContainer.className = 'toast-container';
@@ -121,17 +124,135 @@ function findMatchingInput(form, messages) {
   return match;
 }
 
+/**
+ * Returns the input's "field row" — the closest ancestor whose parent is the
+ * form or a fieldset. This is where we render an inline error message.
+ */
+function getFieldWrapper(input) {
+  let el = input;
+  while (
+    el?.parentElement
+    && el.parentElement.tagName !== 'FORM'
+    && el.parentElement.tagName !== 'FIELDSET'
+  ) {
+    el = el.parentElement;
+  }
+  return el;
+}
+
+function getOrCreateErrorElement(input) {
+  const wrapper = getFieldWrapper(input);
+  if (!wrapper) return null;
+  let errorEl = wrapper.querySelector(':scope > .form-field-error');
+  if (!errorEl) {
+    errorEl = document.createElement('p');
+    errorEl.className = 'form-field-error';
+    errorEl.setAttribute('aria-live', 'polite');
+    errorEl.hidden = true;
+    wrapper.appendChild(errorEl);
+  }
+  return errorEl;
+}
+
+function showInlineError(input, message) {
+  const errorEl = getOrCreateErrorElement(input);
+  if (!errorEl) return;
+  errorEl.textContent = message;
+  errorEl.hidden = false;
+  input.setAttribute('aria-invalid', 'true');
+}
+
+function clearInlineError(input) {
+  const wrapper = getFieldWrapper(input);
+  const errorEl = wrapper?.querySelector(':scope > .form-field-error');
+  if (errorEl) {
+    errorEl.textContent = '';
+    errorEl.hidden = true;
+  }
+  input.removeAttribute('aria-invalid');
+}
+
 function applyInputError(input, message) {
   if (typeof input.setCustomValidity !== 'function') return;
   input.setCustomValidity(message);
-  if (typeof input.reportValidity === 'function') input.reportValidity();
+  showInlineError(input, message);
+  if (typeof input.scrollIntoView === 'function') {
+    input.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+  if (typeof input.focus === 'function') input.focus();
   const clear = () => {
     input.setCustomValidity('');
+    clearInlineError(input);
     input.removeEventListener('input', clear);
     input.removeEventListener('change', clear);
   };
   input.addEventListener('input', clear);
   input.addEventListener('change', clear);
+}
+
+/**
+ * Localized native validation messages, keyed by ValidityState flag.
+ * `default` is the fallback when none of the more specific keys apply.
+ */
+const VALIDATION_MESSAGES = {
+  en: {
+    valueMissing: 'This field is required.',
+    default: 'Please enter a valid value.',
+  },
+  fr: {
+    valueMissing: 'Ce champ est obligatoire.',
+    default: 'Veuillez saisir une valeur valide.',
+  },
+  es: {
+    valueMissing: 'Este campo es obligatorio.',
+    default: 'Por favor, introduzca un valor válido.',
+  },
+};
+
+function pickValidationMessage(validity, messages) {
+  if (validity.customError) return null;
+  if (validity.valueMissing) return messages.valueMissing;
+  if (validity.valid) return null;
+  return messages.default;
+}
+
+/**
+ * Installs localized native-validation messages on every form control.
+ * Listens for `invalid` events and replaces the browser's default message
+ * via setCustomValidity. Custom errors set by other code are not overridden.
+ * @param {HTMLFormElement} form
+ * @param {string} [lang] - Language key (en, fr, es); defaults to 'en'
+ */
+export function setupFormValidation(form, lang = 'en') {
+  ensureFormStyles();
+  const messages = VALIDATION_MESSAGES[lang] || VALIDATION_MESSAGES.en;
+  [...form.querySelectorAll('input, select, textarea')].forEach((input) => {
+    input.addEventListener('invalid', (e) => {
+      e.preventDefault();
+      const message = pickValidationMessage(input.validity, messages);
+      if (message) {
+        input.setCustomValidity(message);
+        showInlineError(input, message);
+      }
+    });
+    const clear = () => {
+      if (input.validity.customError) input.setCustomValidity('');
+      clearInlineError(input);
+    };
+    input.addEventListener('input', clear);
+    input.addEventListener('change', clear);
+  });
+
+  form.addEventListener('submit', (e) => {
+    if (form.checkValidity()) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    const firstInvalid = form.querySelector(':invalid');
+    if (firstInvalid) {
+      firstInvalid.focus();
+      firstInvalid.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+  }, true);
 }
 
 /**
