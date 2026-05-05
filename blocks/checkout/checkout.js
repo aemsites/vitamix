@@ -727,8 +727,14 @@ export default async function decorate(block) {
       loadScript('https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js');
       span.innerHTML = `<apple-pay-button buttonstyle="black" type="buy" locale="${getLocale()}"></apple-pay-button>`;
 
-      const applePayBtn = span.querySelector('apple-pay-button');
-      applePayBtn.addEventListener('click', () => {
+      // Listen on the span wrapper, not the <apple-pay-button> custom element.
+      // The custom element renders as zero-height on non-Safari browsers, so
+      // listening on the host span is more reliable for event propagation.
+      span.addEventListener('click', () => {
+        if (!window.ApplePaySession?.canMakePayments()) {
+          showError(formColumn, 'Apple Pay is not available on this device or browser.');
+          return;
+        }
         if (!selectedShippingMethodId) {
           showError(formColumn, 'Please select a shipping method.');
           return;
@@ -739,10 +745,6 @@ export default async function decorate(block) {
         }
         if (!currentEstimateToken || !currentPreview) {
           showError(formColumn, 'Please wait for shipping and tax estimates to load.');
-          return;
-        }
-        if (!window.ApplePaySession?.canMakePayments()) {
-          showError(formColumn, 'Apple Pay is not available on this device or browser.');
           return;
         }
 
