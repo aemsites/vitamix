@@ -25,7 +25,7 @@ export const ORDERS_API_ORIGIN = 'https://api-stage.adobecommerce.live/aemsites/
 // Add locale codes here as each region goes live (e.g., 'ca', 'fr_ca').
 const EDGE_CART_LOCALES = [];
 
-const isEdgeHost = hostname.includes('localhost') || hostname.includes('edge-orders') || hostname.includes('uat.vitamix.com');
+const isEdgeHost = hostname.includes('localhost') || hostname.includes('edge-orders') || hostname.includes('integration.vitamix.com');
 const isProdHost = hostname.includes('vitamix.com');
 
 // Affirm public API key — safe to expose client-side (used for PDP promo widgets).
