@@ -1,4 +1,6 @@
-import { getMetadata, toClassName, fetchPlaceholders } from '../../scripts/aem.js';
+import {
+  getMetadata, toClassName, fetchPlaceholders, createOptimizedPicture,
+} from '../../scripts/aem.js';
 import {
   buildCarousel, formatServings, formatTime, getLocaleAndLanguage,
 } from '../../scripts/scripts.js';
@@ -216,53 +218,65 @@ function findRelatedRecipes(target, allRecipes, max = 3) {
   }, []);
 }
 
+function hasBadImage(recipe) {
+  return !recipe.image || recipe.image.includes('default-meta-image');
+}
+
 /**
  * Builds the highlight recipe list.
  * @param {Array<{ recipe: Object, href: string }>} rows - Recipe plus URL (author or generated)
  * @param {Object} placeholders - Placeholders for formatting
+ * @param {boolean} isPreview - Whether running on preview/localhost
  */
-function buildFeaturedList(rows, placeholders) {
+function buildFeaturedList(rows, placeholders, isPreview) {
   const ul = document.createElement('ul');
   rows.forEach(({ recipe, href }) => {
-    let imagePath = recipe.image;
-    try {
-      const imageUrl = new URL(imagePath, window.location.origin);
-      imagePath = imageUrl.pathname + imageUrl.search;
-    } catch (e) {
-      // use as-is
-    }
-
     const { difficulty } = recipe;
     const timeText = formatTime(recipe['total-time'], placeholders);
     const servesText = formatServings(recipe.yield);
 
-    const badge = difficulty
-      ? `<span class="badge" data-difficulty="${toClassName(difficulty)}">${difficulty}</span>`
-      : '';
+    const imageWrapper = document.createElement('div');
+    imageWrapper.className = 'image-wrapper';
+    if (!hasBadImage(recipe)) {
+      imageWrapper.append(createOptimizedPicture(recipe.image, '', false));
+    }
 
-    const timeItem = timeText
-      ? `<span><img src="/blocks/recipe/time.svg" alt=""> ${timeText}</span>`
-      : '';
-    const servesItem = servesText
-      ? `<span><img src="/blocks/recipe/yield.svg" alt=""> ${servesText}</span>`
-      : '';
-    const metaRow = (timeItem || servesItem)
-      ? `<p class="meta">${timeItem}${servesItem}</p>`
-      : '';
+    if (difficulty) {
+      const badge = document.createElement('span');
+      badge.className = 'badge';
+      badge.dataset.difficulty = toClassName(difficulty);
+      badge.textContent = difficulty;
+      imageWrapper.append(badge);
+    }
+
+    const body = document.createElement('div');
+    body.className = 'body';
+    const h2 = document.createElement('h2');
+    h2.textContent = recipe.title;
+    body.append(h2);
+    if (timeText || servesText) {
+      const meta = document.createElement('p');
+      meta.className = 'meta';
+      if (timeText) {
+        const s = document.createElement('span');
+        s.innerHTML = `<img src="/blocks/recipe/time.svg" alt=""> ${timeText}`;
+        meta.append(s);
+      }
+      if (servesText) {
+        const s = document.createElement('span');
+        s.innerHTML = `<img src="/blocks/recipe/yield.svg" alt=""> ${servesText}`;
+        meta.append(s);
+      }
+      body.append(meta);
+    }
+
+    const a = document.createElement('a');
+    a.href = href;
+    a.append(imageWrapper, body);
 
     const li = document.createElement('li');
-    li.innerHTML = `
-      <a href="${href}">
-        <div class="image-wrapper">
-          <img src="${imagePath}" alt="" loading="lazy" />
-          ${badge}
-        </div>
-        <div class="body">
-          <h2>${recipe.title}</h2>
-          ${metaRow}
-        </div>
-      </a>
-    `;
+    if (isPreview && hasBadImage(recipe)) li.classList.add('linkchecker-invalid-link');
+    li.append(a);
     ul.append(li);
   });
   return ul;
@@ -270,6 +284,7 @@ function buildFeaturedList(rows, placeholders) {
 
 export default async function decorate(block) {
   const hasHighlight = block.classList.contains('highlight');
+  const isPreview = window.location.hostname.endsWith('.aem.page') || window.location.hostname === 'localhost';
   const { locale, language } = getLocaleAndLanguage();
   const placeholders = hasHighlight ? await fetchPlaceholders(`/${locale}/${language}`) : {};
   const path = `/${locale}/${language}/recipes/query-index.json`;
@@ -297,7 +312,7 @@ export default async function decorate(block) {
         href: hrefFromAuthorLink(anchor),
       };
     })
-    .filter((row) => row);
+    .filter((row) => row && (isPreview || !hasBadImage(row.recipe)));
 
   // If no manual links found, use algorithmic matching
   let relatedRows;
@@ -333,7 +348,7 @@ export default async function decorate(block) {
   }
 
   if (hasHighlight) {
-    block.replaceChildren(buildFeaturedList(relatedRows, placeholders));
+    block.replaceChildren(buildFeaturedList(relatedRows, placeholders, isPreview));
     return;
   }
 
@@ -341,21 +356,16 @@ export default async function decorate(block) {
   const ul = document.createElement('ul');
 
   relatedRows.forEach(({ recipe, href }) => {
+    const a = document.createElement('a');
+    a.href = href;
+    if (!hasBadImage(recipe)) a.append(createOptimizedPicture(recipe.image, '', false));
+    const span = document.createElement('span');
+    span.textContent = recipe.title;
+    a.append(span);
+
     const li = document.createElement('li');
-    // Convert image URL to relative path (pathname + query params only)
-    let imagePath = recipe.image;
-    try {
-      const imageUrl = new URL(imagePath, window.location.origin);
-      imagePath = imageUrl.pathname + imageUrl.search;
-    } catch (e) {
-      // If URL parsing fails, use the path as-is
-    }
-    li.innerHTML = `
-      <a href="${href}">
-        <img src="${imagePath}" alt="" loading="lazy" />
-        <span>${recipe.title}</span>
-      </a>
-    `;
+    if (isPreview && hasBadImage(recipe)) li.classList.add('linkchecker-invalid-link');
+    li.append(a);
     ul.append(li);
   });
 

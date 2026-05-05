@@ -293,20 +293,47 @@ function setupFragmentLoader(nav, ul, li, a) {
  * @param {Element} block The header block element
  */
 export default async function decorate(block) {
-  // load nav as fragment
-  const navMeta = getMetadata('nav');
-  const navPath = navMeta ? new URL(navMeta, window.location).pathname : '/nav';
-  const fragment = await loadFragment(navPath);
-  if (fragment.querySelector('.icon-logo-commercial')) {
-    block.closest('header').classList.add('header-commercial');
-  }
-  rewriteLinks(fragment);
+  let nav;
+  const existingNav = block.querySelector('#nav') || block.querySelector('.nav-wrapper section');
+  const innerNav = block.querySelector('nav');
+  const hasExistingContent = block.children.length > 0 && block.querySelector('ul');
 
-  // decorate nav DOM
-  block.textContent = '';
-  const nav = document.createElement('section');
-  nav.id = 'nav';
-  while (fragment.firstElementChild) nav.append(fragment.firstElementChild);
+  if (existingNav) {
+    nav = existingNav.id === 'nav' ? existingNav : existingNav.querySelector('#nav') || existingNav;
+  } else if (innerNav && innerNav.children.length >= 4) {
+    // aem-embed: block > row > cell > nav (with 4 sections) – use that nav
+    nav = document.createElement('section');
+    nav.id = 'nav';
+    while (innerNav.firstElementChild) nav.append(innerNav.firstElementChild);
+    innerNav.replaceWith(nav);
+    rewriteLinks(nav);
+  } else if (hasExistingContent) {
+    // content already in DOM (e.g. from aem-embed, or server-sided content)
+    nav = document.createElement('section');
+    nav.id = 'nav';
+    while (block.firstElementChild) nav.append(block.firstElementChild);
+    rewriteLinks(nav);
+  }
+
+  if (!nav) {
+    // load nav as fragment
+    const navMeta = getMetadata('nav');
+    const navPath = navMeta ? new URL(navMeta, window.location).pathname : '/nav';
+    const fragment = await loadFragment(navPath);
+    if (fragment.querySelector('.icon-logo-commercial')) {
+      block.closest('header')?.classList.add('header-commercial');
+    }
+    rewriteLinks(fragment);
+
+    block.textContent = '';
+    nav = document.createElement('section');
+    nav.id = 'nav';
+    while (fragment.firstElementChild) nav.append(fragment.firstElementChild);
+  }
+
+  if (nav.querySelector('.icon-logo-commercial')) {
+    block.closest('header')?.classList.add('header-commercial');
+  }
 
   const classes = ['title', 'sections', 'tools', 'cart'];
   classes.forEach((c, i) => {
@@ -415,10 +442,12 @@ export default async function decorate(block) {
     toggleHeader(e.matches, nav, hamburgerButton);
   });
 
-  const navWrapper = document.createElement('div');
-  navWrapper.className = 'nav-wrapper';
-  navWrapper.append(nav);
-  block.append(navWrapper);
+  if (!nav.parentElement?.classList?.contains('nav-wrapper')) {
+    const navWrapper = document.createElement('div');
+    navWrapper.className = 'nav-wrapper';
+    navWrapper.append(nav);
+    block.append(navWrapper);
+  }
 
   swapIcons(block);
 
