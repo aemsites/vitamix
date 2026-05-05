@@ -208,12 +208,15 @@ export class Cart {
         phone,
       },
       shipping: cleanAddr(shippingAddr),
+      // Default billing to shipping when the customer didn't enter a
+      // separate billing address (the "billing same as shipping" flow).
+      // The API treats both as required for order downstream consumers
+      // (transactional emails, payment-provider risk checks, etc.) — sending
+      // shipping as billing keeps every consumer happy without forcing the
+      // customer to type their address twice.
+      billing: cleanAddr(billingAddr ?? shippingAddr),
       items: this.getItemsForAPI(),
     };
-
-    if (billingAddr) {
-      order.billing = cleanAddr(billingAddr);
-    }
     if (shippingMethod) {
       order.shippingMethod = { id: shippingMethod };
     }
