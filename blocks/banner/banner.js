@@ -28,13 +28,17 @@ function getLuminance(el) {
 
 export default function decorate(block) {
   const variants = [...block.classList].filter((c) => c !== 'block' && c !== 'banner');
-  const row = block.firstElementChild;
-  if (row) {
+  const rows = [...block.children];
+  rows.forEach((row) => {
     const cells = [...row.children];
     cells.forEach((cell) => {
       cell.className = isMediaCell(cell) ? 'img-wrapper' : 'text-wrapper';
     });
-    const imgIndex = cells.findIndex((c) => c.classList.contains('img-wrapper'));
+  });
+
+  const firstRow = block.firstElementChild;
+  if (firstRow) {
+    const imgIndex = [...firstRow.children].findIndex((c) => c.classList.contains('img-wrapper'));
     if (imgIndex !== -1) block.classList.add(imgIndex === 0 ? 'left-text' : 'right-text');
   }
 

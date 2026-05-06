@@ -215,6 +215,7 @@
 @media (width >= 1000px) {
   .banner.inset .text-wrapper {
     order: unset;
+    flex: 1 0 40%;
   }
 }
 
@@ -235,7 +236,7 @@
 @media (width >= 1000px) {
   .banner.inset .img-wrapper,
   .banner.inset .vid-wrapper {
-    flex: 0 0 60%;
+    flex: 0 1 60%;
     max-height: 600px;
     aspect-ratio: 4 / 3;
   }
