@@ -190,6 +190,14 @@
   width: 100%;
 }
 
+/* The span wrapper needs explicit block display so width:100% applies and
+   the element is always clickable — <apple-pay-button> is zero-height until
+   the SDK upgrades it, which would make the span unclickable on first render. */
+.checkout-form-column .form form .button-wrapper span.payment-button.apple-pay {
+  display: block;
+  min-height: 44px;
+}
+
 apple-pay-button {
   --apple-pay-button-width: 100%;
   --apple-pay-button-height: 40px;

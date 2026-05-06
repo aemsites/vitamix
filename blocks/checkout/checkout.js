@@ -731,8 +731,12 @@ export default async function decorate(block) {
       // The custom element renders as zero-height on non-Safari browsers, so
       // listening on the host span is more reliable for event propagation.
       span.addEventListener('click', () => {
-        if (!window.ApplePaySession?.canMakePayments()) {
-          showError(formColumn, 'Apple Pay is not available on this device or browser.');
+        // The Apple Pay JS SDK (1.latest / v1.2.0+) polyfills window.ApplePaySession on
+        // Chrome and other non-Safari browsers, enabling the "Scan with iPhone" QR code
+        // flow (requires iOS 18+ on the user's iPhone). If the SDK hasn't loaded yet,
+        // ApplePaySession will be undefined and we show a retry prompt.
+        if (!window.ApplePaySession) {
+          showError(formColumn, 'Apple Pay is still loading — please try again in a moment.');
           return;
         }
         if (!selectedShippingMethodId) {
@@ -757,16 +761,22 @@ export default async function decorate(block) {
         // Snapshot form state before async session callbacks run
         const formData = Object.fromEntries(new FormData(form).entries());
 
-        const session = new window.ApplePaySession(3, {
-          countryCode: country.toUpperCase(),
-          currencyCode,
-          supportedNetworks: ['visa', 'masterCard', 'amex', 'discover'],
-          merchantCapabilities: ['supports3DS'],
-          total: {
-            label: 'Vitamix',
-            amount: parseFloat(currentPreview.total ?? 0).toFixed(2),
-          },
-        });
+        let session;
+        try {
+          session = new window.ApplePaySession(3, {
+            countryCode: country.toUpperCase(),
+            currencyCode,
+            supportedNetworks: ['visa', 'masterCard', 'amex', 'discover'],
+            merchantCapabilities: ['supports3DS'],
+            total: {
+              label: 'Vitamix',
+              amount: parseFloat(currentPreview.total ?? 0).toFixed(2),
+            },
+          });
+        } catch (err) {
+          showError(formColumn, 'Apple Pay is not available. Please try a different payment method.');
+          return;
+        }
 
         session.onvalidatemerchant = async (event) => {
           try {
@@ -841,7 +851,11 @@ export default async function decorate(block) {
 
         session.oncancel = () => {};
 
-        session.begin();
+        try {
+          session.begin();
+        } catch (err) {
+          showError(formColumn, 'Unable to start Apple Pay. Please try a different payment method.');
+        }
       });
     } else {
       span.classList.add('credit-card');
@@ -978,5 +992,7 @@ export default async function decorate(block) {
         }
       }
     });
+
+    clearError(formColumn);
   });
 }
