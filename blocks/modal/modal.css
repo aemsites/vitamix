@@ -85,6 +85,26 @@ body.modal-open {
   padding: 0;
 }
 
+/* product registration find serial modal */
+.modal[data-modal-path*="product-registration-find-serial"] dialog {
+  max-width: 1000px;
+  max-height: 750px;
+  height: 90dvh;
+  width: 90dvw;
+}
+
+.modal[data-modal-path*="product-registration-find-serial"] dialog .modal-content {
+  background-color: var(--color-gray-300);
+  display: flex;
+  max-height: 
+}
+
+@media (width >= 1000px) {
+  .modal[data-modal-path*="product-registration-find-serial"] dialog .modal-content {
+    max-height: calc(90dvh - 64px);
+  }
+}
+
 /* sign-up modal */
 .modal[data-modal-path*="sign-up"] dialog {
   max-width: 1000px;
