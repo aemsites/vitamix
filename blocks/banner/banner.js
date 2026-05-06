@@ -42,6 +42,12 @@ export default function decorate(block) {
   if (video) {
     const wrapper = video.closest('div');
     wrapper.classList.add('vid-wrapper');
+    const picture = wrapper.querySelector('picture');
+    if (picture) {
+      const img = picture.querySelector('img');
+      if (img) video.poster = img.src;
+      (picture.closest('p') || picture).remove();
+    }
   }
 
   if (!variants.includes('inset') && !variants.includes('image')) {
