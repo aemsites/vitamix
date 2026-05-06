@@ -20,6 +20,10 @@
   background-color: var(--banner-color);
 }
 
+.banner > div + div {
+  margin-top: var(--spacing-400);
+}
+
 @media (width >= 800px) {
   .banner > div {
     grid-template-columns: repeat(2, minmax(0, 1fr));
