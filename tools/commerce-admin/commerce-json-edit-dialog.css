@@ -1,0 +1,59 @@
+.commerce-json-edit-dialog {
+  max-width: min(960px, 96vw);
+  width: 100%;
+  padding: 0;
+  border: 1px solid #e1e3e5;
+  border-radius: 8px;
+  background: #fff;
+  color: #202223;
+}
+
+.commerce-json-edit-dialog::backdrop {
+  background: rgb(0 0 0 / 35%);
+}
+
+.commerce-json-edit-title {
+  margin: 0;
+  padding: 14px 18px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  border-bottom: 1px solid #e1e3e5;
+}
+
+.commerce-json-edit-textarea {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: min(420px, 55vh);
+  margin: 0;
+  padding: 14px 16px;
+  border: none;
+  border-bottom: 1px solid #e1e3e5;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  resize: vertical;
+  background: #fafafa;
+  color: #202223;
+}
+
+.commerce-json-edit-textarea:focus {
+  outline: 2px solid rgb(44 44 46 / 20%);
+  outline-offset: -2px;
+}
+
+.commerce-json-edit-error {
+  margin: 0;
+  padding: 8px 16px;
+  font-size: 13px;
+  color: #6b2d1a;
+  background: #fbeae5;
+  border-bottom: 1px solid #edc0b4;
+}
+
+.commerce-json-edit-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 16px 16px;
+}

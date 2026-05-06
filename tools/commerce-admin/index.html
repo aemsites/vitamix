@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Vitamix Commerce Admin</title>
+    <link rel="stylesheet" href="commerce-auth.css" />
+    <link rel="stylesheet" href="pim.css" />
+    <link rel="stylesheet" href="commerce-admin-chrome.css" />
+  </head>
+  <body class="commerce-admin-body" data-commerce-header="hub">
+    <div id="commerce-admin-auth-root" aria-live="polite">
+      <p class="commerce-admin-auth-placeholder">Checking sign-in…</p>
+    </div>
+    <header id="commerce-admin-app-header"></header>
+    <main class="pim-main commerce-admin-hub-main">
+      <h1>Tools</h1>
+      <p class="commerce-admin-hub-lead">Internal tools for catalog and commerce operations.</p>
+
+      <nav class="commerce-admin-hub-nav" aria-label="Commerce admin tools">
+        <h2>Catalog and commerce</h2>
+        <ul>
+          <li>
+            <a href="catalog.html">Product catalog</a>
+            <span class="hub-tool-desc">Browse and edit live product JSON (PIM).</span>
+          </li>
+          <li>
+            <a href="orders.html">Orders</a>
+            <span class="hub-tool-desc">ProductBus list, view, and form edit for customer or addresses (same source as productbus-admin).</span>
+          </li>
+          <li>
+            <a href="price-rules.html">Price rules</a>
+            <span class="hub-tool-desc">UI mock: countries, rules table, promotions and coupons by year (API later).</span>
+          </li>
+          <li>
+            <a href="customers.html">Customers</a>
+            <span class="hub-tool-desc">ProductBus list, view, and JSON edit (same data source as productbus-admin).</span>
+          </li>
+        </ul>
+      </nav>
+    </main>
+    <script type="module" src="auth-page-boot.js"></script>
+    <script type="module" src="commerce-admin-header.js"></script>
+  </body>
+</html>

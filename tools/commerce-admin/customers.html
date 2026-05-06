@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Customers — Vitamix Commerce Admin</title>
+    <link rel="stylesheet" href="commerce-auth.css" />
+    <link rel="stylesheet" href="pim.css" />
+    <link rel="stylesheet" href="commerce-admin-chrome.css" />
+    <link rel="stylesheet" href="commerce-json-edit-dialog.css" />
+    <link rel="stylesheet" href="customers.css" />
+  </head>
+  <body class="customers-body commerce-admin-body" data-commerce-header="subpage" data-commerce-header-page="Customers">
+    <div id="commerce-admin-auth-root" aria-live="polite">
+      <p class="commerce-admin-auth-placeholder">Checking sign-in…</p>
+    </div>
+    <header id="commerce-admin-app-header"></header>
+    <main class="pim-main customers-page">
+      <h1 class="customers-page-title">Customers</h1>
+      <p class="customers-page-lead">
+        ProductBus <code>GET …/customers</code> — search, sort, view JSON, edit via <code>PUT</code>/<code>PATCH</code> (same source as
+        <a href="https://github.com/adobe/helix-tools-website/blob/pb-admin/tools/productbus-admin/customers.js" target="_blank" rel="noopener">productbus-admin</a>).
+      </p>
+
+      <div class="customers-toolbar pim-toolbar">
+        <input
+          type="search"
+          id="customers-search"
+          class="pim-search customers-search-wide"
+          placeholder="Search email, name, phone…"
+          aria-label="Search customers"
+        />
+        <div class="customers-toolbar-right">
+          <div class="customers-toolbar-filters" role="group" aria-label="Sort">
+            <div class="customers-filter-field">
+              <label class="customers-filter-label" for="customers-sort">Sort</label>
+              <select id="customers-sort" class="pim-index-select customers-filter-select" aria-label="Sort by date">
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+              </select>
+            </div>
+          </div>
+          <span class="pim-count" id="customers-count"></span>
+        </div>
+      </div>
+
+      <p id="customers-error" class="customers-error" hidden></p>
+
+      <div id="customers-table" class="customers-table-wrap pim-list-wrapper">
+        <p class="commerce-admin-auth-placeholder customers-loading-msg">Loading customers…</p>
+      </div>
+    </main>
+    <script type="module" src="auth-page-boot.js"></script>
+    <script type="module" src="commerce-admin-header.js"></script>
+    <script type="module" src="customers-page.js"></script>
+  </body>
+</html>

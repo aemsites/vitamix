@@ -1,0 +1,102 @@
+.order-edit-dialog {
+  max-width: min(640px, 96vw);
+  width: 100%;
+  padding: 0;
+  border: 1px solid #e1e3e5;
+  border-radius: 8px;
+  background: #fff;
+  color: #202223;
+}
+
+.order-edit-dialog::backdrop {
+  background: rgb(0 0 0 / 35%);
+}
+
+.order-edit-title {
+  margin: 0;
+  padding: 14px 18px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  border-bottom: 1px solid #e1e3e5;
+}
+
+.order-edit-lead {
+  margin: 0;
+  padding: 10px 18px;
+  font-size: 13px;
+  color: #6d7175;
+  line-height: 1.45;
+  border-bottom: 1px solid #e1e3e5;
+  background: #fafafa;
+}
+
+.order-edit-body {
+  max-height: min(60vh, 520px);
+  overflow-y: auto;
+  padding: 12px 18px 8px;
+}
+
+.order-edit-fieldset {
+  margin: 0 0 16px;
+  padding: 12px 14px 14px;
+  border: 1px solid #e1e3e5;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.order-edit-fieldset legend {
+  padding: 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #202223;
+}
+
+.order-edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.order-edit-field:first-of-type {
+  margin-top: 4px;
+}
+
+.order-edit-field label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #6d7175;
+}
+
+.order-edit-input {
+  padding: 8px 10px;
+  font-size: 14px;
+  border: 1px solid #e1e3e5;
+  border-radius: 6px;
+  font-family: inherit;
+  background: #fff;
+  color: #202223;
+}
+
+.order-edit-input:focus {
+  outline: none;
+  border-color: #2c2c2e;
+  box-shadow: 0 0 0 2px rgb(44 44 46 / 12%);
+}
+
+.order-edit-error {
+  margin: 0;
+  padding: 8px 18px;
+  font-size: 13px;
+  color: #6b2d1a;
+  background: #fbeae5;
+  border-bottom: 1px solid #edc0b4;
+}
+
+.order-edit-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 18px 16px;
+  border-top: 1px solid #e1e3e5;
+}

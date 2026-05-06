@@ -1,0 +1,68 @@
+/* Shared layout for Commerce Admin hub and stub tool pages */
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  max-width: 40rem;
+  margin: 2rem auto;
+  padding: 0 1.25rem;
+  color: #111;
+  line-height: 1.5;
+}
+
+h1 {
+  font-size: 1.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.lead {
+  color: #444;
+  margin-top: 0;
+}
+
+a {
+  color: #0b57d0;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+.stub-note {
+  color: #555;
+  font-size: 0.95rem;
+}
+
+nav ul {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0;
+}
+
+nav li {
+  margin: 0.85rem 0;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+nav li:last-child {
+  border-bottom: none;
+}
+
+.back-row {
+  margin-bottom: 1.5rem;
+  font-size: 0.95rem;
+}
+
+.ca-text-btn {
+  font: inherit;
+  font-size: 0.95rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #0b57d0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.ca-text-btn:hover {
+  color: #084298;
+}

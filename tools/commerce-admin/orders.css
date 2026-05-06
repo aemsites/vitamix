@@ -1,0 +1,237 @@
+/* Orders admin — full width like catalog (not admin-common.css: that caps body at 40rem). */
+.orders-body {
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.orders-page-title {
+  font-size: 1.35rem;
+  margin: 0 0 6px;
+  color: #202223;
+  font-weight: 600;
+}
+
+.orders-page-lead {
+  margin: 0 0 16px;
+  font-size: 14px;
+  color: #6d7175;
+  line-height: 1.45;
+}
+
+.orders-page-lead code {
+  font-size: 12px;
+  background: #f0f0f1;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* Toolbar: search grows; filters sit like catalog index selector */
+.orders-toolbar.pim-toolbar {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  margin-bottom: 14px;
+}
+
+.pim-search.orders-search-wide {
+  flex: 1 1 280px;
+  max-width: none;
+  min-width: 200px;
+}
+
+.orders-toolbar-right {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  margin-left: auto;
+}
+
+.orders-toolbar-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+}
+
+.orders-filter-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.orders-filter-label {
+  font-size: 14px;
+  color: #6d7175;
+  white-space: nowrap;
+}
+
+.orders-filter-select {
+  min-width: 9.5rem;
+}
+
+.orders-error {
+  padding: 12px 14px;
+  background: #fbeae5;
+  border: 1px solid #edc0b4;
+  color: #6b2d1a;
+  border-radius: 6px;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.orders-table-wrap.pim-list-wrapper {
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.orders-loading-msg {
+  padding: 2.5rem 1rem;
+  text-align: center;
+  margin: 0;
+  color: #6d7175;
+  font-size: 14px;
+}
+
+.orders-data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.orders-data-table th,
+.orders-data-table td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid #e1e3e5;
+  vertical-align: middle;
+}
+
+.orders-data-table th {
+  background: #fafafa;
+  font-weight: 600;
+  color: #202223;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.orders-data-table tbody tr:hover {
+  background: #f9f9f9;
+}
+
+.orders-id {
+  font-size: 13px;
+  color: #202223;
+}
+
+.orders-name-cell {
+  max-width: 14rem;
+  word-break: break-word;
+  font-size: 14px;
+  color: #202223;
+}
+
+.orders-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.orders-badge-success {
+  background: #e3f1ed;
+  color: #0d6b4f;
+}
+
+.orders-badge-info {
+  background: #e8f0fe;
+  color: #1a56b0;
+}
+
+.orders-view-btn {
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #e1e3e5;
+  background: #fff;
+  color: #202223;
+  cursor: pointer;
+}
+
+.orders-view-btn:hover {
+  background: #f6f6f7;
+}
+
+.orders-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.orders-edit-btn {
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #2c2c2e;
+  background: #fff;
+  color: #202223;
+  cursor: pointer;
+}
+
+.orders-edit-btn:hover {
+  background: #f6f6f7;
+}
+
+.orders-empty {
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.orders-empty-title {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+  color: #202223;
+}
+
+.orders-empty-text {
+  margin: 0;
+  color: #6d7175;
+  font-size: 14px;
+}
+
+.orders-json-dialog {
+  max-width: min(900px, 96vw);
+  width: 100%;
+  padding: 0;
+  border: 1px solid #e1e3e5;
+  border-radius: 8px;
+  background: #fff;
+  color: #202223;
+}
+
+.orders-json-dialog::backdrop {
+  background: rgb(0 0 0 / 35%);
+}
+
+.orders-json-pre {
+  margin: 0;
+  padding: 16px;
+  max-height: min(70vh, 720px);
+  overflow: auto;
+  font-size: 12px;
+  line-height: 1.45;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  border-bottom: 1px solid #e1e3e5;
+}
+
+.orders-dialog-close {
+  margin: 12px 16px 16px;
+}

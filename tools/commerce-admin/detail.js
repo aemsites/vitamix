@@ -199,8 +199,8 @@ function renderLinkedProducts(paths, indexByUrlKey, sectionTitle, pathKey, isEdi
   const cards = list.map((path, i) => {
     const urlKey = pathToUrlKey(path);
     const product = indexByUrlKey[urlKey];
-        const catalog = getCatalogFromParams();
-    const detailHref = `detail.html?catalog=${encodeURIComponent(catalog)}&product=${encodeURIComponent(urlKey)}`;
+    const catalog = getCatalogFromParams();
+    const detailHref = `product-detail.html?catalog=${encodeURIComponent(catalog)}&product=${encodeURIComponent(urlKey)}`;
     const name = product ? (product.title || product.name || product.sku || urlKey) : urlKey;
     const imgSrc = product && product.image ? resolveIndexImageUrl(product.image) : '';
     const delBtn = isEditMode ? `<button type="button" class="pim-edit-delete" data-edit-path="${escapeHtml(pathKey)}" data-edit-index="${i}" aria-label="Delete">×</button>` : '';
@@ -539,17 +539,29 @@ function attachReviewHandlers() {
   if (saveBtn) {
     saveBtn.addEventListener('click', async () => {
       const status = statusSelect ? statusSelect.value : '';
-      const text = (commentInput && commentInput.value || '').trim();
+      const text = ((commentInput && commentInput.value) || '').trim();
       const currentStatus = getCurrentReviewStatus(reviewHistory);
       const statusChanged = status !== currentStatus;
       if (!statusChanged && !text) return;
       const user = await getFirstName();
       try {
         if (statusChanged) {
-          await appendReviewEvent({ op: 'status_change', urlKey, user, status, ts: new Date().toISOString() });
+          await appendReviewEvent({
+            op: 'status_change',
+            urlKey,
+            user,
+            status,
+            ts: new Date().toISOString(),
+          });
         }
         if (text) {
-          await appendReviewEvent({ op: 'comment', urlKey, user, text, ts: new Date().toISOString() });
+          await appendReviewEvent({
+            op: 'comment',
+            urlKey,
+            user,
+            text,
+            ts: new Date().toISOString(),
+          });
         }
         if (commentInput) commentInput.value = '';
         await refreshReviewSection();
@@ -591,7 +603,7 @@ async function init() {
     loading.classList.remove('active');
     toolbar.style.display = 'flex';
     const backLink = toolbar.querySelector('.pim-detail-back-link');
-    if (backLink) backLink.href = `../product-admin.html?catalog=${encodeURIComponent(getCatalogFromParams())}`;
+    if (backLink) backLink.href = `../commerce-admin.html?catalog=${encodeURIComponent(getCatalogFromParams())}`;
 
     editCheckbox.addEventListener('change', () => {
       editMode = editCheckbox.checked;

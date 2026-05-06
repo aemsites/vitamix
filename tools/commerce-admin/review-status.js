@@ -14,7 +14,9 @@ function normalizeEvents(data) {
 }
 
 /**
- * @returns {Promise<Array<{ op: string, urlKey: string, user: string, ts: string, status?: string, text?: string }>>}
+ * @returns {Promise<Array<{
+ *   op: string, urlKey: string, user: string, ts: string, status?: string, text?: string
+ * }>>}
  */
 export async function fetchReviewLog() {
   const response = await fetch(API_BASE);
@@ -26,7 +28,7 @@ export async function fetchReviewLog() {
 }
 
 /**
- * Append one event to the log. Caller should pass user (first name) from user-identity.
+ * Append one event to the log. Caller should pass user (first name) from getFirstName().
  * @param {object} event - { op: 'status_change'|'comment', urlKey, user, status?, text? }
  */
 export async function appendReviewEvent(event) {

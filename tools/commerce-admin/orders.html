@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Orders — Vitamix Commerce Admin</title>
+    <link rel="stylesheet" href="commerce-auth.css" />
+    <link rel="stylesheet" href="pim.css" />
+    <link rel="stylesheet" href="commerce-admin-chrome.css" />
+    <link rel="stylesheet" href="order-contact-edit-dialog.css" />
+    <link rel="stylesheet" href="orders.css" />
+  </head>
+  <body class="orders-body commerce-admin-body" data-commerce-header="subpage" data-commerce-header-page="Orders">
+    <div id="commerce-admin-auth-root" aria-live="polite">
+      <p class="commerce-admin-auth-placeholder">Checking sign-in…</p>
+    </div>
+    <header id="commerce-admin-app-header"></header>
+    <main class="pim-main orders-page">
+      <h1 class="orders-page-title">Orders</h1>
+      <p class="orders-page-lead">
+        ProductBus <code>GET …/orders</code> — search, filter, view JSON; edit customer and addresses in a form, then <code>PUT</code>/<code>PATCH</code>.
+      </p>
+
+      <div class="orders-toolbar pim-toolbar">
+        <input
+          type="search"
+          id="orders-search"
+          class="pim-search orders-search-wide"
+          placeholder="Search order id, email, state, billing or shipping name…"
+          aria-label="Search orders"
+        />
+        <div class="orders-toolbar-right">
+          <div class="orders-toolbar-filters" role="group" aria-label="Filters">
+            <div class="orders-filter-field">
+              <label class="orders-filter-label" for="orders-state">State</label>
+              <select id="orders-state" class="pim-index-select orders-filter-select" aria-label="Filter by state"></select>
+            </div>
+            <div class="orders-filter-field">
+              <label class="orders-filter-label" for="orders-sort">Sort</label>
+              <select id="orders-sort" class="pim-index-select orders-filter-select" aria-label="Sort by date">
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+              </select>
+            </div>
+          </div>
+          <span class="pim-count" id="orders-count"></span>
+        </div>
+      </div>
+
+      <p id="orders-error" class="orders-error" hidden></p>
+
+      <div id="orders-table" class="orders-table-wrap pim-list-wrapper">
+        <p class="commerce-admin-auth-placeholder orders-loading-msg">Loading orders…</p>
+      </div>
+    </main>
+    <script type="module" src="auth-page-boot.js"></script>
+    <script type="module" src="commerce-admin-header.js"></script>
+    <script type="module" src="orders-page.js"></script>
+  </body>
+</html>

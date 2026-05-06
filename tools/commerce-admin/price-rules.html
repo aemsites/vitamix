@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Price rules — Vitamix Commerce Admin</title>
+    <link rel="stylesheet" href="commerce-auth.css" />
+    <link rel="stylesheet" href="pim.css" />
+    <link rel="stylesheet" href="commerce-admin-chrome.css" />
+    <link rel="stylesheet" href="price-rules.css" />
+  </head>
+  <body class="price-rules-body commerce-admin-body" data-commerce-header="subpage" data-commerce-header-page="Price rules">
+    <div id="commerce-admin-auth-root" aria-live="polite">
+      <p class="commerce-admin-auth-placeholder">Checking sign-in…</p>
+    </div>
+    <header id="commerce-admin-app-header"></header>
+    <main class="pim-main price-rules-page">
+      <h1 class="price-rules-page-title">Price rules</h1>
+      <p class="price-rules-page-lead">
+        Preview layout: <strong>country</strong> (US, CA, MX) → <strong>Rules</strong>, <strong>Promotions</strong> (by year → named sets), or <strong>Coupons</strong> (by year → lists with codes). Static JSON in <code>price-rules-page.js</code> until an API exists.
+      </p>
+      <div id="price-rules-mount"></div>
+    </main>
+    <script type="module" src="auth-page-boot.js"></script>
+    <script type="module" src="commerce-admin-header.js"></script>
+    <script type="module" src="price-rules-page.js"></script>
+  </body>
+</html>

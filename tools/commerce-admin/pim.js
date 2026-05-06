@@ -248,7 +248,7 @@ export function renderProductList(parents, query = '') {
     const title = product.title || product.sku;
     const tr = document.createElement('tr');
     const selectedProduct = readProductFromParams();
-    tr.className = 'pim-row' + (selectedProduct && urlKey === selectedProduct ? ' pim-row-selected' : '');
+    tr.className = `pim-row${selectedProduct && urlKey === selectedProduct ? ' pim-row-selected' : ''}`;
     tr.dataset.urlkey = urlKey;
     tr.setAttribute('role', 'button');
     tr.tabIndex = 0;
@@ -273,7 +273,7 @@ export function renderProductList(parents, query = '') {
   const productFromUrl = readProductFromParams();
   if (productFromUrl) {
     const selectedRow = [...tbody.querySelectorAll('tr.pim-row')].find(
-      (tr) => tr.dataset.urlkey === productFromUrl
+      (tr) => tr.dataset.urlkey === productFromUrl,
     );
     if (selectedRow) {
       selectedRow.classList.add('pim-row-selected');
@@ -375,7 +375,7 @@ export async function init() {
       const row = e.target.closest('tr.pim-row');
       if (!row || !row.dataset.urlkey) return;
       const catalog = currentLocalePath ? `catalog=${encodeURIComponent(currentLocalePath)}&` : '';
-        window.location.href = `product-admin/detail.html?${catalog}product=${encodeURIComponent(row.dataset.urlkey)}`;
+      window.location.href = `commerce-admin/product-detail.html?${catalog}product=${encodeURIComponent(row.dataset.urlkey)}`;
     });
     document.getElementById('productList').addEventListener('keydown', (e) => {
       const row = e.target.closest('tr.pim-row');
@@ -383,7 +383,7 @@ export async function init() {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         const catalog = currentLocalePath ? `catalog=${encodeURIComponent(currentLocalePath)}&` : '';
-        window.location.href = `product-admin/detail.html?${catalog}product=${encodeURIComponent(row.dataset.urlkey)}`;
+        window.location.href = `commerce-admin/product-detail.html?${catalog}product=${encodeURIComponent(row.dataset.urlkey)}`;
       }
     });
 
