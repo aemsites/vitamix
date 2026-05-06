@@ -190,12 +190,15 @@
   width: 100%;
 }
 
-/* The span wrapper needs explicit block display so width:100% applies and
-   the element is always clickable — <apple-pay-button> is zero-height until
-   the SDK upgrades it, which would make the span unclickable on first render. */
+/* The span is the actual click target — the <apple-pay-button> shadow DOM
+   swallows pointer events before they can bubble to the span. Setting
+   pointer-events:none makes clicks fall through to the span, which holds
+   our ApplePaySession logic. display:block + min-height ensure the span
+   is always clickable even before the SDK upgrades <apple-pay-button>. */
 .checkout-form-column .form form .button-wrapper span.payment-button.apple-pay {
   display: block;
   min-height: 44px;
+  cursor: pointer;
 }
 
 apple-pay-button {
@@ -203,6 +206,7 @@ apple-pay-button {
   --apple-pay-button-height: 40px;
   --apple-pay-button-border-radius: 5px;
   --apple-pay-button-padding: 5px 0px;
+  pointer-events: none;
 }
 
 .checkout-form-column .form form .button-wrapper span.payment-button.paypal .button {
