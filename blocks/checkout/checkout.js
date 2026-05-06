@@ -748,7 +748,19 @@ export default async function decorate(block) {
           return;
         }
         if (!currentEstimateToken || !currentPreview) {
-          showError(formColumn, 'Please wait for shipping and tax estimates to load.');
+          // Clicking Apple Pay blurs the previously-focused field, which fires
+          // updatePreview asynchronously — but we're already in the click handler
+          // before that call completes (race condition). If the form looks complete,
+          // kick off a fresh estimate and ask the user to tap again once it's ready.
+          const fd = Object.fromEntries(new FormData(form).entries());
+          const canEstimate = selectedShippingMethodId
+            && fd.email && fd['shipping-firstname'] && fd['shipping-lastname'];
+          if (canEstimate) {
+            import('../../scripts/cart.js').then(({ default: cart }) => updatePreview(form, fd, cart));
+            showError(formColumn, 'Calculating shipping and taxes — please try again in a moment.');
+          } else {
+            showError(formColumn, 'Please complete your shipping address and select a shipping method.');
+          }
           return;
         }
 
