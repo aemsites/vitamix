@@ -93,11 +93,11 @@
   }
 
   .banner.left-text .img-wrapper img {
-    object-position: left;
+    object-position: 40%;
   }
 
   .banner.right-text .img-wrapper img {
-    object-position: right;
+    object-position: 60%;
   }
 }
 
