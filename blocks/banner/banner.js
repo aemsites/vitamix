@@ -1,25 +1,66 @@
 import { buildVideo } from '../../scripts/scripts.js';
 
-export default function decorate(block) {
-  [...block.querySelectorAll('div img, div svg')].forEach((img) => {
-    const closestBlock = img.closest('.block');
-    if (closestBlock !== block) return; // skip nested blocks
-    const wrapper = img.closest('div');
-    if (wrapper.children.length === 1) wrapper.className = 'img-wrapper';
+/**
+ * Returns `true` if a cell contains only media with no text.
+ * @param {Element} cell - Direct child div of the block row
+ * @returns {boolean}
+ */
+function isMediaCell(cell) {
+  if (!cell.querySelector('picture') && !cell.querySelector('svg') && !cell.querySelector('a[href*=".mp4"]')) return false;
+  return [...cell.children].every((child) => {
+    if (child.tagName === 'PICTURE' || child.tagName === 'SVG') return true;
+    if (child.tagName !== 'P') return false;
+    const children = [...child.children];
+    if (children.length === 1 && (children[0].tagName === 'PICTURE' || children[0].tagName === 'SVG')) return true;
+    return !!child.querySelector('a[href*=".mp4"]');
   });
+}
+
+/**
+ * Returns the perceived luminance (0–255) of an element's computed background color.
+ * @param {Element} el - Element with a resolved background-color
+ * @returns {number}
+ */
+function getLuminance(el) {
+  const [r, g, b] = getComputedStyle(el).backgroundColor.match(/\d+/g).map(Number);
+  return (r * 299 + g * 587 + b * 114) / 1000;
+}
+
+export default function decorate(block) {
+  const variants = [...block.classList].filter((c) => c !== 'block' && c !== 'banner');
+  const row = block.firstElementChild;
+  if (row) {
+    const cells = [...row.children];
+    cells.forEach((cell) => {
+      cell.className = isMediaCell(cell) ? 'img-wrapper' : 'text-wrapper';
+    });
+    const imgIndex = cells.findIndex((c) => c.classList.contains('img-wrapper'));
+    if (imgIndex !== -1) block.classList.add(imgIndex === 0 ? 'left-text' : 'right-text');
+  }
 
   const video = buildVideo(block);
   if (video) {
     const wrapper = video.closest('div');
-    wrapper.classList.add('vid-wrapper', 'img-wrapper');
+    wrapper.classList.add('vid-wrapper');
+    const picture = wrapper.querySelector('picture');
+    if (picture) {
+      const img = picture.querySelector('img');
+      if (img) video.poster = img.src;
+      (picture.closest('p') || picture).remove();
+    }
   }
 
-  const variants = [...block.classList].filter((c) => c !== 'block' && c !== 'banner');
-  if (variants.includes('narrow-media')) {
-    block.classList.add('split');
-    variants.push('split');
+  if (!variants.includes('inset') && !variants.includes('image')) {
+    block.parentElement.classList.add('fill');
   }
-  if (variants.includes('split')) {
-    block.parentElement.classList.add('split');
+
+  const colorOverride = variants.find(
+    (c) => getComputedStyle(document.documentElement).getPropertyValue(`--color-${c}`).trim(),
+  );
+  if (colorOverride) {
+    block.style.setProperty('--banner-color', `var(--color-${colorOverride})`);
+    const luminance = getLuminance(block.firstElementChild);
+    block.classList.add(luminance > 128 ? 'light' : 'dark');
+    block.parentElement.classList.add('fill');
   }
 }
