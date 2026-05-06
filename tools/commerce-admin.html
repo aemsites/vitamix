@@ -6,66 +6,9 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
-    <script src="https://da.live/nx/utils/sdk.js" type="module"></script>
-    <script src="/tools/commerce-admin/pim.js" type="module"></script>
     <meta name="Description" content="Vitamix Commerce Admin – Product catalog" />
     <meta name="robots" content="noindex" />
     <title>Vitamix Commerce Admin – Catalog</title>
-    <link rel="stylesheet" href="./commerce-admin/pim.css" />
-    <style>
-      .commerce-admin-breadcrumb {
-        font-size: 14px;
-        margin: 12px 16px 0;
-        font-family: system-ui, -apple-system, Segoe UI, sans-serif;
-      }
-      .commerce-admin-breadcrumb a {
-        color: #2c2c2e;
-      }
-    </style>
-  </head>
-
-  <body>
-    <p class="commerce-admin-breadcrumb">
-      <a href="./commerce-admin/index.html">← Commerce Admin</a>
-    </p>
-    <main class="pim-main">
-      <div class="loading" id="loading">
-        <div class="spinner"></div>
-        <p>Loading products…</p>
-      </div>
-
-      <div class="error" id="error"></div>
-
-      <div class="pim-content" id="content">
-        <div class="pim-toolbar">
-          <input type="search" id="searchInput" class="pim-search" placeholder="Search products…" aria-label="Search products" />
-          <span class="pim-count" id="productCount"></span>
-          <label class="pim-index-label" for="indexSelect">Catalog </label>
-          <select id="indexSelect" class="pim-index-select" aria-label="Product index">
-            <option value="us/en_us">🇺🇸 US English</option>
-            <option value="ca/en_us">🇨🇦 CA English</option>
-            <option value="ca/fr_ca">🇨🇦 CA French</option>
-            <option value="stage/ca/en_us">🇨🇦 STAGE: CA English</option>
-          </select>
-        </div>
-        <div class="pim-list-wrapper">
-          <table class="pim-list" id="productList">
-            <thead>
-              <tr>
-                <th class="pim-col-thumb"></th>
-                <th class="pim-col-product pim-sortable" data-sort="title" tabindex="0">Product</th>
-                <th class="pim-col-sku pim-sortable" data-sort="sku" tabindex="0">SKU</th>
-                <th class="pim-col-variants pim-sortable" data-sort="variants" tabindex="0">Variants</th>
-                <th class="pim-col-availability pim-sortable" data-sort="availability" tabindex="0">Availability</th>
-                <th class="pim-col-price pim-sortable" data-sort="price" tabindex="0">Price</th>
-                <th class="pim-col-review pim-sortable" data-sort="reviewStatus" tabindex="0">Review status</th>
-                <th class="pim-col-last-review pim-sortable" data-sort="lastReview" tabindex="0">Last review update</th>
-              </tr>
-            </thead>
-            <tbody id="productGrid"></tbody>
-          </table>
-        </div>
-      </div>
-    </main>
-  </body>
+    <meta http-equiv="refresh" content="0;url=/tools/commerce-admin/index.html" />
+  
 </html>
