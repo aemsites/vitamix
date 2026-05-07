@@ -517,6 +517,29 @@ export default async function decorate(block) {
     }
   }
 
+  // reCAPTCHA Enterprise attribution. The badge itself is hidden globally
+  // in styles.css; this notice satisfies Google's Terms of Service
+  // requirement to disclose reCAPTCHA usage.
+  const noticeAnchor = formColumn.querySelector('form .button-wrapper');
+  if (noticeAnchor && !formColumn.querySelector('.recaptcha-notice')) {
+    const notice = document.createElement('p');
+    notice.className = 'recaptcha-notice';
+    notice.append(document.createTextNode('This site is protected by reCAPTCHA and the Google '));
+    const privacyLink = document.createElement('a');
+    privacyLink.href = 'https://policies.google.com/privacy';
+    privacyLink.target = '_blank';
+    privacyLink.rel = 'noopener noreferrer';
+    privacyLink.textContent = 'Privacy Policy';
+    notice.append(privacyLink, document.createTextNode(' and '));
+    const termsLink = document.createElement('a');
+    termsLink.href = 'https://policies.google.com/terms';
+    termsLink.target = '_blank';
+    termsLink.rel = 'noopener noreferrer';
+    termsLink.textContent = 'Terms of Service';
+    notice.append(termsLink, document.createTextNode(' apply.'));
+    noticeAnchor.insertAdjacentElement('afterend', notice);
+  }
+
   const submitButtons = [...formColumn.querySelectorAll('form .button-wrapper button[type="submit"]')];
   submitButtons.forEach((button) => {
     let paymentMethod = 'Credit Card';
