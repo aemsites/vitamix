@@ -1,4 +1,5 @@
 import { ORDERS_API_ORIGIN } from './scripts.js';
+import { mintRecaptchaToken, RECAPTCHA_ACTIONS, RECAPTCHA_HEADER } from './recaptcha.js';
 
 /** sessionStorage key for the JWT issued after OTP verification */
 export const AUTH_TOKEN_KEY = 'auth_token';
@@ -31,9 +32,12 @@ function dispatchAuthEvent(loggedIn, email) {
  * @throws {Error} If the request fails or the API returns an error
  */
 export async function login(email, country, locale) {
+  const headers = { 'Content-Type': 'application/json' };
+  const recaptchaToken = await mintRecaptchaToken(RECAPTCHA_ACTIONS.AUTH_LOGIN);
+  if (recaptchaToken) headers[RECAPTCHA_HEADER] = recaptchaToken;
   const resp = await fetch(`${ORDERS_API_ORIGIN}/auth/login`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ email, country, locale }),
   });
   if (!resp.ok) {

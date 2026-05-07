@@ -206,6 +206,7 @@ apple-pay-button {
   --apple-pay-button-height: 40px;
   --apple-pay-button-border-radius: 5px;
   --apple-pay-button-padding: 5px 0px;
+
   pointer-events: none;
 }
 

@@ -1,4 +1,6 @@
 import { ORDERS_API_ORIGIN } from './scripts.js';
+import { AUTH_TOKEN_KEY } from './auth-api.js';
+import { mintRecaptchaToken, RECAPTCHA_ACTIONS, RECAPTCHA_HEADER } from './recaptcha.js';
 
 /**
  * Error thrown when the Commerce API returns a non-2xx response.
@@ -17,16 +19,25 @@ class CommerceApiError extends Error {
  * Makes an authenticated POST request to the Commerce API.
  * Attaches a Bearer token from sessionStorage if one is present, so orders
  * created while a user is logged in are associated with their account.
+ * When `recaptchaAction` is provided AND no Bearer token is available,
+ * mints a reCAPTCHA Enterprise token and attaches it as `X-Recaptcha-Token`.
+ * Bypass if authenticated.
  *
  * @param {string} path - API path relative to ORDERS_API_ORIGIN (e.g. '/orders')
  * @param {Object} body - Request payload, serialised as JSON
+ * @param {string} [recaptchaAction] - One of RECAPTCHA_ACTIONS, or undefined to skip
  * @returns {Promise<Object>} Parsed JSON response body
  * @throws {CommerceApiError} If the response status is not 2xx
  */
-async function post(path, body) {
+async function post(path, body, recaptchaAction) {
   const headers = { 'Content-Type': 'application/json' };
-  const token = sessionStorage.getItem('auth_token');
+  const token = sessionStorage.getItem(AUTH_TOKEN_KEY);
   if (token) headers.Authorization = `Bearer ${token}`;
+
+  if (recaptchaAction && !token) {
+    const recaptchaToken = await mintRecaptchaToken(recaptchaAction);
+    if (recaptchaToken) headers[RECAPTCHA_HEADER] = recaptchaToken;
+  }
 
   const resp = await fetch(`${ORDERS_API_ORIGIN}${path}`, {
     method: 'POST',
@@ -72,7 +83,7 @@ export async function estimateShipping(country, state, items) {
  * @throws {CommerceApiError}
  */
 export async function previewOrder(orderBody) {
-  return post('/orders/preview', orderBody);
+  return post('/orders/preview', orderBody, RECAPTCHA_ACTIONS.ORDERS_PREVIEW);
 }
 
 /**
@@ -86,7 +97,7 @@ export async function previewOrder(orderBody) {
  * @throws {CommerceApiError}
  */
 export async function createOrder(orderBody) {
-  return post('/orders', orderBody);
+  return post('/orders', orderBody, RECAPTCHA_ACTIONS.ORDERS_CREATE);
 }
 
 /**
