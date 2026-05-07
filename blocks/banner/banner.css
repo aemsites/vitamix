@@ -36,11 +36,23 @@
   padding: var(--horizontal-spacing);
 }
 
+.banner .text-wrapper > :first-child {
+  margin-top: 0;
+}
+
+.banner .text-wrapper > :last-child {
+  margin-bottom: 0;
+}
+
+.banner .text-wrapper .img-wrapper {
+  margin-bottom: 1em;
+}
+
+.banner .text-wrapper .icon img,
 .banner .text-wrapper .icon svg {
   width: 100%;
-  max-width: 300px;
-  height: unset;
-  padding-bottom: 1em;
+  max-width: 200px;
+  height: auto;
 }
 
 @media (width >= 800px) {
@@ -56,7 +68,7 @@
 }
 
 /* banner image */
-.banner .img-wrapper,
+.banner > div > .img-wrapper,
 .banner .vid-wrapper {
   max-height: 50dvh;
   line-height: 0;
@@ -75,7 +87,7 @@
 }
 
 @media (width >= 800px) {
-  .banner .img-wrapper,
+  .banner > div > .img-wrapper,
   .banner .vid-wrapper {
     position: relative;
     max-height: unset;
@@ -141,18 +153,18 @@
 }
 
 /* square modifier */
-.banner.square .img-wrapper,
+.banner.square > div > .img-wrapper,
 .banner.square .vid-wrapper,
-.banner.square .img-wrapper img,
+.banner.square > div > .img-wrapper img,
 .banner.square .vid-wrapper video {
   aspect-ratio: 1 / 1;
   max-height: unset;
 }
 
 @media (width >= 800px) {
-  .banner.square .img-wrapper,
+  .banner.square > div > .img-wrapper,
   .banner.square .vid-wrapper,
-  .banner.square .img-wrapper img,
+  .banner.square > div > .img-wrapper img,
   .banner.square .vid-wrapper video {
     aspect-ratio: unset;
   }
@@ -163,10 +175,6 @@
   .banner.square.right-text .vid-wrapper video {
     object-position: center;
   }
-}
-
-.banner.square .text-wrapper .img-wrapper {
-  aspect-ratio: unset;
 }
 
 /* inset variant */
@@ -212,10 +220,6 @@
   padding: 0;
 }
 
-.banner.inset .text-wrapper > :first-child {
-  margin-top: 0;
-}
-
 @media (width >= 1000px) {
   .banner.inset .text-wrapper {
     order: unset;
@@ -238,14 +242,14 @@
 }
 
 @media (width >= 1000px) {
-  .banner.inset .img-wrapper,
+  .banner.inset > div > .img-wrapper,
   .banner.inset .vid-wrapper {
     flex: 0 1 60%;
     max-height: 600px;
     aspect-ratio: 4 / 3;
   }
 
-  .banner.inset.square .img-wrapper,
+  .banner.inset.square > div > .img-wrapper,
   .banner.inset.square .vid-wrapper {
     aspect-ratio: unset;
     max-height: unset;
@@ -292,11 +296,11 @@
   }
 }
 
-.banner.image .img-wrapper {
+.banner.image > div > .img-wrapper {
   justify-self: center;
 }
 
-.banner.image .img-wrapper:last-child {
+.banner.image > div > .img-wrapper:last-child {
   display: none;
 }
 
@@ -309,7 +313,7 @@
 }
 
 @media (width >= 1000px) {
-  .banner.image .img-wrapper:last-child {
+  .banner.image > div > .img-wrapper:last-child {
     display: unset;
   }
 
