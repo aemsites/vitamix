@@ -30,7 +30,10 @@ function enableClick(container) {
     const sameLink = links.length === 1 || [...links].every((a) => a.href === links[0].href);
     if (sameLink) {
       card.classList.add('card-click');
-      card.addEventListener('click', () => links[0].click());
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('a[href]')) return;
+        links[0].click();
+      });
     }
   });
 }
