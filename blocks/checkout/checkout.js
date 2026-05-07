@@ -412,10 +412,18 @@ export default async function decorate(block) {
     if (h3) section.prepend(h3);
   });
 
-  // Invalidate estimates when address fields change
+  // Invalidate estimates when address fields that affect tax/shipping change.
+  // Name and telephone don't affect the estimate, so changes to those fields
+  // don't need to clear the preview — avoiding a race where the user fills in
+  // phone last and then immediately clicks Apple Pay.
   const form = formColumn.querySelector('form');
+  const ESTIMATE_AFFECTING_FIELDS = new Set([
+    'shipping-street-0', 'shipping-street-1', 'shipping-city',
+    'shipping-state', 'shipping-zip',
+  ]);
   const shippingInputs = shippingAddressSection.querySelectorAll('input, select');
   shippingInputs.forEach((input) => {
+    if (!ESTIMATE_AFFECTING_FIELDS.has(input.name)) return;
     input.addEventListener('change', () => {
       currentEstimateToken = null;
       currentPreview = null;
