@@ -742,7 +742,16 @@ export default async function decorate(block) {
                 reenableButton();
               });
               affirm.checkout(payment.checkoutObject);
-              affirm.checkout.open();
+              const openOpts = payment.checkoutMode === 'modal' ? {
+                onSuccess: (checkoutToken) => {
+                  const confirmUrl = payment.checkoutObject.merchant.user_confirmation_url;
+                  window.location.href = `${confirmUrl}&checkout_token=${encodeURIComponent(checkoutToken)}`;
+                },
+                onFail: () => {
+                  reenableButton();
+                },
+              } : {};
+              affirm.checkout.open(openOpts);
             });
             /* eslint-enable no-undef */
           } else {
