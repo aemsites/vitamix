@@ -202,7 +202,11 @@ async function fetchAndPreview(form, formData, shippingMethodsContainer) {
     const firstRate = shippingMethodsContainer.querySelector('input[name="shippingMethod"]:checked');
     if (firstRate) {
       selectedShippingMethodId = firstRate.value;
-      await updatePreview(form, formData, cart);
+      // Re-read form data after the async estimateShipping call: browser AutoFill
+      // may have continued filling fields (e.g. zip) after the state-change event
+      // fired, so the snapshot passed in can be stale and produce a mismatched token.
+      const latestFormData = Object.fromEntries(new FormData(form).entries());
+      await updatePreview(form, latestFormData, cart);
     }
   } catch (err) {
     renderShippingMethods(shippingMethodsContainer, []);
@@ -1010,7 +1014,7 @@ export default async function decorate(block) {
   // handle payment method change
   const paymentMethodGroup = formColumn.querySelector('fieldset[data-name="paymentMethod"]');
   const payButtons = [...formColumn.querySelectorAll('form .button-wrapper span.payment-button')];
-  paymentMethodGroup.addEventListener('change', () => {
+  paymentMethodGroup.addEventListener('change', async () => {
     const paymentMethod = paymentMethodGroup.querySelector('input:checked').value;
 
     // PayPal and Affirm collect billing address on their hosted page — hide the section entirely
@@ -1035,6 +1039,14 @@ export default async function decorate(block) {
         }
       }
     });
+
+    // Refresh the estimate when the payment method changes so the token reflects
+    // the selected provider (required once payment method is included in the hash).
+    if (selectedShippingMethodId) {
+      const { default: cart } = await import('../../scripts/cart.js');
+      const currentFormData = Object.fromEntries(new FormData(form).entries());
+      await updatePreview(form, currentFormData, cart);
+    }
 
     clearError(formColumn);
   });
