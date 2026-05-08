@@ -67,6 +67,8 @@
   }
 }
 
+/* stylelint-disable no-descending-specificity */
+
 /* banner image */
 .banner > div > .img-wrapper,
 .banner .vid-wrapper {
@@ -266,8 +268,6 @@
     max-width: 600px;
   }
 }
-
-/* stylelint-disable no-descending-specificity */
 
 /* image variant */
 .banner.image > div {
