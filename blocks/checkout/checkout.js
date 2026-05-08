@@ -743,7 +743,7 @@ export default async function decorate(block) {
               });
               affirm.checkout(payment.checkoutObject);
               const openOpts = payment.checkoutMode === 'modal' ? {
-                onSuccess: (checkoutToken) => {
+                onSuccess: ({ checkout_token: checkoutToken }) => {
                   const confirmUrl = payment.checkoutObject.merchant.user_confirmation_url;
                   window.location.href = `${confirmUrl}&checkout_token=${encodeURIComponent(checkoutToken)}`;
                 },
