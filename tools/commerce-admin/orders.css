@@ -8,23 +8,9 @@
 
 .orders-page-title {
   font-size: 1.35rem;
-  margin: 0 0 6px;
+  margin: 0 0 16px;
   color: #202223;
   font-weight: 600;
-}
-
-.orders-page-lead {
-  margin: 0 0 16px;
-  font-size: 14px;
-  color: #6d7175;
-  line-height: 1.45;
-}
-
-.orders-page-lead code {
-  font-size: 12px;
-  background: #f0f0f1;
-  padding: 2px 6px;
-  border-radius: 4px;
 }
 
 /* Toolbar: search grows; filters sit like catalog index selector */
@@ -118,6 +104,33 @@
   letter-spacing: 0.03em;
 }
 
+.orders-detail-items-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.orders-detail-items-table th,
+.orders-detail-items-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid #e1e3e5;
+  vertical-align: top;
+}
+
+.orders-detail-items-table th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #6d7175;
+  background: #fafafa;
+}
+
+.orders-data-table th:first-child,
+.orders-data-table td:first-child {
+  min-width: 9rem;
+}
+
 .orders-data-table tbody tr:hover {
   background: #f9f9f9;
 }
@@ -132,8 +145,16 @@
 }
 
 .orders-id {
-  font-size: 13px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   color: #202223;
+}
+
+.orders-detail-rich .coupons-modal-idline code.orders-detail-id-code {
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
 }
 
 .orders-name-cell {
@@ -160,6 +181,70 @@
 .orders-badge-info {
   background: #e8f0fe;
   color: #1a56b0;
+}
+
+.orders-badge-danger {
+  background: #fdecea;
+  color: #8a2c0d;
+}
+
+.orders-badge-error {
+  background: #fff1f0;
+  color: #b42318;
+}
+
+.orders-badge-pending {
+  background: #fff8e6;
+  color: #8a6116;
+}
+
+.orders-badge-processing {
+  background: #ede9fe;
+  color: #4c1d95;
+}
+
+.orders-badge-authorized {
+  background: #e0f7fa;
+  color: #006064;
+}
+
+.orders-badge-shipping {
+  background: #e8f5e9;
+  color: #1b5e20;
+}
+
+.orders-badge-refund {
+  background: #fce4ec;
+  color: #880e4f;
+}
+
+.orders-badge-neutral {
+  background: #f0f0f1;
+  color: #454749;
+}
+
+.orders-detail-rich {
+  margin: -6px 0 20px;
+}
+
+.orders-detail-hero-badge {
+  margin-top: 10px;
+}
+
+.orders-history-state {
+  margin-left: 2px;
+  vertical-align: middle;
+  text-transform: none;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.orders-json-dialog.coupons-detail-dialog {
+  max-width: min(96vw, 900px);
+}
+
+.orders-detail-body.coupons-detail-dialog-scroll {
+  max-height: min(78vh, 900px);
 }
 
 .orders-edit-btn {
@@ -240,11 +325,6 @@
   background: #f6f6f7;
 }
 
-.orders-json-dialog-actions .orders-dialog-close {
-  margin: 0;
-  margin-left: auto;
-}
-
 /* Human-readable order / journal inside view dialog */
 .orders-detail-body {
   margin: 0;
@@ -286,6 +366,24 @@
   margin-bottom: 0;
 }
 
+.orders-detail-address-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px 28px;
+  align-items: start;
+  margin-bottom: 20px;
+}
+
+.orders-detail-address-pair > .orders-detail-section {
+  margin-bottom: 0;
+}
+
+@media (width <= 640px) {
+  .orders-detail-address-pair {
+    grid-template-columns: 1fr;
+  }
+}
+
 .orders-detail-section-title {
   margin: 0 0 10px;
   font-size: 12px;
@@ -315,36 +413,31 @@
   word-break: break-word;
 }
 
+.orders-detail-head-contact {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #6d7175;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.orders-detail-head-contact a {
+  color: #1a56b0;
+  text-decoration: none;
+}
+
 .orders-detail-dl dd a {
   color: #1a56b0;
+}
+
+.orders-detail-head-contact a:hover {
+  text-decoration: underline;
 }
 
 .orders-detail-address {
   margin: 0;
   font-size: 14px;
   white-space: pre-line;
-}
-
-.orders-detail-items-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-
-.orders-detail-items-table th,
-.orders-detail-items-table td {
-  padding: 8px 10px;
-  text-align: left;
-  border-bottom: 1px solid #e1e3e5;
-  vertical-align: top;
-}
-
-.orders-detail-items-table th {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: #6d7175;
-  background: #fafafa;
 }
 
 .orders-detail-item-name {
@@ -439,16 +532,11 @@
   font-size: 12px;
 }
 
-.orders-detail-json-inline {
-  margin: 0;
-  padding: 8px 10px;
-  background: #fff;
-  border: 1px solid #e1e3e5;
-  border-radius: 6px;
+.orders-journal-inline-json {
+  display: block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 11px;
-  line-height: 1.4;
-  white-space: pre-wrap;
+  line-height: 1.35;
+  color: #454749;
   word-break: break-word;
-  max-height: 12rem;
-  overflow: auto;
 }

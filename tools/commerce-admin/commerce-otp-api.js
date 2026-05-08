@@ -1,6 +1,8 @@
 /**
- * ProductBus / Adobe Commerce Live API client (from helix-tools-website productbus-admin/api.js).
- * Auth is stored per environment (`pbus-auth-{org}-{site}-stage|prod`) so switching hosts keeps both sessions.
+ * ProductBus / Adobe Commerce Live API client (from helix-tools-website
+ * productbus-admin/api.js).
+ * Auth is stored per environment (`pbus-auth-{org}-{site}-stage|prod`); switching hosts keeps both
+ * sessions.
  */
 
 import { showToast } from './commerce-otp-ui.js';
@@ -51,6 +53,25 @@ function authStorageKey(org, site, env) {
 
 function legacyAuthKey(org, site) {
   return `pbus-auth-${org}-${site}`;
+}
+
+/**
+ * Auth for a specific ProductBus environment, regardless of the active API base.
+ * Used e.g. to confirm production OTP before promoting from staging.
+ *
+ * @param {string} org
+ * @param {string} site
+ * @param {'stage'|'prod'} env
+ */
+export function getAuthStateForEnv(org, site, env) {
+  const keyEnv = env === 'prod' ? 'prod' : 'stage';
+  const key = authStorageKey(org, site, keyEnv);
+  try {
+    const raw = sessionStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
 }
 
 export function getAuthState(org, site) {

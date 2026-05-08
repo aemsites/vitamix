@@ -1,0 +1,129 @@
+/* Toolbar + JSON toggle — shared by orders, coupons, promotions, cart rules, customers detail modals */
+
+.commerce-detail-modal-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid #e1e3e5;
+  background: #fafafa;
+  flex-shrink: 0;
+}
+
+.commerce-detail-modal-toolbar-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Staging-only: promote entity to production (see commerce-promote-production.js) */
+.commerce-promote-production-btn {
+  box-sizing: border-box;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 2px solid #14532d;
+  background: #166534;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  box-shadow: 0 1px 0 rgb(0 0 0 / 12%);
+}
+
+.commerce-promote-production-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.commerce-promote-production-btn:focus-visible {
+  outline: 3px solid #facc15;
+  outline-offset: 2px;
+}
+
+.commerce-promote-production-btn:hover:not(:disabled) {
+  background: #14532d;
+  border-color: #052e16;
+  color: #fff;
+}
+
+.commerce-detail-modal-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  flex-shrink: 0;
+}
+
+.commerce-detail-modal-close-x {
+  box-sizing: border-box;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid #e1e3e5;
+  background: #fff;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+  color: #202223;
+}
+
+.commerce-detail-modal-close-x:hover {
+  background: #f6f6f7;
+}
+
+.commerce-detail-modal-json-link {
+  padding: 6px 2px;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: #6d7175;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.commerce-detail-modal-json-link:hover {
+  color: #202223;
+  text-decoration: underline;
+}
+
+.commerce-detail-modal-json-link[aria-pressed='true'] {
+  color: #202223;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.commerce-detail-modal-json-pre {
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #202223;
+}
+
+/* Coupon-style detail dialogs: column layout so the scroll region fills height */
+.coupons-detail-dialog {
+  display: flex;
+  flex-direction: column;
+}
+
+.coupons-detail-dialog > .coupons-detail-dialog-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.coupons-detail-dialog > .coupons-modal-footer {
+  flex-shrink: 0;
+}

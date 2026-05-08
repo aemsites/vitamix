@@ -48,20 +48,39 @@ function updateUrlParams(updates) {
   window.history.replaceState({}, '', url);
 }
 
-function getIndexUrl() {
-  return `${AEM_BASE}/${currentLocalePath}/products/index.json?include=all`;
-}
+const IMAGE_QUERY = '?width=750&format=webply&optimize=medium';
 
-function getProductsBaseUrl() {
-  return `${AEM_BASE}/${currentLocalePath}/products/`;
+/**
+ * @param {string} localePath - e.g. us/en_us, ca/en_ca
+ * @returns {string}
+ */
+export function getProductsBaseUrlForLocale(localePath) {
+  const clean = String(localePath || '').replace(/^\/+/, '').replace(/\/+$/, '');
+  return `${AEM_BASE}/${clean}/products/`;
 }
 
 /**
- * Fetch products index via CORS proxy (same as recipe tool).
- * @returns {Promise<{ data: Array<object> }>}
+ * Resolve relative image path using the same query string as the catalog list.
+ * @param {string} localePath - e.g. us/en_us
+ * @param {string} imagePath - e.g. "./media_xxx.jpeg"
+ * @returns {string}
  */
-export async function fetchProductsIndex() {
-  const url = CORS_PROXY + encodeURIComponent(getIndexUrl()) + CORS_KEY;
+export function resolveImageUrlForLocale(localePath, imagePath) {
+  if (!imagePath) return '';
+  const path = imagePath.startsWith('./') ? imagePath.slice(2) : imagePath;
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+  return getProductsBaseUrlForLocale(localePath) + path + IMAGE_QUERY;
+}
+
+/**
+ * Fetch products index for a locale (same CORS proxy + index.json?include=all as catalog).
+ * @param {string} localePath
+ * @returns {Promise<{ data?: object[] } | object[]>}
+ */
+export async function fetchProductsIndexForLocale(localePath) {
+  const clean = String(localePath || '').replace(/^\/+/, '').replace(/\/+$/, '');
+  const indexUrl = `${AEM_BASE}/${clean}/products/index.json?include=all`;
+  const url = CORS_PROXY + encodeURIComponent(indexUrl) + CORS_KEY;
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -69,7 +88,13 @@ export async function fetchProductsIndex() {
   return response.json();
 }
 
-const IMAGE_QUERY = '?width=750&format=webply&optimize=medium';
+/**
+ * Fetch products index via CORS proxy (same as recipe tool).
+ * @returns {Promise<{ data: Array<object> }>}
+ */
+export async function fetchProductsIndex() {
+  return fetchProductsIndexForLocale(currentLocalePath);
+}
 
 /**
  * Resolve relative image path to full URL with image query params.
@@ -77,10 +102,7 @@ const IMAGE_QUERY = '?width=750&format=webply&optimize=medium';
  * @returns {string}
  */
 export function resolveImageUrl(imagePath) {
-  if (!imagePath) return '';
-  const path = imagePath.startsWith('./') ? imagePath.slice(2) : imagePath;
-  if (path.startsWith('http://') || path.startsWith('https://')) return path;
-  return getProductsBaseUrl() + path + IMAGE_QUERY;
+  return resolveImageUrlForLocale(currentLocalePath, imagePath);
 }
 
 /**
@@ -145,7 +167,7 @@ let reviewStatusByUrlKey = {};
 /** @type {Record<string, string>} urlKey -> last status update ts (ISO) */
 let lastReviewUpdateByUrlKey = {};
 
-function getUrlKeyFromProduct(p) {
+export function getUrlKeyFromProduct(p) {
   return p.urlKey || (p.url ? p.url.replace(/\/$/, '').split('/').pop() : '') || p.sku || '';
 }
 
@@ -396,4 +418,6 @@ export async function init() {
   }
 }
 
-init();
+if (typeof document !== 'undefined' && document.getElementById('productGrid')) {
+  init();
+}

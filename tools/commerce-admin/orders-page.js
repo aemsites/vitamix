@@ -5,6 +5,8 @@
 import { apiFetch } from './commerce-otp-api.js';
 import { putOrPatchResource } from './commerce-resource-save.js';
 import { openOrderContactEditDialog } from './order-contact-edit-dialog.js';
+import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
+import { createDetailModalHeaderCloseAndJson } from './commerce-detail-modal-json.js';
 import { PB_ORG, PB_SITE } from './commerce-pbus-config.js';
 import { escapeHtml, showToast } from './commerce-otp-ui.js';
 import { highlightMatch } from './search-highlight.js';
@@ -61,12 +63,54 @@ function shippingName(o) {
   return n || '—';
 }
 
+/** Short id for UI: `friendlyId`, else suffix after `…Z-` in timestamp-prefixed ProductBus ids. */
+function orderIdForDisplay(order) {
+  if (!order || typeof order !== 'object') return '';
+  const fid = order.friendlyId;
+  if (fid != null && String(fid).trim() !== '') return String(fid).trim();
+  const raw = order.id;
+  if (raw == null || String(raw).trim() === '') return '';
+  const s = String(raw).trim();
+  const m = s.match(/(?:\.\d+)?Z-(.+)$/i);
+  if (m && m[1].length > 0) return m[1];
+  return s;
+}
+
+/** Lowercase a-z0-9 only — matches pasted ids with spaces, dashes, colons, etc. */
+function normalizeOrderIdKey(s) {
+  return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+/** Booking-style groups of 4 (e.g. `43KH-W5JM`) from compact short id; uppercase for legibility. */
+function formatOrderIdChunks(shortId) {
+  const compact = normalizeOrderIdKey(shortId);
+  if (!compact) return '—';
+  const parts = [];
+  for (let i = 0; i < compact.length; i += 4) {
+    parts.push(compact.slice(i, i + 4).toUpperCase());
+  }
+  return parts.join('-');
+}
+
+function highlightOrderIdCell(formattedDisplay, compactForMatch, query) {
+  const q = String(query || '').trim();
+  const nq = normalizeOrderIdKey(q);
+  if (!q) return escapeHtml(formattedDisplay);
+  if (nq && normalizeOrderIdKey(compactForMatch).includes(nq)) {
+    return `<mark class="pim-highlight">${escapeHtml(formattedDisplay)}</mark>`;
+  }
+  return highlightMatch(formattedDisplay, q);
+}
+
 /** Text search on id, email, state, billing/shipping names. */
 function filterByQuery(orders, q) {
   if (!q) return orders;
   const needle = q.toLowerCase();
+  const nNeedle = normalizeOrderIdKey(q);
   return orders.filter((o) => {
-    if ((o.id || '').toLowerCase().includes(needle)) return true;
+    if (nNeedle && normalizeOrderIdKey(o.id).includes(nNeedle)) return true;
+    if (nNeedle && normalizeOrderIdKey(String(o.friendlyId || '')).includes(nNeedle)) return true;
+    if (nNeedle && normalizeOrderIdKey(orderIdForDisplay(o)).includes(nNeedle)) return true;
     if ((o.customer?.email || '').toLowerCase().includes(needle)) return true;
     if ((o.customMetadata?.customerEmail || '').toLowerCase().includes(needle)) return true;
     if ((o.state || '').toLowerCase().includes(needle)) return true;
@@ -133,11 +177,10 @@ function resolveOrderId(payload) {
   if (payload.order && typeof payload.order === 'object') {
     candidates.push(payload.order);
   }
-  for (const node of candidates) {
-    const id = node.id ?? node.orderId;
-    if (id != null && String(id).trim() !== '') return String(id).trim();
-  }
-  return '';
+  const rawId = candidates
+    .map((node) => node.id ?? node.orderId)
+    .find((id) => id != null && String(id).trim() !== '');
+  return rawId != null ? String(rawId).trim() : '';
 }
 
 function getOrderNodeForDisplay(payload) {
@@ -152,15 +195,50 @@ function formatDateTime(iso) {
   return Number.isNaN(d.getTime()) ? String(iso) : d.toLocaleString();
 }
 
-function safeHttpUrl(href) {
-  if (typeof href !== 'string' || !href.trim()) return '';
-  try {
-    const u = new URL(href);
-    if (u.protocol === 'http:' || u.protocol === 'https:') return u.href;
-  } catch {
-    /* ignore */
-  }
-  return '';
+/** Distinct badge colors for list + detail (not only success vs default). */
+function orderStateBadgeClass(state) {
+  const s = String(state || 'pending').toLowerCase().replace(/\s+/g, '_');
+  if (s === 'completed' || s === 'payment_completed' || s === 'fulfilled') return 'orders-badge-success';
+  if (s === 'payment_cancelled' || s === 'cancelled' || s === 'canceled' || s === 'abandoned') return 'orders-badge-danger';
+  if (s === 'failed' || s === 'payment_failed' || s === 'error') return 'orders-badge-error';
+  if (s === 'pending' || s === 'created' || s === 'draft' || s === 'new') return 'orders-badge-pending';
+  if (s.includes('process')) return 'orders-badge-processing';
+  if (s.includes('authoriz') || s === 'payment_authorized' || s === 'authorized') return 'orders-badge-authorized';
+  if (s.includes('ship') || s.includes('fulfill') || s === 'shipped') return 'orders-badge-shipping';
+  if (s.includes('refund')) return 'orders-badge-refund';
+  return 'orders-badge-neutral';
+}
+
+function orderCountryTagClass(country) {
+  const c = String(country || '').toLowerCase();
+  if (c === 'us') return 'coupons-tag-us';
+  if (c === 'ca') return 'coupons-tag-ca';
+  if (c === 'mx') return 'coupons-tag-mx';
+  return 'coupons-tag-muted';
+}
+
+function summarizeOrderSubtotalLine(items) {
+  const list = Array.isArray(items) ? items : [];
+  if (!list.length) return '—';
+  let sum = 0;
+  let cur = '';
+  list.forEach((item) => {
+    const p = item?.price;
+    if (!p || p.final == null || p.final === '') return;
+    const n = Number(p.final);
+    if (!Number.isNaN(n)) sum += n;
+    if (!cur && p.currency) cur = String(p.currency);
+  });
+  if (!cur && list[0]?.price?.currency) cur = String(list[0].price.currency);
+  return `${sum.toFixed(2)} ${cur}`.trim() || '—';
+}
+
+function paymentSummaryLine(payment) {
+  if (!payment || typeof payment !== 'object') return '—';
+  const method = payment.method != null ? String(payment.method) : '';
+  const provider = payment.provider != null ? String(payment.provider) : '';
+  const bits = [method, provider].filter(Boolean);
+  return bits.length ? bits.join(' · ') : '—';
 }
 
 function formatAddressLines(addr) {
@@ -177,6 +255,193 @@ function formatAddressLines(addr) {
   if (addr.phone) lines.push(`Phone: ${String(addr.phone)}`);
   if (addr.email) lines.push(String(addr.email));
   return lines.join('\n');
+}
+
+function appendPill(container, label, on) {
+  const span = document.createElement('span');
+  span.className = on ? 'coupons-pill coupons-pill-on' : 'coupons-pill coupons-pill-off';
+  span.textContent = label;
+  container.appendChild(span);
+}
+
+function statBlock(label, value) {
+  const div = document.createElement('div');
+  div.className = 'coupons-modal-stat';
+  div.setAttribute('role', 'listitem');
+  const lbl = document.createElement('span');
+  lbl.className = 'coupons-modal-stat-label';
+  lbl.textContent = label;
+  const val = document.createElement('span');
+  val.className = 'coupons-modal-stat-value';
+  val.textContent = value;
+  div.append(lbl, val);
+  return div;
+}
+
+const ORDER_BANNER_MAX = 400;
+
+/** Non-empty only when the order deserves an alert banner (not routine hints). */
+function orderUnusualBannerText(o) {
+  const pay = o.payment && typeof o.payment === 'object' ? o.payment : null;
+  const payErr = pay && pay.error != null ? String(pay.error).trim() : '';
+  if (payErr) {
+    const msg = `Payment: ${payErr}`;
+    return msg.length <= ORDER_BANNER_MAX ? msg : `${msg.slice(0, ORDER_BANNER_MAX - 1)}…`;
+  }
+  const st = String(o.state || 'pending');
+  if (/cancel|fail|error/i.test(st)) {
+    return 'This order did not complete successfully — review payment and history below.';
+  }
+  return '';
+}
+
+/** Coupon-style hero + stats + pills above sectioned order body. */
+function buildOrderRichHeader(o) {
+  const wrap = document.createElement('div');
+  wrap.className = 'orders-detail-rich';
+
+  const hint = orderUnusualBannerText(o);
+  if (hint) {
+    const banner = document.createElement('div');
+    banner.className = 'coupons-modal-banner';
+    banner.textContent = hint;
+    wrap.appendChild(banner);
+  }
+
+  const head = document.createElement('div');
+  head.className = 'coupons-modal-head';
+  const badges = document.createElement('div');
+  badges.className = 'coupons-modal-badges';
+  if (o.country) {
+    const tag = document.createElement('span');
+    tag.className = `coupons-tag ${orderCountryTagClass(o.country)}`;
+    tag.textContent = String(o.country).toUpperCase();
+    badges.appendChild(tag);
+  }
+  if (o.locale) {
+    const loc = document.createElement('span');
+    loc.className = 'coupons-tag coupons-tag-year';
+    loc.textContent = String(o.locale);
+    badges.appendChild(loc);
+  }
+  head.appendChild(badges);
+
+  const title = document.createElement('h2');
+  title.className = 'coupons-modal-title';
+  const cust = o.customer && typeof o.customer === 'object' ? o.customer : null;
+  const fullName = cust ? [cust.firstName, cust.lastName].filter(Boolean).join(' ').trim() : '';
+  const shortOrderId = orderIdForDisplay(o);
+  title.textContent = fullName || (shortOrderId ? `Order ${formatOrderIdChunks(shortOrderId)}` : 'Order');
+  head.appendChild(title);
+
+  const idLine = document.createElement('p');
+  idLine.className = 'coupons-modal-idline orders-detail-idline';
+  const code = document.createElement('code');
+  code.className = 'orders-detail-id-code';
+  const fullId = String(o.id || '').trim();
+  const shortId = shortOrderId || '';
+  code.textContent = shortId ? formatOrderIdChunks(shortId) : '—';
+  if (fullId) {
+    if (!shortId) code.title = fullId;
+    else if (normalizeOrderIdKey(shortId) !== normalizeOrderIdKey(fullId)) code.title = fullId;
+  }
+  idLine.appendChild(code);
+  head.appendChild(idLine);
+
+  const email = cust?.email ? String(cust.email).trim() : '';
+  const phone = cust?.phone ? String(cust.phone).trim() : '';
+  if (email || phone) {
+    const contactRow = document.createElement('p');
+    contactRow.className = 'orders-detail-head-contact';
+    const parts = [];
+    if (email) {
+      const em = document.createElement('a');
+      em.href = `mailto:${email}`;
+      em.textContent = email;
+      parts.push(em);
+    }
+    if (phone) {
+      const telHref = phone.replace(/[^\d+]/g, '');
+      if (telHref) {
+        const ph = document.createElement('a');
+        ph.href = `tel:${telHref}`;
+        ph.textContent = phone;
+        parts.push(ph);
+      } else {
+        const sp = document.createElement('span');
+        sp.textContent = phone;
+        parts.push(sp);
+      }
+    }
+    parts.forEach((node, i) => {
+      if (i) contactRow.appendChild(document.createTextNode(' · '));
+      contactRow.appendChild(node);
+    });
+    head.appendChild(contactRow);
+  }
+
+  wrap.appendChild(head);
+
+  const st = String(o.state || 'pending');
+  const hero = document.createElement('div');
+  hero.className = 'coupons-modal-hero';
+  const heroInner = document.createElement('div');
+  heroInner.className = 'coupons-modal-hero-inner';
+  const kicker = document.createElement('span');
+  kicker.className = 'coupons-modal-hero-kicker';
+  kicker.textContent = 'Order status';
+  const heroVal = document.createElement('span');
+  heroVal.className = 'coupons-modal-hero-value';
+  heroVal.textContent = st.replace(/_/g, ' ');
+  const heroNote = document.createElement('span');
+  heroNote.className = 'coupons-modal-hero-note';
+  const metaBits = [];
+  if (o.createdAt) metaBits.push(`Created ${formatDateTime(o.createdAt)}`);
+  if (o.updatedAt) metaBits.push(`Updated ${formatDateTime(o.updatedAt)}`);
+  heroNote.textContent = metaBits.join(' · ');
+  const badgeWrap = document.createElement('div');
+  badgeWrap.className = 'orders-detail-hero-badge';
+  const stBadge = document.createElement('span');
+  stBadge.className = `orders-badge ${orderStateBadgeClass(st)}`;
+  stBadge.textContent = st;
+  badgeWrap.appendChild(stBadge);
+  heroInner.append(kicker, heroVal, heroNote, badgeWrap);
+  hero.appendChild(heroInner);
+  wrap.appendChild(hero);
+
+  const items = Array.isArray(o.items) ? o.items : [];
+  const stats = document.createElement('div');
+  stats.className = 'coupons-modal-stats';
+  stats.setAttribute('role', 'list');
+  stats.appendChild(statBlock('Line items', String(items.length)));
+  stats.appendChild(statBlock('Subtotal (lines)', summarizeOrderSubtotalLine(items)));
+  stats.appendChild(statBlock('Payment', paymentSummaryLine(o.payment)));
+  wrap.appendChild(stats);
+
+  const pills = document.createElement('div');
+  pills.className = 'coupons-modal-pills';
+  pills.setAttribute('aria-label', 'Order flags');
+  const pay = o.payment && typeof o.payment === 'object' && Object.keys(o.payment).length > 0;
+  const cancelled = /cancel|fail|error/i.test(st);
+  const hasShip = Boolean(formatAddressLines(o.shipping));
+  appendPill(pills, 'Payment details', pay);
+  appendPill(pills, 'Terminal issue', cancelled);
+  appendPill(pills, 'Shipping address', hasShip);
+  appendPill(pills, 'Multi-line', items.length > 1);
+  wrap.appendChild(pills);
+
+  return wrap;
+}
+
+function safeHttpUrl(href) {
+  if (typeof href !== 'string' || !href.trim()) return '';
+  try {
+    const u = new URL(href);
+    if (u.protocol === 'http:' || u.protocol === 'https:') return u.href;
+  } catch {
+    /* ignore */
+  }
+  return '';
 }
 
 function formatItemPrice(item) {
@@ -198,7 +463,7 @@ function section(title) {
   return sec;
 }
 
-function appendDl(section, rows) {
+function appendDl(sectionEl, rows) {
   const dl = document.createElement('dl');
   dl.className = 'orders-detail-dl';
   rows.forEach(([label, value]) => {
@@ -211,7 +476,7 @@ function appendDl(section, rows) {
     dl.appendChild(dt);
     dl.appendChild(dd);
   });
-  if (dl.children.length) section.appendChild(dl);
+  if (dl.children.length) sectionEl.appendChild(dl);
 }
 
 function linkCell(href, text) {
@@ -241,76 +506,33 @@ function buildOrderHumanView(payload) {
     return root;
   }
 
-  const summary = document.createElement('div');
-  summary.className = 'orders-detail-summary';
-
-  const idRow = document.createElement('div');
-  idRow.style.display = 'flex';
-  idRow.style.flexWrap = 'wrap';
-  idRow.style.alignItems = 'center';
-  idRow.style.gap = '8px';
-  if (o.id != null) {
-    const code = document.createElement('code');
-    code.className = 'orders-detail-summary-id';
-    code.textContent = String(o.id);
-    idRow.appendChild(code);
-  }
-  if (o.friendlyId) {
-    const friendly = document.createElement('span');
-    friendly.className = 'orders-detail-summary-meta';
-    friendly.textContent = `(${o.friendlyId})`;
-    idRow.appendChild(friendly);
-  }
-  const stateEl = document.createElement('span');
-  const st = String(o.state || 'pending');
-  stateEl.className = `orders-badge ${st === 'completed' || st === 'payment_completed' ? 'orders-badge-success' : 'orders-badge-info'}`;
-  stateEl.textContent = st;
-  idRow.appendChild(stateEl);
-  summary.appendChild(idRow);
-
-  const meta = document.createElement('p');
-  meta.className = 'orders-detail-summary-meta';
-  const metaBits = [];
-  if (o.createdAt) metaBits.push(`Created ${formatDateTime(o.createdAt)}`);
-  if (o.updatedAt) metaBits.push(`Updated ${formatDateTime(o.updatedAt)}`);
-  if (o.locale) metaBits.push(`Locale ${o.locale}`);
-  if (o.country) metaBits.push(`Country ${String(o.country).toUpperCase()}`);
-  meta.textContent = metaBits.join(' · ');
-  summary.appendChild(meta);
-  root.appendChild(summary);
-
-  const cust = o.customer;
-  if (cust && typeof cust === 'object' && Object.keys(cust).length) {
-    const sec = section('Customer');
-    appendDl(sec, [
-      ['Name', [cust.firstName, cust.lastName].filter(Boolean).join(' ') || ''],
-      ['Email', cust.email || ''],
-      ['Phone', cust.phone || ''],
-    ]);
-    root.appendChild(sec);
-  }
+  root.appendChild(buildOrderRichHeader(o));
 
   const shipLines = formatAddressLines(o.shipping);
-  if (shipLines) {
-    const sec = section('Shipping');
-    const p = document.createElement('p');
-    p.className = 'orders-detail-address';
-    p.textContent = shipLines;
-    sec.appendChild(p);
-    if (o.shippingMethod?.id != null) {
-      appendDl(sec, [['Shipping method ID', String(o.shippingMethod.id)]]);
-    }
-    root.appendChild(sec);
-  }
-
   const billLines = formatAddressLines(o.billing);
-  if (billLines) {
-    const sec = section('Billing');
-    const p = document.createElement('p');
-    p.className = 'orders-detail-address';
-    p.textContent = billLines;
-    sec.appendChild(p);
-    root.appendChild(sec);
+  if (shipLines || billLines) {
+    const pair = document.createElement('div');
+    pair.className = 'orders-detail-address-pair';
+    if (shipLines) {
+      const sec = section('Shipping');
+      const p = document.createElement('p');
+      p.className = 'orders-detail-address';
+      p.textContent = shipLines;
+      sec.appendChild(p);
+      if (o.shippingMethod?.id != null) {
+        appendDl(sec, [['Shipping method ID', String(o.shippingMethod.id)]]);
+      }
+      pair.appendChild(sec);
+    }
+    if (billLines) {
+      const sec = section('Billing');
+      const p = document.createElement('p');
+      p.className = 'orders-detail-address';
+      p.textContent = billLines;
+      sec.appendChild(p);
+      pair.appendChild(sec);
+    }
+    root.appendChild(pair);
   }
 
   const items = Array.isArray(o.items) ? o.items : [];
@@ -359,7 +581,7 @@ function buildOrderHumanView(payload) {
         ['Shipping (estimate)', bits.join(' · ') || (sm.id != null ? `ID ${sm.id}` : '')],
       ]);
     }
-    const tax = est.tax;
+    const { tax } = est;
     if (tax && typeof tax === 'object') {
       appendDl(sec, [
         ['Tax', [tax.country, tax.state, tax.rate != null ? `${tax.rate}%` : '', tax.id].filter(Boolean).join(' · ')],
@@ -399,8 +621,14 @@ function buildOrderHumanView(payload) {
       const ev = document.createElement('div');
       ev.className = 'orders-history-event';
       const evName = h.event || 'event';
-      const stName = h.state != null ? ` → ${h.state}` : '';
-      ev.textContent = `${evName}${stName}`;
+      ev.appendChild(document.createTextNode(`${evName}`));
+      if (h.state != null && String(h.state).trim() !== '') {
+        ev.appendChild(document.createTextNode(' → '));
+        const stSpan = document.createElement('span');
+        stSpan.className = `orders-badge orders-history-state ${orderStateBadgeClass(h.state)}`;
+        stSpan.textContent = String(h.state);
+        ev.appendChild(stSpan);
+      }
       li.append(time, ev);
       ul.appendChild(li);
     });
@@ -456,10 +684,12 @@ function journalValueDd(key, val) {
     if (key === 'userAgent' || key === 'customerIP') dd.classList.add('mono');
     return dd;
   }
-  const pre = document.createElement('pre');
-  pre.className = 'orders-detail-json-inline';
-  pre.textContent = JSON.stringify(val, null, 2);
-  dd.appendChild(pre);
+  const span = document.createElement('span');
+  span.className = 'orders-journal-inline-json';
+  let s = JSON.stringify(val);
+  if (s.length > 320) s = `${s.slice(0, 317)}…`;
+  span.textContent = s;
+  dd.appendChild(span);
   return dd;
 }
 
@@ -537,12 +767,14 @@ function buildJournalHumanView(data) {
 function showOrderDialog(order, { onEditSaved } = {}) {
   let orderPayload = order;
   const orderId = resolveOrderId(orderPayload);
+  let isJournalView = false;
+  let journalData = null;
 
   const dialog = document.createElement('dialog');
-  dialog.className = 'orders-json-dialog';
+  dialog.className = 'orders-json-dialog coupons-detail-dialog';
 
   const actions = document.createElement('div');
-  actions.className = 'orders-json-dialog-actions';
+  actions.className = 'orders-json-dialog-actions commerce-detail-modal-toolbar';
 
   const editBtn = document.createElement('button');
   editBtn.type = 'button';
@@ -562,17 +794,30 @@ function showOrderDialog(order, { onEditSaved } = {}) {
   viewOrderBtn.textContent = 'View order';
   viewOrderBtn.hidden = true;
 
-  const close = document.createElement('button');
-  close.type = 'button';
-  close.className = 'ca-btn ca-btn-primary orders-dialog-close';
-  close.textContent = 'Close';
-
   const content = document.createElement('div');
-  content.className = 'orders-detail-body';
-  content.appendChild(buildOrderHumanView(orderPayload));
+  content.className = 'coupons-detail-dialog-scroll orders-detail-body';
 
-  actions.append(editBtn, journalBtn, viewOrderBtn, close);
+  const toolbarMain = document.createElement('div');
+  toolbarMain.className = 'commerce-detail-modal-toolbar-main';
+  toolbarMain.append(editBtn, journalBtn, viewOrderBtn);
+
+  const shut = () => {
+    dialog.close();
+    dialog.remove();
+  };
+
+  const header = createDetailModalHeaderCloseAndJson({
+    bodyHost: content,
+    getHumanNode: () => (isJournalView && journalData
+      ? buildJournalHumanView(journalData)
+      : buildOrderHumanView(orderPayload)),
+    getJsonValue: () => (isJournalView && journalData ? journalData : orderPayload),
+    onClose: shut,
+  });
+
+  actions.append(toolbarMain, header.headerRight);
   dialog.append(actions, content);
+  header.resetToHuman();
 
   async function refetchOrderPayload() {
     const resp = await apiFetch(PB_ORG, PB_SITE, `orders/${encodeURIComponent(orderId)}`, { method: 'GET' });
@@ -581,8 +826,9 @@ function showOrderDialog(order, { onEditSaved } = {}) {
   }
 
   function showOrderView() {
-    content.replaceChildren();
-    content.appendChild(buildOrderHumanView(orderPayload));
+    isJournalView = false;
+    journalData = null;
+    header.resetToHuman();
     viewOrderBtn.hidden = true;
     journalBtn.hidden = false;
     editBtn.hidden = false;
@@ -623,8 +869,9 @@ function showOrderDialog(order, { onEditSaved } = {}) {
     try {
       const data = await fetchOrderJournal(orderId);
       const sanitized = omitCardStarKeys(data);
-      content.replaceChildren();
-      content.appendChild(buildJournalHumanView(sanitized));
+      isJournalView = true;
+      journalData = sanitized;
+      header.resetToHuman();
       viewOrderBtn.hidden = false;
       journalBtn.hidden = true;
       editBtn.hidden = true;
@@ -640,18 +887,13 @@ function showOrderDialog(order, { onEditSaved } = {}) {
     showOrderView();
   });
 
-  close.addEventListener('click', () => {
-    dialog.close();
-    dialog.remove();
-  });
-
   dialog.addEventListener('click', (e) => {
     if (e.target === dialog) {
-      dialog.close();
-      dialog.remove();
+      shut();
     }
   });
   document.body.appendChild(dialog);
+  wireDialogEscapeDismiss(dialog, shut);
   dialog.showModal();
 }
 
@@ -703,10 +945,15 @@ function renderTable(wrap, orders, query, onEditSaved) {
     const ship = shippingName(o);
     const createdStr = o.createdAt ? new Date(o.createdAt).toLocaleString() : 'N/A';
     const id = String(o.id || '');
+    const compactId = orderIdForDisplay(o) || id;
+    const formattedId = formatOrderIdChunks(compactId);
+    const titleAttr = id && normalizeOrderIdKey(compactId) !== normalizeOrderIdKey(id)
+      ? ` title="${escapeHtml(id)}"`
+      : '';
     return `
-          <tr class="orders-row-open" data-id="${escapeHtml(id)}" tabindex="0" role="button" aria-label="Open order details for ${escapeHtml(id)}">
-            <td><code class="orders-id">${highlightMatch(String(o.id || ''), query)}</code></td>
-            <td><span class="orders-badge ${o.state === 'completed' ? 'orders-badge-success' : 'orders-badge-info'}">${highlightMatch(String(o.state || 'pending'), query)}</span></td>
+          <tr class="orders-row-open" data-id="${escapeHtml(id)}" tabindex="0" role="button" aria-label="Open order ${escapeHtml(formattedId)}">
+            <td><code class="orders-id"${titleAttr}>${highlightOrderIdCell(formattedId, compactId, query)}</code></td>
+            <td><span class="orders-badge ${orderStateBadgeClass(o.state)}">${highlightMatch(String(o.state || 'pending'), query)}</span></td>
             <td class="orders-name-cell">${highlightMatch(bill, query)}</td>
             <td class="orders-name-cell">${highlightMatch(ship, query)}</td>
             <td>${highlightMatch(String(o.items?.length ?? '—'), query)}</td>
@@ -730,12 +977,16 @@ function renderTable(wrap, orders, query, onEditSaved) {
       }
     };
     row.addEventListener('click', () => {
-      void openDetail();
+      openDetail().catch(() => {
+        /* errors surfaced inside openDetail */
+      });
     });
     row.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
-        void openDetail();
+        openDetail().catch(() => {
+          /* errors surfaced inside openDetail */
+        });
       }
     });
   });

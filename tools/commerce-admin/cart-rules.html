@@ -4,25 +4,30 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex" />
-    <title>Coupons — Vitamix Commerce Admin</title>
+    <title>Cart Rules — Vitamix Commerce Admin</title>
     <link rel="stylesheet" href="commerce-auth.css" />
     <link rel="stylesheet" href="pim.css" />
     <link rel="stylesheet" href="commerce-admin-chrome.css" />
     <link rel="stylesheet" href="commerce-detail-modal.css" />
+    <link rel="stylesheet" href="price-rules.css" />
     <link rel="stylesheet" href="coupons.css" />
   </head>
-  <body class="coupons-body commerce-admin-body" data-commerce-header="subpage" data-commerce-header-page="Coupons">
+  <body
+    class="price-rules-body commerce-admin-body"
+    data-commerce-header="subpage"
+    data-commerce-header-page="Cart Rules"
+    data-pr-app="cart-rules"
+  >
     <div id="commerce-admin-auth-root" aria-live="polite">
       <p class="commerce-admin-auth-placeholder">Checking sign-in…</p>
     </div>
     <header id="commerce-admin-app-header"></header>
-    <main class="pim-main coupons-page">
-      <h1 class="coupons-page-title">Coupons</h1>
-      <div id="coupons-error" class="coupons-error" hidden></div>
-      <div id="coupons-mount" class="coupons-mount"></div>
+    <main class="pim-main price-rules-page">
+      <h1 class="price-rules-page-title">Cart Rules</h1>
+      <div id="price-rules-mount"></div>
     </main>
     <script type="module" src="auth-page-boot.js"></script>
     <script type="module" src="commerce-admin-header.js"></script>
-    <script type="module" src="coupons-page.js"></script>
+    <script type="module" src="price-rules-page.js"></script>
   </body>
 </html>

@@ -2,6 +2,7 @@
 /**
  * Modal JSON editor for ProductBus PUT/PATCH flows (orders, customers).
  */
+import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
 import { showToast } from './commerce-otp-ui.js';
 
 /**
@@ -87,6 +88,9 @@ export function openJsonEditDialog({ title, initialObject, onSave }) {
     });
 
     document.body.appendChild(dialog);
+    wireDialogEscapeDismiss(dialog, () => {
+      dialog.close();
+    });
     dialog.showModal();
     ta.focus();
   });

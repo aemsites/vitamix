@@ -1,9 +1,11 @@
 /**
  * Customers list — ProductBus API (helix productbus-admin/customers.js pattern).
- * View + Edit (JSON editor, PUT / PATCH).
+ * Row opens detail (coupon-style header); Edit in the modal opens the JSON editor (PUT / PATCH).
  */
 import { apiFetch } from './commerce-otp-api.js';
 import { putOrPatchResource } from './commerce-resource-save.js';
+import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
+import { createDetailModalHeaderCloseAndJson } from './commerce-detail-modal-json.js';
 import { openJsonEditDialog } from './commerce-json-edit-dialog.js';
 import { PB_ORG, PB_SITE } from './commerce-pbus-config.js';
 import { escapeHtml, showToast } from './commerce-otp-ui.js';
@@ -48,43 +50,182 @@ function sortByCreated(customers, sort) {
   return arr;
 }
 
-function showJsonDialog(obj) {
+function appendPill(container, label, on) {
+  const span = document.createElement('span');
+  span.className = on ? 'coupons-pill coupons-pill-on' : 'coupons-pill coupons-pill-off';
+  span.textContent = label;
+  container.appendChild(span);
+}
+
+function statBlock(label, value) {
+  const div = document.createElement('div');
+  div.className = 'coupons-modal-stat';
+  div.setAttribute('role', 'listitem');
+  const lbl = document.createElement('span');
+  lbl.className = 'coupons-modal-stat-label';
+  lbl.textContent = label;
+  const val = document.createElement('span');
+  val.className = 'coupons-modal-stat-value';
+  val.textContent = value;
+  div.append(lbl, val);
+  return div;
+}
+
+/** Same “rich header” pattern as orders detail — badges, title, id line, hero, stats, pills. */
+function buildCustomerRichHeader(data) {
+  const wrap = document.createElement('div');
+  wrap.className = 'orders-detail-rich';
+
+  if (!data || typeof data !== 'object') {
+    const p = document.createElement('p');
+    p.className = 'customers-detail-empty';
+    p.textContent = 'No customer data.';
+    wrap.appendChild(p);
+    return wrap;
+  }
+
+  const email = data.email != null ? String(data.email).trim() : '';
+  const fullName = [data.firstName, data.lastName].filter(Boolean).join(' ').trim();
+
+  const head = document.createElement('div');
+  head.className = 'coupons-modal-head';
+  const badges = document.createElement('div');
+  badges.className = 'coupons-modal-badges';
+  if (email && email.includes('@')) {
+    const domain = email.split('@')[1] || '';
+    if (domain) {
+      const tag = document.createElement('span');
+      tag.className = 'coupons-tag coupons-tag-slug';
+      tag.textContent = domain;
+      badges.appendChild(tag);
+    }
+  }
+  head.appendChild(badges);
+
+  const title = document.createElement('h2');
+  title.className = 'coupons-modal-title';
+  /* Email stays on the id line only — avoid repeating it as the headline when there is no name. */
+  title.textContent = fullName || 'Customer';
+  head.appendChild(title);
+
+  const idLine = document.createElement('p');
+  idLine.className = 'coupons-modal-idline orders-detail-idline';
+  const code = document.createElement('code');
+  code.className = 'orders-detail-id-code';
+  code.textContent = email || '—';
+  idLine.appendChild(code);
+  head.appendChild(idLine);
+  wrap.appendChild(head);
+
+  const createdStr = data.createdAt ? new Date(data.createdAt).toLocaleString() : '';
+
+  const stats = document.createElement('div');
+  stats.className = 'coupons-modal-stats';
+  stats.setAttribute('role', 'list');
+  stats.appendChild(statBlock('Phone', data.phone != null && String(data.phone).trim() !== '' ? String(data.phone) : '—'));
+  stats.appendChild(statBlock('First name', data.firstName != null && String(data.firstName).trim() !== '' ? String(data.firstName) : '—'));
+  stats.appendChild(statBlock('Last name', data.lastName != null && String(data.lastName).trim() !== '' ? String(data.lastName) : '—'));
+  stats.appendChild(statBlock('Created', createdStr || '—'));
+  wrap.appendChild(stats);
+
+  const pills = document.createElement('div');
+  pills.className = 'coupons-modal-pills';
+  pills.setAttribute('aria-label', 'Customer flags');
+  appendPill(pills, 'Has phone', Boolean(data.phone && String(data.phone).trim()));
+  appendPill(pills, 'Full name', Boolean(fullName));
+  wrap.appendChild(pills);
+
+  return wrap;
+}
+
+function buildCustomerDetailHumanView(data) {
+  const root = document.createElement('div');
+  root.className = 'customers-detail-human';
+  root.appendChild(buildCustomerRichHeader(data));
+  return root;
+}
+
+function openCustomerDetailModal(customerData, { email, onRefresh } = {}) {
   const dialog = document.createElement('dialog');
-  dialog.className = 'customers-json-dialog';
-  const pre = document.createElement('pre');
-  pre.className = 'customers-json-pre';
-  pre.textContent = JSON.stringify(obj, null, 2);
-  const close = document.createElement('button');
-  close.type = 'button';
-  close.className = 'ca-btn ca-btn-primary customers-dialog-close';
-  close.textContent = 'Close';
-  close.addEventListener('click', () => {
+  dialog.className = 'customers-detail-dialog coupons-detail-dialog';
+
+  const toolbar = document.createElement('div');
+  toolbar.className = 'commerce-detail-modal-toolbar';
+
+  const scroll = document.createElement('div');
+  scroll.className = 'coupons-detail-dialog-scroll customers-detail-scroll';
+
+  const bodyHost = document.createElement('div');
+
+  const editBtn = document.createElement('button');
+  editBtn.type = 'button';
+  editBtn.className = 'orders-edit-btn';
+  editBtn.textContent = 'Edit';
+
+  const toolbarMain = document.createElement('div');
+  toolbarMain.className = 'commerce-detail-modal-toolbar-main';
+  toolbarMain.appendChild(editBtn);
+
+  const shut = () => {
     dialog.close();
     dialog.remove();
+  };
+
+  const header = createDetailModalHeaderCloseAndJson({
+    bodyHost,
+    getHumanNode: () => buildCustomerDetailHumanView(customerData),
+    getJsonValue: () => customerData,
+    onClose: shut,
   });
-  dialog.append(pre, close);
+
+  toolbar.append(toolbarMain, header.headerRight);
+
+  scroll.appendChild(bodyHost);
+  header.resetToHuman();
+
   dialog.addEventListener('click', (e) => {
-    if (e.target === dialog) {
-      dialog.close();
-      dialog.remove();
+    if (e.target === dialog) shut();
+  });
+
+  editBtn.addEventListener('click', async () => {
+    if (!email) return;
+    try {
+      const resp = await apiFetch(PB_ORG, PB_SITE, `customers/${encodeURIComponent(email)}`, { method: 'GET' });
+      let customer = customerData;
+      if (resp.ok) {
+        customer = await resp.json();
+      }
+      const saved = await openJsonEditDialog({
+        title: `Edit customer ${email}`,
+        initialObject: customer,
+        onSave: (parsed) => putOrPatchResource(`customers/${encodeURIComponent(email)}`, parsed),
+      });
+      if (saved) {
+        shut();
+        if (typeof onRefresh === 'function') await onRefresh();
+      }
+    } catch (err) {
+      showToast(err.message || 'Failed to open editor', 'error');
     }
   });
+
+  dialog.append(toolbar, scroll);
   document.body.appendChild(dialog);
+  wireDialogEscapeDismiss(dialog, shut);
   dialog.showModal();
 }
 
-async function viewCustomer(email, rowFallback) {
+async function viewCustomer(email, rowFallback, onRefresh) {
+  let data = rowFallback;
   try {
     const resp = await apiFetch(PB_ORG, PB_SITE, `customers/${encodeURIComponent(email)}`, { method: 'GET' });
     if (resp.ok) {
-      const data = await resp.json();
-      showJsonDialog(data);
-      return;
+      data = await resp.json();
     }
   } catch {
     /* use fallback */
   }
-  showJsonDialog(rowFallback);
+  openCustomerDetailModal(data, { email, onRefresh });
 }
 
 function renderTable(wrap, displayed, query, onEditSaved) {
@@ -106,7 +247,6 @@ function renderTable(wrap, displayed, query, onEditSaved) {
           <th>Last name</th>
           <th>Phone</th>
           <th>Created</th>
-          <th>Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -117,58 +257,44 @@ function renderTable(wrap, displayed, query, onEditSaved) {
     const last = c.lastName || '—';
     const phone = c.phone || '—';
     const createdStr = c.createdAt ? new Date(c.createdAt).toLocaleString() : '—';
+    const labelName = [c.firstName, c.lastName].filter(Boolean).join(' ').trim() || email || 'Customer';
+    const rowClass = email ? 'customers-row-open' : '';
+    const tabIdx = email ? '0' : '-1';
+    const roleBtn = email ? 'role="button"' : '';
     return `
-          <tr>
+          <tr class="${rowClass}" data-email="${safeAttr}" tabindex="${tabIdx}" ${roleBtn} aria-label="Open customer ${escapeHtml(labelName)}">
             <td class="customers-email-cell">${highlightMatch(email, query)}</td>
             <td>${highlightMatch(first, query)}</td>
             <td>${highlightMatch(last, query)}</td>
             <td>${highlightMatch(phone, query)}</td>
             <td>${highlightMatch(createdStr, query)}</td>
-            <td>
-              <div class="customers-actions">
-                <button type="button" class="customers-view-btn" data-email="${safeAttr}">View</button>
-                <button type="button" class="customers-edit-btn" data-email="${safeAttr}">Edit</button>
-              </div>
-            </td>
           </tr>`;
   }).join('')}
       </tbody>
     </table>`;
 
-  wrap.querySelectorAll('.customers-view-btn').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const email = btn.getAttribute('data-email');
-      const row = displayed.find((x) => x.email === email) || { email };
+  wrap.querySelectorAll('tbody tr.customers-row-open[data-email]').forEach((row) => {
+    const openDetail = async () => {
+      const email = row.getAttribute('data-email');
+      if (!email) return;
+      const fallback = displayed.find((x) => x.email === email) || { email };
       try {
-        await viewCustomer(email, row);
+        await viewCustomer(email, fallback, onEditSaved);
       } catch (err) {
         showToast(err.message || 'Failed to load customer', 'error');
       }
+    };
+    row.addEventListener('click', () => {
+      openDetail().catch(() => {
+        /* errors surfaced inside openDetail */
+      });
     });
-  });
-
-  wrap.querySelectorAll('.customers-edit-btn').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const email = btn.getAttribute('data-email');
-      if (!email) return;
-      try {
-        const resp = await apiFetch(PB_ORG, PB_SITE, `customers/${encodeURIComponent(email)}`, { method: 'GET' });
-        let customer;
-        if (resp.ok) {
-          customer = await resp.json();
-        } else {
-          customer = displayed.find((x) => x.email === email) || { email };
-        }
-        const saved = await openJsonEditDialog({
-          title: `Edit customer ${email}`,
-          initialObject: customer,
-          onSave: (parsed) => putOrPatchResource(`customers/${encodeURIComponent(email)}`, parsed),
+    row.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openDetail().catch(() => {
+          /* errors surfaced inside openDetail */
         });
-        if (saved && onEditSaved) {
-          await onEditSaved();
-        }
-      } catch (err) {
-        showToast(err.message || 'Failed to open editor', 'error');
       }
     });
   });

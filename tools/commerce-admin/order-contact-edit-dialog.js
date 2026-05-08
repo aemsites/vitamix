@@ -1,6 +1,7 @@
 /**
  * Edit only customer + shipping + billing on an order (ProductBus order JSON shape).
  */
+import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
 import { showToast } from './commerce-otp-ui.js';
 
 const CUSTOMER_KEYS = ['firstName', 'lastName', 'email', 'phone'];
@@ -171,6 +172,9 @@ export function openOrderContactEditDialog({ title, orderPayload, onSave }) {
     });
 
     document.body.appendChild(dialog);
+    wireDialogEscapeDismiss(dialog, () => {
+      dialog.close();
+    });
     dialog.showModal();
     dialog.querySelector('.order-edit-input')?.focus();
   });

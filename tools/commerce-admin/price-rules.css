@@ -1,4 +1,4 @@
-/* Price rules — UI mock (no API). Full width like orders. */
+/* Cart rules + Promotions mock UI (price-rules-page.js, no API). Shared by cart-rules.html and promotions.html. */
 .price-rules-body {
   max-width: none;
   width: 100%;
@@ -8,23 +8,9 @@
 
 .price-rules-page-title {
   font-size: 1.35rem;
-  margin: 0 0 6px;
+  margin: 0 0 14px;
   color: #202223;
   font-weight: 600;
-}
-
-.price-rules-page-lead {
-  margin: 0 0 12px;
-  font-size: 14px;
-  color: #6d7175;
-  line-height: 1.45;
-}
-
-.price-rules-page-lead code {
-  font-size: 12px;
-  background: #f0f0f1;
-  padding: 2px 6px;
-  border-radius: 4px;
 }
 
 .price-rules-mock-banner {
@@ -93,7 +79,7 @@
   align-items: start;
 }
 
-@media (max-width: 900px) {
+@media (width <= 900px) {
   .pr-split {
     grid-template-columns: 1fr;
   }
@@ -250,4 +236,105 @@
   text-align: center;
   color: #6d7175;
   font-size: 14px;
+}
+
+.pr-promo-standalone-hint {
+  margin: 0 0 12px;
+}
+
+.pr-promo-toolbar.pim-toolbar {
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 16px;
+  margin-bottom: 14px;
+}
+
+.pim-search.pr-promo-search-wide {
+  flex: 1 1 280px;
+  max-width: none;
+  min-width: 200px;
+}
+
+.pr-promo-toolbar-right {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 16px;
+}
+
+.pr-promo-filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pr-promo-filter-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6d7175;
+}
+
+.pr-promo-table-wrap {
+  overflow: auto;
+  border: 1px solid #e1e3e5;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.pr-promo-grid-table tbody tr.pr-promo-grid-row {
+  cursor: pointer;
+}
+
+.pr-promo-grid-table tbody tr.pr-promo-grid-row:hover {
+  background: #f3f6fb;
+}
+
+.pr-promo-grid-table tbody tr.pr-promo-grid-row:focus-visible {
+  outline: 2px solid #1a56b0;
+  outline-offset: -2px;
+}
+
+.pr-promo-col-title {
+  font-weight: 500;
+  color: #202223;
+}
+
+.pr-promo-id-code {
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.pr-empty-cell {
+  padding: 24px 16px !important;
+  text-align: center;
+  color: #6d7175;
+  font-size: 14px;
+  border-bottom: none !important;
+}
+
+/* Promotion detail modal reuses coupons detail classes (load coupons.css on promotions.html). */
+.pr-promo-detail-dialog.coupons-detail-dialog {
+  max-width: min(96vw, 920px);
+}
+
+.pr-promo-detail-dialog.coupons-detail-dialog .coupons-modal-section .pr-data-table {
+  min-width: 640px;
+}
+
+.pr-cart-rule-dialog.coupons-detail-dialog {
+  max-width: min(96vw, 720px);
+}
+
+.pr-cart-rule-lead {
+  min-width: 10rem;
+}
+
+.pr-cart-rule-lead .coupons-grid-lead-badges {
+  margin-bottom: 6px;
+}
+
+.pr-cart-rule-scope {
+  max-width: 14rem;
+  font-size: 12px;
+  color: #5c5f62;
 }

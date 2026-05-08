@@ -1,8 +1,14 @@
 /**
- * Coupons — ProductBus: coupons (types) at …/coupons/types; codes at …/coupons; batch at …/coupons/batch.
- * UI speaks in “coupon” / “code”; navigation is anchored on the selected coupon.
+ * Coupons — ProductBus: types at …/coupons/types; codes at …/coupons;
+ * batch at …/coupons/batch. UI: “coupon” / “code”; nav on selected coupon.
  */
+/* eslint-disable no-use-before-define, no-console */
+// render, bindCodesEvents, and open* dialogs reference each other.
+// console: intentional debug logs for ProductBus coupon API failures.
 import { apiFetch } from './commerce-otp-api.js';
+import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
+import { createDetailModalHeaderShell } from './commerce-detail-modal-json.js';
+import { mountPromoteProductionInToolbar } from './commerce-promote-production.js';
 import { PB_ORG, PB_SITE } from './commerce-pbus-config.js';
 import { escapeHtml, showToast } from './commerce-otp-ui.js';
 
@@ -12,13 +18,359 @@ async function readRespError(resp) {
     || `HTTP ${resp.status}`;
 }
 
+/** Decoded coupon type id when `path` is `coupons/types/{segment}`. */
+function decodeTypeIdFromCouponsTypesPath(path) {
+  const m = String(path).match(/^coupons\/types\/([^?]+)/);
+  if (!m) return '';
+  try {
+    return decodeURIComponent(m[1]);
+  } catch {
+    return m[1];
+  }
+}
+
+/** `type` query value from `coupons?type=…` (decoded). */
+function typeIdFromCouponsQueryPath(path) {
+  const s = String(path);
+  if (!s.startsWith('coupons?')) return '';
+  try {
+    const q = s.indexOf('?');
+    return new URLSearchParams(s.slice(q + 1)).get('type') || '';
+  } catch {
+    return '';
+  }
+}
+
+/** Extra hint when path shape is likely wrong (omit 404 — often a plain “not found”). */
+function appendUnsafeCouponIdHint(decodedTypeId, status) {
+  if (!decodedTypeId || !/[\\/]/.test(decodedTypeId)) return '';
+  if (![400, 405].includes(status)) return '';
+  return ' — Tip: "/" or "\\" in a coupon ID often breaks REST paths (even when URL-encoded). Use hyphens, e.g. spring-sale.';
+}
+
+/** Persisted market filter (All, US, CA, MX). */
+const COUPON_MARKET_STORAGE_KEY = 'vitamix-coupons-market-filter';
+
+const COUPON_MARKETS = /** @type {const} */ ([
+  { key: 'all', label: 'All' },
+  { key: 'us', label: 'United States' },
+  { key: 'ca', label: 'Canada' },
+  { key: 'mx', label: 'Mexico' },
+]);
+
+/** Expected coupon type id: &lt;us|ca|mx&gt;/&lt;year&gt;/&lt;slug…&gt; */
+function assertCouponIdMarketPath(id) {
+  const t = String(id || '').trim();
+  if (!t) throw new Error('Coupon ID is required');
+  if (!/^(us|ca|mx)\/\d{4}\/.+$/i.test(t)) {
+    throw new Error('Coupon ID must look like us/2026/my-promo — country (us, ca, or mx), 4-digit year, then a name (slashes allowed in the name segment).');
+  }
+  if (/[\s?#%\\]/.test(t)) {
+    throw new Error('Coupon ID cannot contain spaces, ?, #, %, or backslashes.');
+  }
+}
+
+function couponMarketPrefixFromId(id) {
+  const s = String(id).trim().toLowerCase();
+  if (s.startsWith('us/')) return 'us';
+  if (s.startsWith('ca/')) return 'ca';
+  if (s.startsWith('mx/')) return 'mx';
+  return '';
+}
+
+function couponsVisibleForMarket() {
+  if (state.marketFilter === 'all') return state.coupons;
+  return state.coupons.filter((row) => {
+    const prefix = couponMarketPrefixFromId(couponIdFromRow(row));
+    return prefix === state.marketFilter;
+  });
+}
+
+/** When id matches <cc>/<year>/… show a readable breakdown. */
+function parseCouponTypePath(id) {
+  const parts = String(id).split('/').filter(Boolean);
+  if (parts.length >= 3 && /^(us|ca|mx)$/i.test(parts[0])) {
+    return {
+      country: parts[0].toLowerCase(),
+      year: parts[1],
+      name: parts.slice(2).join('/'),
+    };
+  }
+  return null;
+}
+
+function marketTagHtml(market) {
+  const m = String(market || '').toLowerCase();
+  const labels = { us: 'US', ca: 'CA', mx: 'MX' };
+  const classes = { us: 'coupons-tag-us', ca: 'coupons-tag-ca', mx: 'coupons-tag-mx' };
+  const label = labels[m];
+  if (!label) return '<span class="coupons-tag coupons-tag-muted">—</span>';
+  return `<span class="coupons-tag ${classes[m]}">${label}</span>`;
+}
+
+function pillHtml(label, on) {
+  const cl = on ? 'coupons-pill coupons-pill-on' : 'coupons-pill coupons-pill-off';
+  return `<span class="${cl}">${escapeHtml(label)}</span>`;
+}
+
+function couponDetailModalInnerHtml(d) {
+  const id = String(d.id ?? state.selectedCouponId ?? '');
+  const name = d.name != null ? String(d.name) : '';
+  const pathSeg = parseCouponTypePath(id);
+  const market = pathSeg ? pathSeg.country : (couponMarketPrefixFromId(id) || '');
+  const year = pathSeg ? pathSeg.year : '';
+  const slugName = pathSeg ? pathSeg.name : '';
+
+  let heroMain = '—';
+  let heroSub = '';
+  if (d.discountType === 'fixed' && d.discountValue != null) {
+    heroMain = `$${d.discountValue}`;
+    heroSub = 'off order subtotal';
+  } else if (d.discountType === 'percentage' && d.discountValue != null) {
+    heroMain = `${d.discountValue}%`;
+    heroSub = 'off order subtotal';
+  } else if (d.discountType) {
+    heroMain = String(d.discountType);
+    heroSub = d.discountValue != null ? String(d.discountValue) : '';
+  }
+
+  const min = d.minimumOrderAmount != null && d.minimumOrderAmount !== ''
+    ? `$${Number(d.minimumOrderAmount).toFixed(2)}`
+    : 'None';
+  const cap = d.maximumDiscountAmount != null && d.maximumDiscountAmount !== ''
+    ? `$${Number(d.maximumDiscountAmount).toFixed(2)}`
+    : 'No cap';
+
+  const cats = Array.isArray(d.excludedCategories) ? d.excludedCategories : [];
+  const catTags = cats.length
+    ? cats.map((c) => `<span class="coupons-mini-tag">${escapeHtml(String(c))}</span>`).join('')
+    : '<span class="coupons-muted">None</span>';
+
+  const listBanner = state.detailFromListFallback
+    ? '<div class="coupons-modal-banner">List snapshot only — edit and delete use the API path and may be unavailable.</div>'
+    : '';
+
+  return `
+    ${listBanner}
+    <div class="coupons-modal-head">
+      <div class="coupons-modal-badges">
+        ${market ? marketTagHtml(market) : ''}
+        ${year ? `<span class="coupons-tag coupons-tag-year">${escapeHtml(year)}</span>` : ''}
+        ${slugName ? `<span class="coupons-tag coupons-tag-slug">${escapeHtml(slugName)}</span>` : ''}
+      </div>
+      <h2 class="coupons-modal-title">${escapeHtml(name || id || 'Coupon')}</h2>
+      <p class="coupons-modal-idline"><code>${escapeHtml(id)}</code></p>
+    </div>
+    <div class="coupons-modal-hero">
+      <div class="coupons-modal-hero-inner">
+        <span class="coupons-modal-hero-kicker">Discount</span>
+        <span class="coupons-modal-hero-value">${escapeHtml(heroMain)}</span>
+        ${heroSub ? `<span class="coupons-modal-hero-note">${escapeHtml(heroSub)}</span>` : ''}
+      </div>
+    </div>
+    <div class="coupons-modal-stats" role="list">
+      <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Minimum order</span><span class="coupons-modal-stat-value">${escapeHtml(min)}</span></div>
+      <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Discount cap</span><span class="coupons-modal-stat-value">${escapeHtml(cap)}</span></div>
+      <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Default code uses</span><span class="coupons-modal-stat-value">${escapeHtml(d.defaultUsageLimit != null ? String(d.defaultUsageLimit) : '—')}</span></div>
+      <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Uses per code</span><span class="coupons-modal-stat-value">${escapeHtml(d.defaultUsesPerCode != null ? String(d.defaultUsesPerCode) : '—')}</span></div>
+    </div>
+    <div class="coupons-modal-pills" aria-label="Program flags">
+      ${pillHtml('Free shipping', !!d.freeShipping)}
+      ${pillHtml('Stacks with rules', d.stackable !== false)}
+      ${pillHtml('Auto-apply', !!d.autoApply)}
+      ${pillHtml('Manual entry', d.allowManualEntry !== false)}
+    </div>
+    <section class="coupons-modal-section">
+      <h3 class="coupons-modal-section-title">Excluded categories</h3>
+      <div class="coupons-modal-tags">${catTags}</div>
+    </section>
+    ${d.notes && String(d.notes).trim()
+    ? `<section class="coupons-modal-section"><h3 class="coupons-modal-section-title">Notes</h3><div class="coupons-modal-notes">${escapeHtml(String(d.notes).trim())}</div></section>`
+    : ''}
+    <div class="coupons-modal-codes" data-cp-modal-codes-mount>${renderCodesSection()}</div>`;
+}
+
+function closeCouponDetailDialog() {
+  document.querySelector('dialog.coupons-detail-dialog')?.remove();
+}
+
+function afterCodesRefresh() {
+  const dlg = document.querySelector('dialog.coupons-detail-dialog');
+  const host = dlg?.querySelector('[data-cp-modal-codes-mount]');
+  if (host) {
+    host.innerHTML = renderCodesSection();
+    bindCodesEvents(dlg);
+    return;
+  }
+  render();
+}
+
+function wireCouponDetailModal(dialog) {
+  const shut = () => {
+    dialog.close();
+    dialog.remove();
+  };
+  wireDialogEscapeDismiss(dialog, shut);
+  dialog.querySelector('[data-cp-modal-close-secondary]')?.addEventListener('click', shut);
+  dialog.addEventListener('click', (e) => {
+    if (e.target === dialog) shut();
+  });
+  dialog.querySelector('[data-cp-modal-edit]')?.addEventListener('click', () => {
+    shut();
+    openEditCouponDialog();
+  });
+  dialog.querySelector('[data-cp-modal-delete]')?.addEventListener('click', async () => {
+    if (!state.selectedCouponId) return;
+    if (state.detailFromListFallback) {
+      showToast('Delete is unavailable for list-only snapshots.', 'error');
+      return;
+    }
+    /* eslint-disable-next-line no-alert -- destructive action needs explicit confirmation */
+    if (!window.confirm(`Delete coupon "${state.selectedCouponId}"?`)) return;
+    try {
+      await couponsApiFetch(
+        `coupons/types/${encodeURIComponent(state.selectedCouponId)}`,
+        { method: 'DELETE' },
+      );
+      showToast('Coupon deleted', 'success');
+      state.selectedCouponId = '';
+      state.couponDetail = null;
+      state.codes = [];
+      shut();
+      await refreshCouponList();
+      render();
+    } catch (err) {
+      console.warn('[commerce-admin/coupons] delete coupon failed', {
+        couponId: state.selectedCouponId,
+        message: err?.message,
+      });
+      setError(err.message || 'Delete failed.');
+      showToast(err.message || 'Delete failed', 'error');
+    }
+  });
+}
+
+function openCouponDetailModal() {
+  closeCouponDetailDialog();
+  const d = state.couponDetail;
+  if (!d || !state.selectedCouponId) return;
+  const dialog = document.createElement('dialog');
+  dialog.className = 'coupons-detail-dialog';
+
+  const toolbar = document.createElement('div');
+  toolbar.className = 'commerce-detail-modal-toolbar';
+
+  const shut = () => {
+    dialog.close();
+    dialog.remove();
+  };
+
+  const toolbarMain = document.createElement('div');
+  toolbarMain.className = 'commerce-detail-modal-toolbar-main';
+
+  mountPromoteProductionInToolbar(toolbarMain, {
+    org: PB_ORG,
+    site: PB_SITE,
+    entityKind: 'coupon',
+    getPayload: () => ({ ...state.couponDetail, id: state.selectedCouponId }),
+  });
+
+  const { headerRight, jsonLink } = createDetailModalHeaderShell(shut);
+
+  toolbar.append(toolbarMain, headerRight);
+
+  const scroll = document.createElement('div');
+  scroll.className = 'coupons-detail-dialog-scroll';
+
+  const humanWrap = document.createElement('div');
+  humanWrap.setAttribute('data-cp-human', '');
+  humanWrap.innerHTML = couponDetailModalInnerHtml(d);
+
+  const jsonPre = document.createElement('pre');
+  jsonPre.className = 'commerce-detail-modal-json-pre';
+  jsonPre.hidden = true;
+  jsonPre.textContent = JSON.stringify(d, null, 2);
+
+  scroll.append(humanWrap, jsonPre);
+
+  jsonLink.addEventListener('click', () => {
+    const showJson = jsonPre.hidden;
+    jsonPre.hidden = !showJson;
+    humanWrap.hidden = showJson;
+    jsonLink.textContent = showJson ? 'Details' : 'JSON';
+    jsonLink.setAttribute('aria-pressed', showJson ? 'true' : 'false');
+  });
+
+  const footer = document.createElement('footer');
+  footer.className = 'coupons-modal-footer';
+  footer.innerHTML = `
+      <button type="button" class="coupons-btn" data-cp-modal-edit ${state.detailFromListFallback ? 'disabled' : ''}>Edit…</button>
+      <button type="button" class="coupons-btn coupons-btn-danger" data-cp-modal-delete ${state.detailFromListFallback ? 'disabled' : ''}>Delete</button>
+      <button type="button" class="coupons-btn coupons-btn-primary" data-cp-modal-close-secondary>Done</button>`;
+
+  dialog.append(toolbar, scroll, footer);
+  document.body.appendChild(dialog);
+  wireCouponDetailModal(dialog);
+  bindCodesEvents(dialog);
+  dialog.showModal();
+}
+
+function renderMarketTabs() {
+  return COUPON_MARKETS.map(({ key, label }) => {
+    const sel = key === state.marketFilter ? 'true' : 'false';
+    return `<button type="button" class="coupons-market-tab" role="tab" aria-selected="${sel}" data-cp-market="${escapeHtml(key)}">${escapeHtml(label)}</button>`;
+  }).join('');
+}
+
+async function alignSelectionToMarketFilter() {
+  closeCouponDetailDialog();
+  const visible = couponsVisibleForMarket();
+  const ids = new Set(visible.map((row) => couponIdFromRow(row)));
+  if (state.selectedCouponId && ids.has(state.selectedCouponId)) {
+    await refreshSelection();
+    return;
+  }
+  state.selectedCouponId = couponIdFromRow(visible[0]) || '';
+  await refreshSelection();
+}
+
+/**
+ * Wraps ProductBus calls: logs failed requests to the console for debugging.
+ */
+async function couponsApiFetch(path, fetchInit = {}) {
+  const method = (fetchInit && fetchInit.method) || 'GET';
+  let resp;
+  try {
+    resp = await apiFetch(PB_ORG, PB_SITE, path, fetchInit);
+  } catch (e) {
+    console.warn('[commerce-admin/coupons] request failed (network or auth)', {
+      method,
+      path,
+      message: e?.message || String(e),
+    });
+    throw e;
+  }
+  if (resp.ok) return resp;
+  const errText = await readRespError(resp);
+  const decodedType = decodeTypeIdFromCouponsTypesPath(path)
+    || typeIdFromCouponsQueryPath(path);
+  console.warn('[commerce-admin/coupons] API error response', {
+    method,
+    path,
+    status: resp.status,
+    statusText: resp.statusText,
+    error: errText,
+    couponTypeId: decodedType || undefined,
+  });
+  const hint = appendUnsafeCouponIdHint(decodedType, resp.status);
+  throw new Error(`${errText}${hint}`);
+}
+
 function asArray(data, keys) {
   if (Array.isArray(data)) return data;
   if (!data || typeof data !== 'object') return [];
-  for (const k of keys) {
-    if (Array.isArray(data[k])) return data[k];
-  }
-  return [];
+  const key = keys.find((k) => Array.isArray(data[k]));
+  return key ? data[key] : [];
 }
 
 /** Coupon id from a list row (API “coupon type”). */
@@ -28,17 +380,23 @@ function couponIdFromRow(row) {
 }
 
 const state = {
+  /** @type {'all'|'us'|'ca'|'mx'} */
+  marketFilter: 'all',
   coupons: [],
   selectedCouponId: '',
   couponDetail: null,
+  /** True when `couponDetail` came from the list row because GET …/types/{id} failed. */
+  detailFromListFallback: false,
   codes: [],
   /** Cursor from the last list response; used for “Next page” requests. */
   codesNextCursor: '',
 };
 
-function setError(msg) {
+/** @param {'error'|'info'} tone */
+function setError(msg, tone = 'error') {
   const el = document.getElementById('coupons-error');
   if (!el) return;
+  el.classList.toggle('coupons-error-info', Boolean(msg) && tone === 'info');
   if (msg) {
     el.hidden = false;
     el.textContent = msg;
@@ -54,48 +412,69 @@ function yn(v) {
   return '—';
 }
 
-function renderCouponRulesHuman(d) {
-  if (!d || typeof d !== 'object') return '';
-  let discountLine = '—';
-  if (d.discountType === 'fixed' && d.discountValue != null) {
-    discountLine = `$${d.discountValue} off the order`;
-  } else if (d.discountType === 'percentage' && d.discountValue != null) {
-    discountLine = `${d.discountValue}% off the order`;
-  } else if (d.discountType) {
-    discountLine = `${d.discountType}: ${d.discountValue ?? '—'}`;
+/** Single-line discount summary for overview grid (list row). */
+function overviewDiscountText(row) {
+  if (!row || typeof row !== 'object') return '—';
+  if (row.discountType === 'fixed' && row.discountValue != null) {
+    return `$${row.discountValue}`;
   }
-  const cats = Array.isArray(d.excludedCategories) && d.excludedCategories.length
-    ? d.excludedCategories.join(', ')
-    : 'None';
-  const min = d.minimumOrderAmount != null && d.minimumOrderAmount !== ''
-    ? `$${Number(d.minimumOrderAmount).toFixed(2)}`
-    : 'None';
-  const cap = d.maximumDiscountAmount != null && d.maximumDiscountAmount !== ''
-    ? `$${Number(d.maximumDiscountAmount).toFixed(2)}`
-    : 'No cap';
-  const rows = [
-    ['Coupon ID', d.id ?? '—'],
-    ['Display name', d.name ?? '—'],
-    ['Discount', discountLine],
-    ['Minimum order subtotal', min],
-    ['Maximum discount (cap)', cap],
-    ['Also grants free shipping', yn(d.freeShipping)],
-    ['Excluded category slugs', cats],
-    ['Stacks with auto pricing rules', yn(d.stackable !== false)],
-    ['Auto-apply (storefront hint)', yn(d.autoApply)],
-    ['Customers can type this code', yn(d.allowManualEntry !== false)],
-    ['Default usage limit (codes)', d.defaultUsageLimit ?? '—'],
-    ['Default uses per code', d.defaultUsesPerCode ?? '—'],
-    ['Internal notes', d.notes && String(d.notes).trim() ? d.notes : '—'],
-  ];
-  return `<dl class="coupons-rule-dl">${rows.map(([dt, dd]) => `
-    <div><dt>${escapeHtml(dt)}</dt><dd>${escapeHtml(String(dd))}</dd></div>
-  `).join('')}</dl>`;
+  if (row.discountType === 'percentage' && row.discountValue != null) {
+    return `${row.discountValue}%`;
+  }
+  if (row.discountType) return `${row.discountType}: ${row.discountValue ?? '—'}`;
+  return '—';
+}
+
+function overviewMinOrder(row) {
+  if (!row || typeof row !== 'object') return '—';
+  if (row.minimumOrderAmount == null || row.minimumOrderAmount === '') return '—';
+  return `$${Number(row.minimumOrderAmount).toFixed(2)}`;
+}
+
+function overviewCap(row) {
+  if (!row || typeof row !== 'object') return '—';
+  if (row.maximumDiscountAmount == null || row.maximumDiscountAmount === '') return '—';
+  return `$${Number(row.maximumDiscountAmount).toFixed(2)}`;
+}
+
+function renderCouponsOverviewBody(filtered) {
+  const emptyCell = (msg) => `<tr><td colspan="8" class="coupons-empty-cell">${msg}</td></tr>`;
+  if (!state.coupons.length) {
+    return emptyCell('No coupons yet (empty list or missing <code>coupons:read</code>).');
+  }
+  if (!filtered.length) {
+    return emptyCell('No coupons for this market. Try <strong>All</strong> or another country tab.');
+  }
+  return filtered.map((row) => {
+    const id = couponIdFromRow(row);
+    const name = row.name || '—';
+    const pathSeg = parseCouponTypePath(id);
+    const year = pathSeg ? pathSeg.year : '—';
+    const disc = overviewDiscountText(row);
+    const min = overviewMinOrder(row);
+    const cap = overviewCap(row);
+    const ship = yn(row.freeShipping);
+    const stack = yn(row.stackable !== false);
+    const label = `Open coupon ${id}`;
+    const mTag = marketTagHtml(couponMarketPrefixFromId(id));
+    return `<tr class="coupons-grid-row coupons-row-open" data-cp-coupon-id="${escapeHtml(id)}" tabindex="0" role="button" aria-label="${escapeHtml(label)}">
+      <td class="coupons-grid-lead">
+        <div class="coupons-grid-lead-badges">${mTag}</div>
+        <code class="coupons-grid-id">${escapeHtml(id || '—')}</code>
+      </td>
+      <td class="coupons-grid-name">${escapeHtml(String(name))}</td>
+      <td>${escapeHtml(year)}</td>
+      <td>${escapeHtml(disc)}</td>
+      <td>${escapeHtml(min)}</td>
+      <td>${escapeHtml(cap)}</td>
+      <td>${escapeHtml(ship)}</td>
+      <td>${escapeHtml(stack)}</td>
+    </tr>`;
+  }).join('');
 }
 
 async function fetchCouponList() {
-  const resp = await apiFetch(PB_ORG, PB_SITE, 'coupons/types', { method: 'GET' });
-  if (!resp.ok) throw new Error(await readRespError(resp));
+  const resp = await couponsApiFetch('coupons/types', { method: 'GET' });
   const data = await resp.json();
   state.coupons = asArray(data, ['types', 'items', 'data', 'results', 'coupons']);
 }
@@ -103,11 +482,28 @@ async function fetchCouponList() {
 async function fetchCouponDetail(id) {
   if (!id) {
     state.couponDetail = null;
+    state.detailFromListFallback = false;
     return;
   }
-  const resp = await apiFetch(PB_ORG, PB_SITE, `coupons/types/${encodeURIComponent(id)}`, { method: 'GET' });
-  if (!resp.ok) throw new Error(await readRespError(resp));
-  state.couponDetail = await resp.json();
+  try {
+    const resp = await couponsApiFetch(`coupons/types/${encodeURIComponent(id)}`, { method: 'GET' });
+    state.couponDetail = await resp.json();
+    state.detailFromListFallback = false;
+  } catch (err) {
+    const row = state.coupons.find((c) => couponIdFromRow(c) === id);
+    if (row && typeof row === 'object') {
+      state.couponDetail = { ...row };
+      state.detailFromListFallback = true;
+      console.warn('[commerce-admin/coupons] detail GET failed; using list row snapshot', {
+        id,
+        message: err?.message || String(err),
+      });
+      return;
+    }
+    state.couponDetail = null;
+    state.detailFromListFallback = false;
+    throw err;
+  }
 }
 
 async function fetchCodesForCoupon({ append } = {}) {
@@ -122,10 +518,10 @@ async function fetchCodesForCoupon({ append } = {}) {
   qs.set('type', state.selectedCouponId);
   qs.set('limit', '100');
   if (cursorParam) qs.set('cursor', cursorParam);
-  const resp = await apiFetch(PB_ORG, PB_SITE, `coupons?${qs.toString()}`, { method: 'GET' });
-  if (!resp.ok) throw new Error(await readRespError(resp));
+  const path = `coupons?${qs.toString()}`;
+  const resp = await couponsApiFetch(path, { method: 'GET' });
   const data = await resp.json();
-  const batch = asArray(data, ['codes', 'items', 'data', 'results']);
+  const batch = asArray(data, ['codes', 'items', 'data', 'results', 'values', 'generated']);
   const next = data && typeof data === 'object' && data.cursor ? String(data.cursor) : '';
   if (append) {
     state.codes = [...state.codes, ...batch];
@@ -133,27 +529,50 @@ async function fetchCodesForCoupon({ append } = {}) {
     state.codes = batch;
   }
   state.codesNextCursor = next;
+  if (!append && state.codes.length && !pickCouponCodeString(state.codes[0])) {
+    console.warn('[commerce-admin/coupons] first code row has no recognized code field; sample:', state.codes[0]);
+  }
 }
 
 async function refreshSelection() {
   if (state.selectedCouponId) {
-    await fetchCouponDetail(state.selectedCouponId);
-    state.codes = [];
-    state.codesNextCursor = '';
+    try {
+      await fetchCouponDetail(state.selectedCouponId);
+      state.codes = [];
+      state.codesNextCursor = '';
+      if (state.detailFromListFallback) {
+        setError('Showing data from the coupon list only: GET …/coupons/types/{id} failed for this id (common when the id contains “/”). Edit and delete use that URL path and are disabled here until the id is fixed on the server.', 'info');
+      } else {
+        setError('');
+      }
+    } catch (e) {
+      state.codes = [];
+      state.codesNextCursor = '';
+      state.detailFromListFallback = false;
+      setError(e.message || 'Could not load this coupon.');
+      throw e;
+    }
   } else {
     state.couponDetail = null;
     state.codes = [];
     state.codesNextCursor = '';
+    state.detailFromListFallback = false;
+    setError('');
   }
 }
 
 async function refreshCouponList() {
   await fetchCouponList();
+  const visible = couponsVisibleForMarket();
   if (state.selectedCouponId) {
     const still = state.coupons.some((c) => couponIdFromRow(c) === state.selectedCouponId);
     if (!still) state.selectedCouponId = couponIdFromRow(state.coupons[0]) || '';
-  } else if (state.coupons.length) {
-    state.selectedCouponId = couponIdFromRow(state.coupons[0]);
+    const stillVisible = visible.some((c) => couponIdFromRow(c) === state.selectedCouponId);
+    if (!stillVisible) state.selectedCouponId = couponIdFromRow(visible[0]) || '';
+  } else if (visible.length) {
+    state.selectedCouponId = couponIdFromRow(visible[0]);
+  } else {
+    state.selectedCouponId = '';
   }
   await refreshSelection();
 }
@@ -182,6 +601,10 @@ function openDialog(title, innerHtml, onSubmit, afterMount, dialogClass) {
       dialog.close();
       dialog.remove();
     } catch (err) {
+      console.warn('[commerce-admin/coupons] dialog submit failed', {
+        title,
+        message: err?.message || String(err),
+      });
       showToast(err.message || 'Request failed', 'error');
     }
   });
@@ -190,6 +613,10 @@ function openDialog(title, innerHtml, onSubmit, afterMount, dialogClass) {
       dialog.close();
       dialog.remove();
     }
+  });
+  wireDialogEscapeDismiss(dialog, () => {
+    dialog.close();
+    dialog.remove();
   });
   dialog.showModal();
 }
@@ -201,6 +628,7 @@ function couponFormHtml({ idReadonly }) {
       <div class="coupons-field coupons-field-full">
         <label for="cp-form-id">Coupon ID <span style="font-weight:400;color:#6d7175">(slug, e.g. friends-and-family)</span></label>
         <input type="text" id="cp-form-id" autocomplete="off" ${idReadonly ? 'readonly class="coupons-readonly"' : ''} required />
+        ${idReadonly ? '' : '<p class="coupons-field-hint">Use <code>us/2026/my-coupon</code>, <code>ca/2026/…</code>, or <code>mx/2026/…</code> (country / 4-digit year / name). No spaces or <code>?</code> <code>#</code> <code>%</code> in the id.</p>'}
       </div>
       <div class="coupons-field coupons-field-full">
         <label for="cp-form-name">Display name</label>
@@ -267,6 +695,7 @@ function readCouponBodyFromForm(dlg, { requireId }) {
   const id = dlg.querySelector('#cp-form-id')?.value?.trim();
   const name = dlg.querySelector('#cp-form-name')?.value?.trim();
   if (requireId && !id) throw new Error('Coupon ID is required');
+  if (requireId) assertCouponIdMarketPath(id);
   if (!name) throw new Error('Display name is required');
   const discountType = dlg.querySelector('#cp-form-discount-type')?.value || 'percentage';
   const discountValRaw = dlg.querySelector('#cp-form-discount-value')?.value;
@@ -304,6 +733,45 @@ function readCouponBodyFromForm(dlg, { requireId }) {
   return body;
 }
 
+/** API may return each code as a string or an object with varying keys. */
+function normalizeCouponCodeEntry(raw) {
+  if (raw == null) return {};
+  if (typeof raw === 'string') return { code: raw.trim() };
+  if (typeof raw === 'object') return raw;
+  return {};
+}
+
+function pickCouponCodeString(c) {
+  const o = normalizeCouponCodeEntry(c);
+  const candidates = [
+    o.code,
+    o.couponCode,
+    o.coupon_code,
+    o.value,
+    o.token,
+    o.label,
+    o.name,
+    o.couponId,
+    o.coupon_id,
+    o.id,
+  ];
+  const hit = candidates.find((v) => v != null && String(v).trim() !== '');
+  return hit != null ? String(hit).trim() : '';
+}
+
+function pickCouponUsageParts(c) {
+  const o = normalizeCouponCodeEntry(c);
+  const used = o.usageCount ?? o.usedCount ?? o.uses ?? o.timesUsed ?? o.redemptions ?? o.useCount;
+  const limit = o.usageLimit ?? o.maxUses ?? o.limit ?? o.maxRedemptions ?? o.totalUses;
+  return { used, limit };
+}
+
+function pickCouponExpires(c) {
+  const o = normalizeCouponCodeEntry(c);
+  const v = o.expiresAt ?? o.expirationDate ?? o.expires ?? o.expiration ?? o.expiry;
+  return v != null && String(v).trim() !== '' ? String(v).trim() : '';
+}
+
 function fillCouponForm(dlg, d) {
   if (!d) return;
   const idEl = dlg.querySelector('#cp-form-id');
@@ -323,21 +791,201 @@ function fillCouponForm(dlg, d) {
   dlg.querySelector('#cp-form-notes').value = d.notes ?? '';
 }
 
+function renderCodesSection() {
+  if (!state.selectedCouponId) {
+    return '<p class="coupons-empty">Select a coupon to load its codes.</p>';
+  }
+  const rows = state.codes.length
+    ? state.codes.map((raw) => {
+      const c = normalizeCouponCodeEntry(raw);
+      const codeStr = pickCouponCodeString(raw);
+      const code = escapeHtml(codeStr || '—');
+      const active = c.active !== false && c.active !== 'false';
+      const { used, limit } = pickCouponUsageParts(raw);
+      const usage = `${used ?? '—'} / ${limit ?? '∞'}`;
+      const expRaw = pickCouponExpires(raw);
+      const exp = expRaw ? escapeHtml(expRaw) : '—';
+      return `<tr><td><code>${code}</code></td><td>${active ? 'Yes' : 'No'}</td><td>${escapeHtml(String(usage))}</td><td>${exp}</td></tr>`;
+    }).join('')
+    : '<tr><td colspan="4" class="coupons-empty" style="padding:16px">No codes loaded yet — use <strong>Load codes</strong>.</td></tr>';
+
+  return `
+    <h3 class="coupons-section-title">Codes for this coupon</h3>
+    <div class="coupons-detail-actions">
+      <button type="button" class="coupons-btn coupons-btn-primary" data-cp-load-codes>Load codes</button>
+      <button type="button" class="coupons-btn" data-cp-add-code>New code</button>
+      <button type="button" class="coupons-btn" data-cp-batch>Generate batch</button>
+      ${state.codesNextCursor ? '<button type="button" class="coupons-btn" data-cp-next-codes>Next page</button>' : ''}
+    </div>
+    <div class="coupons-table-wrap">
+      <table class="coupons-data-table">
+        <thead><tr><th>Code</th><th>Active</th><th>Usage</th><th>Expires</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+function bindCodesEvents(mount) {
+  mount.querySelector('[data-cp-load-codes]')?.addEventListener('click', async () => {
+    try {
+      await fetchCodesForCoupon();
+      setError('');
+      afterCodesRefresh();
+    } catch (err) {
+      console.warn('[commerce-admin/coupons] load codes failed', {
+        couponId: state.selectedCouponId,
+        message: err?.message,
+      });
+      setError(err.message || 'Could not load codes for this coupon.');
+      showToast(err.message || 'Failed to load codes', 'error');
+    }
+  });
+  mount.querySelector('[data-cp-next-codes]')?.addEventListener('click', async () => {
+    if (!state.codesNextCursor) return;
+    try {
+      await fetchCodesForCoupon({ append: true });
+      afterCodesRefresh();
+    } catch (err) {
+      console.warn('[commerce-admin/coupons] codes next page failed', {
+        couponId: state.selectedCouponId,
+        message: err?.message,
+      });
+      showToast(err.message || 'Failed', 'error');
+    }
+  });
+  mount.querySelector('[data-cp-add-code]')?.addEventListener('click', () => openAddCodeDialog());
+  mount.querySelector('[data-cp-batch]')?.addEventListener('click', () => openBatchDialog());
+}
+
+function render() {
+  const mount = document.getElementById('coupons-mount');
+  if (!mount) return;
+
+  const filtered = couponsVisibleForMarket();
+  const overviewBody = renderCouponsOverviewBody(filtered);
+
+  mount.innerHTML = `
+    <div class="coupons-toolbar pim-toolbar">
+      <div class="coupons-toolbar-left">
+        <div class="coupons-market-tabs" role="tablist" aria-label="Market">${renderMarketTabs()}</div>
+      </div>
+      <div class="coupons-toolbar-right">
+        <button type="button" class="coupons-btn coupons-btn-primary" data-cp-reload-all>Reload</button>
+        <button type="button" class="coupons-btn" data-cp-new>New coupon…</button>
+      </div>
+    </div>
+    <p class="coupons-market-hint">Ids: <code>us/2026/name</code>, <code>ca/2026/name</code>, <code>mx/2026/name</code>. Click a row for a <strong>modal</strong> with full rules and codes (like opening an order).</p>
+    <section class="coupons-overview coupons-overview-solo" aria-label="Coupon programs overview">
+      <h2 class="coupons-panel-title">Coupon programs</h2>
+      <p class="coupons-panel-hint">Market tag + quick columns; open the modal for edit, delete, and code tools.</p>
+      <div class="coupons-table-wrap coupons-overview-table-wrap pim-list-wrapper">
+        <table class="coupons-grid-table">
+          <thead>
+            <tr>
+              <th scope="col">Market · ID</th>
+              <th scope="col">Name</th>
+              <th scope="col">Year</th>
+              <th scope="col">Discount</th>
+              <th scope="col">Min order</th>
+              <th scope="col">Cap</th>
+              <th scope="col">Free ship</th>
+              <th scope="col">Stack</th>
+            </tr>
+          </thead>
+          <tbody>${overviewBody}</tbody>
+        </table>
+      </div>
+    </section>`;
+
+  mount.querySelectorAll('[data-cp-market]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const key = btn.getAttribute('data-cp-market');
+      if (!key || key === state.marketFilter) return;
+      state.marketFilter = /** @type {typeof state.marketFilter} */ (key);
+      try {
+        sessionStorage.setItem(COUPON_MARKET_STORAGE_KEY, state.marketFilter);
+        await alignSelectionToMarketFilter();
+        render();
+      } catch (err) {
+        console.warn('[commerce-admin/coupons] market filter change failed', { message: err?.message });
+        showToast(err.message || 'Failed to switch market', 'error');
+      }
+    });
+  });
+
+  mount.querySelector('[data-cp-reload-all]')?.addEventListener('click', async () => {
+    try {
+      closeCouponDetailDialog();
+      await refreshCouponList();
+      render();
+    } catch (err) {
+      console.warn('[commerce-admin/coupons] reload failed', { message: err?.message });
+      setError(err.message || 'Reload failed.');
+      showToast(err.message || 'Reload failed', 'error');
+    }
+  });
+
+  mount.querySelector('[data-cp-new]')?.addEventListener('click', () => openNewCouponDialog());
+
+  mount.querySelectorAll('tr.coupons-grid-row[data-cp-coupon-id]').forEach((rowEl) => {
+    const openRow = async () => {
+      const id = rowEl.getAttribute('data-cp-coupon-id') || '';
+      if (!id) return;
+      state.selectedCouponId = id;
+      try {
+        await refreshSelection();
+        render();
+        openCouponDetailModal();
+      } catch (err) {
+        console.warn('[commerce-admin/coupons] open coupon failed', {
+          couponId: id,
+          message: err?.message || String(err),
+        });
+        state.couponDetail = null;
+        state.detailFromListFallback = false;
+        state.codes = [];
+        state.codesNextCursor = '';
+        setError(err.message || 'Could not load this coupon.');
+        showToast(err.message || 'Failed to load coupon', 'error');
+        render();
+      }
+    };
+    rowEl.addEventListener('click', () => {
+      openRow();
+    });
+    rowEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openRow();
+      }
+    });
+  });
+}
+
 function openNewCouponDialog() {
   openDialog(
     'New coupon',
     couponFormHtml({ idReadonly: false }),
     async (dlg) => {
       const body = readCouponBodyFromForm(dlg, { requireId: true });
-      const resp = await apiFetch(PB_ORG, PB_SITE, 'coupons/types', {
+      await couponsApiFetch('coupons/types', {
         method: 'POST',
         body: JSON.stringify(body),
       });
-      if (!resp.ok) throw new Error(await readRespError(resp));
       showToast('Coupon created', 'success');
+      const m = couponMarketPrefixFromId(body.id);
+      if (m) {
+        state.marketFilter = m;
+        try {
+          sessionStorage.setItem(COUPON_MARKET_STORAGE_KEY, state.marketFilter);
+        } catch {
+          /* ignore */
+        }
+      }
       state.selectedCouponId = body.id;
       await refreshCouponList();
       render();
+      openCouponDetailModal();
     },
     (dlg) => {
       dlg.querySelector('#cp-form-stackable').checked = true;
@@ -349,22 +997,23 @@ function openNewCouponDialog() {
 
 function openEditCouponDialog() {
   if (!state.couponDetail) return;
+  if (state.detailFromListFallback) {
+    showToast('Edit is unavailable: rules are from the list only because GET …/coupons/types/{id} failed for this id.', 'error');
+    return;
+  }
   const snap = { ...state.couponDetail };
   openDialog(
     'Edit coupon',
     couponFormHtml({ idReadonly: true }),
     async (dlg) => {
       const body = readCouponBodyFromForm(dlg, { requireId: false });
-      const resp = await apiFetch(
-        PB_ORG,
-        PB_SITE,
+      await couponsApiFetch(
         `coupons/types/${encodeURIComponent(state.selectedCouponId)}`,
         { method: 'PUT', body: JSON.stringify(body) },
       );
-      if (!resp.ok) throw new Error(await readRespError(resp));
       showToast('Coupon updated', 'success');
       await refreshSelection();
-      render();
+      afterCodesRefresh();
     },
     (dlg) => fillCouponForm(dlg, snap),
     'coupons-dialog-wide',
@@ -408,14 +1057,13 @@ function openAddCodeDialog() {
       if (lim != null) body.usageLimit = lim;
       const upc = readOptionalInt(dlg.querySelector('#cp-code-per-cust')?.value);
       if (upc != null) body.usesPerCustomer = upc;
-      const resp = await apiFetch(PB_ORG, PB_SITE, 'coupons', {
+      await couponsApiFetch('coupons', {
         method: 'POST',
         body: JSON.stringify(body),
       });
-      if (!resp.ok) throw new Error(await readRespError(resp));
       showToast('Code created', 'success');
       await fetchCodesForCoupon();
-      render();
+      afterCodesRefresh();
     },
     null,
     null,
@@ -485,14 +1133,13 @@ function openBatchDialog() {
         if (!Number.isFinite(dv)) throw new Error('Override value required when override is checked');
         body.discountOverride = { discountType: dt, discountValue: dv };
       }
-      const resp = await apiFetch(PB_ORG, PB_SITE, 'coupons/batch', {
+      await couponsApiFetch('coupons/batch', {
         method: 'POST',
         body: JSON.stringify(body),
       });
-      if (!resp.ok) throw new Error(await readRespError(resp));
       showToast('Batch created', 'success');
       await fetchCodesForCoupon();
-      render();
+      afterCodesRefresh();
     },
     (dlg) => {
       const cb = dlg.querySelector('#cp-b-override');
@@ -510,163 +1157,24 @@ function openBatchDialog() {
   );
 }
 
-function renderCodesSection() {
-  if (!state.selectedCouponId) {
-    return '<p class="coupons-empty">Select a coupon to load its codes.</p>';
-  }
-  const rows = state.codes.length
-    ? state.codes.map((c) => {
-      const code = escapeHtml(c.code ?? c.id ?? '—');
-      const active = c.active !== false && c.active !== 'false';
-      const usage = `${c.usageCount ?? '—'} / ${c.usageLimit ?? '∞'}`;
-      const exp = c.expiresAt ? escapeHtml(String(c.expiresAt)) : '—';
-      return `<tr><td><code>${code}</code></td><td>${active ? 'Yes' : 'No'}</td><td>${escapeHtml(String(usage))}</td><td>${exp}</td></tr>`;
-    }).join('')
-    : '<tr><td colspan="4" class="coupons-empty" style="padding:16px">No codes loaded yet — use <strong>Load codes</strong>.</td></tr>';
-
-  return `
-    <h3 class="coupons-section-title">Codes for this coupon</h3>
-    <div class="coupons-detail-actions">
-      <button type="button" class="coupons-btn coupons-btn-primary" data-cp-load-codes>Load codes</button>
-      <button type="button" class="coupons-btn" data-cp-add-code>New code</button>
-      <button type="button" class="coupons-btn" data-cp-batch>Generate batch</button>
-      ${state.codesNextCursor ? '<button type="button" class="coupons-btn" data-cp-next-codes>Next page</button>' : ''}
-    </div>
-    <div class="coupons-table-wrap">
-      <table class="coupons-data-table">
-        <thead><tr><th>Code</th><th>Active</th><th>Usage</th><th>Expires</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>`;
-}
-
-function bindCodesEvents(mount) {
-  mount.querySelector('[data-cp-load-codes]')?.addEventListener('click', async () => {
-    try {
-      await fetchCodesForCoupon();
-      setError('');
-      render();
-    } catch (err) {
-      showToast(err.message || 'Failed to load codes', 'error');
-    }
-  });
-  mount.querySelector('[data-cp-next-codes]')?.addEventListener('click', async () => {
-    if (!state.codesNextCursor) return;
-    try {
-      await fetchCodesForCoupon({ append: true });
-      render();
-    } catch (err) {
-      showToast(err.message || 'Failed', 'error');
-    }
-  });
-  mount.querySelector('[data-cp-add-code]')?.addEventListener('click', () => openAddCodeDialog());
-  mount.querySelector('[data-cp-batch]')?.addEventListener('click', () => openBatchDialog());
-}
-
-function render() {
-  const mount = document.getElementById('coupons-mount');
-  if (!mount) return;
-
-  const listItems = state.coupons.length
-    ? state.coupons.map((row) => {
-      const id = couponIdFromRow(row);
-      const name = row.name || id || '—';
-      const cur = id === state.selectedCouponId ? 'true' : 'false';
-      return `<li><button type="button" aria-current="${cur}" data-cp-coupon-id="${escapeHtml(id)}">${escapeHtml(name)} <span class="coupons-coupon-slug">${escapeHtml(id || '—')}</span></button></li>`;
-    }).join('')
-    : '<li class="coupons-empty">No coupons yet (empty list or missing <code>coupons:read</code>).</li>';
-
-  const detailBlock = state.couponDetail
-    ? `${renderCouponRulesHuman(state.couponDetail)}
-       <details class="coupons-advanced"><summary>Advanced: raw JSON</summary>
-       <pre class="coupons-pre" style="margin-top:8px">${escapeHtml(JSON.stringify(state.couponDetail, null, 2))}</pre></details>`
-    : '<p class="coupons-empty">Select a coupon from the list.</p>';
-
-  mount.innerHTML = `
-    <div class="coupons-split">
-      <div>
-        <p class="coupons-sidebar-head">Coupons</p>
-        <div class="coupons-detail-actions">
-          <button type="button" class="coupons-btn coupons-btn-primary" data-cp-reload-all>Reload</button>
-          <button type="button" class="coupons-btn" data-cp-new>New coupon…</button>
-        </div>
-        <ul class="coupons-coupon-list" aria-label="Coupons">${listItems}</ul>
-      </div>
-      <div class="coupons-detail">
-        <div class="coupons-detail-actions">
-          <button type="button" class="coupons-btn" data-cp-edit ${state.selectedCouponId ? '' : 'disabled'}>Edit coupon…</button>
-          <button type="button" class="coupons-btn" data-cp-del ${state.selectedCouponId ? '' : 'disabled'}>Delete coupon</button>
-        </div>
-        <h2 class="coupons-section-title" style="margin-top:0;border:none;padding:0">Rules</h2>
-        ${detailBlock}
-        ${state.selectedCouponId ? renderCodesSection() : ''}
-      </div>
-    </div>`;
-
-  mount.querySelector('[data-cp-reload-all]')?.addEventListener('click', async () => {
-    try {
-      await refreshCouponList();
-      setError('');
-      render();
-    } catch (err) {
-      showToast(err.message || 'Reload failed', 'error');
-    }
-  });
-
-  mount.querySelector('[data-cp-new]')?.addEventListener('click', () => openNewCouponDialog());
-
-  mount.querySelectorAll('[data-cp-coupon-id]').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const id = btn.getAttribute('data-cp-coupon-id') || '';
-      if (!id || id === state.selectedCouponId) return;
-      state.selectedCouponId = id;
-      try {
-        await refreshSelection();
-        setError('');
-        render();
-      } catch (err) {
-        showToast(err.message || 'Failed to load coupon', 'error');
-      }
-    });
-  });
-
-  mount.querySelector('[data-cp-edit]')?.addEventListener('click', () => openEditCouponDialog());
-
-  mount.querySelector('[data-cp-del]')?.addEventListener('click', async () => {
-    if (!state.selectedCouponId) return;
-    if (!window.confirm(`Delete coupon "${state.selectedCouponId}"? This does not delete codes in R2 until the API does.`)) return;
-    try {
-      const resp = await apiFetch(
-        PB_ORG,
-        PB_SITE,
-        `coupons/types/${encodeURIComponent(state.selectedCouponId)}`,
-        { method: 'DELETE' },
-      );
-      if (!resp.ok) throw new Error(await readRespError(resp));
-      showToast('Coupon deleted', 'success');
-      state.selectedCouponId = '';
-      state.couponDetail = null;
-      state.codes = [];
-      await refreshCouponList();
-      render();
-    } catch (err) {
-      showToast(err.message || 'Delete failed', 'error');
-    }
-  });
-
-  if (state.selectedCouponId) bindCodesEvents(mount);
-}
-
 async function init() {
   const mount = document.getElementById('coupons-mount');
   if (!mount) return;
   try {
+    try {
+      const saved = sessionStorage.getItem(COUPON_MARKET_STORAGE_KEY);
+      if (saved === 'all' || saved === 'us' || saved === 'ca' || saved === 'mx') {
+        state.marketFilter = /** @type {typeof state.marketFilter} */ (saved);
+      }
+    } catch {
+      /* sessionStorage unavailable */
+    }
     await refreshCouponList();
-    setError('');
     render();
   } catch (err) {
+    console.warn('[commerce-admin/coupons] initial load failed', { message: err?.message || String(err) });
     setError(err.message || 'Failed to load coupons');
-    mount.innerHTML = `<p class="coupons-empty">Fix the error above or confirm your token includes <code>coupons:read</code>, then reload.</p>`;
+    mount.innerHTML = '<p class="coupons-empty">Fix the error above or confirm your token includes <code>coupons:read</code>, then reload.</p>';
   }
 }
 
