@@ -887,6 +887,7 @@ export default async function decorate(block) {
 
             if (payment.status === 'completed') {
               session.completePayment({ status: window.ApplePaySession.STATUS_SUCCESS });
+              cart.clear();
               window.location.href = `${getOrderPath('complete')}?orderId=${createdOrder.id}`;
             } else {
               session.completePayment({ status: window.ApplePaySession.STATUS_FAILURE });
@@ -1058,5 +1059,17 @@ export default async function decorate(block) {
     }
 
     clearError(formColumn);
+  });
+
+  // When the browser restores this page from bfcache (e.g. the user hits Back
+  // after a completed payment), re-check the cart. If it's now empty the order
+  // was already placed, so replace the form with the empty-cart state rather
+  // than letting the user submit a duplicate order.
+  window.addEventListener('pageshow', async (e) => {
+    if (!e.persisted) return;
+    const { default: restoredCart } = await import('../../scripts/cart.js');
+    if (restoredCart.itemCount === 0) {
+      showEmptyCart(block);
+    }
   });
 }
