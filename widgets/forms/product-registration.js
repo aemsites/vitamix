@@ -140,9 +140,17 @@ export default async function decorate(widget) {
   const emailConsentEl = form.querySelector('.email-consent-disclaimer');
   if (emailConsentEl) emailConsentEl.textContent = labels.emailConsentDisclaimer ?? '';
   form.querySelector('.click-here-prefix').textContent = labels.clickHereToConsult ?? 'Click here to consult our ';
-  form.querySelector('.privacy-policy-link').textContent = labels.privacyPolicyLinkText ?? 'privacy policy';
+  const privacyPolicyLink = form.querySelector('.privacy-policy-link');
+  if (privacyPolicyLink) {
+    privacyPolicyLink.textContent = labels.privacyPolicyLinkText ?? 'privacy policy';
+    privacyPolicyLink.href = `/${locale}/${language}/privacy-statement`;
+  }
   form.querySelector('.and-our').textContent = labels.andOur ?? ' and our ';
-  form.querySelector('.terms-link').textContent = labels.termsOfUseLinkText ?? 'terms of use.';
+  const termsOfUseLink = form.querySelector('.terms-link');
+  if (termsOfUseLink) {
+    termsOfUseLink.textContent = labels.termsOfUseLinkText ?? 'terms of use.';
+    termsOfUseLink.href = `/${locale}/${language}/legal-notice`;
+  }
 
   const submitBtn = form.querySelector('button[type="submit"]');
   const clearBtn = form.querySelector('.clear-form-btn');
@@ -177,7 +185,7 @@ export default async function decorate(widget) {
         return;
       }
       didNavigate = true;
-      const thankYouPath = `/${locale}/${language}/product-registration-thankyou`;
+      const thankYouPath = `/${locale}/${language}/customer-service/product-registration-thankyou`;
       window.location.href = thankYouPath;
     } catch (err) {
       // eslint-disable-next-line no-console
