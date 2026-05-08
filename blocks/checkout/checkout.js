@@ -887,7 +887,7 @@ export default async function decorate(block) {
 
             if (payment.status === 'completed') {
               session.completePayment({ status: window.ApplePaySession.STATUS_SUCCESS });
-              window.location.href = `${getOrderPath('order-summary')}?orderId=${createdOrder.id}`;
+              window.location.href = `${getOrderPath('complete')}?orderId=${createdOrder.id}`;
             } else {
               session.completePayment({ status: window.ApplePaySession.STATUS_FAILURE });
               const declineMessages = {
