@@ -1,6 +1,15 @@
+main > .section:first-of-type {
+  margin-bottom: 0;
+}
+
+main > .section:first-of-type > div:last-child {
+  margin-bottom: 0;
+}
+
 main > .navigation-container.section {
   position: sticky;
   top: var(--header-height);
+  margin-top: 0;
   z-index: 9;
 }
 
@@ -11,10 +20,6 @@ main > .navigation-container.section ~ .section h4,
 main > .navigation-container.section ~ .section h5,
 main > .navigation-container.section ~ .section h6 {
   scroll-margin-top: calc(74px + 1em);
-}
-
-.hero-container + .navigation-container {
-  margin-top: 0;
 }
 
 .navigation-container > .navigation-wrapper {
