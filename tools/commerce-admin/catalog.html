@@ -1,23 +1,66 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="robots" content="noindex" />
-    <title>Vitamix Commerce Admin – Catalog redirect</title>
+    <title>Vitamix Commerce Admin – Product catalog</title>
     <link rel="stylesheet" href="commerce-auth.css" />
     <link rel="stylesheet" href="pim.css" />
+    <link rel="stylesheet" href="commerce-admin-chrome.css" />
   </head>
-  <body class="commerce-admin-body">
+  <body class="commerce-admin-body" data-commerce-header="subpage" data-commerce-header-page="Catalog">
     <div id="commerce-admin-auth-root" aria-live="polite">
       <p class="commerce-admin-auth-placeholder">Checking sign-in…</p>
     </div>
+    <header id="commerce-admin-app-header"></header>
     <main class="pim-main">
-      <div class="loading active">
+      <div class="loading" id="loading">
         <div class="spinner"></div>
-        <p>Redirecting to the product catalog…</p>
+        <p>Loading products…</p>
+      </div>
+
+      <div class="error" id="error"></div>
+
+      <div class="pim-content" id="content">
+        <div class="pim-toolbar">
+          <input
+            type="search"
+            id="searchInput"
+            class="pim-search"
+            placeholder="Search by title, SKU, availability, price, review…"
+            aria-label="Search products"
+          />
+          <label class="pim-index-label" for="indexSelect">Index</label>
+          <select id="indexSelect" class="pim-index-select" aria-label="Product index locale">
+            <option value="us/en_us">US (en-US)</option>
+            <option value="ca/en_ca">CA (en-CA)</option>
+            <option value="ca/fr_ca">CA (fr-CA)</option>
+          </select>
+          <span class="pim-count" id="productCount">0 products</span>
+        </div>
+
+        <div id="productList" class="pim-list-wrapper">
+          <table class="pim-list" role="grid" aria-label="Products">
+            <thead>
+              <tr>
+                <th class="pim-col-thumb" scope="col"><span class="pim-sr-only">Image</span></th>
+                <th class="pim-col-product pim-sortable" scope="col" data-sort="title" tabindex="0">Product</th>
+                <th class="pim-col-sku pim-sortable" scope="col" data-sort="sku" tabindex="0">SKU</th>
+                <th class="pim-col-variants pim-sortable" scope="col" data-sort="variants" tabindex="0">Variants</th>
+                <th class="pim-col-availability pim-sortable" scope="col" data-sort="availability" tabindex="0">Availability</th>
+                <th class="pim-col-price pim-sortable" scope="col" data-sort="price" tabindex="0">Price</th>
+                <th class="pim-col-review pim-sortable" scope="col" data-sort="reviewStatus" tabindex="0">Review</th>
+                <th class="pim-col-last-review pim-sortable" scope="col" data-sort="lastReview" tabindex="0">Last review</th>
+              </tr>
+            </thead>
+            <tbody id="productGrid"></tbody>
+          </table>
+        </div>
       </div>
     </main>
-    <script type="module" src="catalog-redirect.js"></script>
+    <script type="module" src="auth-page-boot.js"></script>
+    <script type="module" src="commerce-admin-header.js"></script>
+    <script type="module" src="pim.js"></script>
   </body>
 </html>

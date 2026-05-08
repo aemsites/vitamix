@@ -4,7 +4,12 @@
  * On success calls onAuthenticated instead of ProductBus in-app routing.
  */
 
-import { apiFetch, setAuthState } from './commerce-otp-api.js';
+import {
+  apiFetch,
+  setAuthState,
+  getApiEnvironment,
+  setApiEnvironment,
+} from './commerce-otp-api.js';
 import { showToast } from './commerce-otp-ui.js';
 
 async function readError(resp) {
@@ -19,11 +24,24 @@ async function readError(resp) {
  */
 export async function mountCommerceOtpLogin(container, ctx) {
   const { org, site, onAuthenticated } = ctx;
+  const env = getApiEnvironment();
+  container.dataset.apiEnv = env;
 
   container.innerHTML = `
     <div class="ca-login-wrap">
       <h1 class="ca-login-title">Commerce sign-in</h1>
-      <p class="ca-login-subtitle">Enter your email to receive a verification code.</p>
+      <p class="ca-login-subtitle">Choose staging or production, then enter your email for a verification code. Sign-in is remembered separately for each environment.</p>
+      <div class="ca-login-env">
+        <span class="ca-login-env-label" id="ca-login-env-label">Sign in to</span>
+        <select
+          id="commerce-login-api-env"
+          class="commerce-admin-api-env-select ca-login-api-env-select"
+          aria-labelledby="ca-login-env-label"
+        >
+          <option value="stage">Staging</option>
+          <option value="prod">Production</option>
+        </select>
+      </div>
       <form id="commerce-login-form" class="ca-login-form">
         <div class="ca-form-field">
           <label for="login-email">Email</label>
@@ -33,6 +51,18 @@ export async function mountCommerceOtpLogin(container, ctx) {
       </form>
     </div>
   `;
+
+  const envSelect = document.getElementById('commerce-login-api-env');
+  if (envSelect) {
+    envSelect.value = env;
+    envSelect.addEventListener('change', async () => {
+      const next = envSelect.value === 'prod' ? 'prod' : 'stage';
+      if (next === getApiEnvironment()) return;
+      setApiEnvironment(next);
+      showToast(`Switched to ${next === 'prod' ? 'production' : 'staging'}.`, 'success');
+      await mountCommerceOtpLogin(container, ctx);
+    });
+  }
 
   const form = document.getElementById('commerce-login-form');
   let loginState = null;

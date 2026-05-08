@@ -15,14 +15,27 @@
   box-shadow: 0 1px 0 rgb(0 0 0 / 4%);
 }
 
+/* API environment (see commerce-admin-header.js + commerce-otp-api getApiEnvironment) */
+.commerce-admin-app-header.commerce-admin-app-header-api-stage {
+  background: linear-gradient(180deg, #fff6e0 0%, #ffecc8 100%);
+  border-bottom-color: #e8c96a;
+  box-shadow: 0 1px 0 rgb(184 140 40 / 12%);
+}
+
+.commerce-admin-app-header.commerce-admin-app-header-api-prod {
+  background: linear-gradient(180deg, #e8f4ec 0%, #d6ebe0 100%);
+  border-bottom-color: #8fbf9f;
+  box-shadow: 0 1px 0 rgb(40 120 70 / 10%);
+}
+
 .commerce-admin-header-inner {
   max-width: 1400px;
   margin: 0 auto;
   padding: 10px 20px;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  gap: 12px 20px;
   min-height: 48px;
   box-sizing: border-box;
 }
@@ -32,7 +45,51 @@
   align-items: center;
   gap: 12px;
   min-width: 0;
-  flex: 1;
+}
+
+.commerce-admin-header-env {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.commerce-admin-api-env-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgb(32 34 35 / 72%);
+  white-space: nowrap;
+}
+
+.commerce-admin-api-env-select {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 28px 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgb(32 34 35 / 22%);
+  background: rgb(255 255 255 / 92%);
+  color: #202223;
+  cursor: pointer;
+  min-width: 9.5rem;
+  box-sizing: border-box;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23202223' d='M1 1.5 6 6.5 11 1.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+
+.commerce-admin-api-env-select:hover {
+  border-color: rgb(32 34 35 / 38%);
+  background-color: #fff;
+}
+
+.commerce-admin-api-env-select:focus {
+  outline: none;
+  border-color: #1a56b0;
+  box-shadow: 0 0 0 2px rgb(26 86 176 / 22%);
 }
 
 .commerce-admin-header-brand {
@@ -189,13 +246,13 @@
   box-sizing: border-box;
 }
 
-.commerce-admin-user-menu-item:hover:not(:disabled) {
-  background: #f6f6f7;
-}
-
 .commerce-admin-user-menu-item:disabled {
   color: #8c9196;
   cursor: not-allowed;
+}
+
+.commerce-admin-user-menu-item:hover:not(:disabled) {
+  background: #f6f6f7;
 }
 
 .commerce-admin-user-menu-item.danger {

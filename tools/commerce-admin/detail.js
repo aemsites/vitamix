@@ -603,7 +603,7 @@ async function init() {
     loading.classList.remove('active');
     toolbar.style.display = 'flex';
     const backLink = toolbar.querySelector('.pim-detail-back-link');
-    if (backLink) backLink.href = `../commerce-admin.html?catalog=${encodeURIComponent(getCatalogFromParams())}`;
+    if (backLink) backLink.href = `catalog.html?catalog=${encodeURIComponent(getCatalogFromParams())}`;
 
     editCheckbox.addEventListener('change', () => {
       editMode = editCheckbox.checked;

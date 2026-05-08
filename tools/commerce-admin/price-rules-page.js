@@ -1,5 +1,6 @@
 /**
- * Price rules — static UI mock (no API). Structure: country → rules | promotions | coupons.
+ * Price rules — static UI mock (no API). Structure: country → rules | promotions.
+ * Coupons are managed separately — see coupons.html (ProductBus coupons API).
  */
 import { escapeHtml } from './commerce-otp-ui.js';
 
@@ -25,20 +26,12 @@ import { escapeHtml } from './commerce-otp-ui.js';
  * @property {string} title
  * @property {PromotionRow[]} rows
  */
-/** @typedef {object} CouponSet
- * @property {string} id
- * @property {string} couponName
- * @property {string} validity
- * @property {string} [notes]
- * @property {string[]} codes
- */
 
 /**
  * @typedef {{
  *   label: string,
  *   rules: RuleRow[],
  *   promotions: Record<string, PromotionSet[]>,
- *   coupons: Record<string, CouponSet[]>,
  * }} CountryMock
  */
 
@@ -79,15 +72,6 @@ const US_PROMO_ROWS = [
     salePrice: '$269.95',
   },
 ];
-
-function genCodes(prefix, count) {
-  const out = [];
-  for (let i = 1; i <= count; i += 1) {
-    const n = String(i).padStart(4, '0');
-    out.push(`${prefix}-${n}`);
-  }
-  return out;
-}
 
 /** @type {Record<string, CountryMock>} */
 const MOCK = {
@@ -144,33 +128,6 @@ const MOCK = {
         },
       ],
     },
-    coupons: {
-      2026: [
-        {
-          id: 'affiliates-25-off',
-          couponName: 'Affiliates 25% + free shipping',
-          validity: 'Jan 1, 2026 – Dec 31, 2026',
-          notes: 'Tied to rule “25% off total order + Free Shipping - Affiliate”.',
-          codes: genCodes('AFF26', 180),
-        },
-        {
-          id: 'employee-store',
-          couponName: 'Employee store (mock)',
-          validity: '2026 only',
-          notes: 'Single-use codes; not combinable with other % off.',
-          codes: genCodes('EMP-VX', 42),
-        },
-      ],
-      2025: [
-        {
-          id: 'legacy-welcome',
-          couponName: 'Welcome series 2025',
-          validity: 'Expired',
-          notes: 'Kept for reference in mock UI.',
-          codes: genCodes('WEL25', 12),
-        },
-      ],
-    },
   },
   ca: {
     label: 'Canada',
@@ -220,17 +177,6 @@ const MOCK = {
         },
       ],
     },
-    coupons: {
-      2026: [
-        {
-          id: 'partner-stack',
-          couponName: 'Partner stack list',
-          validity: 'Apr 1 – Sep 30, 2026',
-          notes: 'Large code pool (mock).',
-          codes: genCodes('CA-PARTNER', 240),
-        },
-      ],
-    },
   },
   mx: {
     label: 'Mexico',
@@ -263,21 +209,11 @@ const MOCK = {
         },
       ],
     },
-    coupons: {
-      2026: [
-        {
-          id: 'mx-newsletter',
-          couponName: 'Newsletter signup batch',
-          validity: '2026',
-          codes: genCodes('MX-NL', 60),
-        },
-      ],
-    },
   },
 };
 
 const COUNTRIES = /** @type {const} */ (['us', 'ca', 'mx']);
-const AREAS = /** @type {const} */ (['rules', 'promotions', 'coupons']);
+const AREAS = /** @type {const} */ (['rules', 'promotions']);
 
 /**
  * @type {{
@@ -285,8 +221,6 @@ const AREAS = /** @type {const} */ (['rules', 'promotions', 'coupons']);
  *   area: (typeof AREAS)[number],
  *   promoYear: string,
  *   promoId: string,
- *   couponYear: string,
- *   couponId: string,
  * }}
  */
 const state = {
@@ -294,8 +228,6 @@ const state = {
   area: 'rules',
   promoYear: '',
   promoId: '',
-  couponYear: '',
-  couponId: '',
 };
 
 function sortedYears(map) {
@@ -327,12 +259,6 @@ function ensureNavDefaults() {
   const plist = py ? c.promotions[py] : [];
   const p = firstItem(plist, state.promoId);
   state.promoId = p ? p.id : '';
-
-  const cy = firstKey(c.coupons, state.couponYear);
-  state.couponYear = cy;
-  const clist = cy ? c.coupons[cy] : [];
-  const cp = firstItem(clist, state.couponId);
-  state.couponId = cp ? cp.id : '';
 }
 
 function rulesTableHtml(rows) {
@@ -380,22 +306,6 @@ function promotionTableHtml(rows) {
   return `<div class="pr-table-wrap"><table class="pr-data-table"><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div>`;
 }
 
-function couponCodesHtml(codes) {
-  const maxShow = 40;
-  const slice = codes.slice(0, maxShow);
-  const th = ['#', 'Code'].map((h) => `<th scope="col">${escapeHtml(h)}</th>`).join('');
-  const body = slice
-    .map((code, i) => `<tr><td>${i + 1}</td><td><code>${escapeHtml(code)}</code></td></tr>`)
-    .join('');
-  let foot;
-  if (codes.length > maxShow) {
-    foot = `<p class="pr-codes-foot">Showing ${maxShow} of ${codes.length} codes (mock list).</p>`;
-  } else {
-    foot = `<p class="pr-codes-foot">${codes.length} code(s) in this mock list.</p>`;
-  }
-  return `<div class="pr-table-wrap"><table class="pr-data-table"><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div>${foot}`;
-}
-
 function renderCountryTabs() {
   return COUNTRIES.map((key) => {
     const sel = key === state.country ? 'true' : 'false';
@@ -405,7 +315,7 @@ function renderCountryTabs() {
 }
 
 function renderAreaTabs() {
-  const labels = { rules: 'Rules', promotions: 'Promotions', coupons: 'Coupons' };
+  const labels = { rules: 'Rules', promotions: 'Promotions' };
   return AREAS.map((key) => {
     const sel = key === state.area ? 'true' : 'false';
     return `<button type="button" class="pr-tab" role="tab" aria-selected="${sel}" data-pr-area="${key}">${escapeHtml(labels[key])}</button>`;
@@ -446,50 +356,12 @@ function renderPromotionsPanel() {
     </div>`;
 }
 
-function renderCouponsPanel() {
-  const c = MOCK[state.country];
-  const years = sortedYears(c.coupons);
-  if (!years.length) {
-    return '<p class="pr-empty">No coupon folders for this country (mock).</p>';
-  }
-  const treeParts = [];
-  years.forEach((year) => {
-    treeParts.push(`<div class="pr-tree-year">${escapeHtml(year)}</div>`);
-    (c.coupons[year] || []).forEach((cp) => {
-      const cur = cp.id === state.couponId && year === state.couponYear ? 'true' : 'false';
-      treeParts.push(
-        `<button type="button" class="pr-tree-item" aria-current="${cur}" data-pr-coupon-year="${escapeHtml(year)}" data-pr-coupon-id="${escapeHtml(cp.id)}">${escapeHtml(cp.couponName)}</button>`,
-      );
-    });
-  });
-  const set = (c.coupons[state.couponYear] || []).find((x) => x.id === state.couponId);
-  const path = `${state.country.toUpperCase()} / coupons / ${state.couponYear} / ${set ? set.id : '…'}`;
-  const meta = set
-    ? `<div class="pr-detail-head">
-         <h3 class="pr-detail-title">${escapeHtml(set.couponName)}</h3>
-         <p class="pr-detail-path">${escapeHtml(path)}</p>
-       </div>
-       <dl class="pr-meta-grid">
-         <div><dt>Validity</dt><dd>${escapeHtml(set.validity)}</dd></div>
-         ${set.notes ? `<div><dt>Notes</dt><dd>${escapeHtml(set.notes)}</dd></div>` : ''}
-         <div><dt>Codes (count)</dt><dd>${set.codes.length}</dd></div>
-       </dl>
-       ${couponCodesHtml(set.codes)}`
-    : '<p class="pr-empty">Select a coupon list.</p>';
-
-  return `<h2 class="pr-section-title">Coupons</h2>
-    <p class="pr-section-hint">Folder: year → named list → metadata + codes table (mock).</p>
-    <div class="pr-split">
-      <nav class="pr-tree" aria-label="Coupon lists by year">${treeParts.join('')}</nav>
-      <div class="pr-detail">${meta}</div>
-    </div>`;
-}
-
 function renderRulesPanel() {
   const c = MOCK[state.country];
   return `<h2 class="pr-section-title">Rules</h2>
-    <p class="pr-section-hint">Cart / catalog rules table (mock columns aligned to future API).</p>
-    ${rulesTableHtml(c.rules)}`;
+    <p class="pr-section-hint">Cart / catalog rules table (mock columns aligned to AEM <code>config/pricing-rules/{country}/rules.json</code>).</p>
+    ${rulesTableHtml(c.rules)}
+    <p class="pr-section-hint" style="margin-top:16px">Coupon <strong>programs</strong> (types, codes, batches) live in <a href="coupons.html">Coupons</a> — ProductBus <code>…/coupons/types</code> and <code>…/coupons</code>, not in this mock.</p>`;
 }
 
 function render() {
@@ -501,12 +373,12 @@ function render() {
   const panels = {
     rules: renderRulesPanel(),
     promotions: renderPromotionsPanel(),
-    coupons: renderCouponsPanel(),
   };
 
   mount.innerHTML = `
     <div class="price-rules-mock-banner">
-      <strong>Mock data only.</strong> There is no pricing rules API yet; this page previews navigation and table shapes for US, CA, and MX.
+      <strong>Mock data only.</strong> Rules and promotions preview navigation for US, CA, and MX.
+      <a href="coupons.html">Open Coupons</a> for code-based discounts (R2 / ProductBus API).
     </div>
     <div class="pr-country-tabs" role="tablist" aria-label="Country">${renderCountryTabs()}</div>
     <div class="pr-area-tabs" role="tablist" aria-label="Pricing data type">${renderAreaTabs()}</div>
@@ -520,8 +392,6 @@ function render() {
       state.country = key;
       state.promoYear = '';
       state.promoId = '';
-      state.couponYear = '';
-      state.couponId = '';
       render();
     });
   });
@@ -541,16 +411,6 @@ function render() {
       const id = btn.getAttribute('data-pr-promo-id') || '';
       state.promoYear = year;
       state.promoId = id;
-      render();
-    });
-  });
-
-  mount.querySelectorAll('[data-pr-coupon-year]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const year = btn.getAttribute('data-pr-coupon-year') || '';
-      const id = btn.getAttribute('data-pr-coupon-id') || '';
-      state.couponYear = year;
-      state.couponId = id;
       render();
     });
   });

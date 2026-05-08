@@ -18,6 +18,14 @@ html:not(.commerce-admin-auth-ok) body > :not(#commerce-admin-auth-root) {
   box-sizing: border-box;
 }
 
+#commerce-admin-auth-root[data-api-env='stage'] {
+  background: linear-gradient(180deg, #fff4dd 0%, #f6f6f7 42%);
+}
+
+#commerce-admin-auth-root[data-api-env='prod'] {
+  background: linear-gradient(180deg, #e5f4ea 0%, #f6f6f7 42%);
+}
+
 .commerce-admin-auth-placeholder {
   max-width: 28rem;
   margin: 4rem auto;
@@ -45,11 +53,36 @@ html:not(.commerce-admin-auth-ok) body > :not(#commerce-admin-auth-root) {
 }
 
 .ca-login-subtitle {
-  margin: 0 0 24px;
+  margin: 0 0 20px;
   text-align: center;
   font-size: 14px;
   color: #6d7175;
   line-height: 1.45;
+}
+
+.ca-login-env {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  margin: 0 0 20px;
+  padding: 12px 14px;
+  background: rgb(255 255 255 / 72%);
+  border: 1px solid #e1e3e5;
+  border-radius: 8px;
+}
+
+.ca-login-env-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgb(32 34 35 / 72%);
+}
+
+.ca-login-api-env-select {
+  min-width: 10.5rem;
 }
 
 .ca-login-form {
@@ -99,16 +132,6 @@ html:not(.commerce-admin-auth-ok) body > :not(#commerce-admin-auth-root) {
   color: #6d7175;
 }
 
-.ca-button-row {
-  display: flex;
-  gap: 10px;
-  margin-top: 4px;
-}
-
-.ca-button-row .ca-btn {
-  flex: 1;
-}
-
 .ca-btn {
   display: inline-flex;
   align-items: center;
@@ -127,6 +150,16 @@ html:not(.commerce-admin-auth-ok) body > :not(#commerce-admin-auth-root) {
 .ca-btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+.ca-button-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.ca-button-row .ca-btn {
+  flex: 1;
 }
 
 .ca-btn-primary {

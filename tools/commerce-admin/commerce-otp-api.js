@@ -1,12 +1,15 @@
 /**
  * ProductBus / Adobe Commerce Live API client (from helix-tools-website productbus-admin/api.js).
- * Auth state key matches ProductBus admin so the same session can be shared.
+ * Auth is stored per environment (`pbus-auth-{org}-{site}-stage|prod`) so switching hosts keeps both sessions.
  */
 
 import { showToast } from './commerce-otp-ui.js';
 
-const PRODUCTION_API_BASE = 'https://api.adobecommerce.live';
-const STAGE_API_BASE = 'https://api-stage.adobecommerce.live';
+export const PRODUCTION_API_BASE = 'https://api.adobecommerce.live';
+export const STAGE_API_BASE = 'https://api-stage.adobecommerce.live';
+
+/** Session key: value `'false'` means production; absent or other means staging. */
+export const PRODUCTBUS_STAGE_SESSION_KEY = 'productbus-stage';
 
 /** Same fcors proxy as PIM / detail (temporary until Adobe API allows this origin). */
 const CORS_PROXY = 'https://fcors.org/?url=';
@@ -19,25 +22,66 @@ const CORS_KEY = '&key=Mg23N96GgR8O3NjU';
 export function getApiBase() {
   const override = localStorage.getItem('productbus-api-url');
   if (override) return override;
-  if (sessionStorage.getItem('productbus-stage') === 'false') return PRODUCTION_API_BASE;
+  if (sessionStorage.getItem(PRODUCTBUS_STAGE_SESSION_KEY) === 'false') return PRODUCTION_API_BASE;
   return STAGE_API_BASE;
 }
 
+/** Resolved environment for UI (matches `getApiBase()` unless a custom base URL is set). */
+export function getApiEnvironment() {
+  const base = getApiBase();
+  if (base === PRODUCTION_API_BASE) return 'prod';
+  if (base === STAGE_API_BASE) return 'stage';
+  return 'stage';
+}
+
+/** Persist prod vs stage and drop custom API URL override so requests match the selection. */
+export function setApiEnvironment(env) {
+  localStorage.removeItem('productbus-api-url');
+  if (env === 'prod') {
+    sessionStorage.setItem(PRODUCTBUS_STAGE_SESSION_KEY, 'false');
+  } else {
+    sessionStorage.removeItem(PRODUCTBUS_STAGE_SESSION_KEY);
+  }
+}
+
+/** SessionStorage key for ProductBus JWT + profile (separate per API host). */
+function authStorageKey(org, site, env) {
+  return `pbus-auth-${org}-${site}-${env}`;
+}
+
+function legacyAuthKey(org, site) {
+  return `pbus-auth-${org}-${site}`;
+}
+
 export function getAuthState(org, site) {
+  const env = getApiEnvironment();
+  const key = authStorageKey(org, site, env);
   try {
-    const data = sessionStorage.getItem(`pbus-auth-${org}-${site}`);
-    return data ? JSON.parse(data) : null;
+    let raw = sessionStorage.getItem(key);
+    if (!raw) {
+      const old = sessionStorage.getItem(legacyAuthKey(org, site));
+      if (old) {
+        sessionStorage.setItem(key, old);
+        sessionStorage.removeItem(legacyAuthKey(org, site));
+        raw = old;
+      }
+    }
+    return raw ? JSON.parse(raw) : null;
   } catch (e) {
     return null;
   }
 }
 
 export function setAuthState(org, site, state) {
-  sessionStorage.setItem(`pbus-auth-${org}-${site}`, JSON.stringify(state));
+  const env = getApiEnvironment();
+  sessionStorage.setItem(authStorageKey(org, site, env), JSON.stringify(state));
+  sessionStorage.removeItem(legacyAuthKey(org, site));
 }
 
 export function clearAuthState(org, site) {
-  sessionStorage.removeItem(`pbus-auth-${org}-${site}`);
+  const env = getApiEnvironment();
+  sessionStorage.removeItem(authStorageKey(org, site, env));
+  sessionStorage.removeItem(legacyAuthKey(org, site));
 }
 
 export async function apiFetch(org, site, path, options = {}) {

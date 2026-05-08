@@ -340,7 +340,6 @@ export async function init() {
   });
 
   try {
-    currentLocalePath = indexSelect.value;
     updateUrlParams({ [CATALOG_PARAM]: currentLocalePath });
     const [json, reviewEvents] = await Promise.all([
       fetchProductsIndex(),
@@ -375,7 +374,7 @@ export async function init() {
       const row = e.target.closest('tr.pim-row');
       if (!row || !row.dataset.urlkey) return;
       const catalog = currentLocalePath ? `catalog=${encodeURIComponent(currentLocalePath)}&` : '';
-      window.location.href = `commerce-admin/product-detail.html?${catalog}product=${encodeURIComponent(row.dataset.urlkey)}`;
+      window.location.href = `product-detail.html?${catalog}product=${encodeURIComponent(row.dataset.urlkey)}`;
     });
     document.getElementById('productList').addEventListener('keydown', (e) => {
       const row = e.target.closest('tr.pim-row');
@@ -383,7 +382,7 @@ export async function init() {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         const catalog = currentLocalePath ? `catalog=${encodeURIComponent(currentLocalePath)}&` : '';
-        window.location.href = `commerce-admin/product-detail.html?${catalog}product=${encodeURIComponent(row.dataset.urlkey)}`;
+        window.location.href = `product-detail.html?${catalog}product=${encodeURIComponent(row.dataset.urlkey)}`;
       }
     });
 

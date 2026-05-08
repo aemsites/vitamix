@@ -3,9 +3,8 @@
  * Top app bar: hub brand or "← Commerce Admin", user trigger + menu (sign out, placeholders).
  * Expects #commerce-admin-app-header. Run after auth-page-boot.js (module order in HTML).
  */
-import { getAuthState } from './commerce-otp-api.js';
+import { getAuthState, getApiEnvironment, setApiEnvironment } from './commerce-otp-api.js';
 import { PB_ORG, PB_SITE } from './commerce-pbus-config.js';
-import { getStoredFirstNameSync } from './user-identity.js';
 import { escapeHtml } from './commerce-otp-ui.js';
 
 function homeHref() {
@@ -26,13 +25,10 @@ function pageTitleAttr() {
   return t != null && String(t).trim() !== '' ? String(t).trim() : '';
 }
 
-function apiEnvLabel() {
-  try {
-    if (sessionStorage.getItem('productbus-stage') === 'false') return 'Production API';
-    return 'Staging API';
-  } catch {
-    return 'API';
-  }
+function applyApiEnvHeaderClass(slot) {
+  const env = getApiEnvironment();
+  slot.classList.remove('commerce-admin-app-header-api-stage', 'commerce-admin-app-header-api-prod');
+  slot.classList.add(env === 'prod' ? 'commerce-admin-app-header-api-prod' : 'commerce-admin-app-header-api-stage');
 }
 
 function closeMenu(trigger, menu) {
@@ -54,12 +50,7 @@ export function mountCommerceAdminHeader() {
   const pageTitle = pageTitleAttr();
   const auth = getAuthState(PB_ORG, PB_SITE);
   const email = typeof auth?.email === 'string' && auth.email.trim() ? auth.email.trim() : '';
-
-  const stored = getStoredFirstNameSync();
-  const first = stored || 'anonymous';
-  const hasNamed = first.toLowerCase() !== 'anonymous';
-  const primary = hasNamed ? first : email || 'Signed in';
-  const secondary = hasNamed && email ? email : '';
+  const triggerLabel = email || 'Signed in';
 
   let left;
   if (variant === 'hub') {
@@ -74,20 +65,31 @@ export function mountCommerceAdminHeader() {
   }
 
   slot.classList.add('commerce-admin-app-header');
+  applyApiEnvHeaderClass(slot);
   slot.innerHTML = `
     <div class="commerce-admin-header-inner">
       ${left}
+      <div class="commerce-admin-header-env">
+        <span class="commerce-admin-api-env-label" id="commerce-api-env-label">API</span>
+        <select
+          id="commerce-api-env-select"
+          class="commerce-admin-api-env-select"
+          aria-labelledby="commerce-api-env-label"
+        >
+          <option value="stage">Staging</option>
+          <option value="prod">Production</option>
+        </select>
+      </div>
       <div class="commerce-admin-header-right">
         <div class="commerce-admin-user-wrap">
           <button type="button" class="commerce-admin-user-trigger" id="commerce-admin-user-trigger" aria-expanded="false" aria-haspopup="true" aria-controls="commerce-admin-user-menu">
             <span class="commerce-admin-user-label">
-              <span class="commerce-admin-user-name">${escapeHtml(primary)}</span>
-              ${secondary ? `<span class="commerce-admin-user-email">${escapeHtml(secondary)}</span>` : ''}
+              <span class="commerce-admin-user-name">${escapeHtml(triggerLabel)}</span>
             </span>
             <span class="commerce-admin-user-chevron" aria-hidden="true"></span>
           </button>
           <ul class="commerce-admin-user-menu" id="commerce-admin-user-menu" role="menu" aria-labelledby="commerce-admin-user-trigger" hidden>
-            <li class="commerce-admin-user-menu-hint" role="presentation">${escapeHtml(apiEnvLabel())}</li>
+            <li class="commerce-admin-user-menu-hint" role="presentation">Account</li>
             <li role="presentation"><button type="button" class="commerce-admin-user-menu-item" role="menuitem" data-commerce-menu="settings" disabled>Account settings (coming soon)</button></li>
             <li role="presentation"><button type="button" class="commerce-admin-user-menu-item" role="menuitem" data-commerce-menu="prefs" disabled>Preferences (coming soon)</button></li>
             <li role="presentation"><button type="button" class="commerce-admin-user-menu-item danger" role="menuitem" id="commerce-header-sign-out">Sign out</button></li>
@@ -100,6 +102,17 @@ export function mountCommerceAdminHeader() {
   const trigger = document.getElementById('commerce-admin-user-trigger');
   const menu = document.getElementById('commerce-admin-user-menu');
   const signOutBtn = document.getElementById('commerce-header-sign-out');
+  const envSelect = document.getElementById('commerce-api-env-select');
+
+  if (envSelect) {
+    envSelect.value = getApiEnvironment();
+    envSelect.addEventListener('change', () => {
+      const next = envSelect.value === 'prod' ? 'prod' : 'stage';
+      if (next === getApiEnvironment()) return;
+      setApiEnvironment(next);
+      window.location.reload();
+    });
+  }
 
   const syncMenuHidden = () => {
     if (!menu) return;
