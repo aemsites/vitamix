@@ -1,18 +1,26 @@
 /**
- * Pricing mock UI (no API). Entry points: cart-rules.html (rules overview + detail modal),
- * promotions.html (promotion list + modal), or data-pr-app="both" for combined Rules /
- * Promotions tabs.
- * Promotion detail modal reuses classes from coupons.css — include that stylesheet on any
- * page that opens the promotion modal (promotions.html does). Sale-line thumbnails use the
- * same AEM index + image query as catalog (`pim.js` fetch / resolve helpers).
- * Cart rule detail modals reuse coupons.css (load on cart-rules.html).
- * Coupons: coupons.html (ProductBus).
+ * Cart rules + catalog promotions UI. Shapes follow **helix-commerce-api**
+ * (`price-rules/catalog` → `{ promotions }`, `price-rules/cart` → JSON array).
+ * Data comes only from ProductBus; failed loads show errors and empty lists.
  */
 import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
 import { createDetailModalHeaderCloseAndJson } from './commerce-detail-modal-json.js';
 import { mountPromoteProductionInToolbar } from './commerce-promote-production.js';
 import { PB_ORG, PB_SITE } from './commerce-pbus-config.js';
-import { escapeHtml } from './commerce-otp-ui.js';
+import {
+  catalogPathToProductUrl,
+  catalogPriceStringForApi,
+  catalogTimestampStringForApi,
+  catalogRuleToPromotionRow,
+  countryKeyFromCatalogPath,
+  fetchCartPriceRules,
+  fetchCatalogPriceRules,
+  inferPromotionYear,
+  productUrlToCatalogPath,
+  putCartPriceRules,
+  putCatalogPriceRules,
+} from './price-rules-api.js';
+import { escapeHtml, showToast } from './commerce-otp-ui.js';
 import {
   fetchProductsIndexForLocale,
   getParentProducts,
@@ -31,22 +39,26 @@ function getPrAppMode() {
 
 const PR_APP_MODE = getPrAppMode();
 
+/** IANA timezone used for all date display and date-picker values. */
+const ET_TIMEZONE = 'America/New_York';
+
+
 /** @typedef {object} RuleRow
  * @property {string} name
- * @property {string} description
  * @property {string} minimumValue
  * @property {string} salesAmountOff
  * @property {string} freeShipping
- * @property {string} coupons
  * @property {string} products
  * @property {string} categories
  */
 /** @typedef {object} PromotionRow
- * @property {string} start
+ * @property {string} start canonical UTC instant for API (or empty)
  * @property {string} end
  * @property {string} product
  * @property {string} regularPrice
  * @property {string} salePrice
+ * @property {string} [startSourceText] original spreadsheet cell (shown until edited)
+ * @property {string} [endSourceText]
  */
 /** @typedef {object} PromotionSet
  * @property {string} id
@@ -54,192 +66,23 @@ const PR_APP_MODE = getPrAppMode();
  * @property {PromotionRow[]} rows
  */
 
-/**
- * @typedef {{
- *   label: string,
- *   rules: RuleRow[],
- *   promotions: Record<string, PromotionSet[]>,
- * }} CountryMock
- */
-
-const US_PROMO_ROWS = [
-  {
-    start: '4/9/2026 12am',
-    end: '4/20/2026 11:59pm',
-    product: 'https://www.vitamix.com/us/en_us/products/certified-reconditioned-a3500',
-    regularPrice: '$549.95',
-    salePrice: '$429.95',
-  },
-  {
-    start: '4/9/2026 12am',
-    end: '4/20/2026 11:59pm',
-    product: 'https://www.vitamix.com/us/en_us/products/certified-reconditioned-a2500',
-    regularPrice: '$449.95',
-    salePrice: '$349.95',
-  },
-  {
-    start: '4/9/2026 12am',
-    end: '4/20/2026 11:59pm',
-    product: 'https://www.vitamix.com/us/en_us/products/certified-reconditioned-propel-750',
-    regularPrice: '$449.95',
-    salePrice: '$349.95',
-  },
-  {
-    start: '4/9/2026 12am',
-    end: '4/20/2026 11:59pm',
-    product: 'https://www.vitamix.com/us/en_us/products/certified-reconditioned-explorian-with-programs',
-    regularPrice: '$379.95',
-    salePrice: '$329.95',
-  },
-  {
-    start: '4/9/2026 12am',
-    end: '4/20/2026 11:59pm',
-    product: 'https://www.vitamix.com/us/en_us/products/certified-reconditioned-explorian',
-    regularPrice: '$319.95',
-    salePrice: '$269.95',
-  },
-];
-
-/** @type {Record<string, CountryMock>} */
-const MOCK = {
-  us: {
-    label: 'United States',
-    rules: [
-      {
-        name: 'Free Shipping >=  $150',
-        description: 'Free Shipping for Orders over $150',
-        minimumValue: '150',
-        salesAmountOff: '',
-        freeShipping: 'Yes',
-        coupons: '',
-        products: 'HH Only',
-        categories: '',
-      },
-      {
-        name: '25% off total order + Free Shipping - Affiliate',
-        description: '25% off total order + Free Shipping - Affiliate',
-        minimumValue: '',
-        salesAmountOff: '25%',
-        freeShipping: 'Yes',
-        coupons: '2026/affiliates-25-off',
-        products: '',
-        categories: '',
-      },
-    ],
-    promotions: {
-      2026: [
-        {
-          id: 'certified-reconditioned-april',
-          title: 'Certified Reconditioned — April window',
-          rows: US_PROMO_ROWS,
-        },
-        {
-          id: 'loyalty-bonus-mock',
-          title: 'Loyalty tier bonus (mock)',
-          rows: US_PROMO_ROWS.slice(0, 2),
-        },
-      ],
-      2025: [
-        {
-          id: 'archive-holiday',
-          title: 'Holiday 2025 (archived mock)',
-          rows: [
-            {
-              start: '11/20/2025 12am',
-              end: '12/1/2025 11:59pm',
-              product: 'https://www.vitamix.com/us/en_us/products/explorian-series-e310',
-              regularPrice: '$379.95',
-              salePrice: '$349.95',
-            },
-          ],
-        },
-      ],
-    },
-  },
-  ca: {
-    label: 'Canada',
-    rules: [
-      {
-        name: 'Free Shipping threshold (CA)',
-        description: 'Free shipping over minimum cart (mock)',
-        minimumValue: '175',
-        salesAmountOff: '',
-        freeShipping: 'Yes',
-        coupons: '',
-        products: '',
-        categories: '',
-      },
-      {
-        name: 'Partner stack (mock)',
-        description: 'Stack partner coupon with standard rules (mock)',
-        minimumValue: '',
-        salesAmountOff: '15%',
-        freeShipping: 'No',
-        coupons: '2026/partner-stack',
-        products: '',
-        categories: 'Ascent',
-      },
-    ],
-    promotions: {
-      2026: [
-        {
-          id: 'fr-ca-refurb-spring',
-          title: 'Refurb spotlight — FR-CA (mock)',
-          rows: [
-            {
-              start: '4/9/2026 12am',
-              end: '4/20/2026 11:59pm',
-              product: 'https://www.vitamix.com/ca/fr_ca/products/ascent-x2',
-              regularPrice: '$729.95',
-              salePrice: '$649.95',
-            },
-            {
-              start: '4/9/2026 12am',
-              end: '4/20/2026 11:59pm',
-              product: 'https://www.vitamix.com/ca/fr_ca/products/explorian-series-e310',
-              regularPrice: '$449.95',
-              salePrice: '$399.95',
-            },
-          ],
-        },
-      ],
-    },
-  },
-  mx: {
-    label: 'Mexico',
-    rules: [
-      {
-        name: 'MX default shipping rule (mock)',
-        description: 'Baseline shipping behavior for MX storefront',
-        minimumValue: '2500',
-        salesAmountOff: '',
-        freeShipping: 'Yes',
-        coupons: '',
-        products: '',
-        categories: '',
-      },
-    ],
-    promotions: {
-      2026: [
-        {
-          id: 'mx-launch-promo',
-          title: 'Launch promo table (mock)',
-          rows: [
-            {
-              start: '5/1/2026 12am',
-              end: '5/31/2026 11:59pm',
-              product: 'https://www.vitamix.com/',
-              regularPrice: '$9,999 MXN',
-              salePrice: '$8,499 MXN',
-            },
-          ],
-        },
-      ],
-    },
-  },
-};
-
 const COUNTRIES = /** @type {const} */ (['us', 'ca', 'mx']);
+
+/** Display names for market tabs (no embedded pricing data). */
+const COUNTRY_LABELS = /** @type {Record<(typeof COUNTRIES)[number], string>} */ ({
+  us: 'United States',
+  ca: 'Canada',
+  mx: 'Mexico',
+});
+
+/** @param {string} ck */
+function marketLabel(ck) {
+  const k = String(ck || '').toLowerCase();
+  if (COUNTRIES.includes(/** @type {(typeof COUNTRIES)[number]} */ (k))) {
+    return COUNTRY_LABELS[/** @type {(typeof COUNTRIES)[number]} */ (k)];
+  }
+  return k ? k.toUpperCase() : '';
+}
 const AREAS = /** @type {const} */ (['rules', 'promotions']);
 
 /**
@@ -249,6 +92,12 @@ const AREAS = /** @type {const} */ (['rules', 'promotions']);
  *   promoListSearch: string,
  *   promoListYearFilter: string,
  *   cartRuleSearch: string,
+ *   catalogPromotions: import('./price-rules-api.js').CatalogPromotion[],
+ *   catalogDataSource: 'api'|'unavailable',
+ *   catalogLoadError: string,
+ *   cartRulesList: import('./price-rules-api.js').HelixCartPriceRule[]|null,
+ *   cartDataSource: 'api'|'unavailable',
+ *   cartLoadError: string,
  * }}
  */
 const state = {
@@ -257,10 +106,1861 @@ const state = {
   promoListSearch: '',
   promoListYearFilter: '',
   cartRuleSearch: '',
+  /** @type {import('./price-rules-api.js').CatalogPromotion[]} */
+  catalogPromotions: [],
+  /** @type {'api'|'unavailable'} */
+  catalogDataSource: 'unavailable',
+  catalogLoadError: '',
+  /** @type {import('./price-rules-api.js').HelixCartPriceRule[] | null} */
+  cartRulesList: null,
+  /** @type {'api'|'unavailable'} */
+  cartDataSource: 'unavailable',
+  cartLoadError: '',
 };
 
-function sortedYears(map) {
-  return Object.keys(map || {}).sort((a, b) => Number(b) - Number(a));
+/**
+ * Infer admin “market” tab from rule id prefix (`us-…`, `ca-…`, `mx-…`). Rules without a prefix
+ * (legacy ids) are listed under US.
+ *
+ * @param {string} id
+ * @returns {(typeof COUNTRIES)[number]}
+ */
+function cartRuleMarketFromRuleId(id) {
+  const s = String(id || '').toLowerCase();
+  if (s.startsWith('ca-')) return 'ca';
+  if (s.startsWith('mx-')) return 'mx';
+  if (s.startsWith('us-')) return 'us';
+  return 'us';
+}
+
+/** @param {string} ck */
+function rulesForCountryApi(ck) {
+  if (state.cartDataSource !== 'api' || !Array.isArray(state.cartRulesList)) return [];
+  return state.cartRulesList.filter((r) => cartRuleMarketFromRuleId(r.id) === ck);
+}
+
+/**
+ * @param {import('./price-rules-api.js').HelixCartPriceRule} rule
+ * @returns {RuleRow}
+ */
+function helixCartRuleToRuleRow(rule) {
+  const c = rule.conditions && typeof rule.conditions === 'object' ? rule.conditions : {};
+  const a = rule.actions && typeof rule.actions === 'object' ? rule.actions : {};
+  const minRaw = c.minimumSubtotal;
+  const minimumValue = minRaw != null && Number.isFinite(Number(minRaw)) && Number(minRaw) > 0
+    ? String(minRaw)
+    : '';
+  let salesAmountOff = '';
+  if (a.percentOff != null && Number.isFinite(Number(a.percentOff))) {
+    salesAmountOff = `${a.percentOff}%`;
+  } else if (a.fixedOff != null && Number.isFinite(Number(a.fixedOff))) {
+    salesAmountOff = `$${a.fixedOff}`;
+  }
+  const freeShipping = a.freeShipping === true ? 'Yes' : 'No';
+  const products = Array.isArray(c.products) ? c.products.join(', ') : '';
+  const categories = Array.isArray(c.categories) ? c.categories.join(', ') : '';
+  return {
+    name: String(rule.name || ''),
+    minimumValue,
+    salesAmountOff,
+    freeShipping,
+    products,
+    categories,
+  };
+}
+
+function nextCartRulePriority(existing) {
+  const ps = existing.map((r) => {
+    const p = typeof r.priority === 'number' && Number.isFinite(r.priority) ? r.priority : 0;
+    return Math.floor(p);
+  });
+  return (ps.length ? Math.max(0, ...ps) : 0) + 1;
+}
+
+/**
+ * @param {string} market
+ * @param {string} slug
+ * @param {import('./price-rules-api.js').HelixCartPriceRule[]} existing
+ */
+function uniqueCartRuleId(market, slug, existing) {
+  let id = `${market}-${slug}`;
+  const used = new Set(existing.map((r) => String(r.id || '')));
+  if (!used.has(id)) return id;
+  let n = 2;
+  while (used.has(`${id}-${n}`)) n += 1;
+  return `${id}-${n}`;
+}
+
+/**
+ * @param {string} market
+ * @param {RuleRow} row
+ * @param {import('./price-rules-api.js').HelixCartPriceRule[]} existingRules
+ * @param {import('./price-rules-api.js').HelixCartPriceRule | null} [preserveFrom] when set, keep id, priority, stackable, incompatibleTypes
+ * @returns {import('./price-rules-api.js').HelixCartPriceRule}
+ */
+function ruleRowToHelixCartRule(market, row, existingRules, preserveFrom = null) {
+  const slug = ruleSlugFromName(row.name);
+  const id = preserveFrom?.id
+    ? String(preserveFrom.id)
+    : uniqueCartRuleId(market, slug, existingRules);
+  const priority = preserveFrom != null
+    && typeof preserveFrom.priority === 'number'
+    && Number.isFinite(preserveFrom.priority)
+    ? Math.floor(preserveFrom.priority)
+    : nextCartRulePriority(existingRules);
+
+  const minRaw = String(row.minimumValue ?? '').trim();
+  const minNum = minRaw === '' ? 0 : Number(minRaw);
+  const minimumSubtotal = Number.isFinite(minNum) && minNum >= 0 ? minNum : 0;
+
+  const products = String(row.products ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  const categories = String(row.categories ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+
+  /** @type {import('./price-rules-api.js').HelixCartPriceRule['conditions']} */
+  const conditions = { minimumSubtotal };
+  if (products.length) conditions.products = products;
+  if (categories.length) conditions.categories = categories;
+
+  const offRaw = String(row.salesAmountOff ?? '').trim();
+  let percentVal = NaN;
+  let fixedVal = NaN;
+  if (offRaw) {
+    const pm = offRaw.match(/^(\d+(?:\.\d+)?)\s*%$/);
+    if (pm) percentVal = Number(pm[1]);
+    else if (offRaw.startsWith('$')) {
+      const fm = offRaw.match(/\$?\s*(\d+(?:\.\d+)?)/);
+      if (fm) fixedVal = Number(fm[1]);
+    } else {
+      const n = Number(offRaw);
+      if (Number.isFinite(n)) percentVal = n;
+    }
+  }
+  const hasPct = Number.isFinite(percentVal);
+  const hasFixed = Number.isFinite(fixedVal);
+  const fs = /^yes$/i.test(String(row.freeShipping || '').trim());
+
+  /** @type {import('./price-rules-api.js').HelixCartPriceRule['actions']} */
+  let actions;
+  if (fs && hasPct) {
+    actions = { percentOff: percentVal, fixedOff: null, freeShipping: true };
+  } else if (fs && hasFixed) {
+    actions = { percentOff: null, fixedOff: fixedVal, freeShipping: true };
+  } else if (fs) {
+    actions = { freeShipping: true };
+  } else if (hasPct) {
+    actions = { percentOff: percentVal };
+  } else if (hasFixed) {
+    actions = { fixedOff: fixedVal };
+  } else {
+    actions = { freeShipping: false };
+  }
+
+  /** @type {import('./price-rules-api.js').HelixCartPriceRule} */
+  const out = {
+    id,
+    name: row.name,
+    priority,
+    conditions,
+    actions,
+  };
+  if (preserveFrom) {
+    if (typeof preserveFrom.stackable === 'boolean') out.stackable = preserveFrom.stackable;
+    if (Array.isArray(preserveFrom.incompatibleTypes)) {
+      out.incompatibleTypes = [...preserveFrom.incompatibleTypes];
+    }
+  }
+  return out;
+}
+
+/** @param {string} ck */
+function rulesForCountry(ck) {
+  if (state.cartDataSource === 'api' && Array.isArray(state.cartRulesList)) {
+    return rulesForCountryApi(ck).map(helixCartRuleToRuleRow);
+  }
+  return [];
+}
+
+function promotionsListSource() {
+  return state.catalogPromotions;
+}
+
+async function loadCatalogFromApi() {
+  try {
+    const doc = await fetchCatalogPriceRules(PB_ORG, PB_SITE);
+    state.catalogPromotions = Array.isArray(doc.promotions) ? doc.promotions : [];
+    state.catalogDataSource = 'api';
+    state.catalogLoadError = '';
+  } catch (err) {
+    state.catalogPromotions = [];
+    state.catalogDataSource = 'unavailable';
+    state.catalogLoadError = err?.message || String(err);
+  }
+}
+
+async function loadCartFromApi() {
+  try {
+    const doc = await fetchCartPriceRules(PB_ORG, PB_SITE);
+    state.cartRulesList = Array.isArray(doc.rules) ? doc.rules : [];
+    state.cartDataSource = 'api';
+    state.cartLoadError = '';
+  } catch (err) {
+    state.cartRulesList = null;
+    state.cartDataSource = 'unavailable';
+    state.cartLoadError = err?.message || String(err);
+  }
+}
+
+/**
+ * Refreshes catalog promotions from the server only. Used before add/edit/delete.
+ *
+ * @returns {Promise<boolean>}
+ */
+async function fetchCatalogFromServerOrNotify() {
+  try {
+    const doc = await fetchCatalogPriceRules(PB_ORG, PB_SITE);
+    state.catalogPromotions = Array.isArray(doc.promotions) ? doc.promotions : [];
+    state.catalogDataSource = 'api';
+    state.catalogLoadError = '';
+    return true;
+  } catch (err) {
+    const msg = err?.message || String(err);
+    state.catalogLoadError = msg;
+    showToast(`Could not load catalog promotions from the server: ${msg}`, 'error');
+    render();
+    return false;
+  }
+}
+
+/**
+ * Refreshes cart rules from the server only. Used before adding a rule.
+ *
+ * @returns {Promise<boolean>}
+ */
+async function fetchCartRulesFromServerOrNotify() {
+  try {
+    const doc = await fetchCartPriceRules(PB_ORG, PB_SITE);
+    state.cartRulesList = Array.isArray(doc.rules) ? doc.rules : [];
+    state.cartDataSource = 'api';
+    state.cartLoadError = '';
+    return true;
+  } catch (err) {
+    const msg = err?.message || String(err);
+    state.cartLoadError = msg;
+    showToast(`Could not load cart rules from the server: ${msg}`, 'error');
+    render();
+    return false;
+  }
+}
+
+/**
+ * Refresh from server, remove one rule by id, PUT the rest.
+ *
+ * @param {string} ruleId
+ * @returns {Promise<boolean>} true if deleted and saved
+ */
+async function deleteCartRuleById(ruleId) {
+  const ok = await fetchCartRulesFromServerOrNotify();
+  if (!ok) return false;
+  const fresh = Array.isArray(state.cartRulesList) ? state.cartRulesList : [];
+  const next = fresh.filter((r) => String(r.id) !== String(ruleId));
+  if (next.length === fresh.length) {
+    showToast('Rule not found after refresh.', 'error');
+    render();
+    return false;
+  }
+  try {
+    await putCartPriceRules(PB_ORG, PB_SITE, next);
+    state.cartRulesList = next;
+    state.cartDataSource = 'api';
+    state.cartLoadError = '';
+    showToast('Cart rule deleted', 'success');
+    return true;
+  } catch (err) {
+    showToast(err?.message || 'Delete failed', 'error');
+    return false;
+  }
+}
+
+/**
+ * @param {(typeof COUNTRIES)[number]} market
+ * @param {string} slug
+ * @param {import('./price-rules-api.js').CatalogPromotion[]} promotions
+ */
+function uniquePromotionId(market, slug, promotions) {
+  let id = `${market}-${slug}`;
+  const used = new Set(promotions.map((p) => String(p.id || '')));
+  if (!used.has(id)) return id;
+  let n = 2;
+  while (used.has(`${id}-${n}`)) n += 1;
+  return `${id}-${n}`;
+}
+
+/**
+ * US-style spreadsheet datetimes (e.g. <code>4/9/2026 12am</code>) → ISO 8601 for helix.
+ * Passes through values that already look like ISO datetimes.
+ *
+ * @param {string} raw
+ * @returns {string}
+ */
+function normalizeDateForCatalogApi(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  /** @type {string} */
+  let candidate = s;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    candidate = `${s}T00:00:00Z`;
+  } else if (!/^\d{4}-\d{2}-\d{2}T/.test(s)) {
+    const us = parseUsSpreadsheetDateTime(s);
+    candidate = us || s;
+  }
+  const out = catalogTimestampStringForApi(candidate);
+  return out;
+}
+
+/**
+ * Convert Eastern civil time components → UTC `Date`.
+ * Tries both EST (−05:00) and EDT (−04:00) offsets and picks the one whose round-trip
+ * through `America/New_York` matches the original components (handles DST transitions correctly).
+ *
+ * @param {number} year
+ * @param {number} mo   1-based month
+ * @param {number} day
+ * @param {number} h
+ * @param {number} mi
+ * @param {number} sec
+ * @returns {Date}
+ */
+function easternCivilToUtc(year, mo, day, h, mi, sec) {
+  const pad = (n, w = 2) => String(n).padStart(w, '0');
+  const base = `${pad(year, 4)}-${pad(mo)}-${pad(day)}T${pad(h)}:${pad(mi)}:${pad(sec)}`;
+  const etFmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: ET_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+  const get = (parts, type) => parseInt(parts.find((p) => p.type === type)?.value ?? '0', 10);
+  for (const offset of ['-04:00', '-05:00']) {
+    const candidate = new Date(`${base}${offset}`);
+    if (Number.isNaN(candidate.getTime())) continue;
+    const parts = etFmt.formatToParts(candidate);
+    if (
+      get(parts, 'year') === year && get(parts, 'month') === mo && get(parts, 'day') === day
+      && get(parts, 'hour') === h && get(parts, 'minute') === mi && get(parts, 'second') === sec
+    ) return candidate;
+  }
+  return new Date(`${base}-05:00`); // fallback EST
+}
+
+/**
+ * Convert a UTC ISO string to the `YYYY-MM-DDTHH:mm` format expected by
+ * `<input type="datetime-local">`, expressed in US Eastern time (ET_TIMEZONE).
+ *
+ * @param {string} iso
+ * @returns {string}
+ */
+function isoToDatetimeLocalValue(iso) {
+  const s = String(iso || '').trim();
+  if (!s) return '';
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return '';
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: ET_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(d);
+  const get = (type) => parts.find((p) => p.type === type)?.value ?? '00';
+  const hour = get('hour') === '24' ? '00' : get('hour');
+  return `${get('year')}-${get('month')}-${get('day')}T${hour}:${get('minute')}`;
+}
+
+/**
+ * Parse `<input type="datetime-local">` value as **US Eastern** civil time → UTC ISO for the API.
+ *
+ * The datetime-local picker shows Eastern time (set via `isoToDatetimeLocalValue`), so we
+ * must interpret the `YYYY-MM-DDTHH:mm` value in `America/New_York`, not browser-local time.
+ *
+ * @param {string} localValue
+ * @returns {string}
+ */
+function datetimeLocalValueToIso(localValue) {
+  const v = String(localValue || '').trim();
+  if (!v) return '';
+  const m = v.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (m) {
+    const year = Number(m[1]);
+    const mo = Number(m[2]);
+    const day = Number(m[3]);
+    const h = Number(m[4]);
+    const mi = Number(m[5]);
+    const sec = m[6] !== undefined ? Number(m[6]) : 0;
+    const dt = easternCivilToUtc(year, mo, day, h, mi, sec);
+    if (Number.isNaN(dt.getTime())) return '';
+    return catalogTimestampStringForApi(dt);
+  }
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return '';
+  return catalogTimestampStringForApi(d);
+}
+
+/** Display a UTC ISO instant in US Eastern time (ET_TIMEZONE). @param {string} iso */
+function formatIsoForSaleLineView(iso) {
+  const s = String(iso || '').trim();
+  if (!s) return '—';
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return s;
+  return d.toLocaleString('en-US', {
+    timeZone: ET_TIMEZONE,
+    dateStyle: 'short',
+    timeStyle: 'short',
+  });
+}
+
+/** Numeric string for hidden fields / display (no currency symbol). */
+function priceDigitsForUi(raw) {
+  const t = String(raw ?? '').trim();
+  if (!t || t === '—') return '';
+  return catalogPriceStringForApi(raw);
+}
+
+/**
+ * @param {string} raw path or full URL
+ * @returns {string}
+ */
+function resolveProductUrlForRow(raw) {
+  const t = String(raw || '').trim();
+  if (!t) return '';
+  if (/^https?:\/\//i.test(t)) return t;
+  if (t.startsWith('/')) return catalogPathToProductUrl(t);
+  return t;
+}
+
+/**
+ * US spreadsheet `M/D/YYYY` (optional time + am/pm). Interpreted as **US Eastern** civil time, then converted to UTC for the API.
+ *
+ * @param {string} text
+ * @returns {string|null} canonical UTC string or null if not parseable
+ */
+function parseUsSpreadsheetDateTime(text) {
+  const t = String(text || '').trim();
+  if (!t) return null;
+  const m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s*(.*)$/i);
+  if (!m) return null;
+  const month = parseInt(m[1], 10) - 1;
+  const day = parseInt(m[2], 10);
+  const year = parseInt(m[3], 10);
+  const restRaw = String(m[4] || '').trim();
+  const restLower = restRaw.toLowerCase();
+  const isPm = /pm/.test(restLower);
+  const isAm = /am/.test(restLower);
+  /** `\b(am|pm)\b` misses `12am` (no boundary between `2` and `a`). Strip letters instead. */
+  let rest = restRaw.replace(/(am|pm)/gi, '').replace(/\s+/g, ' ').trim();
+  let hh = 0;
+  let mi = 0;
+  let sec = 0;
+  if (rest) {
+    const tm = rest.match(/^(\d{1,2})(?::(\d{2}))?(?::(\d{2}))?$/);
+    if (!tm) return null;
+    hh = parseInt(tm[1], 10);
+    mi = parseInt(tm[2] || '0', 10);
+    sec = parseInt(tm[3] || '0', 10);
+  }
+  /** Inclusive “through 11:59pm” end-of-day in Eastern time. */
+  const isEndOfDay1159pm = isPm && /\b11\s*:\s*59\b/i.test(restRaw);
+  if (isEndOfDay1159pm) sec = 59;
+  if (isPm && hh < 12) hh += 12;
+  if (isAm && hh === 12) hh = 0;
+  // `month` is 0-based from parseInt above; easternCivilToUtc expects 1-based month.
+  const d = easternCivilToUtc(year, month + 1, day, hh, mi, sec);
+  if (Number.isNaN(d.getTime())) return null;
+  return catalogTimestampStringForApi(d);
+}
+
+/** @param {string} line */
+function isSaleLinesTsvHeaderLine(line) {
+  const s = String(line || '').toLowerCase();
+  return /\bstart\b/.test(s) && /\bend\b/.test(s) && /\bproduct\b/.test(s);
+}
+
+/** @param {unknown} c */
+function cleanSaleLinesTsvCell(c) {
+  return String(c ?? '').replace(/^\uFEFF/, '').replace(/\u00a0/g, ' ').trim();
+}
+
+/**
+ * Tab-separated rows: Start, End, Product, Regular Price, Sale Price (header optional).
+ *
+ * @param {string} text
+ * @returns {PromotionRow[]}
+ */
+function parseSaleLinesTsv(text) {
+  /** @type {PromotionRow[]} */
+  const rows = [];
+  const rawLines = String(text || '').split(/\r?\n/);
+  let i = 0;
+  if (rawLines.length && isSaleLinesTsvHeaderLine(rawLines[0])) i = 1;
+  for (; i < rawLines.length; i += 1) {
+    const line = rawLines[i];
+    if (!String(line).trim()) continue;
+    const cols = line.split('\t');
+    if (cols.length < 5) continue;
+    const startRaw = cleanSaleLinesTsvCell(cols[0]);
+    const endRaw = cleanSaleLinesTsvCell(cols[1]);
+    const product = cleanSaleLinesTsvCell(cols[2]);
+    const regularRaw = cleanSaleLinesTsvCell(cols[3]);
+    const salePrice = cleanSaleLinesTsvCell(cols[4]);
+    if (!product || !salePrice) continue;
+    const startNorm = normalizeDateForCatalogApi(startRaw);
+    const endNorm = normalizeDateForCatalogApi(endRaw);
+    rows.push({
+      start: startNorm,
+      end: endNorm,
+      ...(startRaw ? { startSourceText: startRaw } : {}),
+      ...(endRaw ? { endSourceText: endRaw } : {}),
+      product,
+      regularPrice: regularRaw || '—',
+      salePrice,
+    });
+  }
+  return rows;
+}
+
+/**
+ * String keys only (helix catalog rule metadata).
+ *
+ * @param {unknown} raw
+ * @returns {Record<string, string>}
+ */
+function catalogMetadataStringMap(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  /** @type {Record<string, string>} */
+  const out = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (v == null) continue;
+    out[k] = typeof v === 'string' ? v : String(v);
+  }
+  return out;
+}
+
+/**
+ * @param {PromotionRow[]} rows
+ * @param {string} year
+ * @param {import('./price-rules-api.js').CatalogPriceRule[] | undefined} [preserveFromRules] rules for this market before edit — merged by `path` so extra `metadata` keys (e.g. `debug`) and `variants` survive Save
+ * @returns {import('./price-rules-api.js').CatalogPriceRule[]}
+ */
+function promotionRowsToCatalogRules(rows, year, preserveFromRules) {
+  const y = String(year || '').trim() || String(new Date().getFullYear());
+  /** @type {Map<string, import('./price-rules-api.js').CatalogPriceRule>} */
+  const prevByPath = new Map(
+    (preserveFromRules || []).filter((r) => r && r.path).map((r) => [String(r.path), r]),
+  );
+  return rows.map((row) => {
+    const path = productUrlToCatalogPath(row.product);
+    if (!path) throw new Error('Each sale line needs a valid product URL');
+    const price = catalogPriceStringForApi(row.salePrice);
+    const prevRule = prevByPath.get(path);
+    /** @type {import('./price-rules-api.js').CatalogPriceRule} */
+    const rule = { path, price };
+    const start = normalizeDateForCatalogApi(String(row.start || '').trim());
+    const end = normalizeDateForCatalogApi(String(row.end || '').trim());
+    if (start) rule.start = start;
+    if (end) rule.end = end;
+    const reg = String(row.regularPrice || '').trim();
+    const regDigits = reg && reg !== '—' ? catalogPriceStringForApi(reg) : '';
+    const meta = catalogMetadataStringMap(prevRule?.metadata);
+    meta.year = y;
+    if (regDigits) meta.regularPrice = regDigits;
+    else delete meta.regularPrice;
+    rule.metadata = meta;
+
+    if (prevRule?.variants && typeof prevRule.variants === 'object' && !Array.isArray(prevRule.variants)) {
+      try {
+        rule.variants = structuredClone(prevRule.variants);
+      } catch {
+        rule.variants = /** @type {typeof prevRule.variants} */ ({ ...prevRule.variants });
+      }
+    }
+    return rule;
+  }).filter((r) => r.path);
+}
+
+/** @param {HTMLDialogElement} dlg */
+function readPromotionMarketFromForm(dlg) {
+  const v = String(dlg.querySelector('#pr-promo-form-market')?.value ?? '').trim().toLowerCase();
+  if (!COUNTRIES.includes(/** @type {(typeof COUNTRIES)[number]} */ (v))) {
+    throw new Error('Select a valid market');
+  }
+  return /** @type {(typeof COUNTRIES)[number]} */ (v);
+}
+
+/** @param {HTMLDialogElement} dlg */
+function promotionDialogMarketSafe(dlg) {
+  try {
+    return readPromotionMarketFromForm(dlg);
+  } catch {
+    return /** @type {(typeof COUNTRIES)[number]} */ ('us');
+  }
+}
+
+/**
+ * @param {HTMLDialogElement} dlg
+ */
+function refreshPromotionSaleLinesVisuals(dlg) {
+  dlg.querySelectorAll('tr[data-pr-promo-line]').forEach((tr) => {
+    if (tr instanceof HTMLTableRowElement) {
+      fillHiddenDatesFromDisplayedCellsIfEmpty(tr);
+      syncPromotionSaleRowView(tr);
+    }
+  });
+  void hydratePromotionTableThumbs(dlg, promotionDialogMarketSafe(dlg));
+}
+
+/** @param {HTMLDialogElement} dlg */
+function readPromotionLineRowsFromDom(dlg) {
+  /** @type {PromotionRow[]} */
+  const out = [];
+  dlg.querySelectorAll('[data-pr-promo-line]').forEach((line) => {
+    const product = String(line.querySelector('.pr-promo-h-product')?.value ?? '').trim();
+    const saleDigits = String(line.querySelector('.pr-promo-h-sale')?.value ?? '').trim();
+    const regDigits = String(line.querySelector('.pr-promo-h-regular')?.value ?? '').trim();
+    let start = String(line.querySelector('.pr-promo-h-start')?.value ?? '').trim();
+    let end = String(line.querySelector('.pr-promo-h-end')?.value ?? '').trim();
+    if (!start) {
+      const ps = line.getAttribute('data-pr-start-paste');
+      if (ps) start = normalizeDateForCatalogApi(ps);
+    }
+    if (!start) {
+      const txt = String(
+        line.querySelector('.pr-promo-cell[data-field="start"] .pr-promo-cell-view')?.textContent ?? '',
+      ).trim();
+      if (txt && txt !== '—') start = normalizeDateForCatalogApi(txt);
+    }
+    if (!end) {
+      const pe = line.getAttribute('data-pr-end-paste');
+      if (pe) end = normalizeDateForCatalogApi(pe);
+    }
+    if (!end) {
+      const txt = String(
+        line.querySelector('.pr-promo-cell[data-field="end"] .pr-promo-cell-view')?.textContent ?? '',
+      ).trim();
+      if (txt && txt !== '—') end = normalizeDateForCatalogApi(txt);
+    }
+    if (!product && !saleDigits && !regDigits && !start && !end) return;
+    if (!product || !saleDigits) {
+      throw new Error('Each non-empty sale line needs a product path or URL and a sale price');
+    }
+    out.push({
+      product,
+      regularPrice: regDigits || '—',
+      salePrice: saleDigits,
+      start,
+      end,
+    });
+  });
+  return out;
+}
+
+/**
+ * Repair rows where start/end ISO never reached hidden inputs: paste attrs, then visible cell text.
+ *
+ * @param {HTMLTableRowElement} tr
+ */
+function fillHiddenDatesFromDisplayedCellsIfEmpty(tr) {
+  const hS = /** @type {HTMLInputElement | null} */ (tr.querySelector('.pr-promo-h-start'));
+  const hE = /** @type {HTMLInputElement | null} */ (tr.querySelector('.pr-promo-h-end'));
+  const pasteS = tr.getAttribute('data-pr-start-paste');
+  const pasteE = tr.getAttribute('data-pr-end-paste');
+  const viewS = tr.querySelector('.pr-promo-cell[data-field="start"] .pr-promo-cell-view');
+  const viewE = tr.querySelector('.pr-promo-cell[data-field="end"] .pr-promo-cell-view');
+  const viewTxtS = String(viewS?.textContent ?? '').trim();
+  const viewTxtE = String(viewE?.textContent ?? '').trim();
+
+  /**
+   * @param {HTMLInputElement | null} h
+   * @param {string | null} paste
+   * @param {string} viewTxt
+   */
+  function fillOne(h, paste, viewTxt) {
+    if (!h || String(h.value).trim()) return;
+    const candidates = [paste, viewTxt].filter((x) => x && x !== '—');
+    for (const raw of candidates) {
+      const iso = normalizeDateForCatalogApi(String(raw));
+      if (iso) {
+        h.value = iso;
+        return;
+      }
+    }
+  }
+
+  fillOne(hS, pasteS, viewTxtS);
+  fillOne(hE, pasteE, viewTxtE);
+}
+
+/**
+ * @param {HTMLTableRowElement} tr
+ */
+function syncPromotionSaleRowView(tr) {
+  const hStart = /** @type {HTMLInputElement | null} */ (tr.querySelector('.pr-promo-h-start'));
+  const hEnd = /** @type {HTMLInputElement | null} */ (tr.querySelector('.pr-promo-h-end'));
+  const hProduct = /** @type {HTMLInputElement | null} */ (tr.querySelector('.pr-promo-h-product'));
+  const hReg = /** @type {HTMLInputElement | null} */ (tr.querySelector('.pr-promo-h-regular'));
+  const hSale = /** @type {HTMLInputElement | null} */ (tr.querySelector('.pr-promo-h-sale'));
+  const vStart = tr.querySelector('.pr-promo-cell[data-field="start"] .pr-promo-cell-view');
+  const vEnd = tr.querySelector('.pr-promo-cell[data-field="end"] .pr-promo-cell-view');
+  const pathEl = tr.querySelector('.pr-promo-path-text');
+  const vReg = tr.querySelector('.pr-promo-cell[data-field="regular"] .pr-promo-cell-view');
+  const vSale = tr.querySelector('.pr-promo-cell[data-field="sale"] .pr-promo-cell-view');
+  const pasteStart = tr.getAttribute('data-pr-start-paste');
+  const pasteEnd = tr.getAttribute('data-pr-end-paste');
+  if (vStart) {
+    vStart.textContent = pasteStart != null && pasteStart !== ''
+      ? pasteStart
+      : formatIsoForSaleLineView(hStart?.value || '');
+  }
+  if (vEnd) {
+    vEnd.textContent = pasteEnd != null && pasteEnd !== ''
+      ? pasteEnd
+      : formatIsoForSaleLineView(hEnd?.value || '');
+  }
+  const path = productUrlToCatalogPath(hProduct?.value || '');
+  if (pathEl) pathEl.textContent = path || '—';
+  if (vReg) vReg.textContent = hReg?.value?.trim() ? hReg.value : '—';
+  if (vSale) vSale.textContent = hSale?.value?.trim() ? hSale.value : '—';
+}
+
+/**
+ * @param {HTMLDialogElement} dlg
+ * @param {(typeof COUNTRIES)[number]} countryKey
+ */
+async function hydratePromotionTableThumbs(dlg, countryKey) {
+  const rows = /** @type {PromotionRow[]} */ ([]);
+  dlg.querySelectorAll('tr[data-pr-promo-line]').forEach((tr) => {
+    const u = String(tr.querySelector('.pr-promo-h-product')?.value ?? '').trim();
+    if (u) rows.push({ product: u, start: '', end: '', regularPrice: '', salePrice: '' });
+  });
+  const map = rows.length ? await buildThumbUrlMapForPromotionRows(rows, countryKey) : new Map();
+  dlg.querySelectorAll('tr[data-pr-promo-line]').forEach((tr) => {
+    const u = String(tr.querySelector('.pr-promo-h-product')?.value ?? '').trim();
+    const cell = tr.querySelector('.pr-promo-thumb-cell');
+    if (!cell) return;
+    if (!u) {
+      cell.innerHTML = '<span class="pim-thumb-placeholder" aria-hidden="true"></span>';
+      return;
+    }
+    const src = map.get(u) || '';
+    cell.innerHTML = src
+      ? `<img src="${escapeHtml(src)}" alt="" loading="lazy" width="48" height="48" class="pim-thumb-img" />`
+      : '<span class="pim-thumb-placeholder" aria-hidden="true"></span>';
+  });
+}
+
+/** @param {HTMLDialogElement} dlg */
+function closePromotionSaleLineCellEdits(dlg) {
+  dlg.querySelectorAll('.pr-promo-cell-edit').forEach((el) => {
+    /** @type {HTMLElement} */ (el).hidden = true;
+  });
+  dlg.querySelectorAll('.pr-promo-cell-view').forEach((v) => {
+    v.classList.remove('pr-promo-cell-view-active');
+  });
+}
+
+/** Blur any open sale-line editor so values commit before save. */
+function blurOpenPromotionSaleLineEditors(dlg) {
+  const ae = document.activeElement;
+  if (
+    ae instanceof HTMLElement
+    && dlg.contains(ae)
+    && ae.closest('.pr-promo-cell-edit')
+  ) {
+    ae.blur();
+  }
+}
+
+/**
+ * Before PUT: for **open** start/end editors, copy datetime-local → hidden ISO; for **closed**
+ * cells, keep hidden inputs as the source of truth (canonicalize only). Closed `<input
+ * type="datetime-local">` controls sit inside `[hidden]` editors — Chrome often leaves
+ * `input.value` empty after programmatic assignment, so reading them cleared TSV/import dates on
+ * Save. Flush open product / regular / sale editors into hidden fields.
+ *
+ * Uses `element.hidden` (not `:not([hidden])`) so open editors are detected reliably.
+ *
+ * @param {HTMLDialogElement} dlg
+ */
+function commitPromotionSaleLineFieldsBeforeSave(dlg) {
+  dlg.querySelectorAll('tr[data-pr-promo-line]').forEach((line) => {
+    if (line instanceof HTMLTableRowElement) fillHiddenDatesFromDisplayedCellsIfEmpty(line);
+  });
+  dlg.querySelectorAll('tr[data-pr-promo-line]').forEach((line) => {
+    if (!(line instanceof HTMLTableRowElement)) return;
+    const startEdit = line.querySelector('.pr-promo-cell[data-field="start"] .pr-promo-cell-edit');
+    const endEdit = line.querySelector('.pr-promo-cell[data-field="end"] .pr-promo-cell-edit');
+    const hS = /** @type {HTMLInputElement | null} */ (line.querySelector('.pr-promo-h-start'));
+    const hE = /** @type {HTMLInputElement | null} */ (line.querySelector('.pr-promo-h-end'));
+    const inpS = /** @type {HTMLInputElement | null} */ (line.querySelector('.pr-promo-input-start'));
+    const inpE = /** @type {HTMLInputElement | null} */ (line.querySelector('.pr-promo-input-end'));
+
+    const startClosed = startEdit instanceof HTMLElement && startEdit.hidden;
+    const endClosed = endEdit instanceof HTMLElement && endEdit.hidden;
+
+    if (startClosed && inpS && hS) {
+      inpS.value = isoToDatetimeLocalValue(hS.value);
+    }
+    if (endClosed && inpE && hE) {
+      inpE.value = isoToDatetimeLocalValue(hE.value);
+    }
+
+    if (inpS && hS) {
+      if (startClosed) {
+        /** Inputs inside `[hidden]` editors often don’t round-trip in Chrome — keep hidden ISO. */
+        const t = hS.value.trim();
+        const norm = t ? normalizeDateForCatalogApi(t) : '';
+        hS.value = norm;
+      } else {
+        const prevStart = hS.value;
+        const nextStart = datetimeLocalValueToIso(inpS.value);
+        if (!inpS.value.trim()) {
+          hS.value = '';
+          line.removeAttribute('data-pr-start-paste');
+        } else if (nextStart) {
+          hS.value = nextStart;
+          line.removeAttribute('data-pr-start-paste');
+        } else {
+          hS.value = prevStart;
+        }
+      }
+    }
+    if (inpE && hE) {
+      if (endClosed) {
+        const t = hE.value.trim();
+        const norm = t ? normalizeDateForCatalogApi(t) : '';
+        hE.value = norm;
+      } else {
+        const prevEnd = hE.value;
+        const nextEnd = datetimeLocalValueToIso(inpE.value);
+        if (!inpE.value.trim()) {
+          hE.value = '';
+          line.removeAttribute('data-pr-end-paste');
+        } else if (nextEnd) {
+          hE.value = nextEnd;
+          line.removeAttribute('data-pr-end-paste');
+        } else {
+          hE.value = prevEnd;
+        }
+      }
+    }
+    syncPromotionSaleRowView(line);
+  });
+
+  dlg.querySelectorAll('.pr-promo-cell-edit').forEach((edit) => {
+    if (!(edit instanceof HTMLElement) || edit.hidden) return;
+    const cell = edit.closest('.pr-promo-cell');
+    const tr = edit.closest('tr[data-pr-promo-line]');
+    if (!cell || !tr || !(tr instanceof HTMLTableRowElement)) return;
+    const field = cell.getAttribute('data-field');
+    const inp = /** @type {HTMLInputElement | null} */ (edit.querySelector('input'));
+    if (!field || !inp) return;
+    if (field === 'start' || field === 'end') return;
+
+    if (field === 'product') {
+      const h = tr.querySelector('.pr-promo-h-product');
+      if (h && 'value' in h) /** @type {HTMLInputElement} */ (h).value = resolveProductUrlForRow(inp.value);
+    } else if (field === 'regular') {
+      const h = tr.querySelector('.pr-promo-h-regular');
+      if (h && 'value' in h) /** @type {HTMLInputElement} */ (h).value = priceDigitsForUi(inp.value);
+    } else if (field === 'sale') {
+      const h = tr.querySelector('.pr-promo-h-sale');
+      if (h && 'value' in h) /** @type {HTMLInputElement} */ (h).value = priceDigitsForUi(inp.value);
+    }
+    edit.hidden = true;
+    cell.querySelector('.pr-promo-cell-view')?.classList.remove('pr-promo-cell-view-active');
+    syncPromotionSaleRowView(tr);
+  });
+  void hydratePromotionTableThumbs(dlg, promotionDialogMarketSafe(dlg));
+}
+
+/**
+ * @param {HTMLDialogElement} dlg
+ */
+function wirePromotionSaleLineTableCells(dlg) {
+  if (dlg.dataset.prPromoSaleCellsWired === '1') return;
+  dlg.dataset.prPromoSaleCellsWired = '1';
+
+  const tbody = dlg.querySelector('#pr-promo-form-lines-tbody');
+  if (!tbody) return;
+
+  const safeMarket = () => {
+    try {
+      return readPromotionMarketFromForm(dlg);
+    } catch {
+      return /** @type {(typeof COUNTRIES)[number]} */ ('us');
+    }
+  };
+
+  const rehydrateThumbs = () => {
+    void hydratePromotionTableThumbs(dlg, safeMarket());
+  };
+
+  dlg.querySelector('#pr-promo-form-market')?.addEventListener('change', rehydrateThumbs);
+
+  tbody.addEventListener('mousedown', (e) => {
+    const tr = /** @type {HTMLElement | null} */ (e.target)?.closest('tr[data-pr-promo-line]');
+    if (!tr || /** @type {HTMLElement} */ (e.target).closest('[data-pr-promo-line-remove]')) return;
+    tbody.querySelectorAll('tr[data-pr-promo-line]').forEach((r) => r.classList.remove('pr-promo-line-selected'));
+    tr.classList.add('pr-promo-line-selected');
+  });
+
+  tbody.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const el = e.target;
+    if (!(el instanceof Element)) return;
+    const view = el.closest('.pr-promo-cell-view');
+    if (!view) return;
+    e.preventDefault();
+    view.click();
+  });
+
+  tbody.addEventListener('click', (e) => {
+    const t = /** @type {HTMLElement} */ (e.target);
+    if (t.closest('[data-pr-promo-line-remove]')) return;
+    const view = t.closest('.pr-promo-cell-view');
+    if (!view) return;
+    const cell = view.closest('.pr-promo-cell');
+    const tr = view.closest('tr[data-pr-promo-line]');
+    if (!cell || !tr || !(tr instanceof HTMLTableRowElement)) return;
+    const field = cell.getAttribute('data-field');
+    if (!field) return;
+    e.preventDefault();
+    closePromotionSaleLineCellEdits(dlg);
+    const edit = cell.querySelector('.pr-promo-cell-edit');
+    const inp = /** @type {HTMLInputElement | null} */ (edit?.querySelector('input'));
+    if (!edit || !inp) return;
+    if (field === 'start') {
+      inp.value = isoToDatetimeLocalValue(
+        /** @type {HTMLInputElement} */ (tr.querySelector('.pr-promo-h-start')).value,
+      );
+    } else if (field === 'end') {
+      inp.value = isoToDatetimeLocalValue(
+        /** @type {HTMLInputElement} */ (tr.querySelector('.pr-promo-h-end')).value,
+      );
+    } else if (field === 'product') {
+      const full = /** @type {HTMLInputElement} */ (tr.querySelector('.pr-promo-h-product')).value;
+      inp.value = productUrlToCatalogPath(full) || full;
+    } else if (field === 'regular') {
+      inp.value = /** @type {HTMLInputElement} */ (tr.querySelector('.pr-promo-h-regular')).value;
+    } else if (field === 'sale') {
+      inp.value = /** @type {HTMLInputElement} */ (tr.querySelector('.pr-promo-h-sale')).value;
+    }
+    /** @type {HTMLElement} */ (edit).hidden = false;
+    view.classList.add('pr-promo-cell-view-active');
+    inp.focus();
+  });
+
+  tbody.addEventListener('focusout', (e) => {
+    const t = e.target;
+    if (!(t instanceof HTMLInputElement)) return;
+    const cell = t.closest('.pr-promo-cell');
+    const tr = t.closest('tr[data-pr-promo-line]');
+    if (!cell || !tr || !(tr instanceof HTMLTableRowElement)) return;
+    const rt = /** @type {Node | null} */ (e.relatedTarget);
+    if (rt && cell.contains(rt)) return;
+    const field = cell.getAttribute('data-field');
+    const edit = cell.querySelector('.pr-promo-cell-edit');
+    if (!field || !edit || /** @type {HTMLElement} */ (edit).hidden) return;
+
+    if (field === 'start') {
+      /** @type {HTMLInputElement} */ (tr.querySelector('.pr-promo-h-start')).value = datetimeLocalValueToIso(t.value);
+      tr.removeAttribute('data-pr-start-paste');
+    } else if (field === 'end') {
+      /** @type {HTMLInputElement} */ (tr.querySelector('.pr-promo-h-end')).value = datetimeLocalValueToIso(t.value);
+      tr.removeAttribute('data-pr-end-paste');
+    } else if (field === 'product') {
+      /** @type {HTMLInputElement} */ (tr.querySelector('.pr-promo-h-product')).value = resolveProductUrlForRow(t.value);
+    } else if (field === 'regular') {
+      /** @type {HTMLInputElement} */ (tr.querySelector('.pr-promo-h-regular')).value = priceDigitsForUi(t.value);
+    } else if (field === 'sale') {
+      /** @type {HTMLInputElement} */ (tr.querySelector('.pr-promo-h-sale')).value = priceDigitsForUi(t.value);
+    }
+    /** @type {HTMLElement} */ (edit).hidden = true;
+    cell.querySelector('.pr-promo-cell-view')?.classList.remove('pr-promo-cell-view-active');
+    syncPromotionSaleRowView(tr);
+    rehydrateThumbs();
+  });
+}
+
+/**
+ * @param {PromotionRow} r
+ * @param {number} index
+ */
+function promotionFormTableRowHtml(r, index) {
+  const productUrl = resolveProductUrlForRow(String(r.product || '').trim());
+  const path = productUrlToCatalogPath(productUrl);
+  const startPrimary = String(r.start ?? '').trim();
+  const endPrimary = String(r.end ?? '').trim();
+  const startPaste = String(r.startSourceText ?? '').trim();
+  const endPaste = String(r.endSourceText ?? '').trim();
+  /** If parse-time normalization left `start`/`end` empty, derive ISO from pasted spreadsheet text so hidden inputs match the grid. */
+  let startIso = startPrimary && startPrimary !== '—' ? normalizeDateForCatalogApi(startPrimary) : '';
+  if (!startIso && startPaste) startIso = normalizeDateForCatalogApi(startPaste);
+  let endIso = endPrimary && endPrimary !== '—' ? normalizeDateForCatalogApi(endPrimary) : '';
+  if (!endIso && endPaste) endIso = normalizeDateForCatalogApi(endPaste);
+  const saleDigits = priceDigitsForUi(r.salePrice);
+  const regDigits = priceDigitsForUi(
+    r.regularPrice === '—' || r.regularPrice == null ? '' : String(r.regularPrice),
+  );
+  const startPasteAttr = startPaste ? ` data-pr-start-paste="${escapeHtml(startPaste)}"` : '';
+  const endPasteAttr = endPaste ? ` data-pr-end-paste="${escapeHtml(endPaste)}"` : '';
+  const startViewLabel = startPaste || formatIsoForSaleLineView(startIso);
+  const endViewLabel = endPaste || formatIsoForSaleLineView(endIso);
+  return `<tr class="pr-promo-sale-row" data-pr-promo-line data-pr-promo-line-idx="${index}"${startPasteAttr}${endPasteAttr}>
+    <td class="pr-promo-sale-col-del">
+      <button type="button" class="coupons-btn pr-promo-line-remove-btn" data-pr-promo-line-remove aria-label="Remove row">×</button>
+    </td>
+    <td class="pr-promo-line-num">${index + 1}</td>
+    <td class="pr-promo-cell" data-field="start">
+      <input type="hidden" class="pr-promo-h-start" value="${escapeHtml(startIso)}" />
+      <div class="pr-promo-cell-view" tabindex="0" role="button">${escapeHtml(startViewLabel)}</div>
+      <div class="pr-promo-cell-edit" hidden>
+        <input type="datetime-local" class="pr-promo-input-start" step="60" />
+      </div>
+    </td>
+    <td class="pr-promo-cell" data-field="end">
+      <input type="hidden" class="pr-promo-h-end" value="${escapeHtml(endIso)}" />
+      <div class="pr-promo-cell-view" tabindex="0" role="button">${escapeHtml(endViewLabel)}</div>
+      <div class="pr-promo-cell-edit" hidden>
+        <input type="datetime-local" class="pr-promo-input-end" step="60" />
+      </div>
+    </td>
+    <td class="pr-promo-cell pr-promo-cell-wide" data-field="product">
+      <input type="hidden" class="pr-promo-h-product" value="${escapeHtml(productUrl)}" />
+      <div class="pr-promo-cell-view pr-promo-product-view" tabindex="0" role="button">
+        <span class="pr-promo-thumb-cell"></span>
+        <code class="pr-promo-path-text">${path ? escapeHtml(path) : '—'}</code>
+      </div>
+      <div class="pr-promo-cell-edit" hidden>
+        <input type="text" class="pr-promo-input-product" placeholder="/us/en_us/products/… or https://…" />
+      </div>
+    </td>
+    <td class="pr-promo-cell" data-field="regular">
+      <input type="hidden" class="pr-promo-h-regular" value="${escapeHtml(regDigits)}" />
+      <div class="pr-promo-cell-view" tabindex="0" role="button">${regDigits ? escapeHtml(regDigits) : '—'}</div>
+      <div class="pr-promo-cell-edit" hidden>
+        <input type="text" class="pr-promo-input-regular" inputmode="decimal" placeholder="449.95" />
+      </div>
+    </td>
+    <td class="pr-promo-cell" data-field="sale">
+      <input type="hidden" class="pr-promo-h-sale" value="${escapeHtml(saleDigits)}" />
+      <div class="pr-promo-cell-view" tabindex="0" role="button">${saleDigits ? escapeHtml(saleDigits) : '—'}</div>
+      <div class="pr-promo-cell-edit" hidden>
+        <input type="text" class="pr-promo-input-sale" inputmode="decimal" placeholder="429.95" />
+      </div>
+    </td>
+  </tr>`;
+}
+
+function promotionSaleLinesTableWrapHtml(linesHtml) {
+  return `<div class="pr-promo-form-lines-wrap">
+    <div class="pr-promo-form-lines-scroll">
+      <table class="pr-data-table pr-promo-sale-grid" aria-label="Sale lines">
+        <thead>
+          <tr>
+            <th scope="col" class="pr-promo-sale-col-del"><span class="pim-sr-only">Remove</span></th>
+            <th scope="col" class="pr-promo-sale-col-num">#</th>
+            <th scope="col">Start</th>
+            <th scope="col">End</th>
+            <th scope="col">Product path</th>
+            <th scope="col">Regular</th>
+            <th scope="col">Sale</th>
+          </tr>
+        </thead>
+        <tbody id="pr-promo-form-lines-tbody">${linesHtml}</tbody>
+      </table>
+    </div>
+    <details class="pr-promo-tsv-import">
+      <summary>Import from spreadsheet (TSV)</summary>
+      <p class="coupons-field-hint" style="margin-top:8px">Paste tab-separated columns in order:
+        <strong>Start</strong>, <strong>End</strong>, <strong>Product</strong>, <strong>Regular Price</strong>, <strong>Sale Price</strong>.
+        Include the header row from Excel if you like — it is ignored automatically.
+        Dates use <strong>US</strong> <code>M/D/YYYY</code> with optional <code>12am</code>/<code>11:59pm</code>-style times: they are read as <strong>US Eastern time (ET)</strong>, converted to <strong>UTC</strong> for the API, and the pasted text stays visible in the grid until you edit that cell. <code>11:59pm</code> is treated as the last second of that minute (ET). Prices may include <code>$</code>; values are normalized to plain numbers for the API.</p>
+      <textarea id="pr-promo-tsv-paste" class="pr-promo-tsv-textarea" rows="7" spellcheck="false" placeholder="Start&#9;End&#9;Product&#9;Regular Price&#9;Sale Price"></textarea>
+      <div class="pr-promo-tsv-actions">
+        <button type="button" class="coupons-btn coupons-btn-primary" data-pr-promo-tsv-replace>Replace rows from paste</button>
+        <button type="button" class="coupons-btn" data-pr-promo-tsv-append>Append rows from paste</button>
+        <button type="button" class="coupons-btn" data-pr-promo-tsv-clear>Clear box</button>
+      </div>
+    </details>
+  </div>`;
+}
+
+/**
+ * @param {(typeof COUNTRIES)[number]} initialMarket
+ * @param {PromotionRow[]} lines
+ * @param {{ edit?: boolean, promoId?: string }} [opts]
+ */
+function promotionEditFormInnerHtml(initialMarket, lines, opts = {}) {
+  const edit = Boolean(opts.edit);
+  const promoId = opts.promoId ? String(opts.promoId) : '';
+  const optsHtml = COUNTRIES.map((key) => {
+    const label = marketLabel(key).trim() || key.toUpperCase();
+    const sel = key === initialMarket ? ' selected' : '';
+    return `<option value="${escapeHtml(key)}"${sel}>${escapeHtml(label)}</option>`;
+  }).join('');
+  const marketDis = edit ? ' disabled' : '';
+  const idBlock = edit && promoId
+    ? `<div class="coupons-field coupons-field-full">
+        <label>Promotion id <span class="coupons-field-hint">(fixed)</span></label>
+        <p class="pr-cart-rule-id-display"><code>${escapeHtml(promoId)}</code></p>
+      </div>`
+    : '';
+  const seed = lines.length
+    ? lines
+    : [{ product: '', salePrice: '', regularPrice: '', start: '', end: '' }];
+  const linesHtml = seed.map((r, i) => promotionFormTableRowHtml(r, i)).join('');
+  return `
+    <p class="coupons-page-lead" style="margin:0 0 12px;font-size:14px;color:#6d7175">
+      ${edit
+    ? 'Edit sale lines for this market. Lines for other markets on the same promotion are left unchanged. Click a cell to edit; start/end use a US Eastern (ET) date/time picker (saved as UTC ISO 8601). Prices are numbers only (no <code>$</code>) for the API.'
+    : 'New promotion for one market. Click a cell to edit sale lines; start/end use US Eastern (ET) time. Product column shows the storefront path and a thumbnail from the catalog index when the URL resolves. Prices are numbers only (no <code>$</code>) for the API.'}
+    </p>
+    <div class="coupons-form-grid">
+      ${idBlock}
+      <div class="coupons-field coupons-field-full">
+        <label for="pr-promo-form-market">Market</label>
+        <select id="pr-promo-form-market" required${marketDis}>${optsHtml}</select>
+        ${edit
+    ? '<p class="coupons-field-hint">Paths in sale lines must stay under this market’s storefront.</p>'
+    : `<p class="coupons-field-hint">Promotion <code>id</code> will be <code><span id="pr-promo-form-market-code">${escapeHtml(initialMarket)}</span>-</code> plus a slug from the title.</p>`}
+      </div>
+      <div class="coupons-field coupons-field-full">
+        <label for="pr-promo-form-name">Promotion title</label>
+        <input type="text" id="pr-promo-form-name" autocomplete="off" required placeholder="e.g. Spring sale" />
+      </div>
+      <div class="coupons-field">
+        <label for="pr-promo-form-year">Calendar year (metadata)</label>
+        <input type="text" id="pr-promo-form-year" inputmode="numeric" placeholder="2026" />
+      </div>
+    </div>
+    <div class="pr-promo-form-lines-header">
+      <h3 class="pr-promo-form-lines-title">Sale lines</h3>
+      <button type="button" class="coupons-btn" data-pr-promo-line-add>Add row</button>
+    </div>
+    ${promotionSaleLinesTableWrapHtml(linesHtml)}`;
+}
+
+/**
+ * @param {HTMLDialogElement} dlg
+ */
+function refreshPromotionLineIndices(dlg) {
+  const lines = dlg.querySelectorAll('[data-pr-promo-line]');
+  lines.forEach((line, i) => {
+    line.setAttribute('data-pr-promo-line-idx', String(i));
+    const num = line.querySelector('.pr-promo-line-num');
+    if (num) num.textContent = String(i + 1);
+    const rm = line.querySelector('[data-pr-promo-line-remove]');
+    if (rm) {
+      rm.disabled = lines.length <= 1;
+      if (lines.length <= 1) rm.setAttribute('aria-disabled', 'true');
+      else rm.removeAttribute('aria-disabled');
+    }
+  });
+}
+
+/**
+ * @param {HTMLDialogElement} dlg
+ */
+function wirePromotionFormDynamicLines(dlg) {
+  const linesHost = dlg.querySelector('#pr-promo-form-lines-tbody');
+  dlg.querySelector('[data-pr-promo-line-add]')?.addEventListener('click', () => {
+    if (!linesHost) return;
+    const idx = linesHost.querySelectorAll('[data-pr-promo-line]').length;
+    linesHost.insertAdjacentHTML(
+      'beforeend',
+      promotionFormTableRowHtml(
+        { product: '', salePrice: '', regularPrice: '', start: '', end: '' },
+        idx,
+      ),
+    );
+    refreshPromotionLineIndices(dlg);
+    refreshPromotionSaleLinesVisuals(dlg);
+  });
+  linesHost?.addEventListener('click', (e) => {
+    const t = /** @type {HTMLElement} */ (e.target);
+    if (!t.closest('[data-pr-promo-line-remove]')) return;
+    const line = t.closest('[data-pr-promo-line]');
+    const all = linesHost?.querySelectorAll('[data-pr-promo-line]') ?? [];
+    if (!line || all.length <= 1) return;
+    line.remove();
+    refreshPromotionLineIndices(dlg);
+    refreshPromotionSaleLinesVisuals(dlg);
+  });
+}
+
+/**
+ * @param {HTMLDialogElement} dlg
+ */
+function wirePromotionTsvImport(dlg) {
+  const ta = /** @type {HTMLTextAreaElement | null} */ (dlg.querySelector('#pr-promo-tsv-paste'));
+  dlg.querySelector('[data-pr-promo-tsv-clear]')?.addEventListener('click', () => {
+    if (ta) ta.value = '';
+  });
+  const applyParsed = (parsed, mode) => {
+    const tbody = dlg.querySelector('#pr-promo-form-lines-tbody');
+    if (!tbody) return;
+    if (!parsed.length) {
+      showToast('No valid rows found (need 5 tab-separated columns per line).', 'error');
+      return;
+    }
+    if (mode === 'replace') {
+      tbody.innerHTML = parsed.map((r, i) => promotionFormTableRowHtml(r, i)).join('');
+    } else {
+      const startIdx = tbody.querySelectorAll('[data-pr-promo-line]').length;
+      const html = parsed.map((r, i) => promotionFormTableRowHtml(r, startIdx + i)).join('');
+      tbody.insertAdjacentHTML('beforeend', html);
+    }
+    refreshPromotionLineIndices(dlg);
+    refreshPromotionSaleLinesVisuals(dlg);
+    showToast(`${mode === 'replace' ? 'Replaced with' : 'Appended'} ${parsed.length} row(s)`, 'success');
+  };
+  dlg.querySelector('[data-pr-promo-tsv-replace]')?.addEventListener('click', () => {
+    try {
+      const parsed = parseSaleLinesTsv(ta?.value ?? '');
+      applyParsed(parsed, 'replace');
+    } catch (err) {
+      showToast(err?.message || 'Import failed', 'error');
+    }
+  });
+  dlg.querySelector('[data-pr-promo-tsv-append]')?.addEventListener('click', () => {
+    try {
+      const parsed = parseSaleLinesTsv(ta?.value ?? '');
+      applyParsed(parsed, 'append');
+    } catch (err) {
+      showToast(err?.message || 'Import failed', 'error');
+    }
+  });
+}
+
+/**
+ * @param {import('./price-rules-api.js').CatalogPromotion[]} promotions
+ */
+async function putCatalogPromotionsDocument(promotions) {
+  await putCatalogPriceRules(PB_ORG, PB_SITE, { promotions });
+
+  // Confirm the write by reading back — pass cache:'no-store' so the browser does not
+  // serve a pre-PUT cached response.  The CORS proxy (fcors.org) can silently drop the
+  // PUT body and the API then returns an empty/stale document; the read-back lets us
+  // detect that case and surface a real error instead of a false "Promotion added" toast.
+  let returned;
+  try {
+    const doc = await fetchCatalogPriceRules(PB_ORG, PB_SITE, { cache: 'no-store' });
+    returned = Array.isArray(doc.promotions) ? doc.promotions : [];
+  } catch (getErr) {
+    // GET failed — fall back to the submitted snapshot so the UI still reflects the
+    // intended state.  The PUT itself succeeded so we do not re-throw.
+    state.catalogPromotions = promotions;
+    state.catalogDataSource = 'api';
+    state.catalogLoadError = getErr?.message || String(getErr);
+    return;
+  }
+
+  // Detect silent write failure: every ID we submitted must appear in the server response.
+  // If any are absent the proxy most likely dropped the request body (PUT → no-op GET).
+  const submittedIds = new Set(promotions.map((p) => String(p.id)));
+  const missing = [...submittedIds].filter((id) => !returned.some((r) => String(r.id) === id));
+  if (missing.length) {
+    // Update state to the actual server reality before throwing so the list is accurate.
+    state.catalogPromotions = returned;
+    state.catalogDataSource = 'api';
+    state.catalogLoadError = '';
+    throw new Error(
+      `The request was accepted but the data was not saved — ${missing.length} promotion${missing.length === 1 ? '' : 's'} missing from the server response after PUT. `
+      + 'The CORS proxy may not be forwarding the request body. Check the browser Network tab.',
+    );
+  }
+
+  state.catalogPromotions = returned;
+  state.catalogDataSource = 'api';
+  state.catalogLoadError = '';
+}
+
+/**
+ * Throw a descriptive error if any rules have an `end` already in the past.
+ *
+ * The server silently strips expired rules on PUT and removes any promotion that
+ * ends up with zero rules — turning a successful-looking save into a phantom
+ * "Promotion added" with nothing in the list.  This pre-flight check surfaces that
+ * as a visible error before the request is even sent.
+ *
+ * @param {import('./price-rules-api.js').CatalogPriceRule[]} rules
+ */
+function assertNoExpiredRuleEnds(rules) {
+  const now = Date.now();
+  const expired = rules.filter((r) => r.end && new Date(r.end).getTime() <= now);
+  if (!expired.length) return;
+  const paths = expired.map((r) => {
+    const d = new Date(/** @type {string} */ (r.end));
+    return `${r.path} (ended ${d.toLocaleDateString('en-US', { timeZone: ET_TIMEZONE })})`;
+  });
+  const allExpired = expired.length === rules.length;
+  throw new Error(
+    `${expired.length} of ${rules.length} sale line${expired.length === 1 ? '' : 's'} `
+    + `ha${expired.length === 1 ? 's' : 've'} an end date in the past. `
+    + `The server will discard ${allExpired ? 'all of them, leaving an empty promotion that is immediately removed' : 'those lines'}. `
+    + `Update the end dates before saving.\n${paths.join('\n')}`,
+  );
+}
+
+/**
+ * @param {string} promoId
+ * @returns {Promise<boolean>}
+ */
+async function deletePromotionById(promoId) {
+  const ok = await fetchCatalogFromServerOrNotify();
+  if (!ok) return false;
+  const fresh = Array.isArray(state.catalogPromotions) ? state.catalogPromotions : [];
+  const next = fresh.filter((p) => String(p.id) !== String(promoId));
+  if (next.length === fresh.length) {
+    showToast('Promotion not found after refresh.', 'error');
+    render();
+    return false;
+  }
+  try {
+    await putCatalogPromotionsDocument(next);
+    showToast('Promotion deleted', 'success');
+    return true;
+  } catch (err) {
+    showToast(err?.message || 'Delete failed', 'error');
+    return false;
+  }
+}
+
+async function openPromotionAddDialog() {
+  const ok = await fetchCatalogFromServerOrNotify();
+  if (!ok) return;
+
+  const initial = COUNTRIES.includes(state.country) ? state.country : 'us';
+  const dialog = document.createElement('dialog');
+  dialog.className = 'coupons-dialog coupons-dialog-wide pr-promo-form-dialog';
+  dialog.innerHTML = `
+    <div class="coupons-dialog-inner">
+      <h2>Add promotion</h2>
+      ${promotionEditFormInnerHtml(initial, [], { edit: false })}
+      <div class="coupons-dialog-actions">
+        <button type="button" class="coupons-btn" data-pr-promo-form-cancel>Cancel</button>
+        <button type="button" class="coupons-btn coupons-btn-primary" data-pr-promo-form-submit>Add promotion</button>
+      </div>
+    </div>`;
+  document.body.appendChild(dialog);
+  const yearEl = dialog.querySelector('#pr-promo-form-year');
+  if (yearEl && 'value' in yearEl) /** @type {HTMLInputElement} */ (yearEl).value = String(new Date().getFullYear());
+
+  const marketSelect = dialog.querySelector('#pr-promo-form-market');
+  const marketCodeEl = dialog.querySelector('#pr-promo-form-market-code');
+  const syncMarketHint = () => {
+    const k = String(marketSelect?.value ?? '').trim().toLowerCase();
+    if (marketCodeEl && k) marketCodeEl.textContent = k;
+  };
+  marketSelect?.addEventListener('change', syncMarketHint);
+  marketSelect?.addEventListener('input', syncMarketHint);
+  syncMarketHint();
+
+  wirePromotionFormDynamicLines(dialog);
+  wirePromotionTsvImport(dialog);
+  wirePromotionSaleLineTableCells(dialog);
+  refreshPromotionLineIndices(dialog);
+  refreshPromotionSaleLinesVisuals(dialog);
+
+  const close = () => {
+    dialog.close();
+    dialog.remove();
+  };
+  wireDialogEscapeDismiss(dialog, close);
+  dialog.querySelector('[data-pr-promo-form-cancel]')?.addEventListener('click', close);
+  dialog.querySelector('[data-pr-promo-form-submit]')?.addEventListener('click', async () => {
+    try {
+      commitPromotionSaleLineFieldsBeforeSave(dialog);
+      blurOpenPromotionSaleLineEditors(dialog);
+      closePromotionSaleLineCellEdits(dialog);
+      const market = readPromotionMarketFromForm(dialog);
+      const name = String(dialog.querySelector('#pr-promo-form-name')?.value ?? '').trim();
+      if (!name) throw new Error('Promotion title is required');
+      const year = String(dialog.querySelector('#pr-promo-form-year')?.value ?? '').trim()
+        || String(new Date().getFullYear());
+      const lineRows = readPromotionLineRowsFromDom(dialog);
+      if (!lineRows.length) throw new Error('Add at least one sale line');
+      const rulesNew = promotionRowsToCatalogRules(lineRows, year);
+      for (let i = 0; i < rulesNew.length; i += 1) {
+        if (countryKeyFromCatalogPath(rulesNew[i].path) !== market) {
+          throw new Error(
+            `Sale line ${i + 1}: URL path must match the selected market (${market.toUpperCase()})`,
+          );
+        }
+      }
+      assertNoExpiredRuleEnds(rulesNew);
+      const existing = Array.isArray(state.catalogPromotions) ? state.catalogPromotions : [];
+      const slug = ruleSlugFromName(name);
+      const id = uniquePromotionId(market, slug, existing);
+      const next = [...existing, { id, name, rules: rulesNew }];
+      await putCatalogPromotionsDocument(next);
+      showToast('Promotion added', 'success');
+      close();
+      render();
+    } catch (err) {
+      showToast(err?.message || 'Failed to add promotion', 'error');
+    }
+  });
+  dialog.addEventListener('click', (e) => {
+    if (e.target === dialog) close();
+  });
+  dialog.showModal();
+}
+
+/**
+ * @param {string} countryKey
+ * @param {string} promoId
+ */
+async function openPromotionEditDialog(countryKey, promoId) {
+  const ok = await fetchCatalogFromServerOrNotify();
+  if (!ok) return;
+
+  const fresh = Array.isArray(state.catalogPromotions) ? state.catalogPromotions : [];
+  const promo = fresh.find((p) => String(p.id) === String(promoId));
+  if (!promo) {
+    showToast('That promotion was not found after refresh.', 'error');
+    render();
+    return;
+  }
+  const rulesCo = (promo.rules || []).filter(
+    (r) => countryKeyFromCatalogPath(r.path) === countryKey,
+  );
+  const ck = /** @type {(typeof COUNTRIES)[number]} */ (
+    COUNTRIES.includes(/** @type {(typeof COUNTRIES)[number]} */ (countryKey)) ? countryKey : 'us'
+  );
+  const rows = rulesCo.map(catalogRuleToPromotionRow);
+  const yearGuess = inferPromotionYear(promo, ck);
+
+  const dialog = document.createElement('dialog');
+  dialog.className = 'coupons-dialog coupons-dialog-wide pr-promo-form-dialog';
+  dialog.innerHTML = `
+    <div class="coupons-dialog-inner">
+      <h2>Edit promotion</h2>
+      ${promotionEditFormInnerHtml(ck, rows, { edit: true, promoId })}
+      <div class="pr-cart-rule-edit-dialog-actions">
+        <button type="button" class="coupons-btn coupons-btn-danger" data-pr-promo-form-delete>Delete promotion…</button>
+        <div class="pr-cart-rule-edit-actions-end">
+          <button type="button" class="coupons-btn" data-pr-promo-form-cancel>Cancel</button>
+          <button type="button" class="coupons-btn coupons-btn-primary" data-pr-promo-form-submit>Save changes</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(dialog);
+  const nameEl = dialog.querySelector('#pr-promo-form-name');
+  if (nameEl && 'value' in nameEl) /** @type {HTMLInputElement} */ (nameEl).value = promo.name || '';
+  const yearEl = dialog.querySelector('#pr-promo-form-year');
+  if (yearEl && 'value' in yearEl) /** @type {HTMLInputElement} */ (yearEl).value = yearGuess;
+
+  wirePromotionFormDynamicLines(dialog);
+  wirePromotionTsvImport(dialog);
+  wirePromotionSaleLineTableCells(dialog);
+  refreshPromotionLineIndices(dialog);
+  refreshPromotionSaleLinesVisuals(dialog);
+
+  const close = () => {
+    dialog.close();
+    dialog.remove();
+  };
+  wireDialogEscapeDismiss(dialog, close);
+  dialog.querySelector('[data-pr-promo-form-cancel]')?.addEventListener('click', close);
+  dialog.querySelector('[data-pr-promo-form-delete]')?.addEventListener('click', async () => {
+    if (!confirm(`Delete promotion "${promo.name || promoId}" (${promoId})? This cannot be undone.`)) return;
+    try {
+      if (await deletePromotionById(promoId)) {
+        close();
+        render();
+      }
+    } catch (err) {
+      showToast(err?.message || 'Delete failed', 'error');
+    }
+  });
+  dialog.querySelector('[data-pr-promo-form-submit]')?.addEventListener('click', async () => {
+    try {
+      commitPromotionSaleLineFieldsBeforeSave(dialog);
+      blurOpenPromotionSaleLineEditors(dialog);
+      closePromotionSaleLineCellEdits(dialog);
+      const market = readPromotionMarketFromForm(dialog);
+      const name = String(dialog.querySelector('#pr-promo-form-name')?.value ?? '').trim();
+      if (!name) throw new Error('Promotion title is required');
+      const year = String(dialog.querySelector('#pr-promo-form-year')?.value ?? '').trim()
+        || String(new Date().getFullYear());
+      const lineRows = readPromotionLineRowsFromDom(dialog);
+      const list = Array.isArray(state.catalogPromotions) ? state.catalogPromotions : [];
+      const idx = list.findIndex((p) => String(p.id) === String(promoId));
+      if (idx === -1) {
+        showToast('Promotion disappeared during edit. Refresh and try again.', 'error');
+        close();
+        render();
+        return;
+      }
+      const prev = list[idx];
+      const prevMarketRules = (prev.rules || []).filter(
+        (r) => countryKeyFromCatalogPath(r.path) === market,
+      );
+      const rulesNew = lineRows.length ? promotionRowsToCatalogRules(lineRows, year, prevMarketRules) : [];
+      for (let i = 0; i < rulesNew.length; i += 1) {
+        if (countryKeyFromCatalogPath(rulesNew[i].path) !== market) {
+          throw new Error(
+            `Sale line ${i + 1}: URL path must match this market (${market.toUpperCase()})`,
+          );
+        }
+      }
+      assertNoExpiredRuleEnds(rulesNew);
+      const rulesOther = (prev.rules || []).filter(
+        (r) => countryKeyFromCatalogPath(r.path) !== market,
+      );
+      const merged = [...rulesOther, ...rulesNew];
+      if (!merged.length) {
+        throw new Error(
+          'This would remove all sale lines. Delete the promotion instead, or keep at least one line.',
+        );
+      }
+      const next = list.slice();
+      next[idx] = { id: prev.id, name, rules: merged };
+      await putCatalogPromotionsDocument(next);
+      showToast('Promotion updated', 'success');
+      close();
+      render();
+    } catch (err) {
+      showToast(err?.message || 'Failed to update promotion', 'error');
+    }
+  });
+  dialog.addEventListener('click', (e) => {
+    if (e.target === dialog) close();
+  });
+  dialog.showModal();
+}
+
+/**
+ * Market pre-select (same pattern as new-coupon country, without year).
+ * @param {(typeof COUNTRIES)[number]} initialMarket
+ * @param {boolean} [marketLocked] when true, market cannot be changed (edit mode)
+ */
+function cartRuleNewMarketFieldsHtml(initialMarket, marketLocked = false) {
+  const sk = COUNTRIES.includes(initialMarket) ? initialMarket : 'us';
+  const opts = COUNTRIES.map((key) => {
+    const label = marketLabel(key).trim() || key.toUpperCase();
+    const sel = key === sk ? ' selected' : '';
+    return `<option value="${escapeHtml(key)}"${sel}>${escapeHtml(label)}</option>`;
+  }).join('');
+  const dis = marketLocked ? ' disabled' : '';
+  const hint = marketLocked
+    ? '<p class="coupons-field-hint">Market is fixed for this rule (<code>id</code> includes the prefix). Add a new rule to target another market.</p>'
+    : `<p class="coupons-field-hint">New rule <code>id</code> uses prefix <code><span id="pr-cart-add-market-code">${escapeHtml(sk)}</span>-…</code> (helix-commerce-api cart rules are one shared array per site).</p>`;
+  return `
+      <div class="coupons-field coupons-field-full">
+        <label for="pr-cart-add-market">Market</label>
+        <select id="pr-cart-add-market" required${dis}>${opts}</select>
+        ${hint}
+      </div>`;
+}
+
+/**
+ * @param {(typeof COUNTRIES)[number]} initialMarket
+ * @param {{ marketLocked?: boolean, ruleId?: string }} [formOptions]
+ */
+function cartRuleAddFormHtml(initialMarket, formOptions = {}) {
+  const { marketLocked = false, ruleId = '' } = formOptions;
+  const marketBlock = cartRuleNewMarketFieldsHtml(initialMarket, marketLocked);
+  const idBlock = ruleId
+    ? `<div class="coupons-field coupons-field-full">
+        <label>Rule id <span class="coupons-field-hint">(fixed)</span></label>
+        <p class="pr-cart-rule-id-display"><code>${escapeHtml(ruleId)}</code></p>
+      </div>`
+    : '';
+  const lead = marketLocked
+    ? 'Latest rules were loaded from the server. Change fields below — rule <code>id</code> and priority cannot be changed here; use <strong>Delete rule</strong> to remove.'
+    : 'Server data was just refreshed. Choose a market for the rule <code>id</code> prefix, then describe the rule — <code>PUT …/price-rules/cart</code> sends the full rules array.';
+  return `
+    <p class="coupons-page-lead" style="margin:0 0 12px;font-size:14px;color:#6d7175">
+      ${lead}
+    </p>
+    <div class="coupons-form-grid">
+      ${idBlock}
+      ${marketBlock}
+      <div class="coupons-field coupons-field-full">
+        <label for="pr-cart-add-name">Rule name</label>
+        <input type="text" id="pr-cart-add-name" autocomplete="off" required placeholder="e.g. Free shipping threshold" />
+      </div>
+      <div class="coupons-field">
+        <label for="pr-cart-add-min">Minimum cart ($)</label>
+        <input type="text" id="pr-cart-add-min" inputmode="decimal" placeholder="150 or leave empty" />
+      </div>
+      <div class="coupons-field">
+        <label for="pr-cart-add-off">Amount off</label>
+        <input type="text" id="pr-cart-add-off" placeholder="25% or blank" />
+      </div>
+      <div class="coupons-field">
+        <label for="pr-cart-add-freeship">Free shipping</label>
+        <select id="pr-cart-add-freeship">
+          <option value="no">No</option>
+          <option value="yes">Yes</option>
+        </select>
+      </div>
+      <div class="coupons-field coupons-field-full">
+        <label for="pr-cart-add-products">Products scope (optional)</label>
+        <input type="text" id="pr-cart-add-products" placeholder="HH Only" />
+      </div>
+      <div class="coupons-field coupons-field-full">
+        <label for="pr-cart-add-categories">Categories scope (optional)</label>
+        <input type="text" id="pr-cart-add-categories" placeholder="Ascent" />
+      </div>
+    </div>`;
+}
+
+/**
+ * @param {HTMLDialogElement} dlg
+ * @param {RuleRow} row
+ */
+function applyCartRuleFormPrefill(dlg, row) {
+  const setVal = (sel, v) => {
+    const el = dlg.querySelector(sel);
+    if (el && 'value' in el) /** @type {HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement} */ (el).value = v;
+  };
+  setVal('#pr-cart-add-name', row.name || '');
+  setVal('#pr-cart-add-min', row.minimumValue != null ? String(row.minimumValue) : '');
+  setVal('#pr-cart-add-off', row.salesAmountOff != null ? String(row.salesAmountOff) : '');
+  setVal('#pr-cart-add-freeship', /^yes$/i.test(String(row.freeShipping || '').trim()) ? 'yes' : 'no');
+  setVal('#pr-cart-add-products', row.products || '');
+  setVal('#pr-cart-add-categories', row.categories || '');
+}
+
+/**
+ * @param {HTMLDialogElement} dlg
+ * @returns {RuleRow}
+ */
+function readCartRuleAddForm(dlg) {
+  const name = dlg.querySelector('#pr-cart-add-name')?.value?.trim();
+  if (!name) throw new Error('Rule name is required');
+  const fs = dlg.querySelector('#pr-cart-add-freeship')?.value === 'yes' ? 'Yes' : 'No';
+  return {
+    name,
+    minimumValue: dlg.querySelector('#pr-cart-add-min')?.value?.trim() || '',
+    salesAmountOff: dlg.querySelector('#pr-cart-add-off')?.value?.trim() || '',
+    freeShipping: fs,
+    products: dlg.querySelector('#pr-cart-add-products')?.value?.trim() || '',
+    categories: dlg.querySelector('#pr-cart-add-categories')?.value?.trim() || '',
+  };
+}
+
+/**
+ * @param {HTMLDialogElement} dlg
+ * @returns {(typeof COUNTRIES)[number]}
+ */
+function readCartRuleMarketKeyFromForm(dlg) {
+  const v = String(dlg.querySelector('#pr-cart-add-market')?.value ?? '').trim().toLowerCase();
+  if (!COUNTRIES.includes(/** @type {(typeof COUNTRIES)[number]} */ (v))) {
+    throw new Error('Select a valid market');
+  }
+  return /** @type {(typeof COUNTRIES)[number]} */ (v);
+}
+
+/**
+ * @param {string} [defaultMarketKey] initial Market select (defaults to list `state.country`)
+ */
+async function openCartRuleAddDialog(defaultMarketKey) {
+  const ok = await fetchCartRulesFromServerOrNotify();
+  if (!ok) return;
+
+  let initial = typeof defaultMarketKey === 'string' ? defaultMarketKey.trim().toLowerCase() : state.country;
+  if (!COUNTRIES.includes(/** @type {(typeof COUNTRIES)[number]} */ (initial))) {
+    initial = COUNTRIES.includes(state.country) ? state.country : 'us';
+  }
+  const dialog = document.createElement('dialog');
+  dialog.className = 'coupons-dialog coupons-dialog-wide pr-cart-rule-add-dialog';
+  dialog.innerHTML = `
+    <div class="coupons-dialog-inner">
+      <h2>Add cart rule</h2>
+      ${cartRuleAddFormHtml(/** @type {(typeof COUNTRIES)[number]} */ (initial))}
+      <div class="coupons-dialog-actions">
+        <button type="button" class="coupons-btn" data-pr-cart-add-cancel>Cancel</button>
+        <button type="button" class="coupons-btn coupons-btn-primary" data-pr-cart-add-submit>Add rule</button>
+      </div>
+    </div>`;
+  document.body.appendChild(dialog);
+
+  const marketSelect = dialog.querySelector('#pr-cart-add-market');
+  const marketCodeEl = dialog.querySelector('#pr-cart-add-market-code');
+  const syncMarketHint = () => {
+    const k = String(marketSelect?.value ?? '').trim().toLowerCase();
+    if (marketCodeEl && k) marketCodeEl.textContent = k;
+  };
+  marketSelect?.addEventListener('change', syncMarketHint);
+  marketSelect?.addEventListener('input', syncMarketHint);
+  syncMarketHint();
+
+  const close = () => {
+    dialog.close();
+    dialog.remove();
+  };
+  wireDialogEscapeDismiss(dialog, close);
+  dialog.querySelector('[data-pr-cart-add-cancel]')?.addEventListener('click', close);
+  dialog.querySelector('[data-pr-cart-add-submit]')?.addEventListener('click', async () => {
+    try {
+      const countryKey = readCartRuleMarketKeyFromForm(dialog);
+      const row = readCartRuleAddForm(dialog);
+      const existing = Array.isArray(state.cartRulesList) ? state.cartRulesList : [];
+      const apiRule = ruleRowToHelixCartRule(countryKey, row, existing);
+      const next = [...existing, apiRule];
+      await putCartPriceRules(PB_ORG, PB_SITE, next);
+      state.cartRulesList = next;
+      state.cartDataSource = 'api';
+      state.cartLoadError = '';
+      showToast('Cart rule added', 'success');
+      close();
+      render();
+    } catch (err) {
+      showToast(err?.message || 'Failed to add rule', 'error');
+    }
+  });
+  dialog.addEventListener('click', (e) => {
+    if (e.target === dialog) close();
+  });
+  dialog.showModal();
+}
+
+/**
+ * @param {string} ruleId helix cart rule id
+ */
+async function openCartRuleEditDialog(ruleId) {
+  const ok = await fetchCartRulesFromServerOrNotify();
+  if (!ok) return;
+
+  const list = Array.isArray(state.cartRulesList) ? state.cartRulesList : [];
+  const idx = list.findIndex((r) => String(r.id) === String(ruleId));
+  if (idx === -1) {
+    showToast('That rule was not found after refresh.', 'error');
+    render();
+    return;
+  }
+  const apiRule = list[idx];
+  const market = cartRuleMarketFromRuleId(apiRule.id);
+  const row = helixCartRuleToRuleRow(apiRule);
+
+  const dialog = document.createElement('dialog');
+  dialog.className = 'coupons-dialog coupons-dialog-wide pr-cart-rule-add-dialog';
+  dialog.innerHTML = `
+    <div class="coupons-dialog-inner">
+      <h2>Edit cart rule</h2>
+      ${cartRuleAddFormHtml(market, { marketLocked: true, ruleId: apiRule.id })}
+      <div class="pr-cart-rule-edit-dialog-actions">
+        <button type="button" class="coupons-btn coupons-btn-danger" data-pr-cart-rule-delete>Delete rule…</button>
+        <div class="pr-cart-rule-edit-actions-end">
+          <button type="button" class="coupons-btn" data-pr-cart-add-cancel>Cancel</button>
+          <button type="button" class="coupons-btn coupons-btn-primary" data-pr-cart-add-submit>Save changes</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(dialog);
+  applyCartRuleFormPrefill(dialog, row);
+
+  const marketSelect = dialog.querySelector('#pr-cart-add-market');
+  const marketCodeEl = dialog.querySelector('#pr-cart-add-market-code');
+  const syncMarketHint = () => {
+    const k = String(marketSelect?.value ?? '').trim().toLowerCase();
+    if (marketCodeEl && k) marketCodeEl.textContent = k;
+  };
+  marketSelect?.addEventListener('change', syncMarketHint);
+  marketSelect?.addEventListener('input', syncMarketHint);
+  syncMarketHint();
+
+  const close = () => {
+    dialog.close();
+    dialog.remove();
+  };
+  wireDialogEscapeDismiss(dialog, close);
+  dialog.querySelector('[data-pr-cart-add-cancel]')?.addEventListener('click', close);
+  dialog.querySelector('[data-pr-cart-rule-delete]')?.addEventListener('click', async () => {
+    if (!confirm(`Delete cart rule "${apiRule.name || ruleId}" (${ruleId})? This cannot be undone.`)) return;
+    try {
+      if (await deleteCartRuleById(ruleId)) {
+        close();
+        render();
+      }
+    } catch (err) {
+      showToast(err?.message || 'Delete failed', 'error');
+    }
+  });
+  dialog.querySelector('[data-pr-cart-add-submit]')?.addEventListener('click', async () => {
+    try {
+      const fixedMarket = cartRuleMarketFromRuleId(String(ruleId));
+      const newRow = readCartRuleAddForm(dialog);
+      const fresh = Array.isArray(state.cartRulesList) ? state.cartRulesList : [];
+      const idxFresh = fresh.findIndex((r) => String(r.id) === String(ruleId));
+      if (idxFresh === -1) {
+        showToast('Rule disappeared during edit. Refresh and try again.', 'error');
+        close();
+        render();
+        return;
+      }
+      const others = fresh.filter((_, i) => i !== idxFresh);
+      const updated = ruleRowToHelixCartRule(fixedMarket, newRow, others, fresh[idxFresh]);
+      const next = fresh.slice();
+      next[idxFresh] = updated;
+      await putCartPriceRules(PB_ORG, PB_SITE, next);
+      state.cartRulesList = next;
+      state.cartDataSource = 'api';
+      state.cartLoadError = '';
+      showToast('Cart rule updated', 'success');
+      close();
+      render();
+    } catch (err) {
+      showToast(err?.message || 'Failed to update rule', 'error');
+    }
+  });
+  dialog.addEventListener('click', (e) => {
+    if (e.target === dialog) close();
+  });
+  dialog.showModal();
+}
+
+/**
+ * Auth boot runs in a prior module, but wait until `commerce-admin-auth-ok` is on
+ * `documentElement` before calling ProductBus (avoids racing the class toggle).
+ */
+async function waitForCommerceAuthReady() {
+  if (document.documentElement.classList.contains('commerce-admin-auth-ok')) {
+    return;
+  }
+  await new Promise((resolve) => {
+    let n = 0;
+    const t = setInterval(() => {
+      if (document.documentElement.classList.contains('commerce-admin-auth-ok')) {
+        clearInterval(t);
+        resolve(undefined);
+      } else {
+        n += 1;
+        if (n > 320) {
+          clearInterval(t);
+          resolve(undefined);
+        }
+      }
+    }, 32);
+  });
+}
+
+async function initPricingSources() {
+  await waitForCommerceAuthReady();
+  const tasks = [];
+  if (PR_APP_MODE === 'promotions') tasks.push(loadCatalogFromApi());
+  else if (PR_APP_MODE === 'cart-rules') tasks.push(loadCartFromApi());
+  else tasks.push(loadCatalogFromApi(), loadCartFromApi());
+  await Promise.all(tasks);
 }
 
 /**
@@ -269,7 +1969,7 @@ function sortedYears(map) {
  */
 function promotionTableHtml(rows, thumbByProductUrl) {
   if (!rows.length) {
-    return '<p class="pr-empty">No rows in this promotion (mock).</p>';
+    return '<p class="pr-empty">No rows in this promotion.</p>';
   }
   const thumbs = thumbByProductUrl && thumbByProductUrl.size ? thumbByProductUrl : null;
   const labelTh = ['Start', 'End', 'Product', 'Regular Price', 'Sale Price']
@@ -285,8 +1985,8 @@ function promotionTableHtml(rows, thumbByProductUrl) {
         : '<span class="pim-thumb-placeholder" aria-hidden="true"></span>';
       return `<tr>
         <td class="pim-col-thumb pr-promo-table-thumb">${thumbCell}</td>
-        <td>${escapeHtml(r.start)}</td>
-        <td>${escapeHtml(r.end)}</td>
+        <td>${escapeHtml(formatIsoForSaleLineView(r.start))}</td>
+        <td>${escapeHtml(formatIsoForSaleLineView(r.end))}</td>
         <td><a href="${href}" target="_blank" rel="noopener noreferrer">${href}</a></td>
         <td>${escapeHtml(r.regularPrice)}</td>
         <td>${escapeHtml(r.salePrice)}</td>
@@ -310,21 +2010,22 @@ function promotionTableHtml(rows, thumbByProductUrl) {
 /** All promotion sets for the current country (flat list). */
 function allPromotionRowsForCountry() {
   const ck = state.country;
-  const c = MOCK[ck];
-  if (!c?.promotions) return [];
+  const label = marketLabel(ck) || ck;
+  const promotions = promotionsListSource();
   /** @type {PromoListRow[]} */
   const rows = [];
-  sortedYears(c.promotions).forEach((year) => {
-    (c.promotions[year] || []).forEach((p) => {
-      rows.push({
-        countryKey: ck,
-        countryLabel: c.label,
-        year,
-        id: p.id,
-        title: p.title,
-        rowCount: Array.isArray(p.rows) ? p.rows.length : 0,
-        rows: p.rows,
-      });
+  promotions.forEach((p) => {
+    const rulesForCo = (p.rules || []).filter((r) => countryKeyFromCatalogPath(r.path) === ck);
+    if (!rulesForCo.length) return;
+    const year = inferPromotionYear(p, ck);
+    rows.push({
+      countryKey: ck,
+      countryLabel: label,
+      year,
+      id: p.id,
+      title: p.name,
+      rowCount: rulesForCo.length,
+      rows: rulesForCo.map(catalogRuleToPromotionRow),
     });
   });
   return rows;
@@ -344,8 +2045,9 @@ function filteredPromotionRows() {
 }
 
 function promotionYearFilterOptionsHtml() {
-  const c = MOCK[state.country];
-  const years = c?.promotions ? sortedYears(c.promotions) : [];
+  const years = [...new Set(allPromotionRowsForCountry().map((r) => r.year))].sort(
+    (a, b) => Number(b) - Number(a),
+  );
   const curY = state.promoListYearFilter.trim();
   const allSel = !curY ? ' selected' : '';
   const opts = [`<option value=""${allSel}>All years</option>`].concat(
@@ -408,11 +2110,11 @@ function wireCartRuleDetailDialog(dialog) {
  * @param {string} countryKey
  * @param {string} countryLabel
  * @param {RuleRow} rule
- * @param {number} ruleIndex
+ * @param {string} [helixRuleId] stable rule id when loaded from API
  */
-function cartRuleDetailModalInnerHtml(countryKey, countryLabel, rule, ruleIndex) {
+function cartRuleDetailModalInnerHtml(countryKey, countryLabel, rule, helixRuleId = '') {
   const slug = ruleSlugFromName(rule.name);
-  const path = `${countryKey.toUpperCase()} / rules / ${slug}`;
+  const path = helixRuleId ? String(helixRuleId) : `${countryKey.toUpperCase()} / rules / ${slug}`;
   const minDisplay = rule.minimumValue != null && String(rule.minimumValue).trim() !== ''
     ? `$${String(rule.minimumValue).trim()}`
     : 'None';
@@ -423,16 +2125,16 @@ function cartRuleDetailModalInnerHtml(countryKey, countryLabel, rule, ruleIndex)
   const hasMin = Boolean(rule.minimumValue != null && String(rule.minimumValue).trim() !== '');
   const hasOff = Boolean(rule.salesAmountOff != null && String(rule.salesAmountOff).trim() !== '');
   let heroMain = '—';
-  let heroSub = 'Cart / catalog rule (mock)';
+  let heroSub = 'Cart price rule';
   if (hasOff) {
     heroMain = offDisplay;
-    heroSub = 'off qualifying subtotal (mock)';
+    heroSub = 'off qualifying subtotal';
   } else if (fs && hasMin) {
     heroMain = `≥ ${minDisplay}`;
-    heroSub = 'cart for free shipping (mock)';
+    heroSub = 'cart for free shipping';
   } else if (fs) {
     heroMain = 'Free shipping';
-    heroSub = 'benefit on qualifying orders (mock)';
+    heroSub = 'benefit on qualifying orders';
   }
 
   const scopeParts = [rule.products, rule.categories]
@@ -446,16 +2148,13 @@ function cartRuleDetailModalInnerHtml(countryKey, countryLabel, rule, ruleIndex)
     promoPillHtml('Free shipping', fs),
     promoPillHtml('Order minimum', hasMin),
     promoPillHtml('Percent / amount off', hasOff),
-    promoPillHtml('Mock data', true),
   ].join('');
 
   return `
-    <div class="coupons-modal-banner">Mock cart rule — not connected to live AEM or commerce.</div>
     <div class="coupons-modal-head">
       <div class="coupons-modal-badges">
         ${promoMarketTagHtml(countryKey)}
         <span class="coupons-tag coupons-tag-slug">${escapeHtml(slug)}</span>
-        <span class="coupons-tag coupons-tag-year">#${ruleIndex + 1}</span>
       </div>
       <h2 class="coupons-modal-title">${escapeHtml(rule.name)}</h2>
       <p class="coupons-modal-idline"><code>${escapeHtml(path)}</code></p>
@@ -475,22 +2174,20 @@ function cartRuleDetailModalInnerHtml(countryKey, countryLabel, rule, ruleIndex)
     </div>
     <div class="coupons-modal-pills" aria-label="Rule flags">${pills}</div>
     <section class="coupons-modal-section">
-      <h3 class="coupons-modal-section-title">Description</h3>
-      <div class="coupons-modal-notes">${escapeHtml(rule.description || '—')}</div>
-    </section>
-    <section class="coupons-modal-section">
       <h3 class="coupons-modal-section-title">Product / category scope</h3>
       <div class="coupons-modal-tags">${scopeTags}</div>
     </section>`;
 }
 
 function openCartRuleDetailModal(countryKey, ruleIndex) {
-  const c = MOCK[countryKey];
-  const rules = Array.isArray(c?.rules) ? c.rules : [];
+  const rules = rulesForCountry(countryKey);
   const rule = rules[ruleIndex];
   if (!rule) return;
+  const apiRules = rulesForCountryApi(countryKey);
+  const apiRule = state.cartDataSource === 'api' ? apiRules[ruleIndex] : null;
+  const countryLabel = marketLabel(countryKey) || countryKey;
   closeCartRuleDetailDialog();
-  const humanHtml = cartRuleDetailModalInnerHtml(countryKey, c.label, rule, ruleIndex);
+  const humanHtml = cartRuleDetailModalInnerHtml(countryKey, countryLabel, rule, apiRule?.id || '');
   const dialog = document.createElement('dialog');
   dialog.className = 'pr-cart-rule-dialog coupons-detail-dialog';
 
@@ -514,6 +2211,10 @@ function openCartRuleDetailModal(countryKey, ruleIndex) {
       country: countryKey,
       ruleIndex,
       rule,
+      apiRule,
+      cartRules: state.cartDataSource === 'api' && Array.isArray(state.cartRulesList)
+        ? state.cartRulesList
+        : null,
     }),
   });
   const header = createDetailModalHeaderCloseAndJson({
@@ -523,7 +2224,7 @@ function openCartRuleDetailModal(countryKey, ruleIndex) {
       w.innerHTML = humanHtml;
       return w;
     },
-    getJsonValue: () => rule,
+    getJsonValue: () => apiRule || rule,
     onClose: shut,
   });
   toolbar.append(toolbarMain, header.headerRight);
@@ -532,30 +2233,64 @@ function openCartRuleDetailModal(countryKey, ruleIndex) {
   scroll.append(bodyHost);
   const footer = document.createElement('footer');
   footer.className = 'coupons-modal-footer';
-  footer.innerHTML = '<button type="button" class="coupons-btn coupons-btn-primary" data-pr-cart-rule-modal-done>Done</button>';
+  const deleteBtn = apiRule?.id
+    ? '<button type="button" class="coupons-btn coupons-btn-danger" data-pr-cart-rule-modal-delete>Delete…</button> '
+    : '';
+  const editBtn = apiRule?.id
+    ? '<button type="button" class="coupons-btn" data-pr-cart-rule-modal-edit>Edit…</button> '
+    : '';
+  footer.innerHTML = `${deleteBtn}${editBtn}<button type="button" class="coupons-btn coupons-btn-primary" data-pr-cart-rule-modal-done>Done</button>`;
   dialog.append(toolbar, scroll, footer);
   document.body.appendChild(dialog);
   wireCartRuleDetailDialog(dialog);
+  footer.querySelector('[data-pr-cart-rule-modal-delete]')?.addEventListener('click', async () => {
+    const id = apiRule?.id;
+    if (!id) return;
+    if (!confirm(`Delete cart rule "${rule.name}" (${id})? This cannot be undone.`)) return;
+    try {
+      if (await deleteCartRuleById(id)) {
+        shut();
+        render();
+      }
+    } catch (err) {
+      showToast(err?.message || 'Delete failed', 'error');
+    }
+  });
+  footer.querySelector('[data-pr-cart-rule-modal-edit]')?.addEventListener('click', () => {
+    const id = apiRule?.id;
+    if (!id) return;
+    shut();
+    void openCartRuleEditDialog(id).catch((err) => {
+      showToast(err?.message || 'Could not open editor', 'error');
+    });
+  });
   dialog.showModal();
 }
 
 function renderCartRulesOverview() {
   const ck = state.country;
-  const c = MOCK[ck];
-  const rules = Array.isArray(c?.rules) ? c.rules : [];
+  const rules = rulesForCountry(ck);
   const q = state.cartRuleSearch.trim().toLowerCase();
-  const nameDescMatch = (r) => {
-    const n = String(r.name).toLowerCase();
-    const d = String(r.description).toLowerCase();
-    return n.includes(q) || d.includes(q);
+  const ruleSearchMatch = (r) => {
+    const hay = [
+      r.name,
+      r.minimumValue,
+      r.salesAmountOff,
+      r.freeShipping,
+      r.products,
+      r.categories,
+    ]
+      .map((x) => String(x ?? '').toLowerCase())
+      .join(' ');
+    return hay.includes(q);
   };
-  const filtered = !q ? rules : rules.filter(nameDescMatch);
+  const filtered = !q ? rules : rules.filter(ruleSearchMatch);
   const searchVal = escapeHtml(state.cartRuleSearch);
   const mTag = promoMarketTagHtml(ck);
 
   let tbodyHtml;
   if (!rules.length) {
-    tbodyHtml = '<tr><td colspan="5" class="pr-empty-cell">No rules for this country (mock).</td></tr>';
+    tbodyHtml = '<tr><td colspan="5" class="pr-empty-cell">No cart rules for this country.</td></tr>';
   } else if (!filtered.length) {
     tbodyHtml = '<tr><td colspan="5" class="pr-empty-cell">No rules match your search.</td></tr>';
   } else {
@@ -587,8 +2322,16 @@ function renderCartRulesOverview() {
       .join('');
   }
 
-  return `<div class="pr-promo-toolbar pim-toolbar">
-      <input type="search" id="pr-cart-rule-search" class="pim-search pr-promo-search-wide" placeholder="Search rule name or description…" aria-label="Search cart rules" value="${searchVal}" />
+  const cartErr = state.cartLoadError
+    ? `<p class="pr-api-hint pr-api-hint-error" role="status">${escapeHtml(state.cartLoadError)}</p>`
+    : '';
+
+  return `${cartErr}
+    <div class="pr-promo-toolbar pim-toolbar pr-promo-toolbar-with-actions">
+      <input type="search" id="pr-cart-rule-search" class="pim-search pr-promo-search-wide" placeholder="Search name, min, off, scope…" aria-label="Search cart rules" value="${searchVal}" />
+      <div class="pr-promo-api-actions">
+        <button type="button" class="coupons-btn coupons-btn-primary" data-pr-cart-add>Add cart rule…</button>
+      </div>
       <span class="pim-count pr-promo-count">${filtered.length} rule${filtered.length === 1 ? '' : 's'}</span>
     </div>
     <div class="pr-promo-table-wrap pim-list-wrapper">
@@ -694,19 +2437,17 @@ function promotionDetailModalInnerHtml(countryKey, year, countryLabel, set, thum
   const starts = rows.map((r) => r.start);
   const ends = rows.map((r) => r.end);
   const uniformDates = n > 0 && new Set(starts).size === 1 && new Set(ends).size === 1;
-  const heroMain = uniformDates ? String(starts[0]) : String(n);
+  const heroMain = uniformDates ? formatIsoForSaleLineView(String(starts[0])) : String(n);
   const heroSub = uniformDates
-    ? `through ${ends[0]} · ${n} product line${n === 1 ? '' : 's'}`
+    ? `through ${formatIsoForSaleLineView(String(ends[0]))} · ${n} product line${n === 1 ? '' : 's'}`
     : 'sale line entries in this promotion (dates vary per row)';
   const uniqProducts = new Set(rows.map((r) => r.product)).size;
   const pills = [
     promoPillHtml('Multi-line', n > 1),
     promoPillHtml('Uniform window', uniformDates),
-    promoPillHtml('Mock data', true),
   ].join('');
 
   return `
-    <div class="coupons-modal-banner">Mock promotion preview — not connected to live commerce.</div>
     <div class="coupons-modal-head">
       <div class="coupons-modal-badges">
         ${promoMarketTagHtml(countryKey)}
@@ -736,11 +2477,11 @@ function promotionDetailModalInnerHtml(countryKey, year, countryLabel, set, thum
     </section>`;
 }
 
-function wirePromotionDetailDialog(dialog) {
-  const shut = () => {
-    dialog.close();
-    dialog.remove();
-  };
+/**
+ * @param {HTMLDialogElement} dialog
+ * @param {() => void} shut same close handler as modal header JSON `onClose`
+ */
+function wirePromotionDetailDialog(dialog, shut) {
   wireDialogEscapeDismiss(dialog, shut);
   dialog.querySelector('[data-pr-promo-modal-done]')?.addEventListener('click', shut);
   dialog.addEventListener('click', (e) => {
@@ -754,16 +2495,27 @@ function wirePromotionDetailDialog(dialog) {
  * @param {string} promoId
  */
 async function openPromotionDetailModal(countryKey, year, promoId) {
-  const c = MOCK[countryKey];
-  const set = (c?.promotions?.[year] || []).find((x) => x.id === promoId);
-  if (!set) return;
+  const catalogPromo = promotionsListSource().find((p) => p.id === promoId);
+  if (!catalogPromo) return;
+  const rulesForCo = (catalogPromo.rules || []).filter(
+    (r) => countryKeyFromCatalogPath(r.path) === countryKey,
+  );
+  if (!rulesForCo.length) return;
+  const displayYear = year || inferPromotionYear(catalogPromo, countryKey);
+  /** @type {PromotionSet} */
+  const set = {
+    id: catalogPromo.id,
+    title: catalogPromo.name,
+    rows: rulesForCo.map(catalogRuleToPromotionRow),
+  };
+  const countryLabel = marketLabel(countryKey) || countryKey;
   closePromotionDetailDialog();
   const rows = Array.isArray(set.rows) ? set.rows : [];
   const thumbByProductUrl = await buildThumbUrlMapForPromotionRows(rows, countryKey);
   const humanHtml = promotionDetailModalInnerHtml(
     countryKey,
-    year,
-    c.label,
+    displayYear,
+    countryLabel,
     set,
     thumbByProductUrl,
   );
@@ -788,9 +2540,8 @@ async function openPromotionDetailModal(countryKey, year, promoId) {
     entityKind: 'promotion',
     getPayload: () => ({
       country: countryKey,
-      year,
-      id: set.id,
-      promotion: set,
+      year: displayYear,
+      promotion: catalogPromo,
     }),
   });
   const header = createDetailModalHeaderCloseAndJson({
@@ -800,7 +2551,7 @@ async function openPromotionDetailModal(countryKey, year, promoId) {
       w.innerHTML = humanHtml;
       return w;
     },
-    getJsonValue: () => set,
+    getJsonValue: () => catalogPromo,
     onClose: shut,
   });
   toolbar.append(toolbarMain, header.headerRight);
@@ -809,22 +2560,47 @@ async function openPromotionDetailModal(countryKey, year, promoId) {
   scroll.append(bodyHost);
   const footer = document.createElement('footer');
   footer.className = 'coupons-modal-footer';
-  footer.innerHTML = '<button type="button" class="coupons-btn coupons-btn-primary" data-pr-promo-modal-done>Done</button>';
+  const canMutate = state.catalogDataSource === 'api';
+  const deleteBtn = canMutate
+    ? '<button type="button" class="coupons-btn coupons-btn-danger" data-pr-promo-modal-delete>Delete…</button> '
+    : '';
+  const editBtn = canMutate
+    ? '<button type="button" class="coupons-btn" data-pr-promo-modal-edit>Edit…</button> '
+    : '';
+  footer.innerHTML = `${deleteBtn}${editBtn}<button type="button" class="coupons-btn coupons-btn-primary" data-pr-promo-modal-done>Done</button>`;
   dialog.append(toolbar, scroll, footer);
   document.body.appendChild(dialog);
-  wirePromotionDetailDialog(dialog);
+  wirePromotionDetailDialog(dialog, shut);
+  footer.querySelector('[data-pr-promo-modal-delete]')?.addEventListener('click', async () => {
+    if (!canMutate) return;
+    if (!confirm(`Delete promotion "${catalogPromo.name || promoId}" (${promoId})? This cannot be undone.`)) return;
+    try {
+      if (await deletePromotionById(promoId)) {
+        shut();
+        render();
+      }
+    } catch (err) {
+      showToast(err?.message || 'Delete failed', 'error');
+    }
+  });
+  footer.querySelector('[data-pr-promo-modal-edit]')?.addEventListener('click', () => {
+    if (!canMutate) return;
+    shut();
+    void openPromotionEditDialog(countryKey, promoId).catch((err) => {
+      showToast(err?.message || 'Could not open editor', 'error');
+    });
+  });
   dialog.showModal();
 }
 
 function renderPromotionsListPanel() {
   const list = filteredPromotionRows();
   const searchVal = escapeHtml(state.promoListSearch);
-  const c = MOCK[state.country];
-  const hasYears = c?.promotions && sortedYears(c.promotions).length > 0;
+  const hasPromos = allPromotionRowsForCountry().length > 0;
 
   let tbodyHtml;
-  if (!hasYears) {
-    tbodyHtml = '<tr><td colspan="4" class="pr-empty-cell">No promotion folders for this country (mock).</td></tr>';
+  if (!hasPromos) {
+    tbodyHtml = '<tr><td colspan="4" class="pr-empty-cell">No catalog promotions for this country (empty API list or no matching paths).</td></tr>';
   } else if (!list.length) {
     tbodyHtml = '<tr><td colspan="4" class="pr-empty-cell">No promotions match your filters.</td></tr>';
   } else {
@@ -842,8 +2618,16 @@ function renderPromotionsListPanel() {
       .join('');
   }
 
-  return `<div class="pr-promo-toolbar pim-toolbar">
+  const catalogErr = state.catalogLoadError
+    ? `<p class="pr-api-hint pr-api-hint-error" role="status">${escapeHtml(state.catalogLoadError)}</p>`
+    : '';
+
+  return `${catalogErr}
+    <div class="pr-promo-toolbar pim-toolbar pr-promo-toolbar-with-actions">
       <input type="search" id="pr-promo-search" class="pim-search pr-promo-search-wide" placeholder="Search title or promotion id…" aria-label="Search promotions" value="${searchVal}" />
+      <div class="pr-promo-api-actions">
+        <button type="button" class="coupons-btn coupons-btn-primary" data-pr-promo-add>Add promotion…</button>
+      </div>
       <div class="pr-promo-toolbar-right">
         <div class="pr-promo-filter-field">
           <label class="pr-promo-filter-label" for="pr-promo-year">Year</label>
@@ -871,21 +2655,23 @@ function renderPromotionsListPanel() {
 
 function renderMockBanner() {
   const couponsLink = '<a href="coupons.html">Open Coupons</a> for code-based discounts (R2 / ProductBus API).';
-  const peerCart = '<a href="cart-rules.html">Cart Rules</a>';
-  const peerPromo = '<a href="promotions.html">Promotions</a>';
-  if (PR_APP_MODE === 'cart-rules') {
-    return `<div class="price-rules-mock-banner"><strong>Mock data only.</strong> Cart rules overview by country — click a row for a detail modal (like <a href="coupons.html">Coupons</a>). See ${peerPromo}. ${couponsLink}</div>`;
+  const cartLine = PR_APP_MODE !== 'promotions'
+    ? '<strong>Cart rules</strong> load from <code>GET …/price-rules/cart</code> as a JSON array (helix-commerce-api).'
+    : '';
+  const promoLine = PR_APP_MODE !== 'cart-rules'
+    ? '<strong>Catalog promotions</strong> load from <code>GET …/price-rules/catalog</code> '
+      + 'as <code>{ promotions: CatalogPromotion[] }</code>.'
+    : '';
+  if (PR_APP_MODE === 'cart-rules' || PR_APP_MODE === 'promotions') {
+    return '';
   }
-  if (PR_APP_MODE === 'promotions') {
-    return `<div class="price-rules-mock-banner"><strong>Mock data only.</strong> Filter the promotion list by country, year, and search — open a row for details in a modal. See ${peerCart}. ${couponsLink}</div>`;
-  }
-  return `<div class="price-rules-mock-banner"><strong>Mock data only.</strong> Rules and promotions preview for US, CA, and MX. ${couponsLink}</div>`;
+  return `<div class="price-rules-mock-banner">${cartLine} ${promoLine} ${couponsLink}</div>`;
 }
 
 function renderCountryTabs() {
   return COUNTRIES.map((key) => {
     const sel = key === state.country ? 'true' : 'false';
-    const { label } = MOCK[key];
+    const label = marketLabel(key);
     return `<button type="button" class="pr-tab" role="tab" aria-selected="${sel}" data-pr-country="${key}">${escapeHtml(label)}</button>`;
   }).join('');
 }
@@ -900,21 +2686,17 @@ function renderAreaTabs() {
 
 function renderPromotionsPanel() {
   return `<h2 class="pr-section-title">Promotions</h2>
-    <p class="pr-section-hint">Filter the list, then open a row for the full promotion table (mock).</p>
     ${renderPromotionsListPanel()}`;
 }
 
 /** Promotions page (`promotions.html`): list only — page `h1` already names the tool. */
 function renderPromotionsStandaloneMount() {
-  return `<p class="pr-section-hint pr-promo-standalone-hint">Filter by year or search, then click a row for sale-line details (mock).</p>
-    ${renderPromotionsListPanel()}`;
+  return renderPromotionsListPanel();
 }
 
 function renderRulesPanel() {
   const heading = PR_APP_MODE === 'cart-rules' ? 'Cart Rules' : 'Rules';
   return `<h2 class="pr-section-title">${escapeHtml(heading)}</h2>
-    <p class="pr-section-hint">Search or open a row for rule detail in a <strong>modal</strong> (mock, like
-      <a href="coupons.html">Coupons</a>). Overview columns omit coupon ids — use Coupons for programs.</p>
     ${renderCartRulesOverview()}
     <p class="pr-section-hint" style="margin-top:16px">Coupon <strong>programs</strong> (types, codes, batches) live in
       <a href="coupons.html">Coupons</a> — ProductBus <code>…/coupons/types</code> and <code>…/coupons</code>.</p>`;
@@ -922,8 +2704,7 @@ function renderRulesPanel() {
 
 /** Cart rules page (`cart-rules.html`): overview only; the page title is the main heading. */
 function renderCartRulesStandaloneMount() {
-  return `<p class="pr-section-hint pr-promo-standalone-hint">Search or click a row for rule detail in a modal (mock). Coupon programs are in <a href="coupons.html">Coupons</a>.</p>
-    ${renderCartRulesOverview()}`;
+  return renderCartRulesOverview();
 }
 
 function renderRulesBlockForPage() {
@@ -1009,6 +2790,12 @@ function render() {
         }
       });
     });
+
+    mount.querySelector('[data-pr-cart-add]')?.addEventListener('click', () => {
+      void openCartRuleAddDialog(state.country).catch((err) => {
+        showToast(err?.message || 'Could not open add rule', 'error');
+      });
+    });
   }
 
   if (state.area === 'promotions') {
@@ -1058,7 +2845,19 @@ function render() {
         }
       });
     });
+
+    mount.querySelector('[data-pr-promo-add]')?.addEventListener('click', () => {
+      void openPromotionAddDialog().catch((err) => {
+        showToast(err?.message || 'Could not open add promotion', 'error');
+      });
+    });
   }
 }
 
-render();
+initPricingSources()
+  .then(() => render())
+  .catch((err) => {
+    /* eslint-disable-next-line no-console -- boot fallback */
+    console.warn('[commerce-admin/price-rules] init failed', err);
+    render();
+  });

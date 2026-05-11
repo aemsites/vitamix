@@ -45,7 +45,7 @@ function typeIdFromCouponsQueryPath(path) {
 function appendUnsafeCouponIdHint(decodedTypeId, status) {
   if (!decodedTypeId || !/[\\/]/.test(decodedTypeId)) return '';
   if (![400, 405].includes(status)) return '';
-  return ' — Tip: "/" or "\\" in a coupon ID often breaks REST paths (even when URL-encoded). Use hyphens, e.g. spring-sale.';
+  return ' — Tip: "/" or "\\" in a coupon id breaks REST paths. Prefer us-2026-my-promo (hyphens only).';
 }
 
 /** Persisted market filter (All, US, CA, MX). */
@@ -58,12 +58,19 @@ const COUPON_MARKETS = /** @type {const} */ ([
   { key: 'mx', label: 'Mexico' },
 ]);
 
-/** Expected coupon type id: &lt;us|ca|mx&gt;/&lt;year&gt;/&lt;slug…&gt; */
+/**
+ * Expected coupon type id: `us-2026-my-promo` (country-year-key).
+ * Legacy `us/2026/…` is still accepted for reads.
+ */
 function assertCouponIdMarketPath(id) {
   const t = String(id || '').trim();
   if (!t) throw new Error('Coupon ID is required');
-  if (!/^(us|ca|mx)\/\d{4}\/.+$/i.test(t)) {
-    throw new Error('Coupon ID must look like us/2026/my-promo — country (us, ca, or mx), 4-digit year, then a name (slashes allowed in the name segment).');
+  const hyphenForm = /^(us|ca|mx)-\d{4}-[a-z0-9-]+$/i.test(t);
+  const legacySlashForm = /^(us|ca|mx)\/\d{4}\/.+$/i.test(t);
+  if (!hyphenForm && !legacySlashForm) {
+    throw new Error(
+      'Coupon ID must look like us-2026-my-promo — country (us, ca, or mx), 4-digit year, hyphen, then a program key (letters, numbers, hyphens only).',
+    );
   }
   if (/[\s?#%\\]/.test(t)) {
     throw new Error('Coupon ID cannot contain spaces, ?, #, %, or backslashes.');
@@ -72,9 +79,9 @@ function assertCouponIdMarketPath(id) {
 
 function couponMarketPrefixFromId(id) {
   const s = String(id).trim().toLowerCase();
-  if (s.startsWith('us/')) return 'us';
-  if (s.startsWith('ca/')) return 'ca';
-  if (s.startsWith('mx/')) return 'mx';
+  if (s.startsWith('us-') || s.startsWith('us/')) return 'us';
+  if (s.startsWith('ca-') || s.startsWith('ca/')) return 'ca';
+  if (s.startsWith('mx-') || s.startsWith('mx/')) return 'mx';
   return '';
 }
 
@@ -86,9 +93,20 @@ function couponsVisibleForMarket() {
   });
 }
 
-/** When id matches <cc>/<year>/… show a readable breakdown. */
+/**
+ * When id matches country-year-key (hyphen) or legacy country/year/… (slash), return breakdown.
+ */
 function parseCouponTypePath(id) {
-  const parts = String(id).split('/').filter(Boolean);
+  const s = String(id).trim();
+  const hy = s.match(/^((?:us|ca|mx))-(\d{4})-(.+)$/i);
+  if (hy) {
+    return {
+      country: hy[1].toLowerCase(),
+      year: hy[2],
+      name: hy[3],
+    };
+  }
+  const parts = s.split('/').filter(Boolean);
   if (parts.length >= 3 && /^(us|ca|mx)$/i.test(parts[0])) {
     return {
       country: parts[0].toLowerCase(),
@@ -97,6 +115,60 @@ function parseCouponTypePath(id) {
     };
   }
   return null;
+}
+
+/** @param {string} raw */
+function slugifyCouponLabelSegment(raw) {
+  return String(raw || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+/**
+ * @param {string} country
+ * @param {string} year
+ * @param {string} labelSlug
+ */
+function buildCouponIdFromParts(country, year, labelSlug) {
+  return `${String(country).toLowerCase()}-${String(year).trim()}-${labelSlug}`;
+}
+
+function couponYearSelectOptionsHtml() {
+  const y = new Date().getFullYear();
+  const years = [y, y + 1];
+  return years
+    .map((yr) => {
+      const s = String(yr);
+      return `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`;
+    })
+    .join('');
+}
+
+/** Fields for “new coupon” id: country + year + program key (no manual full id). */
+function newCouponIdFieldsHtml() {
+  const countryOpts = COUPON_MARKETS.filter((m) => m.key !== 'all')
+    .map(({ key, label }) => `<option value="${escapeHtml(key)}">${escapeHtml(label)}</option>`)
+    .join('');
+  const y0 = new Date().getFullYear();
+  return `
+      <div class="coupons-field">
+        <label for="cp-new-country">Country</label>
+        <select id="cp-new-country" required>${countryOpts}</select>
+      </div>
+      <div class="coupons-field">
+        <label for="cp-new-year">Year</label>
+        <select id="cp-new-year" required>${couponYearSelectOptionsHtml()}</select>
+      </div>
+      <div class="coupons-field coupons-field-full">
+        <label for="cp-new-label">Program key</label>
+        <input type="text" id="cp-new-label" autocomplete="off" required placeholder="spring-sale" />
+        <p class="coupons-field-hint">Coupon id will be <code id="cp-new-id-preview">${escapeHtml(`us-${y0}-…`)}</code>
+        (<code>country</code>-<code>year</code>-<code>key</code>; letters, numbers, and hyphens only in the key).</p>
+      </div>`;
 }
 
 function marketTagHtml(market) {
@@ -541,7 +613,7 @@ async function refreshSelection() {
       state.codes = [];
       state.codesNextCursor = '';
       if (state.detailFromListFallback) {
-        setError('Showing data from the coupon list only: GET …/coupons/types/{id} failed for this id (common when the id contains “/”). Edit and delete use that URL path and are disabled here until the id is fixed on the server.', 'info');
+        setError('Showing data from the coupon list only: GET …/coupons/types/{id} failed for this id (often when the id contains “/” or other awkward characters). Edit and delete use that URL path and are disabled here until the id is fixed on the server.', 'info');
       } else {
         setError('');
       }
@@ -622,14 +694,18 @@ function openDialog(title, innerHtml, onSubmit, afterMount, dialogClass) {
 }
 
 function couponFormHtml({ idReadonly }) {
+  const idBlock = idReadonly
+    ? `<div class="coupons-field coupons-field-full">
+        <label for="cp-form-id">Coupon ID</label>
+        <input type="text" id="cp-form-id" autocomplete="off" readonly class="coupons-readonly" required />
+        <p class="coupons-field-hint">Ids use <code>country-year-key</code> (e.g. <code>us-2026-spring-sale</code>). Older <code>us/2026/…</code> ids still work in the API.</p>
+      </div>`
+    : `${newCouponIdFieldsHtml()}`;
+
   return `
     <p class="coupons-page-lead" style="margin-bottom:12px">Describe how this coupon behaves. Amounts are in storefront currency unless noted otherwise.</p>
     <div class="coupons-form-grid">
-      <div class="coupons-field coupons-field-full">
-        <label for="cp-form-id">Coupon ID <span style="font-weight:400;color:#6d7175">(slug, e.g. friends-and-family)</span></label>
-        <input type="text" id="cp-form-id" autocomplete="off" ${idReadonly ? 'readonly class="coupons-readonly"' : ''} required />
-        ${idReadonly ? '' : '<p class="coupons-field-hint">Use <code>us/2026/my-coupon</code>, <code>ca/2026/…</code>, or <code>mx/2026/…</code> (country / 4-digit year / name). No spaces or <code>?</code> <code>#</code> <code>%</code> in the id.</p>'}
-      </div>
+      ${idBlock}
       <div class="coupons-field coupons-field-full">
         <label for="cp-form-name">Display name</label>
         <input type="text" id="cp-form-name" autocomplete="off" required />
@@ -692,8 +768,21 @@ function readOptionalInt(raw) {
 }
 
 function readCouponBodyFromForm(dlg, { requireId }) {
-  const id = dlg.querySelector('#cp-form-id')?.value?.trim();
+  let id = dlg.querySelector('#cp-form-id')?.value?.trim() ?? '';
   const name = dlg.querySelector('#cp-form-name')?.value?.trim();
+  if (requireId && dlg.querySelector('#cp-new-country')) {
+    const country = dlg.querySelector('#cp-new-country')?.value?.trim().toLowerCase() || '';
+    const year = dlg.querySelector('#cp-new-year')?.value?.trim() || '';
+    const labelRaw = dlg.querySelector('#cp-new-label')?.value?.trim() || '';
+    if (!country || !year || !labelRaw) {
+      throw new Error('Country, year, and program key are required');
+    }
+    const slug = slugifyCouponLabelSegment(labelRaw);
+    if (!slug) {
+      throw new Error('Program key must include at least one letter or number');
+    }
+    id = buildCouponIdFromParts(country, year, slug);
+  }
   if (requireId && !id) throw new Error('Coupon ID is required');
   if (requireId) assertCouponIdMarketPath(id);
   if (!name) throw new Error('Display name is required');
@@ -870,11 +959,10 @@ function render() {
         <div class="coupons-market-tabs" role="tablist" aria-label="Market">${renderMarketTabs()}</div>
       </div>
       <div class="coupons-toolbar-right">
-        <button type="button" class="coupons-btn coupons-btn-primary" data-cp-reload-all>Reload</button>
-        <button type="button" class="coupons-btn" data-cp-new>New coupon…</button>
+        <button type="button" class="coupons-btn coupons-btn-primary" data-cp-new>New coupon…</button>
       </div>
     </div>
-    <p class="coupons-market-hint">Ids: <code>us/2026/name</code>, <code>ca/2026/name</code>, <code>mx/2026/name</code>. Click a row for a <strong>modal</strong> with full rules and codes (like opening an order).</p>
+    <p class="coupons-market-hint">Ids: <code>us-2026-name</code>, <code>ca-2026-name</code>, <code>mx-2026-name</code> (country-year-key). Click a row for a <strong>modal</strong> with full rules and codes (like opening an order).</p>
     <section class="coupons-overview coupons-overview-solo" aria-label="Coupon programs overview">
       <h2 class="coupons-panel-title">Coupon programs</h2>
       <p class="coupons-panel-hint">Market tag + quick columns; open the modal for edit, delete, and code tools.</p>
@@ -911,18 +999,6 @@ function render() {
         showToast(err.message || 'Failed to switch market', 'error');
       }
     });
-  });
-
-  mount.querySelector('[data-cp-reload-all]')?.addEventListener('click', async () => {
-    try {
-      closeCouponDetailDialog();
-      await refreshCouponList();
-      render();
-    } catch (err) {
-      console.warn('[commerce-admin/coupons] reload failed', { message: err?.message });
-      setError(err.message || 'Reload failed.');
-      showToast(err.message || 'Reload failed', 'error');
-    }
   });
 
   mount.querySelector('[data-cp-new]')?.addEventListener('click', () => openNewCouponDialog());
@@ -990,6 +1066,26 @@ function openNewCouponDialog() {
     (dlg) => {
       dlg.querySelector('#cp-form-stackable').checked = true;
       dlg.querySelector('#cp-form-manual').checked = true;
+      const countryEl = dlg.querySelector('#cp-new-country');
+      const yearEl = dlg.querySelector('#cp-new-year');
+      const labelEl = dlg.querySelector('#cp-new-label');
+      const previewEl = dlg.querySelector('#cp-new-id-preview');
+      const syncPreview = () => {
+        const country = countryEl?.value || 'us';
+        const year = yearEl?.value || String(new Date().getFullYear());
+        const slug = slugifyCouponLabelSegment(labelEl?.value || '');
+        if (previewEl) {
+          previewEl.textContent = slug ? `${country}-${year}-${slug}` : `${country}-${year}-…`;
+        }
+      };
+      if (['us', 'ca', 'mx'].includes(state.marketFilter) && countryEl) {
+        countryEl.value = state.marketFilter;
+      }
+      [countryEl, yearEl, labelEl].forEach((el) => {
+        el?.addEventListener('input', syncPreview);
+        el?.addEventListener('change', syncPreview);
+      });
+      syncPreview();
     },
     'coupons-dialog-wide',
   );
