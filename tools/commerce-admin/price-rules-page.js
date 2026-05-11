@@ -78,7 +78,7 @@ const COUNTRY_LABELS = /** @type {Record<(typeof COUNTRIES)[number], string>} */
 /** @param {string} ck */
 function marketLabel(ck) {
   const k = String(ck || '').toLowerCase();
-  if (COUNTRIES.includes(/** @type {(typeof COUNTRIES)[number]} */ (k))) {
+  if (COUNTRIES.includes(/** @type {(typeof COUNTRIES)[number]} */(k))) {
     return COUNTRY_LABELS[/** @type {(typeof COUNTRIES)[number]} */ (k)];
   }
   return k ? k.toUpperCase() : '';
@@ -634,12 +634,12 @@ function parseSaleLinesTsv(text) {
 }
 
 /**
- * String keys only (helix catalog rule metadata).
+ * String keys only (helix catalog rule custom data).
  *
  * @param {unknown} raw
  * @returns {Record<string, string>}
  */
-function catalogMetadataStringMap(raw) {
+function catalogCustomStringMap(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
   /** @type {Record<string, string>} */
   const out = {};
@@ -653,7 +653,7 @@ function catalogMetadataStringMap(raw) {
 /**
  * @param {PromotionRow[]} rows
  * @param {string} year
- * @param {import('./price-rules-api.js').CatalogPriceRule[] | undefined} [preserveFromRules] rules for this market before edit — merged by `path` so extra `metadata` keys (e.g. `debug`) and `variants` survive Save
+ * @param {import('./price-rules-api.js').CatalogPriceRule[] | undefined} [preserveFromRules] rules for this market before edit — merged by `path` so extra `custom` keys (e.g. `debug`) and `variants` survive Save
  * @returns {import('./price-rules-api.js').CatalogPriceRule[]}
  */
 function promotionRowsToCatalogRules(rows, year, preserveFromRules) {
@@ -675,11 +675,11 @@ function promotionRowsToCatalogRules(rows, year, preserveFromRules) {
     if (end) rule.end = end;
     const reg = String(row.regularPrice || '').trim();
     const regDigits = reg && reg !== '—' ? catalogPriceStringForApi(reg) : '';
-    const meta = catalogMetadataStringMap(prevRule?.metadata);
-    meta.year = y;
-    if (regDigits) meta.regularPrice = regDigits;
-    else delete meta.regularPrice;
-    rule.metadata = meta;
+    const custom = catalogCustomStringMap(prevRule?.custom);
+    custom.year = y;
+    if (regDigits) custom.regularPrice = regDigits;
+    else delete custom.regularPrice;
+    rule.custom = custom;
 
     if (prevRule?.variants && typeof prevRule.variants === 'object' && !Array.isArray(prevRule.variants)) {
       try {
@@ -695,7 +695,7 @@ function promotionRowsToCatalogRules(rows, year, preserveFromRules) {
 /** @param {HTMLDialogElement} dlg */
 function readPromotionMarketFromForm(dlg) {
   const v = String(dlg.querySelector('#pr-promo-form-market')?.value ?? '').trim().toLowerCase();
-  if (!COUNTRIES.includes(/** @type {(typeof COUNTRIES)[number]} */ (v))) {
+  if (!COUNTRIES.includes(/** @type {(typeof COUNTRIES)[number]} */(v))) {
     throw new Error('Select a valid market');
   }
   return /** @type {(typeof COUNTRIES)[number]} */ (v);
@@ -1045,11 +1045,11 @@ function wirePromotionSaleLineTableCells(dlg) {
     if (!edit || !inp) return;
     if (field === 'start') {
       inp.value = isoToDatetimeLocalValue(
-        /** @type {HTMLInputElement} */ (tr.querySelector('.pr-promo-h-start')).value,
+        /** @type {HTMLInputElement} */(tr.querySelector('.pr-promo-h-start')).value,
       );
     } else if (field === 'end') {
       inp.value = isoToDatetimeLocalValue(
-        /** @type {HTMLInputElement} */ (tr.querySelector('.pr-promo-h-end')).value,
+        /** @type {HTMLInputElement} */(tr.querySelector('.pr-promo-h-end')).value,
       );
     } else if (field === 'product') {
       const full = /** @type {HTMLInputElement} */ (tr.querySelector('.pr-promo-h-product')).value;
@@ -1227,8 +1227,8 @@ function promotionEditFormInnerHtml(initialMarket, lines, opts = {}) {
   return `
     <p class="coupons-page-lead" style="margin:0 0 12px;font-size:14px;color:#6d7175">
       ${edit
-    ? 'Edit sale lines for this market. Lines for other markets on the same promotion are left unchanged. Click a cell to edit; start/end use a US Eastern (ET) date/time picker (saved as UTC ISO 8601). Prices are numbers only (no <code>$</code>) for the API.'
-    : 'New promotion for one market. Click a cell to edit sale lines; start/end use US Eastern (ET) time. Product column shows the storefront path and a thumbnail from the catalog index when the URL resolves. Prices are numbers only (no <code>$</code>) for the API.'}
+      ? 'Edit sale lines for this market. Lines for other markets on the same promotion are left unchanged. Click a cell to edit; start/end use a US Eastern (ET) date/time picker (saved as UTC ISO 8601). Prices are numbers only (no <code>$</code>) for the API.'
+      : 'New promotion for one market. Click a cell to edit sale lines; start/end use US Eastern (ET) time. Product column shows the storefront path and a thumbnail from the catalog index when the URL resolves. Prices are numbers only (no <code>$</code>) for the API.'}
     </p>
     <div class="coupons-form-grid">
       ${idBlock}
@@ -1236,8 +1236,8 @@ function promotionEditFormInnerHtml(initialMarket, lines, opts = {}) {
         <label for="pr-promo-form-market">Market</label>
         <select id="pr-promo-form-market" required${marketDis}>${optsHtml}</select>
         ${edit
-    ? '<p class="coupons-field-hint">Paths in sale lines must stay under this market’s storefront.</p>'
-    : `<p class="coupons-field-hint">Promotion <code>id</code> will be <code><span id="pr-promo-form-market-code">${escapeHtml(initialMarket)}</span>-</code> plus a slug from the title.</p>`}
+      ? '<p class="coupons-field-hint">Paths in sale lines must stay under this market’s storefront.</p>'
+      : `<p class="coupons-field-hint">Promotion <code>id</code> will be <code><span id="pr-promo-form-market-code">${escapeHtml(initialMarket)}</span>-</code> plus a slug from the title.</p>`}
       </div>
       <div class="coupons-field coupons-field-full">
         <label for="pr-promo-form-name">Promotion title</label>
@@ -1405,7 +1405,7 @@ function assertNoExpiredRuleEnds(rules) {
   const expired = rules.filter((r) => r.end && new Date(r.end).getTime() <= now);
   if (!expired.length) return;
   const paths = expired.map((r) => {
-    const d = new Date(/** @type {string} */ (r.end));
+    const d = new Date(/** @type {string} */(r.end));
     return `${r.path} (ended ${d.toLocaleDateString('en-US', { timeZone: ET_TIMEZONE })})`;
   });
   const allExpired = expired.length === rules.length;
@@ -1541,7 +1541,7 @@ async function openPromotionEditDialog(countryKey, promoId) {
     (r) => countryKeyFromCatalogPath(r.path) === countryKey,
   );
   const ck = /** @type {(typeof COUNTRIES)[number]} */ (
-    COUNTRIES.includes(/** @type {(typeof COUNTRIES)[number]} */ (countryKey)) ? countryKey : 'us'
+    COUNTRIES.includes(/** @type {(typeof COUNTRIES)[number]} */(countryKey)) ? countryKey : 'us'
   );
   const rows = rulesCo.map(catalogRuleToPromotionRow);
   const yearGuess = inferPromotionYear(promo, ck);
@@ -1764,7 +1764,7 @@ function readCartRuleAddForm(dlg) {
  */
 function readCartRuleMarketKeyFromForm(dlg) {
   const v = String(dlg.querySelector('#pr-cart-add-market')?.value ?? '').trim().toLowerCase();
-  if (!COUNTRIES.includes(/** @type {(typeof COUNTRIES)[number]} */ (v))) {
+  if (!COUNTRIES.includes(/** @type {(typeof COUNTRIES)[number]} */(v))) {
     throw new Error('Select a valid market');
   }
   return /** @type {(typeof COUNTRIES)[number]} */ (v);
@@ -1778,7 +1778,7 @@ async function openCartRuleAddDialog(defaultMarketKey) {
   if (!ok) return;
 
   let initial = typeof defaultMarketKey === 'string' ? defaultMarketKey.trim().toLowerCase() : state.country;
-  if (!COUNTRIES.includes(/** @type {(typeof COUNTRIES)[number]} */ (initial))) {
+  if (!COUNTRIES.includes(/** @type {(typeof COUNTRIES)[number]} */(initial))) {
     initial = COUNTRIES.includes(state.country) ? state.country : 'us';
   }
   const dialog = document.createElement('dialog');
@@ -1786,7 +1786,7 @@ async function openCartRuleAddDialog(defaultMarketKey) {
   dialog.innerHTML = `
     <div class="coupons-dialog-inner">
       <h2>Add cart rule</h2>
-      ${cartRuleAddFormHtml(/** @type {(typeof COUNTRIES)[number]} */ (initial))}
+      ${cartRuleAddFormHtml(/** @type {(typeof COUNTRIES)[number]} */(initial))}
       <div class="coupons-dialog-actions">
         <button type="button" class="coupons-btn" data-pr-cart-add-cancel>Cancel</button>
         <button type="button" class="coupons-btn coupons-btn-primary" data-pr-cart-add-submit>Add rule</button>
@@ -2660,7 +2660,7 @@ function renderMockBanner() {
     : '';
   const promoLine = PR_APP_MODE !== 'cart-rules'
     ? '<strong>Catalog promotions</strong> load from <code>GET …/price-rules/catalog</code> '
-      + 'as <code>{ promotions: CatalogPromotion[] }</code>.'
+    + 'as <code>{ promotions: CatalogPromotion[] }</code>.'
     : '';
   if (PR_APP_MODE === 'cart-rules' || PR_APP_MODE === 'promotions') {
     return '';

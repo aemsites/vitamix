@@ -4,13 +4,13 @@
  * Shapes match **helix-commerce-api** (`src/schemas/PriceRules.js`, `src/routes/price-rules/*-handler.js`):
  * - **Catalog** `GET/PUT …/price-rules/catalog`: JSON object `{ promotions: CatalogPromotion[] }` (not a bare array).
  *   Each `CatalogPriceRule` requires `path`, `price` (string or number; server stores string).
- *   Optional `start` / `end` must be **ISO 8601** timestamps. Optional `metadata` is string values only.
- *   Optional `variants` maps sku → `{ sku, price, start?, end?, metadata? }`.
+ *   Optional `start` / `end` must be **ISO 8601** timestamps. Optional `custom` is string values only.
+ *   Optional `variants` maps sku → `{ sku, price, start?, end?, custom? }`.
  * - **Cart** `GET/PUT …/price-rules/cart`: JSON **array** of cart rules (`CartPriceRulesSchema`).
  */
 import { apiFetch } from './commerce-otp-api.js';
 
-/** @typedef {Record<string, string>} PriceRuleMetadata */
+/** @typedef {Record<string, string>} PriceRuleCustomData */
 
 /**
  * Variant line on a catalog rule (helix `VariantPriceRule`).
@@ -20,7 +20,7 @@ import { apiFetch } from './commerce-otp-api.js';
  * @property {string|number} price
  * @property {string} [start]
  * @property {string} [end]
- * @property {PriceRuleMetadata} [metadata]
+ * @property {PriceRuleCustomData} [custom]
  */
 
 /**
@@ -29,7 +29,7 @@ import { apiFetch } from './commerce-otp-api.js';
  * @property {string|number} price
  * @property {string} [start] ISO 8601 when present (helix `ISOTimestamp`)
  * @property {string} [end] ISO 8601 when present
- * @property {PriceRuleMetadata} [metadata]
+ * @property {PriceRuleCustomData} [custom]
  * @property {Record<string, HelixVariantPriceRule>} [variants]
  */
 
@@ -94,7 +94,7 @@ async function readRespError(resp) {
  * @returns {CatalogPriceRulesDocument}
  */
 export function normalizeCatalogPriceRulesGetResponse(data) {
-  if (data && typeof data === 'object' && !Array.isArray(data) && Array.isArray(/** @type {{ promotions?: unknown }} */ (data).promotions)) {
+  if (data && typeof data === 'object' && !Array.isArray(data) && Array.isArray(/** @type {{ promotions?: unknown }} */(data).promotions)) {
     return { promotions: /** @type {CatalogPromotion[]} */ (/** @type {{ promotions: CatalogPromotion[] }} */ (data).promotions) };
   }
   if (
@@ -102,7 +102,7 @@ export function normalizeCatalogPriceRulesGetResponse(data) {
     && typeof data === 'object'
     && /** @type {{ data?: unknown }} */ (data).data != null
     && typeof /** @type {{ data?: unknown }} */ (data).data === 'object'
-    && Array.isArray(/** @type {{ data?: { promotions?: unknown } }} */ (data).data?.promotions)
+    && Array.isArray(/** @type {{ data?: { promotions?: unknown } }} */(data).data?.promotions)
   ) {
     return {
       promotions: /** @type {CatalogPromotion[]} */ (
@@ -186,14 +186,14 @@ export function normalizeCartRulesGetResponse(data) {
   if (Array.isArray(data)) {
     return { rules: /** @type {HelixCartPriceRule[]} */ (data) };
   }
-  if (data && typeof data === 'object' && Array.isArray(/** @type {{ rules?: unknown }} */ (data).rules)) {
+  if (data && typeof data === 'object' && Array.isArray(/** @type {{ rules?: unknown }} */(data).rules)) {
     return { rules: /** @type {HelixCartPriceRule[]} */ (/** @type {{ rules: HelixCartPriceRule[] }} */ (data).rules) };
   }
   if (
     data
     && typeof data === 'object'
     && /** @type {{ data?: unknown }} */ (data).data != null
-    && Array.isArray(/** @type {{ data?: unknown }} */ (data).data)
+    && Array.isArray(/** @type {{ data?: unknown }} */(data).data)
   ) {
     return { rules: /** @type {HelixCartPriceRule[]} */ (/** @type {{ data: HelixCartPriceRule[] }} */ (data).data) };
   }
@@ -272,9 +272,9 @@ export function catalogPathToProductUrl(path) {
  * @returns {object} PromotionRow-compatible object
  */
 export function catalogRuleToPromotionRow(rule) {
-  const meta = rule.metadata && typeof rule.metadata === 'object' ? rule.metadata : {};
-  const regular = meta.regularPrice != null && String(meta.regularPrice).trim() !== ''
-    ? String(meta.regularPrice)
+  const custom = rule.custom && typeof rule.custom === 'object' ? rule.custom : {};
+  const regular = custom.regularPrice != null && String(custom.regularPrice).trim() !== ''
+    ? String(custom.regularPrice)
     : '—';
   return {
     start: rule.start != null && String(rule.start).trim() !== '' ? String(rule.start) : '—',
@@ -292,11 +292,10 @@ export function catalogRuleToPromotionRow(rule) {
  */
 export function inferPromotionYear(promo, countryKey) {
   const rules = (promo.rules || []).filter((r) => countryKeyFromCatalogPath(r.path) === countryKey);
-  const fromMeta = rules.map((r) => r.metadata?.year).find(Boolean);
-  if (fromMeta) return String(fromMeta);
+  const fromCustom = rules.map((r) => r.custom?.year).find(Boolean);
+  if (fromCustom) return String(fromCustom);
   const yFromStart = rules
     .map((r) => String(r.start || '').match(/(20\d{2})/))
     .find((m) => m);
   return yFromStart ? yFromStart[1] : String(new Date().getFullYear());
 }
-
