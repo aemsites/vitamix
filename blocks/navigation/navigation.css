@@ -370,6 +370,7 @@ main > .navigation-container.section ~ .section h6 {
   align-items: center;
   gap: 1ch;
   width: 100%;
+  padding: calc(17px + 0.75em) 0;
 }
 
 .navigation.jump .menu nav ul > li a::after {
