@@ -77,7 +77,7 @@ main > .section > div {
 }
 
 .email-header {
-  padding: 24px 0 0;
+  padding: 24px 32px 0;
   font-family: Arial, Helvetica, sans-serif;
   text-align: left;
 }
@@ -161,23 +161,27 @@ main > .section > div {
 /*
  * When the banner image is wrapped in a link, the link's <a> wraps the
  * picture/img directly — make the linked image behave the same as an
- * unlinked one (full container width, block layout).
+ * unlinked one (full card width, breaking out of horizontal padding).
  */
 .email-header a img {
   display: block;
-  max-width: 100%;
+  max-width: calc(100% + 64px);
+  width: calc(100% + 64px);
   height: auto;
+  margin: 0 -32px;
 }
 
 /*
  * Standalone images (e.g. promotional banner authored as a paragraph image)
- * span the full container width.
+ * span the full container width, breaking out of the block's horizontal
+ * padding so the banner goes edge-to-edge inside the white card.
  */
 .email-header p img {
-  max-width: 100%;
+  max-width: calc(100% + 64px);
+  width: calc(100% + 64px);
   height: auto;
   display: block;
-  margin: 16px 0;
+  margin: 16px -32px;
 }
 
 /*

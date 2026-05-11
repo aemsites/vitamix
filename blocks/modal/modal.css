@@ -26,6 +26,7 @@ body.modal-open {
   padding: 24px;
   padding-top: 0;
   margin-top: 44px;
+  background-color: var(--color-background);
 }
 
 @media (width >= 900px) {
@@ -334,5 +335,33 @@ body.modal-open {
   .modal#atc-error dialog .modal-content,
   .modal#sync dialog .modal-content {
     margin-bottom: 44px;
+  }
+}
+
+/* stylelint-disable no-descending-specificity */
+
+/* foundation modals */
+.modal[data-modal-path*="/modals/foundation/"] dialog .modal-content {
+  border-radius: var(--rounding-m);
+  padding: var(--spacing-600);
+}
+
+.modal[data-modal-path*="/modals/foundation/"] dialog h1 {
+  font-size: var(--font-size-900);
+}
+
+.modal[data-modal-path*="/modals/foundation/"] dialog h1 + h2 {
+  margin-top: 0;
+  font-family: var(--body-font-family);
+  font-size: var(--heading-size-l);
+}
+
+@media (width >= 900px) {
+  .modal[data-modal-path*="/modals/foundation/"] dialog .modal-content {
+    padding: var(--spacing-600) var(--horizontal-spacing);
+  }
+
+  .modal[data-modal-path*="/modals/foundation/"] dialog h1 {
+    font-size: var(--font-size-1000);
   }
 }
