@@ -31,10 +31,17 @@ export default function decorate(block) {
 
     if (i < activeIndex) {
       li.classList.add('step-complete');
-      const a = document.createElement('a');
-      a.href = stepPaths[i];
-      a.textContent = label;
-      li.appendChild(a);
+      const isLastStep = activeIndex === steps.length - 1;
+      if (isLastStep) {
+        const span = document.createElement('span');
+        span.textContent = label;
+        li.appendChild(span);
+      } else {
+        const a = document.createElement('a');
+        a.href = stepPaths[i];
+        a.textContent = label;
+        li.appendChild(a);
+      }
     } else if (i === activeIndex) {
       li.classList.add('step-active');
       li.setAttribute('aria-current', 'step');

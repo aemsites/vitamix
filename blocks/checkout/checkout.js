@@ -255,6 +255,11 @@ export default async function decorate(block) {
   const paymentContainer = form.querySelector('.payment-method-section');
   await initPayment(paymentContainer, ALL_PROVIDERS, callbacks, config, strings);
 
+  // Re-run preview on payment method change — tax may vary by type (e.g. Avalara surcharge)
+  paymentContainer.addEventListener('change', (e) => {
+    if (e.target.name === 'paymentMethod') updatePreview(form, cart, state, config);
+  });
+
   // Inject order-summary block into this section if the author didn't add one
   const section = block.closest('.section');
   if (section && !section.querySelector('.order-summary-wrapper')) {
