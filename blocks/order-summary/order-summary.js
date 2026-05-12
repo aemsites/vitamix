@@ -4,8 +4,6 @@ import { getConfig, formatPrice } from '../../scripts/commerce-config.js';
 import buildCartItem from '../../scripts/commerce/cart-item.js';
 import { parsePreview } from '../../scripts/commerce-api.js';
 
-loadCSS('/styles/commerce-tokens.css');
-
 function getStrings() {
   return getConfig().getStrings();
 }
@@ -80,7 +78,8 @@ function colocateWithForm(block) {
 /**
  * @param {HTMLDivElement} block
  */
-export default function decorate(block) {
+export default async function decorate(block) {
+  await loadCSS('/styles/commerce-tokens.css');
   const s = getStrings();
   colocateWithForm(block);
   block.innerHTML = buildTemplate(s);

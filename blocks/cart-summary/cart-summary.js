@@ -6,8 +6,6 @@ import applePay from '../../scripts/payments/apple-pay.js';
 import googlePay from '../../scripts/payments/google-pay.js';
 import paypal from '../../scripts/payments/paypal.js';
 
-loadCSS('/styles/commerce-tokens.css');
-
 const ALL_PROVIDERS = [applePay, googlePay, paypal];
 
 const LOCAL_STRINGS = {
@@ -132,6 +130,7 @@ function filterProviders(providers) {
  * @param {HTMLDivElement} block
  */
 export default async function decorate(block) {
+  await loadCSS('/styles/commerce-tokens.css');
   const config = getConfig();
   const s = getStrings();
 

@@ -3,9 +3,6 @@ import cart from '../../scripts/cart.js';
 import { getConfig } from '../../scripts/commerce-config.js';
 import buildCartItem from '../../scripts/commerce/cart-item.js';
 
-loadCSS('/styles/commerce-tokens.css');
-loadCSS('/blocks/cart/cart.css');
-
 const LOCAL_STRINGS = {
   'en-us': {
     cartEmpty: 'Your cart is empty.',
@@ -43,6 +40,10 @@ function buildTemplate(s) {
 }
 
 export default async function decorate(block) {
+  await Promise.all([
+    loadCSS('/styles/commerce-tokens.css'),
+    loadCSS('/blocks/cart/cart.css'),
+  ]);
   block.closest('div.section')?.classList.add('cart-section');
 
   const config = getConfig();

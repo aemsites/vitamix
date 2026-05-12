@@ -1,11 +1,10 @@
 import { loadCSS } from '../../scripts/aem.js';
 import { getConfig } from '../../scripts/commerce-config.js';
 
-loadCSS('/styles/commerce-tokens.css');
-
 const STEP_KEYS = ['cart-new', 'checkout', 'complete'];
 
-export default function decorate(block) {
+export default async function decorate(block) {
+  await loadCSS('/styles/commerce-tokens.css');
   const config = getConfig();
   const s = config.getStrings();
   const currentPath = window.location.pathname;

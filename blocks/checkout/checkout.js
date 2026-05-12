@@ -11,8 +11,6 @@ import { initOrder } from './checkout-order.js';
 import { initPayment } from './checkout-payment.js';
 import { parsePreview } from '../../scripts/commerce-api.js';
 
-loadCSS('/styles/commerce-tokens.css');
-
 const ALL_PROVIDERS = [applePay, paypal, affirm];
 
 const LOCAL_STRINGS = {
@@ -122,6 +120,7 @@ function getStrings(config) {
 }
 
 export default async function decorate(block) {
+  await loadCSS('/styles/commerce-tokens.css');
   const config = getConfig();
   const strings = getStrings(config);
 
