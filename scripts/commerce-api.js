@@ -173,7 +173,9 @@ export async function validateApplePayMerchant(validationUrl, country, locale) {
 export function parsePreview(preview, cartSubtotal) {
   const subtotal = parseFloat(preview.subtotal) || cartSubtotal;
   const taxAmount = parseFloat(preview.taxAmount) || 0;
-  const shippingRate = preview.shippingMethod?.rate ?? 0;
+  const rawRate = preview.shippingMethod?.rate ?? 0;
+  const hasFreeShipping = (preview.discounts ?? []).some((d) => d.freeShipping);
+  const shippingRate = hasFreeShipping ? 0 : rawRate;
   const total = parseFloat(preview.total) || (subtotal + taxAmount + shippingRate);
   return {
     subtotal, taxAmount, shippingRate, total,
