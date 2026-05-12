@@ -162,6 +162,7 @@ export default async function decorate(block) {
   const orderTotalAmountEl = form.querySelector('.order-total-amount');
   if (orderTotalAmountEl) {
     const currencyCode = typeof config.currency === 'function' ? config.currency(config.getLocale()) : config.currency;
+    const breakdownEl = form.querySelector('.order-total-breakdown');
     const breakdownSubtotalEl = form.querySelector('.order-breakdown-subtotal');
     const breakdownShippingEl = form.querySelector('.order-breakdown-shipping');
     const breakdownTaxesEl = form.querySelector('.order-breakdown-taxes');
@@ -181,7 +182,12 @@ export default async function decorate(block) {
 
     document.addEventListener('cart:change', () => { if (cart.itemCount > 0) seedInitial(); });
 
+    document.addEventListener('checkout:preview-loading', () => {
+      breakdownEl?.classList.add('loading');
+    });
+
     document.addEventListener('checkout:preview', (e) => {
+      breakdownEl?.classList.remove('loading');
       const { preview } = e.detail || {};
       if (!preview) return;
       const {

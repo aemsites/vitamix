@@ -770,6 +770,30 @@ button.checkout-submit-btn {
     margin: 12px 0;
     padding-bottom: 12px;
     border-bottom: 1px solid var(--commerce-color-border);
+    position: relative;
+  }
+
+  .order-total-breakdown.loading {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+
+  .order-total-breakdown.loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid var(--commerce-color-border);
+    border-top-color: var(--commerce-color-text);
+    border-radius: 50%;
+    animation: order-breakdown-spin 0.7s linear infinite;
+  }
+
+  @keyframes order-breakdown-spin {
+    to { transform: rotate(360deg); }
   }
 
   .order-total-amount {

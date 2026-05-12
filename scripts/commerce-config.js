@@ -4,7 +4,8 @@ function resolveApiOrigin(org, site) {
   const isProduction = !hostname.endsWith('.aem.page')
     && !hostname.endsWith('.aem.live')
     && hostname !== 'localhost'
-    && !hostname.startsWith('127.');
+    && !hostname.startsWith('127.')
+    && !hostname.startsWith('integration.');
   const base = isProduction
     ? 'https://api.adobecommerce.live'
     : 'https://api-stage.adobecommerce.live';
