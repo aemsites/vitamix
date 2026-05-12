@@ -103,6 +103,7 @@ export async function updatePreview(form, cart, state, config) {
     shippingMethod: { id: state.selectedShippingMethodId },
     locale: `${language.split('_')[0]}-${(language.split('_')[1] || locale).toUpperCase()}`,
     country: locale,
+    paymentMethod: data.get('paymentMethod') || null,
   };
 
   document.dispatchEvent(new CustomEvent('checkout:preview-loading'));

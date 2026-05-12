@@ -146,7 +146,7 @@ export function initOrder(form, cart, state, config, strings) {
       }
 
       // Delegate to the selected provider's own button if not credit-card
-      const selectedMethod = form.querySelector('[name="paymentMethod"]:checked')?.value || 'credit-card';
+      const selectedMethod = form.querySelector('[name="paymentMethod"]:checked')?.value;
 
       if (selectedMethod === 'apple-pay') {
         submitBtn.disabled = true;
@@ -167,7 +167,7 @@ export function initOrder(form, cart, state, config, strings) {
         return;
       }
 
-      if (selectedMethod !== 'credit-card') {
+      if (selectedMethod !== config.cardProvider) {
         const providerBtn = form.querySelector(`.payment-button-container[data-provider="${selectedMethod}"] button`);
         if (providerBtn) {
           submitBtn.disabled = true;

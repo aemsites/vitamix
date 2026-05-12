@@ -55,7 +55,7 @@ function getProviderMeta(strings) {
  * @param {Object} callbacks
  * @param {Object} strings
  */
-export function renderPaymentSection(container, activeProviders, callbacks, strings) {
+export function renderPaymentSection(container, activeProviders, callbacks, strings, config = {}) {
   const providerMeta = getProviderMeta(strings);
 
   // Security notice banner
@@ -96,7 +96,7 @@ export function renderPaymentSection(container, activeProviders, callbacks, stri
   const cardRadio = document.createElement('input');
   cardRadio.type = 'radio';
   cardRadio.name = 'paymentMethod';
-  cardRadio.value = 'credit-card';
+  cardRadio.value = config.cardProvider || 'chase';
   cardRadio.checked = true;
   cardRadio.id = 'payment-credit-card';
 
@@ -214,7 +214,7 @@ export async function initPayment(container, providers, callbacks, config, strin
     try { return p.isAvailable(); } catch { return false; }
   });
 
-  renderPaymentSection(container, available, callbacks, strings);
+  renderPaymentSection(container, available, callbacks, strings, config);
 
   // Render express buttons on the cart page (order-summary block)
   const expressContainer = document.querySelector('.express-checkout-buttons');
