@@ -214,7 +214,7 @@ export default function renderAddToCart(ph, block, parent) {
     }
 
     try {
-      if (window.cartMode === 'edge') {
+      if (window.useEdgeCheckout) {
         const cartApi = (await import('../../scripts/cart.js')).default;
 
         const { sku: variantSku, price, name } = selectedVariant;

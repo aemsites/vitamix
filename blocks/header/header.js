@@ -461,8 +461,8 @@ export default async function decorate(block) {
     if (hasToken) updateAuthUI(true);
   } catch { /* ignore */ }
 
-  // --- Auth panel (edge cart mode only) ---
-  if (window.cartMode === 'edge') {
+  // --- Auth panel (edge checkout mode only) ---
+  if (window.useEdgeCheckout) {
     let authPanel = null;
     const ensureAuthPanel = async () => {
       if (authPanel) return authPanel;
@@ -519,7 +519,7 @@ export default async function decorate(block) {
   });
 
   // change to edge cart link
-  if (window.cartMode === 'edge') {
+  if (window.useEdgeCheckout) {
     cartLink.href = EDGE_CART_PATH();
   }
 
@@ -529,8 +529,8 @@ export default async function decorate(block) {
       return;
     }
 
-    // if on mobile or using legacy cart, redirect to cart page
-    if (window.cartMode === 'legacy' || window.innerWidth < 900) {
+    // if on mobile or not using edge checkout, redirect to cart page
+    if (!window.useEdgeCheckout || window.innerWidth < 900) {
       return;
     }
 
@@ -542,9 +542,9 @@ export default async function decorate(block) {
     let minicart = document.querySelector('#minicart');
 
     const scrollToItem = () => {
+      if (!e.detail?.item?.sku) return;
       setTimeout(() => {
-        const addedItem = minicart.querySelector(`.cart-item-${e.detail.item.sku}`);
-        addedItem.scrollIntoView({ behavior: 'smooth' });
+        minicart.querySelector(`.cart-item-${e.detail.item.sku}`)?.scrollIntoView({ behavior: 'smooth' });
       }, 300);
     };
 

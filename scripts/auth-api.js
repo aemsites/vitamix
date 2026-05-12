@@ -1,4 +1,4 @@
-import { ORDERS_API_ORIGIN } from './scripts.js';
+import { getConfig } from './commerce-config.js';
 import { mintRecaptchaToken, RECAPTCHA_ACTIONS, RECAPTCHA_HEADER } from './recaptcha.js';
 
 /** sessionStorage key for the JWT issued after OTP verification */
@@ -35,7 +35,7 @@ export async function login(email, country, locale) {
   const headers = { 'Content-Type': 'application/json' };
   const recaptchaToken = await mintRecaptchaToken(RECAPTCHA_ACTIONS.AUTH_LOGIN);
   if (recaptchaToken) headers[RECAPTCHA_HEADER] = recaptchaToken;
-  const resp = await fetch(`${ORDERS_API_ORIGIN}/auth/login`, {
+  const resp = await fetch(`${getConfig().apiOrigin}/auth/login`, {
     method: 'POST',
     headers,
     body: JSON.stringify({ email, country, locale }),
@@ -62,7 +62,7 @@ export async function login(email, country, locale) {
  * @throws {Error} If the code is invalid, expired, or the request fails
  */
 export async function verifyCode(email, code, hash, exp) {
-  const resp = await fetch(`${ORDERS_API_ORIGIN}/auth/callback`, {
+  const resp = await fetch(`${getConfig().apiOrigin}/auth/callback`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -97,7 +97,7 @@ export async function verifyCode(email, code, hash, exp) {
 export async function logout() {
   const token = sessionStorage.getItem(AUTH_TOKEN_KEY);
   try {
-    await fetch(`${ORDERS_API_ORIGIN}/auth/logout`, {
+    await fetch(`${getConfig().apiOrigin}/auth/logout`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

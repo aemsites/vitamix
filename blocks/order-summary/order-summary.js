@@ -1,283 +1,160 @@
-import { getOrderPath } from '../../scripts/scripts.js';
+import { loadCSS } from '../../scripts/aem.js';
+import cart from '../../scripts/cart.js';
+import { getConfig, formatPrice } from '../../scripts/commerce-config.js';
+import buildCartItem from '../../scripts/commerce/cart-item.js';
+import { parsePreview } from '../../scripts/commerce-api.js';
+
+loadCSS('/styles/commerce-tokens.css');
+
+function getStrings() {
+  return getConfig().getStrings();
+}
+
+function getCurrencyCode() {
+  const { currency, getLocale } = getConfig();
+  return typeof currency === 'function' ? currency(getLocale()) : currency;
+}
+
+function buildTemplate(s) {
+  return /* html */`
+<div class="order-summary">
+  <div class="order-summary-header">
+    <h3>${s.orderSummary}</h3>
+  </div>
+  <div class="order-summary-content">
+    <div class="order-summary-items"></div>
+    <div class="order-summary-discount">
+      <input type="text" placeholder="${s.discountPlaceholder}" class="discount-input">
+      <button class="discount-apply">${s.apply}</button>
+    </div>
+    <div class="order-summary-totals">
+      <div class="order-summary-row">
+        <span>${s.subtotal}</span>
+        <span class="order-summary-subtotal"></span>
+      </div>
+      <div class="order-summary-row">
+        <span>${s.shipping}</span>
+        <span class="order-summary-shipping"></span>
+      </div>
+      <div class="order-summary-row">
+        <span>${s.estimatedTaxes}</span>
+        <span class="order-summary-taxes"></span>
+      </div>
+      <div class="order-summary-row order-summary-final">
+        <strong>${s.total}</strong>
+        <div class="order-summary-final-amount">
+          <span class="currency"></span>
+          <strong class="order-summary-grand-total"></strong>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+`;
+}
 
 /**
- * Order confirmation / cancellation page.
- *
- * Success: Chase / PayPal → API → redirect here with ?orderId=...
- * Cancel:  Chase / PayPal → API → redirect here with ?orderId=...&reason=...
- *   reason values: customer_cancelled | payment_failed | declined
- *
- * Order display data comes from sessionStorage (saved before the payment redirect).
+ * If the order-summary is authored in its own section (separate from the
+ * cart/checkout block), move its wrapper into the adjacent form section so
+ * the CSS :has(.order-summary-wrapper) two-column layout rule fires correctly.
+ * @param {HTMLDivElement} block
  */
-export default async function decorate(block) {
-  const params = Object.fromEntries(new URLSearchParams(window.location.search).entries());
+function colocateWithForm(block) {
+  const wrapper = block.closest('.order-summary-wrapper');
+  const mySection = wrapper?.closest('.section');
+  if (!wrapper || !mySection) return;
 
-  // cancelled or failed payment
-  if (params.reason) {
-    const container = document.createElement('div');
-    container.className = 'order-result order-cancelled';
+  // Already co-located — nothing to do
+  if (mySection.querySelector('.checkout-wrapper, .cart-wrapper')) return;
 
-    const heading = document.createElement('h2');
-    heading.textContent = 'Payment not completed';
-    container.appendChild(heading);
+  const main = mySection.closest('main') || document;
+  const target = [...main.querySelectorAll('.section')]
+    .find((s) => s !== mySection && s.querySelector('.checkout-wrapper, .cart-wrapper'));
+  if (!target) return;
 
-    const msg = document.createElement('p');
-    msg.textContent = params.reason === 'customer_cancelled'
-      ? 'You cancelled the payment.'
-      : 'Payment could not be processed. Please try again.';
-    container.appendChild(msg);
+  target.appendChild(wrapper);
+  // Remove the now-empty section to avoid stray margins
+  if (!mySection.children.length) mySection.remove();
+}
 
-    const link = document.createElement('p');
-    const returnLink = document.createElement('a');
-    returnLink.href = getOrderPath('checkout');
-    returnLink.className = 'button emphasis';
-    returnLink.textContent = 'Return to checkout';
-    link.appendChild(returnLink);
-    container.appendChild(link);
+/**
+ * @param {HTMLDivElement} block
+ */
+export default function decorate(block) {
+  const s = getStrings();
+  colocateWithForm(block);
+  block.innerHTML = buildTemplate(s);
 
-    block.replaceChildren(container);
-    return;
-  }
+  const itemsList = block.querySelector('.order-summary-items');
+  const subtotalEl = block.querySelector('.order-summary-subtotal');
+  const shippingEl = block.querySelector('.order-summary-shipping');
+  const taxesEl = block.querySelector('.order-summary-taxes');
+  const grandTotalEl = block.querySelector('.order-summary-grand-total');
+  const currencyEl = block.querySelector('.currency');
+  currencyEl.textContent = getCurrencyCode();
 
-  // success flow — read from sessionStorage
-  const orderId = params.orderId || params.id;
-  const email = params.email || sessionStorage.getItem('checkout_email');
-  const orderData = sessionStorage.getItem('checkout_order');
-  const previewData = sessionStorage.getItem('checkout_preview');
-  const cartItemsData = sessionStorage.getItem('checkout_cart_items');
+  const renderItems = () => {
+    itemsList.innerHTML = '';
 
-  if (!orderId) {
-    window.location.href = '/';
-    return;
-  }
-
-  let order;
-  let preview;
-  let cartItems;
-  try {
-    order = orderData ? JSON.parse(orderData) : null;
-    preview = previewData ? JSON.parse(previewData) : null;
-    cartItems = cartItemsData ? JSON.parse(cartItemsData) : null;
-  } catch {
-    order = null;
-    preview = null;
-    cartItems = null;
-  }
-
-  // clear checkout session data
-  sessionStorage.removeItem('checkout_email');
-  sessionStorage.removeItem('checkout_order');
-  sessionStorage.removeItem('checkout_preview');
-  sessionStorage.removeItem('checkout_cart_items');
-
-  // clear the cart
-  try {
-    const { default: cart } = await import('../../scripts/cart.js');
-    cart.clear();
-  } catch {
-    // cart may not be available
-  }
-
-  // build confirmation page
-  const container = document.createElement('div');
-  container.className = 'order-result order-confirmed';
-
-  // header section
-  const headerSection = document.createElement('div');
-  headerSection.className = 'order-header';
-
-  const checkmark = document.createElement('div');
-  checkmark.className = 'order-checkmark';
-  checkmark.innerHTML = '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#2e7d32" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-5"/></svg>';
-  headerSection.appendChild(checkmark);
-
-  const heading = document.createElement('h2');
-  heading.textContent = 'Thank you for your order!';
-  headerSection.appendChild(heading);
-
-  const orderIdEl = document.createElement('p');
-  orderIdEl.className = 'order-id';
-  const orderIdLabel = document.createElement('span');
-  orderIdLabel.textContent = 'Order ID: ';
-  const orderIdValue = document.createElement('strong');
-  orderIdValue.textContent = orderId;
-  orderIdEl.append(orderIdLabel, orderIdValue);
-  headerSection.appendChild(orderIdEl);
-
-  if (email) {
-    const emailEl = document.createElement('p');
-    emailEl.className = 'order-email';
-    emailEl.textContent = `A confirmation will be sent to ${email}.`;
-    headerSection.appendChild(emailEl);
-  }
-
-  container.appendChild(headerSection);
-
-  // two-column layout: items + totals on left, shipping on right
-  const detailsGrid = document.createElement('div');
-  detailsGrid.className = 'order-details';
-
-  // left column: items + totals
-  const leftCol = document.createElement('div');
-  leftCol.className = 'order-details-left';
-
-  // items
-  const displayItems = cartItems || order?.items;
-  if (displayItems?.length) {
-    const itemsSection = document.createElement('div');
-    itemsSection.className = 'order-items';
-
-    const itemsHeading = document.createElement('h3');
-    itemsHeading.textContent = 'Items ordered';
-    itemsSection.appendChild(itemsHeading);
-
-    displayItems.forEach((item) => {
-      const itemEl = document.createElement('div');
-      itemEl.className = 'order-item';
-
-      if (item.image) {
-        const imgWrapper = document.createElement('div');
-        imgWrapper.className = 'order-item-image';
-        const img = document.createElement('img');
-        img.src = item.image;
-        img.alt = item.name || '';
-        imgWrapper.appendChild(img);
-        itemEl.appendChild(imgWrapper);
-      }
-
-      const details = document.createElement('div');
-      details.className = 'order-item-details';
-
-      const name = document.createElement('p');
-      name.className = 'order-item-name';
-      name.textContent = item.name || item.sku;
-      details.appendChild(name);
-
-      if (item.variant) {
-        const variant = document.createElement('p');
-        variant.className = 'order-item-variant';
-        variant.textContent = item.variant;
-        details.appendChild(variant);
-      }
-
-      const qty = document.createElement('p');
-      qty.className = 'order-item-qty';
-      qty.textContent = `Qty: ${item.quantity}`;
-      details.appendChild(qty);
-
-      itemEl.appendChild(details);
-
-      const price = document.createElement('div');
-      price.className = 'order-item-price';
-      const unitPrice = parseFloat(item.price?.final || item.price) || 0;
-      price.textContent = `$${(unitPrice * item.quantity).toFixed(2)}`;
-      itemEl.appendChild(price);
-
-      itemsSection.appendChild(itemEl);
+    cart.items.forEach((item) => {
+      const itemEl = buildCartItem(
+        item,
+        {
+          onQtyChange: (sku, qty) => cart.updateItem(sku, qty),
+          onRemove: (sku) => cart.removeItem(sku),
+          currencyCode: getCurrencyCode(),
+        },
+        { remove: s.remove, removeItem: s.removeItem },
+      );
+      itemsList.appendChild(itemEl);
     });
-    leftCol.appendChild(itemsSection);
-  }
+  };
 
-  // totals
-  if (preview) {
-    const totalsSection = document.createElement('div');
-    totalsSection.className = 'order-totals';
+  const updateTotals = () => {
+    const currency = getCurrencyCode();
+    const subtotal = formatPrice(cart.subtotal, currency);
+    subtotalEl.textContent = subtotal;
+    shippingEl.textContent = '--';
+    taxesEl.textContent = '--';
+    grandTotalEl.textContent = subtotal;
+  };
 
-    const rows = [
-      ['Subtotal', `$${parseFloat(preview.subtotal).toFixed(2)}`],
-      ['Shipping', preview.shippingMethod?.rate === 0 ? 'Free' : `$${parseFloat(preview.shippingMethod?.rate || 0).toFixed(2)}`],
-      ['Tax', `$${parseFloat(preview.taxAmount).toFixed(2)}`],
-    ];
+  renderItems();
+  updateTotals();
 
-    rows.forEach(([label, value]) => {
-      const row = document.createElement('div');
-      row.className = 'order-totals-row';
-      const labelEl = document.createElement('span');
-      labelEl.textContent = label;
-      const valueEl = document.createElement('span');
-      valueEl.textContent = value;
-      row.append(labelEl, valueEl);
-      totalsSection.appendChild(row);
-    });
+  const wrapper = block.closest('.order-summary-wrapper');
+  const syncVisibility = () => {
+    wrapper?.toggleAttribute('hidden', cart.items.length === 0);
+  };
 
-    const totalRow = document.createElement('div');
-    totalRow.className = 'order-totals-row order-totals-total';
-    const totalLabel = document.createElement('strong');
-    totalLabel.textContent = 'Total';
-    const totalValue = document.createElement('strong');
-    totalValue.textContent = `$${parseFloat(preview.total).toFixed(2)}`;
-    totalRow.append(totalLabel, totalValue);
-    totalsSection.appendChild(totalRow);
+  document.addEventListener('cart:change', () => {
+    renderItems();
+    updateTotals();
+    syncVisibility();
+  });
 
-    leftCol.appendChild(totalsSection);
-  }
+  const summaryContent = block.querySelector('.order-summary-content');
+  document.addEventListener('checkout:preview-loading', () => {
+    summaryContent?.classList.add('loading');
+  });
 
-  detailsGrid.appendChild(leftCol);
+  document.addEventListener('checkout:preview', (e) => {
+    summaryContent?.classList.remove('loading');
+    const { preview } = e.detail || {};
+    if (!preview) return;
 
-  // right column: shipping address
-  const rightCol = document.createElement('div');
-  rightCol.className = 'order-details-right';
+    const {
+      subtotal, taxAmount, shippingRate, total,
+    } = parsePreview(preview, cart.subtotal);
 
-  if (order?.shipping) {
-    const addrSection = document.createElement('div');
-    addrSection.className = 'order-shipping-address';
+    const currency = getCurrencyCode();
+    subtotalEl.textContent = formatPrice(subtotal, currency);
+    shippingEl.textContent = shippingRate === 0
+      ? s.free
+      : formatPrice(parseFloat(shippingRate), currency);
+    taxesEl.textContent = formatPrice(taxAmount, currency);
+    grandTotalEl.textContent = formatPrice(total, currency);
+  });
 
-    const addrHeading = document.createElement('h3');
-    addrHeading.textContent = 'Shipping address';
-    addrSection.appendChild(addrHeading);
-
-    const addr = order.shipping;
-    const lines = [
-      addr.name,
-      addr.company,
-      addr.address1,
-      addr.address2,
-      `${addr.city}, ${addr.state} ${addr.zip}`,
-      addr.country?.toUpperCase(),
-    ].filter(Boolean);
-
-    lines.forEach((line) => {
-      const p = document.createElement('p');
-      p.textContent = line;
-      addrSection.appendChild(p);
-    });
-
-    rightCol.appendChild(addrSection);
-  }
-
-  if (order?.customer) {
-    const contactSection = document.createElement('div');
-    contactSection.className = 'order-contact';
-
-    const contactHeading = document.createElement('h3');
-    contactHeading.textContent = 'Contact';
-    contactSection.appendChild(contactHeading);
-
-    const contactEmail = document.createElement('p');
-    contactEmail.textContent = order.customer.email;
-    contactSection.appendChild(contactEmail);
-
-    if (order.customer.phone) {
-      const contactPhone = document.createElement('p');
-      contactPhone.textContent = order.customer.phone;
-      contactSection.appendChild(contactPhone);
-    }
-
-    rightCol.appendChild(contactSection);
-  }
-
-  detailsGrid.appendChild(rightCol);
-  container.appendChild(detailsGrid);
-
-  // continue shopping
-  const actions = document.createElement('div');
-  actions.className = 'order-actions';
-  const continueLink = document.createElement('a');
-  continueLink.href = '/';
-  continueLink.className = 'button emphasis';
-  continueLink.textContent = 'Continue shopping';
-  actions.appendChild(continueLink);
-  container.appendChild(actions);
-
-  block.replaceChildren(container);
+  syncVisibility();
 }

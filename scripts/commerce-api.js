@@ -1,4 +1,4 @@
-import { ORDERS_API_ORIGIN } from './scripts.js';
+import { getConfig } from './commerce-config.js';
 import { AUTH_TOKEN_KEY } from './auth-api.js';
 import { mintRecaptchaToken, RECAPTCHA_ACTIONS, RECAPTCHA_HEADER } from './recaptcha.js';
 
@@ -39,7 +39,7 @@ async function post(path, body, recaptchaAction) {
     if (recaptchaToken) headers[RECAPTCHA_HEADER] = recaptchaToken;
   }
 
-  const resp = await fetch(`${ORDERS_API_ORIGIN}${path}`, {
+  const resp = await fetch(`${getConfig().apiOrigin}${path}`, {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
@@ -67,6 +67,26 @@ export async function estimateShipping(country, state, items) {
   return post('/estimate/shipping', {
     country,
     shipping: { country, state },
+    items,
+  });
+}
+
+/**
+ * Fetches fully computed totals for all shipping methods at an address during Apple Pay
+ * express checkout. Called inside `onshippingcontactselected` where only a partial address
+ * (city, state, country, zip — no street) is available.
+ *
+ * @param {string} country - ISO 3166-1 alpha-2 country code (e.g. 'us', 'ca')
+ * @param {string} state - State or province code (e.g. 'QC', 'CA')
+ * @param {string} zip - Postal/ZIP code
+ * @param {Array<{sku: string, path: string, quantity: number, price: Object}>} items
+ * @returns {Promise<{ subtotal: number, shippingMethods: Array<Object> }>}
+ * @throws {CommerceApiError}
+ */
+export async function estimateExpressCheckout(country, state, zip, items) {
+  return post('/estimate/express-checkout', {
+    country,
+    shipping: { country, state, zip },
     items,
   });
 }
@@ -142,4 +162,20 @@ export async function validateApplePayMerchant(validationUrl, country, locale) {
     ...(country ? { country } : {}),
     ...(locale ? { locale } : {}),
   });
+}
+
+/**
+ * Normalises a checkout:preview payload into scalar price values.
+ * @param {Object} preview
+ * @param {number} cartSubtotal - fallback when preview.subtotal is absent
+ * @returns {{ subtotal: number, taxAmount: number, shippingRate: number, total: number }}
+ */
+export function parsePreview(preview, cartSubtotal) {
+  const subtotal = parseFloat(preview.subtotal) || cartSubtotal;
+  const taxAmount = parseFloat(preview.taxAmount) || 0;
+  const shippingRate = preview.shippingMethod?.rate ?? 0;
+  const total = parseFloat(preview.total) || (subtotal + taxAmount + shippingRate);
+  return {
+    subtotal, taxAmount, shippingRate, total,
+  };
 }

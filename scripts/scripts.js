@@ -19,11 +19,9 @@ import {
 
 const { hostname } = window.location;
 
-export const ORDERS_API_ORIGIN = 'https://api-stage.adobecommerce.live/aemsites/sites/vitamix';
-
-// Locales enabled for edge cart on production.
-// Add locale codes here as each region goes live (e.g., 'ca', 'fr_ca').
-const EDGE_CART_LOCALES = [];
+// Locale+language pairs enabled for edge checkout on production.
+// Format: '<locale>/<language>' (e.g., 'ca/fr_ca'). Add pairs as each region goes live.
+const EDGE_CHECKOUT_LOCALES = ['ca/fr_ca', 'ca/en_us', 'us/en_us'];
 
 const isEdgeHost = hostname.includes('localhost') || hostname.includes('edge-orders') || hostname.includes('integration.vitamix.com') || hostname.includes('uat.vitamix.com');
 const isProdHost = hostname.includes('vitamix.com');
@@ -35,6 +33,11 @@ export const AFFIRM_PUBLIC_KEY = isProdHost ? 'LIVE_PUBLIC_KEY' : 'GH4VQBRG3LHDS
 export const FORMS_ENDPOINT = isProdHost
   ? 'https://main--vitamix--aemsites.aem.network' // TODO: make empty string when Akamai ready
   : 'https://main--vitamix--aemsites.aem.network';
+
+window.CommerceConfig = {
+  org: 'aemsites',
+  site: 'vitamix',
+};
 
 /**
  * Load fonts.css and set a session storage flag.
@@ -1196,11 +1199,11 @@ async function loadEager(doc) {
   const { locale, language } = getLocaleAndLanguage();
   document.documentElement.lang = language ? language.split('_')[0] : 'en';
 
-  // Dev/staging hosts: edge cart enabled for all locales.
-  // Production: edge cart enabled only for locales listed in EDGE_CART_LOCALES.
-  window.cartMode = (isEdgeHost || EDGE_CART_LOCALES.includes(locale)) ? 'edge' : 'legacy';
-  if (['edge', 'legacy'].includes(localStorage.getItem('cartMode'))) {
-    window.cartMode = localStorage.getItem('cartMode');
+  // Dev/staging hosts: edge checkout enabled for all locales.
+  // Production: edge checkout enabled only for locale+language pairs in EDGE_CHECKOUT_LOCALES.
+  window.useEdgeCheckout = isEdgeHost || EDGE_CHECKOUT_LOCALES.includes(`${locale}/${language}`);
+  if (localStorage.getItem('useEdgeCheckout') !== null) {
+    window.useEdgeCheckout = localStorage.getItem('useEdgeCheckout') === 'true';
   }
 
   /* simulation date */

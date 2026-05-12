@@ -1,238 +1,308 @@
-.checkout-container {
+/* Constrain the combined form + order summary to the commerce max-width */
+main > .section:has(.checkout-wrapper) {
+  max-width: var(--commerce-max-width);
+  margin-right: auto;
+  margin-left: auto;
+  gap: 24px;
+}
+
+/* Stack section cards with spacing */
+.checkout-form {
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  max-width: 1440px;
-  margin: 0 auto;
-  padding: 32px 0 0;
+  gap: 12px;
 }
 
-/* Mobile: cart summary on top, form below */
-@media (width < 1000px) {
-  .checkout-container {
-    flex-direction: column;
-  }
-
-  .checkout-summary-column {
-    order: -1; /* Cart summary appears first on mobile */
-  }
-
-  .checkout-form-column {
-    order: 1;
-  }
+/* Sign-in prompt — not a card, just a small text link above */
+.checkout-signin-prompt {
+  padding: 0 0 4px;
+  font-size: var(--commerce-font-size-sm);
 }
 
-/* Desktop: form on left, cart summary on right */
-@media (width >= 1000px) {
-  .checkout-container {
-    flex-direction: row;
-    align-items: flex-start;
-    gap: 40px;
-  }
-
-  .checkout-form-column {
-    flex: 1;
-    max-width: 600px;
-  }
-
-  .checkout-summary-column {
-    flex: 0 0 450px;
-    position: sticky;
-    top: 100px; /* Keeps it visible while scrolling */
-  }
+.checkout-signin-link {
+  color: var(--commerce-color-text);
+  text-decoration: underline;
 }
 
-/* Remove default block wrapper margins */
-.checkout .form-wrapper,
-.checkout .cart-summary-wrapper {
+/* ── Section cards — each section is a white bordered card ──────── */
+.checkout-form .form-section {
+  background: var(--commerce-color-background);
+  border: 1px solid var(--commerce-color-border);
+  border-radius: var(--commerce-radius-card);
+  padding: 20px 24px;
+}
+
+/* Fieldset sections inherit card styling */
+.checkout-form fieldset.form-section {
   margin: 0;
 }
 
-/* Form styling adjustments for checkout context */
-.checkout-form-column .form {
-  background: transparent;
+.checkout-form .form-section h3 {
+  margin: 0 0 16px;
+  font-size: var(--commerce-font-size-base);
+  font-weight: var(--commerce-font-weight-bold);
 }
 
-.checkout-form-column form {
-  display: grid;
-  gap: var(--spacing-80);
-}
-
-.checkout-form-column form input,
-.checkout-form-column form select {
-  font-weight: normal;
-  font-family: var(--sans-serif-font-family);
-  font-size: 16px;
-  box-sizing: border-box;
-  height: 48px;
-}
-
-.checkout-form-column .button-wrapper {
-  margin-top: var(--spacing-80);
-}
-
-.checkout-form-column .button {
+.checkout-form fieldset.form-section legend {
+  float: left;
+  grid-column: 1 / -1;
   width: 100%;
+  padding: 0;
+  margin-bottom: 16px;
+  font-size: var(--commerce-font-size-base);
+  font-weight: var(--commerce-font-weight-bold);
 }
 
-.checkout-form-column form .field-help-text {
-  font-size: var(--body-size-xs);
-  padding-left: 8px;
+/* Clearfix for fieldset legend float */
+.checkout-form fieldset.form-section::after {
+  content: '';
+  display: block;
+  clear: both;
 }
 
-.checkout-form-column .form form fieldset[data-name="optIn"] {
-  margin-top: 0;
+/* Express checkout — card panel */
+.checkout-form .express-checkout-section {
+  background: var(--commerce-color-surface);
 }
 
-.checkout-form-column form fieldset[data-name="optIn"] legend {
+.checkout-form .express-checkout-section[hidden] {
   display: none;
 }
 
-/* Shipping & billing address grid layout — 6-col grid for 2-col and 3-col rows */
-.checkout-form-column .section-shipping,
-.checkout-form-column .section-billing {
+/* Billing section — card with radio options */
+
+/* ── Express checkout ─────────────────────────────────────────────── */
+.express-checkout-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.express-checkout-label {
+  margin: 0;
+  font-size: var(--commerce-font-size-base);
+  font-weight: var(--commerce-font-weight-bold);
+}
+
+.express-checkout-tagline {
+  margin: 0;
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-text-muted);
+}
+
+.express-checkout-buttons {
+  container-type: inline-size;
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: 12px;
+  overflow: hidden;
+  max-width: 100%;
+}
+
+/* All buttons share one row at wide sizes — div covers SDK iframes, button covers stubs */
+.express-checkout-buttons > div,
+.express-checkout-buttons > button {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  height: 58px;
+}
+
+/* Stub Pay Later button fills its wrapper in the default (wide) state */
+.paypal-paylater-wrapper .paypal-express-btn {
+  height: 58px;
+}
+
+/* Pay Later drops to a full-width second row when space is tight */
+@container (max-width: 480px) {
+  .express-checkout-buttons > .paypal-paylater-wrapper {
+    flex: 0 0 100%;
+  }
+}
+
+@media (width >= 1118px) and (width <= 1250px) {
+  .express-checkout-buttons > .paypal-paylater-wrapper {
+    flex: 0 0 100%;
+  }
+}
+
+@media (width >= 610px) and (width <= 714px) {
+  .express-checkout-buttons > .paypal-paylater-wrapper {
+    flex: 0 0 100%;
+  }
+}
+
+.express-checkout-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0 0;
+  padding-top: 14px;
+  font-size: 11px;
+  font-weight: var(--commerce-font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--commerce-color-text-muted);
+  white-space: nowrap;
+}
+
+.express-checkout-divider::before,
+.express-checkout-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--commerce-color-border);
+}
+
+/* ── Field grid ───────────────────────────────────────────────────── */
+.form-fields {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
   gap: 12px;
-  align-items: end;
 }
 
-/* Shipping methods */
-.shipping-methods {
-  border: none;
-  padding: 0;
-  width: 100%;
-}
-
-.shipping-methods h3 {
-  margin-bottom: var(--spacing-40);
-}
-
-.checkout-form-column .section-shipping h3,
-.checkout-form-column .section-billing h3 {
+.form-field {
   grid-column: 1 / -1;
 }
 
-/* Default: all fields full width */
-.checkout-form-column .section-shipping .form-field,
-.checkout-form-column .section-billing .form-field {
-  grid-column: 1 / -1;
+.form-field.field-half {
+  grid-column: span 3;
 }
 
-.checkout-form-column .form .form-field + .form-field {
-  margin-top: 8px;
+.form-field.field-third {
+  grid-column: span 2;
 }
 
-/* Company — full width, after lastname */
-.checkout-form-column .section-shipping .form-field[data-name="company"],
-.checkout-form-column .section-billing .form-field[data-name="company"] { order: 3; }
-
-/* Reorder fields: firstname(1) lastname(2) street-0(3) street-1(4) city(5) state(6) zip(7) phone(8) */
-.checkout-form-column .section-shipping .form-field[data-name="firstname"],
-.checkout-form-column .section-billing .form-field[data-name="firstname"] { order: 1; }
-
-.checkout-form-column .section-shipping .form-field[data-name="lastname"],
-.checkout-form-column .section-billing .form-field[data-name="lastname"] { order: 2; }
-
-.checkout-form-column .section-shipping .form-field[data-name="street-0"],
-.checkout-form-column .section-billing .form-field[data-name="street-0"] { order: 4; }
-
-.checkout-form-column .section-shipping .form-field[data-name="street-1"],
-.checkout-form-column .section-billing .form-field[data-name="street-1"] { order: 5; }
-
-.checkout-form-column .section-shipping .form-field[data-name="city"],
-.checkout-form-column .section-billing .form-field[data-name="city"] { order: 6; }
-
-.checkout-form-column .section-shipping .form-field[data-name="state"],
-.checkout-form-column .section-billing .form-field[data-name="state"] { order: 7; }
-
-.checkout-form-column .section-shipping .form-field[data-name="zip"],
-.checkout-form-column .section-billing .form-field[data-name="zip"] { order: 8; }
-
-.checkout-form-column .section-shipping .form-field[data-name="telephone"],
-.checkout-form-column .section-billing .form-field[data-name="telephone"] { order: 9; }
-
-/* Desktop layout — data-name uses original field names (without shipping-/billing- prefix) */
-@media (width >= 480px) {
-  /* First name / Last name — half width each */
-  .checkout-form-column .section-shipping .form-field[data-name="firstname"],
-  .checkout-form-column .section-billing .form-field[data-name="firstname"] {
-    grid-column: 1 / 4;
-  }
-
-  .checkout-form-column .section-shipping .form-field[data-name="lastname"],
-  .checkout-form-column .section-billing .form-field[data-name="lastname"] {
-    grid-column: 4 / 7;
-  }
-
-  /* City / Province / Postal code — thirds */
-  .checkout-form-column .section-shipping .form-field[data-name="city"],
-  .checkout-form-column .section-billing .form-field[data-name="city"] {
-    grid-column: 1 / 3;
-  }
-
-  .checkout-form-column .section-shipping .form-field[data-name="state"],
-  .checkout-form-column .section-billing .form-field[data-name="state"] {
-    grid-column: 3 / 5;
-  }
-
-  .checkout-form-column .section-shipping .form-field[data-name="zip"],
-  .checkout-form-column .section-billing .form-field[data-name="zip"] {
-    grid-column: 5 / 7;
-  }
+/* ── Floating labels — checkbox first (lower specificity than :has() below) ── */
+.form-field-checkbox label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: var(--commerce-font-size-sm);
 }
 
-.checkout-form-column .form form .form-field[data-name="street-1"] {
-  margin-top: -2px;
-}
-
-.checkout-form-column .form form .button-wrapper span.payment-button {
-  width: 100%;
-}
-
-/* The span is the actual click target — the <apple-pay-button> shadow DOM
-   swallows pointer events before they can bubble to the span. Setting
-   pointer-events:none makes clicks fall through to the span, which holds
-   our ApplePaySession logic. display:block + min-height ensure the span
-   is always clickable even before the SDK upgrades <apple-pay-button>. */
-.checkout-form-column .form form .button-wrapper span.payment-button.apple-pay {
-  display: block;
-  min-height: 44px;
+.form-field-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex-shrink: 0;
   cursor: pointer;
 }
 
-apple-pay-button {
-  --apple-pay-button-width: 100%;
-  --apple-pay-button-height: 40px;
-  --apple-pay-button-border-radius: 5px;
-  --apple-pay-button-padding: 5px 0px;
+.floating-label-field {
+  position: relative;
+}
 
+.floating-label-field input,
+.floating-label-field select,
+.floating-label-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 20px 14px 4px;
+  height: var(--commerce-input-height);
+  border: 1px solid var(--commerce-input-border);
+  border-radius: var(--commerce-input-radius);
+  background: var(--commerce-input-background);
+  font-size: var(--commerce-font-size-sm);
+  font-weight: 400;
+  font-family: inherit;
+  color: var(--commerce-color-text);
+  outline: none;
+  appearance: none;
+}
+
+.floating-label-field textarea {
+  height: auto;
+  padding-top: 24px;
+  resize: vertical;
+}
+
+.floating-label-field select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23666' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 36px;
+  cursor: pointer;
+}
+
+.floating-label-field input:focus,
+.floating-label-field select:focus,
+.floating-label-field textarea:focus {
+  border-color: var(--commerce-input-border-focus);
+}
+
+.floating-label-field input:-webkit-autofill,
+.floating-label-field input:-webkit-autofill:hover,
+.floating-label-field input:-webkit-autofill:focus {
+  box-shadow: 0 0 0 1000px var(--commerce-input-background) inset;
+  -webkit-text-fill-color: var(--commerce-color-text);
+}
+
+.floating-label-field select:-webkit-autofill,
+.floating-label-field select:-webkit-autofill:hover,
+.floating-label-field select:-webkit-autofill:focus {
+  background-color: var(--commerce-input-background);
+  color: var(--commerce-color-text);
+}
+
+.floating-label-field input[required] + label::after,
+.floating-label-field select[required] + label::after {
+  content: ' *';
+  color: var(--commerce-color-error, #c00);
+}
+
+.floating-label-field label {
+  position: absolute;
+  left: 14px;
+  top: 16px;
+  margin: 0;
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-text-muted);
   pointer-events: none;
+  transition: top 0.15s ease, font-size 0.15s ease;
 }
 
-.checkout-form-column .form form .button-wrapper span.payment-button.paypal .button {
+.floating-label-field:has(input:focus) label,
+.floating-label-field:has(input:not(:placeholder-shown)) label,
+.floating-label-field:has(select:focus) label,
+.floating-label-field:has(select.has-value) label,
+.floating-label-field:has(textarea:focus) label,
+.floating-label-field:has(textarea:not(:placeholder-shown)) label {
+  top: 8px;
+  font-size: 0.7rem;
+}
+
+.floating-label-field input.field-required,
+.floating-label-field select.field-required {
+  border-color: var(--commerce-color-error);
+}
+
+/* Gift message char count */
+.char-count {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--commerce-color-text-muted);
+  text-align: right;
+  margin-top: 4px;
+}
+
+/* ── Shipping methods — horizontal card layout ───────────────────── */
+.shipping-methods {
   display: flex;
-  justify-content: center;
-  gap: 6px;
-  padding-top: 13px;
-  padding-bottom: 13px;
-  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
-span.payment-button.paypal .button img {
-  height: 24px;
-  width: 70px;
+.checkout-form .shipping-methods:has(.shipping-methods-placeholder) {
+  padding-bottom: 20px;
 }
 
-/* Form section ordering */
-.checkout-form-column form .section-shipping { order: 1; }
-.checkout-form-column form > .form-field[data-name="billingEqualsShipping"] { order: 2; }
-.checkout-form-column form .section-billing { order: 3; }
-.checkout-form-column form .shipping-methods { order: 4; }
-.checkout-form-column form .section-payment { order: 5; }
-.checkout-form-column form > .form-field[data-name="email"] { order: 0; }
-.checkout-form-column form > .form-field[data-name="optIn"] { order: 0; }
-.checkout-form-column form .button-wrapper { order: 7; }
+.checkout-form .shipping-methods:has(.shipping-methods-placeholder) legend {
+  margin-bottom: 8px;
+}
 
 .shipping-methods.loading {
   opacity: 0.5;
@@ -240,70 +310,500 @@ span.payment-button.paypal .button img {
 }
 
 .shipping-method-option {
+  flex: 1 1 auto;
+  min-width: 150px;
   display: flex;
-  align-items: center;
+  flex-direction: row;
+  align-items: flex-start;
   gap: 12px;
-  padding: 12px 16px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  margin-bottom: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--commerce-color-border);
+  border-radius: var(--commerce-radius-badge);
   cursor: pointer;
   transition: border-color 0.15s;
-  width: 100%;
-  box-sizing: border-box;
 }
 
 .shipping-method-option:hover {
-  border-color: #333;
+  border-color: var(--commerce-color-text);
 }
 
 .shipping-method-option:has(input:checked) {
-  border-color: #333;
-  background: #fafafa;
+  border-color: var(--commerce-color-text);
+  background: var(--commerce-color-surface);
 }
 
 .shipping-method-option input[type="radio"] {
-  margin: 0;
+  flex-shrink: 0;
+  margin: 2px 0 0;
   width: 18px;
   height: 18px;
+  cursor: pointer;
+  accent-color: var(--commerce-color-text);
+}
+
+.shipping-method-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .shipping-method-label {
-  flex: 1;
+  font-size: var(--commerce-font-size-sm);
+  font-weight: var(--commerce-font-weight-bold);
+}
+
+.shipping-method-eta {
+  font-size: 12px;
+  color: var(--commerce-color-text-muted);
 }
 
 .shipping-method-price {
-  font-weight: 600;
+  font-size: var(--commerce-font-size-sm);
+  font-weight: var(--commerce-font-weight-bold);
 }
 
-.shipping-methods-empty {
-  color: #666;
+.shipping-method-price-free {
+  color: #2a7c43;
+}
+
+.shipping-methods-empty,
+.shipping-methods-placeholder {
+  color: var(--commerce-color-text-muted);
+  font-size: var(--commerce-font-size-sm);
   font-style: italic;
+  margin-top: 4px;
 }
 
-/* Required indicator is now appended directly to the floating label text in JS */
-
-/* Required field error state */
-.checkout-form-column form input.field-required,
-.checkout-form-column form select.field-required {
-  border-color: #c00;
+/* ── Billing address ─────────────────────────────────────────────── */
+.billing-subtitle {
+  margin: 0 0 16px;
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-text-muted);
 }
 
-/* Checkout error */
-.checkout-error {
-  background: #fee;
-  border: 1px solid #c00;
-  color: #900;
-  padding: 12px 16px;
-  border-radius: 6px;
-  margin-bottom: var(--spacing-40);
+.billing-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.checkout-error[aria-hidden="true"] {
+.billing-option-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--commerce-color-border);
+  border-radius: var(--commerce-radius-card);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.billing-option-card:has(input:checked) {
+  border-color: var(--commerce-color-text);
+}
+
+.billing-option-card input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  flex-shrink: 0;
+  cursor: pointer;
+  accent-color: var(--commerce-color-text);
+}
+
+.billing-option-content {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.billing-option-label {
+  font-size: var(--commerce-font-size-sm);
+  font-weight: var(--commerce-font-weight-bold);
+}
+
+.billing-option-detail {
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-text-muted);
+}
+
+.billing-fields-wrapper {
+  margin-top: 20px;
+}
+
+/* ── Payment method ──────────────────────────────────────────────── */
+.payment-security-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  background: var(--commerce-color-surface);
+  border: 1px solid var(--commerce-color-border);
+  border-radius: var(--commerce-radius-card);
+}
+
+.payment-security-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  background: #e8e8e8;
+  border-radius: 8px;
+  color: var(--commerce-color-text-muted);
+}
+
+.payment-security-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--commerce-font-size-sm);
+}
+
+.payment-security-text strong {
+  color: var(--commerce-color-text);
+  font-weight: var(--commerce-font-weight-bold);
+}
+
+.payment-security-text span {
+  color: var(--commerce-color-text-muted);
+}
+
+.payment-how-label {
+  margin: 0 0 12px;
+  font-size: 11px;
+  font-weight: var(--commerce-font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--commerce-color-text-muted);
+}
+
+.payment-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.payment-option-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--commerce-color-border);
+  border-radius: var(--commerce-radius-card);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.payment-option-card:hover {
+  border-color: var(--commerce-color-text-muted);
+}
+
+.payment-option-card.payment-option-active {
+  border-color: var(--commerce-color-text);
+}
+
+.payment-option-card input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  flex-shrink: 0;
+  cursor: pointer;
+  accent-color: var(--commerce-color-text);
+}
+
+.payment-option-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  color: var(--commerce-color-text-muted);
+}
+
+.payment-icon-pp {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 14px;
+  font-weight: bold;
+  line-height: 1;
+}
+
+.payment-icon-text {
+  font-size: 12px;
+  font-weight: var(--commerce-font-weight-bold);
+  color: var(--commerce-color-text-muted);
+}
+
+.payment-option-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.payment-option-label {
+  font-size: var(--commerce-font-size-sm);
+  font-weight: var(--commerce-font-weight-bold);
+  color: var(--commerce-color-text);
+}
+
+.payment-option-sublabel {
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-text-muted);
+}
+
+.payment-option-badges {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.card-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 5px;
+  border: 1px solid var(--commerce-color-border);
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: var(--commerce-font-weight-bold);
+  color: var(--commerce-color-text-muted);
+  letter-spacing: 0.02em;
+}
+
+.payment-button-container {
   display: none;
 }
 
-/* Empty cart */
+/* PayPal stub buttons */
+.paypal-btn,
+.paypal-express-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  height: 48px;
+  overflow: hidden;
+  background: #ffc439;
+  border: none;
+  border-radius: var(--commerce-button-radius);
+  cursor: pointer;
+  transition: background 0.15s;
+  box-sizing: border-box;
+}
+
+.pp-wordmark {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 20px;
+  font-weight: bold;
+  line-height: 1;
+}
+
+.pp-pay { color: #003087; }
+
+.pp-pal { color: #009cde; }
+
+.pp-later {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 13px;
+  font-weight: bold;
+  color: #003087;
+  margin-left: 6px;
+}
+
+.paypal-btn:hover,
+.paypal-express-btn:hover {
+  background: #f0b929;
+}
+
+.paypal-btn:disabled,
+.paypal-express-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  font-size: var(--commerce-font-size-sm);
+  color: #003087;
+}
+
+.paylater-btn,
+.paylater-express-btn {
+  background: #e8f4fb;
+  border: 1px solid #b0d8f0;
+}
+
+.paylater-btn:hover,
+.paylater-express-btn:hover {
+  background: #d0eaf7;
+}
+
+/* Not-configured dialog */
+.paypal-not-configured-dialog {
+  border: 1px solid var(--commerce-color-border);
+  border-radius: var(--commerce-radius-card);
+  padding: var(--commerce-card-padding);
+  min-width: 280px;
+  text-align: center;
+}
+
+.paypal-not-configured-dialog p {
+  margin: 0 0 16px;
+  font-size: var(--commerce-font-size-sm);
+}
+
+.paypal-not-configured-dialog::backdrop {
+  background: rgb(0 0 0 / 40%);
+}
+
+/* Apple Pay */
+apple-pay-button {
+  --apple-pay-button-width: 100%;
+  --apple-pay-button-height: 58px;
+  --apple-pay-button-border-radius: var(--commerce-button-radius);
+  --apple-pay-button-padding: 0;
+
+  flex: 1;
+  min-width: 0;
+  display: block;
+}
+
+
+/* ── Order total breakdown (mobile only) ─────────────────────────── */
+.order-total-breakdown {
+  display: none;
+}
+
+.order-breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-text-muted);
+}
+
+/* ── Order total + submit ─────────────────────────────────────────── */
+.order-total-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.order-total-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.order-total-label {
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-text-muted);
+}
+
+.order-total-amount {
+  font-size: 28px;
+  font-weight: var(--commerce-font-weight-bold);
+  color: var(--commerce-color-text);
+  line-height: 1.1;
+}
+
+.order-total-tnc {
+  margin: 0;
+  font-size: 11px;
+  color: var(--commerce-color-text-muted);
+}
+
+button.checkout-submit-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  padding: 14px 24px;
+  font-size: var(--commerce-font-size-base);
+}
+
+.submit-lock-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.checkout-submit-btn:disabled {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.checkout-submit-btn.is-loading .submit-lock-icon svg {
+  display: none;
+}
+
+.checkout-submit-btn.is-loading .submit-lock-icon::after {
+  content: '';
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgb(255 255 255 / 40%);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: submit-btn-spin 0.7s linear infinite;
+}
+
+@keyframes submit-btn-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (width < 1000px) {
+  .card-badge {
+    display: none;
+  }
+
+  .order-total-breakdown {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 12px 0;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--commerce-color-border);
+  }
+
+  .order-total-amount {
+    text-align: right;
+    padding-bottom: 8px;
+  }
+
+  .order-total-section {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  button.checkout-submit-btn {
+    justify-content: center;
+    width: 100%;
+  }
+}
+
+/* ── Error ───────────────────────────────────────────────────────── */
+.checkout-error {
+  background: var(--commerce-color-error-bg);
+  border: 1px solid var(--commerce-color-error-border);
+  border-radius: var(--commerce-radius-badge);
+  color: var(--commerce-color-error);
+  font-size: var(--commerce-font-size-sm);
+  margin-top: 4px;
+  padding: 12px 16px;
+}
+
+.checkout-error[hidden] {
+  display: none;
+}
+
+/* ── Empty cart ──────────────────────────────────────────────────── */
 .checkout-empty {
   text-align: center;
   padding: 80px 24px;
@@ -315,61 +815,76 @@ span.payment-button.paypal .button img {
 
 .checkout-empty p {
   margin: 0 0 24px;
-  color: #555;
+  color: var(--commerce-color-text-muted);
 }
 
-/* Loading state for pay button */
-.checkout-form-column .button.loading {
-  opacity: 0.7;
-  pointer-events: none;
+/* ── Section collapse ────────────────────────────────────────────── */
+.form-section.is-collapsed > :not(.section-collapsed-bar) {
+  display: none;
 }
 
-/* Floating label */
-.checkout-form-column .floating-label-field {
-  position: relative;
+.section-collapsed-bar:not([hidden]) {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
-.checkout-form-column .floating-label-field input,
-.checkout-form-column .floating-label-field select,
-.checkout-form-column .floating-label-field textarea {
-  padding-top: 20px;
-  padding-bottom: 4px;
-  height: 52px;
+.section-check {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
 }
 
-.checkout-form-column .floating-label-field select {
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23666' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 14px center;
-  padding-right: 36px;
+.section-summary-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
-.checkout-form-column .floating-label-field textarea {
-  height: auto;
-  padding-top: 24px;
+.section-summary-title {
+  font-size: var(--commerce-font-size-base);
+  font-weight: var(--commerce-font-weight-bold);
+  color: var(--commerce-color-text);
 }
 
-.checkout-form-column .floating-label-field label {
-  position: absolute;
-  left: var(--spacing-100);
-  top: 16px;
-  margin: 0;
-  font-size: 1rem;
-  color: #888;
-  pointer-events: none;
-  transition: top 0.15s ease, font-size 0.15s ease, color 0.15s ease;
+.section-summary-detail {
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* Float label up when focused or filled */
-.checkout-form-column .floating-label-field:has(input:focus) label,
-.checkout-form-column .floating-label-field:has(input:not(:placeholder-shown)) label,
-.checkout-form-column .floating-label-field:has(select:focus) label,
-.checkout-form-column .floating-label-field:has(select.has-value) label,
-.checkout-form-column .floating-label-field:has(textarea:focus) label,
-.checkout-form-column .floating-label-field:has(textarea:not(:placeholder-shown)) label {
-  top: 8px;
-  transform: translateY(0);
-  font-size: 0.7rem;
-  color: #555;
+.section-edit-btn {
+  background: none;
+  border: none;
+  padding: 4px 0;
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-text-muted);
+  cursor: pointer;
+  text-decoration: underline;
+  flex-shrink: 0;
+}
+
+.section-edit-btn:hover {
+  color: var(--commerce-color-text);
+}
+
+/* ── Mobile ──────────────────────────────────────────────────────── */
+@media (width < 480px) {
+  .form-field.field-half,
+  .form-field.field-third {
+    grid-column: 1 / -1;
+  }
+
+  .shipping-methods {
+    grid-template-columns: 1fr;
+  }
+
+  .checkout-form .form-section {
+    padding: 16px;
+  }
+
 }

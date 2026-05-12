@@ -1,3 +1,5 @@
+import { getConfig } from './commerce-config.js';
+
 const debounce = (func, wait) => {
   let timeout;
   return (...args) => {
@@ -8,13 +10,10 @@ const debounce = (func, wait) => {
 
 export class Cart {
   static get STORAGE_KEY() {
-    const locale = window.location.pathname.split('/')[1] || 'default';
-    return `cart:${locale === 'drafts' ? 'ca' : locale}`;
+    return `cart:${getConfig().getLocale()}`;
   }
 
   static STORAGE_VERSION = 1;
-
-  static SHIPPING_THRESHOLD = 150;
 
   /** @type {Record<string, CartItem>} */
   #items = {};
@@ -88,10 +87,6 @@ export class Cart {
         : item.price / 100),
       0,
     );
-  }
-
-  get shipping() {
-    return this.subtotal < Cart.SHIPPING_THRESHOLD ? 10 : 0;
   }
 
   clear() {
@@ -177,6 +172,8 @@ export class Cart {
    *   price: {final: string, currency: string}, imageUrl?: string, productUrl?: string}>}
    */
   getItemsForAPI() {
+    const { currency, getLocale } = getConfig();
+    const currencyCode = typeof currency === 'function' ? currency(getLocale()) : currency;
     return this.items.map((item) => ({
       sku: item.sku,
       path: item.path || new URL(item.url, window.location.origin).pathname,
@@ -184,53 +181,11 @@ export class Cart {
       name: item.name,
       price: {
         final: String(item.price),
-        currency: window.location.pathname.startsWith('/ca/') ? 'CAD' : 'USD',
+        currency: currencyCode,
       },
       ...(item.image ? { imageUrl: item.image } : {}),
       ...(item.url ? { productUrl: item.url } : {}),
     }));
-  }
-
-  getOrderJSON(email, firstName, lastName, phone, shippingAddr, {
-    billingAddr, shippingMethod, estimateToken, locale, country,
-  } = {}) {
-    // remove empty string values from addresses
-    const cleanAddr = (addr) => Object.fromEntries(
-      // eslint-disable-next-line no-unused-vars
-      Object.entries(addr).filter(([_, value]) => value !== ''),
-    );
-
-    const order = {
-      customer: {
-        firstName,
-        lastName,
-        email,
-        phone,
-      },
-      shipping: cleanAddr(shippingAddr),
-      // Default billing to shipping when the customer didn't enter a
-      // separate billing address (the "billing same as shipping" flow).
-      // The API treats both as required for order downstream consumers
-      // (transactional emails, payment-provider risk checks, etc.) — sending
-      // shipping as billing keeps every consumer happy without forcing the
-      // customer to type their address twice.
-      billing: cleanAddr(billingAddr ?? shippingAddr),
-      items: this.getItemsForAPI(),
-    };
-    if (shippingMethod) {
-      order.shippingMethod = { id: shippingMethod };
-    }
-    if (estimateToken) {
-      order.estimateToken = estimateToken;
-    }
-    if (locale) {
-      order.locale = locale;
-    }
-    if (country) {
-      order.country = country;
-    }
-
-    return order;
   }
 
   toJSON() {
