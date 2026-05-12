@@ -1,3 +1,7 @@
+.section > .order-complete-wrapper {
+  margin-top: 32px;
+}
+
 /* Order confirmation page */
 .order-result {
   max-width: 900px;
