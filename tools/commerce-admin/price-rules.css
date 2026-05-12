@@ -375,6 +375,208 @@
   min-width: 640px;
 }
 
+.pr-promo-overview-timeline-mount {
+  margin: 0 0 16px;
+}
+
+/* Promotions overview calendar (seven months: three before through three after today; cf. alert-banners timeline). */
+.pr-promo-cal {
+  position: relative;
+  background: #fafafa;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 12px;
+  overflow: hidden;
+}
+
+.pr-promo-cal-inner {
+  position: relative;
+}
+
+.pr-promo-cal-header {
+  margin-bottom: 8px;
+}
+
+.pr-promo-cal-year {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.pr-promo-cal-months {
+  display: flex;
+}
+
+.pr-promo-cal-month {
+  flex: 1;
+  text-align: center;
+  font-size: 0.75rem;
+  color: #666;
+  border-left: 1px solid #e0e0e0;
+  padding: 4px 0;
+}
+
+.pr-promo-cal-month:last-child {
+  border-right: 1px solid #e0e0e0;
+}
+
+.pr-promo-cal-body {
+  position: relative;
+}
+
+.pr-promo-cal-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pr-promo-cal-row {
+  display: flex;
+  align-items: center;
+  height: 20px;
+}
+
+.pr-promo-cal-row-empty {
+  height: auto;
+  min-height: 28px;
+  align-items: flex-start;
+}
+
+.pr-promo-cal-empty-msg {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #6d7175;
+}
+
+/* 7 vertical month guides (same proportions as alert-banners `.timeline-track`) */
+.pr-promo-cal-track {
+  flex: 1;
+  position: relative;
+  height: 100%;
+  background: linear-gradient(
+    to right,
+    #e0e0e0 0,
+    #e0e0e0 1px,
+    transparent 1px,
+    transparent 14.28%,
+    #e0e0e0 14.28%,
+    #e0e0e0 calc(14.28% + 1px),
+    transparent calc(14.28% + 1px),
+    transparent 28.57%,
+    #e0e0e0 28.57%,
+    #e0e0e0 calc(28.57% + 1px),
+    transparent calc(28.57% + 1px),
+    transparent 42.85%,
+    #e0e0e0 42.85%,
+    #e0e0e0 calc(42.85% + 1px),
+    transparent calc(42.85% + 1px),
+    transparent 57.14%,
+    #e0e0e0 57.14%,
+    #e0e0e0 calc(57.14% + 1px),
+    transparent calc(57.14% + 1px),
+    transparent 71.42%,
+    #e0e0e0 71.42%,
+    #e0e0e0 calc(71.42% + 1px),
+    transparent calc(71.42% + 1px),
+    transparent 85.71%,
+    #e0e0e0 85.71%,
+    #e0e0e0 calc(85.71% + 1px),
+    transparent calc(85.71% + 1px),
+    transparent 100%
+  );
+}
+
+.pr-promo-cal-bar {
+  position: absolute;
+  height: 16px;
+  top: 2px;
+  border-radius: 4px;
+  min-width: 4px;
+  box-sizing: border-box;
+  transition: opacity 0.2s;
+}
+
+.pr-promo-cal-bar:hover {
+  opacity: 0.85;
+}
+
+.pr-promo-cal-bar-past {
+  background-color: #bdbdbd;
+}
+
+.pr-promo-cal-bar-future {
+  background-color: #64b5f6;
+}
+
+.pr-promo-cal-bar-current {
+  background-color: #81c784;
+}
+
+.pr-promo-cal-bar-selected {
+  box-shadow: 0 0 0 2px #333;
+}
+
+.pr-promo-cal-bar-open-start {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.pr-promo-cal-bar-open-start::before {
+  content: '◀';
+  position: absolute;
+  left: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  color: inherit;
+  opacity: 0.7;
+}
+
+.pr-promo-cal-bar-open-end {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.pr-promo-cal-bar-open-end::after {
+  content: '▶';
+  position: absolute;
+  right: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  color: inherit;
+  opacity: 0.7;
+}
+
+.pr-promo-cal-now {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: #d32f2f;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.pr-promo-cal-now-label {
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-weight: 600;
+  color: #d32f2f;
+  white-space: nowrap;
+  background: #fff;
+  padding: 1px 4px;
+  border-radius: 3px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 15%);
+  pointer-events: none;
+}
+
 .pr-cart-rule-dialog.coupons-detail-dialog {
   max-width: min(96vw, 720px);
 }

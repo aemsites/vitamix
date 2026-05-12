@@ -2431,6 +2431,237 @@ async function buildThumbUrlMapForPromotionRows(rows, countryKey) {
   return map;
 }
 
+/** @param {unknown} value sale line start/end (ISO or em dash) */
+function promotionRowInstantMs(value) {
+  const s = String(value ?? '').trim();
+  if (!s || s === '—') return NaN;
+  const t = Date.parse(s);
+  return Number.isNaN(t) ? NaN : t;
+}
+
+/** @param {number} ms */
+function formatPromotionDurationMs(ms) {
+  if (!Number.isFinite(ms) || ms <= 0) return '';
+  const days = Math.round(ms / 86400000);
+  if (days >= 1) return `${days} day${days === 1 ? '' : 's'}`;
+  const hours = Math.round(ms / 3600000);
+  if (hours >= 1) return `${hours} hour${hours === 1 ? '' : 's'}`;
+  const mins = Math.max(1, Math.round(ms / 60000));
+  return `${mins} minute${mins === 1 ? '' : 's'}`;
+}
+
+const PR_PROMO_CAL_MONTH_NAMES = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+
+/**
+ * Seven calendar month labels spanning three months before `date` through three months after
+ * (same window as `blocks/alert-banners` `createTimeline`).
+ *
+ * @param {Date} date
+ */
+function promotionCalendarSixMonthWindow(date) {
+  const currentMonth = date.getMonth();
+  const currentYear = date.getFullYear();
+
+  let startMonth = currentMonth - 3;
+  let startYear = currentYear;
+  if (startMonth < 0) {
+    startMonth += 12;
+    startYear -= 1;
+  }
+  const rangeStart = new Date(startYear, startMonth, 1);
+
+  let endMonth = currentMonth + 3;
+  let endYear = currentYear;
+  if (endMonth > 11) {
+    endMonth -= 12;
+    endYear += 1;
+  }
+  const rangeEnd = new Date(endYear, endMonth + 1, 0, 23, 59, 59, 999);
+
+  const rangeDuration = rangeEnd.getTime() - rangeStart.getTime();
+
+  /** @type {{ month: number, year: number, name: string }[]} */
+  const displayMonths = [];
+  let m = startMonth;
+  let y = startYear;
+  for (let i = 0; i < 7; i += 1) {
+    displayMonths.push({ month: m, year: y, name: PR_PROMO_CAL_MONTH_NAMES[m] });
+    m += 1;
+    if (m > 11) {
+      m = 0;
+      y += 1;
+    }
+  }
+
+  return {
+    rangeStart,
+    rangeEnd,
+    rangeDuration,
+    displayMonths,
+    startYear,
+    endYear,
+  };
+}
+
+/**
+ * Earliest parseable start; latest parseable end, or `null` end when any sale line lacks a
+ * parseable end (open-ended, clamped to the visible window for drawing).
+ *
+ * @param {PromotionRow[]} rows
+ * @returns {{ minStart: Date, maxEnd: Date | null } | null}
+ */
+function promotionWindowForTimeline(rows) {
+  if (!Array.isArray(rows) || !rows.length) return null;
+  let minS = Infinity;
+  let maxE = -Infinity;
+  let allEnds = true;
+  rows.forEach((r) => {
+    const s = promotionRowInstantMs(r?.start);
+    const e = promotionRowInstantMs(r?.end);
+    if (!Number.isNaN(s)) minS = Math.min(minS, s);
+    if (!Number.isNaN(e)) maxE = Math.max(maxE, e);
+    else allEnds = false;
+  });
+  if (minS === Infinity) return null;
+  if (!allEnds) return { minStart: new Date(minS), maxEnd: null };
+  if (maxE === -Infinity || maxE < minS) return null;
+  return { minStart: new Date(minS), maxEnd: new Date(maxE) };
+}
+
+/**
+ * @param {Date} minStart
+ * @param {Date | null} maxEnd
+ * @param {Date} date
+ */
+function promotionRangePastFuture(minStart, maxEnd, date) {
+  const afterStart = minStart <= date;
+  const beforeEnd = !maxEnd || maxEnd >= date;
+  if (afterStart && beforeEnd) return 'current';
+  if (minStart > date) return 'future';
+  return 'past';
+}
+
+/** Promotions overview (`promotions.html`): calendar strip between page title and country tabs. */
+function renderPromotionsOverviewCalendarHtml() {
+  const now = new Date();
+  const win = promotionCalendarSixMonthWindow(now);
+
+  const yearLabel = win.startYear === win.endYear
+    ? String(win.startYear)
+    : `${win.startYear}–${win.endYear}`;
+
+  const monthsRowHtml = win.displayMonths
+    .map(({ name }) => `<div class="pr-promo-cal-month">${escapeHtml(name)}</div>`)
+    .join('');
+
+  const list = filteredPromotionRows().slice().sort((a, b) => {
+    const wa = promotionWindowForTimeline(a.rows);
+    const wb = promotionWindowForTimeline(b.rows);
+    const ta = wa ? wa.minStart.getTime() : 0;
+    const tb = wb ? wb.minStart.getTime() : 0;
+    return ta - tb;
+  });
+
+  const { rangeStart, rangeEnd, rangeDuration } = win;
+  const rangeStartMs = rangeStart.getTime();
+  const rangeEndMs = rangeEnd.getTime();
+
+  let selectedDone = false;
+  /** @type {string[]} */
+  const rowsHtmlParts = [];
+
+  list.forEach((r) => {
+    const w = promotionWindowForTimeline(r.rows);
+    if (!w) return;
+
+    const startTime = w.minStart.getTime();
+    const endTime = w.maxEnd ? w.maxEnd.getTime() : rangeEndMs;
+
+    const visibleStart = Math.max(startTime, rangeStartMs);
+    const visibleEnd = Math.min(endTime, rangeEndMs);
+
+    if (visibleEnd < rangeStartMs || visibleStart > rangeEndMs) return;
+
+    const leftPercent = ((visibleStart - rangeStartMs) / rangeDuration) * 100;
+    const rawWidth = ((visibleEnd - visibleStart) / rangeDuration) * 100;
+    const widthPercent = Math.max(rawWidth, 0.35);
+
+    const pf = promotionRangePastFuture(w.minStart, w.maxEnd, now);
+    let cls = 'current';
+    if (pf === 'past') cls = 'past';
+    else if (pf === 'future') cls = 'future';
+    let selected = '';
+    if (cls === 'current' && !selectedDone) {
+      selected = ' pr-promo-cal-bar-selected';
+      selectedDone = true;
+    }
+
+    const fullStart = formatIsoForSaleLineView(w.minStart.toISOString());
+    const fullEnd = w.maxEnd ? formatIsoForSaleLineView(w.maxEnd.toISOString()) : 'open-ended';
+    const dur = w.maxEnd
+      ? formatPromotionDurationMs(w.maxEnd.getTime() - w.minStart.getTime())
+      : '';
+    const tip = dur ? `${fullStart} → ${fullEnd} (${dur})` : `${fullStart} → ${fullEnd}`;
+
+    /** @type {string[]} */
+    const barClasses = [`pr-promo-cal-bar pr-promo-cal-bar-${cls}${selected}`];
+    if (startTime < rangeStartMs) barClasses.push('pr-promo-cal-bar-open-start');
+    if (!w.maxEnd || w.maxEnd.getTime() > rangeEndMs) barClasses.push('pr-promo-cal-bar-open-end');
+
+    rowsHtmlParts.push(
+      `<div class="pr-promo-cal-row">
+        <div class="pr-promo-cal-track">
+          <div class="${barClasses.join(' ')}" style="left:${Math.max(0, leftPercent)}%;width:${Math.min(100, widthPercent)}%" title="${escapeHtml(`${r.title} — ${tip}`)}"></div>
+        </div>
+      </div>`,
+    );
+  });
+
+  let bodyRowsHtml;
+  if (rowsHtmlParts.length) {
+    bodyRowsHtml = rowsHtmlParts.join('');
+  } else if (!allPromotionRowsForCountry().length) {
+    bodyRowsHtml = `<div class="pr-promo-cal-row pr-promo-cal-row-empty" role="status">
+        <p class="pr-promo-cal-empty-msg">No catalog promotions for this market in this view.</p>
+      </div>`;
+  } else if (!list.length) {
+    bodyRowsHtml = `<div class="pr-promo-cal-row pr-promo-cal-row-empty" role="status">
+        <p class="pr-promo-cal-empty-msg">No promotions match your filters; adjust search or group to see spans.</p>
+      </div>`;
+  } else {
+    bodyRowsHtml = `<div class="pr-promo-cal-row pr-promo-cal-row-empty" role="status">
+        <p class="pr-promo-cal-empty-msg">No promotions in this list overlap this six-month window, or none have parseable sale dates.</p>
+      </div>`;
+  }
+
+  let nowHtml = '';
+  const nowMs = now.getTime();
+  if (nowMs >= rangeStartMs && nowMs <= rangeEndMs) {
+    const nowPercent = ((nowMs - rangeStartMs) / rangeDuration) * 100;
+    const d = now.getMonth() + 1;
+    const day = now.getDate();
+    nowHtml = `<div class="pr-promo-cal-now" style="left:${nowPercent}%">
+        <span class="pr-promo-cal-now-label">${d}/${day}</span>
+        <span class="pim-sr-only">Today</span>
+      </div>`;
+  }
+
+  return `<div class="pr-promo-cal" role="region" aria-label="Promotion sale spans across seven months">
+    <div class="pr-promo-cal-inner">
+      <div class="pr-promo-cal-header">
+        <div class="pr-promo-cal-year">${escapeHtml(yearLabel)}</div>
+        <div class="pr-promo-cal-months">${monthsRowHtml}</div>
+      </div>
+      <div class="pr-promo-cal-body">
+        ${nowHtml}
+        <div class="pr-promo-cal-rows">${bodyRowsHtml}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
 /**
  * @param {string} countryKey
  * @param {string} groupLabel display label from rule <code>custom.group</code>
@@ -2744,6 +2975,17 @@ function render() {
     ${areaTabsHtml}
     <div class="pr-panel" role="tabpanel">${panels[state.area]}</div>
   `;
+
+  const promoTimelineRoot = document.getElementById('pr-promo-overview-timeline-root');
+  if (promoTimelineRoot) {
+    if (PR_APP_MODE === 'promotions') {
+      promoTimelineRoot.innerHTML = renderPromotionsOverviewCalendarHtml();
+      promoTimelineRoot.removeAttribute('hidden');
+    } else {
+      promoTimelineRoot.innerHTML = '';
+      promoTimelineRoot.setAttribute('hidden', '');
+    }
+  }
 
   mount.querySelectorAll('[data-pr-country]').forEach((btn) => {
     btn.addEventListener('click', () => {
