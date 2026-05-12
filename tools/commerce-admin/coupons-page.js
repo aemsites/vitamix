@@ -10,7 +10,12 @@ import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
 import { createDetailModalHeaderShell } from './commerce-detail-modal-json.js';
 import { mountPromoteProductionInToolbar } from './commerce-promote-production.js';
 import { PB_ORG, PB_SITE } from './commerce-pbus-config.js';
-import { commerceGroupBadgeHtml, escapeHtml, showToast } from './commerce-otp-ui.js';
+import {
+  commerceGroupBadgeHtml,
+  commerceMarketEmojiHtml,
+  escapeHtml,
+  showToast,
+} from './commerce-otp-ui.js';
 
 async function readRespError(resp) {
   return resp.headers.get('x-error')
@@ -499,7 +504,7 @@ function overviewCap(row) {
 }
 
 function renderCouponsOverviewBody(filtered) {
-  const emptyCell = (msg) => `<tr><td colspan="8" class="coupons-empty-cell">${msg}</td></tr>`;
+  const emptyCell = (msg) => `<tr><td colspan="9" class="coupons-empty-cell">${msg}</td></tr>`;
   if (!state.coupons.length) {
     return emptyCell('No coupons yet (empty list or missing <code>coupons:read</code>).');
   }
@@ -517,12 +522,9 @@ function renderCouponsOverviewBody(filtered) {
     const ship = yn(row.freeShipping);
     const stack = yn(row.stackable !== false);
     const label = `Open coupon ${id}`;
-    const mTag = marketTagHtml(couponMarketPrefixFromId(id));
+    const mKey = couponMarketPrefixFromId(id);
     return `<tr class="coupons-grid-row coupons-row-open" data-cp-coupon-id="${escapeHtml(id)}" tabindex="0" role="button" aria-label="${escapeHtml(label)}">
-      <td class="coupons-grid-lead">
-        <div class="coupons-grid-lead-badges">${mTag}</div>
-        <code class="coupons-grid-id">${escapeHtml(id || '—')}</code>
-      </td>
+      <td class="coupons-grid-lead"><code class="coupons-grid-id">${escapeHtml(id || '—')}</code></td>
       <td class="coupons-grid-name">${escapeHtml(String(name))}</td>
       <td>${escapeHtml(disc)}</td>
       <td>${escapeHtml(min)}</td>
@@ -530,6 +532,7 @@ function renderCouponsOverviewBody(filtered) {
       <td>${escapeHtml(ship)}</td>
       <td>${escapeHtml(stack)}</td>
       <td class="coupons-grid-col-year">${commerceGroupBadgeHtml(year)}</td>
+      <td class="coupons-grid-col-market">${commerceMarketEmojiHtml(mKey)}</td>
     </tr>`;
   }).join('');
 }
@@ -961,12 +964,12 @@ function render() {
     <p class="coupons-market-hint">Ids: <code>us-2026-name</code>, <code>ca-2026-name</code>, <code>mx-2026-name</code> (country-year-key). Click a row for a <strong>modal</strong> with full rules and codes (like opening an order).</p>
     <section class="coupons-overview coupons-overview-solo" aria-label="Coupon programs overview">
       <h2 class="coupons-panel-title">Coupon programs</h2>
-      <p class="coupons-panel-hint">Market tag + quick columns; open the modal for edit, delete, and code tools.</p>
+      <p class="coupons-panel-hint">Quick columns; open the modal for edit, delete, and code tools.</p>
       <div class="coupons-table-wrap coupons-overview-table-wrap pim-list-wrapper">
         <table class="coupons-grid-table">
           <thead>
             <tr>
-              <th scope="col">Market · ID</th>
+              <th scope="col">ID</th>
               <th scope="col">Name</th>
               <th scope="col">Discount</th>
               <th scope="col">Min order</th>
@@ -974,6 +977,7 @@ function render() {
               <th scope="col">Free ship</th>
               <th scope="col">Stack</th>
               <th scope="col" class="coupons-grid-col-year">Year</th>
+              <th scope="col" class="coupons-grid-col-market">Market</th>
             </tr>
           </thead>
           <tbody>${overviewBody}</tbody>

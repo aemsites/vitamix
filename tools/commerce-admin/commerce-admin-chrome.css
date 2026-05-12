@@ -393,3 +393,20 @@
   border-color: #9ec5e8;
   color: #0d4a6e;
 }
+
+/* Market column (cart rules, coupons, promotions overview tables) */
+.commerce-admin-market-emoji {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  line-height: 1;
+  padding: 2px 4px;
+  user-select: none;
+}
+
+.commerce-admin-market-emoji-unknown {
+  font-size: 14px;
+  font-weight: 600;
+  color: #6d7175;
+}

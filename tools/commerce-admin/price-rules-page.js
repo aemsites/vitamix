@@ -21,7 +21,12 @@ import {
   putCartPriceRules,
   putCatalogPriceRules,
 } from './price-rules-api.js';
-import { commerceGroupBadgeHtml, escapeHtml, showToast } from './commerce-otp-ui.js';
+import {
+  commerceGroupBadgeHtml,
+  commerceMarketEmojiHtml,
+  escapeHtml,
+  showToast,
+} from './commerce-otp-ui.js';
 import {
   fetchProductsIndexForLocale,
   getParentProducts,
@@ -2289,13 +2294,12 @@ function renderCartRulesOverview() {
   };
   const filtered = !q ? rules : rules.filter(ruleSearchMatch);
   const searchVal = escapeHtml(state.cartRuleSearch);
-  const mTag = promoMarketTagHtml(ck);
 
   let tbodyHtml;
   if (!rules.length) {
-    tbodyHtml = '<tr><td colspan="5" class="pr-empty-cell">No cart rules for this country.</td></tr>';
+    tbodyHtml = '<tr><td colspan="6" class="pr-empty-cell">No cart rules for this country.</td></tr>';
   } else if (!filtered.length) {
-    tbodyHtml = '<tr><td colspan="5" class="pr-empty-cell">No rules match your search.</td></tr>';
+    tbodyHtml = '<tr><td colspan="6" class="pr-empty-cell">No rules match your search.</td></tr>';
   } else {
     tbodyHtml = filtered
       .map((r) => {
@@ -2315,11 +2319,12 @@ function renderCartRulesOverview() {
         const label = `Open rule ${r.name}`;
         return `<tr class="pr-promo-grid-row pr-cart-rule-row" role="button" tabindex="0" aria-label="${escapeHtml(label)}"
             data-pr-cart-rule-open data-pr-country="${escapeHtml(ck)}" data-pr-rule-idx="${idx}">
-            <td class="pr-cart-rule-lead"><div class="coupons-grid-lead-badges">${mTag}</div><strong>${escapeHtml(r.name)}</strong></td>
+            <td class="pr-cart-rule-lead"><strong>${escapeHtml(r.name)}</strong></td>
             <td>${min}</td>
             <td>${off}</td>
             <td>${ship}</td>
             <td class="pr-cart-rule-scope">${scopeShort}</td>
+            <td class="pr-cart-rule-col-market">${commerceMarketEmojiHtml(ck)}</td>
           </tr>`;
       })
       .join('');
@@ -2341,11 +2346,12 @@ function renderCartRulesOverview() {
       <table class="pr-data-table pr-promo-grid-table" aria-label="Cart rules">
         <thead>
           <tr>
-            <th scope="col">Market · Rule</th>
+            <th scope="col">Rule</th>
             <th scope="col">Min cart</th>
             <th scope="col">Off</th>
             <th scope="col">Free ship</th>
             <th scope="col">Scope</th>
+            <th scope="col" class="pr-cart-rule-col-market">Market</th>
           </tr>
         </thead>
         <tbody>${tbodyHtml}</tbody>
@@ -2606,9 +2612,9 @@ function renderPromotionsListPanel() {
 
   let tbodyHtml;
   if (!hasPromos) {
-    tbodyHtml = '<tr><td colspan="4" class="pr-empty-cell">No catalog promotions for this country (empty API list or no matching paths).</td></tr>';
+    tbodyHtml = '<tr><td colspan="5" class="pr-empty-cell">No catalog promotions for this country (empty API list or no matching paths).</td></tr>';
   } else if (!list.length) {
-    tbodyHtml = '<tr><td colspan="4" class="pr-empty-cell">No promotions match your filters.</td></tr>';
+    tbodyHtml = '<tr><td colspan="5" class="pr-empty-cell">No promotions match your filters.</td></tr>';
   } else {
     tbodyHtml = list
       .map((r) => {
@@ -2619,6 +2625,7 @@ function renderPromotionsListPanel() {
             <td><code class="pr-promo-id-code">${escapeHtml(r.id)}</code></td>
             <td>${r.rowCount}</td>
             <td class="pr-promo-col-group">${commerceGroupBadgeHtml(r.group)}</td>
+            <td class="pr-promo-col-market">${commerceMarketEmojiHtml(r.countryKey)}</td>
           </tr>`;
       })
       .join('');
@@ -2652,6 +2659,7 @@ function renderPromotionsListPanel() {
             <th scope="col">Id</th>
             <th scope="col">Rows</th>
             <th scope="col" class="pr-promo-col-group">Group</th>
+            <th scope="col" class="pr-promo-col-market">Market</th>
           </tr>
         </thead>
         <tbody>${tbodyHtml}</tbody>

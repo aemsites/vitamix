@@ -378,6 +378,13 @@
   white-space: nowrap;
 }
 
+.coupons-grid-table th.coupons-grid-col-market,
+.coupons-grid-table td.coupons-grid-col-market {
+  text-align: right;
+  width: 1%;
+  white-space: nowrap;
+}
+
 .coupons-grid-table tbody tr.coupons-row-open {
   cursor: pointer;
 }

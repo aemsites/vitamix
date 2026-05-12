@@ -36,6 +36,25 @@ export function commerceGroupBadgeHtml(raw) {
   return `<span class="commerce-admin-group-badge commerce-admin-group-badge-hue-${n}">${escapeHtml(s)}</span>`;
 }
 
+/** Flag emoji + accessible label for storefront market (US / CA / MX). */
+/**
+ * @param {unknown} countryKey `us` | `ca` | `mx`
+ * @returns {string} HTML
+ */
+export function commerceMarketEmojiHtml(countryKey) {
+  const k = String(countryKey ?? '').trim().toLowerCase();
+  if (k === 'us') {
+    return '<span class="commerce-admin-market-emoji" role="img" aria-label="United States">🇺🇸</span>';
+  }
+  if (k === 'ca') {
+    return '<span class="commerce-admin-market-emoji" role="img" aria-label="Canada">🇨🇦</span>';
+  }
+  if (k === 'mx') {
+    return '<span class="commerce-admin-market-emoji" role="img" aria-label="Mexico">🇲🇽</span>';
+  }
+  return '<span class="commerce-admin-market-emoji commerce-admin-market-emoji-unknown" aria-hidden="true">—</span>';
+}
+
 export function showToast(message, type = 'success') {
   const existing = document.querySelector('.commerce-admin-toast');
   if (existing) existing.remove();

@@ -336,6 +336,23 @@
   white-space: nowrap;
 }
 
+.pr-promo-grid-table thead th.pr-promo-col-market,
+.pr-promo-col-market {
+  text-align: right;
+  width: 1%;
+  white-space: nowrap;
+}
+
+.pr-cart-rule-col-market {
+  text-align: right;
+  width: 1%;
+  white-space: nowrap;
+}
+
+.pr-promo-grid-table thead th.pr-cart-rule-col-market {
+  text-align: right;
+}
+
 .pr-promo-id-code {
   font-size: 12px;
   word-break: break-all;
