@@ -626,17 +626,21 @@ test.describe('PDP Integration Tests', () => {
         pageUrl,
       } = config;
 
-      await page.route('**/bin/vitamix/newslettersubscription**', async (route) => {
-        const url = route.request().url();
-        const urlObj = new URL(url);
+      await page.route('**/us/en_us/forms**', async (route) => {
+        expect(route.request().method()).toBe('POST');
+        const body = route.request().postDataJSON();
 
-        // Check the query parameters
-        expect(urlObj.searchParams.get('email')).toBe('test@test.com');
-        expect(urlObj.searchParams.get('mobile')).toBe('1234567890');
-        expect(urlObj.searchParams.get('sms_optin')).toBe(smsOptin ? '1' : '0');
-        expect(urlObj.searchParams.get('lead_source')).toBe(leadSource);
-        expect(urlObj.searchParams.get('pageUrl')).toContain(pageUrl);
-        expect(urlObj.searchParams.get('actionUrl')).toBe('/us/en_us/rest/V1/vitamix-api/newslettersubscribe');
+        expect(body.formId).toBe('us/en_us/newsletter');
+        expect(body.email).toBe('test@test.com');
+        expect(body.mobile).toBe('1234567890');
+        expect(body.emailOptIn).toBe(true);
+        expect(body.leadSource).toBe(leadSource);
+        expect(body.pageUrl).toContain(pageUrl);
+        if (smsOptin) {
+          expect(body.smsOptIn).toBeTruthy();
+        } else {
+          expect(body.smsOptIn).toBeFalsy();
+        }
 
         console.log('✓ Newsletter subscription request intercepted with correct parameters');
         await route.fulfill({

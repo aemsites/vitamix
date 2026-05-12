@@ -1,5 +1,5 @@
 import { toCamelCase, toClassName } from '../../scripts/aem.js';
-import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { getFormSubmissionUrl, getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 /**
  * Creates an HTML element with an optional class name
@@ -426,17 +426,25 @@ function enableFooterSignUp(form) {
       leadSource = `sub-em-${window.leadSourceOverride}-${country}`;
     }
 
+    const { locale, language } = getLocaleAndLanguage();
     const payload = {
+      formId: `${locale}/${language}/newsletter`,
+      pageUrl: window.location.href,
       email,
       mobile,
-      sms_optin: optIn ? '1' : '0',
-      lead_source: leadSource,
-      pageUrl: window.location.href,
-      actionUrl: '/us/en_us/rest/V1/vitamix-api/newslettersubscribe',
+      smsOptIn: optIn,
+      emailOptIn: true,
+      leadSource,
     };
-    const params = new URLSearchParams(payload);
     try {
-      const resp = await fetch(`https://www.vitamix.com/bin/vitamix/newslettersubscription?${params.toString()}`);
+      const url = getFormSubmissionUrl();
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
       if (!resp.ok) {
         // eslint-disable-next-line no-console
         console.error('Failed to submit newsletter subscription', resp);
