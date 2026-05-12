@@ -371,6 +371,13 @@
   color: #6d7175;
 }
 
+.coupons-grid-table th.coupons-grid-col-year,
+.coupons-grid-table td.coupons-grid-col-year {
+  text-align: right;
+  width: 1%;
+  white-space: nowrap;
+}
+
 .coupons-grid-table tbody tr.coupons-row-open {
   cursor: pointer;
 }

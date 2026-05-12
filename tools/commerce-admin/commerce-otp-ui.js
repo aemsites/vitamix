@@ -18,6 +18,24 @@ export function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+/**
+ * Colored pill for catalog group / coupon year in overview tables and modals.
+ * @param {unknown} raw
+ * @returns {string}
+ */
+export function commerceGroupBadgeHtml(raw) {
+  const s = String(raw ?? '').trim();
+  if (!s || s === '—') {
+    return '<span class="commerce-admin-group-badge commerce-admin-group-badge-muted">—</span>';
+  }
+  let h = 0;
+  for (let i = 0; i < s.length; i += 1) {
+    h += s.charCodeAt(i) * (i + 1);
+  }
+  const n = h % 8;
+  return `<span class="commerce-admin-group-badge commerce-admin-group-badge-hue-${n}">${escapeHtml(s)}</span>`;
+}
+
 export function showToast(message, type = 'success') {
   const existing = document.querySelector('.commerce-admin-toast');
   if (existing) existing.remove();

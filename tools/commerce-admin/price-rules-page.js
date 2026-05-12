@@ -10,17 +10,18 @@ import { PB_ORG, PB_SITE } from './commerce-pbus-config.js';
 import {
   catalogPathToProductUrl,
   catalogPriceStringForApi,
+  catalogRulesForCountryTab,
   catalogTimestampStringForApi,
   catalogRuleToPromotionRow,
   countryKeyFromCatalogPath,
   fetchCartPriceRules,
   fetchCatalogPriceRules,
-  inferPromotionYear,
+  promotionCatalogGroup,
   productUrlToCatalogPath,
   putCartPriceRules,
   putCatalogPriceRules,
 } from './price-rules-api.js';
-import { escapeHtml, showToast } from './commerce-otp-ui.js';
+import { commerceGroupBadgeHtml, escapeHtml, showToast } from './commerce-otp-ui.js';
 import {
   fetchProductsIndexForLocale,
   getParentProducts,
@@ -89,7 +90,7 @@ const AREAS = /** @type {const} */ (['rules', 'promotions']);
  *   country: (typeof COUNTRIES)[number],
  *   area: (typeof AREAS)[number],
  *   promoListSearch: string,
- *   promoListYearFilter: string,
+ *   promoListGroupFilter: string,
  *   cartRuleSearch: string,
  *   catalogPromotions: import('./price-rules-api.js').CatalogPromotion[],
  *   catalogDataSource: 'api'|'unavailable',
@@ -103,7 +104,7 @@ const state = {
   country: 'us',
   area: PR_APP_MODE === 'promotions' ? 'promotions' : 'rules',
   promoListSearch: '',
-  promoListYearFilter: '',
+  promoListGroupFilter: '',
   cartRuleSearch: '',
   /** @type {import('./price-rules-api.js').CatalogPromotion[]} */
   catalogPromotions: [],
@@ -118,24 +119,23 @@ const state = {
 };
 
 /**
- * Infer admin “market” tab from rule id prefix (`us-…`, `ca-…`, `mx-…`). Rules without a prefix
- * (legacy ids) are listed under US.
+ * Market tab from helix `country` on the cart rule (defaults to US when missing or unknown).
  *
- * @param {string} id
+ * @param {import('./price-rules-api.js').HelixCartPriceRule} rule
  * @returns {(typeof COUNTRIES)[number]}
  */
-function cartRuleMarketFromRuleId(id) {
-  const s = String(id || '').toLowerCase();
-  if (s.startsWith('ca-')) return 'ca';
-  if (s.startsWith('mx-')) return 'mx';
-  if (s.startsWith('us-')) return 'us';
+function cartRuleMarketFromRule(rule) {
+  const c = rule && typeof rule.country === 'string' ? rule.country.trim().toLowerCase() : '';
+  if (/^[a-z]{2}$/.test(c) && COUNTRIES.includes(/** @type {(typeof COUNTRIES)[number]} */ (c))) {
+    return /** @type {(typeof COUNTRIES)[number]} */ (c);
+  }
   return 'us';
 }
 
 /** @param {string} ck */
 function rulesForCountryApi(ck) {
   if (state.cartDataSource !== 'api' || !Array.isArray(state.cartRulesList)) return [];
-  return state.cartRulesList.filter((r) => cartRuleMarketFromRuleId(r.id) === ck);
+  return state.cartRulesList.filter((r) => cartRuleMarketFromRule(r) === ck);
 }
 
 /**
@@ -177,12 +177,11 @@ function nextCartRulePriority(existing) {
 }
 
 /**
- * @param {string} market
  * @param {string} slug
  * @param {import('./price-rules-api.js').HelixCartPriceRule[]} existing
  */
-function uniqueCartRuleId(market, slug, existing) {
-  const id = `${market}-${slug}`;
+function uniqueCartRuleId(slug, existing) {
+  const id = slug;
   const used = new Set(existing.map((r) => String(r.id || '')));
   if (!used.has(id)) return id;
   let n = 2;
@@ -202,7 +201,7 @@ function ruleRowToHelixCartRule(market, row, existingRules, preserveFrom = null)
   const slug = ruleSlugFromName(row.name);
   const id = preserveFrom?.id
     ? String(preserveFrom.id)
-    : uniqueCartRuleId(market, slug, existingRules);
+    : uniqueCartRuleId(slug, existingRules);
   const priority = preserveFrom != null
     && typeof preserveFrom.priority === 'number'
     && Number.isFinite(preserveFrom.priority)
@@ -262,11 +261,15 @@ function ruleRowToHelixCartRule(market, row, existingRules, preserveFrom = null)
     priority,
     conditions,
     actions,
+    country: market,
   };
   if (preserveFrom) {
     if (typeof preserveFrom.stackable === 'boolean') out.stackable = preserveFrom.stackable;
     if (Array.isArray(preserveFrom.incompatibleTypes)) {
       out.incompatibleTypes = [...preserveFrom.incompatibleTypes];
+    }
+    if (typeof preserveFrom.locale === 'string' && preserveFrom.locale.trim()) {
+      out.locale = preserveFrom.locale.trim();
     }
   }
   return out;
@@ -382,12 +385,11 @@ async function deleteCartRuleById(ruleId) {
 }
 
 /**
- * @param {(typeof COUNTRIES)[number]} market
  * @param {string} slug
  * @param {import('./price-rules-api.js').CatalogPromotion[]} promotions
  */
-function uniquePromotionId(market, slug, promotions) {
-  const id = `${market}-${slug}`;
+function uniquePromotionId(slug, promotions) {
+  const id = slug;
   const used = new Set(promotions.map((p) => String(p.id || '')));
   if (!used.has(id)) return id;
   let n = 2;
@@ -636,7 +638,7 @@ function parseSaleLinesTsv(text) {
 }
 
 /**
- * String keys only (helix catalog rule custom data).
+ * String-key map from rule `custom` (helix).
  *
  * @param {unknown} raw
  * @returns {Record<string, string>}
@@ -654,14 +656,14 @@ function catalogCustomStringMap(raw) {
 
 /**
  * @param {PromotionRow[]} rows
- * @param {string} year
+ * @param {string} group Calendar / grouping label stored on each rule as `custom.group`
  * @param {import('./price-rules-api.js').CatalogPriceRule[] | undefined} [preserveFromRules]
  *   rules for this market before edit — merged by `path` so extra `custom` keys (e.g. `debug`)
  *   and `variants` survive Save
  * @returns {import('./price-rules-api.js').CatalogPriceRule[]}
  */
-function promotionRowsToCatalogRules(rows, year, preserveFromRules) {
-  const y = String(year || '').trim() || String(new Date().getFullYear());
+function promotionRowsToCatalogRules(rows, group, preserveFromRules) {
+  const g = String(group || '').trim() || String(new Date().getFullYear());
   /** @type {Map<string, import('./price-rules-api.js').CatalogPriceRule>} */
   const prevByPath = new Map(
     (preserveFromRules || []).filter((r) => r && r.path).map((r) => [String(r.path), r]),
@@ -679,8 +681,8 @@ function promotionRowsToCatalogRules(rows, year, preserveFromRules) {
     if (end) rule.end = end;
     const reg = String(row.regularPrice || '').trim();
     const regDigits = reg && reg !== '—' ? catalogPriceStringForApi(reg) : '';
-    const custom = catalogCustomStringMap(prevRule?.custom);
-    custom.year = y;
+    const custom = { ...catalogCustomStringMap(prevRule?.custom) };
+    custom.group = g;
     if (regDigits) custom.regularPrice = regDigits;
     else delete custom.regularPrice;
     rule.custom = custom;
@@ -1254,16 +1256,16 @@ function promotionEditFormInnerHtml(initialMarket, lines, opts = {}) {
         <label for="pr-promo-form-market">Market</label>
         <select id="pr-promo-form-market" required${marketDis}>${optsHtml}</select>
     ${edit
-    ? '<p class="coupons-field-hint">Paths in sale lines must stay under this market’s storefront.</p>'
-    : `<p class="coupons-field-hint">Promotion <code>id</code> will be <code><span id="pr-promo-form-market-code">${escapeHtml(initialMarket)}</span>-</code> plus a slug from the title.</p>`}
+    ? '<p class="coupons-field-hint">Paths in sale lines must stay under this market\'s storefront.</p>'
+    : '<p class="coupons-field-hint">Promotion <code>id</code> is a slug from the title (unique across all promotions). Market is stored in the <code>country</code> field.</p>'}
       </div>
       <div class="coupons-field coupons-field-full">
         <label for="pr-promo-form-name">Promotion title</label>
         <input type="text" id="pr-promo-form-name" autocomplete="off" required placeholder="e.g. Spring sale" />
       </div>
       <div class="coupons-field">
-        <label for="pr-promo-form-year">Calendar year (metadata)</label>
-        <input type="text" id="pr-promo-form-year" inputmode="numeric" placeholder="2026" />
+        <label for="pr-promo-form-group">Group <span class="coupons-field-hint">(e.g. calendar year)</span></label>
+        <input type="text" id="pr-promo-form-group" inputmode="text" placeholder="2026" />
       </div>
     </div>
     <div class="pr-promo-form-lines-header">
@@ -1482,18 +1484,8 @@ async function openPromotionAddDialog() {
       </div>
     </div>`;
   document.body.appendChild(dialog);
-  const yearEl = dialog.querySelector('#pr-promo-form-year');
-  if (yearEl && 'value' in yearEl) /** @type {HTMLInputElement} */ (yearEl).value = String(new Date().getFullYear());
-
-  const marketSelect = dialog.querySelector('#pr-promo-form-market');
-  const marketCodeEl = dialog.querySelector('#pr-promo-form-market-code');
-  const syncMarketHint = () => {
-    const k = String(marketSelect?.value ?? '').trim().toLowerCase();
-    if (marketCodeEl && k) marketCodeEl.textContent = k;
-  };
-  marketSelect?.addEventListener('change', syncMarketHint);
-  marketSelect?.addEventListener('input', syncMarketHint);
-  syncMarketHint();
+  const groupEl = dialog.querySelector('#pr-promo-form-group');
+  if (groupEl && 'value' in groupEl) /** @type {HTMLInputElement} */ (groupEl).value = String(new Date().getFullYear());
 
   wirePromotionFormDynamicLines(dialog);
   wirePromotionTsvImport(dialog);
@@ -1515,11 +1507,11 @@ async function openPromotionAddDialog() {
       const market = readPromotionMarketFromForm(dialog);
       const name = String(dialog.querySelector('#pr-promo-form-name')?.value ?? '').trim();
       if (!name) throw new Error('Promotion title is required');
-      const year = String(dialog.querySelector('#pr-promo-form-year')?.value ?? '').trim()
+      const group = String(dialog.querySelector('#pr-promo-form-group')?.value ?? '').trim()
         || String(new Date().getFullYear());
       const lineRows = readPromotionLineRowsFromDom(dialog);
       if (!lineRows.length) throw new Error('Add at least one sale line');
-      const rulesNew = promotionRowsToCatalogRules(lineRows, year);
+      const rulesNew = promotionRowsToCatalogRules(lineRows, group);
       for (let i = 0; i < rulesNew.length; i += 1) {
         if (countryKeyFromCatalogPath(rulesNew[i].path) !== market) {
           throw new Error(
@@ -1530,8 +1522,13 @@ async function openPromotionAddDialog() {
       assertNoExpiredRuleEnds(rulesNew);
       const existing = Array.isArray(state.catalogPromotions) ? state.catalogPromotions : [];
       const slug = ruleSlugFromName(name);
-      const id = uniquePromotionId(market, slug, existing);
-      const next = [...existing, { id, name, rules: rulesNew }];
+      const id = uniquePromotionId(slug, existing);
+      const next = [...existing, {
+        id,
+        name,
+        country: market,
+        rules: rulesNew,
+      }];
       await putCatalogPromotionsDocument(next);
       showToast('Promotion added', 'success');
       close();
@@ -1561,14 +1558,12 @@ async function openPromotionEditDialog(countryKey, promoId) {
     render();
     return;
   }
-  const rulesCo = (promo.rules || []).filter(
-    (r) => countryKeyFromCatalogPath(r.path) === countryKey,
-  );
+  const rulesCo = catalogRulesForCountryTab(promo, countryKey);
   const ck = /** @type {(typeof COUNTRIES)[number]} */ (
     COUNTRIES.includes(/** @type {(typeof COUNTRIES)[number]} */(countryKey)) ? countryKey : 'us'
   );
   const rows = rulesCo.map(catalogRuleToPromotionRow);
-  const yearGuess = inferPromotionYear(promo, ck);
+  const groupGuess = promotionCatalogGroup(promo, ck);
 
   const dialog = document.createElement('dialog');
   dialog.className = 'coupons-dialog coupons-dialog-wide pr-promo-form-dialog';
@@ -1587,8 +1582,8 @@ async function openPromotionEditDialog(countryKey, promoId) {
   document.body.appendChild(dialog);
   const nameEl = dialog.querySelector('#pr-promo-form-name');
   if (nameEl && 'value' in nameEl) /** @type {HTMLInputElement} */ (nameEl).value = promo.name || '';
-  const yearEl = dialog.querySelector('#pr-promo-form-year');
-  if (yearEl && 'value' in yearEl) /** @type {HTMLInputElement} */ (yearEl).value = yearGuess;
+  const groupEl = dialog.querySelector('#pr-promo-form-group');
+  if (groupEl && 'value' in groupEl) /** @type {HTMLInputElement} */ (groupEl).value = groupGuess;
 
   wirePromotionFormDynamicLines(dialog);
   wirePromotionTsvImport(dialog);
@@ -1621,7 +1616,7 @@ async function openPromotionEditDialog(countryKey, promoId) {
       const market = readPromotionMarketFromForm(dialog);
       const name = String(dialog.querySelector('#pr-promo-form-name')?.value ?? '').trim();
       if (!name) throw new Error('Promotion title is required');
-      const year = String(dialog.querySelector('#pr-promo-form-year')?.value ?? '').trim()
+      const group = String(dialog.querySelector('#pr-promo-form-group')?.value ?? '').trim()
         || String(new Date().getFullYear());
       const lineRows = readPromotionLineRowsFromDom(dialog);
       const list = Array.isArray(state.catalogPromotions) ? state.catalogPromotions : [];
@@ -1633,11 +1628,9 @@ async function openPromotionEditDialog(countryKey, promoId) {
         return;
       }
       const prev = list[idx];
-      const prevMarketRules = (prev.rules || []).filter(
-        (r) => countryKeyFromCatalogPath(r.path) === market,
-      );
+      const prevMarketRules = catalogRulesForCountryTab(prev, market);
       const rulesNew = lineRows.length
-        ? promotionRowsToCatalogRules(lineRows, year, prevMarketRules)
+        ? promotionRowsToCatalogRules(lineRows, group, prevMarketRules)
         : [];
       for (let i = 0; i < rulesNew.length; i += 1) {
         if (countryKeyFromCatalogPath(rulesNew[i].path) !== market) {
@@ -1647,9 +1640,8 @@ async function openPromotionEditDialog(countryKey, promoId) {
         }
       }
       assertNoExpiredRuleEnds(rulesNew);
-      const rulesOther = (prev.rules || []).filter(
-        (r) => countryKeyFromCatalogPath(r.path) !== market,
-      );
+      const onTab = new Set(catalogRulesForCountryTab(prev, market));
+      const rulesOther = (prev.rules || []).filter((r) => !onTab.has(r));
       const merged = [...rulesOther, ...rulesNew];
       if (!merged.length) {
         throw new Error(
@@ -1657,7 +1649,12 @@ async function openPromotionEditDialog(countryKey, promoId) {
         );
       }
       const next = list.slice();
-      next[idx] = { id: prev.id, name, rules: merged };
+      next[idx] = {
+        ...prev,
+        name,
+        country: market,
+        rules: merged,
+      };
       await putCatalogPromotionsDocument(next);
       showToast('Promotion updated', 'success');
       close();
@@ -1686,8 +1683,8 @@ function cartRuleNewMarketFieldsHtml(initialMarket, marketLocked = false) {
   }).join('');
   const dis = marketLocked ? ' disabled' : '';
   const hint = marketLocked
-    ? '<p class="coupons-field-hint">Market is fixed for this rule (<code>id</code> includes the prefix). Add a new rule to target another market.</p>'
-    : `<p class="coupons-field-hint">New rule <code>id</code> uses prefix <code><span id="pr-cart-add-market-code">${escapeHtml(sk)}</span>-…</code> (helix-commerce-api cart rules are one shared array per site).</p>`;
+    ? '<p class="coupons-field-hint">Market is fixed on this rule (<code>country</code> on the saved object).</p>'
+    : '<p class="coupons-field-hint">Rule <code>id</code> is a slug from the name. Market is stored in the <code>country</code> field (helix-commerce-api cart rules are one shared array per site).</p>';
   return `
       <div class="coupons-field coupons-field-full">
         <label for="pr-cart-add-market">Market</label>
@@ -1711,7 +1708,7 @@ function cartRuleAddFormHtml(initialMarket, formOptions = {}) {
     : '';
   const lead = marketLocked
     ? 'Latest rules were loaded from the server. Change fields below — rule <code>id</code> and priority cannot be changed here; use <strong>Delete rule</strong> to remove.'
-    : 'Server data was just refreshed. Choose a market for the rule <code>id</code> prefix, then describe the rule — <code>PUT …/price-rules/cart</code> sends the full rules array.';
+    : 'Server data was just refreshed. Choose a market (stored as <code>country</code>), then describe the rule — <code>PUT …/price-rules/cart</code> sends the full rules array.';
   return `
     <p class="coupons-page-lead" style="margin:0 0 12px;font-size:14px;color:#6d7175">
       ${lead}
@@ -1820,16 +1817,6 @@ async function openCartRuleAddDialog(defaultMarketKey) {
     </div>`;
   document.body.appendChild(dialog);
 
-  const marketSelect = dialog.querySelector('#pr-cart-add-market');
-  const marketCodeEl = dialog.querySelector('#pr-cart-add-market-code');
-  const syncMarketHint = () => {
-    const k = String(marketSelect?.value ?? '').trim().toLowerCase();
-    if (marketCodeEl && k) marketCodeEl.textContent = k;
-  };
-  marketSelect?.addEventListener('change', syncMarketHint);
-  marketSelect?.addEventListener('input', syncMarketHint);
-  syncMarketHint();
-
   const close = () => {
     dialog.close();
     dialog.remove();
@@ -1875,7 +1862,7 @@ async function openCartRuleEditDialog(ruleId) {
     return;
   }
   const apiRule = list[idx];
-  const market = cartRuleMarketFromRuleId(apiRule.id);
+  const market = cartRuleMarketFromRule(apiRule);
   const row = helixCartRuleToRuleRow(apiRule);
 
   const dialog = document.createElement('dialog');
@@ -1894,16 +1881,6 @@ async function openCartRuleEditDialog(ruleId) {
     </div>`;
   document.body.appendChild(dialog);
   applyCartRuleFormPrefill(dialog, row);
-
-  const marketSelect = dialog.querySelector('#pr-cart-add-market');
-  const marketCodeEl = dialog.querySelector('#pr-cart-add-market-code');
-  const syncMarketHint = () => {
-    const k = String(marketSelect?.value ?? '').trim().toLowerCase();
-    if (marketCodeEl && k) marketCodeEl.textContent = k;
-  };
-  marketSelect?.addEventListener('change', syncMarketHint);
-  marketSelect?.addEventListener('input', syncMarketHint);
-  syncMarketHint();
 
   const close = () => {
     dialog.close();
@@ -1924,8 +1901,6 @@ async function openCartRuleEditDialog(ruleId) {
   });
   dialog.querySelector('[data-pr-cart-add-submit]')?.addEventListener('click', async () => {
     try {
-      const fixedMarket = cartRuleMarketFromRuleId(String(ruleId));
-      const newRow = readCartRuleAddForm(dialog);
       const fresh = Array.isArray(state.cartRulesList) ? state.cartRulesList : [];
       const idxFresh = fresh.findIndex((r) => String(r.id) === String(ruleId));
       if (idxFresh === -1) {
@@ -1934,6 +1909,8 @@ async function openCartRuleEditDialog(ruleId) {
         render();
         return;
       }
+      const fixedMarket = cartRuleMarketFromRule(fresh[idxFresh]);
+      const newRow = readCartRuleAddForm(dialog);
       const others = fresh.filter((_, i) => i !== idxFresh);
       const updated = ruleRowToHelixCartRule(fixedMarket, newRow, others, fresh[idxFresh]);
       const next = fresh.slice();
@@ -2026,7 +2003,7 @@ function promotionTableHtml(rows, thumbByProductUrl) {
  * @typedef {object} PromoListRow
  * @property {string} countryKey
  * @property {string} countryLabel
- * @property {string} year
+ * @property {string} group list/filter label from `custom.group`
  * @property {string} id
  * @property {string} title
  * @property {number} rowCount
@@ -2041,13 +2018,13 @@ function allPromotionRowsForCountry() {
   /** @type {PromoListRow[]} */
   const rows = [];
   promotions.forEach((p) => {
-    const rulesForCo = (p.rules || []).filter((r) => countryKeyFromCatalogPath(r.path) === ck);
+    const rulesForCo = catalogRulesForCountryTab(p, ck);
     if (!rulesForCo.length) return;
-    const year = inferPromotionYear(p, ck);
+    const group = promotionCatalogGroup(p, ck);
     rows.push({
       countryKey: ck,
       countryLabel: label,
-      year,
+      group,
       id: p.id,
       title: p.name,
       rowCount: rulesForCo.length,
@@ -2059,8 +2036,8 @@ function allPromotionRowsForCountry() {
 
 function filteredPromotionRows() {
   let list = allPromotionRowsForCountry();
-  const yf = state.promoListYearFilter.trim();
-  if (yf) list = list.filter((r) => r.year === yf);
+  const gf = state.promoListGroupFilter.trim();
+  if (gf) list = list.filter((r) => r.group === gf);
   const q = state.promoListSearch.trim().toLowerCase();
   if (q) {
     list = list.filter(
@@ -2070,16 +2047,16 @@ function filteredPromotionRows() {
   return list;
 }
 
-function promotionYearFilterOptionsHtml() {
-  const years = [...new Set(allPromotionRowsForCountry().map((r) => r.year))].sort(
-    (a, b) => Number(b) - Number(a),
+function promotionGroupFilterOptionsHtml() {
+  const groups = [...new Set(allPromotionRowsForCountry().map((r) => r.group))].sort(
+    (a, b) => String(b).localeCompare(String(a), undefined, { numeric: true }),
   );
-  const curY = state.promoListYearFilter.trim();
-  const allSel = !curY ? ' selected' : '';
-  const opts = [`<option value=""${allSel}>All years</option>`].concat(
-    years.map((y) => {
-      const sel = y === curY ? ' selected' : '';
-      return `<option value="${escapeHtml(y)}"${sel}>${escapeHtml(y)}</option>`;
+  const curG = state.promoListGroupFilter.trim();
+  const allSel = !curG ? ' selected' : '';
+  const opts = [`<option value=""${allSel}>All groups</option>`].concat(
+    groups.map((g) => {
+      const sel = g === curG ? ' selected' : '';
+      return `<option value="${escapeHtml(g)}"${sel}>${escapeHtml(g)}</option>`;
     }),
   );
   return opts.join('');
@@ -2450,14 +2427,20 @@ async function buildThumbUrlMapForPromotionRows(rows, countryKey) {
 
 /**
  * @param {string} countryKey
- * @param {string} year
+ * @param {string} groupLabel display label from rule <code>custom.group</code>
  * @param {string} countryLabel
  * @param {PromotionSet} set
  * @param {Map<string, string>} thumbByProductUrl
  */
-function promotionDetailModalInnerHtml(countryKey, year, countryLabel, set, thumbByProductUrl) {
+function promotionDetailModalInnerHtml(
+  countryKey,
+  groupLabel,
+  countryLabel,
+  set,
+  thumbByProductUrl,
+) {
   const { id } = set;
-  const fullPath = `${countryKey.toUpperCase()} / promotions / ${year} / ${id}`;
+  const fullPath = `${countryKey.toUpperCase()} / promotions / ${groupLabel} / ${id}`;
   const rows = Array.isArray(set.rows) ? set.rows : [];
   const n = rows.length;
   const starts = rows.map((r) => r.start);
@@ -2477,7 +2460,7 @@ function promotionDetailModalInnerHtml(countryKey, year, countryLabel, set, thum
     <div class="coupons-modal-head">
       <div class="coupons-modal-badges">
         ${promoMarketTagHtml(countryKey)}
-        <span class="coupons-tag coupons-tag-year">${escapeHtml(year)}</span>
+        ${commerceGroupBadgeHtml(groupLabel)}
         <span class="coupons-tag coupons-tag-slug">${escapeHtml(id)}</span>
       </div>
       <h2 class="coupons-modal-title">${escapeHtml(set.title)}</h2>
@@ -2492,7 +2475,7 @@ function promotionDetailModalInnerHtml(countryKey, year, countryLabel, set, thum
     </div>
     <div class="coupons-modal-stats" role="list">
       <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Market</span><span class="coupons-modal-stat-value">${escapeHtml(countryLabel)}</span></div>
-      <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Calendar year</span><span class="coupons-modal-stat-value">${escapeHtml(year)}</span></div>
+      <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Group</span><span class="coupons-modal-stat-value">${commerceGroupBadgeHtml(groupLabel)}</span></div>
       <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Sale lines</span><span class="coupons-modal-stat-value">${String(n)}</span></div>
       <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Unique products</span><span class="coupons-modal-stat-value">${String(uniqProducts)}</span></div>
     </div>
@@ -2517,17 +2500,14 @@ function wirePromotionDetailDialog(dialog, shut) {
 
 /**
  * @param {string} countryKey
- * @param {string} year
  * @param {string} promoId
  */
-async function openPromotionDetailModal(countryKey, year, promoId) {
+async function openPromotionDetailModal(countryKey, promoId) {
   const catalogPromo = promotionsListSource().find((p) => p.id === promoId);
   if (!catalogPromo) return;
-  const rulesForCo = (catalogPromo.rules || []).filter(
-    (r) => countryKeyFromCatalogPath(r.path) === countryKey,
-  );
+  const rulesForCo = catalogRulesForCountryTab(catalogPromo, countryKey);
   if (!rulesForCo.length) return;
-  const displayYear = year || inferPromotionYear(catalogPromo, countryKey);
+  const displayGroup = promotionCatalogGroup(catalogPromo, countryKey);
   /** @type {PromotionSet} */
   const set = {
     id: catalogPromo.id,
@@ -2540,7 +2520,7 @@ async function openPromotionDetailModal(countryKey, year, promoId) {
   const thumbByProductUrl = await buildThumbUrlMapForPromotionRows(rows, countryKey);
   const humanHtml = promotionDetailModalInnerHtml(
     countryKey,
-    displayYear,
+    displayGroup,
     countryLabel,
     set,
     thumbByProductUrl,
@@ -2566,7 +2546,7 @@ async function openPromotionDetailModal(countryKey, year, promoId) {
     entityKind: 'promotion',
     getPayload: () => ({
       country: countryKey,
-      year: displayYear,
+      group: displayGroup,
       promotion: catalogPromo,
     }),
   });
@@ -2634,11 +2614,11 @@ function renderPromotionsListPanel() {
       .map((r) => {
         const label = `Open promotion ${r.title}`;
         return `<tr class="pr-promo-grid-row" role="button" tabindex="0" aria-label="${escapeHtml(label)}"
-            data-pr-promo-open data-pr-country="${escapeHtml(r.countryKey)}" data-pr-year="${escapeHtml(r.year)}" data-pr-id="${escapeHtml(r.id)}">
-            <td>${escapeHtml(r.year)}</td>
+            data-pr-promo-open data-pr-country="${escapeHtml(r.countryKey)}" data-pr-id="${escapeHtml(r.id)}">
             <td class="pr-promo-col-title">${escapeHtml(r.title)}</td>
             <td><code class="pr-promo-id-code">${escapeHtml(r.id)}</code></td>
             <td>${r.rowCount}</td>
+            <td class="pr-promo-col-group">${commerceGroupBadgeHtml(r.group)}</td>
           </tr>`;
       })
       .join('');
@@ -2656,9 +2636,9 @@ function renderPromotionsListPanel() {
       </div>
       <div class="pr-promo-toolbar-right">
         <div class="pr-promo-filter-field">
-          <label class="pr-promo-filter-label" for="pr-promo-year">Year</label>
-          <select id="pr-promo-year" class="pim-index-select pr-promo-year-select" aria-label="Filter by year">
-            ${promotionYearFilterOptionsHtml()}
+          <label class="pr-promo-filter-label" for="pr-promo-group">Group</label>
+          <select id="pr-promo-group" class="pim-index-select pr-promo-year-select" aria-label="Filter by group">
+            ${promotionGroupFilterOptionsHtml()}
           </select>
         </div>
         <span class="pim-count pr-promo-count">${list.length} promotion${list.length === 1 ? '' : 's'}</span>
@@ -2668,10 +2648,10 @@ function renderPromotionsListPanel() {
       <table class="pr-data-table pr-promo-grid-table" aria-label="Promotions">
         <thead>
           <tr>
-            <th scope="col">Year</th>
             <th scope="col">Title</th>
             <th scope="col">Id</th>
             <th scope="col">Rows</th>
+            <th scope="col" class="pr-promo-col-group">Group</th>
           </tr>
         </thead>
         <tbody>${tbodyHtml}</tbody>
@@ -2763,7 +2743,7 @@ function render() {
       if (!key || key === state.country) return;
       state.country = /** @type {(typeof COUNTRIES)[number]} */ (key);
       state.promoListSearch = '';
-      state.promoListYearFilter = '';
+      state.promoListGroupFilter = '';
       state.cartRuleSearch = '';
       closeAllPricingDetailDialogs();
       render();
@@ -2841,18 +2821,17 @@ function render() {
         }
       });
     }
-    mount.querySelector('#pr-promo-year')?.addEventListener('change', (e) => {
+    mount.querySelector('#pr-promo-group')?.addEventListener('change', (e) => {
       const t = /** @type {HTMLSelectElement} */ (e.target);
-      state.promoListYearFilter = t.value;
+      state.promoListGroupFilter = t.value;
       render();
     });
 
     const openFromRow = (row) => {
       const ck = row.getAttribute('data-pr-country') || '';
-      const year = row.getAttribute('data-pr-year') || '';
       const id = row.getAttribute('data-pr-id') || '';
-      if (!ck || !year || !id) return;
-      openPromotionDetailModal(ck, year, id).catch((err) => {
+      if (!ck || !id) return;
+      openPromotionDetailModal(ck, id).catch((err) => {
         /* eslint-disable-next-line no-console -- modal/index failures */
         console.warn('[commerce-admin/promotions] open promotion modal failed', {
           message: err?.message || String(err),

@@ -321,3 +321,75 @@
   font-size: 14px;
   color: #6d7175;
 }
+
+/* Group / year pills (promotions list, coupon program overview, detail modals) */
+.commerce-admin-group-badge {
+  display: inline-block;
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  line-height: 1.25;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.commerce-admin-group-badge-muted {
+  background: #f1f2f3;
+  border-color: #d2d5d8;
+  color: #6d7175;
+}
+
+.commerce-admin-group-badge-hue-0 {
+  background: #e8f0fe;
+  border-color: #b4d0fe;
+  color: #1a56b0;
+}
+
+.commerce-admin-group-badge-hue-1 {
+  background: #e3f1df;
+  border-color: #a3d49c;
+  color: #1f6b2a;
+}
+
+.commerce-admin-group-badge-hue-2 {
+  background: #fce8f3;
+  border-color: #f0b8d9;
+  color: #8e2267;
+}
+
+.commerce-admin-group-badge-hue-3 {
+  background: #fff4e5;
+  border-color: #f5c08a;
+  color: #8a4b08;
+}
+
+.commerce-admin-group-badge-hue-4 {
+  background: #e8f7f7;
+  border-color: #8fd4d4;
+  color: #0d5c5c;
+}
+
+.commerce-admin-group-badge-hue-5 {
+  background: #f3e8ff;
+  border-color: #cdb0f0;
+  color: #4a1d7a;
+}
+
+.commerce-admin-group-badge-hue-6 {
+  background: #fff0f0;
+  border-color: #f0b0b0;
+  color: #8b1f1f;
+}
+
+.commerce-admin-group-badge-hue-7 {
+  background: #eef6ff;
+  border-color: #9ec5e8;
+  color: #0d4a6e;
+}

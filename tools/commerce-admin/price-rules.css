@@ -329,6 +329,13 @@
   color: #202223;
 }
 
+.pr-promo-grid-table thead th.pr-promo-col-group,
+.pr-promo-col-group {
+  text-align: right;
+  width: 1%;
+  white-space: nowrap;
+}
+
 .pr-promo-id-code {
   font-size: 12px;
   word-break: break-all;

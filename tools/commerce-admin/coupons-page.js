@@ -10,7 +10,7 @@ import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
 import { createDetailModalHeaderShell } from './commerce-detail-modal-json.js';
 import { mountPromoteProductionInToolbar } from './commerce-promote-production.js';
 import { PB_ORG, PB_SITE } from './commerce-pbus-config.js';
-import { escapeHtml, showToast } from './commerce-otp-ui.js';
+import { commerceGroupBadgeHtml, escapeHtml, showToast } from './commerce-otp-ui.js';
 
 async function readRespError(resp) {
   return resp.headers.get('x-error')
@@ -60,14 +60,11 @@ const COUPON_MARKETS = /** @type {const} */ ([
 
 /**
  * Expected coupon type id: `us-2026-my-promo` (country-year-key).
- * Legacy `us/2026/…` is still accepted for reads.
  */
 function assertCouponIdMarketPath(id) {
   const t = String(id || '').trim();
   if (!t) throw new Error('Coupon ID is required');
-  const hyphenForm = /^(us|ca|mx)-\d{4}-[a-z0-9-]+$/i.test(t);
-  const legacySlashForm = /^(us|ca|mx)\/\d{4}\/.+$/i.test(t);
-  if (!hyphenForm && !legacySlashForm) {
+  if (!/^(us|ca|mx)-\d{4}-[a-z0-9-]+$/i.test(t)) {
     throw new Error(
       'Coupon ID must look like us-2026-my-promo — country (us, ca, or mx), 4-digit year, hyphen, then a program key (letters, numbers, hyphens only).',
     );
@@ -79,9 +76,9 @@ function assertCouponIdMarketPath(id) {
 
 function couponMarketPrefixFromId(id) {
   const s = String(id).trim().toLowerCase();
-  if (s.startsWith('us-') || s.startsWith('us/')) return 'us';
-  if (s.startsWith('ca-') || s.startsWith('ca/')) return 'ca';
-  if (s.startsWith('mx-') || s.startsWith('mx/')) return 'mx';
+  if (s.startsWith('us-')) return 'us';
+  if (s.startsWith('ca-')) return 'ca';
+  if (s.startsWith('mx-')) return 'mx';
   return '';
 }
 
@@ -94,7 +91,7 @@ function couponsVisibleForMarket() {
 }
 
 /**
- * When id matches country-year-key (hyphen) or legacy country/year/… (slash), return breakdown.
+ * When id matches `country-year-key`, return breakdown for UI and derived fields.
  */
 function parseCouponTypePath(id) {
   const s = String(id).trim();
@@ -104,14 +101,6 @@ function parseCouponTypePath(id) {
       country: hy[1].toLowerCase(),
       year: hy[2],
       name: hy[3],
-    };
-  }
-  const parts = s.split('/').filter(Boolean);
-  if (parts.length >= 3 && /^(us|ca|mx)$/i.test(parts[0])) {
-    return {
-      country: parts[0].toLowerCase(),
-      year: parts[1],
-      name: parts.slice(2).join('/'),
     };
   }
   return null;
@@ -227,7 +216,7 @@ function couponDetailModalInnerHtml(d) {
     <div class="coupons-modal-head">
       <div class="coupons-modal-badges">
         ${market ? marketTagHtml(market) : ''}
-        ${year ? `<span class="coupons-tag coupons-tag-year">${escapeHtml(year)}</span>` : ''}
+        ${year ? commerceGroupBadgeHtml(year) : ''}
         ${slugName ? `<span class="coupons-tag coupons-tag-slug">${escapeHtml(slugName)}</span>` : ''}
       </div>
       <h2 class="coupons-modal-title">${escapeHtml(name || id || 'Coupon')}</h2>
@@ -535,12 +524,12 @@ function renderCouponsOverviewBody(filtered) {
         <code class="coupons-grid-id">${escapeHtml(id || '—')}</code>
       </td>
       <td class="coupons-grid-name">${escapeHtml(String(name))}</td>
-      <td>${escapeHtml(year)}</td>
       <td>${escapeHtml(disc)}</td>
       <td>${escapeHtml(min)}</td>
       <td>${escapeHtml(cap)}</td>
       <td>${escapeHtml(ship)}</td>
       <td>${escapeHtml(stack)}</td>
+      <td class="coupons-grid-col-year">${commerceGroupBadgeHtml(year)}</td>
     </tr>`;
   }).join('');
 }
@@ -698,7 +687,7 @@ function couponFormHtml({ idReadonly }) {
     ? `<div class="coupons-field coupons-field-full">
         <label for="cp-form-id">Coupon ID</label>
         <input type="text" id="cp-form-id" autocomplete="off" readonly class="coupons-readonly" required />
-        <p class="coupons-field-hint">Ids use <code>country-year-key</code> (e.g. <code>us-2026-spring-sale</code>). Older <code>us/2026/…</code> ids still work in the API.</p>
+        <p class="coupons-field-hint">Ids use <code>country-year-key</code> (e.g. <code>us-2026-spring-sale</code>).</p>
       </div>`
     : `${newCouponIdFieldsHtml()}`;
 
@@ -819,6 +808,13 @@ function readCouponBodyFromForm(dlg, { requireId }) {
     defaultUsesPerCode,
     notes,
   };
+  const seg = parseCouponTypePath(String(body.id || ''));
+  if (seg && /^(us|ca|mx)$/.test(seg.country)) {
+    body.country = seg.country;
+  }
+  if (seg && seg.year) {
+    body.custom = { group: String(seg.year).trim() };
+  }
   return body;
 }
 
@@ -972,12 +968,12 @@ function render() {
             <tr>
               <th scope="col">Market · ID</th>
               <th scope="col">Name</th>
-              <th scope="col">Year</th>
               <th scope="col">Discount</th>
               <th scope="col">Min order</th>
               <th scope="col">Cap</th>
               <th scope="col">Free ship</th>
               <th scope="col">Stack</th>
+              <th scope="col" class="coupons-grid-col-year">Year</th>
             </tr>
           </thead>
           <tbody>${overviewBody}</tbody>

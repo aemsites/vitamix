@@ -2,14 +2,19 @@
  * ProductBus catalog + cart price rules (commerce-admin).
  *
  * Shapes match **helix-commerce-api**
- * (`src/schemas/PriceRules.js`, `src/routes/price-rules/*-handler.js`):
+ * (`src/schemas/PriceRules.js`, `src/routes/price-rules/*-handler.js`,
+ * `src/utils/locale.js`):
  * - **Catalog** `GET/PUT …/price-rules/catalog`:
  *   JSON object `{ promotions: CatalogPromotion[] }` (not a bare array).
+ *   Each promotion may include optional **`country`** (ISO 3166-1 alpha-2, `^[a-z]{2}$`) and
+ *   **`locale`** (BCP-47 subset per helix `LOCALE_PATTERN`) in addition to `id`, `name`, `rules`.
  *   Each `CatalogPriceRule` requires `path`, `price` (string or number; server stores string).
  *   Optional `start` / `end` must be **ISO 8601** timestamps.
- *   Optional `custom` is string values only.
+ *   Optional `custom` on each rule is string values only. Use **`custom.group`** for the
+ *   admin calendar / grouping label.
  *   Optional `variants` maps sku → `{ sku, price, start?, end?, custom? }`.
  * - **Cart** `GET/PUT …/price-rules/cart`: JSON **array** of cart rules (`CartPriceRulesSchema`).
+ *   Each rule may include optional **`country`** / **`locale`** (same patterns as catalog).
  */
 import { apiFetch } from './commerce-otp-api.js';
 
@@ -41,6 +46,8 @@ import { apiFetch } from './commerce-otp-api.js';
  * @property {string} id
  * @property {string} name
  * @property {CatalogPriceRule[]} rules
+ * @property {string} [country] ISO 3166-1 alpha-2 (`^[a-z]{2}$`, helix `COUNTRY_PATTERN`)
+ * @property {string} [locale] BCP-47 subset (helix `LOCALE_PATTERN`, e.g. `en-US`, `fr-CA`)
  */
 
 /**
@@ -73,6 +80,8 @@ import { apiFetch } from './commerce-otp-api.js';
  * @property {HelixCartPriceRuleActions} actions
  * @property {boolean} [stackable]
  * @property {string[]} [incompatibleTypes]
+ * @property {string} [country] ISO 3166-1 alpha-2 (helix `COUNTRY_PATTERN`)
+ * @property {string} [locale] BCP-47 subset (helix `LOCALE_PATTERN`)
  */
 
 /**
@@ -254,13 +263,45 @@ export async function putCartPriceRules(org, site, body) {
   if (!resp.ok) throw new Error(await readRespError(resp));
 }
 
-/** @param {string} path */
+/** Helix `COUNTRY_PATTERN` (ISO 3166-1 alpha-2, lowercase). */
+const HELIX_COUNTRY_RE = /^[a-z]{2}$/;
+
+/**
+ * First path segment as country key when the path looks like `/{cc}/…` (storefront locale URLs).
+ * Matches helix `COUNTRY_PATTERN` for the segment; supports any two-letter market (`vr`, etc.).
+ *
+ * @param {string} path
+ * @returns {string} lowercase country code or empty when not matched
+ */
 export function countryKeyFromCatalogPath(path) {
-  const p = String(path || '').toLowerCase();
-  if (p.startsWith('/us/')) return 'us';
-  if (p.startsWith('/ca/')) return 'ca';
-  if (p.startsWith('/mx/')) return 'mx';
-  return '';
+  const m = String(path || '').toLowerCase().match(/^\/([a-z]{2})\//);
+  return m ? m[1] : '';
+}
+
+/**
+ * Optional promotion-level `country` from helix (`CatalogPromotion.country`).
+ *
+ * @param {CatalogPromotion | null | undefined} promo
+ * @returns {string} normalized code or empty when absent / invalid
+ */
+export function promotionAnnotatedCountry(promo) {
+  const c = promo && typeof promo.country === 'string' ? promo.country.trim().toLowerCase() : '';
+  return HELIX_COUNTRY_RE.test(c) ? c : '';
+}
+
+/**
+ * Rules to show under a country tab: use promotion `country` when set (helix annotation),
+ * otherwise infer from each rule `path` via {@link countryKeyFromCatalogPath}.
+ *
+ * @param {CatalogPromotion} promo
+ * @param {string} countryKey
+ * @returns {CatalogPriceRule[]}
+ */
+export function catalogRulesForCountryTab(promo, countryKey) {
+  const ck = String(countryKey || '').toLowerCase();
+  const tagged = promotionAnnotatedCountry(promo);
+  if (tagged) return tagged === ck ? [...(promo.rules || [])] : [];
+  return (promo.rules || []).filter((r) => countryKeyFromCatalogPath(r.path) === ck);
 }
 
 /**
@@ -291,15 +332,32 @@ export function catalogPathToProductUrl(path) {
 }
 
 /**
+ * String-key map from rule `custom` (helix).
+ *
+ * @param {unknown} raw
+ * @returns {PriceRuleCustomData}
+ */
+function catalogCustomStringMap(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  /** @type {PriceRuleCustomData} */
+  const out = {};
+  Object.entries(raw).forEach(([k, v]) => {
+    if (v == null) return;
+    out[k] = typeof v === 'string' ? v : String(v);
+  });
+  return out;
+}
+
+/**
  * Map a catalog rule to a table row (UI).
  *
  * @param {CatalogPriceRule} rule
  * @returns {object} PromotionRow-compatible object
  */
 export function catalogRuleToPromotionRow(rule) {
-  const custom = rule.custom && typeof rule.custom === 'object' ? rule.custom : {};
-  const regular = custom.regularPrice != null && String(custom.regularPrice).trim() !== ''
-    ? String(custom.regularPrice)
+  const c = catalogCustomStringMap(rule?.custom);
+  const regular = c.regularPrice != null && String(c.regularPrice).trim() !== ''
+    ? String(c.regularPrice)
     : '—';
   return {
     start: rule.start != null && String(rule.start).trim() !== '' ? String(rule.start) : '—',
@@ -311,14 +369,21 @@ export function catalogRuleToPromotionRow(rule) {
 }
 
 /**
+ * Group / calendar label for list filters and UI: reads **`custom.group`** on sale-line rules,
+ * else a year from `start`, else the current year.
+ *
  * @param {CatalogPromotion} promo
  * @param {string} countryKey
  * @returns {string}
  */
-export function inferPromotionYear(promo, countryKey) {
-  const rules = (promo.rules || []).filter((r) => countryKeyFromCatalogPath(r.path) === countryKey);
-  const fromCustom = rules.map((r) => r.custom?.year).find(Boolean);
-  if (fromCustom) return String(fromCustom);
+export function promotionCatalogGroup(promo, countryKey) {
+  const rules = catalogRulesForCountryTab(promo, countryKey);
+  const fromGroup = rules.map((r) => {
+    const c = catalogCustomStringMap(r.custom);
+    const g = c.group != null && String(c.group).trim() !== '' ? String(c.group).trim() : '';
+    return g;
+  }).find(Boolean);
+  if (fromGroup) return fromGroup;
   const yFromStart = rules
     .map((r) => String(r.start || '').match(/(20\d{2})/))
     .find((m) => m);
