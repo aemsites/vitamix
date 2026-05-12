@@ -50,6 +50,7 @@ const ET_TIMEZONE = 'America/New_York';
 
 /** @typedef {object} RuleRow
  * @property {string} name
+ * @property {string} [id] helix rule id when loaded from API (empty for new rows)
  * @property {string} minimumValue
  * @property {string} salesAmountOff
  * @property {string} freeShipping
@@ -163,7 +164,9 @@ function helixCartRuleToRuleRow(rule) {
   const freeShipping = a.freeShipping === true ? 'Yes' : 'No';
   const products = Array.isArray(c.products) ? c.products.join(', ') : '';
   const categories = Array.isArray(c.categories) ? c.categories.join(', ') : '';
+  const hid = rule.id != null ? String(rule.id).trim() : '';
   return {
+    id: hid,
     name: String(rule.name || ''),
     minimumValue,
     salesAmountOff,
@@ -1777,6 +1780,7 @@ function readCartRuleAddForm(dlg) {
   if (!name) throw new Error('Rule name is required');
   const fs = dlg.querySelector('#pr-cart-add-freeship')?.value === 'yes' ? 'Yes' : 'No';
   return {
+    id: '',
     name,
     minimumValue: dlg.querySelector('#pr-cart-add-min')?.value?.trim() || '',
     salesAmountOff: dlg.querySelector('#pr-cart-add-off')?.value?.trim() || '',
@@ -2282,6 +2286,7 @@ function renderCartRulesOverview() {
   const ruleSearchMatch = (r) => {
     const hay = [
       r.name,
+      r.id,
       r.minimumValue,
       r.salesAmountOff,
       r.freeShipping,
@@ -2297,9 +2302,9 @@ function renderCartRulesOverview() {
 
   let tbodyHtml;
   if (!rules.length) {
-    tbodyHtml = '<tr><td colspan="6" class="pr-empty-cell">No cart rules for this country.</td></tr>';
+    tbodyHtml = '<tr><td colspan="7" class="pr-empty-cell">No cart rules for this country.</td></tr>';
   } else if (!filtered.length) {
-    tbodyHtml = '<tr><td colspan="6" class="pr-empty-cell">No rules match your search.</td></tr>';
+    tbodyHtml = '<tr><td colspan="7" class="pr-empty-cell">No rules match your search.</td></tr>';
   } else {
     tbodyHtml = filtered
       .map((r) => {
@@ -2316,10 +2321,12 @@ function renderCartRulesOverview() {
           .filter(Boolean)
           .join(' · ') || '—';
         const scopeShort = scope.length > 56 ? `${escapeHtml(scope.slice(0, 53))}…` : escapeHtml(scope);
+        const ruleId = (r.id && String(r.id).trim()) || ruleSlugFromName(r.name);
         const label = `Open rule ${r.name}`;
         return `<tr class="pr-promo-grid-row pr-cart-rule-row" role="button" tabindex="0" aria-label="${escapeHtml(label)}"
             data-pr-cart-rule-open data-pr-country="${escapeHtml(ck)}" data-pr-rule-idx="${idx}">
-            <td class="pr-cart-rule-lead"><strong>${escapeHtml(r.name)}</strong></td>
+            <td class="pr-promo-col-title">${escapeHtml(r.name)}</td>
+            <td><code class="pr-promo-id-code">${escapeHtml(ruleId)}</code></td>
             <td>${min}</td>
             <td>${off}</td>
             <td>${ship}</td>
@@ -2336,7 +2343,7 @@ function renderCartRulesOverview() {
 
   return `${cartErr}
     <div class="pr-promo-toolbar pim-toolbar pr-promo-toolbar-with-actions">
-      <input type="search" id="pr-cart-rule-search" class="pim-search pr-promo-search-wide" placeholder="Search name, min, off, scope…" aria-label="Search cart rules" value="${searchVal}" />
+      <input type="search" id="pr-cart-rule-search" class="pim-search pr-promo-search-wide" placeholder="Search title, id, min, off, scope…" aria-label="Search cart rules" value="${searchVal}" />
       <div class="pr-promo-api-actions">
         <button type="button" class="coupons-btn coupons-btn-primary" data-pr-cart-add>Add cart rule…</button>
       </div>
@@ -2346,7 +2353,8 @@ function renderCartRulesOverview() {
       <table class="pr-data-table pr-promo-grid-table" aria-label="Cart rules">
         <thead>
           <tr>
-            <th scope="col">Rule</th>
+            <th scope="col">Title</th>
+            <th scope="col">Id</th>
             <th scope="col">Min cart</th>
             <th scope="col">Off</th>
             <th scope="col">Free ship</th>

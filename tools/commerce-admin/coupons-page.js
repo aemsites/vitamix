@@ -521,11 +521,11 @@ function renderCouponsOverviewBody(filtered) {
     const cap = overviewCap(row);
     const ship = yn(row.freeShipping);
     const stack = yn(row.stackable !== false);
-    const label = `Open coupon ${id}`;
+    const label = `Open coupon ${String(name)}`;
     const mKey = couponMarketPrefixFromId(id);
     return `<tr class="coupons-grid-row coupons-row-open" data-cp-coupon-id="${escapeHtml(id)}" tabindex="0" role="button" aria-label="${escapeHtml(label)}">
-      <td class="coupons-grid-lead"><code class="coupons-grid-id">${escapeHtml(id || '—')}</code></td>
-      <td class="coupons-grid-name">${escapeHtml(String(name))}</td>
+      <td class="coupons-grid-lead coupons-grid-name">${escapeHtml(String(name))}</td>
+      <td><code class="coupons-grid-id">${escapeHtml(id || '—')}</code></td>
       <td>${escapeHtml(disc)}</td>
       <td>${escapeHtml(min)}</td>
       <td>${escapeHtml(cap)}</td>
@@ -969,8 +969,8 @@ function render() {
         <table class="coupons-grid-table">
           <thead>
             <tr>
-              <th scope="col">ID</th>
-              <th scope="col">Name</th>
+              <th scope="col">Title</th>
+              <th scope="col">Id</th>
               <th scope="col">Discount</th>
               <th scope="col">Min order</th>
               <th scope="col">Cap</th>

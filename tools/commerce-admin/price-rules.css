@@ -581,14 +581,6 @@
   max-width: min(96vw, 720px);
 }
 
-.pr-cart-rule-lead {
-  min-width: 10rem;
-}
-
-.pr-cart-rule-lead .coupons-grid-lead-badges {
-  margin-bottom: 6px;
-}
-
 .pr-cart-rule-scope {
   max-width: 14rem;
   font-size: 12px;
