@@ -1,10 +1,13 @@
 /**
  * ProductBus catalog + cart price rules (commerce-admin).
  *
- * Shapes match **helix-commerce-api** (`src/schemas/PriceRules.js`, `src/routes/price-rules/*-handler.js`):
- * - **Catalog** `GET/PUT …/price-rules/catalog`: JSON object `{ promotions: CatalogPromotion[] }` (not a bare array).
+ * Shapes match **helix-commerce-api**
+ * (`src/schemas/PriceRules.js`, `src/routes/price-rules/*-handler.js`):
+ * - **Catalog** `GET/PUT …/price-rules/catalog`:
+ *   JSON object `{ promotions: CatalogPromotion[] }` (not a bare array).
  *   Each `CatalogPriceRule` requires `path`, `price` (string or number; server stores string).
- *   Optional `start` / `end` must be **ISO 8601** timestamps. Optional `custom` is string values only.
+ *   Optional `start` / `end` must be **ISO 8601** timestamps.
+ *   Optional `custom` is string values only.
  *   Optional `variants` maps sku → `{ sku, price, start?, end?, custom? }`.
  * - **Cart** `GET/PUT …/price-rules/cart`: JSON **array** of cart rules (`CartPriceRulesSchema`).
  */
@@ -94,8 +97,16 @@ async function readRespError(resp) {
  * @returns {CatalogPriceRulesDocument}
  */
 export function normalizeCatalogPriceRulesGetResponse(data) {
-  if (data && typeof data === 'object' && !Array.isArray(data) && Array.isArray(/** @type {{ promotions?: unknown }} */(data).promotions)) {
-    return { promotions: /** @type {CatalogPromotion[]} */ (/** @type {{ promotions: CatalogPromotion[] }} */ (data).promotions) };
+  const asObj = /** @type {{ promotions?: unknown }} */ (data);
+  if (
+    data && typeof data === 'object' && !Array.isArray(data)
+    && Array.isArray(asObj.promotions)
+  ) {
+    return {
+      promotions: /** @type {CatalogPromotion[]} */ (
+        /** @type {{ promotions: CatalogPromotion[] }} */ (data).promotions
+      ),
+    };
   }
   if (
     data
@@ -114,7 +125,8 @@ export function normalizeCatalogPriceRulesGetResponse(data) {
 }
 
 /**
- * Coerce a storefront display price to a string `parseFloat` accepts (helix PUT validates numeric price).
+ * Coerce a storefront display price to a string `parseFloat` accepts
+ * (helix PUT validates numeric price).
  *
  * @param {string|number} raw
  * @returns {string}
@@ -130,7 +142,8 @@ export function catalogPriceStringForApi(raw) {
 
 /**
  * UTC instant for helix `CatalogPriceRule` / variant `start` & `end` (JSON Schema `pattern`).
- * Emits `YYYY-MM-DDTHH:mm:ssZ` with no fractional seconds — avoids `400` "pattern" failures from `.000Z` or non-ISO text.
+ * Emits `YYYY-MM-DDTHH:mm:ssZ` with no fractional seconds — avoids `400` "pattern" failures
+ * from `.000Z` or non-ISO text.
  *
  * @param {string|Date} raw
  * @returns {string} empty string if missing or unparseable
@@ -150,11 +163,15 @@ export function catalogTimestampStringForApi(raw) {
 /**
  * @param {string} org
  * @param {string} site
- * @param {RequestInit} [fetchOptions] Extra fetch options (e.g. `{ cache: 'no-store' }` after a PUT).
+ * @param {RequestInit} [fetchOptions] Extra fetch options
+ *   (e.g. `{ cache: 'no-store' }` after a PUT).
  * @returns {Promise<CatalogPriceRulesDocument>}
  */
 export async function fetchCatalogPriceRules(org, site, fetchOptions) {
-  const resp = await apiFetch(org, site, 'price-rules/catalog', { method: 'GET', ...fetchOptions });
+  const resp = await apiFetch(org, site, 'price-rules/catalog', {
+    method: 'GET',
+    ...fetchOptions,
+  });
   if (!resp.ok) throw new Error(await readRespError(resp));
   const data = await resp.json();
   return normalizeCatalogPriceRulesGetResponse(data);
@@ -163,7 +180,8 @@ export async function fetchCatalogPriceRules(org, site, fetchOptions) {
 /**
  * @param {string} org
  * @param {string} site
- * @param {CatalogPriceRulesDocument} body — must be `{ promotions: [...] }` per helix (not a JSON array).
+ * @param {CatalogPriceRulesDocument} body — must be `{ promotions: [...] }` per helix
+ *   (not a JSON array).
  */
 export async function putCatalogPriceRules(org, site, body) {
   if (!body || typeof body !== 'object' || Array.isArray(body) || !Array.isArray(body.promotions)) {
@@ -177,7 +195,8 @@ export async function putCatalogPriceRules(org, site, body) {
 }
 
 /**
- * Parse GET …/price-rules/cart JSON into `{ rules }` (wire format is a JSON array per helix-commerce-api).
+ * Parse GET …/price-rules/cart JSON into `{ rules }` (wire format is a JSON array
+ * per helix-commerce-api).
  *
  * @param {unknown} data
  * @returns {CartPriceRulesDocument}
@@ -186,8 +205,12 @@ export function normalizeCartRulesGetResponse(data) {
   if (Array.isArray(data)) {
     return { rules: /** @type {HelixCartPriceRule[]} */ (data) };
   }
-  if (data && typeof data === 'object' && Array.isArray(/** @type {{ rules?: unknown }} */(data).rules)) {
-    return { rules: /** @type {HelixCartPriceRule[]} */ (/** @type {{ rules: HelixCartPriceRule[] }} */ (data).rules) };
+  if (
+    data && typeof data === 'object'
+    && Array.isArray(/** @type {{ rules?: unknown }} */ (data).rules)
+  ) {
+    const typed = /** @type {{ rules: HelixCartPriceRule[] }} */ (data);
+    return { rules: /** @type {HelixCartPriceRule[]} */ (typed.rules) };
   }
   if (
     data
@@ -195,7 +218,8 @@ export function normalizeCartRulesGetResponse(data) {
     && /** @type {{ data?: unknown }} */ (data).data != null
     && Array.isArray(/** @type {{ data?: unknown }} */(data).data)
   ) {
-    return { rules: /** @type {HelixCartPriceRule[]} */ (/** @type {{ data: HelixCartPriceRule[] }} */ (data).data) };
+    const typed = /** @type {{ data: HelixCartPriceRule[] }} */ (data);
+    return { rules: /** @type {HelixCartPriceRule[]} */ (typed.data) };
   }
   return { rules: [] };
 }
@@ -215,7 +239,8 @@ export async function fetchCartPriceRules(org, site) {
 /**
  * @param {string} org
  * @param {string} site
- * @param {HelixCartPriceRule[] | CartPriceRulesDocument} body — array on the wire, or `{ rules }` for convenience
+ * @param {HelixCartPriceRule[] | CartPriceRulesDocument} body — array on the wire,
+ *   or `{ rules }` for convenience
  */
 export async function putCartPriceRules(org, site, body) {
   const rules = Array.isArray(body) ? body : body?.rules;

@@ -457,6 +457,13 @@
   background: #fafbfb;
 }
 
+.pr-promo-line-remove-btn {
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 8px;
+  min-width: 32px;
+}
+
 .pr-promo-sale-grid tbody tr[data-pr-promo-line] .pr-promo-line-remove-btn {
   opacity: 0;
   transition: opacity 0.12s ease;
@@ -555,13 +562,6 @@
 
 .pr-promo-cell-wide {
   min-width: 260px;
-}
-
-.pr-promo-line-remove-btn {
-  font-size: 14px;
-  line-height: 1;
-  padding: 2px 8px;
-  min-width: 32px;
 }
 
 .pr-promo-tsv-import {

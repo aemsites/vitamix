@@ -42,7 +42,6 @@ const PR_APP_MODE = getPrAppMode();
 /** IANA timezone used for all date display and date-picker values. */
 const ET_TIMEZONE = 'America/New_York';
 
-
 /** @typedef {object} RuleRow
  * @property {string} name
  * @property {string} minimumValue
@@ -183,7 +182,7 @@ function nextCartRulePriority(existing) {
  * @param {import('./price-rules-api.js').HelixCartPriceRule[]} existing
  */
 function uniqueCartRuleId(market, slug, existing) {
-  let id = `${market}-${slug}`;
+  const id = `${market}-${slug}`;
   const used = new Set(existing.map((r) => String(r.id || '')));
   if (!used.has(id)) return id;
   let n = 2;
@@ -195,7 +194,8 @@ function uniqueCartRuleId(market, slug, existing) {
  * @param {string} market
  * @param {RuleRow} row
  * @param {import('./price-rules-api.js').HelixCartPriceRule[]} existingRules
- * @param {import('./price-rules-api.js').HelixCartPriceRule | null} [preserveFrom] when set, keep id, priority, stackable, incompatibleTypes
+ * @param {import('./price-rules-api.js').HelixCartPriceRule | null} [preserveFrom]
+ *   when set, keep id, priority, stackable, incompatibleTypes
  * @returns {import('./price-rules-api.js').HelixCartPriceRule}
  */
 function ruleRowToHelixCartRule(market, row, existingRules, preserveFrom = null) {
@@ -387,7 +387,7 @@ async function deleteCartRuleById(ruleId) {
  * @param {import('./price-rules-api.js').CatalogPromotion[]} promotions
  */
 function uniquePromotionId(market, slug, promotions) {
-  let id = `${market}-${slug}`;
+  const id = `${market}-${slug}`;
   const used = new Set(promotions.map((p) => String(p.id || '')));
   if (!used.has(id)) return id;
   let n = 2;
@@ -444,15 +444,17 @@ function easternCivilToUtc(year, mo, day, h, mi, sec) {
     hour12: false,
   });
   const get = (parts, type) => parseInt(parts.find((p) => p.type === type)?.value ?? '0', 10);
-  for (const offset of ['-04:00', '-05:00']) {
+  const match = ['-04:00', '-05:00'].map((offset) => {
     const candidate = new Date(`${base}${offset}`);
-    if (Number.isNaN(candidate.getTime())) continue;
+    if (Number.isNaN(candidate.getTime())) return null;
     const parts = etFmt.formatToParts(candidate);
     if (
       get(parts, 'year') === year && get(parts, 'month') === mo && get(parts, 'day') === day
       && get(parts, 'hour') === h && get(parts, 'minute') === mi && get(parts, 'second') === sec
     ) return candidate;
-  }
+    return null;
+  }).find(Boolean);
+  if (match) return match;
   return new Date(`${base}-05:00`); // fallback EST
 }
 
@@ -544,7 +546,8 @@ function resolveProductUrlForRow(raw) {
 }
 
 /**
- * US spreadsheet `M/D/YYYY` (optional time + am/pm). Interpreted as **US Eastern** civil time, then converted to UTC for the API.
+ * US spreadsheet `M/D/YYYY` (optional time + am/pm). Interpreted as **US Eastern** civil time,
+ * then converted to UTC for the API.
  *
  * @param {string} text
  * @returns {string|null} canonical UTC string or null if not parseable
@@ -562,7 +565,7 @@ function parseUsSpreadsheetDateTime(text) {
   const isPm = /pm/.test(restLower);
   const isAm = /am/.test(restLower);
   /** `\b(am|pm)\b` misses `12am` (no boundary between `2` and `a`). Strip letters instead. */
-  let rest = restRaw.replace(/(am|pm)/gi, '').replace(/\s+/g, ' ').trim();
+  const rest = restRaw.replace(/(am|pm)/gi, '').replace(/\s+/g, ' ').trim();
   let hh = 0;
   let mi = 0;
   let sec = 0;
@@ -605,19 +608,18 @@ function parseSaleLinesTsv(text) {
   /** @type {PromotionRow[]} */
   const rows = [];
   const rawLines = String(text || '').split(/\r?\n/);
-  let i = 0;
-  if (rawLines.length && isSaleLinesTsvHeaderLine(rawLines[0])) i = 1;
-  for (; i < rawLines.length; i += 1) {
-    const line = rawLines[i];
-    if (!String(line).trim()) continue;
+  let startIdx = 0;
+  if (rawLines.length && isSaleLinesTsvHeaderLine(rawLines[0])) startIdx = 1;
+  rawLines.slice(startIdx).forEach((line) => {
+    if (!String(line).trim()) return;
     const cols = line.split('\t');
-    if (cols.length < 5) continue;
+    if (cols.length < 5) return;
     const startRaw = cleanSaleLinesTsvCell(cols[0]);
     const endRaw = cleanSaleLinesTsvCell(cols[1]);
     const product = cleanSaleLinesTsvCell(cols[2]);
     const regularRaw = cleanSaleLinesTsvCell(cols[3]);
     const salePrice = cleanSaleLinesTsvCell(cols[4]);
-    if (!product || !salePrice) continue;
+    if (!product || !salePrice) return;
     const startNorm = normalizeDateForCatalogApi(startRaw);
     const endNorm = normalizeDateForCatalogApi(endRaw);
     rows.push({
@@ -629,7 +631,7 @@ function parseSaleLinesTsv(text) {
       regularPrice: regularRaw || '—',
       salePrice,
     });
-  }
+  });
   return rows;
 }
 
@@ -643,17 +645,19 @@ function catalogCustomStringMap(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
   /** @type {Record<string, string>} */
   const out = {};
-  for (const [k, v] of Object.entries(raw)) {
-    if (v == null) continue;
+  Object.entries(raw).forEach(([k, v]) => {
+    if (v == null) return;
     out[k] = typeof v === 'string' ? v : String(v);
-  }
+  });
   return out;
 }
 
 /**
  * @param {PromotionRow[]} rows
  * @param {string} year
- * @param {import('./price-rules-api.js').CatalogPriceRule[] | undefined} [preserveFromRules] rules for this market before edit — merged by `path` so extra `custom` keys (e.g. `debug`) and `variants` survive Save
+ * @param {import('./price-rules-api.js').CatalogPriceRule[] | undefined} [preserveFromRules]
+ *   rules for this market before edit — merged by `path` so extra `custom` keys (e.g. `debug`)
+ *   and `variants` survive Save
  * @returns {import('./price-rules-api.js').CatalogPriceRule[]}
  */
 function promotionRowsToCatalogRules(rows, year, preserveFromRules) {
@@ -720,7 +724,7 @@ function refreshPromotionSaleLinesVisuals(dlg) {
       syncPromotionSaleRowView(tr);
     }
   });
-  void hydratePromotionTableThumbs(dlg, promotionDialogMarketSafe(dlg));
+  hydratePromotionTableThumbs(dlg, promotionDialogMarketSafe(dlg)).catch(() => {});
 }
 
 /** @param {HTMLDialogElement} dlg */
@@ -791,13 +795,10 @@ function fillHiddenDatesFromDisplayedCellsIfEmpty(tr) {
   function fillOne(h, paste, viewTxt) {
     if (!h || String(h.value).trim()) return;
     const candidates = [paste, viewTxt].filter((x) => x && x !== '—');
-    for (const raw of candidates) {
-      const iso = normalizeDateForCatalogApi(String(raw));
-      if (iso) {
-        h.value = iso;
-        return;
-      }
-    }
+    const iso = candidates
+      .map((raw) => normalizeDateForCatalogApi(String(raw)))
+      .find((v) => v);
+    if (iso) h.value = iso;
   }
 
   fillOne(hS, pasteS, viewTxtS);
@@ -844,7 +845,15 @@ async function hydratePromotionTableThumbs(dlg, countryKey) {
   const rows = /** @type {PromotionRow[]} */ ([]);
   dlg.querySelectorAll('tr[data-pr-promo-line]').forEach((tr) => {
     const u = String(tr.querySelector('.pr-promo-h-product')?.value ?? '').trim();
-    if (u) rows.push({ product: u, start: '', end: '', regularPrice: '', salePrice: '' });
+    if (u) {
+      rows.push({
+        product: u,
+        start: '',
+        end: '',
+        regularPrice: '',
+        salePrice: '',
+      });
+    }
   });
   const map = rows.length ? await buildThumbUrlMapForPromotionRows(rows, countryKey) : new Map();
   dlg.querySelectorAll('tr[data-pr-promo-line]').forEach((tr) => {
@@ -984,7 +993,7 @@ function commitPromotionSaleLineFieldsBeforeSave(dlg) {
     cell.querySelector('.pr-promo-cell-view')?.classList.remove('pr-promo-cell-view-active');
     syncPromotionSaleRowView(tr);
   });
-  void hydratePromotionTableThumbs(dlg, promotionDialogMarketSafe(dlg));
+  hydratePromotionTableThumbs(dlg, promotionDialogMarketSafe(dlg)).catch(() => {});
 }
 
 /**
@@ -1006,7 +1015,7 @@ function wirePromotionSaleLineTableCells(dlg) {
   };
 
   const rehydrateThumbs = () => {
-    void hydratePromotionTableThumbs(dlg, safeMarket());
+    hydratePromotionTableThumbs(dlg, safeMarket()).catch(() => {});
   };
 
   dlg.querySelector('#pr-promo-form-market')?.addEventListener('change', rehydrateThumbs);
@@ -1107,7 +1116,10 @@ function promotionFormTableRowHtml(r, index) {
   const endPrimary = String(r.end ?? '').trim();
   const startPaste = String(r.startSourceText ?? '').trim();
   const endPaste = String(r.endSourceText ?? '').trim();
-  /** If parse-time normalization left `start`/`end` empty, derive ISO from pasted spreadsheet text so hidden inputs match the grid. */
+  /**
+   * If parse-time normalization left `start`/`end` empty, derive ISO from pasted
+   * spreadsheet text so hidden inputs match the grid.
+   */
   let startIso = startPrimary && startPrimary !== '—' ? normalizeDateForCatalogApi(startPrimary) : '';
   if (!startIso && startPaste) startIso = normalizeDateForCatalogApi(startPaste);
   let endIso = endPrimary && endPrimary !== '—' ? normalizeDateForCatalogApi(endPrimary) : '';
@@ -1222,22 +1234,28 @@ function promotionEditFormInnerHtml(initialMarket, lines, opts = {}) {
     : '';
   const seed = lines.length
     ? lines
-    : [{ product: '', salePrice: '', regularPrice: '', start: '', end: '' }];
+    : [{
+      product: '',
+      salePrice: '',
+      regularPrice: '',
+      start: '',
+      end: '',
+    }];
   const linesHtml = seed.map((r, i) => promotionFormTableRowHtml(r, i)).join('');
   return `
     <p class="coupons-page-lead" style="margin:0 0 12px;font-size:14px;color:#6d7175">
-      ${edit
-      ? 'Edit sale lines for this market. Lines for other markets on the same promotion are left unchanged. Click a cell to edit; start/end use a US Eastern (ET) date/time picker (saved as UTC ISO 8601). Prices are numbers only (no <code>$</code>) for the API.'
-      : 'New promotion for one market. Click a cell to edit sale lines; start/end use US Eastern (ET) time. Product column shows the storefront path and a thumbnail from the catalog index when the URL resolves. Prices are numbers only (no <code>$</code>) for the API.'}
+    ${edit
+    ? 'Edit sale lines for this market. Lines for other markets on the same promotion are left unchanged. Click a cell to edit; start/end use a US Eastern (ET) date/time picker (saved as UTC ISO 8601). Prices are numbers only (no <code>$</code>) for the API.'
+    : 'New promotion for one market. Click a cell to edit sale lines; start/end use US Eastern (ET) time. Product column shows the storefront path and a thumbnail from the catalog index when the URL resolves. Prices are numbers only (no <code>$</code>) for the API.'}
     </p>
     <div class="coupons-form-grid">
       ${idBlock}
       <div class="coupons-field coupons-field-full">
         <label for="pr-promo-form-market">Market</label>
         <select id="pr-promo-form-market" required${marketDis}>${optsHtml}</select>
-        ${edit
-      ? '<p class="coupons-field-hint">Paths in sale lines must stay under this market’s storefront.</p>'
-      : `<p class="coupons-field-hint">Promotion <code>id</code> will be <code><span id="pr-promo-form-market-code">${escapeHtml(initialMarket)}</span>-</code> plus a slug from the title.</p>`}
+    ${edit
+    ? '<p class="coupons-field-hint">Paths in sale lines must stay under this market’s storefront.</p>'
+    : `<p class="coupons-field-hint">Promotion <code>id</code> will be <code><span id="pr-promo-form-market-code">${escapeHtml(initialMarket)}</span>-</code> plus a slug from the title.</p>`}
       </div>
       <div class="coupons-field coupons-field-full">
         <label for="pr-promo-form-name">Promotion title</label>
@@ -1284,7 +1302,13 @@ function wirePromotionFormDynamicLines(dlg) {
     linesHost.insertAdjacentHTML(
       'beforeend',
       promotionFormTableRowHtml(
-        { product: '', salePrice: '', regularPrice: '', start: '', end: '' },
+        {
+          product: '',
+          salePrice: '',
+          regularPrice: '',
+          start: '',
+          end: '',
+        },
         idx,
       ),
     );
@@ -1579,7 +1603,7 @@ async function openPromotionEditDialog(countryKey, promoId) {
   wireDialogEscapeDismiss(dialog, close);
   dialog.querySelector('[data-pr-promo-form-cancel]')?.addEventListener('click', close);
   dialog.querySelector('[data-pr-promo-form-delete]')?.addEventListener('click', async () => {
-    if (!confirm(`Delete promotion "${promo.name || promoId}" (${promoId})? This cannot be undone.`)) return;
+    if (!window.confirm(`Delete promotion "${promo.name || promoId}" (${promoId})? This cannot be undone.`)) return;
     try {
       if (await deletePromotionById(promoId)) {
         close();
@@ -1612,7 +1636,9 @@ async function openPromotionEditDialog(countryKey, promoId) {
       const prevMarketRules = (prev.rules || []).filter(
         (r) => countryKeyFromCatalogPath(r.path) === market,
       );
-      const rulesNew = lineRows.length ? promotionRowsToCatalogRules(lineRows, year, prevMarketRules) : [];
+      const rulesNew = lineRows.length
+        ? promotionRowsToCatalogRules(lineRows, year, prevMarketRules)
+        : [];
       for (let i = 0; i < rulesNew.length; i += 1) {
         if (countryKeyFromCatalogPath(rulesNew[i].path) !== market) {
           throw new Error(
@@ -1886,7 +1912,7 @@ async function openCartRuleEditDialog(ruleId) {
   wireDialogEscapeDismiss(dialog, close);
   dialog.querySelector('[data-pr-cart-add-cancel]')?.addEventListener('click', close);
   dialog.querySelector('[data-pr-cart-rule-delete]')?.addEventListener('click', async () => {
-    if (!confirm(`Delete cart rule "${apiRule.name || ruleId}" (${ruleId})? This cannot be undone.`)) return;
+    if (!window.confirm(`Delete cart rule "${apiRule.name || ruleId}" (${ruleId})? This cannot be undone.`)) return;
     try {
       if (await deleteCartRuleById(ruleId)) {
         close();
@@ -2246,7 +2272,7 @@ function openCartRuleDetailModal(countryKey, ruleIndex) {
   footer.querySelector('[data-pr-cart-rule-modal-delete]')?.addEventListener('click', async () => {
     const id = apiRule?.id;
     if (!id) return;
-    if (!confirm(`Delete cart rule "${rule.name}" (${id})? This cannot be undone.`)) return;
+    if (!window.confirm(`Delete cart rule "${rule.name}" (${id})? This cannot be undone.`)) return;
     try {
       if (await deleteCartRuleById(id)) {
         shut();
@@ -2260,7 +2286,7 @@ function openCartRuleDetailModal(countryKey, ruleIndex) {
     const id = apiRule?.id;
     if (!id) return;
     shut();
-    void openCartRuleEditDialog(id).catch((err) => {
+    openCartRuleEditDialog(id).catch((err) => {
       showToast(err?.message || 'Could not open editor', 'error');
     });
   });
@@ -2573,7 +2599,7 @@ async function openPromotionDetailModal(countryKey, year, promoId) {
   wirePromotionDetailDialog(dialog, shut);
   footer.querySelector('[data-pr-promo-modal-delete]')?.addEventListener('click', async () => {
     if (!canMutate) return;
-    if (!confirm(`Delete promotion "${catalogPromo.name || promoId}" (${promoId})? This cannot be undone.`)) return;
+    if (!window.confirm(`Delete promotion "${catalogPromo.name || promoId}" (${promoId})? This cannot be undone.`)) return;
     try {
       if (await deletePromotionById(promoId)) {
         shut();
@@ -2586,7 +2612,7 @@ async function openPromotionDetailModal(countryKey, year, promoId) {
   footer.querySelector('[data-pr-promo-modal-edit]')?.addEventListener('click', () => {
     if (!canMutate) return;
     shut();
-    void openPromotionEditDialog(countryKey, promoId).catch((err) => {
+    openPromotionEditDialog(countryKey, promoId).catch((err) => {
       showToast(err?.message || 'Could not open editor', 'error');
     });
   });
@@ -2792,7 +2818,7 @@ function render() {
     });
 
     mount.querySelector('[data-pr-cart-add]')?.addEventListener('click', () => {
-      void openCartRuleAddDialog(state.country).catch((err) => {
+      openCartRuleAddDialog(state.country).catch((err) => {
         showToast(err?.message || 'Could not open add rule', 'error');
       });
     });
@@ -2847,7 +2873,7 @@ function render() {
     });
 
     mount.querySelector('[data-pr-promo-add]')?.addEventListener('click', () => {
-      void openPromotionAddDialog().catch((err) => {
+      openPromotionAddDialog().catch((err) => {
         showToast(err?.message || 'Could not open add promotion', 'error');
       });
     });
