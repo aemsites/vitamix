@@ -1,10 +1,11 @@
-import { loadCSS, getMetadata } from '../../scripts/aem.js';
+import { loadCSS } from '../../scripts/aem.js';
 import { getConfig, formatPrice } from '../../scripts/commerce-config.js';
 import cart from '../../scripts/cart.js';
 import { previewOrder, createOrder, initiatePayment } from '../../scripts/commerce-api.js';
 import applePay from '../../scripts/payments/apple-pay.js';
 import googlePay from '../../scripts/payments/google-pay.js';
 import paypal from '../../scripts/payments/paypal.js';
+import { getActiveProviders } from '../checkout/checkout-payment.js';
 
 const ALL_PROVIDERS = [applePay, googlePay, paypal];
 
@@ -100,25 +101,6 @@ function buildTemplate(s) {
 }
 
 /**
- * Filters ALL_PROVIDERS using the `disabled-providers` page metadata and the
- * `?enable-providers=` query param override used for testing.
- * @param {Object[]} providers
- * @returns {Object[]}
- */
-function filterProviders(providers) {
-  const disabled = (getMetadata('disabled-providers') || '')
-    .split(',').map((p) => p.trim().toLowerCase()).filter(Boolean);
-  const reEnabled = (new URLSearchParams(window.location.search).get('enable-providers') || '')
-    .split(',').map((p) => p.trim().toLowerCase()).filter(Boolean);
-
-  return providers.filter((p) => {
-    if (reEnabled.includes(p.id)) return true;
-    if (disabled.includes(p.id)) return false;
-    return true;
-  });
-}
-
-/**
  * Decorates the cart-summary block.
  *
  * 1. Colocate with the cart section for two-column CSS layout
@@ -177,7 +159,7 @@ export default async function decorate(block) {
   });
 
   // 5. Build express-checkout callbacks, load SDKs, render available wallet buttons
-  const state = { currentEstimateToken: null };
+  const state = { currentEstimateToken: null, currentPreview: null };
 
   const callbacks = {
     getCart: () => cart,
@@ -187,6 +169,7 @@ export default async function decorate(block) {
       const couponCode = sessionStorage.getItem('checkout_coupon_code') || undefined;
       const result = await previewOrder({ ...body, ...(couponCode ? { couponCode } : {}) });
       if (result.estimateToken) state.currentEstimateToken = result.estimateToken;
+      state.currentPreview = result;
       return result;
     },
     createOrder: (orderBody) => createOrder(orderBody),
@@ -195,13 +178,22 @@ export default async function decorate(block) {
       errorEl.textContent = msg;
       errorEl.hidden = false;
     },
-    onComplete: () => {
+    onComplete: (createdOrder) => {
+      const order = createdOrder?.order ?? createdOrder;
+      const orderId = order?.id;
+      try {
+        if (order?.customer?.email) sessionStorage.setItem('checkout_email', order.customer.email);
+        sessionStorage.setItem('checkout_cart_items', JSON.stringify(cart.items));
+        if (state.currentPreview) sessionStorage.setItem('checkout_preview', JSON.stringify(state.currentPreview));
+        if (order) sessionStorage.setItem('checkout_order', JSON.stringify(order));
+      } catch { /* ignore */ }
       cart.clear();
-      window.location.href = config.getOrderPath('complete');
+      const path = config.getOrderPath('complete');
+      window.location.href = orderId ? `${path}?orderId=${orderId}` : path;
     },
   };
 
-  const active = filterProviders(ALL_PROVIDERS).filter((p) => p.supportsExpress);
+  const active = getActiveProviders(ALL_PROVIDERS).filter((p) => p.supportsExpress);
   await Promise.all(active.map(async (p) => {
     try { await p.load(config); } catch { /* provider load failure handled by isAvailable check */ }
   }));

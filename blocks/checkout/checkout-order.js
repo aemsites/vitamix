@@ -123,9 +123,12 @@ export function initOrder(form, cart, state, config, strings) {
     initiatePayment: (...args) => initiatePayment(...args),
     showError: (msg) => showError(form, msg),
     clearError: () => clearError(form),
-    onComplete: () => {
+    onComplete: (createdOrder) => {
+      const order = createdOrder?.order ?? createdOrder;
+      const orderId = order?.id;
       cart.clear();
-      window.location.href = config.getOrderPath('complete');
+      const path = config.getOrderPath('complete');
+      window.location.href = orderId ? `${path}?orderId=${orderId}` : path;
     },
   };
 

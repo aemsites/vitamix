@@ -277,6 +277,10 @@ export function beginCheckoutSession(config, callbacks) {
 
         if (result.status === 'completed') {
           session.completePayment(window.ApplePaySession.STATUS_SUCCESS);
+          const email = formData.get('email') || '';
+          const cart = callbacks.getCart();
+          const preview = callbacks.getState().currentPreview;
+          callbacks.saveCheckoutSession?.(email, cart, preview, createdOrder.order ?? createdOrder);
           callbacks.onComplete(createdOrder);
           resolve('success');
         } else {
