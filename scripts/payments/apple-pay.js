@@ -99,13 +99,14 @@ function startExpressSession(btn, config, callbacks) {
     session.onshippingmethodselected = async (e) => {
       try {
         const contact = lastShippingContact;
+        const countryCode = contact?.countryCode?.toLowerCase();
         const previewResult = await callbacks.previewOrderDirect({
           items: cart.getItemsForAPI(),
           shippingMethod: { id: e.shippingMethod.identifier },
-          ...(contact ? {
-            country: contact.countryCode,
+          ...(countryCode ? {
+            country: countryCode,
             shipping: {
-              country: contact.countryCode,
+              country: countryCode,
               state: contact.administrativeArea,
               zip: contact.postalCode || '',
             },
