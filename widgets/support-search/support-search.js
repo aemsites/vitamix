@@ -377,6 +377,38 @@ const FILTER_TYPES = [
   { value: 'faq', labelKey: 'typeFaq', defaultLabel: 'FAQ' },
 ];
 
+/**
+ * Read filter config from URL query params (same keys as search-results: search, type, page).
+ * @returns {Object}
+ */
+function getConfigFromURL() {
+  const params = new URLSearchParams(window.location.search);
+  const config = {};
+  params.forEach((value, key) => {
+    config[key] = value;
+  });
+  return config;
+}
+
+/**
+ * Update URL with current filter state (pushState), matching search-results behavior.
+ * @param {Object} filterConfig
+ */
+function updateURL(filterConfig) {
+  const params = new URLSearchParams();
+  Object.keys(filterConfig).forEach((key) => {
+    if (key === 'page' && filterConfig[key] === 1) return;
+    const val = filterConfig[key];
+    if (val && (typeof val !== 'string' || val.trim())) {
+      if (key !== 'page' || val !== 1) params.set(key, val);
+    }
+  });
+  const newURL = params.toString()
+    ? `${window.location.pathname}?${params.toString()}`
+    : window.location.pathname;
+  window.history.pushState({ filterConfig }, '', newURL);
+}
+
 const ITEMS_PER_PAGE = 12;
 const INPUT_DEBOUNCE_MS = 200;
 
@@ -394,11 +426,14 @@ function buildSupportSearchUi(root, copy) {
   const paginationEl = root.querySelector('.support-search-pagination');
   const searchInput = root.querySelector('#support-search-input');
 
-  const createFilterConfig = (resetPage = true) => ({
-    search: searchInput?.value || '',
-    type: currentTypeFilter || '',
-    page: resetPage ? 1 : currentPage,
-  });
+  const createFilterConfig = (resetPage = true) => {
+    if (resetPage) currentPage = 1;
+    return {
+      search: searchInput?.value || '',
+      type: currentTypeFilter || '',
+      page: resetPage ? 1 : currentPage,
+    };
+  };
 
   const displayResults = (results, page = 1) => {
     if (!resultsElement) return;
@@ -479,7 +514,7 @@ function buildSupportSearchUi(root, copy) {
     });
   };
 
-  const runSearch = async (filterConfig) => {
+  const runSearch = async (filterConfig, updateURLState = true) => {
     const query = (filterConfig.search || '').trim();
     root.classList.toggle('support-search-has-query', Boolean(query));
 
@@ -487,6 +522,13 @@ function buildSupportSearchUi(root, copy) {
       currentPage = 1;
       if (resultsElement) resultsElement.innerHTML = '';
       if (paginationEl) paginationEl.innerHTML = '';
+      if (updateURLState) {
+        updateURL({
+          search: '',
+          type: '',
+          page: 1,
+        });
+      }
       return;
     }
 
@@ -519,8 +561,16 @@ function buildSupportSearchUi(root, copy) {
     displayResults(results, page);
     displayPagination(totalResults, page, (pageNum) => {
       currentPage = pageNum;
-      runSearch({ ...filterConfig, page: pageNum });
+      runSearch({ ...filterConfig, page: pageNum }, true);
     });
+
+    if (updateURLState) {
+      updateURL({
+        search: filterConfig.search || '',
+        type: filterConfig.type || '',
+        page: parseInt(filterConfig.page, 10) || 1,
+      });
+    }
   };
 
   const renderTypeFilters = () => {
@@ -540,7 +590,7 @@ function buildSupportSearchUi(root, copy) {
           b.setAttribute('aria-pressed', b.dataset.type === value ? 'true' : 'false');
           b.classList.toggle('active', b.dataset.type === value);
         });
-        runSearch(createFilterConfig(true));
+        runSearch(createFilterConfig(true), true);
       });
       typeFiltersEl.appendChild(btn);
     });
@@ -549,7 +599,7 @@ function buildSupportSearchUi(root, copy) {
   const scheduleSearch = () => {
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
-      runSearch(createFilterConfig(true));
+      runSearch(createFilterConfig(true), true);
     }, INPUT_DEBOUNCE_MS);
   };
 
@@ -557,7 +607,7 @@ function buildSupportSearchUi(root, copy) {
   searchInput?.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
       clearTimeout(debounceTimer);
-      runSearch(createFilterConfig(true));
+      runSearch(createFilterConfig(true), true);
     }
   });
 
@@ -565,11 +615,37 @@ function buildSupportSearchUi(root, copy) {
   form?.addEventListener('submit', (e) => {
     e.preventDefault();
     clearTimeout(debounceTimer);
-    runSearch(createFilterConfig(true));
+    runSearch(createFilterConfig(true), true);
   });
 
+  const urlConfig = getConfigFromURL();
+  if (urlConfig.page) currentPage = parseInt(urlConfig.page, 10) || 1;
+  if (urlConfig.search) searchInput.value = urlConfig.search;
+  if (urlConfig.type && FILTER_TYPES.some((t) => t.value === urlConfig.type)) {
+    currentTypeFilter = urlConfig.type;
+  }
+
   renderTypeFilters();
-  runSearch(createFilterConfig(true));
+
+  const initialConfig = {
+    search: searchInput?.value || '',
+    type: currentTypeFilter || '',
+    page: currentPage,
+  };
+  runSearch(initialConfig, true);
+
+  window.addEventListener('popstate', (event) => {
+    if (event.state?.filterConfig) {
+      const saved = event.state.filterConfig;
+      if (saved.search !== undefined) searchInput.value = saved.search || '';
+      if (saved.page) currentPage = parseInt(saved.page, 10) || 1;
+      if (saved.type !== undefined) {
+        currentTypeFilter = saved.type || '';
+        renderTypeFilters();
+      }
+      runSearch(saved, false);
+    }
+  });
 }
 
 /**
