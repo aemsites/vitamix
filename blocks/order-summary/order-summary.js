@@ -18,6 +18,12 @@ function buildTemplate(s) {
 <div class="order-summary">
   <div class="order-summary-header">
     <h3>${s.orderSummary}</h3>
+    <span class="order-summary-header-total"></span>
+    <button class="order-summary-toggle" aria-expanded="false" aria-label="Toggle order summary">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <polyline points="6 9 12 15 18 9"></polyline>
+      </svg>
+    </button>
   </div>
   <div class="order-summary-content">
     <div class="order-summary-items"></div>
@@ -75,6 +81,92 @@ function colocateWithForm(block) {
   if (!mySection.children.length) mySection.remove();
 }
 
+function initMobileCollapse(block) {
+  const summary = block.querySelector('.order-summary');
+  const toggle = block.querySelector('.order-summary-toggle');
+  const content = block.querySelector('.order-summary-content');
+  if (!summary || !toggle || !content) return;
+
+  const mq = window.matchMedia('(max-width: 999px)');
+
+  // Measure natural padding once before any inline overrides.
+  const cs = window.getComputedStyle(content);
+  const naturalPT = parseFloat(cs.paddingTop);
+  const naturalPB = parseFloat(cs.paddingBottom);
+
+  const setCollapsed = (instant) => {
+    if (instant) content.style.transition = 'none';
+    content.style.height = '0';
+    content.style.paddingTop = '0';
+    content.style.paddingBottom = '0';
+    if (instant) {
+      content.getBoundingClientRect();
+      content.style.transition = '';
+    }
+  };
+
+  const setExpanded = (instant) => {
+    if (instant) content.style.transition = 'none';
+    content.style.height = '';
+    content.style.paddingTop = '';
+    content.style.paddingBottom = '';
+    if (instant) {
+      content.getBoundingClientRect();
+      content.style.transition = '';
+    }
+  };
+
+  const expand = () => {
+    // paddingTop/Bottom are currently '0' inline; scrollHeight is content-only.
+    const targetHeight = content.scrollHeight + naturalPT + naturalPB;
+    content.style.height = `${targetHeight}px`;
+    content.style.paddingTop = `${naturalPT}px`;
+    content.style.paddingBottom = `${naturalPB}px`;
+    content.addEventListener('transitionend', (e) => {
+      if (e.propertyName === 'height') setExpanded(false);
+    }, { once: true });
+  };
+
+  toggle.addEventListener('click', () => {
+    if (summary.classList.contains('is-collapsed')) {
+      summary.classList.remove('is-collapsed');
+      toggle.setAttribute('aria-expanded', 'true');
+      expand();
+    } else {
+      // Lock current pixel values so the transition has an explicit start point.
+      content.style.height = `${content.scrollHeight}px`;
+      content.style.paddingTop = `${naturalPT}px`;
+      content.style.paddingBottom = `${naturalPB}px`;
+      content.getBoundingClientRect();
+      summary.classList.add('is-collapsed');
+      toggle.setAttribute('aria-expanded', 'false');
+      content.getBoundingClientRect();
+      setCollapsed(false);
+    }
+  });
+
+  mq.addEventListener('change', (e) => {
+    if (e.matches) {
+      summary.classList.add('is-collapsed');
+      toggle.setAttribute('aria-expanded', 'false');
+      setCollapsed(true);
+    } else {
+      summary.classList.remove('is-collapsed');
+      toggle.setAttribute('aria-expanded', 'true');
+      setExpanded(true);
+    }
+  });
+
+  summary.classList.add('is-collapsed');
+  toggle.setAttribute('aria-expanded', 'false');
+  setCollapsed(true);
+  if (!mq.matches) {
+    summary.classList.remove('is-collapsed');
+    toggle.setAttribute('aria-expanded', 'true');
+    setExpanded(true);
+  }
+}
+
 /**
  * @param {HTMLDivElement} block
  */
@@ -89,6 +181,7 @@ export default async function decorate(block) {
   const shippingEl = block.querySelector('.order-summary-shipping');
   const taxesEl = block.querySelector('.order-summary-taxes');
   const grandTotalEl = block.querySelector('.order-summary-grand-total');
+  const headerTotalEl = block.querySelector('.order-summary-header-total');
   const currencyEl = block.querySelector('.currency');
   currencyEl.textContent = getCurrencyCode();
 
@@ -116,6 +209,7 @@ export default async function decorate(block) {
     shippingEl.textContent = '--';
     taxesEl.textContent = '--';
     grandTotalEl.textContent = subtotal;
+    headerTotalEl.textContent = subtotal;
   };
 
   renderItems();
@@ -153,7 +247,9 @@ export default async function decorate(block) {
       : formatPrice(parseFloat(shippingRate), currency);
     taxesEl.textContent = formatPrice(taxAmount, currency);
     grandTotalEl.textContent = formatPrice(total, currency);
+    headerTotalEl.textContent = formatPrice(total, currency);
   });
 
   syncVisibility();
+  initMobileCollapse(block);
 }
