@@ -609,6 +609,21 @@ function buildOrderHumanView(payload) {
     root.appendChild(sec);
   }
 
+  const custom = o.custom;
+  if (custom && typeof custom === 'object' && Object.keys(custom).length) {
+    const sec = section('Custom');
+    const rows = Object.entries(custom).map(([k, v]) => {
+      const label = k.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
+      let text = '';
+      if (v != null && v !== '') {
+        text = typeof v === 'object' ? JSON.stringify(v) : String(v);
+      }
+      return [label, text];
+    });
+    appendDl(sec, rows);
+    root.appendChild(sec);
+  }
+
   const hist = Array.isArray(o.history) ? o.history : [];
   if (hist.length) {
     const sec = section('State history');
@@ -937,7 +952,6 @@ function renderTable(wrap, orders, query, onEditSaved) {
           <th>Shipping</th>
           <th>Items</th>
           <th>Created</th>
-          <th>Synced</th>
         </tr>
       </thead>
       <tbody>
@@ -945,7 +959,6 @@ function renderTable(wrap, orders, query, onEditSaved) {
     const bill = billingName(o);
     const ship = shippingName(o);
     const createdStr = o.createdAt ? new Date(o.createdAt).toLocaleString() : 'N/A';
-    const syncedStr = o.custom?.syncedToEbs ? new Date(o.custom.syncedToEbs).toLocaleString() : '—';
     const id = String(o.id || '');
     const compactId = orderIdForDisplay(o) || id;
     const formattedId = formatOrderIdChunks(compactId);
@@ -960,7 +973,6 @@ function renderTable(wrap, orders, query, onEditSaved) {
             <td class="orders-name-cell">${highlightMatch(ship, query)}</td>
             <td>${highlightMatch(String(o.items?.length ?? '—'), query)}</td>
             <td>${highlightMatch(createdStr, query)}</td>
-            <td>${highlightMatch(syncedStr, query)}</td>
           </tr>`;
   }).join('')}
       </tbody>
