@@ -181,9 +181,12 @@ function startExpressSession(btn, config, callbacks) {
           session.completePayment(window.ApplePaySession.STATUS_FAILURE);
           callbacks.showError(result.reason || 'Apple Pay payment failed.');
         }
-      } catch {
+      } catch (err) {
         session.completePayment(window.ApplePaySession.STATUS_FAILURE);
-        callbacks.showError('Apple Pay payment failed. Please try again.');
+        const msg = err?.errorHeader === 'recaptcha score too low'
+          ? 'Payment was declined for security reasons. Please refresh the page and try again.'
+          : 'Apple Pay payment failed. Please try again.';
+        callbacks.showError(msg);
       }
     };
 
@@ -280,9 +283,10 @@ export function beginCheckoutSession(config, callbacks) {
           session.completePayment(window.ApplePaySession.STATUS_FAILURE);
           reject(new Error(result.reason || 'payment-failed'));
         }
-      } catch {
+      } catch (err) {
         session.completePayment(window.ApplePaySession.STATUS_FAILURE);
-        reject(new Error('payment-failed'));
+        const reason = err?.errorHeader === 'recaptcha score too low' ? 'recaptcha-blocked' : 'payment-failed';
+        reject(new Error(reason));
       }
     };
 

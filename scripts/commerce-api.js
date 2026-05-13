@@ -8,10 +8,11 @@ import { mintRecaptchaToken, RECAPTCHA_ACTIONS, RECAPTCHA_HEADER } from './recap
  * can inspect the error detail without re-parsing the response.
  */
 class CommerceApiError extends Error {
-  constructor(status, body) {
+  constructor(status, body, errorHeader) {
     super(body?.message || `API error ${status}`);
     this.status = status;
     this.body = body;
+    this.errorHeader = errorHeader || null;
   }
 }
 
@@ -46,7 +47,7 @@ async function post(path, body, recaptchaAction) {
   });
   const data = await resp.json();
   if (!resp.ok) {
-    throw new CommerceApiError(resp.status, data);
+    throw new CommerceApiError(resp.status, data, resp.headers.get('x-error'));
   }
   return data;
 }

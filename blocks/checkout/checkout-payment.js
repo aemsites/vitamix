@@ -57,6 +57,8 @@ function getProviderMeta(strings) {
  */
 export function renderPaymentSection(container, activeProviders, callbacks, strings, config = {}) {
   const providerMeta = getProviderMeta(strings);
+  const cardProviderId = config.cardProvider || 'chase';
+  const chaseActive = activeProviders.some((p) => p.id === cardProviderId);
 
   // Security notice banner
   const notice = document.createElement('div');
@@ -90,47 +92,49 @@ export function renderPaymentSection(container, activeProviders, callbacks, stri
   optionsWrapper.className = 'payment-options';
 
   // Credit card option
-  const cardLabel = document.createElement('label');
-  cardLabel.className = 'payment-option-card payment-option-active';
+  if (chaseActive) {
+    const cardLabel = document.createElement('label');
+    cardLabel.className = 'payment-option-card payment-option-active';
 
-  const cardRadio = document.createElement('input');
-  cardRadio.type = 'radio';
-  cardRadio.name = 'paymentMethod';
-  cardRadio.value = config.cardProvider || 'chase';
-  cardRadio.checked = true;
-  cardRadio.id = 'payment-credit-card';
+    const cardRadio = document.createElement('input');
+    cardRadio.type = 'radio';
+    cardRadio.name = 'paymentMethod';
+    cardRadio.value = cardProviderId;
+    cardRadio.checked = true;
+    cardRadio.id = 'payment-credit-card';
 
-  const cardIcon = document.createElement('span');
-  cardIcon.className = 'payment-option-icon';
-  cardIcon.innerHTML = CARD_ICON_SVG;
+    const cardIcon = document.createElement('span');
+    cardIcon.className = 'payment-option-icon';
+    cardIcon.innerHTML = CARD_ICON_SVG;
 
-  const cardContent = document.createElement('div');
-  cardContent.className = 'payment-option-content';
+    const cardContent = document.createElement('div');
+    cardContent.className = 'payment-option-content';
 
-  const cardTitle = document.createElement('span');
-  cardTitle.className = 'payment-option-label';
-  cardTitle.textContent = strings.creditCard;
+    const cardTitle = document.createElement('span');
+    cardTitle.className = 'payment-option-label';
+    cardTitle.textContent = strings.creditCard;
 
-  const cardSub = document.createElement('span');
-  cardSub.className = 'payment-option-sublabel';
-  cardSub.textContent = strings.creditCardSub;
+    const cardSub = document.createElement('span');
+    cardSub.className = 'payment-option-sublabel';
+    cardSub.textContent = strings.creditCardSub;
 
-  cardContent.append(cardTitle, cardSub);
+    cardContent.append(cardTitle, cardSub);
 
-  const cardBadges = document.createElement('div');
-  cardBadges.className = 'payment-option-badges';
-  ['VISA', 'MC', 'AMEX'].forEach((name) => {
-    const badge = document.createElement('span');
-    badge.className = 'card-badge';
-    badge.textContent = name;
-    cardBadges.appendChild(badge);
-  });
+    const cardBadges = document.createElement('div');
+    cardBadges.className = 'payment-option-badges';
+    ['VISA', 'MC', 'AMEX'].forEach((name) => {
+      const badge = document.createElement('span');
+      badge.className = 'card-badge';
+      badge.textContent = name;
+      cardBadges.appendChild(badge);
+    });
 
-  cardLabel.append(cardRadio, cardIcon, cardContent, cardBadges);
-  optionsWrapper.appendChild(cardLabel);
+    cardLabel.append(cardRadio, cardIcon, cardContent, cardBadges);
+    optionsWrapper.appendChild(cardLabel);
+  }
 
-  // Provider options
-  activeProviders.forEach((provider) => {
+  // Provider options (Chase is rendered above as the card block)
+  activeProviders.filter((p) => p.id !== cardProviderId).forEach((provider) => {
     const meta = providerMeta[provider.id] || { label: provider.id, sublabel: '', icon: '' };
 
     const optLabel = document.createElement('label');
@@ -172,6 +176,20 @@ export function renderPaymentSection(container, activeProviders, callbacks, stri
   });
 
   container.appendChild(optionsWrapper);
+
+  // When Chase is disabled, default-select the first available provider
+  if (!chaseActive) {
+    const firstRadio = optionsWrapper.querySelector('input[type="radio"]');
+    if (firstRadio) {
+      firstRadio.checked = true;
+      firstRadio.closest('.payment-option-card')?.classList.add('payment-option-active');
+      const firstProvider = activeProviders.find((p) => p.id !== cardProviderId);
+      const billingSection = container.closest('form')?.querySelector('.billing-section');
+      if (billingSection && firstProvider) {
+        billingSection.hidden = firstProvider.hidesBilling ?? false;
+      }
+    }
+  }
 
   // Wire radio changes
   container.addEventListener('change', (e) => {

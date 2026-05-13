@@ -4,6 +4,7 @@ import cart from '../../scripts/cart.js';
 import applePay, { beginCheckoutSession } from '../../scripts/payments/apple-pay.js';
 import paypal from '../../scripts/payments/paypal.js';
 import affirm from '../../scripts/payments/affirm.js';
+import chase from '../../scripts/payments/chase.js';
 import buildForm, { initCollapse } from './checkout-form.js';
 import { initAddress } from './checkout-address.js';
 import { initShipping, updatePreview } from './checkout-shipping.js';
@@ -11,7 +12,7 @@ import { initOrder } from './checkout-order.js';
 import { initPayment } from './checkout-payment.js';
 import { parsePreview } from '../../scripts/commerce-api.js';
 
-const ALL_PROVIDERS = [applePay, paypal, affirm];
+const ALL_PROVIDERS = [chase, applePay, paypal, affirm];
 
 const LOCAL_STRINGS = {
   'en-us': {
