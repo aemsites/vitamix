@@ -71,9 +71,6 @@ export async function updatePreview(form, cart, state, config) {
   const email = data.get('email') || '';
   const firstName = data.get('shipping-firstname') || '';
   const lastName = data.get('shipping-lastname') || '';
-
-  // Preview requires customer identity — skip if not yet filled
-  if (!email || !firstName || !lastName) return;
   const locale = config.getLocale();
   const language = config.getLanguage();
 
@@ -91,20 +88,22 @@ export async function updatePreview(form, cart, state, config) {
   };
 
   const orderBody = {
-    customer: {
-      firstName,
-      lastName,
-      email,
-      phone: data.get('shipping-telephone') || '',
-    },
     shipping: Object.fromEntries(Object.entries(shippingAddr).filter(([, v]) => v !== '')),
-    billing: Object.fromEntries(Object.entries(shippingAddr).filter(([, v]) => v !== '')),
     items: cart.getItemsForAPI(),
     shippingMethod: { id: state.selectedShippingMethodId },
     locale: `${language.split('_')[0]}-${(language.split('_')[1] || locale).toUpperCase()}`,
     country: locale,
     paymentMethod: data.get('paymentMethod') || null,
   };
+
+  if (email && firstName && lastName) {
+    orderBody.customer = {
+      firstName,
+      lastName,
+      email,
+      phone: data.get('shipping-telephone') || '',
+    };
+  }
 
   document.dispatchEvent(new CustomEvent('checkout:preview-loading'));
 

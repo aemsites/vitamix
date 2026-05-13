@@ -126,6 +126,129 @@ function wireBillingToggle(form) {
   updateBillingVisibility();
 }
 
+function fillAddressFields(section, addressInput, addressComponents) {
+  const c = {};
+  addressComponents.forEach((comp) => {
+    comp.types.forEach((type) => { c[type] = comp; });
+  });
+
+  const street = [c.street_number?.longText, c.route?.longText].filter(Boolean).join(' ');
+  addressInput.value = street;
+
+  const address2Input = section.querySelector('[autocomplete="address-line2"]');
+  if (address2Input && c.subpremise) {
+    address2Input.value = c.subpremise.longText;
+  }
+
+  const cityInput = section.querySelector('[autocomplete="address-level2"]');
+  if (cityInput) {
+    cityInput.value = (c.locality || c.sublocality || c.postal_town)?.longText || '';
+  }
+
+  const zipInput = section.querySelector('[autocomplete="postal-code"]');
+  if (zipInput) {
+    zipInput.value = c.postal_code?.longText || '';
+  }
+
+  // Set state last so FormData is complete when the change event triggers fetchAndPreview.
+  // Always dispatch even if the component is absent — the state may already be set from
+  // a prior interaction, and we still need to re-trigger the shipping/tax estimate.
+  const stateSelect = section.querySelector('select[name$="-state"]');
+  if (stateSelect) {
+    if (c.administrative_area_level_1) {
+      stateSelect.value = c.administrative_area_level_1.shortText;
+      stateSelect.classList.toggle('has-value', !!stateSelect.value);
+    }
+    stateSelect.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+}
+
+function initPlacesAutocomplete(section, config) {
+  const addressInput = section.querySelector('[autocomplete="address-line1"]');
+  if (!addressInput) return;
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'places-autocomplete-wrapper';
+  addressInput.parentElement.insertBefore(wrapper, addressInput);
+  wrapper.append(addressInput);
+
+  // type="search" + autocomplete="off" is the reliable way to suppress Chrome's
+  // address autofill dropdown — Chrome ignores autocomplete="off" on text inputs
+  // it heuristically classifies as address fields, but respects it on search inputs.
+  addressInput.type = 'search';
+  addressInput.setAttribute('autocomplete', 'off');
+
+  let sessionToken = crypto.randomUUID();
+  let debounceTimer;
+  let dropdown;
+
+  function removeDropdown() {
+    if (dropdown) { dropdown.remove(); dropdown = null; }
+  }
+
+  function showDropdown(suggestions) {
+    removeDropdown();
+    if (!suggestions.length) return;
+
+    dropdown = document.createElement('ul');
+    dropdown.className = 'places-autocomplete-dropdown';
+
+    suggestions.forEach(({ placePrediction: p }) => {
+      const li = document.createElement('li');
+      const main = document.createElement('span');
+      main.className = 'places-main';
+      main.textContent = p.structuredFormat.mainText.text;
+      const secondary = document.createElement('span');
+      secondary.className = 'places-secondary';
+      secondary.textContent = p.structuredFormat.secondaryText.text;
+      li.append(main, secondary);
+
+      li.addEventListener('mousedown', async (e) => {
+        e.preventDefault();
+        addressInput.value = p.structuredFormat.mainText.text;
+        removeDropdown();
+
+        try {
+          const params = new URLSearchParams({ place_id: p.placeId, sessiontoken: sessionToken });
+          const resp = await fetch(`${config.apiOrigin}/places/details?${params}`);
+          if (resp.ok) {
+            const data = await resp.json();
+            if (data.addressComponents) {
+              fillAddressFields(section, addressInput, data.addressComponents);
+            }
+          }
+        } catch { /* silent */ }
+
+        sessionToken = crypto.randomUUID();
+      });
+
+      dropdown.append(li);
+    });
+
+    wrapper.append(dropdown);
+  }
+
+  addressInput.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    const { value } = addressInput;
+    if (value.length < 3) { removeDropdown(); return; }
+
+    debounceTimer = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({ input: value, sessiontoken: sessionToken });
+        const resp = await fetch(`${config.apiOrigin}/places/autocomplete?${params}`);
+        if (!resp.ok) return;
+        const data = await resp.json();
+        showDropdown(data.suggestions || []);
+      } catch { /* silent */ }
+    }, 300);
+  });
+
+  addressInput.addEventListener('blur', () => {
+    setTimeout(removeDropdown, 200);
+  });
+}
+
 /**
  * @param {HTMLFormElement} form
  * @param {Object} state
@@ -137,6 +260,11 @@ export function initAddress(form, state, config, strings) {
   populateStateSelect(form, 'shipping-', isCanada, strings);
   populateStateSelect(form, 'billing-', isCanada, strings);
   wireBillingToggle(form);
+
+  const shippingSection = form.querySelector('.shipping-address-section');
+  const billingSection = form.querySelector('.billing-fields-wrapper');
+  if (shippingSection) initPlacesAutocomplete(shippingSection, config);
+  if (billingSection) initPlacesAutocomplete(billingSection, config);
 
   // Invalidate estimate token when estimate-affecting fields change
   form.addEventListener('change', (e) => {
