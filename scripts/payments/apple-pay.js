@@ -136,7 +136,7 @@ function startExpressSession(btn, config, callbacks) {
           city: contact.locality,
           state: contact.administrativeArea,
           zip: contact.postalCode,
-          country: contact.countryCode,
+          country: contact.countryCode?.toLowerCase() || locale,
           phone: contact.phoneNumber || '',
           email: contact.emailAddress || '',
         };
@@ -154,6 +154,7 @@ function startExpressSession(btn, config, callbacks) {
           shippingMethod: { id: e.payment.shippingMethod?.identifier || '' },
           estimateToken: callbacks.getState().currentEstimateToken,
           country: locale,
+          locale: bcp47,
         };
 
         const createdOrder = await callbacks.createOrder(orderBody);
