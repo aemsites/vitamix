@@ -286,6 +286,12 @@ export default async function decorate(block) {
   const rows = [...block.querySelectorAll(':scope > div')];
   buildToolbar(block, placeholders);
 
+  const toolbar = block.querySelector('.toolbar');
+  const navSection = document.querySelector('main > .navigation-container');
+  if (navSection && toolbar) {
+    toolbar.style.top = `calc(var(--header-height) + ${navSection.offsetHeight}px)`;
+  }
+
   const list = document.createElement('ul');
   list.setAttribute('aria-label', placeholders.grantees || 'Grantees');
   rows.forEach((row) => {

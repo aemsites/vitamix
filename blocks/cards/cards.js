@@ -134,8 +134,10 @@ export default function decorate(block) {
 
     // assign classes based on content
     [...li.children].forEach((child) => {
-      const picture = child.querySelector('picture');
-      const video = child.querySelector('video');
+      const pictureEl = child.querySelector('picture');
+      const picture = pictureEl && !pictureEl.closest('.section') ? pictureEl : null;
+      const videoEl = child.querySelector('video');
+      const video = videoEl && !videoEl.closest('.section') ? videoEl : null;
       const hasMedia = picture || video;
 
       if (hasMedia) {
