@@ -184,11 +184,4 @@ export function initShipping(form, shippingContainer, cart, state, config, strin
       updatePreview(form, cart, state, config);
     }
   });
-
-  // Re-run preview when cart changes
-  document.addEventListener('cart:change', () => {
-    if (state.selectedShippingMethodId) {
-      updatePreview(form, cart, state, config);
-    }
-  });
 }

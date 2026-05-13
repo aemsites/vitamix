@@ -231,6 +231,19 @@ export default async function decorate(block) {
   const shippingContainer = form.querySelector('.shipping-methods');
   initShipping(form, shippingContainer, cart, state, config, strings);
 
+  // When the cart changes mid-checkout, invalidate the stale estimate and
+  // re-run the preview so totals stay accurate. The empty-cart listener above
+  // handles the zero-items case via reload; this handles qty changes and
+  // partial removes while items remain.
+  document.addEventListener('cart:change', () => {
+    if (cart.itemCount === 0) return;
+    state.currentEstimateToken = null;
+    state.currentPreview = null;
+    if (state.selectedShippingMethodId) {
+      updatePreview(form, cart, state, config);
+    }
+  });
+
   // Retry preview when customer identity fields are filled after shipping is already selected.
   // This handles the case where state/province is chosen before email or name is entered,
   // causing the first updatePreview call to bail out on the missing-fields guard.
