@@ -29,6 +29,8 @@ function startExpressSession(btn, config, callbacks) {
     const language = config.getLanguage();
     const bcp47 = `${language.split('_')[0]}-${(language.split('_')[1] || locale).toUpperCase()}`;
 
+    let lastShippingContact = null;
+
     const request = {
       countryCode: locale.toUpperCase(),
       currencyCode: typeof config.currency === 'function' ? config.currency(locale) : config.currency,
@@ -50,6 +52,7 @@ function startExpressSession(btn, config, callbacks) {
     };
 
     session.onshippingcontactselected = async (e) => {
+      lastShippingContact = e.shippingContact;
       const contact = e.shippingContact;
       try {
         const result = await estimateExpressCheckout(
@@ -95,9 +98,18 @@ function startExpressSession(btn, config, callbacks) {
 
     session.onshippingmethodselected = async (e) => {
       try {
+        const contact = lastShippingContact;
         const previewResult = await callbacks.previewOrderDirect({
           items: cart.getItemsForAPI(),
           shippingMethod: { id: e.shippingMethod.identifier },
+          ...(contact ? {
+            country: contact.countryCode,
+            shipping: {
+              country: contact.countryCode,
+              state: contact.administrativeArea,
+              zip: contact.postalCode || '',
+            },
+          } : {}),
         });
         session.completeShippingMethodSelection({
           newTotal: { label: config.site || 'Store', amount: String(previewResult.total) },
@@ -277,19 +289,6 @@ export function beginCheckoutSession(config, callbacks) {
   });
 }
 
-function showNotConfiguredDialog() {
-  const dialog = document.createElement('dialog');
-  dialog.className = 'paypal-not-configured-dialog';
-  dialog.innerHTML = /* html */`
-    <p>Apple Pay Express Checkout is not configured yet.</p>
-    <button class="button" autofocus>Close</button>
-  `;
-  dialog.querySelector('button').addEventListener('click', () => dialog.close());
-  dialog.addEventListener('close', () => dialog.remove());
-  document.body.appendChild(dialog);
-  dialog.showModal();
-}
-
 /** @type {import('./types').PaymentProvider} */
 export default {
   id: 'apple-pay',
@@ -307,16 +306,7 @@ export default {
     const language = config.getLanguage();
     const bcp47 = `${language.split('_')[0]}-${(language.split('_')[1] || locale).toUpperCase()}`;
     const btn = createApplePayButton(bcp47);
-
-    if (!window.CommerceConfig?.applePay?.merchantId) {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        showNotConfiguredDialog();
-      });
-    } else {
-      startExpressSession(btn, config, callbacks);
-    }
-
+    startExpressSession(btn, config, callbacks);
     container.appendChild(btn);
   },
 

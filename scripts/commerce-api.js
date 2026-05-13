@@ -84,7 +84,7 @@ export async function estimateShipping(country, state, items) {
  * @throws {CommerceApiError}
  */
 export async function estimateExpressCheckout(country, state, zip, items) {
-  return post('/estimate/express-checkout', {
+  return post('/estimate/order', {
     country,
     shipping: { country, state, zip },
     items,
