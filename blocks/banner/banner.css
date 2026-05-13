@@ -185,6 +185,10 @@
   max-width: 600px;
 }
 
+.banner.inset.full-width {
+  max-width: unset;
+}
+
 .banner.inset > div {
   gap: var(--horizontal-spacing);
 }
