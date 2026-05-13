@@ -28,11 +28,15 @@ function corsProxyFetch(url) {
   return fetch(`${corsProxy}${encodeURIComponent(fullUrl)}${corsKey}`);
 }
 
-/** @param {string} absoluteUrl - Full https URL (manuals JSON on aem.page) */
-function corsProxyFetchAny(absoluteUrl) {
-  const corsProxy = 'https://fcors.org/?url=';
-  const corsKey = '&key=Mg23N96GgR8O3NjU';
-  return fetch(`${corsProxy}${encodeURIComponent(absoluteUrl)}${corsKey}`);
+/**
+ * Same-origin base path for owner's manuals assets (JSON + PDFs under /assets/manuals/{locale}/).
+ * @param {string} locale - Region (us, ca, mx, vr)
+ * @returns {string}
+ */
+function manualsAssetBase(locale) {
+  const loc = ['us', 'ca', 'mx', 'vr'].includes(locale) ? locale : 'us';
+  const path = `/assets/manuals/${loc}`;
+  return `${window.hlx?.codeBasePath || ''}${path}`;
 }
 
 /**
@@ -64,9 +68,8 @@ function normalizeProduct(row, locale, language) {
  * @param {string} locale
  */
 function normalizeManual(row, locale) {
-  const loc = ['us', 'ca', 'mx', 'vr'].includes(locale) ? locale : 'us';
   const filename = (row.filename || '').trim();
-  const base = `https://main--vitamix--aemsites.aem.page/assets/manuals/${loc}`;
+  const base = manualsAssetBase(locale);
   const path = filename ? `${base}/${encodeURIComponent(filename)}` : '';
   return {
     type: 'manual',
@@ -144,9 +147,8 @@ async function fetchFaqItems(locale, language) {
 }
 
 async function fetchManualRows(locale) {
-  const loc = ['us', 'ca', 'mx', 'vr'].includes(locale) ? locale : 'us';
-  const url = `https://main--vitamix--aemsites.aem.page/assets/manuals/${loc}/manuals.json`;
-  const res = useFcors() ? await corsProxyFetchAny(url) : await fetch(url);
+  const url = `${manualsAssetBase(locale)}/manuals.json`;
+  const res = await fetch(url);
   if (!res.ok) return [];
   const json = await res.json();
   return Array.isArray(json.data) ? json.data : [];
