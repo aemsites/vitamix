@@ -30,6 +30,7 @@ function startExpressSession(btn, config, callbacks) {
     const bcp47 = `${language.split('_')[0]}-${(language.split('_')[1] || locale).toUpperCase()}`;
 
     let lastShippingContact = null;
+    let lastShippingMethodId = null;
 
     const request = {
       countryCode: locale.toUpperCase(),
@@ -112,6 +113,8 @@ function startExpressSession(btn, config, callbacks) {
             },
           } : {}),
         });
+        lastShippingMethodId = e.shippingMethod.identifier;
+        callbacks.getState().currentEstimateToken = previewResult.estimateToken;
         session.completeShippingMethodSelection({
           newTotal: { label: config.site || 'Store', amount: String(previewResult.total) },
           newLineItems: [
@@ -151,7 +154,7 @@ function startExpressSession(btn, config, callbacks) {
           shipping: shippingAddr,
           billing: shippingAddr,
           items: cart.getItemsForAPI(),
-          shippingMethod: { id: e.payment.shippingMethod?.identifier || '' },
+          shippingMethod: { id: lastShippingMethodId || e.payment.shippingMethod?.identifier || '' },
           estimateToken: callbacks.getState().currentEstimateToken,
           country: locale,
           locale: bcp47,

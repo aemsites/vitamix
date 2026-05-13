@@ -68,6 +68,9 @@ export function buildOrderJSON(formData, form, cart, state, config) {
   order.locale = `${language.split('_')[0]}-${(language.split('_')[1] || locale).toUpperCase()}`;
   order.country = locale;
 
+  const paymentMethod = formData.get('paymentMethod');
+  if (paymentMethod) order.paymentMethod = paymentMethod;
+
   return order;
 }
 
