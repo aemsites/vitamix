@@ -937,6 +937,7 @@ function renderTable(wrap, orders, query, onEditSaved) {
           <th>Shipping</th>
           <th>Items</th>
           <th>Created</th>
+          <th>Synced</th>
         </tr>
       </thead>
       <tbody>
@@ -944,6 +945,7 @@ function renderTable(wrap, orders, query, onEditSaved) {
     const bill = billingName(o);
     const ship = shippingName(o);
     const createdStr = o.createdAt ? new Date(o.createdAt).toLocaleString() : 'N/A';
+    const syncedStr = o.custom?.syncedToEbs ? new Date(o.custom.syncedToEbs).toLocaleString() : '—';
     const id = String(o.id || '');
     const compactId = orderIdForDisplay(o) || id;
     const formattedId = formatOrderIdChunks(compactId);
@@ -958,6 +960,7 @@ function renderTable(wrap, orders, query, onEditSaved) {
             <td class="orders-name-cell">${highlightMatch(ship, query)}</td>
             <td>${highlightMatch(String(o.items?.length ?? '—'), query)}</td>
             <td>${highlightMatch(createdStr, query)}</td>
+            <td>${highlightMatch(syncedStr, query)}</td>
           </tr>`;
   }).join('')}
       </tbody>
