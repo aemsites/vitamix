@@ -97,7 +97,7 @@ export default {
     } catch { /* fall back to stub buttons */ }
   },
 
-  isAvailable: () => true,
+  isAvailable: () => !!window.paypal,
 
   /**
    * Renders the PayPal Express Checkout button (and Pay Later button if

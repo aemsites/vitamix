@@ -37,6 +37,9 @@ export const FORMS_ENDPOINT = isProdHost
 window.CommerceConfig = {
   org: 'aemsites',
   site: 'vitamix',
+  paypal: {
+    clientId: 'AdWjsTBIELzBwnT08zwFuxDeEW89L8bTcBnE_d4C8lwZHpqMjCszTRh4lrYsUx0TGnjFffeC_UXiIBgJ',
+  },
 };
 
 /**
