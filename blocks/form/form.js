@@ -1,5 +1,5 @@
 import { toCamelCase, toClassName } from '../../scripts/aem.js';
-import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { getFormSubmissionUrl, getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 /**
  * Creates an HTML element with an optional class name
@@ -77,7 +77,13 @@ function buildSection(field) {
  */
 function buildInput(field) {
   const {
-    type, field: fieldName, required, default: defaultValue, placeholder, autocomplete,
+    type,
+    field: fieldName,
+    required,
+    default: defaultValue,
+    placeholder,
+    pattern,
+    autocomplete
   } = field;
 
   const input = createElement('input');
@@ -85,9 +91,30 @@ function buildInput(field) {
   input.id = generateId(fieldName);
   input.name = input.id;
   input.required = required === 'true';
+
   if (defaultValue) input.value = defaultValue;
   if (placeholder) input.placeholder = placeholder;
   if (autocomplete) input.autocomplete = autocomplete;
+  if (pattern) input.pattern = pattern;
+
+  if (fieldName === 'mobile') {
+    input.setAttribute('maxlength', '14');
+    input.setAttribute('minlength', '10');
+    input.setAttribute('inputmode', 'tel');
+
+    input.addEventListener('input', ({ currentTarget }) => {
+      currentTarget.value = currentTarget.value.replace(/[^0-9()\-\s]/g, '');
+
+      const digits = currentTarget.value.replace(/\D/g, '');
+
+      if (digits.length !== 10) {
+        currentTarget.setCustomValidity('Enter a valid 10 digit mobile number');
+      } else {
+        currentTarget.setCustomValidity('');
+      }
+    });
+  }
+
   return input;
 }
 
@@ -440,7 +467,7 @@ function enableNavSearch(form) {
     const { search } = Object.fromEntries(data.entries()) || '';
     const { locale, language } = getLocaleAndLanguage();
     const basePath = `/${locale}/${language}`;
-    window.location.href = `https://www.vitamix.com${basePath}/search-result?search=${search}`;
+    window.location.href = `${basePath}/search-result?search=${search}`;
   });
 }
 
@@ -466,17 +493,25 @@ function enableFooterSignUp(form) {
       leadSource = `sub-em-${window.leadSourceOverride}-${country}`;
     }
 
+    const { locale, language } = getLocaleAndLanguage();
     const payload = {
+      formId: `${locale}/${language}/newsletter`,
+      pageUrl: window.location.href,
       email,
       mobile,
-      sms_optin: optIn ? '1' : '0',
-      lead_source: leadSource,
-      pageUrl: window.location.href,
-      actionUrl: '/us/en_us/rest/V1/vitamix-api/newslettersubscribe',
+      smsOptIn: optIn,
+      emailOptIn: true,
+      leadSource,
     };
-    const params = new URLSearchParams(payload);
     try {
-      const resp = await fetch(`https://www.vitamix.com/bin/vitamix/newslettersubscription?${params.toString()}`);
+      const url = getFormSubmissionUrl();
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
       if (!resp.ok) {
         // eslint-disable-next-line no-console
         console.error('Failed to submit newsletter subscription', resp);

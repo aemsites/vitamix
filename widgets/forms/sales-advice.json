@@ -1,0 +1,200 @@
+{
+  "en": {
+    "labels": {
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "professionalTitle": "Professional Title",
+      "emailAddress": "Email Address",
+      "phoneNumber": "Phone Number",
+      "businessName": "Business Name",
+      "typeOfBusiness": "Type of Business",
+      "numberOfLocations": "Number of Locations",
+      "state": "State",
+      "province": "Province",
+      "zipCode": "Zip Code",
+      "postalCode": "Postal Code",
+      "country": "Country",
+      "unitedStates": "United States",
+      "canada": "Canada",
+      "mexico": "Mexico",
+      "notYourCountry": "Not your country?",
+      "reasonForContactingExpert": "Reason for Contacting a Vitamix Expert",
+      "marketingOptIn": "Yes, I would like to receive additional information from Vitamix about how they can help my business. (Optional)",
+      "pleaseSelect": "Please Select",
+      "submit": "Submit",
+      "sending": "Sending..."
+    },
+    "placeholders": {
+      "state": "Please Select",
+      "typeOfBusiness": "Select an option",
+      "numberOfLocations": "Select an option",
+      "reasonForExpert": "Select an option"
+    },
+    "inputPlaceholders": {
+      "firstName": "",
+      "lastName": "",
+      "professionalTitle": "",
+      "emailAddress": "",
+      "phoneNumber": "",
+      "businessName": "",
+      "zipCode": ""
+    },
+    "typeOfBusinessOptions": [
+      { "value": "bar-lounge", "label": "Bar & Lounge" },
+      { "value": "specialty-coffee-beverage-bar", "label": "Specialty Coffee & Beverage Bar" },
+      { "value": "fast-food-quick-service", "label": "Fast Food & Quick Service" },
+      { "value": "casual-fine-dining", "label": "Casual & Fine Dining" },
+      { "value": "hospitality", "label": "Hospitality" },
+      { "value": "event-catering", "label": "Event Catering" },
+      { "value": "institutional", "label": "Institutional" },
+      { "value": "product-manufacturer", "label": "Product Manufacturer" },
+      { "value": "other", "label": "Other" }
+    ],
+    "numberOfLocationsOptions": [
+      { "value": "1-5", "label": "1 - 5" },
+      { "value": "6-10", "label": "6 - 10" },
+      { "value": "11-50", "label": "11 - 50" },
+      { "value": "50-more", "label": "50 - more" }
+    ],
+    "reasonForExpertOptions": [
+      { "value": "product-demo", "label": "Request a product demonstration" },
+      { "value": "pricing-quote", "label": "Pricing or quote information" },
+      { "value": "choose-equipment", "label": "Help choosing equipment for my business" },
+      { "value": "service-warranty", "label": "Service or warranty for commercial equipment" },
+      { "value": "retailer-partner", "label": "Retailer or partnership inquiry" },
+      { "value": "general", "label": "General business inquiry" }
+    ]
+  },
+  "fr": {
+    "labels": {
+      "firstName": "Prénom",
+      "lastName": "Nom de famille",
+      "professionalTitle": "Titre professionnel",
+      "emailAddress": "Adresse courriel",
+      "phoneNumber": "Numéro de téléphone",
+      "businessName": "Nom de l'entreprise",
+      "typeOfBusiness": "Type d'entreprise",
+      "numberOfLocations": "Nombre d'établissements",
+      "state": "État",
+      "province": "Province",
+      "zipCode": "Code postal",
+      "postalCode": "Code postal",
+      "country": "Pays",
+      "unitedStates": "États-Unis",
+      "canada": "Canada",
+      "mexico": "Mexique",
+      "notYourCountry": "Ce n'est pas votre pays?",
+      "reasonForContactingExpert": "Raison pour contacter un expert Vitamix",
+      "marketingOptIn": "Oui, je souhaite recevoir des renseignements supplémentaires de Vitamix sur la façon dont ils peuvent aider mon entreprise. (Optionnel)",
+      "pleaseSelect": "Veuillez sélectionner",
+      "submit": "Soumettre",
+      "sending": "Envoi en cours..."
+    },
+    "placeholders": {
+      "state": "Veuillez sélectionner",
+      "typeOfBusiness": "Sélectionnez une option",
+      "numberOfLocations": "Sélectionnez une option",
+      "reasonForExpert": "Sélectionnez une option"
+    },
+    "inputPlaceholders": {
+      "firstName": "",
+      "lastName": "",
+      "professionalTitle": "",
+      "emailAddress": "",
+      "phoneNumber": "",
+      "businessName": "",
+      "zipCode": ""
+    },
+    "typeOfBusinessOptions": [
+      { "value": "bar-lounge", "label": "Bar et salon" },
+      { "value": "specialty-coffee-beverage-bar", "label": "Café et bar à boissons spécialisées" },
+      { "value": "fast-food-quick-service", "label": "Restauration rapide" },
+      { "value": "casual-fine-dining", "label": "Restauration décontractée et gastronomique" },
+      { "value": "hospitality", "label": "Hôtellerie" },
+      { "value": "event-catering", "label": "Traiteur événementiel" },
+      { "value": "institutional", "label": "Restauration collective" },
+      { "value": "product-manufacturer", "label": "Fabricant de produits" },
+      { "value": "other", "label": "Autre" }
+    ],
+    "numberOfLocationsOptions": [
+      { "value": "1-5", "label": "1 - 5" },
+      { "value": "6-10", "label": "6 - 10" },
+      { "value": "11-50", "label": "11 - 50" },
+      { "value": "50-more", "label": "50 et plus" }
+    ],
+    "reasonForExpertOptions": [
+      { "value": "product-demo", "label": "Demander une démonstration de produit" },
+      { "value": "pricing-quote", "label": "Tarification ou soumission" },
+      { "value": "choose-equipment", "label": "Aide pour choisir l'équipement pour mon entreprise" },
+      { "value": "service-warranty", "label": "Service ou garantie pour équipement commercial" },
+      { "value": "retailer-partner", "label": "Demande de détaillant ou de partenariat" },
+      { "value": "general", "label": "Demande commerciale générale" }
+    ]
+  },
+  "es": {
+    "labels": {
+      "firstName": "Nombre",
+      "lastName": "Apellido",
+      "professionalTitle": "Título profesional",
+      "emailAddress": "Correo electrónico",
+      "phoneNumber": "Número de teléfono",
+      "businessName": "Nombre del negocio",
+      "typeOfBusiness": "Tipo de negocio",
+      "numberOfLocations": "Número de ubicaciones",
+      "state": "Estado",
+      "province": "Provincia",
+      "zipCode": "Código postal",
+      "postalCode": "Código postal",
+      "country": "País",
+      "unitedStates": "Estados Unidos",
+      "canada": "Canadá",
+      "mexico": "México",
+      "notYourCountry": "¿No es su país?",
+      "reasonForContactingExpert": "Motivo para contactar a un experto de Vitamix",
+      "marketingOptIn": "Sí, deseo recibir información adicional de Vitamix sobre cómo pueden ayudar a mi negocio. (Opcional)",
+      "pleaseSelect": "Por favor seleccione",
+      "submit": "Enviar",
+      "sending": "Enviando..."
+    },
+    "placeholders": {
+      "state": "Por favor seleccione",
+      "typeOfBusiness": "Seleccione una opción",
+      "numberOfLocations": "Seleccione una opción",
+      "reasonForExpert": "Seleccione una opción"
+    },
+    "inputPlaceholders": {
+      "firstName": "",
+      "lastName": "",
+      "professionalTitle": "",
+      "emailAddress": "",
+      "phoneNumber": "",
+      "businessName": "",
+      "zipCode": ""
+    },
+    "typeOfBusinessOptions": [
+      { "value": "bar-lounge", "label": "Bar y salón" },
+      { "value": "specialty-coffee-beverage-bar", "label": "Café y bar de bebidas especiales" },
+      { "value": "fast-food-quick-service", "label": "Comida rápida" },
+      { "value": "casual-fine-dining", "label": "Restaurante informal y de alta cocina" },
+      { "value": "hospitality", "label": "Hospitalidad" },
+      { "value": "event-catering", "label": "Catering para eventos" },
+      { "value": "institutional", "label": "Institucional" },
+      { "value": "product-manufacturer", "label": "Fabricante de productos" },
+      { "value": "other", "label": "Otro" }
+    ],
+    "numberOfLocationsOptions": [
+      { "value": "1-5", "label": "1 - 5" },
+      { "value": "6-10", "label": "6 - 10" },
+      { "value": "11-50", "label": "11 - 50" },
+      { "value": "50-more", "label": "50 o más" }
+    ],
+    "reasonForExpertOptions": [
+      { "value": "product-demo", "label": "Solicitar una demostración del producto" },
+      { "value": "pricing-quote", "label": "Información de precios o cotización" },
+      { "value": "choose-equipment", "label": "Ayuda para elegir equipos para mi negocio" },
+      { "value": "service-warranty", "label": "Servicio o garantía para equipos comerciales" },
+      { "value": "retailer-partner", "label": "Consulta sobre minorista o asociación" },
+      { "value": "general", "label": "Consulta comercial general" }
+    ]
+  }
+}

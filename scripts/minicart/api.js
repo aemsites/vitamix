@@ -90,13 +90,15 @@ export const store = new Store();
 export const cartApi = {
   addToCart: async (sku, options, quantity) => {
     const { addToCart } = await import('./cart.js');
-    // const { showCart } = await import('./Minicart.js');
+    // Always refresh side-by-side to ensure cart_id matches the current
+    // PHP session. A stale cart_id from an expired session causes items
+    // to be added to an orphaned quote, resulting in an empty checkout.
+    await updateMagentoCacheSections(['side-by-side']);
     if (!store.getCartId()) {
       console.debug('Cannot add item to cart, need to create a new cart first.');
-      await updateMagentoCacheSections(['cart', 'customer', 'side-by-side']);
+      await updateMagentoCacheSections(['cart', 'customer']);
     }
     await addToCart(sku, options, quantity);
-    // showCart();
   },
   toggleCart: async () => {
     // const { toggle } = await import('./Minicart.js');
