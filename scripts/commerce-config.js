@@ -3,6 +3,7 @@ const { hostname } = window.location;
 function resolveApiOrigin(org, site) {
   const isProduction = !hostname.endsWith('.aem.page')
     && !hostname.endsWith('.aem.live')
+    && !hostname.endsWith('.aem.network')
     && hostname !== 'localhost'
     && !hostname.startsWith('127.')
     && !hostname.startsWith('integration.');
