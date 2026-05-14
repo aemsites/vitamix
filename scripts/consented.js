@@ -105,7 +105,7 @@ s.src="https://c.amazon-adsystem.com/aat/amzn.js";s.id="amznpixel";
 s.async=true;t=d.getElementsByTagName("script")[0];
 t.parentNode.insertBefore(s,t)
 }(window,document); amzn("setRegion", "NA");
-amzn("addTag", "56d3e600-30c0-4b2fb290-4e44c553d164");
+amzn("addTag", "56d3e600-30c0-4b2f-b290-4e44c553d164");
 amzn("trackEvent", "PageView");
 // End of Amazon DSP
 

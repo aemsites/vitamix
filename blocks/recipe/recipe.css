@@ -307,6 +307,7 @@ main > .recipe-container.section > .recipe-wrapper {
 .recipe .recipe-toolbar {
   grid-area: toolbar;
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
   gap: var(--spacing-60);
   border-radius: var(--rounding-m);

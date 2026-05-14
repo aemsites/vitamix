@@ -51,8 +51,10 @@ export default async function decorate(widget) {
   if (!form) return;
 
   const { locale, language } = getLocaleAndLanguage();
+  const vitamixInternationalPath = `/${locale}/${language}/vitamix-international`;
   const countryCode = (locale || 'us').toUpperCase();
   const lang = (language || 'en_us').split('_')[0];
+  import('./util.js').then(({ setupFormValidation }) => setupFormValidation(form, lang));
   const copy = await loadFormCopy(lang).catch(() => ({}));
   const stateOptions = await getStatesProvincesOptions(countryCode, lang).catch(() => []);
   const labels = copy.labels || {};
@@ -91,7 +93,10 @@ export default async function decorate(widget) {
   const countryInput = form.querySelector('input[name="country"]');
   if (countryInput) countryInput.value = countryName;
   const countryLink = form.querySelector('.country-change-link');
-  if (countryLink) countryLink.textContent = labels.notYourCountry ?? 'Not your country?';
+  if (countryLink) {
+    countryLink.textContent = labels.notYourCountry ?? 'Not your country?';
+    countryLink.href = vitamixInternationalPath;
+  }
 
   setSelectOptions(
     form.querySelector('#consult-expert-state'),
@@ -112,14 +117,6 @@ export default async function decorate(widget) {
   const submitBtn = form.querySelector('button[type="submit"]');
   if (submitBtn) submitBtn.textContent = labels.submit ?? 'Submit';
 
-  const countryChangeLink = form.querySelector('.country-change-link');
-  if (countryChangeLink) {
-    countryChangeLink.addEventListener('click', (e) => {
-      e.preventDefault();
-      // Placeholder for future country selector
-    });
-  }
-
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const data = new FormData(form);
@@ -135,6 +132,7 @@ export default async function decorate(widget) {
       submitButton.textContent = labels.sending ?? 'Sending...';
     }
 
+    let didNavigate = false;
     try {
       const resp = await fetch(getFormSubmissionUrl(), {
         method: 'POST',
@@ -142,16 +140,24 @@ export default async function decorate(widget) {
         body: JSON.stringify(payload),
       });
       if (!resp.ok) {
-        throw new Error(`Sheet logger responded with ${resp.status}`);
+        const { handleFormSubmitError } = await import('./util.js');
+        await handleFormSubmitError(resp, form, labels.submissionFailed ?? 'Something went wrong. Please try again.');
+        return;
       }
+      didNavigate = true;
       const thankYouPath = `/${locale}/${language}/consult-expert-thankyou`;
       window.location.href = thankYouPath;
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Consult expert form submission failed', err);
-      [...form.elements].forEach((el) => { el.disabled = false; });
-      if (submitButton) {
-        submitButton.textContent = submitButton.dataset.originalLabel || buttonLabel;
+      const { toast } = await import('./util.js');
+      toast(labels.networkError ?? 'Could not reach the server. Please try again.', 'error');
+    } finally {
+      if (!didNavigate) {
+        [...form.elements].forEach((el) => { el.disabled = false; });
+        if (submitButton) {
+          submitButton.textContent = submitButton.dataset.originalLabel || buttonLabel;
+        }
       }
     }
   });

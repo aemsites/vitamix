@@ -17,6 +17,7 @@
 @import url('typography.css');
 
 
+:host,
 :root {
   --color-brand-primary: var(--color-charcoal);
   --color-brand-secondary: var(--color-red);
@@ -75,6 +76,7 @@ body.cart-template {
 }
 
 @media (width >= 900px) {
+  :host,
   :root {
     /* widths and heights */
     --horizontal-spacing: var(--spacing-800);
@@ -82,6 +84,7 @@ body.cart-template {
 }
 
 @media (width >= 1000px) {
+  :host,
   :root {
     /* widths and heights */
     --header-height: 84px;

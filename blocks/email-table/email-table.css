@@ -1,0 +1,61 @@
+/*
+ * email-table
+ *
+ * Generic two-column block authored as a table where the first row is column
+ * headers (rendered larger and bolder) and subsequent rows are content lines:
+ *
+ *   | email-table                         |
+ *   | ---                                 |
+ *   | Billing Info | Shipping Info        |  <- header row
+ *   | {{billing.name}} | {{shipping.name}} |  <- content row
+ *   | ...
+ *
+ * Used in the order-confirmation email for both the address pair and the
+ * payment / shipping methods pair.
+ *
+ * Layout uses display:table / display:table-cell instead of flexbox so the
+ * inlined output renders correctly across email clients (helix-to-email
+ * strips flex/grid). Equal-width columns via table-layout:fixed.
+ *
+ * Vertical spacing between content rows is intentionally tight — line-height
+ * handles separation rather than per-row padding, so address lines read as a
+ * single block rather than a spaced-out list.
+ */
+
+.email-table {
+  padding: 8px 32px;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 14px;
+  color: #333;
+}
+
+.email-table > div {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+}
+
+.email-table > div > div {
+  display: table-cell;
+  width: 50%;
+  vertical-align: top;
+  padding: 0 16px 0 0;
+  line-height: 1.5;
+}
+
+/*
+ * Zero out paragraph margins inside cells. DA wraps each line of cell
+ * content in <p>, and the default 1em top/bottom margin would otherwise
+ * add ~14–28px of vertical space between every address line.
+ */
+.email-table p {
+  margin: 0;
+}
+
+/* Header row — larger, bolder, with breathing room below before content */
+.email-table > div:first-child > div {
+  font-size: 17px;
+  font-weight: bold;
+  color: #000;
+  padding-bottom: 8px;
+}
