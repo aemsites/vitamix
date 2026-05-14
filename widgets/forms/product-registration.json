@@ -47,14 +47,42 @@
       "phone": "",
       "email": "you@example.com"
     },
-    "purchasedFromOptions": [
-      { "label": "Amazon", "value": "amazon" },
-      { "label": "Best Buy", "value": "best-buy" },
-      { "label": "Canadian Tire", "value": "canadian-tire" },
-      { "label": "Costco", "value": "costco" },
-      { "label": "Hudson's Bay", "value": "hudsons-bay" },
-      { "label": "Other", "value": "other" }
-    ]
+    "purchasedFromOptionsByCountry": {
+      "ca": [
+        { "label": "Amazon", "value": "amazon" },
+        { "label": "Best Buy", "value": "best-buy" },
+        { "label": "Canadian Tire", "value": "canadian-tire" },
+        { "label": "Costco", "value": "costco" },
+        { "label": "Hudson's Bay", "value": "hudsons-bay" },
+        { "label": "Other", "value": "other" }
+      ],
+      "us": [
+        { "label": "Amazon", "value": "amazon" },
+        { "label": "Bed Bath & Beyond", "value": "bed-bath-beyond" },
+        { "label": "Belk", "value": "belk" },
+        { "label": "Best Buy", "value": "best-buy" },
+        { "label": "Bloomingdales", "value": "bloomingdales" },
+        { "label": "Costco", "value": "costco" },
+        { "label": "Crate & Barrel", "value": "crate-and-barrel" },
+        { "label": "Dillards", "value": "dillards" },
+        { "label": "Kohls", "value": "kohls" },
+        { "label": "Macys", "value": "macys" },
+        { "label": "QVC", "value": "qvc" },
+        { "label": "Sams Club", "value": "sams-club" },
+        { "label": "Target", "value": "target" },
+        { "label": "Whole Foods", "value": "whole-foods" },
+        { "label": "Williams-Sonoma", "value": "williams-sonoma" },
+        { "label": "Other", "value": "other" }
+      ],
+      "mx": [
+        { "label": "Amazon", "value": "amazon" },
+        { "label": "Costco", "value": "costco" },
+        { "label": "El Palacio de Hierro", "value": "el-palacio-de-hierro" },
+        { "label": "Liverpool", "value": "liverpool" },
+        { "label": "Williams-Sonoma", "value": "williams-sonoma" },
+        { "label": "Other", "value": "other" }
+      ]
+    }
   },
   "fr": {
     "labels": {
@@ -104,14 +132,42 @@
       "phone": "",
       "email": "courriel@exemple.com"
     },
-    "purchasedFromOptions": [
-      { "label": "Amazon", "value": "amazon" },
-      { "label": "Best Buy", "value": "best-buy" },
-      { "label": "Canadian Tire", "value": "canadian-tire" },
-      { "label": "Costco", "value": "costco" },
-      { "label": "La Baie d'Hudson", "value": "hudsons-bay" },
-      { "label": "Autre", "value": "other" }
-    ]
+    "purchasedFromOptionsByCountry": {
+      "ca": [
+        { "label": "Amazon", "value": "amazon" },
+        { "label": "Best Buy", "value": "best-buy" },
+        { "label": "Canadian Tire", "value": "canadian-tire" },
+        { "label": "Costco", "value": "costco" },
+        { "label": "La Baie d'Hudson", "value": "hudsons-bay" },
+        { "label": "Autre", "value": "other" }
+      ],
+      "us": [
+        { "label": "Amazon", "value": "amazon" },
+        { "label": "Bed Bath & Beyond", "value": "bed-bath-beyond" },
+        { "label": "Belk", "value": "belk" },
+        { "label": "Best Buy", "value": "best-buy" },
+        { "label": "Bloomingdales", "value": "bloomingdales" },
+        { "label": "Costco", "value": "costco" },
+        { "label": "Crate & Barrel", "value": "crate-and-barrel" },
+        { "label": "Dillards", "value": "dillards" },
+        { "label": "Kohls", "value": "kohls" },
+        { "label": "Macys", "value": "macys" },
+        { "label": "QVC", "value": "qvc" },
+        { "label": "Sams Club", "value": "sams-club" },
+        { "label": "Target", "value": "target" },
+        { "label": "Whole Foods", "value": "whole-foods" },
+        { "label": "Williams-Sonoma", "value": "williams-sonoma" },
+        { "label": "Autre", "value": "other" }
+      ],
+      "mx": [
+        { "label": "Amazon", "value": "amazon" },
+        { "label": "Costco", "value": "costco" },
+        { "label": "El Palacio de Hierro", "value": "el-palacio-de-hierro" },
+        { "label": "Liverpool", "value": "liverpool" },
+        { "label": "Williams-Sonoma", "value": "williams-sonoma" },
+        { "label": "Autre", "value": "other" }
+      ]
+    }
   },
   "es": {
     "labels": {
@@ -161,13 +217,41 @@
       "phone": "",
       "email": "correo@ejemplo.com"
     },
-    "purchasedFromOptions": [
-      { "label": "Amazon", "value": "amazon" },
-      { "label": "Best Buy", "value": "best-buy" },
-      { "label": "Canadian Tire", "value": "canadian-tire" },
-      { "label": "Costco", "value": "costco" },
-      { "label": "Hudson's Bay", "value": "hudsons-bay" },
-      { "label": "Otro", "value": "other" }
-    ]
+    "purchasedFromOptionsByCountry": {
+      "ca": [
+        { "label": "Amazon", "value": "amazon" },
+        { "label": "Best Buy", "value": "best-buy" },
+        { "label": "Canadian Tire", "value": "canadian-tire" },
+        { "label": "Costco", "value": "costco" },
+        { "label": "Hudson's Bay", "value": "hudsons-bay" },
+        { "label": "Otro", "value": "other" }
+      ],
+      "us": [
+        { "label": "Amazon", "value": "amazon" },
+        { "label": "Bed Bath & Beyond", "value": "bed-bath-beyond" },
+        { "label": "Belk", "value": "belk" },
+        { "label": "Best Buy", "value": "best-buy" },
+        { "label": "Bloomingdales", "value": "bloomingdales" },
+        { "label": "Costco", "value": "costco" },
+        { "label": "Crate & Barrel", "value": "crate-and-barrel" },
+        { "label": "Dillards", "value": "dillards" },
+        { "label": "Kohls", "value": "kohls" },
+        { "label": "Macys", "value": "macys" },
+        { "label": "QVC", "value": "qvc" },
+        { "label": "Sams Club", "value": "sams-club" },
+        { "label": "Target", "value": "target" },
+        { "label": "Whole Foods", "value": "whole-foods" },
+        { "label": "Williams-Sonoma", "value": "williams-sonoma" },
+        { "label": "Otro", "value": "other" }
+      ],
+      "mx": [
+        { "label": "Amazon", "value": "amazon" },
+        { "label": "Costco", "value": "costco" },
+        { "label": "El Palacio de Hierro", "value": "el-palacio-de-hierro" },
+        { "label": "Liverpool", "value": "liverpool" },
+        { "label": "Williams-Sonoma", "value": "williams-sonoma" },
+        { "label": "Otro", "value": "other" }
+      ]
+    }
   }
 }

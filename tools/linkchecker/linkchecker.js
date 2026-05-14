@@ -8,6 +8,7 @@ function checkLinks() {
   const links = document.querySelectorAll('a[href]');
   links.forEach((link) => {
     const url = new URL(link.href);
+    if (url.pathname.startsWith('/assets/')) return;
     if (link.href.startsWith('https://www.vitamix.com/content/dam/')) return;
     if (url.origin.includes('vitamix.com')
         || url.origin.includes('.aem.')
