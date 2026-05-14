@@ -76,6 +76,15 @@ main > .section > div {
   padding: 0;
 }
 
+/*
+ * Default content sections (paragraphs and headings not inside a named block)
+ * still need horizontal padding — the reset above strips it from everything,
+ * so put it back explicitly for the wrapper EDS generates for non-block content.
+ */
+main > .section > .default-content-wrapper {
+  padding: 0 32px;
+}
+
 .email-header {
   padding: 24px 32px 0;
   font-family: Arial, Helvetica, sans-serif;
