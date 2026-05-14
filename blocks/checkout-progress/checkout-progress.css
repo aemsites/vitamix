@@ -72,7 +72,8 @@
 }
 
 /* Complete steps: dark fill with checkmark */
-.checkout-progress .step-complete a::before {
+.checkout-progress .step-complete a::before,
+.checkout-progress .step-complete span::before {
   content: '✓';
   background: var(--commerce-color-text);
   border-color: var(--commerce-color-text);
@@ -87,7 +88,8 @@
   color: #fff;
 }
 
-.checkout-progress .step-complete a {
+.checkout-progress .step-complete a,
+.checkout-progress .step-complete span {
   color: var(--commerce-color-text);
 }
 
