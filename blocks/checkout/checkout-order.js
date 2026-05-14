@@ -114,7 +114,12 @@ export function initOrder(form, cart, state, config, strings) {
     getFormData: () => new FormData(form),
     getState: () => state,
     updatePreview: () => updatePreview(form, cart, state, config),
-    previewOrderDirect: (body) => previewOrder(body),
+    previewOrderDirect: async (body) => {
+      const result = await previewOrder(body);
+      if (result.estimateToken) state.currentEstimateToken = result.estimateToken;
+      state.currentPreview = result;
+      return result;
+    },
     buildOrderJSON: (formData) => buildOrderJSON(formData, form, cart, state, config),
     saveCheckoutSession: (email, c, preview, order) => (
       saveCheckoutSession(email, c, preview, order)
@@ -126,6 +131,8 @@ export function initOrder(form, cart, state, config, strings) {
     onComplete: (createdOrder) => {
       const order = createdOrder?.order ?? createdOrder;
       const orderId = order?.id;
+      const email = order?.customer?.email || '';
+      saveCheckoutSession(email, cart, state.currentPreview, order);
       cart.clear();
       const path = config.getOrderPath('complete');
       window.location.href = orderId ? `${path}?orderId=${orderId}` : path;

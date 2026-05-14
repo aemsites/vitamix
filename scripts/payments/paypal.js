@@ -24,7 +24,7 @@ function getPayLaterLabel(language) {
   return PAY_LATER_LABELS[lang] || 'Pay Later';
 }
 
-function loadSdk(clientId, currency, locale) {
+function loadSdk(clientId, currency, locale, intent = 'capture') {
   if (sdkLoadPromise) return sdkLoadPromise;
   sdkLoadPromise = new Promise((resolve, reject) => {
     if (window.paypal) { resolve(); return; }
@@ -36,6 +36,7 @@ function loadSdk(clientId, currency, locale) {
       currency,
       components: 'buttons,messages',
       locale: normalizedLocale,
+      intent,
       commit: 'false',
       'enable-funding': 'paylater',
     });
@@ -95,8 +96,9 @@ export default {
       ? config.currency(config.getLocale())
       : (config.currency || 'USD');
     const locale = config.getLanguage().replace('-', '_');
+    const intent = (window.CommerceConfig?.paypal?.intent || 'capture').toLowerCase();
     try {
-      await loadSdk(clientId, currency, locale);
+      await loadSdk(clientId, currency, locale, intent);
     } catch { /* fall back to stub buttons */ }
   },
 
@@ -139,6 +141,11 @@ export default {
     let lastShippingMethods = [];
     let lastShippingAddress = null;
 
+    const expressConfig = callbacks.getConfig();
+    const currency = typeof expressConfig.currency === 'function'
+      ? expressConfig.currency(expressConfig.getLocale())
+      : (expressConfig.currency || 'USD');
+
     const buttonConfig = {
       style: {
         layout: 'horizontal',
@@ -168,6 +175,7 @@ export default {
             type: 'address',
             country: config.getLocale(),
             locale: getLocaleAndLanguage(false, true).language,
+            currency,
             address: {
               country: data.shippingAddress.countryCode,
               state: data.shippingAddress.state,
@@ -179,6 +187,24 @@ export default {
             return actions.reject(data.errors.ADDRESS_ERROR);
           }
           lastShippingMethods = result.shippingMethods;
+          // Preview with the default (first) method so estimateToken is always set
+          // even when the user never changes the shipping option (onShippingOptionsChange
+          // only fires on an explicit option change, not on initial address selection).
+          const countryCode = data.shippingAddress.countryCode?.toLowerCase();
+          const [defaultMethod] = lastShippingMethods;
+          const preview = await callbacks.previewOrderDirect({
+            items: cart.getItemsForAPI(),
+            shippingMethod: { id: String(defaultMethod.id) },
+            ...(countryCode ? {
+              country: countryCode,
+              shipping: {
+                country: countryCode,
+                state: data.shippingAddress.state,
+                zip: data.shippingAddress.postalCode || '',
+              },
+            } : {}),
+          });
+          state.currentEstimateToken = preview.estimateToken;
         } catch {
           return actions.reject(data.errors.ADDRESS_ERROR);
         }
@@ -196,6 +222,7 @@ export default {
           type: 'option',
           country: config.getLocale(),
           locale: getLocaleAndLanguage(false, true).language,
+          currency,
           selectedOptionId: method.id,
           total: method.total,
           taxAmount: method.taxAmount,
@@ -204,7 +231,7 @@ export default {
         const countryCode = lastShippingAddress?.countryCode?.toLowerCase();
         const preview = await callbacks.previewOrderDirect({
           items: cart.getItemsForAPI(),
-          shippingMethod: { id: method.id },
+          shippingMethod: { id: String(method.id) },
           ...(countryCode ? {
             country: countryCode,
             shipping: {
@@ -235,13 +262,13 @@ export default {
               email: session.payer.email,
               phone: '',
             },
-            shipping: session.shippingAddress,
-            billing: session.shippingAddress,
+            shipping: { ...session.shippingAddress, email: session.payer.email },
+            billing: { ...session.shippingAddress, email: session.payer.email },
             items: cart.getItemsForAPI(),
             shippingMethod: { id: session.selectedOptionId },
             estimateToken: state.currentEstimateToken,
             country: session.shippingAddress.country,
-            locale: config.getLanguage(),
+            locale: getLocaleAndLanguage(false, true).language,
           };
           const createdOrder = await callbacks.createOrder(orderBody);
           const fraudToken = (() => {
@@ -280,7 +307,7 @@ export default {
     const payLaterBtn = window.paypal.Buttons({
       ...buttonConfig,
       fundingSource: window.paypal.FUNDING.PAYLATER,
-      style: { ...buttonConfig.style, color: 'silver', label: 'pay_later' },
+      style: { ...buttonConfig.style, color: 'silver' },
     });
     if (payLaterBtn.isEligible()) {
       const wrapper = document.createElement('div');
