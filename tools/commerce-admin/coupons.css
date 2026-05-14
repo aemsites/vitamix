@@ -970,3 +970,155 @@
   border: 1px solid #e1e3e5;
   border-radius: 6px;
 }
+
+/* Add codes dialog — grid + TSV (pattern aligned with catalog promotions) */
+.cp-add-codes-lines-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 10px;
+}
+
+.cp-add-codes-lines-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #202223;
+}
+
+.cp-add-codes-lines-wrap {
+  margin-bottom: 4px;
+}
+
+.cp-add-codes-lines-scroll {
+  overflow-x: auto;
+  margin-bottom: 12px;
+  border: 1px solid #e1e3e5;
+  border-radius: 8px;
+  background: #fff;
+  -webkit-overflow-scrolling: touch;
+}
+
+.cp-add-codes-grid {
+  min-width: 640px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.cp-add-codes-grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f6f6f7;
+  border-bottom: 1px solid #e1e3e5;
+  padding: 8px 6px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.cp-add-codes-grid tbody td {
+  border-bottom: 1px solid #eceeef;
+  padding: 6px;
+  vertical-align: middle;
+}
+
+.cp-add-codes-grid tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.cp-add-codes-grid tbody tr[data-cp-add-code-line]:hover,
+.cp-add-codes-grid tbody tr[data-cp-add-code-line]:focus-within {
+  background: #fafbfb;
+}
+
+.cp-add-codes-col-del {
+  width: 44px;
+  text-align: center;
+}
+
+.cp-add-codes-num-col {
+  width: 36px;
+  text-align: right;
+  color: #6d7175;
+  font-variant-numeric: tabular-nums;
+}
+
+.cp-add-codes-num {
+  display: inline-block;
+  min-width: 1.25em;
+}
+
+.cp-add-codes-remove {
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 8px;
+  min-width: 32px;
+  border-radius: 6px;
+  border: 1px solid #e1e3e5;
+  background: #fff;
+  color: #202223;
+  cursor: pointer;
+}
+
+.cp-add-codes-remove:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.cp-add-codes-remove:hover:not(:disabled) {
+  background: #f6f6f7;
+}
+
+.coupons-dialog .cp-add-codes-input {
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 8px;
+  border: 1px solid #c9cccf;
+  border-radius: 6px;
+}
+
+.cp-add-codes-input-code {
+  min-width: 12rem;
+}
+
+.cp-add-codes-tsv-import {
+  margin-top: 4px;
+  padding: 10px 12px;
+  border: 1px solid #e1e3e5;
+  border-radius: 8px;
+  background: #fafbfb;
+}
+
+.cp-add-codes-tsv-import summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.cp-add-codes-tsv-textarea {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 8px;
+  padding: 8px 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  border: 1px solid #c9cccf;
+  border-radius: 6px;
+  resize: vertical;
+  min-height: 120px;
+}
+
+.cp-add-codes-tsv-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}

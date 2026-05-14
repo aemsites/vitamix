@@ -855,7 +855,7 @@ async function refreshCouponList() {
   await refreshSelection();
 }
 
-async function openDialog(title, innerHtml, onSubmit, afterMount, dialogClass) {
+async function openDialog(title, innerHtml, onSubmit, afterMount, dialogClass, submitLabel = 'Save') {
   const dialog = document.createElement('dialog');
   dialog.className = `coupons-dialog${dialogClass ? ` ${dialogClass}` : ''}`;
   dialog.innerHTML = `
@@ -866,7 +866,7 @@ async function openDialog(title, innerHtml, onSubmit, afterMount, dialogClass) {
       </div>
       <div class="coupons-dialog-actions">
         <button type="button" class="coupons-btn" data-cp-cancel>Cancel</button>
-        <button type="button" class="coupons-btn coupons-btn-primary" data-cp-submit>Save</button>
+        <button type="button" class="coupons-btn coupons-btn-primary" data-cp-submit>${escapeHtml(submitLabel)}</button>
       </div>
     </div>`;
   document.body.appendChild(dialog);
@@ -1115,7 +1115,7 @@ function fillCouponForm(dlg, d) {
 
 function renderCodesSection() {
   if (!state.selectedCouponId) {
-    return '<p class="coupons-empty">Select a coupon to load its codes.</p>';
+    return '<p class="coupons-empty">Select a coupon to show its codes.</p>';
   }
   const rows = state.codes.length
     ? state.codes.map((raw) => {
@@ -1129,13 +1129,13 @@ function renderCodesSection() {
       const exp = expRaw ? escapeHtml(expRaw) : '—';
       return `<tr><td><code>${code}</code></td><td>${active ? 'Yes' : 'No'}</td><td>${escapeHtml(String(usage))}</td><td>${exp}</td></tr>`;
     }).join('')
-    : '<tr><td colspan="4" class="coupons-empty" style="padding:16px">No codes loaded yet — use <strong>Load codes</strong>.</td></tr>';
+    : '<tr><td colspan="4" class="coupons-empty" style="padding:16px">No codes in the list yet — use <strong>Show codes</strong>.</td></tr>';
 
   return `
     <h3 class="coupons-section-title">Codes for this coupon</h3>
     <div class="coupons-detail-actions">
-      <button type="button" class="coupons-btn coupons-btn-primary" data-cp-load-codes>Load codes</button>
-      <button type="button" class="coupons-btn" data-cp-add-code>New code</button>
+      <button type="button" class="coupons-btn coupons-btn-primary" data-cp-show-codes>Show codes</button>
+      <button type="button" class="coupons-btn" data-cp-add-codes>Add new codes...</button>
       <button type="button" class="coupons-btn" data-cp-batch>Generate batch</button>
       ${state.codesNextCursor ? '<button type="button" class="coupons-btn" data-cp-next-codes>Next page</button>' : ''}
     </div>
@@ -1148,13 +1148,13 @@ function renderCodesSection() {
 }
 
 function bindCodesEvents(mount) {
-  mount.querySelector('[data-cp-load-codes]')?.addEventListener('click', async () => {
+  mount.querySelector('[data-cp-show-codes]')?.addEventListener('click', async () => {
     try {
       await fetchCodesForCoupon();
       setError('');
       afterCodesRefresh();
     } catch (err) {
-      console.warn('[commerce-admin/coupons] load codes failed', {
+      console.warn('[commerce-admin/coupons] show codes failed', {
         couponId: state.selectedCouponId,
         message: err?.message,
       });
@@ -1175,7 +1175,7 @@ function bindCodesEvents(mount) {
       showToast(err.message || 'Failed', 'error');
     }
   });
-  mount.querySelector('[data-cp-add-code]')?.addEventListener('click', () => openAddCodeDialog());
+  mount.querySelector('[data-cp-add-codes]')?.addEventListener('click', () => openAddCodesDialog());
   mount.querySelector('[data-cp-batch]')?.addEventListener('click', () => openBatchDialog());
 }
 
@@ -1354,53 +1354,329 @@ function openEditCouponDialog() {
   );
 }
 
-function openAddCodeDialog() {
-  if (!state.selectedCouponId) return;
-  openDialog(
-    'New code for this coupon',
-    `<p class="coupons-page-lead" style="margin-bottom:10px">Codes are stored for coupon <strong>${escapeHtml(state.selectedCouponId)}</strong>.</p>
-     <div class="coupons-form-grid">
-       <div class="coupons-field coupons-field-full">
-         <label for="cp-code-val">Code</label>
-         <input type="text" id="cp-code-val" autocomplete="off" placeholder="FAF-APR2026" required />
-       </div>
-       <div class="coupons-field">
-         <label for="cp-code-exp">Expires</label>
-         <input type="datetime-local" id="cp-code-exp" />
-       </div>
-       <div class="coupons-field">
-         <label for="cp-code-limit">Total use limit</label>
-         <input type="number" id="cp-code-limit" min="0" step="1" placeholder="empty = unlimited" />
-       </div>
-       <div class="coupons-field">
-         <label for="cp-code-per-cust">Uses per customer</label>
-         <input type="number" id="cp-code-per-cust" min="0" step="1" placeholder="empty = unlimited" />
-       </div>
-     </div>`,
-    async (dlg) => {
-      const code = dlg.querySelector('#cp-code-val')?.value?.trim();
-      if (!code) throw new Error('Code is required');
-      const typeId = state.selectedCouponId;
-      const body = { code, typeId };
-      const expLocal = dlg.querySelector('#cp-code-exp')?.value;
-      if (expLocal) {
-        const iso = new Date(expLocal).toISOString();
-        if (!Number.isNaN(Date.parse(iso))) body.expiresAt = iso;
+function toDatetimeLocalValue(d) {
+  if (!(d instanceof Date) || Number.isNaN(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function parseExpiresCellToLocal(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  const d = new Date(s);
+  if (!Number.isNaN(d.getTime())) return toDatetimeLocalValue(d);
+  return '';
+}
+
+function isCouponCodesTsvHeaderLine(parts) {
+  const a = String(parts[0] || '').trim().toLowerCase();
+  return a === 'code' || a === 'coupon code' || a === 'couponcode';
+}
+
+/**
+ * First TSV column is the coupon code; optional Expires and limits in later columns.
+ * @param {string} text
+ * @return {Array<{ code: string, expiresLocal?: string, usageLimit?: number,
+ *   usesPerCustomer?: number }>}
+ */
+function parseCouponCodesTsv(text) {
+  const raw = String(text || '').replace(/^\uFEFF/, '');
+  const splitLines = raw.split(/\r\n|\n|\r/).map((l) => l.replace(/\r$/, ''));
+  const trimmed = splitLines.filter((line) => line.trim());
+  const allParts = trimmed.map((line) => line.split('\t').map((c) => c.trim()));
+  const dataRows = allParts.length && isCouponCodesTsvHeaderLine(allParts[0])
+    ? allParts.slice(1)
+    : allParts;
+  return dataRows
+    .filter((parts) => parts[0])
+    .map((parts) => {
+      const code = parts[0];
+      /** @type {{ code: string, expiresLocal?: string, usageLimit?: number,
+       *   usesPerCustomer?: number }} */
+      const row = { code };
+      if (parts[1]) {
+        const el = parseExpiresCellToLocal(parts[1]);
+        if (el) row.expiresLocal = el;
       }
-      const lim = readOptionalInt(dlg.querySelector('#cp-code-limit')?.value);
-      if (lim != null) body.usageLimit = lim;
-      const upc = readOptionalInt(dlg.querySelector('#cp-code-per-cust')?.value);
-      if (upc != null) body.usesPerCustomer = upc;
-      await couponsApiFetch('coupons', {
-        method: 'POST',
-        body: JSON.stringify(body),
-      });
-      showToast('Code created', 'success');
+      const lim = readOptionalInt(parts[2]);
+      if (lim != null) row.usageLimit = lim;
+      const upc = readOptionalInt(parts[3]);
+      if (upc != null) row.usesPerCustomer = upc;
+      return row;
+    });
+}
+
+/**
+ * @param {{ code?: string, expiresLocal?: string, usageLimit?: number,
+ *   usesPerCustomer?: number }} [row]
+ */
+function couponAddCodesRowHtml(row = {}) {
+  const code = escapeHtml(String(row.code ?? ''));
+  const exp = escapeHtml(String(row.expiresLocal ?? ''));
+  const lim = row.usageLimit != null && `${row.usageLimit}` !== ''
+    ? escapeHtml(String(row.usageLimit))
+    : '';
+  const per = row.usesPerCustomer != null && `${row.usesPerCustomer}` !== ''
+    ? escapeHtml(String(row.usesPerCustomer))
+    : '';
+  const rmBtn = '<button type="button" class="cp-add-codes-remove" data-cp-add-code-remove '
+    + 'aria-label="Remove row">×</button>';
+  return `<tr data-cp-add-code-line>
+    <td class="cp-add-codes-col-del">${rmBtn}</td>
+    <td class="cp-add-codes-num-col"><span class="cp-add-codes-num"></span></td>
+    <td><input type="text" class="cp-add-codes-input cp-add-codes-input-code" data-cp-add-code-val `
+    + `autocomplete="off" placeholder="Coupon code" value="${code}" /></td>
+    <td><input type="datetime-local" class="cp-add-codes-input" data-cp-add-code-exp value="${exp}" /></td>
+    <td><input type="number" class="cp-add-codes-input" data-cp-add-code-limit min="0" step="1" `
+    + `placeholder="∞" value="${lim}" /></td>
+    <td><input type="number" class="cp-add-codes-input" data-cp-add-code-per min="0" step="1" `
+    + `placeholder="∞" value="${per}" /></td>
+  </tr>`;
+}
+
+/** @param {HTMLDialogElement} dlg */
+function refreshAddCodesLineIndices(dlg) {
+  const lines = dlg.querySelectorAll('tr[data-cp-add-code-line]');
+  lines.forEach((tr, i) => {
+    const num = tr.querySelector('.cp-add-codes-num');
+    if (num) num.textContent = String(i + 1);
+    const rm = tr.querySelector('[data-cp-add-code-remove]');
+    if (rm instanceof HTMLButtonElement) {
+      rm.disabled = lines.length <= 1;
+    }
+  });
+}
+
+/** @param {HTMLDialogElement} dlg */
+function readCouponCodeBodiesFromAddGrid(dlg) {
+  const typeId = state.selectedCouponId;
+  const lines = [...dlg.querySelectorAll('tr[data-cp-add-code-line]')];
+  return lines.map((tr) => {
+    const code = tr.querySelector('[data-cp-add-code-val]')?.value?.trim() ?? '';
+    /** @type {{ code: string, typeId: string, expiresAt?: string, usageLimit?: number,
+     *   usesPerCustomer?: number }} */
+    const body = { code, typeId };
+    const expLocal = tr.querySelector('[data-cp-add-code-exp]')?.value ?? '';
+    if (expLocal) {
+      const iso = new Date(expLocal).toISOString();
+      if (!Number.isNaN(Date.parse(iso))) body.expiresAt = iso;
+    }
+    const lim = readOptionalInt(tr.querySelector('[data-cp-add-code-limit]')?.value ?? '');
+    if (lim != null) body.usageLimit = lim;
+    const upc = readOptionalInt(tr.querySelector('[data-cp-add-code-per]')?.value ?? '');
+    if (upc != null) body.usesPerCustomer = upc;
+    return body;
+  }).filter((b) => b.code);
+}
+
+/** @param {HTMLDialogElement} dlg */
+function wireAddCodesGridPasteExpansion(dlg) {
+  const tbody = dlg.querySelector('#cp-add-codes-tbody');
+  if (!tbody) return;
+  tbody.addEventListener('paste', (e) => {
+    const { target, clipboardData } = e;
+    if (!(target instanceof HTMLInputElement) || !target.matches('[data-cp-add-code-val]')) return;
+    const text = clipboardData?.getData('text/plain') ?? '';
+    if (!text.includes('\n') && !text.includes('\r')) return;
+    const lines = text.split(/\r\n|\n|\r/).map((l) => l.replace(/\r$/, ''))
+      .filter((l) => l.trim() !== '');
+    if (lines.length <= 1) return;
+    e.preventDefault();
+    const startTr = target.closest('tr[data-cp-add-code-line]');
+    if (!startTr || !tbody.contains(startTr)) return;
+    const allRows = [...tbody.querySelectorAll('tr[data-cp-add-code-line]')];
+    const startIdx = allRows.indexOf(/** @type {HTMLTableRowElement} */ (startTr));
+    if (startIdx < 0) return;
+    lines.forEach((lineText, j) => {
+      const parts = lineText.split('\t').map((c) => c.trim());
+      const code = (parts[0] || '').trim();
+      if (!code) return;
+      let tr = tbody.querySelectorAll('tr[data-cp-add-code-line]')[startIdx + j];
+      if (!tr) {
+        tbody.insertAdjacentHTML('beforeend', couponAddCodesRowHtml({}));
+        const list = tbody.querySelectorAll('tr[data-cp-add-code-line]');
+        tr = list[list.length - 1];
+      }
+      if (!tr) return;
+      const codeEl = tr.querySelector('[data-cp-add-code-val]');
+      if (codeEl instanceof HTMLInputElement) codeEl.value = code;
+      const expEl = tr.querySelector('[data-cp-add-code-exp]');
+      if (parts[1] && expEl instanceof HTMLInputElement) {
+        const el = parseExpiresCellToLocal(parts[1]);
+        if (el) expEl.value = el;
+      }
+      const limEl = tr.querySelector('[data-cp-add-code-limit]');
+      const lim = readOptionalInt(parts[2]);
+      if (lim != null && limEl instanceof HTMLInputElement) limEl.value = String(lim);
+      const perEl = tr.querySelector('[data-cp-add-code-per]');
+      const upc = readOptionalInt(parts[3]);
+      if (upc != null && perEl instanceof HTMLInputElement) perEl.value = String(upc);
+    });
+    refreshAddCodesLineIndices(dlg);
+  });
+}
+
+/**
+ * @param {HTMLDialogElement} dlg
+ * @param {Array<{ code: string, expiresLocal?: string, usageLimit?: number,
+ *   usesPerCustomer?: number }>} parsed
+ * @param {'replace' | 'append'} mode
+ */
+function applyCouponCodesTsvToGrid(dlg, parsed, mode) {
+  const tbody = dlg.querySelector('#cp-add-codes-tbody');
+  if (!tbody) return;
+  if (!parsed.length) {
+    showToast(
+      'No valid rows — one code per line, or tab-separated columns starting with Code.',
+      'error',
+    );
+    return;
+  }
+  if (mode === 'replace') {
+    tbody.innerHTML = parsed.map((r) => couponAddCodesRowHtml(r)).join('');
+  } else {
+    parsed.forEach((r) => {
+      tbody.insertAdjacentHTML('beforeend', couponAddCodesRowHtml(r));
+    });
+  }
+  refreshAddCodesLineIndices(dlg);
+  showToast(`${mode === 'replace' ? 'Replaced with' : 'Appended'} ${parsed.length} row(s)`, 'success');
+}
+
+/** @param {HTMLDialogElement} dlg */
+function wireAddCodesDialog(dlg) {
+  const tbody = dlg.querySelector('#cp-add-codes-tbody');
+  dlg.querySelector('[data-cp-add-code-row-add]')?.addEventListener('click', () => {
+    if (!tbody) return;
+    tbody.insertAdjacentHTML('beforeend', couponAddCodesRowHtml({}));
+    refreshAddCodesLineIndices(dlg);
+  });
+  tbody?.addEventListener('click', (e) => {
+    const t = /** @type {HTMLElement} */ (e.target);
+    if (!t.closest('[data-cp-add-code-remove]')) return;
+    const line = t.closest('tr[data-cp-add-code-line]');
+    const all = tbody?.querySelectorAll('tr[data-cp-add-code-line]') ?? [];
+    if (!line || all.length <= 1) return;
+    line.remove();
+    refreshAddCodesLineIndices(dlg);
+  });
+  const ta = /** @type {HTMLTextAreaElement | null} */ (dlg.querySelector('#cp-add-codes-tsv-paste'));
+  dlg.querySelector('[data-cp-add-codes-tsv-clear]')?.addEventListener('click', () => {
+    if (ta) ta.value = '';
+  });
+  dlg.querySelector('[data-cp-add-codes-tsv-replace]')?.addEventListener('click', () => {
+    try {
+      const parsed = parseCouponCodesTsv(ta?.value ?? '');
+      applyCouponCodesTsvToGrid(dlg, parsed, 'replace');
+    } catch (err) {
+      showToast(err?.message || 'Import failed', 'error');
+    }
+  });
+  dlg.querySelector('[data-cp-add-codes-tsv-append]')?.addEventListener('click', () => {
+    try {
+      const parsed = parseCouponCodesTsv(ta?.value ?? '');
+      applyCouponCodesTsvToGrid(dlg, parsed, 'append');
+    } catch (err) {
+      showToast(err?.message || 'Import failed', 'error');
+    }
+  });
+  refreshAddCodesLineIndices(dlg);
+  wireAddCodesGridPasteExpansion(dlg);
+}
+
+function openAddCodesDialog() {
+  if (!state.selectedCouponId) return;
+  const idEsc = escapeHtml(state.selectedCouponId);
+  const intro = [
+    '<p class="coupons-page-lead" style="margin-bottom:10px">Create one or more codes for ',
+    `<strong>${idEsc}</strong>. Edit the grid, paste a column from Excel `,
+    'into <strong>Code</strong> (multiple rows expand the grid), or use ',
+    '<strong>Import from spreadsheet (TSV)</strong> — one code per line works; you can also use ',
+    'tab-separated <code>Code</code>, optional <code>Expires</code>, <code>Usage limit</code>, and ',
+    '<code>Uses per customer</code>.</p>',
+  ].join('');
+  const tsvHint = '<p class="coupons-field-hint" style="margin-top:8px">Paste one code per line '
+    + '(from a single spreadsheet column), or tab-separated columns: '
+    + '<strong>Code</strong> (required); optional <strong>Expires</strong> (parseable date); '
+    + '<strong>Total use limit</strong>; <strong>Uses per customer</strong>. '
+    + 'A header row whose first cell is <code>Code</code> is skipped.</p>';
+  const inner = `${intro}
+    <div class="cp-add-codes-lines-header">
+      <h3 class="cp-add-codes-lines-title">Codes to create</h3>
+      <button type="button" class="coupons-btn" data-cp-add-code-row-add>Add row</button>
+    </div>
+    <div class="cp-add-codes-lines-wrap">
+      <div class="cp-add-codes-lines-scroll">
+        <table class="coupons-data-table cp-add-codes-grid" aria-label="Codes to create">
+          <thead>
+            <tr>
+              <th scope="col" class="cp-add-codes-col-del"><span class="pim-sr-only">Remove</span></th>
+              <th scope="col" class="cp-add-codes-num-col">#</th>
+              <th scope="col">Code</th>
+              <th scope="col">Expires</th>
+              <th scope="col">Usage limit</th>
+              <th scope="col">Uses / customer</th>
+            </tr>
+          </thead>
+          <tbody id="cp-add-codes-tbody">${couponAddCodesRowHtml({})}</tbody>
+        </table>
+      </div>
+      <details class="cp-add-codes-tsv-import">
+        <summary>Import from spreadsheet (TSV)</summary>
+        ${tsvHint}
+        <textarea id="cp-add-codes-tsv-paste" class="cp-add-codes-tsv-textarea" rows="7" spellcheck="false" placeholder="SAVE20&#10;SAVE21&#10;or: SAVE22&#9;2026-12-31T12:00&#9;100&#9;1"></textarea>
+        <div class="cp-add-codes-tsv-actions">
+          <button type="button" class="coupons-btn coupons-btn-primary" data-cp-add-codes-tsv-replace>Replace rows from paste</button>
+          <button type="button" class="coupons-btn" data-cp-add-codes-tsv-append>Append rows from paste</button>
+          <button type="button" class="coupons-btn" data-cp-add-codes-tsv-clear>Clear box</button>
+        </div>
+      </details>
+    </div>`;
+  openDialog(
+    'Add new codes...',
+    inner,
+    async (dlg) => {
+      const bodies = readCouponCodeBodiesFromAddGrid(dlg);
+      if (!bodies.length) throw new Error('Add at least one code in the grid.');
+      const sub = dlg.querySelector('[data-cp-submit]');
+      if (sub instanceof HTMLButtonElement) sub.disabled = true;
+      const fails = [];
+      try {
+        /* eslint-disable no-await-in-loop -- serial POSTs are gentler on the API */
+        for (let bi = 0; bi < bodies.length; bi += 1) {
+          const body = bodies[bi];
+          try {
+            await couponsApiFetch('coupons', {
+              method: 'POST',
+              body: JSON.stringify(body),
+            });
+          } catch (err) {
+            fails.push({ code: body.code, message: err?.message || String(err) });
+          }
+        }
+        /* eslint-enable no-await-in-loop */
+      } finally {
+        if (sub instanceof HTMLButtonElement) sub.disabled = false;
+      }
+      if (fails.length === bodies.length) {
+        const samp = fails.slice(0, 3).map((f) => `${f.code}: ${f.message}`).join('; ');
+        throw new Error(`No codes were created (${fails.length}). ${samp}${fails.length > 3 ? '...' : ''}`);
+      }
       await fetchCodesForCoupon();
       afterCodesRefresh();
+      if (fails.length) {
+        console.warn('[commerce-admin/coupons] create codes partial failure', fails);
+        const ok = bodies.length - fails.length;
+        showToast(`Created ${ok} of ${bodies.length} code(s). Failures: open the console.`, 'error');
+      } else {
+        showToast(`Created ${bodies.length} code(s)`, 'success');
+      }
     },
-    null,
-    null,
+    async (dlg) => {
+      wireAddCodesDialog(dlg);
+    },
+    'coupons-dialog-wide',
+    'Create codes',
   );
 }
 
