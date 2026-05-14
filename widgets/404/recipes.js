@@ -1,6 +1,6 @@
 /**
  * Last URL segment, lowercased and kebab-style (spaces/underscores → hyphens).
- * @param {string} segment
+ * @param {string} segment — raw URL path segment
  * @returns {string}
  */
 function normalizeKebabLower(segment) {
@@ -17,7 +17,7 @@ function normalizeKebabLower(segment) {
 
 /**
  * Final segment of a path.
- * @param {string} pathname
+ * @param {string} pathname — URL pathname (e.g. window.location.pathname)
  * @returns {string}
  */
 function lastPathSegment(pathname) {
@@ -36,7 +36,7 @@ function stripTrailingRecipeId(slug) {
 
 /**
  * Slug from a recipe index `path` (basename, normalized).
- * @param {string} path
+ * @param {string} path — recipe's path field from the query-index
  * @returns {string}
  */
 function slugFromRecipePath(path) {
@@ -47,13 +47,13 @@ function slugFromRecipePath(path) {
  * If the query index has a recipe whose path matches this 404 URL's last segment
  * (normalized), prefer full slug exact, then base exact after stripping `-r` digits
  * from the index slug, then prefix match on the full slug.
- * @param {string} locale
- * @param {string} language
+ * @param {string} locale — two-letter country code (e.g. 'us')
+ * @param {string} language — locale+language code (e.g. 'en_us')
  * @returns {Promise<void>}
  */
 async function tryRedirectFromRecipeIndex(locale, language) {
-  const needle = normalizeKebabLower(lastPathSegment(window.location.pathname));
-  if (!needle || needle === 'recipes') return;
+  const targetSlug = normalizeKebabLower(lastPathSegment(window.location.pathname));
+  if (!targetSlug || targetSlug === 'recipes') return;
 
   const indexUrl = `/${locale}/${language}/recipes/query-index.json`;
   let resp;
@@ -80,10 +80,10 @@ async function tryRedirectFromRecipeIndex(locale, language) {
     const path = (r.path || '').trim();
     const slug = slugFromRecipePath(path);
     if (!slug) return [];
-    if (slug === needle) return [{ path, slug, score: 3 }];
+    if (slug === targetSlug) return [{ path, slug, score: 3 }];
     const slugBase = stripTrailingRecipeId(slug);
-    if (slugBase === needle) return [{ path, slug, score: 2 }];
-    if (needle.length >= 3 && slug.startsWith(needle)) return [{ path, slug, score: 1 }];
+    if (slugBase === targetSlug) return [{ path, slug, score: 2 }];
+    if (targetSlug.length >= 3 && slug.startsWith(targetSlug)) return [{ path, slug, score: 1 }];
     return [];
   });
 
@@ -118,15 +118,27 @@ export default async function decorate(widget) {
 
   const scriptPath = new URL(import.meta.url).pathname;
   const jsonUrl = `${window.hlx?.codeBasePath || ''}${scriptPath.replace(/\.js$/, '.json')}`;
-  const resp = await fetch(jsonUrl);
-  const data = await resp.json();
+  let resp;
+  try {
+    resp = await fetch(jsonUrl);
+  } catch {
+    return;
+  }
+  if (!resp.ok) return;
+  let data;
+  try {
+    data = await resp.json();
+  } catch {
+    return;
+  }
   const copy = data[langKey] || data.en;
+  if (!copy) return;
 
-  const title = widget.querySelector('.recipes-404-title');
-  const eyebrow = widget.querySelector('.recipes-404-eyebrow');
-  const lead = widget.querySelector('.recipes-404-lead');
-  const browse = widget.querySelector('.recipes-404-browse');
-  const img = widget.querySelector('.recipes-404-image');
+  const title = widget.querySelector('.title');
+  const eyebrow = widget.querySelector('.eyebrow');
+  const lead = widget.querySelector('.lead');
+  const browse = widget.querySelector('.button-wrapper .button');
+  const img = widget.querySelector('img');
   const recipesHome = `/${locale}/${language}/recipes`;
 
   if (title) title.textContent = copy.title;
