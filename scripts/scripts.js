@@ -672,6 +672,8 @@ function buildAutoBlocks(main) {
       section.classList.add('section');
       section.append(toc);
       main.prepend(section);
+    } else if (getMetadata('template') === 'corp') {
+      document.body.classList.add('corp-no-toc');
     }
   } catch (error) {
     // eslint-disable-next-line no-console
