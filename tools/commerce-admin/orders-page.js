@@ -616,7 +616,11 @@ function buildOrderHumanView(payload) {
       const label = k.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
       let text = '';
       if (v != null && v !== '') {
-        text = typeof v === 'object' ? JSON.stringify(v) : String(v);
+        if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v)) {
+          text = formatDateTime(v) || v;
+        } else {
+          text = typeof v === 'object' ? JSON.stringify(v) : String(v);
+        }
       }
       return [label, text];
     });
