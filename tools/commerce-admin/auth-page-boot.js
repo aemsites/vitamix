@@ -1,3 +1,4 @@
+/* eslint-disable no-console -- temporary auth-order debugging; remove when stable */
 /**
  * Blocks the page until ProductBus OTP auth is satisfied (same API as productbus-admin).
  * Org/site are fixed for this Vitamix project (matches Edge Delivery:
@@ -27,9 +28,11 @@ function applyProfileFromAuth() {
 }
 
 async function ensureCommerceAuth() {
+  console.log('[commerce-admin] auth-page-boot ensureCommerceAuth start');
   const root = document.getElementById('commerce-admin-auth-root');
   if (!root) {
     document.documentElement.classList.add('commerce-admin-auth-ok');
+    console.log('[commerce-admin] auth-page-boot no #commerce-admin-auth-root; added commerce-admin-auth-ok');
     return;
   }
 
@@ -43,7 +46,10 @@ async function ensureCommerceAuth() {
   };
 
   const proceed = async () => {
-    if (getAuthState(PB_ORG, PB_SITE)) {
+    const existing = getAuthState(PB_ORG, PB_SITE);
+    if (existing?.token) {
+      const roles = Array.isArray(existing?.roles) ? existing.roles.join(',') : String(existing?.roles ?? '');
+      console.log(`[commerce-admin] auth-page-boot existing session; add commerce-admin-auth-ok roles=${roles}`);
       applyProfileFromAuth();
       document.documentElement.classList.add('commerce-admin-auth-ok');
       collapseAuthRoot();
@@ -57,6 +63,8 @@ async function ensureCommerceAuth() {
         org: PB_ORG,
         site: PB_SITE,
         onAuthenticated: (result) => {
+          const roles = Array.isArray(result?.roles) ? result.roles.join(',') : String(result?.roles ?? '');
+          console.log(`[commerce-admin] auth-page-boot onAuthenticated add commerce-admin-auth-ok email=${String(result?.email ?? '')} roles=${roles}`);
           applyProfileFromAuth();
           document.documentElement.classList.add('commerce-admin-auth-ok');
           collapseAuthRoot();
@@ -86,6 +94,7 @@ async function ensureCommerceAuth() {
   });
 
   await tryAuth();
+  console.log('[commerce-admin] auth-page-boot ensureCommerceAuth end (next module scripts may run)');
 }
 
 await ensureCommerceAuth();

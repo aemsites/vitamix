@@ -5,7 +5,8 @@
 /* eslint-disable no-use-before-define, no-console */
 // render, bindCodesEvents, and open* dialogs reference each other.
 // console: intentional debug logs for ProductBus coupon API failures.
-import { apiFetch } from './commerce-otp-api.js';
+import { apiFetch, getApiEnvironment, getAuthState } from './commerce-otp-api.js';
+import { waitForCommerceAuthReady } from './commerce-wait-auth-ready.js';
 import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
 import { createDetailModalHeaderShell } from './commerce-detail-modal-json.js';
 import { mountPromoteProductionInToolbar } from './commerce-promote-production.js';
@@ -1256,6 +1257,17 @@ function openBatchDialog() {
 async function init() {
   const mount = document.getElementById('coupons-mount');
   if (!mount) return;
+  console.log('[commerce-admin] coupons init start (before waitForCommerceAuthReady)');
+  const authed = await waitForCommerceAuthReady(PB_ORG, PB_SITE);
+  if (!authed) {
+    setError('Sign-in did not finish before the wait timed out. Reload the page and complete sign-in.');
+    mount.innerHTML = '<p class="coupons-empty">Reload the page after signing in.</p>';
+    return;
+  }
+  const a = getAuthState(PB_ORG, PB_SITE);
+  const roles = Array.isArray(a?.roles) ? a.roles.join(',') : String(a?.roles ?? '');
+  const htmlOk = document.documentElement.classList.contains('commerce-admin-auth-ok');
+  console.log(`[commerce-admin] coupons init after wait apiEnv=${getApiEnvironment()} hasToken=${Boolean(a?.token)} htmlAuthOk=${htmlOk} roles=${roles}`);
   try {
     try {
       const saved = sessionStorage.getItem(COUPON_MARKET_STORAGE_KEY);

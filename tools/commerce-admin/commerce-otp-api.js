@@ -1,3 +1,4 @@
+/* eslint-disable no-console -- temporary auth-order debugging; remove when stable */
 /**
  * ProductBus / Adobe Commerce Live API client (from helix-tools-website
  * productbus-admin/api.js).
@@ -97,6 +98,8 @@ export function setAuthState(org, site, state) {
   const env = getApiEnvironment();
   sessionStorage.setItem(authStorageKey(org, site, env), JSON.stringify(state));
   sessionStorage.removeItem(legacyAuthKey(org, site));
+  const roles = Array.isArray(state?.roles) ? state.roles.join(',') : String(state?.roles ?? '');
+  console.log(`[commerce-admin] setAuthState env=${env} storageKey=pbus-auth-${org}-${site}-${env} hasToken=${Boolean(state?.token)} roles=${roles}`);
 }
 
 export function clearAuthState(org, site) {
@@ -121,6 +124,11 @@ export async function apiFetch(org, site, path, options = {}) {
     headers.Authorization = `Bearer ${auth.token}`;
   }
 
+  const method = String(fetchOptions.method || 'GET');
+  const roles = Array.isArray(auth?.roles) ? auth.roles.join(',') : String(auth?.roles ?? '');
+  const htmlOk = document.documentElement.classList.contains('commerce-admin-auth-ok');
+  console.log(`[commerce-admin] apiFetch method=${method} path=${path} apiEnv=${getApiEnvironment()} hasBearer=${Boolean(auth?.token)} htmlAuthOk=${htmlOk} roles=${roles}`);
+
   const response = await fetch(fetchUrl, {
     ...fetchOptions,
     headers,
@@ -134,6 +142,7 @@ export async function apiFetch(org, site, path, options = {}) {
 
   if (response.status === 403) {
     const errorMsg = response.headers.get('x-error') || 'Forbidden';
+    console.log(`[commerce-admin] apiFetch 403 path=${path} x-error=${errorMsg} hasBearer=${Boolean(auth?.token)} htmlAuthOk=${htmlOk}`);
     showToast(`${errorMsg} (${response.status})`, 'error');
     throw new Error(errorMsg);
   }

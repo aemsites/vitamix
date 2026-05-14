@@ -3,6 +3,7 @@
  * Row opens detail (coupon-style header); Edit in the modal opens the JSON editor (PUT / PATCH).
  */
 import { apiFetch } from './commerce-otp-api.js';
+import { waitForCommerceAuthReady } from './commerce-wait-auth-ready.js';
 import { putOrPatchResource } from './commerce-resource-save.js';
 import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
 import { createDetailModalHeaderCloseAndJson } from './commerce-detail-modal-json.js';
@@ -307,6 +308,13 @@ async function init() {
   const countEl = document.getElementById('customers-count');
   const errEl = document.getElementById('customers-error');
   if (!wrap || !search || !sortSel) return;
+
+  const authed = await waitForCommerceAuthReady(PB_ORG, PB_SITE);
+  if (!authed) {
+    errEl.hidden = false;
+    errEl.textContent = 'Sign-in did not finish before the wait timed out. Reload the page.';
+    return;
+  }
 
   const initialQ = getUrlParam('q');
   const initialSort = getUrlParam('sort') === 'oldest' ? 'oldest' : 'newest';

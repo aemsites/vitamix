@@ -3,6 +3,7 @@
  * (`price-rules/catalog` → `{ promotions }`, `price-rules/cart` → JSON array).
  * Data comes only from ProductBus; failed loads show errors and empty lists.
  */
+import { waitForCommerceAuthReady } from './commerce-wait-auth-ready.js';
 import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
 import { createDetailModalHeaderCloseAndJson } from './commerce-detail-modal-json.js';
 import { mountPromoteProductionInToolbar } from './commerce-promote-production.js';
@@ -1941,33 +1942,12 @@ async function openCartRuleEditDialog(ruleId) {
   dialog.showModal();
 }
 
-/**
- * Auth boot runs in a prior module, but wait until `commerce-admin-auth-ok` is on
- * `documentElement` before calling ProductBus (avoids racing the class toggle).
- */
-async function waitForCommerceAuthReady() {
-  if (document.documentElement.classList.contains('commerce-admin-auth-ok')) {
+async function initPricingSources() {
+  const authed = await waitForCommerceAuthReady(PB_ORG, PB_SITE);
+  if (!authed) {
+    showToast('Sign-in did not finish before the wait timed out. Reload the page.', 'error');
     return;
   }
-  await new Promise((resolve) => {
-    let n = 0;
-    const t = setInterval(() => {
-      if (document.documentElement.classList.contains('commerce-admin-auth-ok')) {
-        clearInterval(t);
-        resolve(undefined);
-      } else {
-        n += 1;
-        if (n > 320) {
-          clearInterval(t);
-          resolve(undefined);
-        }
-      }
-    }, 32);
-  });
-}
-
-async function initPricingSources() {
-  await waitForCommerceAuthReady();
   const tasks = [];
   if (PR_APP_MODE === 'promotions') tasks.push(loadCatalogFromApi());
   else if (PR_APP_MODE === 'cart-rules') tasks.push(loadCartFromApi());

@@ -3,6 +3,7 @@
  * Row opens a detail dialog (human-readable order + journal); Edit saves via PUT / PATCH.
  */
 import { apiFetch } from './commerce-otp-api.js';
+import { waitForCommerceAuthReady } from './commerce-wait-auth-ready.js';
 import { putOrPatchResource } from './commerce-resource-save.js';
 import { openOrderContactEditDialog } from './order-contact-edit-dialog.js';
 import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
@@ -1019,6 +1020,13 @@ async function init() {
   const countEl = document.getElementById('orders-count');
   const errEl = document.getElementById('orders-error');
   if (!wrap || !search || !stateSel || !sortSel) return;
+
+  const authed = await waitForCommerceAuthReady(PB_ORG, PB_SITE);
+  if (!authed) {
+    errEl.hidden = false;
+    errEl.textContent = 'Sign-in did not finish before the wait timed out. Reload the page.';
+    return;
+  }
 
   const initialQ = getUrlParam('q');
   const initialState = getUrlParam('state');
