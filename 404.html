@@ -85,22 +85,11 @@
   </script>
   <footer></footer>
   <script>
-    function getLocaleLanguage404() {
-      if (!window.location.pathname.match(/^\/[a-z]{2}\/[a-z]{2}_[a-z]{2}\//)) {
-        return { locale: 'us', language: 'en_us' };
-      }
-      var pathSegments = window.location.pathname.split('/').filter(Boolean);
-      return {
-        locale: pathSegments[0] || 'us',
-        language: pathSegments[1] || 'en_us',
-      };
-    }
-
     function setDefault404NavLinks() {
       var home = document.querySelector('.error-home');
       var search = document.querySelector('.error-search');
       if (!home && !search) return;
-      var loc = getLocaleLanguage404();
+      var loc = getCountryAndLanguage();
       var base = '/' + loc.locale + '/' + loc.language;
       if (home) {
         home.href = base + '/';
