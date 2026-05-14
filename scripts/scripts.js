@@ -18,10 +18,31 @@ import {
   getMetadata,
 } from './aem.js';
 
-const isProdHost = window.location.hostname.includes('vitamix.com');
+const { hostname } = window.location;
+
+// Locale+language pairs enabled for edge checkout on production.
+// Format: '<locale>/<language>' (e.g., 'ca/fr_ca'). Add pairs as each region goes live.
+const EDGE_CHECKOUT_LOCALES = ['ca/fr_ca', 'ca/en_us', 'us/en_us'];
+
+const isEdgeHost = hostname.includes('localhost') || hostname.includes('edge-orders') || hostname.includes('integration.vitamix.com') || hostname.includes('uat.vitamix.com');
+const isProdHost = hostname.includes('vitamix.com');
+
+// Affirm public API key — safe to expose client-side (used for PDP promo widgets).
+// Checkout gets its key from the server's checkout object so it always matches the
+// environment of the merchant config.
+export const AFFIRM_PUBLIC_KEY = isProdHost ? 'LIVE_PUBLIC_KEY' : 'GH4VQBRG3LHDS5CM';
 export const FORMS_ENDPOINT = isProdHost
   ? ''
   : 'https://main--vitamix--aemsites.aem.network';
+
+window.CommerceConfig = {
+  org: 'aemsites',
+  site: 'vitamix',
+  paypal: {
+    clientId: 'AdWjsTBIELzBwnT08zwFuxDeEW89L8bTcBnE_d4C8lwZHpqMjCszTRh4lrYsUx0TGnjFffeC_UXiIBgJ',
+    intent: 'authorize',
+  },
+};
 
 /**
  * Load fonts.css and set a session storage flag.
@@ -116,20 +137,48 @@ export function formatServings(servingsString) {
 
 /**
  * Gets the locale and language from the window.location.pathname.
+ * @param {boolean} [forceEnCA] - Remap en_us → en_ca for Canadian English paths.
+ * @param {boolean} [bcp47] - Return language as a BCP-47 tag (e.g. 'en-US') instead of
+ *   the underscore form used in URL paths (e.g. 'en_us').
  * @returns {Object} Object with locale and language.
  */
-export function getLocaleAndLanguage(forceEnCA = false) {
+export function getLocaleAndLanguage(forceEnCA = false, bcp47 = false) {
   const pathSegments = window.location.pathname.split('/').filter(Boolean);
   const locale = pathSegments[0] || 'us'; // fallback to 'us' if not found
-  const language = pathSegments[1] || 'en_us'; // fallback to 'en_us' if not found
+  let language = pathSegments[1] || 'en_us'; // fallback to 'en_us' if not found
 
   // Commerce backend uses the language code en_ca for the Canada english store view.
   // On the frontend they are incorrectly using the en_us language code.
   if (forceEnCA && locale === 'ca' && language === 'en_us') {
-    return { locale, language: 'en_ca' };
+    language = 'en_ca';
+  }
+
+  if (bcp47) {
+    language = language.replace('_', '-').replace(/-([a-z]{2})$/, (_, r) => `-${r.toUpperCase()}`);
   }
 
   return { locale, language };
+}
+
+/**
+ * Returns the path for an order-flow page (cart, checkout, complete, cancel)
+ * scoped to the current locale and language.
+ * @param {'cart'|'checkout'|'complete'|'cancel'} page
+ * @returns {string}
+ */
+export function getOrderPath(page) {
+  const { locale, language } = getLocaleAndLanguage();
+  return `/${locale}/${language}/order/${page}`;
+}
+
+/**
+ * Returns the path for an account page scoped to the current locale and language.
+ * @param {string} [page] - Optional sub-page (e.g., 'orders', 'order-detail')
+ * @returns {string}
+ */
+export function getAccountPath(page) {
+  const { locale, language } = getLocaleAndLanguage();
+  return page ? `/${locale}/${language}/account/${page}` : `/${locale}/${language}/account`;
 }
 
 /**
@@ -1276,9 +1325,15 @@ async function simulatePDPPreview() {
  * @param {Element} doc The container element
  */
 async function loadEager(doc) {
-  const locale = window.location.pathname.split('/')[2];
-  const language = locale ? locale.split('_')[0] : 'en';
-  document.documentElement.lang = language;
+  const { locale, language } = getLocaleAndLanguage();
+  document.documentElement.lang = language ? language.split('_')[0] : 'en';
+
+  // Dev/staging hosts: edge checkout enabled for all locales.
+  // Production: edge checkout enabled only for locale+language pairs in EDGE_CHECKOUT_LOCALES.
+  window.useEdgeCheckout = isEdgeHost || EDGE_CHECKOUT_LOCALES.includes(`${locale}/${language}`);
+  if (localStorage.getItem('useEdgeCheckout') !== null) {
+    window.useEdgeCheckout = localStorage.getItem('useEdgeCheckout') === 'true';
+  }
 
   /* simulation date */
   const params = new URLSearchParams(window.location.search);
@@ -1404,8 +1459,8 @@ async function loadLazy(doc) {
 function decorateExternalLinks() {
   const externalLinks = document.querySelectorAll('a[href^="https://"]');
   externalLinks.forEach((link) => {
-    const { hostname } = new URL(link.href);
-    if (!link.href.includes('vitamix') || hostname === 'localhost') {
+    const { hostname: linkHostname } = new URL(link.href);
+    if (!link.href.includes('vitamix') || linkHostname === 'localhost') {
       link.setAttribute('target', '_blank');
       link.setAttribute('rel', 'noopener');
     }
@@ -1453,6 +1508,16 @@ async function loadDelayed() {
     // eslint-disable-next-line no-console
     console.error('Error loading link checker', e);
   }
+
+  const { default: injectForterSnippet } = await import('./forter-snippet.js');
+  injectForterSnippet();
+
+  document.addEventListener('ftr:tokenReady', (evt) => {
+    const token = evt.detail;
+    try {
+      sessionStorage.setItem('forter_token', token);
+    } catch { /* ignore */ }
+  });
 
   const initContentScore = async () => {
     const CONTENT_SCORE = 'https://tools.aem.live/tools/content-score/src/scripts.js';

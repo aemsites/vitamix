@@ -1,0 +1,66 @@
+:root {
+  /* ── Colour: brand ─────────────────────────────────────────── */
+  --commerce-color-primary: var(--link-color, #ea580c);
+  --commerce-color-primary-hover: color-mix(in srgb, var(--commerce-color-primary) 85%, black);
+  --commerce-color-primary-text: #fff;
+
+  /* ── Colour: text ──────────────────────────────────────────── */
+  --commerce-color-text: var(--text-color, #1a1a1a);
+  --commerce-color-text-muted: #6b7280;
+  --commerce-color-text-price: var(--commerce-color-text);
+
+  /* ── Colour: semantic ──────────────────────────────────────── */
+  --commerce-color-error: #dc2626;
+  --commerce-color-error-bg: #fef2f2;
+  --commerce-color-error-border: #fecaca;
+  --commerce-color-success: #16a34a;
+  --commerce-color-discount: #16a34a;
+
+  /* ── Colour: surface ───────────────────────────────────────── */
+  --commerce-color-background: var(--background-color, #fff);
+  --commerce-color-surface: #f9fafb;
+  --commerce-color-border: #e5e7eb;
+
+  /* ── Typography ────────────────────────────────────────────── */
+  --commerce-font-family: var(--body-font-family, sans-serif);
+  --commerce-font-size-base: 1rem;
+  --commerce-font-size-sm: 0.875rem;
+  --commerce-font-size-xs: 0.8125rem;
+  --commerce-font-size-price: 1rem;
+  --commerce-font-size-total: 1.25rem;
+  --commerce-font-weight-bold: 600;
+
+  /* ── Buttons ───────────────────────────────────────────────── */
+  --commerce-button-radius: 6px;
+  --commerce-button-height: 48px;
+  --commerce-button-font-size: 1rem;
+  --commerce-button-font-weight: var(--commerce-font-weight-bold);
+
+  /* ── Inputs ────────────────────────────────────────────────── */
+  --commerce-input-radius: 6px;
+  --commerce-input-border: var(--commerce-color-border);
+  --commerce-input-border-focus: var(--commerce-color-primary);
+  --commerce-input-background: var(--commerce-color-background);
+  --commerce-input-height: 52px;
+
+  /* ── Shape ─────────────────────────────────────────────────── */
+  --commerce-radius-card: 12px;
+  --commerce-radius-badge: 4px;
+
+  /* ── Spacing ───────────────────────────────────────────────── */
+  --commerce-gap: 1.5rem;
+  --commerce-gap-sm: 0.75rem;
+  --commerce-card-padding: 24px;
+
+  /* ── Layout ────────────────────────────────────────────────── */
+  --commerce-max-width: 1300px;
+  --commerce-summary-width: 420px;
+  --commerce-form-max-width: 600px;
+  --commerce-item-image-size: 80px;
+  --commerce-sticky-top: 100px;
+
+  /* ── Checkout progress step indicator ─────────────────────── */
+  --commerce-step-color-active: #40596b;
+  --commerce-step-color-complete: var(--commerce-color-primary);
+  --commerce-step-color-inactive: var(--commerce-color-border);
+}

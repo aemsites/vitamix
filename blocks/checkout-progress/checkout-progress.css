@@ -1,0 +1,101 @@
+.section > .checkout-progress-wrapper {
+  margin: 0 auto;
+  width: 100%;
+}
+
+.checkout-progress nav {
+  display: flex;
+  justify-content: center;
+  padding: 16px 0;
+}
+
+.checkout-progress ol {
+  display: flex;
+  align-items: center;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  gap: 0;
+  counter-reset: step-counter;
+}
+
+.checkout-progress .step {
+  display: flex;
+  align-items: center;
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-text-muted);
+}
+
+/* Connector line between steps */
+.checkout-progress .step + .step::before {
+  content: '';
+  display: block;
+  width: 48px;
+  height: 2px;
+  background: var(--commerce-step-color-inactive);
+  margin: 0 12px;
+}
+
+.checkout-progress .step-complete + .step::before {
+  background: var(--commerce-color-text);
+}
+
+.checkout-progress .step a,
+.checkout-progress .step span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: inherit;
+  white-space: nowrap;
+}
+
+/* Circle — inactive (future) steps: white fill, border only, no number */
+.checkout-progress .step a::before,
+.checkout-progress .step span::before {
+  content: '';
+  counter-increment: step-counter;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: var(--commerce-font-weight-bold);
+  line-height: 1;
+  flex-shrink: 0;
+  background: #fff;
+  border: 2px solid var(--commerce-color-border);
+  color: #fff;
+  box-sizing: border-box;
+}
+
+/* Complete steps: dark fill with checkmark */
+.checkout-progress .step-complete a::before {
+  content: '✓';
+  background: var(--commerce-color-text);
+  border-color: var(--commerce-color-text);
+  color: #fff;
+}
+
+/* Active step: brand fill with step number */
+.checkout-progress .step-active span::before {
+  content: counter(step-counter);
+  background: var(--commerce-step-color-active);
+  border-color: var(--commerce-step-color-active);
+  color: #fff;
+}
+
+.checkout-progress .step-complete a {
+  color: var(--commerce-color-text);
+}
+
+.checkout-progress .step-active span {
+  color: var(--commerce-color-text);
+  font-weight: var(--commerce-font-weight-bold);
+}
+
+.checkout-progress .step-complete a:hover {
+  text-decoration: underline;
+}
