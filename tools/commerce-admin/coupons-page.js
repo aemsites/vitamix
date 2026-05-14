@@ -443,8 +443,8 @@ function couponDetailModalInnerHtml(d) {
     <div class="coupons-modal-stats" role="list">
       <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Minimum order</span><span class="coupons-modal-stat-value">${escapeHtml(min)}</span></div>
       <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Discount cap</span><span class="coupons-modal-stat-value">${escapeHtml(cap)}</span></div>
-      <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Default code uses</span><span class="coupons-modal-stat-value">${escapeHtml(d.defaultUsageLimit != null ? String(d.defaultUsageLimit) : '—')}</span></div>
-      <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Uses per code</span><span class="coupons-modal-stat-value">${escapeHtml(d.defaultUsesPerCode != null ? String(d.defaultUsesPerCode) : '—')}</span></div>
+      <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Total cap per code</span><span class="coupons-modal-stat-value">${escapeHtml(d.defaultUsageLimit != null ? String(d.defaultUsageLimit) : '—')}</span></div>
+      <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Cap per customer</span><span class="coupons-modal-stat-value">${escapeHtml(d.defaultUsesPerCode != null ? String(d.defaultUsesPerCode) : '—')}</span></div>
     </div>
     <div class="coupons-modal-pills" aria-label="Program flags">
       ${pillHtml('Free shipping', !!d.freeShipping)}
@@ -1038,11 +1038,11 @@ function couponFormHtml({ idReadonly }) {
         <label class="coupons-checkbox-row"><input type="checkbox" id="cp-form-manual" checked /> Customers may enter a code manually at checkout</label>
       </div>
       <div class="coupons-field">
-        <label for="cp-form-def-limit">Default usage limit (total uses per code)</label>
+        <label for="cp-form-def-limit">Total cap per code (default)</label>
         <input type="number" id="cp-form-def-limit" min="0" step="1" placeholder="empty = unlimited" />
       </div>
       <div class="coupons-field">
-        <label for="cp-form-def-per-code">Default uses per code</label>
+        <label for="cp-form-def-per-code">Cap per customer (default)</label>
         <input type="number" id="cp-form-def-per-code" min="0" step="1" placeholder="empty = unlimited" />
       </div>
       <div class="coupons-field coupons-field-full">
