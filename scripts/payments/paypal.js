@@ -144,7 +144,6 @@ export default {
         color: 'gold',
         shape: 'rect',
         label: 'paypal',
-        disableMaxHeight: true,
       },
 
       createOrder: async () => {
