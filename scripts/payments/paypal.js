@@ -28,11 +28,13 @@ function loadSdk(clientId, currency, locale) {
   sdkLoadPromise = new Promise((resolve, reject) => {
     if (window.paypal) { resolve(); return; }
     const script = document.createElement('script');
+    const [lang, country] = locale.split('_');
+    const normalizedLocale = country ? `${lang}_${country.toUpperCase()}` : locale;
     const params = new URLSearchParams({
       'client-id': clientId,
       currency,
       components: 'buttons,messages',
-      locale,
+      locale: normalizedLocale,
       commit: 'false',
       'enable-funding': 'paylater',
     });
