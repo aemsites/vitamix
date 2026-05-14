@@ -146,7 +146,7 @@ export default {
         shape: 'rect',
         label: 'paypal',
         tagline: false,
-        height: 58,
+        height: 55,
       },
 
       createOrder: async () => {

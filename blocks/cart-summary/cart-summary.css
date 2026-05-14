@@ -127,7 +127,7 @@ div.section.cart-section:has(.cart-summary-wrapper) > .cart-wrapper {
 
 .cart-summary-express-buttons apple-pay-button {
   --apple-pay-button-width: 100%;
-  --apple-pay-button-height: 48px;
+  --apple-pay-button-height: 55px;
   --apple-pay-button-border-radius: var(--commerce-button-radius);
   --apple-pay-button-padding: 0;
 
@@ -157,7 +157,7 @@ div.section.cart-section:has(.cart-summary-wrapper) > .cart-wrapper {
   align-items: center;
   justify-content: center;
   width: 100%;
-  height: 48px;
+  height: 55px;
   background: #ffc439;
   border: none;
   border-radius: var(--commerce-button-radius);

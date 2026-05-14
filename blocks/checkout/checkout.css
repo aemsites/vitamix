@@ -107,12 +107,12 @@ main > .section:has(.checkout-wrapper) {
   flex: 1;
   min-width: 0;
   display: flex;
-  height: 58px;
+  height: 55px;
 }
 
 /* Stub Pay Later button fills its wrapper in the default (wide) state */
 .paypal-paylater-wrapper .paypal-express-btn {
-  height: 58px;
+  height: 55px;
 }
 
 /* Pay Later drops to a full-width second row when space is tight */
@@ -587,7 +587,7 @@ main > .section:has(.checkout-wrapper) {
   flex: 1;
   min-width: 0;
   width: 100%;
-  height: 58px;
+  height: 55px;
   overflow: hidden;
   background: #ffc439;
   border: none;
@@ -661,7 +661,7 @@ main > .section:has(.checkout-wrapper) {
 /* Apple Pay */
 apple-pay-button {
   --apple-pay-button-width: 100%;
-  --apple-pay-button-height: 58px;
+  --apple-pay-button-height: 55px;
   --apple-pay-button-border-radius: var(--commerce-button-radius);
   --apple-pay-button-padding: 0;
 
