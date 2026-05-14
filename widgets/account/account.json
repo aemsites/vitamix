@@ -11,59 +11,92 @@
     "panels": {
       "overview": {
         "title": "My Account",
-        "intro": "Overview of your Vitamix account. Detailed data will load from the account API.",
-        "rows": [
-          { "label": "Member since", "value": "March 2024" },
-          { "label": "Account status", "value": "Active" },
-          { "label": "Preferred store", "value": "United States" }
-        ]
+        "intro": "Your account summary loads from the account service when you are signed in."
       },
       "information": {
-        "title": "Account Information",
-        "rows": [
-          { "label": "Email", "valueKey": "email" },
-          { "label": "Name", "value": "David Nuescheler" },
-          { "label": "Phone", "value": "+1 (216) 555-0142" },
-          { "label": "Customer ID", "value": "VX-1000192" },
-          { "label": "Preferred language", "value": "English (US)" }
-        ]
+        "title": "Account Information"
       },
       "address": {
-        "title": "Addresses",
-        "mockAddresses": [
-          {
-            "badge": "Default billing",
-            "lines": [
-              "David Nuescheler",
-              "1234 Mockingbird Lane",
-              "Cleveland, OH 44114",
-              "United States"
-            ]
-          },
-          {
-            "badge": "Shipping",
-            "lines": [
-              "David Nuescheler",
-              "88 Example Parkway, Suite 200",
-              "Toronto, ON M5V 2T6",
-              "Canada"
-            ]
-          }
-        ]
+        "title": "Addresses"
       },
       "orders": {
-        "title": "Order History",
-        "mockOrders": [
-          { "id": "VM-482910", "date": "Nov 2, 2025", "total": "$429.00" },
-          { "id": "VM-471205", "date": "Aug 18, 2025", "total": "$89.95" }
-        ]
+        "title": "Order History"
       }
     },
+    "overviewLabels": {
+      "displayName": "Name",
+      "email": "Email",
+      "memberSince": "Member since",
+      "accountStatus": "Account status",
+      "storeRegion": "Store region"
+    },
+    "customerInfo": {
+      "email": "Email",
+      "name": "Name",
+      "phone": "Phone",
+      "customerId": "Customer ID",
+      "preferredLanguage": "Preferred language",
+      "accountStatus": "Account status",
+      "created": "Member since",
+      "updated": "Last updated"
+    },
+    "countries": {
+      "us": "United States",
+      "ca": "Canada",
+      "mx": "Mexico"
+    },
+    "addressBook": {
+      "add": "Add address",
+      "edit": "Edit",
+      "remove": "Remove",
+      "save": "Save",
+      "cancel": "Cancel",
+      "deleteConfirm": "Remove this address?",
+      "dialogAddTitle": "New address",
+      "dialogEditTitle": "Edit address",
+      "firstName": "First name",
+      "lastName": "Last name",
+      "email": "Email",
+      "address1": "Street address",
+      "address2": "Apt, suite, etc. (optional)",
+      "city": "City",
+      "country": "Country",
+      "phone": "Phone",
+      "defaultAddress": "Default address",
+      "zipUs": "ZIP code",
+      "postalOther": "Postal code",
+      "stateUs": "State",
+      "stateCa": "Province",
+      "stateMx": "State",
+      "regionPlaceholder": "Select state or province",
+      "emptyList": "No saved addresses yet.",
+      "listSummaryFallback": "Address",
+      "validationRequired": "Please fill all required fields.",
+      "saveError": "Could not save address.",
+      "deleteError": "Could not remove address.",
+      "loadDetailError": "Could not load address.",
+      "defaultBadge": "Default",
+      "addressBadge": "Address"
+    },
+    "ordersEmpty": "No orders yet.",
     "logout": "Log out",
     "sectionSelectAria": "Account menu",
     "orderMock": {
       "placed": "Placed",
-      "total": "Total"
+      "total": "Total",
+      "state": "Status"
+    },
+    "orderDetail": {
+      "back": "← All orders",
+      "loading": "Loading order…",
+      "error": "Could not load this order.",
+      "placedOn": "Placed",
+      "status": "Status",
+      "qty": "Qty.",
+      "shippingAddress": "Shipping address",
+      "billingAddress": "Billing address",
+      "payment": "Payment",
+      "paymentCard": "Card ending {{lastFour}}"
     }
   },
   "fr": {
@@ -78,59 +111,92 @@
     "panels": {
       "overview": {
         "title": "Mon compte",
-        "intro": "Aperçu de votre compte Vitamix. Les données détaillées proviendront de l'API.",
-        "rows": [
-          { "label": "Membre depuis", "value": "mars 2024" },
-          { "label": "Statut du compte", "value": "Actif" },
-          { "label": "Boutique préférée", "value": "Canada" }
-        ]
+        "intro": "Le résumé de votre compte est chargé depuis le service compte lorsque vous êtes connecté."
       },
       "information": {
-        "title": "Informations du compte",
-        "rows": [
-          { "label": "Courriel", "valueKey": "email" },
-          { "label": "Nom", "value": "David Nuescheler" },
-          { "label": "Téléphone", "value": "+1 (416) 555-0188" },
-          { "label": "ID client", "value": "VX-CA-90012" },
-          { "label": "Langue préférée", "value": "Français (CA)" }
-        ]
+        "title": "Informations du compte"
       },
       "address": {
-        "title": "Adresses",
-        "mockAddresses": [
-          {
-            "badge": "Facturation par défaut",
-            "lines": [
-              "David Nuescheler",
-              "1234 rue du Faux",
-              "Montréal, QC H2Y 1C6",
-              "Canada"
-            ]
-          },
-          {
-            "badge": "Livraison",
-            "lines": [
-              "David Nuescheler",
-              "88 avenue Exemple, bureau 200",
-              "Toronto, ON M5V 2T6",
-              "Canada"
-            ]
-          }
-        ]
+        "title": "Adresses"
       },
       "orders": {
-        "title": "Historique des commandes",
-        "mockOrders": [
-          { "id": "VM-482910", "date": "2 nov. 2025", "total": "429,00 $ CA" },
-          { "id": "VM-471205", "date": "18 août 2025", "total": "89,95 $ CA" }
-        ]
+        "title": "Historique des commandes"
       }
     },
+    "overviewLabels": {
+      "displayName": "Nom",
+      "email": "Courriel",
+      "memberSince": "Membre depuis",
+      "accountStatus": "Statut du compte",
+      "storeRegion": "Boutique"
+    },
+    "customerInfo": {
+      "email": "Courriel",
+      "name": "Nom",
+      "phone": "Téléphone",
+      "customerId": "ID client",
+      "preferredLanguage": "Langue préférée",
+      "accountStatus": "Statut du compte",
+      "created": "Membre depuis",
+      "updated": "Dernière mise à jour"
+    },
+    "countries": {
+      "us": "États-Unis",
+      "ca": "Canada",
+      "mx": "Mexique"
+    },
+    "addressBook": {
+      "add": "Ajouter une adresse",
+      "edit": "Modifier",
+      "remove": "Supprimer",
+      "save": "Enregistrer",
+      "cancel": "Annuler",
+      "deleteConfirm": "Supprimer cette adresse ?",
+      "dialogAddTitle": "Nouvelle adresse",
+      "dialogEditTitle": "Modifier l'adresse",
+      "firstName": "Prénom",
+      "lastName": "Nom",
+      "email": "Courriel",
+      "address1": "Adresse",
+      "address2": "Appartement, bureau, etc. (facultatif)",
+      "city": "Ville",
+      "country": "Pays",
+      "phone": "Téléphone",
+      "defaultAddress": "Adresse par défaut",
+      "zipUs": "Code ZIP",
+      "postalOther": "Code postal",
+      "stateUs": "État",
+      "stateCa": "Province",
+      "stateMx": "État",
+      "regionPlaceholder": "Sélectionnez l'état ou la province",
+      "emptyList": "Aucune adresse enregistrée.",
+      "listSummaryFallback": "Adresse",
+      "validationRequired": "Veuillez remplir tous les champs obligatoires.",
+      "saveError": "Impossible d'enregistrer l'adresse.",
+      "deleteError": "Impossible de supprimer l'adresse.",
+      "loadDetailError": "Impossible de charger l'adresse.",
+      "defaultBadge": "Par défaut",
+      "addressBadge": "Adresse"
+    },
+    "ordersEmpty": "Aucune commande pour le moment.",
     "logout": "Se déconnecter",
     "sectionSelectAria": "Menu du compte",
     "orderMock": {
       "placed": "Passée le",
-      "total": "Total"
+      "total": "Total",
+      "state": "Statut"
+    },
+    "orderDetail": {
+      "back": "← Toutes les commandes",
+      "loading": "Chargement de la commande…",
+      "error": "Impossible de charger cette commande.",
+      "placedOn": "Passée le",
+      "status": "Statut",
+      "qty": "Qté",
+      "shippingAddress": "Adresse de livraison",
+      "billingAddress": "Adresse de facturation",
+      "payment": "Paiement",
+      "paymentCard": "Carte se terminant par {{lastFour}}"
     }
   },
   "es": {
@@ -145,59 +211,92 @@
     "panels": {
       "overview": {
         "title": "Mi cuenta",
-        "intro": "Resumen de su cuenta Vitamix. Los datos detallados vendrán de la API.",
-        "rows": [
-          { "label": "Miembro desde", "value": "marzo de 2024" },
-          { "label": "Estado de la cuenta", "value": "Activa" },
-          { "label": "Tienda preferida", "value": "Estados Unidos" }
-        ]
+        "intro": "El resumen de su cuenta se carga desde el servicio de cuenta cuando ha iniciado sesión."
       },
       "information": {
-        "title": "Información de la cuenta",
-        "rows": [
-          { "label": "Correo", "valueKey": "email" },
-          { "label": "Nombre", "value": "David Nuescheler" },
-          { "label": "Teléfono", "value": "+1 (305) 555-0160" },
-          { "label": "ID de cliente", "value": "VX-US-44021" },
-          { "label": "Idioma preferido", "value": "Español (US)" }
-        ]
+        "title": "Información de la cuenta"
       },
       "address": {
-        "title": "Direcciones",
-        "mockAddresses": [
-          {
-            "badge": "Facturación predeterminada",
-            "lines": [
-              "David Nuescheler",
-              "1234 Calle Ejemplo",
-              "Miami, FL 33101",
-              "Estados Unidos"
-            ]
-          },
-          {
-            "badge": "Envío",
-            "lines": [
-              "David Nuescheler",
-              "88 Parkway de Muestra, Oficina 200",
-              "Toronto, ON M5V 2T6",
-              "Canadá"
-            ]
-          }
-        ]
+        "title": "Direcciones"
       },
       "orders": {
-        "title": "Historial de pedidos",
-        "mockOrders": [
-          { "id": "VM-482910", "date": "2 nov 2025", "total": "US$429.00" },
-          { "id": "VM-471205", "date": "18 ago 2025", "total": "US$89.95" }
-        ]
+        "title": "Historial de pedidos"
       }
     },
+    "overviewLabels": {
+      "displayName": "Nombre",
+      "email": "Correo",
+      "memberSince": "Miembro desde",
+      "accountStatus": "Estado de la cuenta",
+      "storeRegion": "Tienda"
+    },
+    "customerInfo": {
+      "email": "Correo",
+      "name": "Nombre",
+      "phone": "Teléfono",
+      "customerId": "ID de cliente",
+      "preferredLanguage": "Idioma preferido",
+      "accountStatus": "Estado de la cuenta",
+      "created": "Miembro desde",
+      "updated": "Última actualización"
+    },
+    "countries": {
+      "us": "Estados Unidos",
+      "ca": "Canadá",
+      "mx": "México"
+    },
+    "addressBook": {
+      "add": "Añadir dirección",
+      "edit": "Editar",
+      "remove": "Eliminar",
+      "save": "Guardar",
+      "cancel": "Cancelar",
+      "deleteConfirm": "¿Eliminar esta dirección?",
+      "dialogAddTitle": "Nueva dirección",
+      "dialogEditTitle": "Editar dirección",
+      "firstName": "Nombre",
+      "lastName": "Apellido",
+      "email": "Correo",
+      "address1": "Dirección",
+      "address2": "Apartamento, suite, etc. (opcional)",
+      "city": "Ciudad",
+      "country": "País",
+      "phone": "Teléfono",
+      "defaultAddress": "Dirección predeterminada",
+      "zipUs": "Código ZIP",
+      "postalOther": "Código postal",
+      "stateUs": "Estado",
+      "stateCa": "Provincia",
+      "stateMx": "Estado",
+      "regionPlaceholder": "Seleccione estado o provincia",
+      "emptyList": "No hay direcciones guardadas.",
+      "listSummaryFallback": "Dirección",
+      "validationRequired": "Complete todos los campos obligatorios.",
+      "saveError": "No se pudo guardar la dirección.",
+      "deleteError": "No se pudo eliminar la dirección.",
+      "loadDetailError": "No se pudo cargar la dirección.",
+      "defaultBadge": "Predeterminada",
+      "addressBadge": "Dirección"
+    },
+    "ordersEmpty": "Aún no hay pedidos.",
     "logout": "Cerrar sesión",
     "sectionSelectAria": "Menú de la cuenta",
     "orderMock": {
       "placed": "Realizado",
-      "total": "Total"
+      "total": "Total",
+      "state": "Estado"
+    },
+    "orderDetail": {
+      "back": "← Todos los pedidos",
+      "loading": "Cargando pedido…",
+      "error": "No se pudo cargar este pedido.",
+      "placedOn": "Realizado",
+      "status": "Estado",
+      "qty": "Cant.",
+      "shippingAddress": "Dirección de envío",
+      "billingAddress": "Dirección de facturación",
+      "payment": "Pago",
+      "paymentCard": "Tarjeta terminada en {{lastFour}}"
     }
   }
 }

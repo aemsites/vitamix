@@ -58,16 +58,22 @@
   background: var(--commerce-color-background);
 }
 
-.account-widget--mobile-nav-select .account-nav-mobile {
+.account-sidebar-footer {
+  padding: 12px 16px 16px;
+  margin-top: auto;
+  border-top: 1px solid var(--commerce-color-border);
+}
+
+.account-widget-mobile-nav-select .account-nav-mobile {
   display: block;
 }
 
-.account-widget--mobile-nav-select .account-nav {
+.account-widget-mobile-nav-select .account-nav {
   display: none;
 }
 
 /* On mobile compact nav, sign out is only in the select — hide duplicate footer button */
-.account-widget--mobile-nav-select .account-sidebar-footer {
+.account-widget-mobile-nav-select .account-sidebar-footer {
   display: none;
 }
 
@@ -130,12 +136,6 @@
   font-weight: var(--commerce-font-weight-bold);
   border-left: 3px solid var(--commerce-color-primary);
   padding-left: calc(24px - 3px);
-}
-
-.account-sidebar-footer {
-  padding: 12px 16px 16px;
-  margin-top: auto;
-  border-top: 1px solid var(--commerce-color-border);
 }
 
 .account-logout {
@@ -257,6 +257,124 @@
   max-width: 42rem;
 }
 
+.account-address-toolbar {
+  margin: 0 0 16px;
+}
+
+.account-address-item-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.account-address-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  flex-shrink: 0;
+}
+
+.account-address-dialog {
+  max-width: min(100vw - 32px, 560px);
+  width: 100%;
+  padding: 0;
+  border: 1px solid var(--commerce-color-border);
+  border-radius: var(--commerce-radius-card);
+  background: var(--commerce-color-background);
+}
+
+.account-address-dialog::backdrop {
+  background: rgb(0 0 0 / 45%);
+}
+
+.account-address-dialog-inner {
+  padding: 20px 24px 24px;
+}
+
+.account-address-dialog-title {
+  margin: 0 0 16px;
+  font-size: var(--commerce-font-size-lg);
+}
+
+.account-address-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 16px;
+}
+
+.account-addr-field-full {
+  grid-column: 1 / -1;
+}
+
+.account-addr-field label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: var(--commerce-font-size-xs);
+  color: var(--commerce-color-text-muted);
+}
+
+.account-addr-field .required {
+  color: var(--commerce-color-error-text, #b00020);
+}
+
+.account-addr-field input:not([type='checkbox'], [type='radio']),
+.account-addr-field select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid var(--commerce-input-border);
+  border-radius: var(--commerce-input-radius);
+  font-size: var(--commerce-font-size-sm);
+  background: var(--commerce-input-background);
+}
+
+.account-addr-field-checkbox label {
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 10px;
+  margin: 0;
+  cursor: pointer;
+  color: var(--commerce-color-text);
+  font-size: var(--commerce-font-size-sm);
+}
+
+.account-addr-field-checkbox input[type='checkbox'] {
+  width: auto;
+  min-width: 1rem;
+  height: auto;
+  margin: 0.2em 0 0;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.account-addr-field-checkbox .account-addr-default-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.account-address-form-error {
+  margin: 12px 0 0;
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-error-text, #b00020);
+}
+
+.account-address-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.account-orders-empty {
+  margin: 0 0 12px;
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-text-muted);
+}
+
 .account-address-item {
   margin: 0 0 20px;
   padding-bottom: 20px;
@@ -286,26 +404,49 @@
   white-space: pre-line;
 }
 
+.account-orders-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 42rem;
+}
+
 .account-order-mock-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  max-width: 42rem;
   display: flex;
   flex-direction: column;
   gap: 0;
+}
+
+.account-order-mock-row {
+  margin: 0;
+  padding: 0;
 }
 
 .account-order-mock-item {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  width: 100%;
+  margin: 0;
   padding: 14px 0;
+  border: none;
   border-bottom: 1px solid var(--commerce-color-border);
+  border-radius: 0;
   background: transparent;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
 }
 
-.account-order-mock-item:last-child {
+.account-order-mock-item:hover {
+  background: color-mix(in srgb, var(--commerce-color-text) 4%, transparent);
+}
+
+.account-order-mock-row:last-child .account-order-mock-item {
   border-bottom: none;
 }
 
@@ -321,6 +462,74 @@
   gap: 12px 24px;
   font-size: var(--commerce-font-size-xs);
   color: var(--commerce-color-text-muted);
+}
+
+.account-order-detail-back {
+  margin: 0 0 12px;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: var(--commerce-color-primary);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.account-order-detail-heading {
+  margin: 0 0 12px;
+  font-size: var(--commerce-font-size-md);
+  font-weight: var(--commerce-font-weight-bold);
+}
+
+.account-order-detail-readout {
+  max-width: 42rem;
+}
+
+.account-order-detail-readout .order-summary {
+  margin-top: 0;
+}
+
+.account-order-detail-meta {
+  margin-bottom: 20px;
+}
+
+.account-order-detail-loading {
+  margin: 0;
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-text-muted);
+}
+
+.account-order-detail-addresses {
+  display: grid;
+  gap: 20px;
+  margin-top: 24px;
+  max-width: 42rem;
+}
+
+@media (width >= 640px) {
+  .account-order-detail-addresses {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.account-order-detail-address-title {
+  margin: 0 0 8px;
+  font-size: var(--commerce-font-size-xs);
+  font-weight: var(--commerce-font-weight-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--commerce-color-text-muted);
+}
+
+.account-order-detail-foot {
+  margin-top: 20px;
+  max-width: 42rem;
+}
+
+.account-order-detail-error {
+  margin: 12px 0 0;
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-error-text, #b00020);
 }
 
 @media (width >= 768px) {
@@ -340,15 +549,15 @@
     padding-right: clamp(8px, 2vw, 32px);
   }
 
-  .account-widget--mobile-nav-select .account-nav-mobile {
+  .account-widget-mobile-nav-select .account-nav-mobile {
     display: none;
   }
 
-  .account-widget--mobile-nav-select .account-nav {
+  .account-widget-mobile-nav-select .account-nav {
     display: block;
   }
 
-  .account-widget--mobile-nav-select .account-sidebar-footer {
+  .account-widget-mobile-nav-select .account-sidebar-footer {
     display: block;
   }
 }

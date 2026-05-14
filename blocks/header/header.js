@@ -5,6 +5,7 @@ import { AUTH_EVENT, getUser, isLoggedIn } from '../../scripts/auth-api.js';
 import {
   addMagentoCacheListener, getLoggedInFromLocalStorage, getMagentoCache,
 } from '../../scripts/storage/util.js';
+import { lockBodyScroll, unlockBodyScroll } from '../../scripts/body-scroll-lock.js';
 
 /** True when OTP JWT or legacy Magento customer cache indicates signed in. */
 function isHeaderAuthSessionActive() {
@@ -550,7 +551,12 @@ export default async function decorate(block) {
         if (!inside) accountMgmtDialog.closeModal();
       });
 
+      accountMgmtDialog.addEventListener('close', () => {
+        unlockBodyScroll();
+      });
+
       const open = () => {
+        lockBodyScroll();
         accountMgmtDialog.showModal();
         accountMgmtDialog.setAttribute('aria-expanded', 'true');
       };
@@ -702,6 +708,10 @@ export default async function decorate(block) {
         }
       });
 
+      minicart.addEventListener('close', () => {
+        unlockBodyScroll();
+      });
+
       const closeOnEmpty = (ev) => {
         if (ev.detail.action === 'empty') {
           minicart.closeModal();
@@ -710,6 +720,7 @@ export default async function decorate(block) {
 
       // open/close methods to account for transitions
       const open = () => {
+        lockBodyScroll();
         minicart.showModal();
         minicart.setAttribute('aria-expanded', true);
         document.addEventListener('cart:change', closeOnEmpty);

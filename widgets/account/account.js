@@ -1,4 +1,5 @@
 import { loadCSS } from '../../scripts/aem.js';
+import { renderAccountAddressList } from './account-api.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 import { getUser, logout } from '../../scripts/auth-api.js';
 
@@ -19,48 +20,6 @@ async function loadCopy(lang) {
 }
 
 /**
- * @param {HTMLElement} section
- * @param {Array<{ label?: string, value?: string, valueKey?: string }>} rows
- * @param {string} [email]
- */
-function fillMockRows(section, rows, email) {
-  if (!section || !rows?.length) return;
-  const rowEls = section.querySelectorAll('.account-mock-row');
-  rows.forEach((row, i) => {
-    const el = rowEls[i];
-    if (!el) return;
-    const label = el.querySelector('.account-mock-label');
-    const value = el.querySelector('.account-mock-value');
-    if (label) label.textContent = row.label ?? '';
-    if (value) {
-      const v = row.valueKey === 'email' ? (email || '—') : (row.value ?? '—');
-      value.textContent = v;
-    }
-  });
-}
-
-/**
- * @param {HTMLElement} listEl
- * @param {Array<{ badge?: string, lines?: string[] }>} addresses
- */
-function fillAddressList(listEl, addresses) {
-  if (!listEl || !addresses?.length) return;
-  listEl.innerHTML = '';
-  addresses.forEach((addr) => {
-    const li = document.createElement('li');
-    li.className = 'account-address-item';
-    const badge = document.createElement('div');
-    badge.className = 'account-address-badge';
-    badge.textContent = addr.badge || '';
-    const lines = document.createElement('p');
-    lines.className = 'account-address-lines';
-    lines.textContent = (addr.lines || []).join('\n');
-    li.append(badge, lines);
-    listEl.append(li);
-  });
-}
-
-/**
  * @param {HTMLElement} widget
  */
 export default async function decorate(widget) {
@@ -68,9 +27,11 @@ export default async function decorate(widget) {
   await Promise.all([
     loadCSS(`${base}/styles/commerce-tokens.css`),
     loadCSS(`${base}/widgets/account/account.css`),
+    loadCSS(`${base}/blocks/order-summary/order-summary.css`),
+    loadCSS(`${base}/scripts/commerce/cart-item.css`),
   ]);
 
-  const { language } = getLocaleAndLanguage();
+  const { locale, language } = getLocaleAndLanguage();
   const lang = (language || 'en_us').split('_')[0];
   const copy = await loadCopy(lang);
   const email = getUser()?.email || '';
@@ -123,7 +84,6 @@ export default async function decorate(widget) {
     const intro = overview.querySelector('.account-panel-intro');
     if (t) t.textContent = p.title || '';
     if (intro) intro.textContent = p.intro || '';
-    fillMockRows(overview, p.rows, email);
   }
 
   const information = widget.querySelector('.account-panel[data-section="information"]');
@@ -131,35 +91,32 @@ export default async function decorate(widget) {
     const p = panels.information || {};
     const t = information.querySelector('.account-panel-title');
     if (t) t.textContent = p.title || '';
-    fillMockRows(information, p.rows, email);
   }
 
   const address = widget.querySelector('.account-panel[data-section="address"]');
   if (address) {
     const p = panels.address || {};
     const t = address.querySelector('.account-panel-title');
-    const listEl = address.querySelector('.account-address-list');
+    const addBtn = address.querySelector('.account-address-add');
     if (t) t.textContent = p.title || '';
-    fillAddressList(listEl, p.mockAddresses);
+    const ab = /** @type {Record<string, string>} */ (copy.addressBook || {});
+    if (addBtn) {
+      addBtn.textContent = ab.add || 'Add address';
+      addBtn.hidden = !email;
+      addBtn.disabled = !email;
+    }
+    await renderAccountAddressList(widget, [], copy);
   }
 
   const orders = widget.querySelector('.account-panel[data-section="orders"]');
   if (orders) {
     const p = panels.orders || {};
     const t = orders.querySelector('.account-panel-title');
-    const list = orders.querySelector('.account-order-mock-list');
+    const emptyEl = orders.querySelector('.account-orders-empty');
     if (t) t.textContent = p.title || '';
-    if (list && Array.isArray(p.mockOrders)) {
-      const om = copy.orderMock || {};
-      list.innerHTML = p.mockOrders.map((o) => `
-        <li class="account-order-mock-item">
-          <span class="account-order-mock-id">${o.id || ''}</span>
-          <div class="account-order-mock-meta">
-            <span>${om.placed || ''}: ${o.date || '—'}</span>
-            <span>${om.total || ''}: ${o.total || '—'}</span>
-          </div>
-        </li>
-      `).join('');
+    if (emptyEl) {
+      emptyEl.hidden = false;
+      emptyEl.textContent = String(copy.ordersEmpty || '');
     }
   }
 
@@ -168,13 +125,13 @@ export default async function decorate(widget) {
 
   const syncMobileNavMode = () => {
     if (mq.matches) {
-      widget.classList.remove('account-widget--mobile-nav-select');
+      widget.classList.remove('account-widget-mobile-nav-select');
       return;
     }
     if (activeSection !== 'overview') {
-      widget.classList.add('account-widget--mobile-nav-select');
+      widget.classList.add('account-widget-mobile-nav-select');
     } else {
-      widget.classList.remove('account-widget--mobile-nav-select');
+      widget.classList.remove('account-widget-mobile-nav-select');
     }
   };
 
@@ -234,16 +191,27 @@ export default async function decorate(widget) {
     });
   }
 
+  const {
+    fetchAccountBundle,
+    applyAccountDataToWidget,
+    wireOrderDetailInteractions,
+  } = await import('./account-api.js');
+  const { wireAccountAddressBook } = await import('./account-address-book.js');
+
+  const copyWithLocale = { ...copy, accountLocale: locale || 'us' };
+
   if (email) {
     try {
-      const { fetchAccountBundle, applyAccountDataToWidget } = await import('../../scripts/account-api.js');
       const data = await fetchAccountBundle(email);
-      applyAccountDataToWidget(widget, data, copy);
+      await applyAccountDataToWidget(widget, data, copyWithLocale);
     } catch (err) {
       // eslint-disable-next-line no-console -- integration: copy API bundle errors
       console.log('VITAMIX_ACCOUNT_API_BUNDLE_EXCEPTION');
       // eslint-disable-next-line no-console
       console.log(err instanceof Error ? err.message : String(err));
     }
+    wireAccountAddressBook(widget, email, lang, String(locale || 'us').toLowerCase(), copy);
   }
+
+  wireOrderDetailInteractions(widget, copy);
 }

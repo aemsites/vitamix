@@ -39,54 +39,24 @@
           <div class="account-panel-body">
             <h4 id="account-panel-overview-title" class="account-panel-title"></h4>
             <p class="account-panel-intro"></p>
-            <div class="account-mock-rows">
-              <div class="account-mock-row">
-                <span class="account-mock-label"></span>
-                <span class="account-mock-value"></span>
-              </div>
-              <div class="account-mock-row">
-                <span class="account-mock-label"></span>
-                <span class="account-mock-value"></span>
-              </div>
-              <div class="account-mock-row">
-                <span class="account-mock-label"></span>
-                <span class="account-mock-value"></span>
-              </div>
-            </div>
+            <div class="account-mock-rows account-overview-rows"></div>
           </div>
         </section>
 
         <section class="account-panel" data-section="information" hidden aria-labelledby="account-panel-info-title">
           <div class="account-panel-body">
             <h4 id="account-panel-info-title" class="account-panel-title"></h4>
-            <div class="account-mock-rows">
-              <div class="account-mock-row">
-                <span class="account-mock-label"></span>
-                <span class="account-mock-value"></span>
-              </div>
-              <div class="account-mock-row">
-                <span class="account-mock-label"></span>
-                <span class="account-mock-value"></span>
-              </div>
-              <div class="account-mock-row">
-                <span class="account-mock-label"></span>
-                <span class="account-mock-value"></span>
-              </div>
-              <div class="account-mock-row">
-                <span class="account-mock-label"></span>
-                <span class="account-mock-value"></span>
-              </div>
-              <div class="account-mock-row">
-                <span class="account-mock-label"></span>
-                <span class="account-mock-value"></span>
-              </div>
-            </div>
+            <div class="account-mock-rows"></div>
           </div>
         </section>
 
         <section class="account-panel" data-section="address" hidden aria-labelledby="account-panel-address-title">
           <div class="account-panel-body">
             <h4 id="account-panel-address-title" class="account-panel-title"></h4>
+            <div class="account-address-toolbar">
+              <button type="button" class="button emphasis account-address-add"></button>
+            </div>
+            <p class="account-address-empty" hidden></p>
             <ul class="account-address-list"></ul>
           </div>
         </section>
@@ -94,10 +64,88 @@
         <section class="account-panel" data-section="orders" hidden aria-labelledby="account-panel-orders-title">
           <div class="account-panel-body">
             <h4 id="account-panel-orders-title" class="account-panel-title"></h4>
-            <ul class="account-order-mock-list"></ul>
+            <div class="account-orders-stack">
+              <div class="account-orders-list-panel">
+                <p class="account-orders-empty" hidden></p>
+                <ul class="account-order-mock-list"></ul>
+              </div>
+              <div class="account-order-detail-panel" hidden>
+                <button type="button" class="account-order-detail-back"></button>
+                <h5 class="account-order-detail-heading"></h5>
+                <div class="account-order-detail-readout"></div>
+                <p class="account-order-detail-error" hidden></p>
+              </div>
+            </div>
           </div>
         </section>
       </div>
     </div>
   </div>
+
+  <dialog class="account-address-dialog" aria-labelledby="account-address-dialog-title">
+    <div class="account-address-dialog-inner">
+      <h3 id="account-address-dialog-title" class="account-address-dialog-title"></h3>
+      <form class="account-address-form" method="post">
+        <div class="account-address-form-grid">
+          <div class="account-addr-field">
+            <label for="account-addr-first"><span class="label-text"></span><span class="required" aria-hidden="true">*</span></label>
+            <input id="account-addr-first" name="firstName" type="text" autocomplete="given-name" required>
+          </div>
+          <div class="account-addr-field">
+            <label for="account-addr-last"><span class="label-text"></span><span class="required" aria-hidden="true">*</span></label>
+            <input id="account-addr-last" name="lastName" type="text" autocomplete="family-name" required>
+          </div>
+          <div class="account-addr-field account-addr-field-full">
+            <label for="account-addr-email"><span class="label-text"></span></label>
+            <input id="account-addr-email" name="email" type="email" autocomplete="email" readonly>
+          </div>
+          <div class="account-addr-field account-addr-field-full">
+            <label for="account-addr-line1"><span class="label-text"></span><span class="required" aria-hidden="true">*</span></label>
+            <input id="account-addr-line1" name="address1" type="text" autocomplete="address-line1" required>
+          </div>
+          <div class="account-addr-field account-addr-field-full">
+            <label for="account-addr-line2"><span class="label-text"></span></label>
+            <input id="account-addr-line2" name="address2" type="text" autocomplete="address-line2">
+          </div>
+          <div class="account-addr-field">
+            <label for="account-addr-country"><span class="label-text"></span><span class="required" aria-hidden="true">*</span></label>
+            <select id="account-addr-country" name="country" required>
+              <option value="us">United States</option>
+              <option value="ca">Canada</option>
+              <option value="mx">Mexico</option>
+            </select>
+          </div>
+          <div class="account-addr-field">
+            <label for="account-addr-city"><span class="label-text"></span><span class="required" aria-hidden="true">*</span></label>
+            <input id="account-addr-city" name="city" type="text" autocomplete="address-level2" required>
+          </div>
+          <div class="account-addr-field">
+            <label for="account-addr-state"><span class="label-text"></span><span class="required" aria-hidden="true">*</span></label>
+            <select id="account-addr-state" name="state" required>
+              <option value=""></option>
+            </select>
+          </div>
+          <div class="account-addr-field">
+            <label for="account-addr-zip"><span class="label-text"></span><span class="required" aria-hidden="true">*</span></label>
+            <input id="account-addr-zip" name="zip" type="text" autocomplete="postal-code" required>
+          </div>
+          <div class="account-addr-field account-addr-field-full">
+            <label for="account-addr-phone"><span class="label-text"></span></label>
+            <input id="account-addr-phone" name="phone" type="tel" autocomplete="tel">
+          </div>
+          <div class="account-addr-field account-addr-field-full account-addr-field-checkbox">
+            <label>
+              <input type="checkbox" name="isDefault">
+              <span class="account-addr-default-label"></span>
+            </label>
+          </div>
+        </div>
+        <p class="account-address-form-error" hidden></p>
+        <div class="account-address-form-actions">
+          <button type="submit" class="button emphasis account-address-save"></button>
+          <button type="button" class="button link-style account-address-cancel"></button>
+        </div>
+      </form>
+    </div>
+  </dialog>
 </div>
