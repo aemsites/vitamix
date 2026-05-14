@@ -358,13 +358,6 @@ button:disabled {
   border-top: 1px solid #e2e8f0;
 }
 
-.edit-form-actions-heading {
-  margin: 0 0 12px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #475569;
-}
-
 .edit-form-actions-section button {
   display: block;
   width: 100%;

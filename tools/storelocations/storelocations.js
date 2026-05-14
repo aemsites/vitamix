@@ -420,7 +420,8 @@ function renderTable() {
   thSelect.appendChild(selectAllCheckbox);
   trHead.appendChild(thSelect);
   trHead.appendChild(document.createElement('th')); // row action
-  columns.forEach((col) => {
+  const gridColumns = columns.filter((c) => c !== 'ACTION');
+  gridColumns.forEach((col) => {
     const th = document.createElement('th');
     th.textContent = col;
     th.scope = 'col';
@@ -453,7 +454,7 @@ function renderTable() {
     editBtn.addEventListener('click', () => openEditModal(row));
     editCell.appendChild(editBtn);
     tr.appendChild(editCell);
-    columns.forEach((col) => {
+    gridColumns.forEach((col) => {
       const td = document.createElement('td');
       const val = row[col];
       td.textContent = val != null ? String(val) : '';
@@ -589,10 +590,6 @@ function openEditModal(row) {
 
   const actionsSection = document.createElement('div');
   actionsSection.className = 'edit-form-actions-section';
-  const actionsHeading = document.createElement('h3');
-  actionsHeading.className = 'edit-form-actions-heading';
-  actionsHeading.textContent = 'Actions';
-  actionsSection.appendChild(actionsHeading);
   const mapsAddressBtn = document.createElement('button');
   mapsAddressBtn.type = 'button';
   mapsAddressBtn.className = 'btn-secondary btn-maps';
