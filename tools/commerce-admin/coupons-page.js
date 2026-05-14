@@ -855,6 +855,47 @@ async function refreshCouponList() {
   await refreshSelection();
 }
 
+/** Copy for the leave guard when a coupon dialog was edited and not saved. */
+const UNSAVED_COUPON_DIALOG_LEAVE = [
+  'You have unsaved changes. If you leave now, your edits will be lost.',
+  '',
+  'Leave without saving?',
+].join('\n');
+
+/**
+ * Stable snapshot of values in `root` for dirty checks (tree order).
+ * @param {Element | null} root
+ */
+function serializeCouponsDialogFormSnapshot(root) {
+  if (!root) return '';
+  const parts = [];
+  const els = root.querySelectorAll('input, textarea, select');
+  els.forEach((el, i) => {
+    if (el instanceof HTMLInputElement) {
+      if (el.disabled) return;
+      const t = el.type;
+      if (t === 'button' || t === 'submit' || t === 'reset' || t === 'image' || t === 'hidden') {
+        return;
+      }
+      const key = el.id || `${el.name || 'field'}:${i}:${t}:${el.value}`;
+      if (t === 'checkbox' || t === 'radio') {
+        parts.push(`${key}\t${t}\t${el.checked ? '1' : '0'}`);
+      } else {
+        parts.push(`${key}\t${t}\t${el.value}`);
+      }
+    } else if (el instanceof HTMLTextAreaElement) {
+      if (el.disabled) return;
+      const key = el.id || `textarea:${i}`;
+      parts.push(`${key}\tta\t${el.value}`);
+    } else if (el instanceof HTMLSelectElement) {
+      if (el.disabled) return;
+      const key = el.id || `select:${i}`;
+      parts.push(`${key}\tsel\t${el.value}`);
+    }
+  });
+  return parts.join('\n');
+}
+
 async function openDialog(title, innerHtml, onSubmit, afterMount, dialogClass, submitLabel = 'Save') {
   const dialog = document.createElement('dialog');
   dialog.className = `coupons-dialog${dialogClass ? ` ${dialogClass}` : ''}`;
@@ -871,7 +912,34 @@ async function openDialog(title, innerHtml, onSubmit, afterMount, dialogClass, s
     </div>`;
   document.body.appendChild(dialog);
   const prevBodyOverflow = document.body.style.overflow;
+  const scrollRoot = dialog.querySelector('.coupons-dialog-scroll');
+  let baseline = '';
+  const recaptureBaseline = () => {
+    baseline = serializeCouponsDialogFormSnapshot(scrollRoot);
+  };
+  const formIsDirty = () => Boolean(scrollRoot)
+    && serializeCouponsDialogFormSnapshot(scrollRoot) !== baseline;
+  const confirmLeaveIfDirty = () => {
+    if (!formIsDirty()) return true;
+    /* eslint-disable-next-line no-alert -- leave guard; matches other confirm flows in this page */
+    return window.confirm(UNSAVED_COUPON_DIALOG_LEAVE);
+  };
+  const dismissDialog = () => {
+    dialog.close();
+    dialog.remove();
+  };
+  const tryDismiss = () => {
+    if (!confirmLeaveIfDirty()) return;
+    dismissDialog();
+  };
+  const onBeforeUnload = (e) => {
+    if (!formIsDirty()) return;
+    e.preventDefault();
+    e.returnValue = '';
+  };
+  window.addEventListener('beforeunload', onBeforeUnload);
   const onDialogClose = () => {
+    window.removeEventListener('beforeunload', onBeforeUnload);
     document.body.style.overflow = prevBodyOverflow;
     document.querySelector('datalist#cp-form-categories-datalist')?.remove();
     dialog.querySelector('.cp-category-suggest-panel')?.remove();
@@ -880,9 +948,12 @@ async function openDialog(title, innerHtml, onSubmit, afterMount, dialogClass, s
   if (typeof afterMount === 'function') {
     await Promise.resolve(afterMount(dialog));
   }
+  recaptureBaseline();
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(recaptureBaseline);
+  });
   dialog.querySelector('[data-cp-cancel]')?.addEventListener('click', () => {
-    dialog.close();
-    dialog.remove();
+    tryDismiss();
   });
   dialog.querySelector('[data-cp-submit]')?.addEventListener('click', async () => {
     try {
@@ -899,13 +970,11 @@ async function openDialog(title, innerHtml, onSubmit, afterMount, dialogClass, s
   });
   dialog.addEventListener('click', (e) => {
     if (e.target === dialog) {
-      dialog.close();
-      dialog.remove();
+      tryDismiss();
     }
   });
   wireDialogEscapeDismiss(dialog, () => {
-    dialog.close();
-    dialog.remove();
+    tryDismiss();
   });
   document.body.style.overflow = 'hidden';
   dialog.showModal();
