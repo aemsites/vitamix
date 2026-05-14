@@ -1,3 +1,9 @@
+import {
+  createPayPalSession,
+  patchPayPalSession,
+  getPayPalSession,
+} from '../commerce-api.js';
+
 let sdkLoadPromise = null;
 
 const PAY_LATER_LABELS = {
@@ -25,8 +31,10 @@ function loadSdk(clientId, currency, locale) {
     const params = new URLSearchParams({
       'client-id': clientId,
       currency,
-      components: 'buttons',
+      components: 'buttons,messages',
       locale,
+      commit: 'false',
+      'enable-funding': 'paylater',
     });
     script.src = `https://www.paypal.com/sdk/js?${params}`;
     script.onload = () => resolve();
@@ -70,11 +78,6 @@ function showNotConfiguredDialog() {
   dialog.showModal();
 }
 
-function sdkOnClick(actions) {
-  showNotConfiguredDialog();
-  return actions.reject();
-}
-
 /** @type {import('./types').PaymentProvider} */
 export default {
   id: 'paypal',
@@ -96,43 +99,181 @@ export default {
 
   isAvailable: () => true,
 
+  /**
+   * Renders the PayPal Express Checkout button (and Pay Later button if
+   * eligible) into the provided container element.
+   *
+   * 1. Guard: if window.paypal is not loaded, render stub dialog buttons
+   * 2. Declare closure state: lastShippingMethods, lastShippingAddress
+   * 3. Build buttonConfig with createOrder, onShippingAddressChange,
+   *    onShippingOptionsChange, onApprove, onError, onCancel
+   * 4. Render primary PayPal button
+   * 5. Render Pay Later button only if isEligible()
+   *
+   * @param {HTMLElement} container
+   * @param {object} callbacks
+   */
   renderExpressButton(container, callbacks) {
-    if (window.paypal) {
-      window.paypal.Buttons({
-        style: {
-          layout: 'horizontal', color: 'gold', shape: 'rect', label: 'paypal', disableMaxHeight: true,
-        },
-        onClick: (data, actions) => sdkOnClick(actions),
-      }).render(container);
+    if (!window.paypal) {
+      // No SDK — stub buttons with localized Pay Later label
+      const label = getPayLaterLabel(callbacks.getConfig().getLanguage());
+      const paypalBtn = createButton(PAYPAL_WORDMARK, 'paypal-express-btn');
+      paypalBtn.addEventListener('click', showNotConfiguredDialog);
+      container.appendChild(paypalBtn);
 
-      const payLaterBtn = window.paypal.Buttons({
-        fundingSource: window.paypal.FUNDING.PAYLATER,
-        style: {
-          layout: 'horizontal', color: 'silver', shape: 'rect', label: 'pay_later', disableMaxHeight: true,
-        },
-        onClick: (data, actions) => sdkOnClick(actions),
-      });
-      if (payLaterBtn.isEligible()) {
-        const payLaterWrapper = document.createElement('div');
-        payLaterWrapper.className = 'paypal-paylater-wrapper';
-        container.appendChild(payLaterWrapper);
-        payLaterBtn.render(payLaterWrapper);
-      }
+      const payLaterWrapper = document.createElement('div');
+      payLaterWrapper.className = 'paypal-paylater-wrapper';
+      const payLaterStub = createButton(
+        payLaterWordmark(label),
+        'paypal-express-btn paylater-express-btn',
+      );
+      payLaterStub.addEventListener('click', showNotConfiguredDialog);
+      payLaterWrapper.appendChild(payLaterStub);
+      container.appendChild(payLaterWrapper);
       return;
     }
 
-    // No SDK — stub buttons with localized Pay Later label
-    const label = getPayLaterLabel(callbacks.getConfig().getLanguage());
-    const paypalBtn = createButton(PAYPAL_WORDMARK, 'paypal-express-btn');
-    paypalBtn.addEventListener('click', showNotConfiguredDialog);
-    container.appendChild(paypalBtn);
+    let lastShippingMethods = [];
+    let lastShippingAddress = null;
 
-    const payLaterWrapper = document.createElement('div');
-    payLaterWrapper.className = 'paypal-paylater-wrapper';
-    const payLaterBtn = createButton(payLaterWordmark(label), 'paypal-express-btn paylater-express-btn');
-    payLaterBtn.addEventListener('click', showNotConfiguredDialog);
-    payLaterWrapper.appendChild(payLaterBtn);
-    container.appendChild(payLaterWrapper);
+    const buttonConfig = {
+      style: {
+        layout: 'horizontal',
+        color: 'gold',
+        shape: 'rect',
+        label: 'paypal',
+        disableMaxHeight: true,
+      },
+
+      createOrder: async () => {
+        const config = callbacks.getConfig();
+        const cart = callbacks.getCart();
+        const state = callbacks.getState();
+        const { paypalOrderId } = await createPayPalSession(cart.getItemsForAPI(), config);
+        state.paypalSessionId = paypalOrderId;
+        return paypalOrderId;
+      },
+
+      onShippingAddressChange: async (data, actions) => {
+        lastShippingAddress = data.shippingAddress;
+        const state = callbacks.getState();
+        const cart = callbacks.getCart();
+        try {
+          const result = await patchPayPalSession(state.paypalSessionId, {
+            type: 'address',
+            address: {
+              country: data.shippingAddress.countryCode,
+              state: data.shippingAddress.state,
+              zip: data.shippingAddress.postalCode,
+            },
+            items: cart.getItemsForAPI(),
+          });
+          if (!result.shippingMethods?.length) {
+            return actions.reject(data.errors.ADDRESS_ERROR);
+          }
+          lastShippingMethods = result.shippingMethods;
+        } catch {
+          return actions.reject(data.errors.ADDRESS_ERROR);
+        }
+        return undefined;
+      },
+
+      onShippingOptionsChange: async (data, actions) => {
+        const selectedId = data.selectedShippingOption?.id;
+        const method = lastShippingMethods.find((m) => m.id === selectedId);
+        if (!method) return actions.reject(data.errors.METHOD_UNAVAILABLE);
+        const state = callbacks.getState();
+        const cart = callbacks.getCart();
+        await patchPayPalSession(state.paypalSessionId, {
+          type: 'option',
+          selectedOptionId: method.id,
+          total: method.total,
+          taxAmount: method.taxAmount,
+          shippingRate: method.rate,
+        });
+        const countryCode = lastShippingAddress?.countryCode?.toLowerCase();
+        const preview = await callbacks.previewOrderDirect({
+          items: cart.getItemsForAPI(),
+          shippingMethod: { id: method.id },
+          ...(countryCode ? {
+            country: countryCode,
+            shipping: {
+              country: countryCode,
+              state: lastShippingAddress.state,
+              zip: lastShippingAddress.postalCode || '',
+            },
+          } : {}),
+        });
+        state.currentEstimateToken = preview.estimateToken;
+        return undefined;
+      },
+
+      onApprove: async () => {
+        try {
+          const state = callbacks.getState();
+          const session = await getPayPalSession(state.paypalSessionId);
+          const cart = callbacks.getCart();
+          const config = callbacks.getConfig();
+          const orderBody = {
+            customer: {
+              firstName: session.payer.firstName,
+              lastName: session.payer.lastName,
+              email: session.payer.email,
+              phone: '',
+            },
+            shipping: session.shippingAddress,
+            billing: session.shippingAddress,
+            items: cart.getItemsForAPI(),
+            shippingMethod: { id: session.selectedOptionId },
+            estimateToken: state.currentEstimateToken,
+            country: session.shippingAddress.country,
+            locale: config.getLanguage(),
+          };
+          const createdOrder = await callbacks.createOrder(orderBody);
+          const fraudToken = (() => {
+            try { return sessionStorage.getItem('forter_token') || undefined; } catch { return undefined; }
+          })();
+          const idempotencyKey = crypto.randomUUID?.() || `${Date.now()}`;
+          const result = await callbacks.initiatePayment(
+            createdOrder.order?.id ?? createdOrder.id,
+            idempotencyKey,
+            fraudToken,
+            'paypal-express',
+            'paypal',
+            { paypalOrderId: state.paypalSessionId },
+          );
+          if (result.status === 'completed') {
+            callbacks.onComplete(createdOrder);
+          } else {
+            callbacks.showError(result.reason || 'PayPal payment failed. Please try again.');
+          }
+        } catch {
+          callbacks.showError('PayPal payment failed. Please try again.');
+        }
+      },
+
+      onError: () => {
+        callbacks.showError('PayPal encountered an error. Please try again.');
+      },
+
+      onCancel: () => {
+        // User dismissed the PayPal sheet intentionally — no action needed.
+      },
+    };
+
+    window.paypal.Buttons(buttonConfig).render(container);
+
+    const payLaterBtn = window.paypal.Buttons({
+      ...buttonConfig,
+      fundingSource: window.paypal.FUNDING.PAYLATER,
+      style: { ...buttonConfig.style, color: 'silver', label: 'pay_later' },
+    });
+    if (payLaterBtn.isEligible()) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'paypal-paylater-wrapper';
+      container.appendChild(wrapper);
+      payLaterBtn.render(wrapper);
+    }
   },
 
   renderCheckoutButton(container, callbacks) {
