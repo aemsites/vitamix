@@ -65,6 +65,9 @@ export function buildOrderJSON(formData, form, cart, state, config) {
     order.giftMessage = giftMessage.trim();
   }
 
+  const couponCode = sessionStorage.getItem('checkout_coupon_code') || undefined;
+  if (couponCode) order.couponCode = couponCode;
+
   order.locale = `${language.split('_')[0]}-${(language.split('_')[1] || locale).toUpperCase()}`;
   order.country = locale;
 

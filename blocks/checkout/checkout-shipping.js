@@ -96,6 +96,9 @@ export async function updatePreview(form, cart, state, config) {
     paymentMethod: data.get('paymentMethod') || null,
   };
 
+  const couponCode = sessionStorage.getItem('checkout_coupon_code') || undefined;
+  if (couponCode) orderBody.couponCode = couponCode;
+
   if (email && firstName && lastName) {
     orderBody.customer = {
       firstName,
