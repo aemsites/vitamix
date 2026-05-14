@@ -3,6 +3,7 @@ import {
   patchPayPalSession,
   getPayPalSession,
 } from '../commerce-api.js';
+import { getLocaleAndLanguage } from '../scripts.js';
 
 let sdkLoadPromise = null;
 
@@ -144,6 +145,8 @@ export default {
         color: 'gold',
         shape: 'rect',
         label: 'paypal',
+        tagline: false,
+        height: 58,
       },
 
       createOrder: async () => {
@@ -159,9 +162,12 @@ export default {
         lastShippingAddress = data.shippingAddress;
         const state = callbacks.getState();
         const cart = callbacks.getCart();
+        const config = callbacks.getConfig();
         try {
           const result = await patchPayPalSession(state.paypalSessionId, {
             type: 'address',
+            country: config.getLocale(),
+            locale: getLocaleAndLanguage(false, true).language,
             address: {
               country: data.shippingAddress.countryCode,
               state: data.shippingAddress.state,
@@ -185,8 +191,11 @@ export default {
         if (!method) return actions.reject(data.errors.METHOD_UNAVAILABLE);
         const state = callbacks.getState();
         const cart = callbacks.getCart();
+        const config = callbacks.getConfig();
         await patchPayPalSession(state.paypalSessionId, {
           type: 'option',
+          country: config.getLocale(),
+          locale: getLocaleAndLanguage(false, true).language,
           selectedOptionId: method.id,
           total: method.total,
           taxAmount: method.taxAmount,
@@ -212,9 +221,13 @@ export default {
       onApprove: async () => {
         try {
           const state = callbacks.getState();
-          const session = await getPayPalSession(state.paypalSessionId);
           const cart = callbacks.getCart();
           const config = callbacks.getConfig();
+          const session = await getPayPalSession(
+            state.paypalSessionId,
+            config.getLocale(),
+            getLocaleAndLanguage(false, true).language,
+          );
           const orderBody = {
             customer: {
               firstName: session.payer.firstName,

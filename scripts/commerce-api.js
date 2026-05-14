@@ -1,6 +1,7 @@
 import { getConfig } from './commerce-config.js';
 import { AUTH_TOKEN_KEY } from './auth-api.js';
 import { mintRecaptchaToken, RECAPTCHA_ACTIONS, RECAPTCHA_HEADER } from './recaptcha.js';
+import { getLocaleAndLanguage } from './scripts.js';
 
 /**
  * Error thrown when the Commerce API returns a non-2xx response.
@@ -188,10 +189,12 @@ export async function createPayPalSession(items, config) {
   const currency = typeof config.currency === 'function'
     ? config.currency(config.getLocale())
     : config.currency;
+  const { locale: country, language: locale } = getLocaleAndLanguage(false, true);
   return request('/payments/paypal/session', {
     items,
     currency,
-    locale: config.getLanguage().replace('-', '_'),
+    country,
+    locale,
   }, 'POST');
 }
 
@@ -214,12 +217,18 @@ export async function patchPayPalSession(paypalOrderId, data) {
  * Called in onApprove after the buyer has authenticated.
  *
  * @param {string} paypalOrderId - PayPal order ID from createPayPalSession
+ * @param {string} [country] - Store country code for provider config resolution
+ * @param {string} [locale] - Store locale for provider config resolution
  * @returns {Promise<{payer: object, shippingAddress: object,
  *   selectedOptionId: string|undefined}>}
  * @throws {CommerceApiError}
  */
-export async function getPayPalSession(paypalOrderId) {
-  return request(`/payments/paypal/session/${paypalOrderId}`, null, 'GET');
+export async function getPayPalSession(paypalOrderId, country, locale) {
+  const params = new URLSearchParams();
+  if (country) params.set('country', country);
+  if (locale) params.set('locale', locale);
+  const qs = params.size ? `?${params}` : '';
+  return request(`/payments/paypal/session/${paypalOrderId}${qs}`, null, 'GET');
 }
 
 /**
