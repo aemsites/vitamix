@@ -38,10 +38,12 @@
         <button role="tab" aria-selected="false" aria-controls="locator-hh-online-tabpanel" id="locator-hh-online-tab" class="locator-online">Online Retailers</button>
         <button role="tab" aria-selected="false" aria-controls="locator-hh-distributors-tabpanel" id="locator-hh-distributors-tab" class="locator-distributors">Distributors</button>
       </div>
-      <div class="locator-tabpanels">
-        <div class="locator-tabpanel locator-retailers" role="tabpanel" aria-labelledby="locator-hh-retailers-tab" aria-hidden="false" id="locator-hh-retailers-tabpanel"></div>
-        <div class="locator-tabpanel locator-online" role="tabpanel" aria-labelledby="locator-hh-online-tab" aria-hidden="true" id="locator-hh-online-tabpanel"></div>
-        <div class="locator-tabpanel locator-distributors" role="tabpanel" aria-labelledby="locator-hh-distributors-tab" aria-hidden="true" id="locator-hh-distributors-tabpanel"></div>
+      <div class="locator-hh-layout">
+        <div class="locator-tabpanels">
+          <div class="locator-tabpanel locator-retailers" role="tabpanel" aria-labelledby="locator-hh-retailers-tab" aria-hidden="false" id="locator-hh-retailers-tabpanel"></div>
+          <div class="locator-tabpanel locator-online" role="tabpanel" aria-labelledby="locator-hh-online-tab" aria-hidden="true" id="locator-hh-online-tabpanel"></div>
+          <div class="locator-tabpanel locator-distributors" role="tabpanel" aria-labelledby="locator-hh-distributors-tab" aria-hidden="true" id="locator-hh-distributors-tabpanel"></div>
+        </div>
       </div>
     </div>
 
@@ -51,9 +53,11 @@
         <button role="tab" aria-selected="true" aria-controls="locator-comm-distributors-tabpanel" id="locator-comm-distributors-tab" class="locator-distributors">Distributors</button>
         <button role="tab" aria-selected="false" aria-controls="locator-comm-localrep-tabpanel" id="locator-comm-localrep-tab" class="locator-online">Local Representatives</button>
       </div>
-      <div class="locator-tabpanels">
-        <div class="locator-tabpanel locator-distributors" role="tabpanel" aria-labelledby="locator-comm-distributors-tab" id="locator-comm-distributors-tabpanel"></div>
-        <div class="locator-tabpanel locator-online" role="tabpanel" aria-labelledby="locator-comm-localrep-tab" aria-hidden="true" id="locator-comm-localrep-tabpanel"></div>
+      <div class="locator-comm-layout">
+        <div class="locator-tabpanels">
+          <div class="locator-tabpanel locator-distributors" role="tabpanel" aria-labelledby="locator-comm-distributors-tab" id="locator-comm-distributors-tabpanel"></div>
+          <div class="locator-tabpanel locator-online" role="tabpanel" aria-labelledby="locator-comm-localrep-tab" aria-hidden="true" id="locator-comm-localrep-tabpanel"></div>
+        </div>
       </div>
     </div>
 
@@ -63,11 +67,17 @@
         <button role="tab" aria-selected="true" aria-controls="locator-events-hh-tabpanel" id="locator-events-hh-tab" class="locator-events">Household Events</button>
         <button role="tab" aria-selected="false" aria-controls="locator-events-comm-tabpanel" id="locator-events-comm-tab" class="locator-events">Commercial Events</button>
       </div>
-      <div class="locator-tabpanels">
-        <div class="locator-tabpanel locator-events" role="tabpanel" aria-labelledby="locator-events-hh-tab" id="locator-events-hh-tabpanel"></div>
-        <div class="locator-tabpanel locator-events" role="tabpanel" aria-labelledby="locator-events-comm-tab" aria-hidden="true" id="locator-events-comm-tabpanel"></div>
+      
+      <div class="locator-events-layout">
+        <div class="locator-tabpanels">
+          <div class="locator-tabpanel locator-events" role="tabpanel" aria-labelledby="locator-events-hh-tab" id="locator-events-hh-tabpanel"></div>
+          <div class="locator-tabpanel locator-events" role="tabpanel" aria-labelledby="locator-events-comm-tab" aria-hidden="true" id="locator-events-comm-tabpanel"></div>
+        </div>
+
+        <div id="locator-events-calendar" class="locator-events-calendar" aria-label="Events calendar"></div>
       </div>
     </div>
+
 
   </div>  
 </div>

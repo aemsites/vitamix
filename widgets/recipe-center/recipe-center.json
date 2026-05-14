@@ -17,11 +17,12 @@
     "course": "Course",
     "recipeType": "Recipe Type",
     "difficulty": "Difficulty",
-    "compatibleContainers": "Compatible Containers",
+    "compatibleContainers": "Compatible Products or Containers",
     "dietaryInterests": "Dietary Interests",
     "previous": "Previous",
     "next": "Next",
-    "clearAll": "Clear All"
+    "clearAll": "Clear All",
+    "matchingContainersAria": "Matching containers"
   },
   "fr": {
     "searchRecipes": "Rechercher des recettes",
@@ -41,11 +42,12 @@
     "course": "Type de plat",
     "recipeType": "Type de recette",
     "difficulty": "Difficulté",
-    "compatibleContainers": "Contenants compatibles",
+    "compatibleContainers": "Produits ou contenants compatibles",
     "dietaryInterests": "Régimes alimentaires",
     "previous": "Précédent",
     "next": "Suivant",
-    "clearAll": "Tout effacer"
+    "clearAll": "Tout effacer",
+    "matchingContainersAria": "Contenants correspondants"
   },
   "es": {
     "searchRecipes": "Buscar recetas",
@@ -65,10 +67,11 @@
     "course": "Tipo de plato",
     "recipeType": "Tipo de receta",
     "difficulty": "Dificultad",
-    "compatibleContainers": "Contenedores compatibles",
+    "compatibleContainers": "Productos o recipientes compatibles",
     "dietaryInterests": "Preferencias dietéticas",
     "previous": "Anterior",
     "next": "Siguiente",
-    "clearAll": "Borrar todo"
+    "clearAll": "Borrar todo",
+    "matchingContainersAria": "Contenedores coincidentes"
   }
 }
