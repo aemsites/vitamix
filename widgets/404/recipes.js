@@ -26,6 +26,15 @@ function lastPathSegment(pathname) {
 }
 
 /**
+ * Recipe index path segments often end with `-r` + digits; strip for base-key match.
+ * @param {string} slug - Already kebab-lowercased segment
+ * @returns {string}
+ */
+function stripTrailingRecipeId(slug) {
+  return (slug || '').replace(/-r\d+$/i, '');
+}
+
+/**
  * Slug from a recipe index `path` (basename, normalized).
  * @param {string} path
  * @returns {string}
@@ -35,8 +44,9 @@ function slugFromRecipePath(path) {
 }
 
 /**
- * If the query index has a recipe whose path slug starts with this 404 URL's
- * last segment (normalized), redirect to the best-matching recipe path.
+ * If the query index has a recipe whose path matches this 404 URL's last segment
+ * (normalized), prefer full slug exact, then base exact after stripping `-r` digits
+ * from the index slug, then prefix match on the full slug.
  * @param {string} locale
  * @param {string} language
  * @returns {Promise<void>}
@@ -70,15 +80,16 @@ async function tryRedirectFromRecipeIndex(locale, language) {
     const path = (r.path || '').trim();
     const slug = slugFromRecipePath(path);
     if (!slug) return [];
-    if (slug === needle) return [{ path, slug, score: 2 }];
+    if (slug === needle) return [{ path, slug, score: 3 }];
+    const slugBase = stripTrailingRecipeId(slug);
+    if (slugBase === needle) return [{ path, slug, score: 2 }];
     if (needle.length >= 3 && slug.startsWith(needle)) return [{ path, slug, score: 1 }];
     return [];
   });
 
   if (matches.length === 0) return;
 
-  // Same score: prefer shortest slug so "acai-bowl" resolves to …/acai-bowl-r…
-  // not a longer slug that also starts with "acai-bowl" (e.g. …mini-chopper…).
+  // Higher score first; same score: shortest slug (prefix tier avoids …mini-chopper…).
   matches.sort((a, b) => b.score - a.score || a.slug.length - b.slug.length);
   const best = matches[0];
   const target = best.path.startsWith('/') ? best.path : `/${best.path}`;
