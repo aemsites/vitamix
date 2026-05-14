@@ -52,12 +52,16 @@ function findMatchingRecipe(href, data) {
     return data.find((recipe) => recipe.path === pathForMatch);
   }
 
-  // Match base path (without r-ID suffix)
+  // Match base path (without r-ID suffix) — prefer exact over equipment-stripped
+  const exact = data.find((recipe) => {
+    const lastIndex = recipe.path.lastIndexOf('-r');
+    return recipe.path.substring(0, lastIndex) === pathForMatch;
+  });
+  if (exact) return exact;
+
   return data.find((recipe) => {
     const lastIndex = recipe.path.lastIndexOf('-r');
-    const recipePath = recipe.path.substring(0, lastIndex);
-    if (recipePath === pathForMatch) return true;
-    return stripEquipmentSuffix(recipePath) === pathForMatch;
+    return stripEquipmentSuffix(recipe.path.substring(0, lastIndex)) === pathForMatch;
   });
 }
 
