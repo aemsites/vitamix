@@ -339,6 +339,8 @@
 
 .coupons-table-wrap {
   overflow: auto;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid #e1e3e5;
   border-radius: 8px;
   background: #fff;

@@ -410,3 +410,122 @@
   font-weight: 600;
   color: #6d7175;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Mobile / narrow viewports — horizontal scroll for overview tables + shell  */
+/* -------------------------------------------------------------------------- */
+
+.commerce-admin-body .pim-main,
+.commerce-admin-body .commerce-admin-hub-main {
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* Catalog + any list using .pim-list-wrapper: pim.css uses overflow:hidden which clips wide tables. */
+.commerce-admin-body .pim-list-wrapper {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Wide data tables: keep column readability; parent .pim-list-wrapper scrolls horizontally. */
+@media (max-width: 900px) {
+  .commerce-admin-body .pim-list {
+    min-width: 720px;
+  }
+
+  .commerce-admin-body .orders-data-table,
+  .commerce-admin-body .customers-data-table {
+    min-width: 640px;
+  }
+
+  .commerce-admin-body .coupons-grid-table,
+  .commerce-admin-body .coupons-data-table {
+    min-width: 880px;
+  }
+
+  .commerce-admin-body .pr-data-table,
+  .commerce-admin-body .pr-promo-grid-table {
+    min-width: 720px;
+  }
+
+  .commerce-admin-body .pr-table-wrap,
+  .commerce-admin-body .pr-promo-table-wrap,
+  .commerce-admin-body .pr-promo-form-lines-scroll {
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (max-width: 720px) {
+  .commerce-admin-body .pim-main,
+  .commerce-admin-body .commerce-admin-hub-main {
+    padding-left: max(12px, env(safe-area-inset-left, 0px));
+    padding-right: max(12px, env(safe-area-inset-right, 0px));
+    padding-top: 16px;
+    padding-bottom: 28px;
+  }
+
+  .commerce-admin-header-inner {
+    padding: 8px 12px;
+    gap: 10px 12px;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+
+  .commerce-admin-header-page {
+    display: none;
+  }
+
+  .commerce-admin-user-trigger {
+    max-width: min(200px, 46vw);
+    padding: 6px 8px 6px 10px;
+    font-size: 13px;
+  }
+
+  .commerce-admin-api-env-select {
+    min-width: 7.5rem;
+    font-size: 12px;
+    padding-right: 26px;
+  }
+
+  /* Catalog / PIM toolbar: stack search full-width */
+  .commerce-admin-body .pim-toolbar {
+    flex-wrap: wrap;
+    align-items: stretch;
+  }
+
+  .commerce-admin-body .pim-search {
+    flex: 1 1 100%;
+    max-width: none;
+    min-width: 0;
+  }
+
+  .commerce-admin-body .pim-index-label {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 520px) {
+  .commerce-admin-header-inner {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
+  }
+
+  .commerce-admin-header-left {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+
+  .commerce-admin-header-env {
+    justify-self: start;
+  }
+
+  .commerce-admin-header-right {
+    justify-self: end;
+  }
+
+  .commerce-admin-hub-main > h1 {
+    font-size: 1.2rem;
+  }
+}
