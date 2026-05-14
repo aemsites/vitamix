@@ -1,3 +1,5 @@
+import { getLocaleAndLanguage } from '../scripts.js';
+
 /** @type {import('./types').PaymentProvider} */
 export default {
   id: 'affirm',
@@ -77,12 +79,8 @@ export default {
         return;
       }
 
-      const config = callbacks.getConfig();
-      const locale = config.getLocale();
-      const language = config.getLanguage();
+      const { locale, language: affirmLocale } = getLocaleAndLanguage(true, true);
       const affirmCountryCode = locale === 'ca' ? 'CAN' : 'USA';
-      const [lang, region] = language.split('_');
-      const affirmLocale = region ? `${lang}_${region.toUpperCase()}` : language;
 
       // eslint-disable-next-line no-underscore-dangle
       window._affirm_config = {
