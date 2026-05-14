@@ -272,7 +272,8 @@ async function renderFreeGift() {
     };
 
     const fetchGifts = async () => {
-      const resp = await fetch('/us/en_us/products/config/free-gifts.plain.html');
+      const { locale, language } = getLocaleAndLanguage();
+      const resp = await fetch(`/${locale}/${language}/products/config/free-gifts.plain.html`);
       if (!resp.ok) return null;
       const text = await resp.text();
       const doc = new DOMParser().parseFromString(text, 'text/html');

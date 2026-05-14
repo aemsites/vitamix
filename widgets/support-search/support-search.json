@@ -1,0 +1,38 @@
+{
+  "en": {
+    "search": "Search support",
+    "go": "Go",
+    "showing": "Showing",
+    "of": "of",
+    "previous": "Previous",
+    "next": "Next",
+    "filterAll": "All",
+    "typeProduct": "Product",
+    "typeManual": "Manual",
+    "typeFaq": "FAQ"
+  },
+  "fr": {
+    "search": "Recherche assistance",
+    "go": "Aller",
+    "showing": "Affichage",
+    "of": "sur",
+    "previous": "Précédent",
+    "next": "Suivant",
+    "filterAll": "Tout",
+    "typeProduct": "Produit",
+    "typeManual": "Manuel",
+    "typeFaq": "FAQ"
+  },
+  "es": {
+    "search": "Buscar soporte",
+    "go": "Ir",
+    "showing": "Mostrando",
+    "of": "de",
+    "previous": "Anterior",
+    "next": "Siguiente",
+    "filterAll": "Todo",
+    "typeProduct": "Producto",
+    "typeManual": "Manual",
+    "typeFaq": "FAQ"
+  }
+}

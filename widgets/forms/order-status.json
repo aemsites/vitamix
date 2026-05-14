@@ -7,6 +7,20 @@
     },
     "inputPlaceholders": {
       "orderNumber": ""
+    },
+    "result": {
+      "labels": {
+        "orderNumber": "Order Number",
+        "orderStatus": "Order Status"
+      },
+      "statuses": {
+        "received": "Order Received",
+        "processed": "Order Processed",
+        "partiallyShipped": "Partially Shipped",
+        "shipped": "Order Shipped",
+        "cancelled": "Order Cancelled",
+        "unavailable": "Status Unavailable"
+      }
     }
   },
   "fr": {
@@ -17,6 +31,20 @@
     },
     "inputPlaceholders": {
       "orderNumber": ""
+    },
+    "result": {
+      "labels": {
+        "orderNumber": "Numéro de commande",
+        "orderStatus": "État de la commande"
+      },
+      "statuses": {
+        "received": "Commande reçue",
+        "processed": "Commande traitée",
+        "partiallyShipped": "Partiellement expédiée",
+        "shipped": "Commande expédiée",
+        "cancelled": "Commande annulée",
+        "unavailable": "État indisponible"
+      }
     }
   },
   "es": {
@@ -27,6 +55,20 @@
     },
     "inputPlaceholders": {
       "orderNumber": ""
+    },
+    "result": {
+      "labels": {
+        "orderNumber": "Número de pedido",
+        "orderStatus": "Estado del pedido"
+      },
+      "statuses": {
+        "received": "Pedido recibido",
+        "processed": "Pedido procesado",
+        "partiallyShipped": "Parcialmente enviado",
+        "shipped": "Pedido enviado",
+        "cancelled": "Pedido cancelado",
+        "unavailable": "Estado no disponible"
+      }
     }
   }
 }

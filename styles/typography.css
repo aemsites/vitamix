@@ -1,3 +1,4 @@
+:host,
 :root {
   /* font sizes */
   --font-size-20: 10px;
@@ -71,6 +72,7 @@
 }
 
 @media (width >= 800px) {
+  :host,
   :root {
     /* heading sizes */
     --heading-size-xl: var(--font-size-900);  /* h2 */
