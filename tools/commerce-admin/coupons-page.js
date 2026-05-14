@@ -17,11 +17,216 @@ import {
   escapeHtml,
   showToast,
 } from './commerce-otp-ui.js';
+import { collectCategorySlugsFromIndexRows, fetchProductsIndexForLocale } from './pim.js';
 
 async function readRespError(resp) {
   return resp.headers.get('x-error')
     || (await resp.text().catch(() => '')).trim()
     || `HTTP ${resp.status}`;
+}
+
+/** @type {{ locale: string, slugs: string[] }} */
+let couponCategorySlugCache = { locale: '', slugs: [] };
+
+/**
+ * Map market tab + new-coupon country to AEM products index path (see catalog).
+ * @returns {string} e.g. us/en_us
+ */
+function localePathForCouponCategoryIndex(dlg) {
+  const countryEl = dlg?.querySelector('#cp-new-country');
+  if (countryEl?.value) {
+    const c = String(countryEl.value).trim().toLowerCase();
+    if (c === 'ca') return 'ca/en_ca';
+    if (c === 'mx') return 'us/en_us';
+    return 'us/en_us';
+  }
+  const m = state.marketFilter;
+  if (m === 'ca') return 'ca/en_ca';
+  if (m === 'mx') return 'us/en_us';
+  return 'us/en_us';
+}
+
+/**
+ * @param {string} localePath
+ * @returns {Promise<string[]>}
+ */
+async function getCategorySlugsForCoupons(localePath) {
+  if (couponCategorySlugCache.locale === localePath) {
+    return couponCategorySlugCache.slugs;
+  }
+  const json = await fetchProductsIndexForLocale(localePath);
+  const data = json.data || json;
+  const rows = Array.isArray(data) ? data : [];
+  const slugs = collectCategorySlugsFromIndexRows(rows);
+  couponCategorySlugCache = { locale: localePath, slugs };
+  return slugs;
+}
+
+/**
+ * Native `<datalist>` is unreliable inside modal `<dialog>` (top layer). Use an
+ * in-dialog suggestion panel instead.
+ * @param {HTMLDialogElement} dlg
+ */
+async function wireCouponCategorySuggestPanel(dlg) {
+  const localePath = localePathForCouponCategoryIndex(dlg);
+  /** @type {{ slugs: string[] }} */
+  const slugBag = { slugs: [] };
+  try {
+    slugBag.slugs = await getCategorySlugsForCoupons(localePath);
+  } catch (err) {
+    console.warn('[commerce-admin/coupons] category index for suggestions failed', {
+      localePath,
+      message: err?.message || String(err),
+    });
+  }
+
+  const panel = document.createElement('div');
+  panel.className = 'cp-category-suggest-panel';
+  panel.hidden = true;
+  panel.setAttribute('role', 'listbox');
+  dlg.appendChild(panel);
+
+  /** @type {HTMLInputElement|null} */
+  let activeInput = null;
+  let overPanel = false;
+
+  const reposition = () => {
+    if (!activeInput || panel.hidden) return;
+    const ir = activeInput.getBoundingClientRect();
+    const w = Math.min(Math.max(ir.width, 220), Math.max(160, window.innerWidth - ir.left - 12));
+    panel.style.position = 'fixed';
+    panel.style.top = `${ir.bottom + 4}px`;
+    panel.style.left = `${ir.left}px`;
+    panel.style.width = `${w}px`;
+    panel.style.zIndex = '2147483646';
+  };
+
+  const MAX_ROWS = 80;
+
+  const categoryLastToken = (value) => {
+    const parts = String(value || '').split(',');
+    return parts[parts.length - 1].trim().toLowerCase();
+  };
+
+  const filterSlugs = (query) => {
+    const list = slugBag.slugs;
+    if (!query) return list.slice(0, MAX_ROWS);
+    const starts = [];
+    const rest = [];
+    for (const s of list) {
+      const low = s.toLowerCase();
+      if (!low.includes(query)) continue;
+      if (low.startsWith(query)) starts.push(s);
+      else rest.push(s);
+    }
+    starts.sort((a, b) => a.localeCompare(b));
+    rest.sort((a, b) => a.localeCompare(b));
+    return [...starts, ...rest].slice(0, MAX_ROWS);
+  };
+
+  const applyPick = (input, slug) => {
+    const v = String(input.value);
+    const li = v.lastIndexOf(',');
+    const head = li === -1 ? '' : `${v.slice(0, li + 1).replace(/\s*$/, '')}, `;
+    input.value = `${head}${slug}`;
+  };
+
+  const render = () => {
+    if (!activeInput) return;
+    const token = categoryLastToken(activeInput.value);
+    const matches = filterSlugs(token);
+    panel.replaceChildren();
+    if (matches.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'cp-category-suggest-empty';
+      empty.textContent = slugBag.slugs.length
+        ? 'No matching categories — try another fragment or type a slug.'
+        : 'No categories found in the product index for this locale.';
+      panel.appendChild(empty);
+    } else {
+      for (const slug of matches) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'cp-category-suggest-option';
+        btn.textContent = slug;
+        btn.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          if (activeInput) applyPick(activeInput, slug);
+          panel.hidden = true;
+          panel.replaceChildren();
+          activeInput?.focus();
+        });
+        panel.appendChild(btn);
+      }
+    }
+    panel.hidden = false;
+    reposition();
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(reposition);
+    });
+  };
+
+  const hide = () => {
+    panel.hidden = true;
+    panel.replaceChildren();
+  };
+
+  const onFieldFocus = (/** @type {HTMLInputElement} */ input) => {
+    activeInput = input;
+    render();
+  };
+
+  const onFieldInput = (/** @type {HTMLInputElement} */ input) => {
+    if (activeInput === input) render();
+  };
+
+  const onFieldBlur = () => {
+    window.setTimeout(() => {
+      const ae = document.activeElement;
+      if (overPanel || panel.contains(ae) || ae === activeInput || inputs.includes(/** @type {any} */ (ae))) {
+        return;
+      }
+      hide();
+    }, 200);
+  };
+
+  panel.addEventListener('mouseenter', () => {
+    overPanel = true;
+  });
+  panel.addEventListener('mouseleave', () => {
+    overPanel = false;
+  });
+
+  const inputs = /** @type {HTMLInputElement[]} */ ([
+    dlg.querySelector('#cp-form-excluded'),
+    dlg.querySelector('#cp-form-included'),
+  ].filter(Boolean));
+
+  for (const input of inputs) {
+    input.addEventListener('focus', () => onFieldFocus(input));
+    input.addEventListener('input', () => onFieldInput(input));
+    input.addEventListener('blur', onFieldBlur);
+  }
+
+  const countryEl = dlg.querySelector('#cp-new-country');
+  countryEl?.addEventListener('change', async () => {
+    couponCategorySlugCache = { locale: '', slugs: [] };
+    try {
+      slugBag.slugs = await getCategorySlugsForCoupons(localePathForCouponCategoryIndex(dlg));
+    } catch {
+      slugBag.slugs = [];
+    }
+    if (activeInput && !panel.hidden) render();
+  });
+
+  const ac = new AbortController();
+  const scrollHost = dlg.querySelector('.coupons-dialog-scroll');
+  (scrollHost || dlg).addEventListener('scroll', reposition, { capture: true, signal: ac.signal });
+  window.addEventListener('resize', reposition, { signal: ac.signal });
+  dlg.addEventListener('close', () => {
+    ac.abort();
+    hide();
+  }, { once: true });
 }
 
 /** Decoded coupon type id when `path` is `coupons/types/{segment}`. */
@@ -258,7 +463,10 @@ function couponDetailModalInnerHtml(d) {
 }
 
 function closeCouponDetailDialog() {
-  document.querySelector('dialog.coupons-detail-dialog')?.remove();
+  const el = document.querySelector('dialog.coupons-detail-dialog');
+  if (!el) return;
+  if (el.open) el.close();
+  el.remove();
 }
 
 function afterCodesRefresh() {
@@ -377,8 +585,13 @@ function openCouponDetailModal() {
 
   dialog.append(toolbar, scroll, footer);
   document.body.appendChild(dialog);
+  const prevBodyOverflow = document.body.style.overflow;
+  dialog.addEventListener('close', () => {
+    document.body.style.overflow = prevBodyOverflow;
+  }, { once: true });
   wireCouponDetailModal(dialog);
   bindCodesEvents(dialog);
+  document.body.style.overflow = 'hidden';
   dialog.showModal();
 }
 
@@ -642,20 +855,31 @@ async function refreshCouponList() {
   await refreshSelection();
 }
 
-function openDialog(title, innerHtml, onSubmit, afterMount, dialogClass) {
+async function openDialog(title, innerHtml, onSubmit, afterMount, dialogClass) {
   const dialog = document.createElement('dialog');
   dialog.className = `coupons-dialog${dialogClass ? ` ${dialogClass}` : ''}`;
   dialog.innerHTML = `
     <div class="coupons-dialog-inner">
-      <h2>${escapeHtml(title)}</h2>
-      ${innerHtml}
+      <div class="coupons-dialog-scroll" tabindex="-1">
+        <h2 class="coupons-dialog-title">${escapeHtml(title)}</h2>
+        ${innerHtml}
+      </div>
       <div class="coupons-dialog-actions">
         <button type="button" class="coupons-btn" data-cp-cancel>Cancel</button>
         <button type="button" class="coupons-btn coupons-btn-primary" data-cp-submit>Save</button>
       </div>
     </div>`;
   document.body.appendChild(dialog);
-  if (typeof afterMount === 'function') afterMount(dialog);
+  const prevBodyOverflow = document.body.style.overflow;
+  const onDialogClose = () => {
+    document.body.style.overflow = prevBodyOverflow;
+    document.querySelector('datalist#cp-form-categories-datalist')?.remove();
+    dialog.querySelector('.cp-category-suggest-panel')?.remove();
+  };
+  dialog.addEventListener('close', onDialogClose, { once: true });
+  if (typeof afterMount === 'function') {
+    await Promise.resolve(afterMount(dialog));
+  }
   dialog.querySelector('[data-cp-cancel]')?.addEventListener('click', () => {
     dialog.close();
     dialog.remove();
@@ -683,6 +907,7 @@ function openDialog(title, innerHtml, onSubmit, afterMount, dialogClass) {
     dialog.close();
     dialog.remove();
   });
+  document.body.style.overflow = 'hidden';
   dialog.showModal();
 }
 
@@ -723,8 +948,13 @@ function couponFormHtml({ idReadonly }) {
         <input type="number" id="cp-form-max-cap" min="0" step="any" placeholder="empty = no cap" />
       </div>
       <div class="coupons-field coupons-field-full">
+        <label for="cp-form-included">Included category slugs <span class="coupons-field-hint">(UI only — not saved to API yet)</span></label>
+        <input type="text" id="cp-form-included" autocomplete="off" placeholder="Type or pick suggestions; comma separated" />
+      </div>
+      <div class="coupons-field coupons-field-full">
         <label for="cp-form-excluded">Excluded category slugs</label>
-        <input type="text" id="cp-form-excluded" placeholder="sale, outlet — comma separated" />
+        <input type="text" id="cp-form-excluded" autocomplete="off" placeholder="Type or pick suggestions; comma separated" />
+        <p class="coupons-field-hint">Suggestions come from the product index for the selected market / new-coupon country (same source as catalog). Focus the field or keep typing to open the list.</p>
       </div>
       <div class="coupons-field coupons-field-full">
         <label class="coupons-checkbox-row"><input type="checkbox" id="cp-form-free-ship" /> Also grants <strong>free shipping</strong> when the coupon applies</label>
@@ -870,7 +1100,10 @@ function fillCouponForm(dlg, d) {
   dlg.querySelector('#cp-form-discount-value').value = d.discountValue != null ? String(d.discountValue) : '';
   dlg.querySelector('#cp-form-min').value = d.minimumOrderAmount != null ? String(d.minimumOrderAmount) : '';
   dlg.querySelector('#cp-form-max-cap').value = d.maximumDiscountAmount != null ? String(d.maximumDiscountAmount) : '';
-  dlg.querySelector('#cp-form-excluded').value = Array.isArray(d.excludedCategories) ? d.excludedCategories.join(', ') : '';
+  const inc = dlg.querySelector('#cp-form-included');
+  if (inc) inc.value = '';
+  const ex = dlg.querySelector('#cp-form-excluded');
+  if (ex) ex.value = Array.isArray(d.excludedCategories) ? d.excludedCategories.join(', ') : '';
   dlg.querySelector('#cp-form-free-ship').checked = !!d.freeShipping;
   dlg.querySelector('#cp-form-stackable').checked = d.stackable !== false;
   dlg.querySelector('#cp-form-auto').checked = !!d.autoApply;
@@ -1064,7 +1297,7 @@ function openNewCouponDialog() {
       render();
       openCouponDetailModal();
     },
-    (dlg) => {
+    async (dlg) => {
       dlg.querySelector('#cp-form-stackable').checked = true;
       dlg.querySelector('#cp-form-manual').checked = true;
       const countryEl = dlg.querySelector('#cp-new-country');
@@ -1087,6 +1320,7 @@ function openNewCouponDialog() {
         el?.addEventListener('change', syncPreview);
       });
       syncPreview();
+      await wireCouponCategorySuggestPanel(dlg);
     },
     'coupons-dialog-wide',
   );
@@ -1112,7 +1346,10 @@ function openEditCouponDialog() {
       await refreshSelection();
       afterCodesRefresh();
     },
-    (dlg) => fillCouponForm(dlg, snap),
+    async (dlg) => {
+      fillCouponForm(dlg, snap);
+      await wireCouponCategorySuggestPanel(dlg);
+    },
     'coupons-dialog-wide',
   );
 }

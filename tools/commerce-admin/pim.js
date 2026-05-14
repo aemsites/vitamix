@@ -125,6 +125,56 @@ export function getVariantCount(variantSkus) {
   return variantSkus.split(',').map((s) => s.trim()).filter(Boolean).length;
 }
 
+/**
+ * Unique category **slugs** (url keys) from product index rows (`index.json`).
+ * Uses `categoriesUrlKey` (comma-separated in Vitamix; see `blocks/plp/plp.js`) and
+ * `url_key` / `urlKey` on objects in `custom.categories`. Omits display-only `categories` strings.
+ *
+ * @param {object[]} rows
+ * @returns {string[]}
+ */
+export function collectCategorySlugsFromIndexRows(rows) {
+  /** @type {Set<string>} */
+  const set = new Set();
+
+  /** @param {unknown} raw */
+  const addSlugListField = (raw) => {
+    if (raw == null || raw === '') return;
+    if (Array.isArray(raw)) {
+      raw.forEach((x) => {
+        if (typeof x === 'string' && x.trim()) set.add(x.trim());
+      });
+      return;
+    }
+    if (typeof raw === 'string') {
+      raw.split(',').forEach((part) => {
+        const s = part.trim();
+        if (s) set.add(s);
+      });
+    }
+  };
+
+  /** @param {unknown} raw */
+  const addFromCustomCategories = (raw) => {
+    if (raw == null || raw === '') return;
+    if (!Array.isArray(raw)) return;
+    for (const c of raw) {
+      if (c && typeof c === 'object') {
+        const slug = String(c.url_key || c.urlKey || '').trim();
+        if (slug) set.add(slug);
+      }
+    }
+  };
+
+  if (!Array.isArray(rows)) return [];
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue;
+    addSlugListField(row.categoriesUrlKey);
+    addFromCustomCategories(row.custom?.categories);
+  }
+  return [...set].sort((a, b) => a.localeCompare(b));
+}
+
 function escapeHtml(str) {
   if (str == null) return '';
   const div = document.createElement('div');

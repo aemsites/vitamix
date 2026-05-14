@@ -531,7 +531,9 @@
   position: relative;
   max-height: min(82vh, 880px);
   overflow: auto;
+  overscroll-behavior: contain;
   padding: 22px 26px 12px;
+  -webkit-overflow-scrolling: touch;
 }
 
 .coupons-modal-close {
@@ -847,10 +849,64 @@
 }
 
 .coupons-dialog {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
   max-width: min(640px, 94vw);
+  max-height: min(calc(100vh - 32px), 920px);
+  width: 100%;
+  margin: auto;
   padding: 0;
   border: 1px solid #e1e3e5;
   border-radius: 8px;
+}
+
+/* In-dialog category combobox (native <datalist> is unreliable in modal <dialog>) */
+.cp-category-suggest-panel {
+  position: fixed;
+  z-index: 2147483646;
+  max-height: 240px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background: #fff;
+  border: 1px solid #c9cccf;
+  border-radius: 8px;
+  box-shadow: 0 10px 32px rgb(0 0 0 / 18%);
+  box-sizing: border-box;
+}
+
+.cp-category-suggest-option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  font-size: 14px;
+  padding: 8px 12px;
+  margin: 0;
+  border: none;
+  border-bottom: 1px solid #f0f0f1;
+  background: none;
+  cursor: pointer;
+  color: #202223;
+}
+
+.cp-category-suggest-option:last-child {
+  border-bottom: none;
+}
+
+.cp-category-suggest-option:hover,
+.cp-category-suggest-option:focus-visible {
+  background: #e8f0fe;
+  outline: none;
+}
+
+.cp-category-suggest-empty {
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #6d7175;
+  line-height: 1.4;
 }
 
 .coupons-dialog::backdrop {
@@ -858,19 +914,38 @@
 }
 
 .coupons-dialog-inner {
-  padding: 16px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0;
 }
 
-.coupons-dialog h2 {
+.coupons-dialog-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  padding: 16px 18px 12px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.coupons-dialog-title {
   margin: 0 0 12px;
   font-size: 1.05rem;
+  font-weight: 600;
+  color: #202223;
 }
 
 .coupons-dialog-actions {
   display: flex;
+  flex-shrink: 0;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 14px;
+  margin-top: 0;
+  padding: 12px 18px 16px;
+  border-top: 1px solid #e1e3e5;
+  background: #fff;
 }
 
 .coupons-dialog-wide {
