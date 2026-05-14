@@ -1,0 +1,203 @@
+{
+  "en": {
+    "modalTitle": "Account",
+    "nav": {
+      "overview": "My Account",
+      "information": "Account Information",
+      "address": "Addresses",
+      "orders": "Order History"
+    },
+    "greeting": "Welcome back",
+    "panels": {
+      "overview": {
+        "title": "My Account",
+        "intro": "Overview of your Vitamix account. Detailed data will load from the account API.",
+        "rows": [
+          { "label": "Member since", "value": "March 2024" },
+          { "label": "Account status", "value": "Active" },
+          { "label": "Preferred store", "value": "United States" }
+        ]
+      },
+      "information": {
+        "title": "Account Information",
+        "rows": [
+          { "label": "Email", "valueKey": "email" },
+          { "label": "Name", "value": "David Nuescheler" },
+          { "label": "Phone", "value": "+1 (216) 555-0142" },
+          { "label": "Customer ID", "value": "VX-1000192" },
+          { "label": "Preferred language", "value": "English (US)" }
+        ]
+      },
+      "address": {
+        "title": "Addresses",
+        "mockAddresses": [
+          {
+            "badge": "Default billing",
+            "lines": [
+              "David Nuescheler",
+              "1234 Mockingbird Lane",
+              "Cleveland, OH 44114",
+              "United States"
+            ]
+          },
+          {
+            "badge": "Shipping",
+            "lines": [
+              "David Nuescheler",
+              "88 Example Parkway, Suite 200",
+              "Toronto, ON M5V 2T6",
+              "Canada"
+            ]
+          }
+        ]
+      },
+      "orders": {
+        "title": "Order History",
+        "mockOrders": [
+          { "id": "VM-482910", "date": "Nov 2, 2025", "total": "$429.00" },
+          { "id": "VM-471205", "date": "Aug 18, 2025", "total": "$89.95" }
+        ]
+      }
+    },
+    "logout": "Log out",
+    "sectionSelectAria": "Account menu",
+    "orderMock": {
+      "placed": "Placed",
+      "total": "Total"
+    }
+  },
+  "fr": {
+    "modalTitle": "Compte",
+    "nav": {
+      "overview": "Mon compte",
+      "information": "Informations du compte",
+      "address": "Adresses",
+      "orders": "Historique des commandes"
+    },
+    "greeting": "Bon retour",
+    "panels": {
+      "overview": {
+        "title": "Mon compte",
+        "intro": "Aperçu de votre compte Vitamix. Les données détaillées proviendront de l'API.",
+        "rows": [
+          { "label": "Membre depuis", "value": "mars 2024" },
+          { "label": "Statut du compte", "value": "Actif" },
+          { "label": "Boutique préférée", "value": "Canada" }
+        ]
+      },
+      "information": {
+        "title": "Informations du compte",
+        "rows": [
+          { "label": "Courriel", "valueKey": "email" },
+          { "label": "Nom", "value": "David Nuescheler" },
+          { "label": "Téléphone", "value": "+1 (416) 555-0188" },
+          { "label": "ID client", "value": "VX-CA-90012" },
+          { "label": "Langue préférée", "value": "Français (CA)" }
+        ]
+      },
+      "address": {
+        "title": "Adresses",
+        "mockAddresses": [
+          {
+            "badge": "Facturation par défaut",
+            "lines": [
+              "David Nuescheler",
+              "1234 rue du Faux",
+              "Montréal, QC H2Y 1C6",
+              "Canada"
+            ]
+          },
+          {
+            "badge": "Livraison",
+            "lines": [
+              "David Nuescheler",
+              "88 avenue Exemple, bureau 200",
+              "Toronto, ON M5V 2T6",
+              "Canada"
+            ]
+          }
+        ]
+      },
+      "orders": {
+        "title": "Historique des commandes",
+        "mockOrders": [
+          { "id": "VM-482910", "date": "2 nov. 2025", "total": "429,00 $ CA" },
+          { "id": "VM-471205", "date": "18 août 2025", "total": "89,95 $ CA" }
+        ]
+      }
+    },
+    "logout": "Se déconnecter",
+    "sectionSelectAria": "Menu du compte",
+    "orderMock": {
+      "placed": "Passée le",
+      "total": "Total"
+    }
+  },
+  "es": {
+    "modalTitle": "Cuenta",
+    "nav": {
+      "overview": "Mi cuenta",
+      "information": "Información de la cuenta",
+      "address": "Direcciones",
+      "orders": "Historial de pedidos"
+    },
+    "greeting": "Bienvenido de nuevo",
+    "panels": {
+      "overview": {
+        "title": "Mi cuenta",
+        "intro": "Resumen de su cuenta Vitamix. Los datos detallados vendrán de la API.",
+        "rows": [
+          { "label": "Miembro desde", "value": "marzo de 2024" },
+          { "label": "Estado de la cuenta", "value": "Activa" },
+          { "label": "Tienda preferida", "value": "Estados Unidos" }
+        ]
+      },
+      "information": {
+        "title": "Información de la cuenta",
+        "rows": [
+          { "label": "Correo", "valueKey": "email" },
+          { "label": "Nombre", "value": "David Nuescheler" },
+          { "label": "Teléfono", "value": "+1 (305) 555-0160" },
+          { "label": "ID de cliente", "value": "VX-US-44021" },
+          { "label": "Idioma preferido", "value": "Español (US)" }
+        ]
+      },
+      "address": {
+        "title": "Direcciones",
+        "mockAddresses": [
+          {
+            "badge": "Facturación predeterminada",
+            "lines": [
+              "David Nuescheler",
+              "1234 Calle Ejemplo",
+              "Miami, FL 33101",
+              "Estados Unidos"
+            ]
+          },
+          {
+            "badge": "Envío",
+            "lines": [
+              "David Nuescheler",
+              "88 Parkway de Muestra, Oficina 200",
+              "Toronto, ON M5V 2T6",
+              "Canadá"
+            ]
+          }
+        ]
+      },
+      "orders": {
+        "title": "Historial de pedidos",
+        "mockOrders": [
+          { "id": "VM-482910", "date": "2 nov 2025", "total": "US$429.00" },
+          { "id": "VM-471205", "date": "18 ago 2025", "total": "US$89.95" }
+        ]
+      }
+    },
+    "logout": "Cerrar sesión",
+    "sectionSelectAria": "Menú de la cuenta",
+    "orderMock": {
+      "placed": "Realizado",
+      "total": "Total"
+    }
+  }
+}

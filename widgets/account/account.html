@@ -1,0 +1,103 @@
+<div class="account-widget">
+  <div class="account-layout">
+    <aside class="account-sidebar">
+      <div class="account-summary-card">
+        <div class="account-summary-header">
+          <h3 class="account-greeting"></h3>
+          <p class="account-email-muted"></p>
+        </div>
+        <div class="account-nav-shell">
+          <div class="account-nav-mobile">
+            <select class="account-nav-select"></select>
+          </div>
+          <nav class="account-nav" aria-label="Account navigation">
+            <ul class="account-nav-list">
+              <li>
+                <button type="button" class="account-nav-item is-active" data-section="overview" aria-current="page"></button>
+              </li>
+              <li>
+                <button type="button" class="account-nav-item" data-section="information"></button>
+              </li>
+              <li>
+                <button type="button" class="account-nav-item" data-section="address"></button>
+              </li>
+              <li>
+                <button type="button" class="account-nav-item" data-section="orders"></button>
+              </li>
+            </ul>
+          </nav>
+        </div>
+        <div class="account-sidebar-footer">
+          <button type="button" class="account-logout button"></button>
+        </div>
+      </div>
+    </aside>
+
+    <div class="account-main">
+      <div class="account-panels">
+        <section class="account-panel is-visible" data-section="overview" aria-labelledby="account-panel-overview-title">
+          <div class="account-panel-body">
+            <h4 id="account-panel-overview-title" class="account-panel-title"></h4>
+            <p class="account-panel-intro"></p>
+            <div class="account-mock-rows">
+              <div class="account-mock-row">
+                <span class="account-mock-label"></span>
+                <span class="account-mock-value"></span>
+              </div>
+              <div class="account-mock-row">
+                <span class="account-mock-label"></span>
+                <span class="account-mock-value"></span>
+              </div>
+              <div class="account-mock-row">
+                <span class="account-mock-label"></span>
+                <span class="account-mock-value"></span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="account-panel" data-section="information" hidden aria-labelledby="account-panel-info-title">
+          <div class="account-panel-body">
+            <h4 id="account-panel-info-title" class="account-panel-title"></h4>
+            <div class="account-mock-rows">
+              <div class="account-mock-row">
+                <span class="account-mock-label"></span>
+                <span class="account-mock-value"></span>
+              </div>
+              <div class="account-mock-row">
+                <span class="account-mock-label"></span>
+                <span class="account-mock-value"></span>
+              </div>
+              <div class="account-mock-row">
+                <span class="account-mock-label"></span>
+                <span class="account-mock-value"></span>
+              </div>
+              <div class="account-mock-row">
+                <span class="account-mock-label"></span>
+                <span class="account-mock-value"></span>
+              </div>
+              <div class="account-mock-row">
+                <span class="account-mock-label"></span>
+                <span class="account-mock-value"></span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="account-panel" data-section="address" hidden aria-labelledby="account-panel-address-title">
+          <div class="account-panel-body">
+            <h4 id="account-panel-address-title" class="account-panel-title"></h4>
+            <ul class="account-address-list"></ul>
+          </div>
+        </section>
+
+        <section class="account-panel" data-section="orders" hidden aria-labelledby="account-panel-orders-title">
+          <div class="account-panel-body">
+            <h4 id="account-panel-orders-title" class="account-panel-title"></h4>
+            <ul class="account-order-mock-list"></ul>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+</div>
