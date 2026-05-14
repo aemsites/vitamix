@@ -77,10 +77,17 @@ main > .section > div {
 }
 
 /*
- * Default content sections (paragraphs and headings not inside a named block)
- * still need horizontal padding — the reset above strips it from everything,
- * so put it back explicitly for the wrapper EDS generates for non-block content.
+ * Default content paragraphs need horizontal padding restored.
+ *
+ * helix-to-email works from server-side HTML where:
+ *   - the section <div> has no .section class (that is added client-side by aem.js)
+ *   - default content is bare <p> children, not wrapped in .default-content-wrapper
+ *     (that wrapper is also added client-side)
+ *
+ * The first rule targets the server-side shape helix-to-email sees.
+ * The second rule targets the client-side shape so DA browser previews look right.
  */
+main > div > p,
 main > .section > .default-content-wrapper {
   padding: 0 32px;
 }
