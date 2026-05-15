@@ -1,6 +1,7 @@
 import { createOrder, initiatePayment, previewOrder } from '../../scripts/commerce-api.js';
 import { collectAddress } from './checkout-address.js';
 import { updatePreview } from './checkout-shipping.js';
+import { FORMS_ENDPOINT, getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 /**
  * Writes checkout state to sessionStorage before a payment redirect.
@@ -100,6 +101,37 @@ function clearError(form) {
 }
 
 /**
+ * Fire-and-forget newsletter subscription after order creation.
+ * Reads the newsletter checkbox from formData; does nothing if unchecked.
+ * @param {FormData} formData
+ */
+function subscribeNewsletter(formData) {
+  if (!formData.get('newsletter')) return;
+
+  const { locale, language } = getLocaleAndLanguage();
+  const email = formData.get('email') || '';
+  const firstName = formData.get('shipping-firstname') || '';
+  const lastName = formData.get('shipping-lastname') || '';
+
+  const url = `${FORMS_ENDPOINT}/${locale}/${language}/forms`;
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      formId: `${locale}/${language}/newsletter`,
+      email,
+      emailOptIn: true,
+      firstName,
+      lastName,
+      country: locale,
+    }),
+  }).catch((err) => {
+    // eslint-disable-next-line no-console
+    console.error('newsletter subscription failed:', err);
+  });
+}
+
+/**
  * Wires the Chase (credit card) submit button and provides a shared callbacks object
  * that payment providers can use.
  *
@@ -127,7 +159,11 @@ export function initOrder(form, cart, state, config, strings) {
     saveCheckoutSession: (email, c, preview, order) => (
       saveCheckoutSession(email, c, preview, order)
     ),
-    createOrder: (orderBody) => createOrder(orderBody),
+    createOrder: async (orderBody) => {
+      const result = await createOrder(orderBody);
+      subscribeNewsletter(new FormData(form));
+      return result;
+    },
     initiatePayment: (...args) => initiatePayment(...args),
     showError: (msg) => showError(form, msg),
     clearError: () => clearError(form),
@@ -224,6 +260,7 @@ export function initOrder(form, cart, state, config, strings) {
 
       try {
         const createdOrder = await createOrder(orderBody);
+        subscribeNewsletter(formData);
         saveCheckoutSession(email, cart, state.currentPreview, createdOrder.order ?? createdOrder);
 
         const fraudToken = config.getFraudToken?.();
