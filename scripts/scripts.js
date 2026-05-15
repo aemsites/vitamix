@@ -206,7 +206,7 @@ export function getCookies() {
 
 function setAffiliateCoupon() {
   const urlParams = new URLSearchParams(window.location.search);
-  const { cjevent, COUPON } = Object.fromEntries(urlParams);
+  const { cjdata, cjevent, COUPON } = Object.fromEntries(urlParams);
 
   if (cjevent) {
     localStorage.setItem('cjevent', JSON.stringify({ value: cjevent, ts: Date.now() }));
@@ -219,7 +219,8 @@ function setAffiliateCoupon() {
     const { locale, language } = getLocaleAndLanguage();
     if (!(locale === 'ca' && language === 'fr_ca')) {
       const cartUrl = new URL(`https://www.vitamix.com/${locale}/${language}/checkout/cart`);
-      cartUrl.searchParams.set('cjevent', cjevent || '');
+      if (cjdata) cartUrl.searchParams.set('cjdata', cjdata);
+      if (cjevent) cartUrl.searchParams.set('cjevent', cjevent);
       cartUrl.searchParams.set('COUPON', COUPON);
       fetch(cartUrl.toString());
     }
