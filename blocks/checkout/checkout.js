@@ -258,6 +258,11 @@ export default async function decorate(block) {
     });
   });
 
+  // Re-run preview when a coupon code is applied from the order summary sidebar.
+  document.addEventListener('checkout:coupon-apply', () => {
+    if (state.selectedShippingMethodId) updatePreview(form, cart, state, config);
+  });
+
   // Wire Chase submit and get shared callbacks for providers
   const callbacks = initOrder(form, cart, state, config, strings);
 

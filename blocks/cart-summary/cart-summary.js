@@ -14,11 +14,15 @@ const LOCAL_STRINGS = {
     havePromoCode: 'Have a promo code?',
     shippingPlaceholder: 'Calculated at checkout',
     checkoutSecurely: 'Checkout securely',
+    applied: 'Code saved',
+    discountPending: 'Applied at checkout',
   },
   'fr-ca': {
     havePromoCode: 'Vous avez un code promo?',
     shippingPlaceholder: 'Calculée à la caisse',
     checkoutSecurely: 'Payer en toute sécurité',
+    applied: 'Code sauvegardé',
+    discountPending: 'Appliqué à la caisse',
   },
 };
 
@@ -77,6 +81,10 @@ function buildTemplate(s) {
         <span>${s.subtotal}</span>
         <span class="cart-summary-subtotal"></span>
       </div>
+      <div class="cart-summary-row cart-summary-discount-row" hidden>
+        <span class="cart-summary-discount-label"></span>
+        <span class="cart-summary-discount-pending">${s.discountPending}</span>
+      </div>
       <div class="cart-summary-row">
         <span>${s.shipping}</span>
         <span class="cart-summary-shipping">${s.shippingPlaceholder}</span>
@@ -127,6 +135,8 @@ export default async function decorate(block) {
   const expressContainer = block.querySelector('.cart-summary-express-buttons');
   const discountInput = block.querySelector('.discount-input');
   const discountApply = block.querySelector('.discount-apply');
+  const discountRow = block.querySelector('.cart-summary-discount-row');
+  const discountRowLabel = block.querySelector('.cart-summary-discount-label');
   const errorEl = block.querySelector('.cart-summary-error');
   const checkoutBtn = block.querySelector('.cart-summary-checkout-btn');
 
@@ -144,17 +154,32 @@ export default async function decorate(block) {
   document.addEventListener('cart:change', updateTotals);
 
   // 4. Restore saved promo code; persist to sessionStorage on apply
+  const showDiscountRow = (code) => {
+    discountRowLabel.textContent = `${s.discount} (${code})`;
+    discountRow.hidden = false;
+  };
+  const hideDiscountRow = () => { discountRow.hidden = true; };
+
   const savedCoupon = sessionStorage.getItem('checkout_coupon_code') || '';
   if (savedCoupon) {
     discountInput.value = savedCoupon;
     block.querySelector('.cart-summary-promo').open = true;
+    showDiscountRow(savedCoupon);
   }
   discountApply.addEventListener('click', () => {
     const code = discountInput.value.trim();
     if (code) {
       sessionStorage.setItem('checkout_coupon_code', code);
+      showDiscountRow(code);
+      discountApply.textContent = s.applied;
+      discountApply.disabled = true;
+      setTimeout(() => {
+        discountApply.textContent = s.apply;
+        discountApply.disabled = false;
+      }, 2000);
     } else {
       sessionStorage.removeItem('checkout_coupon_code');
+      hideDiscountRow();
     }
   });
 

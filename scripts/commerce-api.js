@@ -260,10 +260,11 @@ export function parsePreview(preview, cartSubtotal) {
   const subtotal = parseFloat(preview.subtotal) || cartSubtotal;
   const taxAmount = parseFloat(preview.taxAmount) || 0;
   const rawRate = preview.shippingMethod?.rate ?? 0;
-  const hasFreeShipping = (preview.discounts ?? []).some((d) => d.freeShipping);
+  const discounts = preview.discounts ?? [];
+  const hasFreeShipping = discounts.some((d) => d.freeShipping);
   const shippingRate = hasFreeShipping ? 0 : rawRate;
   const total = parseFloat(preview.total) || (subtotal + taxAmount + shippingRate);
   return {
-    subtotal, taxAmount, shippingRate, total,
+    subtotal, taxAmount, shippingRate, total, discounts,
   };
 }

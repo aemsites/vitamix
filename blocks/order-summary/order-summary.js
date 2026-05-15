@@ -36,6 +36,7 @@ function buildTemplate(s) {
         <span>${s.subtotal}</span>
         <span class="order-summary-subtotal"></span>
       </div>
+      <div class="order-summary-discounts"></div>
       <div class="order-summary-row">
         <span>${s.shipping}</span>
         <span class="order-summary-shipping"></span>
@@ -183,7 +184,47 @@ export default async function decorate(block) {
   const grandTotalEl = block.querySelector('.order-summary-grand-total');
   const headerTotalEl = block.querySelector('.order-summary-header-total');
   const currencyEl = block.querySelector('.currency');
+  const discountInput = block.querySelector('.discount-input');
+  const discountApply = block.querySelector('.discount-apply');
+  const discountsEl = block.querySelector('.order-summary-discounts');
   currencyEl.textContent = getCurrencyCode();
+
+  const showPendingDiscount = (code) => {
+    discountsEl.innerHTML = '';
+    const row = document.createElement('div');
+    row.className = 'order-summary-row order-summary-discount-item order-summary-discount-pending';
+    const label = document.createElement('span');
+    label.textContent = `${s.discount} (${code})`;
+    const amount = document.createElement('span');
+    amount.className = 'order-summary-discount-amount';
+    amount.textContent = '--';
+    row.append(label, amount);
+    discountsEl.appendChild(row);
+  };
+
+  const savedCoupon = sessionStorage.getItem('checkout_coupon_code') || '';
+  if (savedCoupon) {
+    discountInput.value = savedCoupon;
+    showPendingDiscount(savedCoupon);
+  }
+
+  discountApply.addEventListener('click', () => {
+    const code = discountInput.value.trim();
+    if (code) {
+      sessionStorage.setItem('checkout_coupon_code', code);
+      showPendingDiscount(code);
+      discountApply.textContent = s.applied;
+      discountApply.disabled = true;
+      setTimeout(() => {
+        discountApply.textContent = s.apply;
+        discountApply.disabled = false;
+      }, 2000);
+    } else {
+      sessionStorage.removeItem('checkout_coupon_code');
+      discountsEl.innerHTML = '';
+    }
+    document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
+  });
 
   const renderItems = () => {
     itemsList.innerHTML = '';
@@ -237,11 +278,25 @@ export default async function decorate(block) {
     if (!preview) return;
 
     const {
-      subtotal, taxAmount, shippingRate, total,
+      subtotal, taxAmount, shippingRate, total, discounts,
     } = parsePreview(preview, cart.subtotal);
 
     const currency = getCurrencyCode();
     subtotalEl.textContent = formatPrice(subtotal, currency);
+
+    discountsEl.innerHTML = '';
+    discounts.filter((d) => !d.freeShipping && d.amount > 0).forEach((d) => {
+      const row = document.createElement('div');
+      row.className = 'order-summary-row order-summary-discount-item';
+      const label = document.createElement('span');
+      label.textContent = d.name || s.discount;
+      const amount = document.createElement('span');
+      amount.className = 'order-summary-discount-amount';
+      amount.textContent = `-${formatPrice(d.amount, currency)}`;
+      row.append(label, amount);
+      discountsEl.appendChild(row);
+    });
+
     shippingEl.textContent = shippingRate === 0
       ? s.free
       : formatPrice(parseFloat(shippingRate), currency);

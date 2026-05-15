@@ -336,6 +336,11 @@ dialog.paypal-not-configured-dialog::backdrop {
   gap: 8px;
 }
 
+.cart-summary-discount-pending {
+  color: var(--commerce-color-text-muted);
+  font-style: italic;
+}
+
 .cart-summary-final-amount .currency {
   font-size: var(--commerce-font-size-xs);
   font-weight: 400;

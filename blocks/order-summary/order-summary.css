@@ -238,6 +238,10 @@
   gap: 8px;
 }
 
+.order-summary-discount-amount {
+  color: var(--commerce-color-success, #2d7a3a);
+}
+
 .order-summary-final-amount .currency {
   font-size: var(--commerce-font-size-xs);
   font-weight: 400;
