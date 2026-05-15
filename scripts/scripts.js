@@ -217,7 +217,7 @@ function setAffiliateCoupon() {
 
     // TODO: remove once all locales migrate off Magento — applies the coupon to the PHP cart
     const { locale, language } = getLocaleAndLanguage();
-    if (!(locale === 'ca' && language === 'fr_ca')) {
+    if (!EDGE_CHECKOUT_LOCALES.includes(`${locale}/${language}`)) {
       const cartUrl = new URL(`https://www.vitamix.com/${locale}/${language}/checkout/cart`);
       if (cjdata) cartUrl.searchParams.set('cjdata', cjdata);
       if (cjevent) cartUrl.searchParams.set('cjevent', cjevent);
