@@ -75,7 +75,7 @@ function startExpressSession(btn, config, callbacks) {
         const defaultMethod = methods[0];
         session.completeShippingContactSelection({
           newShippingMethods: methods.map((m) => ({
-            identifier: m.id,
+            identifier: String(m.id),
             label: m.label,
             detail: m.eta || '',
             amount: String(m.rate),
@@ -104,6 +104,7 @@ function startExpressSession(btn, config, callbacks) {
         const previewResult = await callbacks.previewOrderDirect({
           items: cart.getItemsForAPI(),
           shippingMethod: { id: e.shippingMethod.identifier },
+          locale: bcp47,
           ...(countryCode ? {
             country: countryCode,
             shipping: {
