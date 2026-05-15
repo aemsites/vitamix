@@ -7,16 +7,15 @@ import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 /**
  * Base URL for customer-scoped APIs:
- * `{apiOrigin}/customers/{email}` (apiOrigin is e.g. …/aemsites/sites/vitamix).
- * Email is appended unencoded so `@` stays literal — temporary until the service accepts
- * RFC 3986 path encoding (`%40` for `@`).
+ * `{apiOrigin}/customers/{encodedEmail}` (apiOrigin is e.g. …/aemsites/sites/vitamix).
+ * The email path segment is URL-encoded (e.g. `@` → `%40`) per RFC 3986.
  *
  * @param {string} customerEmail
  * @returns {string}
  */
 export function getCustomerApiBase(customerEmail) {
   const origin = getConfig().apiOrigin.replace(/\/$/, '');
-  return `${origin}/customers/${customerEmail}`;
+  return `${origin}/customers/${encodeURIComponent(customerEmail)}`;
 }
 
 /**
