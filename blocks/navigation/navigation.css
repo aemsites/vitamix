@@ -172,12 +172,15 @@ main > .navigation-container.section ~ .section h6 {
 
 .navigation .menu nav button {
   align-self: stretch;
-  position: relative;
   text-transform: uppercase;
   transition: color 0.2s;
 }
 
-.navigation .menu nav button[data-current]::after {
+.navigation .menu nav [data-current] {
+  position: relative;
+}
+
+.navigation .menu nav [data-current]::after {
   content: "";
   position: absolute;
   top: 0;
