@@ -35,11 +35,17 @@ export const FORMS_ENDPOINT = isProdHost
   ? ''
   : 'https://main--vitamix--aemsites.aem.network';
 
+const PAYPAL_CLIENT_IDS = {
+  us: 'AaBQdCVqIp15uFQaHrJmTUDBZ-xJrOYPs99NtZ-iLN5oij-ustZq304ikTHJKwqqSL4yN0v9GLireQLN',
+  ca: 'AVlGkhsI0_EFNFx8jnRsv0dSROcLzzLYtTdMoNieyjZeAWlIXdFpocB6eyhHvuDOZ3F2YFmQDkLE03Rp',
+};
+const siteLocale = window.location.pathname.split('/').filter(Boolean)[0] || 'us';
+
 window.CommerceConfig = {
   org: 'aemsites',
   site: 'vitamix',
   paypal: {
-    clientId: 'AdWjsTBIELzBwnT08zwFuxDeEW89L8bTcBnE_d4C8lwZHpqMjCszTRh4lrYsUx0TGnjFffeC_UXiIBgJ',
+    clientId: PAYPAL_CLIENT_IDS[siteLocale] ?? PAYPAL_CLIENT_IDS.us,
     intent: 'authorize',
   },
 };
