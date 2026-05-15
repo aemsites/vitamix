@@ -234,6 +234,37 @@ function summarizeOrderSubtotalLine(items) {
   return `${sum.toFixed(2)} ${cur}`.trim() || '—';
 }
 
+/**
+ * Prefer `payment.amount` (+ `payment.currency`) when the charge total is present;
+ * otherwise sum line-item `price.final` (same as legacy “Subtotal (lines)”).
+ */
+function summarizeOrderMonetaryTotal(o) {
+  const pay = o?.payment;
+  if (pay && typeof pay === 'object') {
+    const rawAmt = pay.amount;
+    if (rawAmt != null && String(rawAmt).trim() !== '') {
+      let amtStr;
+      if (typeof rawAmt === 'number' && !Number.isNaN(rawAmt)) {
+        amtStr = rawAmt.toFixed(2);
+      } else {
+        amtStr = String(rawAmt).trim();
+      }
+      let cur = pay.currency != null ? String(pay.currency).trim() : '';
+      const items = Array.isArray(o.items) ? o.items : [];
+      if (!cur && items[0]?.price?.currency) cur = String(items[0].price.currency);
+      return cur ? `${amtStr} ${cur}` : amtStr;
+    }
+  }
+  return summarizeOrderSubtotalLine(Array.isArray(o.items) ? o.items : []);
+}
+
+function orderHasPaymentChargedAmount(o) {
+  const pay = o?.payment;
+  if (!pay || typeof pay !== 'object') return false;
+  const raw = pay.amount;
+  return raw != null && String(raw).trim() !== '';
+}
+
 function paymentSummaryLine(payment) {
   if (!payment || typeof payment !== 'object') return '—';
   const method = payment.method != null ? String(payment.method) : '';
@@ -415,7 +446,10 @@ function buildOrderRichHeader(o) {
   stats.className = 'coupons-modal-stats';
   stats.setAttribute('role', 'list');
   stats.appendChild(statBlock('Line items', String(items.length)));
-  stats.appendChild(statBlock('Subtotal (lines)', summarizeOrderSubtotalLine(items)));
+  stats.appendChild(statBlock(
+    orderHasPaymentChargedAmount(o) ? 'Payment amount' : 'Subtotal (lines)',
+    summarizeOrderMonetaryTotal(o),
+  ));
   stats.appendChild(statBlock('Payment', paymentSummaryLine(o.payment)));
   wrap.appendChild(stats);
 
@@ -610,7 +644,7 @@ function buildOrderHumanView(payload) {
     root.appendChild(sec);
   }
 
-  const custom = o.custom;
+  const { custom } = o;
   if (custom && typeof custom === 'object' && Object.keys(custom).length) {
     const sec = section('Custom');
     const rows = Object.entries(custom).map(([k, v]) => {
