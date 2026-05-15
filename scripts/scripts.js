@@ -24,7 +24,7 @@ const { hostname } = window.location;
 // Format: '<locale>/<language>' (e.g., 'ca/fr_ca'). Add pairs as each region goes live.
 const EDGE_CHECKOUT_LOCALES = ['ca/fr_ca', 'ca/en_us', 'us/en_us'];
 
-const isEdgeHost = hostname.includes('localhost') || hostname.includes('edge-orders') || hostname.includes('integration.vitamix.com') || hostname.includes('uat.vitamix.com');
+const isEdgeHost = hostname.includes('localhost') || hostname.includes('edge-accounts') || hostname.includes('edge-orders') || hostname.includes('integration.vitamix.com') || hostname.includes('uat.vitamix.com');
 const isProdHost = hostname.includes('vitamix.com');
 
 // Affirm public API key — safe to expose client-side (used for PDP promo widgets).
@@ -214,15 +214,23 @@ function setAffiliateCoupon() {
   const urlParams = new URLSearchParams(window.location.search);
   const { cjdata, cjevent, COUPON } = Object.fromEntries(urlParams);
 
-  if (!cjdata || !cjevent || !COUPON) return;
+  if (cjevent) {
+    localStorage.setItem('cjevent', JSON.stringify({ value: cjevent, ts: Date.now() }));
+  }
 
-  const { locale, language } = getLocaleAndLanguage();
-  const loginUrl = new URL(`https://www.vitamix.com/${locale}/${language}/checkout/cart`);
-  Object.entries({ cjdata, cjevent, COUPON }).forEach(([key, value]) => {
-    loginUrl.searchParams.set(key, value);
-  });
+  if (COUPON) {
+    sessionStorage.setItem('checkout_coupon_code', COUPON);
 
-  fetch(loginUrl.toString());
+    // TODO: remove once all locales migrate off Magento — applies the coupon to the PHP cart
+    const { locale, language } = getLocaleAndLanguage();
+    if (!EDGE_CHECKOUT_LOCALES.includes(`${locale}/${language}`)) {
+      const cartUrl = new URL(`https://www.vitamix.com/${locale}/${language}/checkout/cart`);
+      if (cjdata) cartUrl.searchParams.set('cjdata', cjdata);
+      if (cjevent) cartUrl.searchParams.set('cjevent', cjevent);
+      cartUrl.searchParams.set('COUPON', COUPON);
+      fetch(cartUrl.toString());
+    }
+  }
 }
 
 /**

@@ -1,0 +1,302 @@
+{
+  "en": {
+    "modalTitle": "Account",
+    "nav": {
+      "overview": "My Account",
+      "information": "Account Information",
+      "address": "Addresses",
+      "orders": "Order History"
+    },
+    "greeting": "Welcome back",
+    "panels": {
+      "overview": {
+        "title": "My Account",
+        "intro": "Your account summary loads from the account service when you are signed in."
+      },
+      "information": {
+        "title": "Account Information"
+      },
+      "address": {
+        "title": "Addresses"
+      },
+      "orders": {
+        "title": "Order History"
+      }
+    },
+    "overviewLabels": {
+      "displayName": "Name",
+      "email": "Email",
+      "memberSince": "Member since",
+      "accountStatus": "Account status",
+      "storeRegion": "Store region"
+    },
+    "customerInfo": {
+      "email": "Email",
+      "name": "Name",
+      "phone": "Phone",
+      "customerId": "Customer ID",
+      "preferredLanguage": "Preferred language",
+      "accountStatus": "Account status",
+      "created": "Member since",
+      "updated": "Last updated"
+    },
+    "countries": {
+      "us": "United States",
+      "ca": "Canada",
+      "mx": "Mexico"
+    },
+    "addressBook": {
+      "add": "Add address",
+      "edit": "Edit",
+      "remove": "Remove",
+      "save": "Save",
+      "cancel": "Cancel",
+      "deleteConfirm": "Remove this address?",
+      "dialogAddTitle": "New address",
+      "dialogEditTitle": "Edit address",
+      "firstName": "First name",
+      "lastName": "Last name",
+      "email": "Email",
+      "address1": "Street address",
+      "address2": "Apt, suite, etc. (optional)",
+      "city": "City",
+      "country": "Country",
+      "phone": "Phone",
+      "defaultAddress": "Default address",
+      "zipUs": "ZIP code",
+      "postalOther": "Postal code",
+      "stateUs": "State",
+      "stateCa": "Province",
+      "stateMx": "State",
+      "regionPlaceholder": "Select state or province",
+      "emptyList": "No saved addresses yet.",
+      "listSummaryFallback": "Address",
+      "validationRequired": "Please fill all required fields.",
+      "saveError": "Could not save address.",
+      "deleteError": "Could not remove address.",
+      "loadDetailError": "Could not load address.",
+      "defaultBadge": "Default",
+      "addressBadge": "Address"
+    },
+    "ordersEmpty": "No orders yet.",
+    "logout": "Log out",
+    "sectionSelectAria": "Account menu",
+    "orderMock": {
+      "placed": "Placed",
+      "total": "Total",
+      "state": "Status"
+    },
+    "orderDetail": {
+      "back": "← All orders",
+      "loading": "Loading order…",
+      "error": "Could not load this order.",
+      "placedOn": "Placed",
+      "status": "Status",
+      "qty": "Qty.",
+      "shippingAddress": "Shipping address",
+      "billingAddress": "Billing address",
+      "payment": "Payment",
+      "paymentCard": "Card ending {{lastFour}}"
+    }
+  },
+  "fr": {
+    "modalTitle": "Compte",
+    "nav": {
+      "overview": "Mon compte",
+      "information": "Informations du compte",
+      "address": "Adresses",
+      "orders": "Historique des commandes"
+    },
+    "greeting": "Bon retour",
+    "panels": {
+      "overview": {
+        "title": "Mon compte",
+        "intro": "Le résumé de votre compte est chargé depuis le service compte lorsque vous êtes connecté."
+      },
+      "information": {
+        "title": "Informations du compte"
+      },
+      "address": {
+        "title": "Adresses"
+      },
+      "orders": {
+        "title": "Historique des commandes"
+      }
+    },
+    "overviewLabels": {
+      "displayName": "Nom",
+      "email": "Courriel",
+      "memberSince": "Membre depuis",
+      "accountStatus": "Statut du compte",
+      "storeRegion": "Boutique"
+    },
+    "customerInfo": {
+      "email": "Courriel",
+      "name": "Nom",
+      "phone": "Téléphone",
+      "customerId": "ID client",
+      "preferredLanguage": "Langue préférée",
+      "accountStatus": "Statut du compte",
+      "created": "Membre depuis",
+      "updated": "Dernière mise à jour"
+    },
+    "countries": {
+      "us": "États-Unis",
+      "ca": "Canada",
+      "mx": "Mexique"
+    },
+    "addressBook": {
+      "add": "Ajouter une adresse",
+      "edit": "Modifier",
+      "remove": "Supprimer",
+      "save": "Enregistrer",
+      "cancel": "Annuler",
+      "deleteConfirm": "Supprimer cette adresse ?",
+      "dialogAddTitle": "Nouvelle adresse",
+      "dialogEditTitle": "Modifier l'adresse",
+      "firstName": "Prénom",
+      "lastName": "Nom",
+      "email": "Courriel",
+      "address1": "Adresse",
+      "address2": "Appartement, bureau, etc. (facultatif)",
+      "city": "Ville",
+      "country": "Pays",
+      "phone": "Téléphone",
+      "defaultAddress": "Adresse par défaut",
+      "zipUs": "Code ZIP",
+      "postalOther": "Code postal",
+      "stateUs": "État",
+      "stateCa": "Province",
+      "stateMx": "État",
+      "regionPlaceholder": "Sélectionnez l'état ou la province",
+      "emptyList": "Aucune adresse enregistrée.",
+      "listSummaryFallback": "Adresse",
+      "validationRequired": "Veuillez remplir tous les champs obligatoires.",
+      "saveError": "Impossible d'enregistrer l'adresse.",
+      "deleteError": "Impossible de supprimer l'adresse.",
+      "loadDetailError": "Impossible de charger l'adresse.",
+      "defaultBadge": "Par défaut",
+      "addressBadge": "Adresse"
+    },
+    "ordersEmpty": "Aucune commande pour le moment.",
+    "logout": "Se déconnecter",
+    "sectionSelectAria": "Menu du compte",
+    "orderMock": {
+      "placed": "Passée le",
+      "total": "Total",
+      "state": "Statut"
+    },
+    "orderDetail": {
+      "back": "← Toutes les commandes",
+      "loading": "Chargement de la commande…",
+      "error": "Impossible de charger cette commande.",
+      "placedOn": "Passée le",
+      "status": "Statut",
+      "qty": "Qté",
+      "shippingAddress": "Adresse de livraison",
+      "billingAddress": "Adresse de facturation",
+      "payment": "Paiement",
+      "paymentCard": "Carte se terminant par {{lastFour}}"
+    }
+  },
+  "es": {
+    "modalTitle": "Cuenta",
+    "nav": {
+      "overview": "Mi cuenta",
+      "information": "Información de la cuenta",
+      "address": "Direcciones",
+      "orders": "Historial de pedidos"
+    },
+    "greeting": "Bienvenido de nuevo",
+    "panels": {
+      "overview": {
+        "title": "Mi cuenta",
+        "intro": "El resumen de su cuenta se carga desde el servicio de cuenta cuando ha iniciado sesión."
+      },
+      "information": {
+        "title": "Información de la cuenta"
+      },
+      "address": {
+        "title": "Direcciones"
+      },
+      "orders": {
+        "title": "Historial de pedidos"
+      }
+    },
+    "overviewLabels": {
+      "displayName": "Nombre",
+      "email": "Correo",
+      "memberSince": "Miembro desde",
+      "accountStatus": "Estado de la cuenta",
+      "storeRegion": "Tienda"
+    },
+    "customerInfo": {
+      "email": "Correo",
+      "name": "Nombre",
+      "phone": "Teléfono",
+      "customerId": "ID de cliente",
+      "preferredLanguage": "Idioma preferido",
+      "accountStatus": "Estado de la cuenta",
+      "created": "Miembro desde",
+      "updated": "Última actualización"
+    },
+    "countries": {
+      "us": "Estados Unidos",
+      "ca": "Canadá",
+      "mx": "México"
+    },
+    "addressBook": {
+      "add": "Añadir dirección",
+      "edit": "Editar",
+      "remove": "Eliminar",
+      "save": "Guardar",
+      "cancel": "Cancelar",
+      "deleteConfirm": "¿Eliminar esta dirección?",
+      "dialogAddTitle": "Nueva dirección",
+      "dialogEditTitle": "Editar dirección",
+      "firstName": "Nombre",
+      "lastName": "Apellido",
+      "email": "Correo",
+      "address1": "Dirección",
+      "address2": "Apartamento, suite, etc. (opcional)",
+      "city": "Ciudad",
+      "country": "País",
+      "phone": "Teléfono",
+      "defaultAddress": "Dirección predeterminada",
+      "zipUs": "Código ZIP",
+      "postalOther": "Código postal",
+      "stateUs": "Estado",
+      "stateCa": "Provincia",
+      "stateMx": "Estado",
+      "regionPlaceholder": "Seleccione estado o provincia",
+      "emptyList": "No hay direcciones guardadas.",
+      "listSummaryFallback": "Dirección",
+      "validationRequired": "Complete todos los campos obligatorios.",
+      "saveError": "No se pudo guardar la dirección.",
+      "deleteError": "No se pudo eliminar la dirección.",
+      "loadDetailError": "No se pudo cargar la dirección.",
+      "defaultBadge": "Predeterminada",
+      "addressBadge": "Dirección"
+    },
+    "ordersEmpty": "Aún no hay pedidos.",
+    "logout": "Cerrar sesión",
+    "sectionSelectAria": "Menú de la cuenta",
+    "orderMock": {
+      "placed": "Realizado",
+      "total": "Total",
+      "state": "Estado"
+    },
+    "orderDetail": {
+      "back": "← Todos los pedidos",
+      "loading": "Cargando pedido…",
+      "error": "No se pudo cargar este pedido.",
+      "placedOn": "Realizado",
+      "status": "Estado",
+      "qty": "Cant.",
+      "shippingAddress": "Dirección de envío",
+      "billingAddress": "Dirección de facturación",
+      "payment": "Pago",
+      "paymentCard": "Tarjeta terminada en {{lastFour}}"
+    }
+  }
+}

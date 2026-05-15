@@ -1,7 +1,20 @@
 import { getMetadata, toClassName } from '../../scripts/aem.js';
 import { swapIcons, getCookies, getOrderPath } from '../../scripts/scripts.js';
 import { loadFragment } from '../fragment/fragment.js';
-import { AUTH_TOKEN_KEY } from '../../scripts/auth-api.js';
+import { AUTH_EVENT, getUser, isLoggedIn } from '../../scripts/auth-api.js';
+import {
+  addMagentoCacheListener, getLoggedInFromLocalStorage, getMagentoCache,
+} from '../../scripts/storage/util.js';
+import { lockBodyScroll, unlockBodyScroll } from '../../scripts/body-scroll-lock.js';
+
+/** True when OTP JWT or legacy Magento customer cache indicates signed in. */
+function isHeaderAuthSessionActive() {
+  try {
+    return isLoggedIn() || getLoggedInFromLocalStorage();
+  } catch {
+    return false;
+  }
+}
 
 const EDGE_CART_PATH = () => getOrderPath('cart');
 
@@ -468,29 +481,48 @@ export default async function decorate(block) {
   }
 
   const accountLink = block.querySelector('.icon-account').parentElement;
+  const defaultAccountLabel = (accountLink?.lastChild?.textContent ?? '').trim();
 
-  const customer = cookies.vitamix_customer;
-  if (customer) {
-    accountLink.lastChild.textContent = `${customer}'s Account`;
-  }
-
-  // --- Auth state display (all pages) ---
-
-  const updateAuthUI = (loggedIn) => {
-    accountLink.classList.toggle('is-logged-in', !!loggedIn);
+  /**
+   * Account link label: fragment default when signed out; cookie name, OTP email local-part,
+   * or Magento customer firstname when signed in (same "'s Account" pattern as legacy cookie).
+   */
+  const resolveAccountLinkLabel = (signedIn) => {
+    const cookieName = getCookies().vitamix_customer;
+    if (!signedIn) {
+      if (cookieName) return `${cookieName}'s Account`;
+      return defaultAccountLabel;
+    }
+    if (cookieName) return `${cookieName}'s Account`;
+    if (isLoggedIn()) {
+      const email = getUser()?.email;
+      if (email) {
+        const local = email.split('@')[0];
+        return `${local}'s Account`;
+      }
+    }
+    if (getLoggedInFromLocalStorage()) {
+      const first = getMagentoCache().customer?.firstname;
+      if (first) return `${first}'s Account`;
+    }
+    return defaultAccountLabel;
   };
 
-  document.addEventListener('commerce:auth-state-changed', (ev) => {
-    updateAuthUI(ev.detail.loggedIn);
-  });
+  // --- Auth state display (all pages): OTP session and/or legacy Magento customer cache ---
 
-  // restore auth UI on page load
-  try {
-    const hasToken = !!sessionStorage.getItem(AUTH_TOKEN_KEY);
-    if (hasToken) updateAuthUI(true);
-  } catch { /* ignore */ }
+  const syncHeaderAuthDisplay = () => {
+    const combined = isHeaderAuthSessionActive();
+    accountLink.classList.toggle('is-logged-in', combined);
+    if (accountLink.lastChild) {
+      accountLink.lastChild.textContent = resolveAccountLinkLabel(combined);
+    }
+  };
 
-  // --- Auth panel (edge checkout mode only) ---
+  document.addEventListener(AUTH_EVENT, syncHeaderAuthDisplay);
+  addMagentoCacheListener(syncHeaderAuthDisplay);
+  syncHeaderAuthDisplay();
+
+  // --- Auth panel + OTP account drawer (edge checkout mode only) ---
   if (window.useEdgeCheckout) {
     let authPanel = null;
     const ensureAuthPanel = async () => {
@@ -501,14 +533,96 @@ export default async function decorate(block) {
       return authPanel;
     };
 
+    /** @type {HTMLDialogElement | null} */
+    let accountMgmtDialog = null;
+    const ensureAccountManagementModal = async () => {
+      if (accountMgmtDialog) return accountMgmtDialog;
+      const base = window.hlx?.codeBasePath || '';
+      const htmlResp = await fetch(`${base}/widgets/account/account.html`);
+      const html = await htmlResp.text();
+
+      accountMgmtDialog = document.createElement('dialog');
+      accountMgmtDialog.id = 'account-management';
+      accountMgmtDialog.className = 'minicart account-management';
+      accountMgmtDialog.setAttribute('aria-expanded', 'false');
+      block.append(accountMgmtDialog);
+
+      const headerRow = document.createElement('div');
+      headerRow.className = 'slide-panel-header';
+      const accountTitle = document.createElement('h2');
+      accountTitle.textContent = 'Account';
+      const accountClose = document.createElement('button');
+      accountClose.className = 'slide-panel-close';
+      accountClose.textContent = '\u00D7';
+      accountClose.setAttribute('aria-label', 'Close');
+      headerRow.append(accountTitle, accountClose);
+
+      const bodyHost = document.createElement('div');
+      bodyHost.innerHTML = html.trim();
+      const widgetRoot = bodyHost.firstElementChild;
+      if (!widgetRoot) {
+        accountMgmtDialog.remove();
+        accountMgmtDialog = null;
+        throw new Error('account widget HTML missing root');
+      }
+      accountMgmtDialog.append(headerRow, widgetRoot);
+
+      accountClose.addEventListener('click', () => {
+        accountMgmtDialog.closeModal();
+      });
+
+      accountMgmtDialog.addEventListener('click', (event) => {
+        const rect = accountMgmtDialog.getBoundingClientRect();
+        const inside = rect.top <= event.clientY
+          && event.clientY <= rect.top + rect.height
+          && rect.left <= event.clientX
+          && event.clientX <= rect.left + rect.width;
+        if (!inside) accountMgmtDialog.closeModal();
+      });
+
+      accountMgmtDialog.addEventListener('close', () => {
+        unlockBodyScroll();
+      });
+
+      const open = () => {
+        lockBodyScroll();
+        accountMgmtDialog.showModal();
+        accountMgmtDialog.setAttribute('aria-expanded', 'true');
+      };
+      accountMgmtDialog.openModal = open;
+
+      const close = () => {
+        accountMgmtDialog.setAttribute('aria-expanded', 'false');
+        setTimeout(() => {
+          accountMgmtDialog.close();
+        }, 300);
+      };
+      accountMgmtDialog.closeModal = close;
+
+      const { default: decorateAccount } = await import(`${base}/widgets/account/account.js`);
+      await decorateAccount(widgetRoot);
+
+      return accountMgmtDialog;
+    };
+
     accountLink.addEventListener('click', async (e) => {
-      const hasToken = !!sessionStorage.getItem(AUTH_TOKEN_KEY);
-      if (!hasToken) {
+      if (!isHeaderAuthSessionActive()) {
         e.preventDefault();
         const panel = await ensureAuthPanel();
         panel.showEmailStep();
         panel.open();
+        return;
       }
+      if (isLoggedIn()) {
+        e.preventDefault();
+        try {
+          const dlg = await ensureAccountManagementModal();
+          dlg.openModal();
+        } catch {
+          /* fall through to default navigation */
+        }
+      }
+      /* Legacy Magento session only: follow account href */
     });
   }
 
@@ -623,6 +737,10 @@ export default async function decorate(block) {
         }
       });
 
+      minicart.addEventListener('close', () => {
+        unlockBodyScroll();
+      });
+
       const closeOnEmpty = (ev) => {
         if (ev.detail.action === 'empty') {
           minicart.closeModal();
@@ -631,6 +749,7 @@ export default async function decorate(block) {
 
       // open/close methods to account for transitions
       const open = () => {
+        lockBodyScroll();
         minicart.showModal();
         minicart.setAttribute('aria-expanded', true);
         document.addEventListener('cart:change', closeOnEmpty);
