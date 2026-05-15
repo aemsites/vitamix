@@ -206,17 +206,15 @@ export function getCookies() {
 
 function setAffiliateCoupon() {
   const urlParams = new URLSearchParams(window.location.search);
-  const { cjdata, cjevent, COUPON } = Object.fromEntries(urlParams);
+  const { cjevent, COUPON } = Object.fromEntries(urlParams);
 
-  if (!cjdata || !cjevent || !COUPON) return;
+  if (cjevent) {
+    localStorage.setItem('cjevent', JSON.stringify({ value: cjevent, ts: Date.now() }));
+  }
 
-  const { locale, language } = getLocaleAndLanguage();
-  const loginUrl = new URL(`https://www.vitamix.com/${locale}/${language}/checkout/cart`);
-  Object.entries({ cjdata, cjevent, COUPON }).forEach(([key, value]) => {
-    loginUrl.searchParams.set(key, value);
-  });
-
-  fetch(loginUrl.toString());
+  if (COUPON) {
+    sessionStorage.setItem('checkout_coupon_code', COUPON);
+  }
 }
 
 /**
