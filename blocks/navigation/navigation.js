@@ -355,6 +355,11 @@ export default function decorate(block) {
       }
     });
 
+    const navParts = [];
+    if (siblings.some((el, i) => i < ulIndex && el.classList.contains('button-wrapper'))) navParts.push('pre');
+    if (siblings.some((el, i) => i > ulIndex && el.classList.contains('button-wrapper'))) navParts.push('post');
+    if (navParts.length) block.dataset.nav = navParts.join(',');
+
     if (variants.includes('jump')) {
       decorateJump(block, ul, row);
     } else {
