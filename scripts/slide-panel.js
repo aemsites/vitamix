@@ -1,3 +1,5 @@
+import { lockBodyScroll, unlockBodyScroll } from './body-scroll-lock.js';
+
 /**
  * Creates a reusable slide-out dialog panel.
  * @param {string} id - Element ID for the dialog
@@ -29,7 +31,12 @@ export default function createSlidePanel(id, title, className) {
 
   dialog.append(headerRow, content);
 
+  dialog.addEventListener('close', () => {
+    unlockBodyScroll();
+  });
+
   function open() {
+    lockBodyScroll();
     dialog.showModal();
     dialog.setAttribute('aria-expanded', 'true');
   }
