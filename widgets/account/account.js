@@ -1,6 +1,6 @@
 import { loadCSS } from '../../scripts/aem.js';
 import { renderAccountAddressList } from './account-api.js';
-import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { getFormSubmissionUrl, getLocaleAndLanguage } from '../../scripts/scripts.js';
 import { getUser, logout } from '../../scripts/auth-api.js';
 
 /** Select option value for sign out (not a content section). */
@@ -91,6 +91,106 @@ export default async function decorate(widget) {
     const p = panels.information || {};
     const t = information.querySelector('.account-panel-title');
     if (t) t.textContent = p.title || '';
+    const comm = /** @type {Record<string, string>} */ (copy.communications || {});
+    const commRoot = information.querySelector('.account-communications');
+    const commTitle = information.querySelector('.account-communications-title');
+    const commQuestion = information.querySelector('.account-communications-question');
+    const commActions = information.querySelector('.account-communications-actions');
+    const commSubscribe = information.querySelector('.account-communications-subscribe');
+    const commUnsubscribe = information.querySelector('.account-communications-unsubscribe');
+    const commSuccess = information.querySelector('.account-communications-success');
+    const commError = information.querySelector('.account-communications-error');
+    if (commTitle) commTitle.textContent = comm.title || 'Communications';
+    if (commQuestion) {
+      commQuestion.textContent = comm.question
+        || 'Would you like us to send you periodic emails and newsletters from Vitamix?';
+    }
+    if (commSubscribe) commSubscribe.textContent = comm.subscribe || 'Subscribe';
+    if (commUnsubscribe) commUnsubscribe.textContent = comm.unsubscribe || 'Unsubscribe';
+
+    const setCommLoading = (loading) => {
+      [commSubscribe, commUnsubscribe].forEach((btn) => {
+        if (btn) {
+          btn.disabled = loading;
+        }
+      });
+    };
+
+    const showCommSuccess = (message) => {
+      if (commActions) commActions.hidden = true;
+      if (commError) {
+        commError.hidden = true;
+        commError.textContent = '';
+      }
+      if (commSuccess) {
+        commSuccess.textContent = message;
+        commSuccess.hidden = false;
+      }
+    };
+
+    const showCommError = (message) => {
+      if (!commError) return;
+      commError.textContent = message;
+      commError.hidden = false;
+    };
+
+    const submitNewsletterPreference = async (emailOptIn) => {
+      const trimmed = (email || '').trim();
+      if (!trimmed) return;
+      const country = window.location.pathname.split('/')[1] || 'us';
+      const leadSource = `sub-em-account-${country}`;
+      const payload = {
+        formId: `${locale}/${language}/newsletter`,
+        pageUrl: window.location.href,
+        email: trimmed,
+        mobile: '',
+        smsOptIn: false,
+        emailOptIn,
+        leadSource,
+      };
+      setCommLoading(true);
+      if (commError) {
+        commError.hidden = true;
+        commError.textContent = '';
+      }
+      try {
+        const url = getFormSubmissionUrl();
+        const resp = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        let apiMessage = '';
+        try {
+          const body = await resp.json();
+          apiMessage = body?.data?.message != null ? String(body.data.message) : '';
+        } catch {
+          /* non-JSON */
+        }
+        if (!resp.ok) {
+          showCommError(comm.error || 'Something went wrong. Please try again.');
+          return;
+        }
+        const fallback = emailOptIn
+          ? (comm.successSubscribe || 'You are subscribed to Vitamix emails.')
+          : (comm.successUnsubscribe || 'You are unsubscribed from Vitamix emails.');
+        showCommSuccess(apiMessage.trim() || fallback);
+      } catch {
+        showCommError(comm.error || 'Something went wrong. Please try again.');
+      } finally {
+        setCommLoading(false);
+      }
+    };
+
+    if (commRoot && email) {
+      commRoot.hidden = false;
+      commSubscribe?.addEventListener('click', () => {
+        submitNewsletterPreference(true);
+      });
+      commUnsubscribe?.addEventListener('click', () => {
+        submitNewsletterPreference(false);
+      });
+    }
   }
 
   const address = widget.querySelector('.account-panel[data-section="address"]');
