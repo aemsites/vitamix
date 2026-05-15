@@ -198,6 +198,7 @@ function decorateDefault(block, ul, row) {
     const link = li.querySelector('a');
     if (link && link.pathname === currentPath) {
       li.setAttribute('data-current', '');
+      link.setAttribute('aria-current', 'page');
       return;
     }
     const subUl = subLists[i];
