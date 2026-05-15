@@ -1,0 +1,23 @@
+.forms-made-in-giveaway form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-200);
+}
+
+.forms-made-in-giveaway [data-required]::after {
+  content: '*';
+  margin-left: 0.5ch;
+  color: var(--color-red);
+}
+
+.forms-made-in-giveaway .radio-group legend {
+  margin-bottom: 0.5em;
+}
+
+.forms-made-in-giveaway .radio-group .radio-option {
+  cursor: pointer;
+}
+
+.forms-made-in-giveaway .made-in-giveaway-thank-you {
+  color: var(--color-asparagus);
+}
