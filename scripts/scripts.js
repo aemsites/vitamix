@@ -214,6 +214,15 @@ function setAffiliateCoupon() {
 
   if (COUPON) {
     sessionStorage.setItem('checkout_coupon_code', COUPON);
+
+    // TODO: remove once all locales migrate off Magento — applies the coupon to the PHP cart
+    const { locale, language } = getLocaleAndLanguage();
+    if (!(locale === 'ca' && language === 'fr_ca')) {
+      const cartUrl = new URL(`https://www.vitamix.com/${locale}/${language}/checkout/cart`);
+      cartUrl.searchParams.set('cjevent', cjevent || '');
+      cartUrl.searchParams.set('COUPON', COUPON);
+      fetch(cartUrl.toString());
+    }
   }
 }
 
