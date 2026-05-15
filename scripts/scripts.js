@@ -208,15 +208,23 @@ function setAffiliateCoupon() {
   const urlParams = new URLSearchParams(window.location.search);
   const { cjdata, cjevent, COUPON } = Object.fromEntries(urlParams);
 
-  if (!cjdata || !cjevent || !COUPON) return;
+  if (cjevent) {
+    localStorage.setItem('cjevent', JSON.stringify({ value: cjevent, ts: Date.now() }));
+  }
 
-  const { locale, language } = getLocaleAndLanguage();
-  const loginUrl = new URL(`https://www.vitamix.com/${locale}/${language}/checkout/cart`);
-  Object.entries({ cjdata, cjevent, COUPON }).forEach(([key, value]) => {
-    loginUrl.searchParams.set(key, value);
-  });
+  if (COUPON) {
+    sessionStorage.setItem('checkout_coupon_code', COUPON);
 
-  fetch(loginUrl.toString());
+    // TODO: remove once all locales migrate off Magento — applies the coupon to the PHP cart
+    const { locale, language } = getLocaleAndLanguage();
+    if (!EDGE_CHECKOUT_LOCALES.includes(`${locale}/${language}`)) {
+      const cartUrl = new URL(`https://www.vitamix.com/${locale}/${language}/checkout/cart`);
+      if (cjdata) cartUrl.searchParams.set('cjdata', cjdata);
+      if (cjevent) cartUrl.searchParams.set('cjevent', cjevent);
+      cartUrl.searchParams.set('COUPON', COUPON);
+      fetch(cartUrl.toString());
+    }
+  }
 }
 
 /**
