@@ -4,6 +4,7 @@ main > .section:has(.checkout-wrapper) {
   margin-right: auto;
   margin-left: auto;
   gap: 24px;
+  isolation: isolate;
 }
 
 /* Stack section cards with spacing */
