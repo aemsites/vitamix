@@ -76,6 +76,48 @@
   font-weight: 600;
 }
 
+.coupons-country-field-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0 0 6px;
+  color: #202223;
+}
+
+.coupons-market-tabs--form {
+  margin-bottom: 4px;
+}
+
+/* Country multi-select in coupon dialogs — same look as toolbar market tabs */
+.coupons-market-tab--toggle {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  margin: 0;
+  font-weight: 500;
+}
+
+.coupons-market-tab--toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.coupons-market-tab--toggle:has(input:checked) {
+  border-color: #2c2c2e;
+  background: #202223;
+  color: #fff;
+  font-weight: 600;
+}
+
+.coupons-market-tab--toggle:has(:focus-visible) {
+  outline: 2px solid #1a56b0;
+  outline-offset: 2px;
+}
+
 .coupons-market-hint {
   margin: 0 0 16px;
   font-size: 13px;
@@ -371,6 +413,27 @@
   text-transform: uppercase;
   letter-spacing: 0.03em;
   color: #6d7175;
+}
+
+.coupons-grid-table th .pim-th-sort-btn {
+  font: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  text-align: inherit;
+}
+
+.coupons-grid-table th .pim-th-sort-btn:hover {
+  text-decoration: underline;
 }
 
 .coupons-grid-table th.coupons-grid-col-year,

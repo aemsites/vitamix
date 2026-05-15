@@ -11,7 +11,9 @@
  *   Each `CatalogPriceRule` requires `path`, `price` (string or number; server stores string).
  *   Optional `start` / `end` must be **ISO 8601** timestamps.
  *   Optional `custom` on each rule is string values only. Use **`custom.group`** for the
- *   admin calendar / grouping label.
+ *   admin calendar / grouping label. Optional **`custom.minimumSubtotal`**: plain number string
+ *   (same as `regularPrice`); when set, the storefront may require cart subtotal ≥ this value
+ *   before applying the promotion price.
  *   Optional `variants` maps sku → `{ sku, price, start?, end?, custom? }`.
  * - **Cart** `GET/PUT …/price-rules/cart`: JSON **array** of cart rules (`CartPriceRulesSchema`).
  *   Each rule may include optional **`country`** / **`locale`** (same patterns as catalog).
@@ -366,6 +368,27 @@ export function catalogRuleToPromotionRow(rule) {
     regularPrice: regular,
     salePrice: rule.price != null ? String(rule.price) : '—',
   };
+}
+
+/**
+ * Reads optional minimum-cart condition from catalog sale lines (`custom.minimumSubtotal`).
+ * Uses the first strictly positive value found (rules are normally written with the same
+ * threshold on every line).
+ *
+ * @param {CatalogPriceRule[] | null | undefined} rules
+ * @returns {string} normalized digit string for the API, or '' when absent
+ */
+export function promotionMinimumSubtotalFromRules(rules) {
+  const arr = Array.isArray(rules) ? rules : [];
+  const hit = arr.map((r) => {
+    const c = catalogCustomStringMap(r?.custom);
+    const raw = c.minimumSubtotal;
+    if (raw == null || String(raw).trim() === '') return '';
+    const digits = catalogPriceStringForApi(raw);
+    const n = parseFloat(digits);
+    return Number.isFinite(n) && n > 0 ? digits : '';
+  }).find((d) => d);
+  return hit || '';
 }
 
 /**

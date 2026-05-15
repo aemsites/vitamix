@@ -18,6 +18,7 @@ import {
   fetchCartPriceRules,
   fetchCatalogPriceRules,
   promotionCatalogGroup,
+  promotionMinimumSubtotalFromRules,
   productUrlToCatalogPath,
   putCartPriceRules,
   putCatalogPriceRules,
@@ -71,6 +72,8 @@ const ET_TIMEZONE = 'America/New_York';
  * @property {string} id
  * @property {string} title
  * @property {PromotionRow[]} rows
+ * @property {string} [minimumSubtotalDigits] normalized digits when any line has
+ *   `custom.minimumSubtotal`
  */
 
 const COUNTRIES = /** @type {const} */ (['us', 'ca', 'mx']);
@@ -105,6 +108,10 @@ const AREAS = /** @type {const} */ (['rules', 'promotions']);
  *   cartRulesList: import('./price-rules-api.js').HelixCartPriceRule[]|null,
  *   cartDataSource: 'api'|'unavailable',
  *   cartLoadError: string,
+ *   promoListSortKey: 'title'|'id'|'rows'|'mincart'|'group'|'market',
+ *   promoListSortDir: 'asc'|'desc',
+ *   cartRuleSortKey: 'title'|'id'|'min'|'off'|'freeship'|'scope'|'market',
+ *   cartRuleSortDir: 'asc'|'desc',
  * }}
  */
 const state = {
@@ -113,6 +120,10 @@ const state = {
   promoListSearch: '',
   promoListGroupFilter: '',
   cartRuleSearch: '',
+  promoListSortKey: /** @type {'title'|'id'|'rows'|'mincart'|'group'|'market'} */ ('title'),
+  promoListSortDir: /** @type {'asc'|'desc'} */ ('asc'),
+  cartRuleSortKey: /** @type {'title'|'id'|'min'|'off'|'freeship'|'scope'|'market'} */ ('title'),
+  cartRuleSortDir: /** @type {'asc'|'desc'} */ ('asc'),
   /** @type {import('./price-rules-api.js').CatalogPromotion[]} */
   catalogPromotions: [],
   /** @type {'api'|'unavailable'} */
@@ -669,9 +680,11 @@ function catalogCustomStringMap(raw) {
  * @param {import('./price-rules-api.js').CatalogPriceRule[] | undefined} [preserveFromRules]
  *   rules for this market before edit — merged by `path` so extra `custom` keys (e.g. `debug`)
  *   and `variants` survive Save
+ * @param {{ enabled: boolean, amountRaw: string } | undefined} [minCartCondition]
+ *   when `enabled`, writes `custom.minimumSubtotal` on each rule; otherwise removes that key
  * @returns {import('./price-rules-api.js').CatalogPriceRule[]}
  */
-function promotionRowsToCatalogRules(rows, group, preserveFromRules) {
+function promotionRowsToCatalogRules(rows, group, preserveFromRules, minCartCondition) {
   const g = String(group || '').trim() || String(new Date().getFullYear());
   /** @type {Map<string, import('./price-rules-api.js').CatalogPriceRule>} */
   const prevByPath = new Map(
@@ -694,6 +707,14 @@ function promotionRowsToCatalogRules(rows, group, preserveFromRules) {
     custom.group = g;
     if (regDigits) custom.regularPrice = regDigits;
     else delete custom.regularPrice;
+    if (minCartCondition && minCartCondition.enabled) {
+      const minDigits = catalogPriceStringForApi(minCartCondition.amountRaw);
+      const minN = parseFloat(minDigits);
+      if (Number.isFinite(minN) && minN > 0) custom.minimumSubtotal = minDigits;
+      else delete custom.minimumSubtotal;
+    } else {
+      delete custom.minimumSubtotal;
+    }
     rule.custom = custom;
 
     if (prevRule?.variants && typeof prevRule.variants === 'object' && !Array.isArray(prevRule.variants)) {
@@ -714,6 +735,26 @@ function readPromotionMarketFromForm(dlg) {
     throw new Error('Select a valid market');
   }
   return /** @type {(typeof COUNTRIES)[number]} */ (v);
+}
+
+/** @param {HTMLDialogElement} dlg */
+function wirePromotionMinCartConditionFields(dlg) {
+  const cb = dlg.querySelector('#pr-promo-min-cart-enabled');
+  const amt = dlg.querySelector('#pr-promo-min-cart-amount');
+  if (!(cb instanceof HTMLInputElement) || !(amt instanceof HTMLInputElement)) return;
+  const sync = () => {
+    amt.disabled = !cb.checked;
+  };
+  cb.addEventListener('change', sync);
+  sync();
+}
+
+/** @param {HTMLDialogElement} dlg */
+function readPromotionMinCartCondition(dlg) {
+  const cb = dlg.querySelector('#pr-promo-min-cart-enabled');
+  const enabled = cb instanceof HTMLInputElement && cb.checked;
+  const raw = String(dlg.querySelector('#pr-promo-min-cart-amount')?.value ?? '').trim();
+  return { enabled, amountRaw: raw };
 }
 
 /** @param {HTMLDialogElement} dlg */
@@ -1276,6 +1317,14 @@ function promotionEditFormInnerHtml(initialMarket, lines, opts = {}) {
         <label for="pr-promo-form-group">Group <span class="coupons-field-hint">(e.g. calendar year)</span></label>
         <input type="text" id="pr-promo-form-group" inputmode="text" placeholder="2026" />
       </div>
+      <div class="coupons-field coupons-field-full">
+        <label class="pr-promo-min-cart-check">
+          <input type="checkbox" id="pr-promo-min-cart-enabled" />
+          Require minimum cart subtotal
+        </label>
+        <input type="text" id="pr-promo-min-cart-amount" class="pr-promo-min-cart-amount-input" inputmode="decimal" placeholder="e.g. 100" disabled aria-label="Minimum cart subtotal (dollars)" />
+        <p class="coupons-field-hint">Optional. When enabled, each saved sale line includes <code>custom.minimumSubtotal</code> as a plain number (storefront applies the threshold when supported). Turn off to clear this condition.</p>
+      </div>
     </div>
     <div class="pr-promo-form-lines-header">
       <h3 class="pr-promo-form-lines-title">Sale lines</h3>
@@ -1485,8 +1534,10 @@ async function openPromotionAddDialog() {
   dialog.className = 'coupons-dialog coupons-dialog-wide pr-promo-form-dialog';
   dialog.innerHTML = `
     <div class="coupons-dialog-inner">
-      <h2>Add promotion</h2>
-      ${promotionEditFormInnerHtml(initial, [], { edit: false })}
+      <div class="coupons-dialog-scroll" tabindex="-1">
+        <h2 class="coupons-dialog-title">Add promotion</h2>
+        ${promotionEditFormInnerHtml(initial, [], { edit: false })}
+      </div>
       <div class="coupons-dialog-actions">
         <button type="button" class="coupons-btn" data-pr-promo-form-cancel>Cancel</button>
         <button type="button" class="coupons-btn coupons-btn-primary" data-pr-promo-form-submit>Add promotion</button>
@@ -1498,6 +1549,7 @@ async function openPromotionAddDialog() {
 
   wirePromotionFormDynamicLines(dialog);
   wirePromotionTsvImport(dialog);
+  wirePromotionMinCartConditionFields(dialog);
   wirePromotionSaleLineTableCells(dialog);
   refreshPromotionLineIndices(dialog);
   refreshPromotionSaleLinesVisuals(dialog);
@@ -1518,9 +1570,17 @@ async function openPromotionAddDialog() {
       if (!name) throw new Error('Promotion title is required');
       const group = String(dialog.querySelector('#pr-promo-form-group')?.value ?? '').trim()
         || String(new Date().getFullYear());
+      const minCart = readPromotionMinCartCondition(dialog);
+      if (minCart.enabled) {
+        const d = catalogPriceStringForApi(minCart.amountRaw);
+        const n = parseFloat(d);
+        if (!Number.isFinite(n) || n <= 0) {
+          throw new Error('Minimum cart subtotal must be a positive number when that condition is enabled.');
+        }
+      }
       const lineRows = readPromotionLineRowsFromDom(dialog);
       if (!lineRows.length) throw new Error('Add at least one sale line');
-      const rulesNew = promotionRowsToCatalogRules(lineRows, group);
+      const rulesNew = promotionRowsToCatalogRules(lineRows, group, undefined, minCart);
       for (let i = 0; i < rulesNew.length; i += 1) {
         if (countryKeyFromCatalogPath(rulesNew[i].path) !== market) {
           throw new Error(
@@ -1578,9 +1638,11 @@ async function openPromotionEditDialog(countryKey, promoId) {
   dialog.className = 'coupons-dialog coupons-dialog-wide pr-promo-form-dialog';
   dialog.innerHTML = `
     <div class="coupons-dialog-inner">
-      <h2>Edit promotion</h2>
-      ${promotionEditFormInnerHtml(ck, rows, { edit: true, promoId })}
-      <div class="pr-cart-rule-edit-dialog-actions">
+      <div class="coupons-dialog-scroll" tabindex="-1">
+        <h2 class="coupons-dialog-title">Edit promotion</h2>
+        ${promotionEditFormInnerHtml(ck, rows, { edit: true, promoId })}
+      </div>
+      <div class="coupons-dialog-actions pr-cart-rule-edit-dialog-actions">
         <button type="button" class="coupons-btn coupons-btn-danger" data-pr-promo-form-delete>Delete promotion…</button>
         <div class="pr-cart-rule-edit-actions-end">
           <button type="button" class="coupons-btn" data-pr-promo-form-cancel>Cancel</button>
@@ -1593,9 +1655,20 @@ async function openPromotionEditDialog(countryKey, promoId) {
   if (nameEl && 'value' in nameEl) /** @type {HTMLInputElement} */ (nameEl).value = promo.name || '';
   const groupEl = dialog.querySelector('#pr-promo-form-group');
   if (groupEl && 'value' in groupEl) /** @type {HTMLInputElement} */ (groupEl).value = groupGuess;
+  const minDigits = promotionMinimumSubtotalFromRules(rulesCo);
+  const minCb = dialog.querySelector('#pr-promo-min-cart-enabled');
+  const minAmt = dialog.querySelector('#pr-promo-min-cart-amount');
+  if (minCb instanceof HTMLInputElement && minAmt instanceof HTMLInputElement) {
+    if (minDigits) {
+      minCb.checked = true;
+      minAmt.value = minDigits;
+      minAmt.disabled = false;
+    }
+  }
 
   wirePromotionFormDynamicLines(dialog);
   wirePromotionTsvImport(dialog);
+  wirePromotionMinCartConditionFields(dialog);
   wirePromotionSaleLineTableCells(dialog);
   refreshPromotionLineIndices(dialog);
   refreshPromotionSaleLinesVisuals(dialog);
@@ -1627,6 +1700,14 @@ async function openPromotionEditDialog(countryKey, promoId) {
       if (!name) throw new Error('Promotion title is required');
       const group = String(dialog.querySelector('#pr-promo-form-group')?.value ?? '').trim()
         || String(new Date().getFullYear());
+      const minCart = readPromotionMinCartCondition(dialog);
+      if (minCart.enabled) {
+        const d = catalogPriceStringForApi(minCart.amountRaw);
+        const n = parseFloat(d);
+        if (!Number.isFinite(n) || n <= 0) {
+          throw new Error('Minimum cart subtotal must be a positive number when that condition is enabled.');
+        }
+      }
       const lineRows = readPromotionLineRowsFromDom(dialog);
       const list = Array.isArray(state.catalogPromotions) ? state.catalogPromotions : [];
       const idx = list.findIndex((p) => String(p.id) === String(promoId));
@@ -1639,7 +1720,7 @@ async function openPromotionEditDialog(countryKey, promoId) {
       const prev = list[idx];
       const prevMarketRules = catalogRulesForCountryTab(prev, market);
       const rulesNew = lineRows.length
-        ? promotionRowsToCatalogRules(lineRows, group, prevMarketRules)
+        ? promotionRowsToCatalogRules(lineRows, group, prevMarketRules, minCart)
         : [];
       for (let i = 0; i < rulesNew.length; i += 1) {
         if (countryKeyFromCatalogPath(rulesNew[i].path) !== market) {
@@ -1818,8 +1899,10 @@ async function openCartRuleAddDialog(defaultMarketKey) {
   dialog.className = 'coupons-dialog coupons-dialog-wide pr-cart-rule-add-dialog';
   dialog.innerHTML = `
     <div class="coupons-dialog-inner">
-      <h2>Add cart rule</h2>
-      ${cartRuleAddFormHtml(/** @type {(typeof COUNTRIES)[number]} */(initial))}
+      <div class="coupons-dialog-scroll" tabindex="-1">
+        <h2 class="coupons-dialog-title">Add cart rule</h2>
+        ${cartRuleAddFormHtml(/** @type {(typeof COUNTRIES)[number]} */(initial))}
+      </div>
       <div class="coupons-dialog-actions">
         <button type="button" class="coupons-btn" data-pr-cart-add-cancel>Cancel</button>
         <button type="button" class="coupons-btn coupons-btn-primary" data-pr-cart-add-submit>Add rule</button>
@@ -1879,9 +1962,11 @@ async function openCartRuleEditDialog(ruleId) {
   dialog.className = 'coupons-dialog coupons-dialog-wide pr-cart-rule-add-dialog';
   dialog.innerHTML = `
     <div class="coupons-dialog-inner">
-      <h2>Edit cart rule</h2>
-      ${cartRuleAddFormHtml(market, { marketLocked: true, ruleId: apiRule.id })}
-      <div class="pr-cart-rule-edit-dialog-actions">
+      <div class="coupons-dialog-scroll" tabindex="-1">
+        <h2 class="coupons-dialog-title">Edit cart rule</h2>
+        ${cartRuleAddFormHtml(market, { marketLocked: true, ruleId: apiRule.id })}
+      </div>
+      <div class="coupons-dialog-actions pr-cart-rule-edit-dialog-actions">
         <button type="button" class="coupons-btn coupons-btn-danger" data-pr-cart-rule-delete>Delete rule…</button>
         <div class="pr-cart-rule-edit-actions-end">
           <button type="button" class="coupons-btn" data-pr-cart-add-cancel>Cancel</button>
@@ -1997,6 +2082,7 @@ function promotionTableHtml(rows, thumbByProductUrl) {
  * @property {string} title
  * @property {number} rowCount
  * @property {PromotionRow[]} rows
+ * @property {string} minCartDigits normalized threshold for list display, or ''
  */
 
 /** All promotion sets for the current country (flat list). */
@@ -2010,6 +2096,7 @@ function allPromotionRowsForCountry() {
     const rulesForCo = catalogRulesForCountryTab(p, ck);
     if (!rulesForCo.length) return;
     const group = promotionCatalogGroup(p, ck);
+    const minCartDigits = promotionMinimumSubtotalFromRules(rulesForCo);
     rows.push({
       countryKey: ck,
       countryLabel: label,
@@ -2018,6 +2105,7 @@ function allPromotionRowsForCountry() {
       title: p.name,
       rowCount: rulesForCo.length,
       rows: rulesForCo.map(catalogRuleToPromotionRow),
+      minCartDigits,
     });
   });
   return rows;
@@ -2034,6 +2122,111 @@ function filteredPromotionRows() {
     );
   }
   return list;
+}
+
+/**
+ * @param {PromoListRow} a
+ * @param {PromoListRow} b
+ * @param {'title'|'id'|'rows'|'mincart'|'group'|'market'} key
+ */
+function comparePromoListRows(a, b, key) {
+  switch (key) {
+    case 'title': return String(a.title).localeCompare(String(b.title), undefined, { sensitivity: 'base' });
+    case 'id': return String(a.id).localeCompare(String(b.id), undefined, { sensitivity: 'base' });
+    case 'rows': return (a.rowCount || 0) - (b.rowCount || 0);
+    case 'mincart': {
+      const na = parseFloat(String(a.minCartDigits || '')) || 0;
+      const nb = parseFloat(String(b.minCartDigits || '')) || 0;
+      return na - nb;
+    }
+    case 'group': return String(a.group).localeCompare(String(b.group), undefined, { sensitivity: 'base', numeric: true });
+    case 'market': return String(a.countryKey).localeCompare(String(b.countryKey));
+    default: return 0;
+  }
+}
+
+/**
+ * @param {PromoListRow[]} list
+ * @param {'title'|'id'|'rows'|'mincart'|'group'|'market'} key
+ * @param {'asc'|'desc'} dir
+ */
+function sortPromoListRows(list, key, dir) {
+  const m = dir === 'desc' ? -1 : 1;
+  return list.slice().sort((a, b) => {
+    const c = comparePromoListRows(a, b, key);
+    if (c !== 0) return m * c;
+    return String(a.title).localeCompare(String(b.title), undefined, { sensitivity: 'base' });
+  });
+}
+
+/**
+ * @param {RuleRow} a
+ * @param {RuleRow} b
+ * @param {'title'|'id'|'min'|'off'|'freeship'|'scope'|'market'} key
+ */
+function compareCartRuleRows(a, b, key) {
+  switch (key) {
+    case 'title': return String(a.name).localeCompare(String(b.name), undefined, { sensitivity: 'base' });
+    case 'id': return String(a.id || '').localeCompare(String(b.id || ''), undefined, { sensitivity: 'base' });
+    case 'min': {
+      const na = parseFloat(String(a.minimumValue ?? '').replace(/,/g, '')) || 0;
+      const nb = parseFloat(String(b.minimumValue ?? '').replace(/,/g, '')) || 0;
+      return na - nb;
+    }
+    case 'off': return String(a.salesAmountOff ?? '').localeCompare(String(b.salesAmountOff ?? ''), undefined, { numeric: true, sensitivity: 'base' });
+    case 'freeship': return (/^yes$/i.test(String(a.freeShipping)) ? 1 : 0) - (/^yes$/i.test(String(b.freeShipping)) ? 1 : 0);
+    case 'scope': {
+      const sa = [a.products, a.categories].map((x) => (x != null ? String(x).trim() : '')).filter(Boolean).join(' ');
+      const sb = [b.products, b.categories].map((x) => (x != null ? String(x).trim() : '')).filter(Boolean).join(' ');
+      return sa.localeCompare(sb, undefined, { sensitivity: 'base' });
+    }
+    case 'market': return 0;
+    default: return 0;
+  }
+}
+
+/**
+ * @param {RuleRow[]} list
+ * @param {'title'|'id'|'min'|'off'|'freeship'|'scope'|'market'} key
+ * @param {'asc'|'desc'} dir
+ */
+function sortCartRuleRows(list, key, dir) {
+  const m = dir === 'desc' ? -1 : 1;
+  return list.slice().sort((a, b) => {
+    const c = compareCartRuleRows(a, b, key);
+    if (c !== 0) return m * c;
+    return String(a.name).localeCompare(String(b.name), undefined, { sensitivity: 'base' });
+  });
+}
+
+/**
+ * @param {'title'|'id'|'rows'|'mincart'|'group'|'market'} key
+ */
+function prPromoSortTh(key, label, extraClass = '') {
+  const active = state.promoListSortKey === key;
+  let aria = 'none';
+  let ind = '';
+  if (active) {
+    aria = state.promoListSortDir === 'asc' ? 'ascending' : 'descending';
+    ind = state.promoListSortDir === 'asc' ? ' ▲' : ' ▼';
+  }
+  const classAttr = extraClass.trim() ? ` class="${escapeHtml(extraClass.trim())}"` : '';
+  return `<th scope="col"${classAttr} aria-sort="${aria}"><button type="button" class="pim-th-sort-btn" data-pr-promo-sort="${escapeHtml(key)}">${escapeHtml(label)}${escapeHtml(ind)}</button></th>`;
+}
+
+/**
+ * @param {'title'|'id'|'min'|'off'|'freeship'|'scope'|'market'} key
+ */
+function prCartSortTh(key, label, extraClass = '') {
+  const active = state.cartRuleSortKey === key;
+  let aria = 'none';
+  let ind = '';
+  if (active) {
+    aria = state.cartRuleSortDir === 'asc' ? 'ascending' : 'descending';
+    ind = state.cartRuleSortDir === 'asc' ? ' ▲' : ' ▼';
+  }
+  const classAttr = extraClass.trim() ? ` class="${escapeHtml(extraClass.trim())}"` : '';
+  return `<th scope="col"${classAttr} aria-sort="${aria}"><button type="button" class="pim-th-sort-btn" data-pr-cart-sort="${escapeHtml(key)}">${escapeHtml(label)}${escapeHtml(ind)}</button></th>`;
 }
 
 function promotionGroupFilterOptionsHtml() {
@@ -2067,6 +2260,13 @@ function promoMarketTagHtml(countryKey) {
 function promoPillHtml(label, on) {
   const cl = on ? 'coupons-pill coupons-pill-on' : 'coupons-pill coupons-pill-off';
   return `<span class="${cl}">${escapeHtml(label)}</span>`;
+}
+
+/** @param {string} digits normalized plain number string */
+function formatPromotionMinCartListCell(digits) {
+  const n = parseFloat(String(digits || '').trim());
+  if (!Number.isFinite(n) || n <= 0) return '—';
+  return `≥ $${n.toFixed(2)}`;
 }
 
 function ruleSlugFromName(name) {
@@ -2278,6 +2478,7 @@ function renderCartRulesOverview() {
     return hay.includes(q);
   };
   const filtered = !q ? rules : rules.filter(ruleSearchMatch);
+  const displayRules = sortCartRuleRows(filtered, state.cartRuleSortKey, state.cartRuleSortDir);
   const searchVal = escapeHtml(state.cartRuleSearch);
 
   let tbodyHtml;
@@ -2286,7 +2487,7 @@ function renderCartRulesOverview() {
   } else if (!filtered.length) {
     tbodyHtml = '<tr><td colspan="7" class="pr-empty-cell">No rules match your search.</td></tr>';
   } else {
-    tbodyHtml = filtered
+    tbodyHtml = displayRules
       .map((r) => {
         const idx = rules.indexOf(r);
         const min = r.minimumValue != null && String(r.minimumValue).trim() !== ''
@@ -2327,19 +2528,19 @@ function renderCartRulesOverview() {
       <div class="pr-promo-api-actions">
         <button type="button" class="coupons-btn coupons-btn-primary" data-pr-cart-add>Add cart rule…</button>
       </div>
-      <span class="pim-count pr-promo-count">${filtered.length} rule${filtered.length === 1 ? '' : 's'}</span>
+      <span class="pim-count pr-promo-count">${displayRules.length} rule${displayRules.length === 1 ? '' : 's'}</span>
     </div>
     <div class="pr-promo-table-wrap pim-list-wrapper">
       <table class="pr-data-table pr-promo-grid-table" aria-label="Cart rules">
         <thead>
           <tr>
-            <th scope="col">Title</th>
-            <th scope="col">Id</th>
-            <th scope="col">Min cart</th>
-            <th scope="col">Off</th>
-            <th scope="col">Free ship</th>
-            <th scope="col">Scope</th>
-            <th scope="col" class="pr-cart-rule-col-market">Market</th>
+            ${prCartSortTh('title', 'Title', 'pr-promo-col-title')}
+            ${prCartSortTh('id', 'Id')}
+            ${prCartSortTh('min', 'Min cart')}
+            ${prCartSortTh('off', 'Off')}
+            ${prCartSortTh('freeship', 'Free ship')}
+            ${prCartSortTh('scope', 'Scope')}
+            ${prCartSortTh('market', 'Market', 'pr-cart-rule-col-market')}
           </tr>
         </thead>
         <tbody>${tbodyHtml}</tbody>
@@ -2676,9 +2877,13 @@ function promotionDetailModalInnerHtml(
     ? `through ${formatIsoForSaleLineView(String(ends[0]))} · ${n} product line${n === 1 ? '' : 's'}`
     : 'sale line entries in this promotion (dates vary per row)';
   const uniqProducts = new Set(rows.map((r) => r.product)).size;
+  const minDigits = String(set.minimumSubtotalDigits || '').trim();
+  const minN = parseFloat(minDigits);
+  const minCartDisplay = Number.isFinite(minN) && minN > 0 ? `≥ $${minN.toFixed(2)}` : '—';
   const pills = [
     promoPillHtml('Multi-line', n > 1),
     promoPillHtml('Uniform window', uniformDates),
+    promoPillHtml('Min. cart', Boolean(minDigits && Number.isFinite(minN) && minN > 0)),
   ].join('');
 
   return `
@@ -2703,6 +2908,7 @@ function promotionDetailModalInnerHtml(
       <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Group</span><span class="coupons-modal-stat-value">${commerceGroupBadgeHtml(groupLabel)}</span></div>
       <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Sale lines</span><span class="coupons-modal-stat-value">${String(n)}</span></div>
       <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Unique products</span><span class="coupons-modal-stat-value">${String(uniqProducts)}</span></div>
+      <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Min. cart</span><span class="coupons-modal-stat-value">${escapeHtml(minCartDisplay)}</span></div>
     </div>
     <div class="coupons-modal-pills" aria-label="Promotion shape">${pills}</div>
     <section class="coupons-modal-section">
@@ -2738,6 +2944,7 @@ async function openPromotionDetailModal(countryKey, promoId) {
     id: catalogPromo.id,
     title: catalogPromo.name,
     rows: rulesForCo.map(catalogRuleToPromotionRow),
+    minimumSubtotalDigits: promotionMinimumSubtotalFromRules(rulesForCo),
   };
   const countryLabel = marketLabel(countryKey) || countryKey;
   closePromotionDetailDialog();
@@ -2825,15 +3032,16 @@ async function openPromotionDetailModal(countryKey, promoId) {
 }
 
 function renderPromotionsListPanel() {
-  const list = filteredPromotionRows();
+  const baseList = filteredPromotionRows();
+  const list = sortPromoListRows(baseList, state.promoListSortKey, state.promoListSortDir);
   const searchVal = escapeHtml(state.promoListSearch);
   const hasPromos = allPromotionRowsForCountry().length > 0;
 
   let tbodyHtml;
   if (!hasPromos) {
-    tbodyHtml = '<tr><td colspan="5" class="pr-empty-cell">No catalog promotions for this country (empty API list or no matching paths).</td></tr>';
+    tbodyHtml = '<tr><td colspan="6" class="pr-empty-cell">No catalog promotions for this country (empty API list or no matching paths).</td></tr>';
   } else if (!list.length) {
-    tbodyHtml = '<tr><td colspan="5" class="pr-empty-cell">No promotions match your filters.</td></tr>';
+    tbodyHtml = '<tr><td colspan="6" class="pr-empty-cell">No promotions match your filters.</td></tr>';
   } else {
     tbodyHtml = list
       .map((r) => {
@@ -2843,6 +3051,7 @@ function renderPromotionsListPanel() {
             <td class="pr-promo-col-title">${escapeHtml(r.title)}</td>
             <td><code class="pr-promo-id-code">${escapeHtml(r.id)}</code></td>
             <td>${r.rowCount}</td>
+            <td class="pr-promo-col-mincart">${escapeHtml(formatPromotionMinCartListCell(r.minCartDigits))}</td>
             <td class="pr-promo-col-group">${commerceGroupBadgeHtml(r.group)}</td>
             <td class="pr-promo-col-market">${commerceMarketEmojiHtml(r.countryKey)}</td>
           </tr>`;
@@ -2874,11 +3083,12 @@ function renderPromotionsListPanel() {
       <table class="pr-data-table pr-promo-grid-table" aria-label="Promotions">
         <thead>
           <tr>
-            <th scope="col">Title</th>
-            <th scope="col">Id</th>
-            <th scope="col">Rows</th>
-            <th scope="col" class="pr-promo-col-group">Group</th>
-            <th scope="col" class="pr-promo-col-market">Market</th>
+            ${prPromoSortTh('title', 'Title', 'pr-promo-col-title')}
+            ${prPromoSortTh('id', 'Id')}
+            ${prPromoSortTh('rows', 'Rows')}
+            ${prPromoSortTh('mincart', 'Min. cart', 'pr-promo-col-mincart')}
+            ${prPromoSortTh('group', 'Group', 'pr-promo-col-group')}
+            ${prPromoSortTh('market', 'Market', 'pr-promo-col-market')}
           </tr>
         </thead>
         <tbody>${tbodyHtml}</tbody>
@@ -2983,6 +3193,10 @@ function render() {
       state.promoListSearch = '';
       state.promoListGroupFilter = '';
       state.cartRuleSearch = '';
+      state.promoListSortKey = 'title';
+      state.promoListSortDir = 'asc';
+      state.cartRuleSortKey = 'title';
+      state.cartRuleSortDir = 'asc';
       closeAllPricingDetailDialogs();
       render();
     });
@@ -3040,6 +3254,23 @@ function render() {
         showToast(err?.message || 'Could not open add rule', 'error');
       });
     });
+
+    mount.querySelector('table[aria-label="Cart rules"]')?.addEventListener('click', (e) => {
+      const btn = /** @type {HTMLElement | null} */ (e.target)?.closest('[data-pr-cart-sort]');
+      if (!btn || !(btn instanceof HTMLButtonElement)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const sortKey = btn.getAttribute('data-pr-cart-sort');
+      const allowed = ['title', 'id', 'min', 'off', 'freeship', 'scope', 'market'];
+      if (!sortKey || !allowed.includes(sortKey)) return;
+      if (state.cartRuleSortKey === sortKey) {
+        state.cartRuleSortDir = state.cartRuleSortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        state.cartRuleSortKey = /** @type {typeof state.cartRuleSortKey} */ (sortKey);
+        state.cartRuleSortDir = 'asc';
+      }
+      render();
+    });
   }
 
   if (state.area === 'promotions') {
@@ -3062,6 +3293,23 @@ function render() {
     mount.querySelector('#pr-promo-group')?.addEventListener('change', (e) => {
       const t = /** @type {HTMLSelectElement} */ (e.target);
       state.promoListGroupFilter = t.value;
+      render();
+    });
+
+    mount.querySelector('table[aria-label="Promotions"]')?.addEventListener('click', (e) => {
+      const btn = /** @type {HTMLElement | null} */ (e.target)?.closest('[data-pr-promo-sort]');
+      if (!btn || !(btn instanceof HTMLButtonElement)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const sortKey = btn.getAttribute('data-pr-promo-sort');
+      const allowed = ['title', 'id', 'rows', 'mincart', 'group', 'market'];
+      if (!sortKey || !allowed.includes(sortKey)) return;
+      if (state.promoListSortKey === sortKey) {
+        state.promoListSortDir = state.promoListSortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        state.promoListSortKey = /** @type {typeof state.promoListSortKey} */ (sortKey);
+        state.promoListSortDir = 'asc';
+      }
       render();
     });
 

@@ -220,6 +220,27 @@
   white-space: nowrap;
 }
 
+.pr-data-table th .pim-th-sort-btn {
+  font: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  text-align: inherit;
+}
+
+.pr-data-table th .pim-th-sort-btn:hover {
+  text-decoration: underline;
+}
+
 .pr-data-table tbody tr:hover {
   background: #f9f9f9;
 }
@@ -331,6 +352,25 @@
 .pr-promo-col-title {
   font-weight: 500;
   color: #202223;
+}
+
+.pr-promo-grid-table thead th.pr-promo-col-mincart,
+.pr-promo-col-mincart {
+  text-align: right;
+  width: 1%;
+  white-space: nowrap;
+}
+
+.pr-promo-min-cart-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.pr-promo-min-cart-amount-input {
+  max-width: 200px;
 }
 
 .pr-promo-grid-table thead th.pr-promo-col-group,
@@ -608,7 +648,6 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 10px;
-  margin-top: 14px;
 }
 
 .pr-cart-rule-edit-actions-end {

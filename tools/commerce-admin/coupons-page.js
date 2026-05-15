@@ -1,6 +1,8 @@
 /**
  * Coupons — ProductBus: types at …/coupons/types; codes at …/coupons;
  * batch at …/coupons/batch. UI: “coupon” / “code”; nav on selected coupon.
+ * Coupon type bodies use camelCase fields such as `excludedCategories` and `includedCategories`
+ * (string[]); the API may also return snake_case — the form normalizes on read.
  */
 /* eslint-disable no-use-before-define, no-console */
 // render, bindCodesEvents, and open* dialogs reference each other.
@@ -32,17 +34,11 @@ let couponCategorySlugCache = { locale: '', slugs: [] };
  * Map market tab + new-coupon country to AEM products index path (see catalog).
  * @returns {string} e.g. us/en_us
  */
+/** @param {HTMLDialogElement | null | undefined} dlg */
 function localePathForCouponCategoryIndex(dlg) {
-  const countryEl = dlg?.querySelector('#cp-new-country');
-  if (countryEl?.value) {
-    const c = String(countryEl.value).trim().toLowerCase();
-    if (c === 'ca') return 'ca/en_ca';
-    if (c === 'mx') return 'us/en_us';
-    return 'us/en_us';
-  }
-  const m = state.marketFilter;
-  if (m === 'ca') return 'ca/en_ca';
-  if (m === 'mx') return 'us/en_us';
+  const c = primaryCouponCountryForCategoryIndex(dlg);
+  if (c === 'ca') return 'ca/en_ca';
+  if (c === 'mx') return 'us/en_us';
   return 'us/en_us';
 }
 
@@ -208,8 +204,7 @@ async function wireCouponCategorySuggestPanel(dlg) {
     input.addEventListener('blur', onFieldBlur);
   }
 
-  const countryEl = dlg.querySelector('#cp-new-country');
-  countryEl?.addEventListener('change', async () => {
+  const refreshSlugBagFromMarkets = async () => {
     couponCategorySlugCache = { locale: '', slugs: [] };
     try {
       slugBag.slugs = await getCategorySlugsForCoupons(localePathForCouponCategoryIndex(dlg));
@@ -217,6 +212,11 @@ async function wireCouponCategorySuggestPanel(dlg) {
       slugBag.slugs = [];
     }
     if (activeInput && !panel.hidden) render();
+  };
+  dlg.querySelectorAll('input.cp-new-country-cb, input.cp-edit-country-cb').forEach((el) => {
+    el.addEventListener('change', () => {
+      refreshSlugBagFromMarkets().catch(() => {});
+    });
   });
 
   const ac = new AbortController();
@@ -268,6 +268,69 @@ const COUPON_MARKETS = /** @type {const} */ ([
   { key: 'ca', label: 'Canada' },
   { key: 'mx', label: 'Mexico' },
 ]);
+
+/** API / id segment order — “first country” for persistence until multi-country exists. */
+const COUPON_API_COUNTRIES = /** @type {const} */ (['us', 'ca', 'mx']);
+
+/**
+ * @param {string[]} selected lower-case country keys (any order)
+ * @returns {string} first among {@link COUPON_API_COUNTRIES} present in `selected`, else `us`
+ */
+function firstCouponCountryInApiOrder(selected) {
+  const set = new Set(selected.map((s) => String(s || '').trim().toLowerCase()));
+  const hit = COUPON_API_COUNTRIES.find((k) => set.has(k));
+  return hit || 'us';
+}
+
+/**
+ * @param {HTMLDialogElement} dlg
+ * @param {string} checkboxSelector e.g. `input.cp-new-country-cb`
+ */
+function readCouponCountryCheckboxValues(dlg, checkboxSelector) {
+  const allowed = new Set(COUPON_API_COUNTRIES);
+  return [...dlg.querySelectorAll(checkboxSelector)]
+    .filter((el) => el instanceof HTMLInputElement && el.checked && !el.disabled)
+    .map((el) => String(el.value || '').trim().toLowerCase())
+    .filter((k) => allowed.has(k));
+}
+
+/**
+ * @param {HTMLDialogElement} dlg
+ */
+function wireCouponCountryCheckboxGuards(dlg) {
+  const groups = [
+    dlg.querySelectorAll('input.cp-new-country-cb'),
+    dlg.querySelectorAll('input.cp-edit-country-cb'),
+  ];
+  const guard = (/** @type {NodeListOf<HTMLInputElement>} */ list) => {
+    if (!list.length) return;
+    if (![...list].some((cb) => cb.checked)) {
+      const first = list[0];
+      if (first) first.checked = true;
+    }
+  };
+  groups.forEach((list) => {
+    [...list].forEach((cb) => {
+      cb.addEventListener('change', () => guard(list));
+    });
+  });
+}
+
+/**
+ * @param {HTMLDialogElement} dlg
+ * @returns {string} first country for category index locale (us|ca|mx)
+ */
+function primaryCouponCountryForCategoryIndex(dlg) {
+  if (dlg) {
+    const fromNew = readCouponCountryCheckboxValues(dlg, 'input.cp-new-country-cb');
+    if (fromNew.length) return firstCouponCountryInApiOrder(fromNew);
+    const fromEdit = readCouponCountryCheckboxValues(dlg, 'input.cp-edit-country-cb');
+    if (fromEdit.length) return firstCouponCountryInApiOrder(fromEdit);
+  }
+  const m = state.marketFilter;
+  if (m === 'ca' || m === 'mx') return m;
+  return 'us';
+}
 
 /**
  * Expected coupon type id: `us-2026-my-promo` (country-year-key).
@@ -348,17 +411,49 @@ function couponYearSelectOptionsHtml() {
     .join('');
 }
 
+/** Countries as market-style toggles (new coupon id builder). */
+function newCouponCountryCheckboxesHtml() {
+  const tabs = COUPON_MARKETS.filter((m) => m.key !== 'all')
+    .map(({ key, label }) => `
+      <label class="coupons-market-tab coupons-market-tab--toggle">
+        <input type="checkbox" class="cp-new-country-cb" value="${escapeHtml(key)}" />
+        <span class="coupons-market-tab-label">${escapeHtml(label)}</span>
+      </label>`)
+    .join('');
+  return `
+      <div class="coupons-field coupons-field-full" data-cp-new-countries>
+        <span class="coupons-country-field-label" id="cp-new-country-legend">Countries</span>
+        <div class="coupons-market-tabs coupons-market-tabs--form" role="group" aria-labelledby="cp-new-country-legend" aria-describedby="cp-new-country-hint">
+          ${tabs}
+        </div>
+        <p id="cp-new-country-hint" class="coupons-field-hint">Select at least one. The coupon id uses the <strong>first</strong> country in US → Canada → Mexico order among your selection. Multi-market on the API is not wired yet.</p>
+      </div>`;
+}
+
+/** Same toggles on edit — extra selections are UI-only until the API accepts multiple. */
+function editCouponCountryFieldsHtml() {
+  const tabs = COUPON_MARKETS.filter((m) => m.key !== 'all')
+    .map(({ key, label }) => `
+      <label class="coupons-market-tab coupons-market-tab--toggle">
+        <input type="checkbox" class="cp-edit-country-cb" value="${escapeHtml(key)}" />
+        <span class="coupons-market-tab-label">${escapeHtml(label)}</span>
+      </label>`)
+    .join('');
+  return `
+      <div class="coupons-field coupons-field-full" data-cp-edit-countries>
+        <span class="coupons-country-field-label" id="cp-edit-country-legend">Countries</span>
+        <div class="coupons-market-tabs coupons-market-tabs--form" role="group" aria-labelledby="cp-edit-country-legend">
+          ${tabs}
+        </div>
+        <p class="coupons-field-hint">Select at least one. <code>country</code> on save still follows the coupon id until the API supports multiple markets.</p>
+      </div>`;
+}
+
 /** Fields for “new coupon” id: country + year + program key (no manual full id). */
 function newCouponIdFieldsHtml() {
-  const countryOpts = COUPON_MARKETS.filter((m) => m.key !== 'all')
-    .map(({ key, label }) => `<option value="${escapeHtml(key)}">${escapeHtml(label)}</option>`)
-    .join('');
   const y0 = new Date().getFullYear();
   return `
-      <div class="coupons-field">
-        <label for="cp-new-country">Country</label>
-        <select id="cp-new-country" required>${countryOpts}</select>
-      </div>
+      ${newCouponCountryCheckboxesHtml()}
       <div class="coupons-field">
         <label for="cp-new-year">Year</label>
         <select id="cp-new-year" required>${couponYearSelectOptionsHtml()}</select>
@@ -413,7 +508,15 @@ function couponDetailModalInnerHtml(d) {
     ? `$${Number(d.maximumDiscountAmount).toFixed(2)}`
     : 'No cap';
 
-  const cats = Array.isArray(d.excludedCategories) ? d.excludedCategories : [];
+  const incCats = Array.isArray(d.includedCategories ?? d.included_categories)
+    ? /** @type {string[]} */ (d.includedCategories ?? d.included_categories)
+    : [];
+  const incCatTags = incCats.length
+    ? incCats.map((c) => `<span class="coupons-mini-tag">${escapeHtml(String(c))}</span>`).join('')
+    : '<span class="coupons-muted">None (all eligible categories)</span>';
+  const cats = Array.isArray(d.excludedCategories ?? d.excluded_categories)
+    ? /** @type {string[]} */ (d.excludedCategories ?? d.excluded_categories)
+    : [];
   const catTags = cats.length
     ? cats.map((c) => `<span class="coupons-mini-tag">${escapeHtml(String(c))}</span>`).join('')
     : '<span class="coupons-muted">None</span>';
@@ -452,6 +555,11 @@ function couponDetailModalInnerHtml(d) {
       ${pillHtml('Auto-apply', !!d.autoApply)}
       ${pillHtml('Manual entry', d.allowManualEntry !== false)}
     </div>
+    <section class="coupons-modal-section">
+      <h3 class="coupons-modal-section-title">Included categories</h3>
+      <p class="coupons-field-hint" style="margin:0 0 8px">When set, the coupon applies only to cart lines in these categories. Leave empty to allow any category unless excluded below.</p>
+      <div class="coupons-modal-tags">${incCatTags}</div>
+    </section>
     <section class="coupons-modal-section">
       <h3 class="coupons-modal-section-title">Excluded categories</h3>
       <div class="coupons-modal-tags">${catTags}</div>
@@ -670,6 +778,9 @@ const state = {
   codes: [],
   /** Cursor from the last list response; used for “Next page” requests. */
   codesNextCursor: '',
+  /** Overview grid sort (default: title A–Z). */
+  overviewSortKey: /** @type {'title'|'id'|'discount'|'min'|'cap'|'freeship'|'stack'|'year'|'market'} */ ('title'),
+  overviewSortDir: /** @type {'asc'|'desc'} */ ('asc'),
 };
 
 /** @param {'error'|'info'} tone */
@@ -715,6 +826,72 @@ function overviewCap(row) {
   if (!row || typeof row !== 'object') return '—';
   if (row.maximumDiscountAmount == null || row.maximumDiscountAmount === '') return '—';
   return `$${Number(row.maximumDiscountAmount).toFixed(2)}`;
+}
+
+/** @param {object} row coupon list row */
+function couponOverviewSortValue(row, key) {
+  const id = couponIdFromRow(row);
+  const pathSeg = parseCouponTypePath(id);
+  switch (key) {
+    case 'title': return String(row.name ?? '').toLowerCase();
+    case 'id': return id.toLowerCase();
+    case 'discount': {
+      const n = Number(row.discountValue);
+      return Number.isFinite(n) ? n : 0;
+    }
+    case 'min': {
+      const n = Number(row.minimumOrderAmount);
+      return Number.isFinite(n) ? n : 0;
+    }
+    case 'cap': {
+      const n = Number(row.maximumDiscountAmount);
+      return Number.isFinite(n) ? n : 0;
+    }
+    case 'freeship': return row.freeShipping ? 1 : 0;
+    case 'stack': return row.stackable !== false ? 1 : 0;
+    case 'year': return pathSeg && pathSeg.year ? Number(pathSeg.year) || 0 : 0;
+    case 'market': return couponMarketPrefixFromId(id);
+    default: return '';
+  }
+}
+
+/**
+ * @param {object[]} rows
+ * @param {string} key
+ * @param {'asc'|'desc'} dir
+ */
+function sortCouponOverviewRows(rows, key, dir) {
+  const numeric = new Set(['discount', 'min', 'cap', 'freeship', 'stack', 'year']);
+  const m = dir === 'desc' ? -1 : 1;
+  return rows.slice().sort((a, b) => {
+    const va = couponOverviewSortValue(a, key);
+    const vb = couponOverviewSortValue(b, key);
+    let cmp = 0;
+    if (numeric.has(key)) {
+      cmp = (Number(va) || 0) - (Number(vb) || 0);
+    } else {
+      cmp = String(va).localeCompare(String(vb), undefined, { sensitivity: 'base', numeric: true });
+    }
+    if (cmp !== 0) return m * cmp;
+    return String(a.name ?? '').localeCompare(String(b.name ?? ''), undefined, { sensitivity: 'base' });
+  });
+}
+
+/**
+ * @param {string} key
+ * @param {string} label
+ * @param {string} [extraClass]
+ */
+function couponSortableTh(key, label, extraClass = '') {
+  const active = state.overviewSortKey === key;
+  let aria = 'none';
+  let ind = '';
+  if (active) {
+    aria = state.overviewSortDir === 'asc' ? 'ascending' : 'descending';
+    ind = state.overviewSortDir === 'asc' ? ' ▲' : ' ▼';
+  }
+  const classAttr = extraClass.trim() ? ` class="${escapeHtml(extraClass.trim())}"` : '';
+  return `<th scope="col"${classAttr} aria-sort="${aria}"><button type="button" class="pim-th-sort-btn" data-cp-sort="${escapeHtml(key)}">${escapeHtml(label)}${escapeHtml(ind)}</button></th>`;
 }
 
 function renderCouponsOverviewBody(filtered) {
@@ -986,7 +1163,7 @@ function couponFormHtml({ idReadonly }) {
         <label for="cp-form-id">Coupon ID</label>
         <input type="text" id="cp-form-id" autocomplete="off" readonly class="coupons-readonly" required />
         <p class="coupons-field-hint">Ids use <code>country-year-key</code> (e.g. <code>us-2026-spring-sale</code>).</p>
-      </div>`
+      </div>${editCouponCountryFieldsHtml()}`
     : `${newCouponIdFieldsHtml()}`;
 
   return `
@@ -1017,13 +1194,14 @@ function couponFormHtml({ idReadonly }) {
         <input type="number" id="cp-form-max-cap" min="0" step="any" placeholder="empty = no cap" />
       </div>
       <div class="coupons-field coupons-field-full">
-        <label for="cp-form-included">Included category slugs <span class="coupons-field-hint">(UI only — not saved to API yet)</span></label>
+        <label for="cp-form-included">Included category slugs</label>
         <input type="text" id="cp-form-included" autocomplete="off" placeholder="Type or pick suggestions; comma separated" />
+        <p class="coupons-field-hint">When set, the coupon only applies to these categories. Leave empty for no include filter. Suggestions use the primary selected country (see Countries above).</p>
       </div>
       <div class="coupons-field coupons-field-full">
         <label for="cp-form-excluded">Excluded category slugs</label>
         <input type="text" id="cp-form-excluded" autocomplete="off" placeholder="Type or pick suggestions; comma separated" />
-        <p class="coupons-field-hint">Suggestions come from the product index for the selected market / new-coupon country (same source as catalog). Focus the field or keep typing to open the list.</p>
+        <p class="coupons-field-hint">Suggestions use the product index for the primary selected country (first among US → CA → MX when several are checked). Focus the field or keep typing to open the list.</p>
       </div>
       <div class="coupons-field coupons-field-full">
         <label class="coupons-checkbox-row"><input type="checkbox" id="cp-form-free-ship" /> Also grants <strong>free shipping</strong> when the coupon applies</label>
@@ -1062,12 +1240,14 @@ function readOptionalInt(raw) {
 function readCouponBodyFromForm(dlg, { requireId }) {
   let id = dlg.querySelector('#cp-form-id')?.value?.trim() ?? '';
   const name = dlg.querySelector('#cp-form-name')?.value?.trim();
-  if (requireId && dlg.querySelector('#cp-new-country')) {
-    const country = dlg.querySelector('#cp-new-country')?.value?.trim().toLowerCase() || '';
+  if (requireId && dlg.querySelector('input.cp-new-country-cb')) {
+    const selected = readCouponCountryCheckboxValues(dlg, 'input.cp-new-country-cb');
+    if (!selected.length) throw new Error('Select at least one country.');
+    const country = firstCouponCountryInApiOrder(selected);
     const year = dlg.querySelector('#cp-new-year')?.value?.trim() || '';
     const labelRaw = dlg.querySelector('#cp-new-label')?.value?.trim() || '';
-    if (!country || !year || !labelRaw) {
-      throw new Error('Country, year, and program key are required');
+    if (!year || !labelRaw) {
+      throw new Error('Year and program key are required');
     }
     const slug = slugifyCouponLabelSegment(labelRaw);
     if (!slug) {
@@ -1085,6 +1265,8 @@ function readCouponBodyFromForm(dlg, { requireId }) {
   const minRaw = dlg.querySelector('#cp-form-min')?.value;
   const minimumOrderAmount = minRaw != null && String(minRaw).trim() !== '' ? Number(minRaw) : 0;
   const maxCap = readOptionalInt(dlg.querySelector('#cp-form-max-cap')?.value);
+  const includedRaw = dlg.querySelector('#cp-form-included')?.value || '';
+  const includedCategories = includedRaw.split(',').map((s) => s.trim()).filter(Boolean);
   const excludedRaw = dlg.querySelector('#cp-form-excluded')?.value || '';
   const excludedCategories = excludedRaw.split(',').map((s) => s.trim()).filter(Boolean);
   const freeShipping = !!dlg.querySelector('#cp-form-free-ship')?.checked;
@@ -1103,6 +1285,7 @@ function readCouponBodyFromForm(dlg, { requireId }) {
     minimumOrderAmount: Number.isFinite(minimumOrderAmount) ? minimumOrderAmount : 0,
     maximumDiscountAmount: maxCap,
     freeShipping,
+    includedCategories,
     excludedCategories,
     stackable,
     autoApply,
@@ -1112,6 +1295,10 @@ function readCouponBodyFromForm(dlg, { requireId }) {
     notes,
   };
   const seg = parseCouponTypePath(String(body.id || ''));
+  if (dlg.querySelector('input.cp-edit-country-cb')) {
+    const editSel = readCouponCountryCheckboxValues(dlg, 'input.cp-edit-country-cb');
+    if (!editSel.length) throw new Error('Select at least one country.');
+  }
   if (seg && /^(us|ca|mx)$/.test(seg.country)) {
     body.country = seg.country;
   }
@@ -1160,6 +1347,31 @@ function pickCouponExpires(c) {
   return v != null && String(v).trim() !== '' ? String(v).trim() : '';
 }
 
+/**
+ * Edit dialog: pre-check country toggles from id (and optional future API list).
+ * @param {HTMLDialogElement} dlg
+ * @param {object} d coupon type
+ */
+function applyCouponCountryCheckboxesFromDetail(dlg, d) {
+  const editCbs = dlg.querySelectorAll('input.cp-edit-country-cb');
+  if (!editCbs.length) return;
+  const id = String(d.id ?? d.typeId ?? '').trim();
+  const seg = parseCouponTypePath(id);
+  const raw = d.countries ?? d.markets ?? d.countryCodes;
+  let keys = [];
+  if (Array.isArray(raw) && raw.length) {
+    const allowed = new Set(COUPON_API_COUNTRIES);
+    keys = raw
+      .map((x) => String(x).trim().toLowerCase())
+      .filter((k) => allowed.has(k));
+  }
+  if (!keys.length && seg) keys = [seg.country];
+  if (!keys.length) keys = ['us'];
+  editCbs.forEach((cb) => {
+    if (cb instanceof HTMLInputElement) cb.checked = keys.includes(cb.value);
+  });
+}
+
 function fillCouponForm(dlg, d) {
   if (!d) return;
   const idEl = dlg.querySelector('#cp-form-id');
@@ -1169,10 +1381,12 @@ function fillCouponForm(dlg, d) {
   dlg.querySelector('#cp-form-discount-value').value = d.discountValue != null ? String(d.discountValue) : '';
   dlg.querySelector('#cp-form-min').value = d.minimumOrderAmount != null ? String(d.minimumOrderAmount) : '';
   dlg.querySelector('#cp-form-max-cap').value = d.maximumDiscountAmount != null ? String(d.maximumDiscountAmount) : '';
+  const incList = d.includedCategories ?? d.included_categories;
   const inc = dlg.querySelector('#cp-form-included');
-  if (inc) inc.value = '';
+  if (inc) inc.value = Array.isArray(incList) ? incList.join(', ') : '';
+  const exList = d.excludedCategories ?? d.excluded_categories;
   const ex = dlg.querySelector('#cp-form-excluded');
-  if (ex) ex.value = Array.isArray(d.excludedCategories) ? d.excludedCategories.join(', ') : '';
+  if (ex) ex.value = Array.isArray(exList) ? exList.join(', ') : '';
   dlg.querySelector('#cp-form-free-ship').checked = !!d.freeShipping;
   dlg.querySelector('#cp-form-stackable').checked = d.stackable !== false;
   dlg.querySelector('#cp-form-auto').checked = !!d.autoApply;
@@ -1180,6 +1394,7 @@ function fillCouponForm(dlg, d) {
   dlg.querySelector('#cp-form-def-limit').value = d.defaultUsageLimit != null ? String(d.defaultUsageLimit) : '';
   dlg.querySelector('#cp-form-def-per-code').value = d.defaultUsesPerCode != null ? String(d.defaultUsesPerCode) : '';
   dlg.querySelector('#cp-form-notes').value = d.notes ?? '';
+  applyCouponCountryCheckboxesFromDetail(dlg, d);
 }
 
 function renderCodesSection() {
@@ -1253,7 +1468,8 @@ function render() {
   if (!mount) return;
 
   const filtered = couponsVisibleForMarket();
-  const overviewBody = renderCouponsOverviewBody(filtered);
+  const sorted = sortCouponOverviewRows(filtered, state.overviewSortKey, state.overviewSortDir);
+  const overviewBody = renderCouponsOverviewBody(sorted);
 
   mount.innerHTML = `
     <div class="coupons-toolbar pim-toolbar">
@@ -1272,15 +1488,15 @@ function render() {
         <table class="coupons-grid-table">
           <thead>
             <tr>
-              <th scope="col">Title</th>
-              <th scope="col">Id</th>
-              <th scope="col">Discount</th>
-              <th scope="col">Min order</th>
-              <th scope="col">Cap</th>
-              <th scope="col">Free ship</th>
-              <th scope="col">Stack</th>
-              <th scope="col" class="coupons-grid-col-year">Year</th>
-              <th scope="col" class="coupons-grid-col-market">Market</th>
+              ${couponSortableTh('title', 'Title')}
+              ${couponSortableTh('id', 'Id')}
+              ${couponSortableTh('discount', 'Discount')}
+              ${couponSortableTh('min', 'Min order')}
+              ${couponSortableTh('cap', 'Cap')}
+              ${couponSortableTh('freeship', 'Free ship')}
+              ${couponSortableTh('stack', 'Stack')}
+              ${couponSortableTh('year', 'Year', 'coupons-grid-col-year')}
+              ${couponSortableTh('market', 'Market', 'coupons-grid-col-market')}
             </tr>
           </thead>
           <tbody>${overviewBody}</tbody>
@@ -1305,6 +1521,24 @@ function render() {
   });
 
   mount.querySelector('[data-cp-new]')?.addEventListener('click', () => openNewCouponDialog());
+
+  mount.querySelector('table.coupons-grid-table')?.addEventListener('click', (e) => {
+    const btn = /** @type {HTMLElement | null} */ (e.target)?.closest('[data-cp-sort]');
+    if (!btn || !(btn instanceof HTMLButtonElement)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const key = btn.getAttribute('data-cp-sort');
+    if (!key) return;
+    const allowed = ['title', 'id', 'discount', 'min', 'cap', 'freeship', 'stack', 'year', 'market'];
+    if (!allowed.includes(key)) return;
+    if (state.overviewSortKey === key) {
+      state.overviewSortDir = state.overviewSortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      state.overviewSortKey = /** @type {typeof state.overviewSortKey} */ (key);
+      state.overviewSortDir = 'asc';
+    }
+    render();
+  });
 
   mount.querySelectorAll('tr.coupons-grid-row[data-cp-coupon-id]').forEach((rowEl) => {
     const openRow = async () => {
@@ -1369,24 +1603,34 @@ function openNewCouponDialog() {
     async (dlg) => {
       dlg.querySelector('#cp-form-stackable').checked = true;
       dlg.querySelector('#cp-form-manual').checked = true;
-      const countryEl = dlg.querySelector('#cp-new-country');
       const yearEl = dlg.querySelector('#cp-new-year');
       const labelEl = dlg.querySelector('#cp-new-label');
       const previewEl = dlg.querySelector('#cp-new-id-preview');
       const syncPreview = () => {
-        const country = countryEl?.value || 'us';
+        const selected = readCouponCountryCheckboxValues(dlg, 'input.cp-new-country-cb');
+        const country = selected.length ? firstCouponCountryInApiOrder(selected) : 'us';
         const year = yearEl?.value || String(new Date().getFullYear());
         const slug = slugifyCouponLabelSegment(labelEl?.value || '');
         if (previewEl) {
           previewEl.textContent = slug ? `${country}-${year}-${slug}` : `${country}-${year}-…`;
         }
       };
-      if (['us', 'ca', 'mx'].includes(state.marketFilter) && countryEl) {
-        countryEl.value = state.marketFilter;
+      dlg.querySelectorAll('input.cp-new-country-cb').forEach((cb) => {
+        if (cb instanceof HTMLInputElement) {
+          cb.checked = ['us', 'ca', 'mx'].includes(state.marketFilter) && cb.value === state.marketFilter;
+        }
+      });
+      if (!readCouponCountryCheckboxValues(dlg, 'input.cp-new-country-cb').length) {
+        const us = dlg.querySelector('input.cp-new-country-cb[value="us"]');
+        if (us instanceof HTMLInputElement) us.checked = true;
       }
-      [countryEl, yearEl, labelEl].forEach((el) => {
+      wireCouponCountryCheckboxGuards(dlg);
+      [yearEl, labelEl].forEach((el) => {
         el?.addEventListener('input', syncPreview);
         el?.addEventListener('change', syncPreview);
+      });
+      dlg.querySelectorAll('input.cp-new-country-cb').forEach((cb) => {
+        cb.addEventListener('change', syncPreview);
       });
       syncPreview();
       await wireCouponCategorySuggestPanel(dlg);
@@ -1417,6 +1661,7 @@ function openEditCouponDialog() {
     },
     async (dlg) => {
       fillCouponForm(dlg, snap);
+      wireCouponCountryCheckboxGuards(dlg);
       await wireCouponCategorySuggestPanel(dlg);
     },
     'coupons-dialog-wide',
