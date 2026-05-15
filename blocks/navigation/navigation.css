@@ -364,6 +364,10 @@ main > .navigation-container.section ~ .section h6 {
   grid-template-columns: 1fr max-content;
 }
 
+.navigation.jump:not([data-nav*="post"]) .menu {
+  grid-template-columns: 1fr;
+}
+
 .navigation.jump .menu nav {
   display: flex;
   text-transform: uppercase;

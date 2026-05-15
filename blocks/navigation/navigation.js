@@ -147,6 +147,10 @@ function decorateJump(block, ul, row) {
             if (popoverLink) popoverLink.setAttribute('aria-current', 'location');
           }
 
+          const allLinks = [...links];
+          if (link === allLinks[0]) wrapper.dataset.scroll = 'start';
+          else if (link === allLinks[allLinks.length - 1]) wrapper.dataset.scroll = 'end';
+
           const mobile = !window.matchMedia('(width >= 800px)').matches;
           const sticky = Math.abs(block.getBoundingClientRect().top) < 1;
           if (!mobile && sticky) link.scrollIntoView({ behavior: 'smooth', inline: 'center' });
