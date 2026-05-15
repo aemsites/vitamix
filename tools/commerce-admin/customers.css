@@ -169,3 +169,29 @@
   color: #6d7175;
   font-size: 14px;
 }
+
+.customers-detail-address-subtitle {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #202223;
+}
+
+.customers-detail-address-gap {
+  height: 16px;
+}
+
+.customers-order-number-list {
+  margin: 0;
+  padding: 0 0 0 1.1rem;
+  list-style: disc;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #202223;
+}
+
+.customers-order-number-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+  word-break: break-all;
+}
