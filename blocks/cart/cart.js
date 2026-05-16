@@ -85,11 +85,17 @@ export default async function decorate(block) {
       const itemEl = buildCartItem(
         item,
         {
-          onQtyChange: (sku, qty) => cart.updateItem(sku, qty),
-          onRemove: (sku) => cart.removeItem(sku),
+          onQtyChange: (key, qty) => cart.updateItem(key, qty),
+          onRemove: (key) => cart.removeItem(key),
+          onWarrantyChange: (key, warranty) => cart.updateItemWarranty(key, warranty),
           currencyCode,
         },
-        { remove: s.remove, removeItem: s.removeItem },
+        {
+          remove: s.remove,
+          removeItem: s.removeItem,
+          warranty: s.warranty,
+          free: s.free,
+        },
       );
       itemList.appendChild(itemEl);
     });

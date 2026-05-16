@@ -1,5 +1,6 @@
 import { getMetadata } from '../../scripts/aem.js';
-import { checkVariantOutOfStock, getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { checkVariantOutOfStock, getLocaleAndLanguage, getOfferPricing } from '../../scripts/scripts.js';
+import { getCartItemKey, getWarrantyPrice } from '../../scripts/commerce/warranty.js';
 
 /**
  * Renders "Find Locally" button container.
@@ -217,19 +218,30 @@ export default function renderAddToCart(ph, block, parent) {
       if (window.useEdgeCheckout) {
         const cartApi = (await import('../../scripts/cart.js')).default;
 
-        const { sku: variantSku, price, name } = selectedVariant;
+        const { sku: variantSku, name } = selectedVariant;
+        const pricing = selectedVariant.price || getOfferPricing(selectedVariant);
+        const basePrice = pricing?.final ?? (parseFloat(selectedVariant.price) || 0);
+        const warrantyOptions = parent.custom?.options?.length
+          ? [...parent.custom.options]
+          : undefined;
+        const selectedWarranty = window.selectedWarranty || warrantyOptions?.[0];
+        const unitPrice = basePrice + getWarrantyPrice(selectedWarranty);
         const item = {
           sku: variantSku ?? sku,
           parentSku: variantSku ? sku : undefined,
           quantity: parseInt(quantity, 10),
-          price,
+          basePrice,
+          unitPrice,
           name,
           url: selectedVariant.url,
           path: new URL(selectedVariant.url).pathname,
           image: selectedVariant.image[0],
           variant: window.selectedVariant?.options?.color || '',
           selectedOptions,
+          warrantyOptions,
+          selectedWarranty,
         };
+        item.key = getCartItemKey(item);
         await cartApi.addItem(item);
 
         // reenable button

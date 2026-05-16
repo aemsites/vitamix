@@ -6,6 +6,7 @@ import {
   addMagentoCacheListener, getLoggedInFromLocalStorage, getMagentoCache,
 } from '../../scripts/storage/util.js';
 import { lockBodyScroll, unlockBodyScroll } from '../../scripts/body-scroll-lock.js';
+import { cartItemDomId } from '../../scripts/commerce/warranty.js';
 
 /** True when OTP JWT or legacy Magento customer cache indicates signed in. */
 function isHeaderAuthSessionActive() {
@@ -687,7 +688,8 @@ export default async function decorate(block) {
     const scrollToItem = () => {
       if (!e.detail?.item?.sku) return;
       setTimeout(() => {
-        minicart.querySelector(`.cart-item-${e.detail.item.sku}`)?.scrollIntoView({ behavior: 'smooth' });
+        const domId = cartItemDomId(e.detail.item.key || e.detail.item.sku);
+        minicart.querySelector(`.cart-item-${domId}`)?.scrollIntoView({ behavior: 'smooth' });
       }, 300);
     };
 

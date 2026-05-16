@@ -64,6 +64,41 @@
   color: var(--commerce-color-text-muted, #6b7280);
 }
 
+.cart-item-warranty-text {
+  margin: 4px 0 0;
+  font-size: var(--commerce-font-size-xs);
+  color: var(--commerce-color-text-muted, #6b7280);
+}
+
+.cart-item-warranty-options {
+  margin: 8px 0 0;
+  padding: 0;
+  border: none;
+}
+
+.cart-item-warranty-options legend {
+  padding: 0;
+  font-size: var(--commerce-font-size-xs);
+  font-weight: 600;
+  color: var(--commerce-color-text);
+  margin-bottom: 4px;
+}
+
+.cart-item-warranty-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 4px 0 0;
+  font-size: var(--commerce-font-size-xs);
+  color: var(--commerce-color-text-muted, #6b7280);
+  cursor: pointer;
+}
+
+.cart-item-warranty-option input {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
 /* Actions row */
 .cart-item-actions {
   display: flex;

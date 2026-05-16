@@ -1,4 +1,9 @@
 import { getConfig } from './commerce-config.js';
+import {
+  getCartItemKey,
+  getItemUnitPrice,
+  selectedOptionsWithWarranty,
+} from './commerce/warranty.js';
 
 const debounce = (func, wait) => {
   let timeout;
@@ -13,7 +18,7 @@ export class Cart {
     return `cart:${getConfig().getLocale()}`;
   }
 
-  static STORAGE_VERSION = 1;
+  static STORAGE_VERSION = 2;
 
   /** @type {Record<string, CartItem>} */
   #items = {};
@@ -23,16 +28,29 @@ export class Cart {
     this.#persistNow();
   }
 
+  #normalizeItem(item) {
+    const key = item.key || getCartItemKey(item);
+    const unitPrice = getItemUnitPrice(item);
+    return {
+      ...item,
+      key,
+      unitPrice,
+      selectedOptions: item.selectedOptions
+        ?? selectedOptionsWithWarranty([], item.warrantyOptions, item.selectedWarranty),
+    };
+  }
+
   #restore() {
     const cart = localStorage.getItem(Cart.STORAGE_KEY);
     if (cart) {
       const parsed = JSON.parse(cart);
-      if (parsed.version !== Cart.STORAGE_VERSION) {
+      if (parsed.version !== Cart.STORAGE_VERSION && parsed.version !== 1) {
         localStorage.removeItem(Cart.STORAGE_KEY);
         return;
       }
-      this.#items = parsed.items.reduce((acc, item) => {
-        acc[item.sku] = item;
+      this.#items = parsed.items.reduce((acc, raw) => {
+        const item = this.#normalizeItem(raw);
+        acc[item.key] = item;
         return acc;
       }, {});
       document.dispatchEvent(
@@ -82,9 +100,7 @@ export class Cart {
 
   get subtotal() {
     return Object.values(this.#items).reduce(
-      (acc, item) => acc + item.quantity * (typeof item.price === 'string'
-        ? parseFloat(item.price)
-        : item.price / 100),
+      (acc, item) => acc + item.quantity * getItemUnitPrice(item),
       0,
     );
   }
@@ -107,17 +123,18 @@ export class Cart {
    * @param {CartItem} item
    */
   addItem(item) {
-    const existing = this.#items[item.sku];
+    const normalized = this.#normalizeItem(item);
+    const existing = this.#items[normalized.key];
     if (existing) {
-      existing.quantity += item.quantity;
+      existing.quantity += normalized.quantity;
     } else {
-      this.#items[item.sku] = item;
+      this.#items[normalized.key] = normalized;
     }
     document.dispatchEvent(
       new CustomEvent('cart:change', {
         detail: {
           cart: this,
-          item,
+          item: this.#items[normalized.key],
           action: 'add',
         },
       }),
@@ -126,19 +143,19 @@ export class Cart {
   }
 
   /**
-   * @param {string} sku
+   * @param {string} key - Cart line key ({@link getCartItemKey})
    * @param {number} quantity
    */
-  updateItem(sku, quantity) {
-    if (!this.#items[sku]) {
-      throw new Error(`Item with sku ${sku} not found`);
+  updateItem(key, quantity) {
+    if (!this.#items[key]) {
+      throw new Error(`Item with key ${key} not found`);
     }
-    this.#items[sku].quantity = quantity;
+    this.#items[key].quantity = quantity;
     document.dispatchEvent(
       new CustomEvent('cart:change', {
         detail: {
           cart: this,
-          item: this.#items[sku],
+          item: this.#items[key],
           action: 'update',
         },
       }),
@@ -148,11 +165,52 @@ export class Cart {
   }
 
   /**
-   * @param {string} sku
+   * @param {string} key
+   * @param {{ uid: string, name?: string, sku?: string, finalPrice?: string|number }} warranty
    */
-  removeItem(sku) {
-    const item = this.#items[sku];
-    delete this.#items[sku];
+  updateItemWarranty(key, warranty) {
+    const item = this.#items[key];
+    if (!item) {
+      throw new Error(`Item with key ${key} not found`);
+    }
+    const updated = this.#normalizeItem({
+      ...item,
+      selectedWarranty: warranty,
+      selectedOptions: selectedOptionsWithWarranty(
+        item.selectedOptions,
+        item.warrantyOptions,
+        warranty,
+      ),
+    });
+    if (updated.key === key) {
+      this.#items[key] = updated;
+    } else {
+      delete this.#items[key];
+      const existing = this.#items[updated.key];
+      if (existing) {
+        existing.quantity += updated.quantity;
+      } else {
+        this.#items[updated.key] = updated;
+      }
+    }
+    document.dispatchEvent(
+      new CustomEvent('cart:change', {
+        detail: {
+          cart: this,
+          item: this.#items[updated.key],
+          action: 'update-warranty',
+        },
+      }),
+    );
+    this.#persist();
+  }
+
+  /**
+   * @param {string} key
+   */
+  removeItem(key) {
+    const item = this.#items[key];
+    delete this.#items[key];
     document.dispatchEvent(
       new CustomEvent('cart:change', {
         detail: {
@@ -169,7 +227,8 @@ export class Cart {
   /**
    * Returns cart items in API-compatible format.
    * @returns {Array<{sku: string, path: string, quantity: number, name: string,
-   *   price: {final: string, currency: string}, imageUrl?: string, productUrl?: string}>}
+   *   price: {final: string, currency: string}, selected_options?: string[],
+   *   imageUrl?: string, productUrl?: string}>}
    */
   getItemsForAPI() {
     const { currency, getLocale } = getConfig();
@@ -180,9 +239,10 @@ export class Cart {
       quantity: item.quantity,
       name: item.name,
       price: {
-        final: String(item.price),
+        final: String(getItemUnitPrice(item)),
         currency: currencyCode,
       },
+      ...(item.selectedOptions?.length ? { selected_options: item.selectedOptions } : {}),
       ...(item.image ? { imageUrl: item.image } : {}),
       ...(item.url ? { productUrl: item.url } : {}),
     }));

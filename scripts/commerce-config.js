@@ -50,6 +50,7 @@ const defaults = {
       or: 'or',
       orderSummary: 'Order summary',
       discountPlaceholder: 'Discount code or gift card',
+      warranty: 'Warranty',
     },
     'fr-ca': {
       stepCart: 'Panier',
@@ -70,6 +71,7 @@ const defaults = {
       or: 'ou',
       orderSummary: 'Récapitulatif de commande',
       discountPlaceholder: 'Code de réduction ou carte-cadeau',
+      warranty: 'Garantie',
     },
   },
   getStrings() {

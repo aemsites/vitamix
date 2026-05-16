@@ -162,6 +162,13 @@ export default async function decorate(block) {
         details.appendChild(variant);
       }
 
+      if (item.selectedWarranty?.name) {
+        const warranty = document.createElement('p');
+        warranty.className = 'order-item-variant';
+        warranty.textContent = `Warranty: ${item.selectedWarranty.name}`;
+        details.appendChild(warranty);
+      }
+
       const qty = document.createElement('p');
       qty.className = 'order-item-qty';
       qty.textContent = `Qty: ${item.quantity}`;
@@ -171,7 +178,8 @@ export default async function decorate(block) {
 
       const price = document.createElement('div');
       price.className = 'order-item-price';
-      const unitPrice = parseFloat(item.price?.final || item.price) || 0;
+      const unitPrice = item.unitPrice
+        ?? (parseFloat(item.price?.final || item.price) || 0);
       price.textContent = formatPrice(unitPrice * item.quantity, currencyCode);
       itemEl.appendChild(price);
 
