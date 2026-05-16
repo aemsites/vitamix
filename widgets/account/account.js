@@ -1,5 +1,5 @@
 import { loadCSS } from '../../scripts/aem.js';
-import { renderAccountAddressList } from './account-api.js';
+import { fetchFormsProfile, renderAccountAddressList } from './account-api.js';
 import { getFormSubmissionUrl, getLocaleAndLanguage } from '../../scripts/scripts.js';
 import { getUser, logout } from '../../scripts/auth-api.js';
 
@@ -94,37 +94,47 @@ export default async function decorate(widget) {
     const comm = /** @type {Record<string, string>} */ (copy.communications || {});
     const commRoot = information.querySelector('.account-communications');
     const commTitle = information.querySelector('.account-communications-title');
-    const commQuestion = information.querySelector('.account-communications-question');
+    const commQuestionCopy = information.querySelector('.account-communications-question-copy');
+    const commQuestionShimmer = information.querySelector('.account-communications-question-shimmer');
     const commActions = information.querySelector('.account-communications-actions');
+    const commBtnShimmer = information.querySelector('.account-communications-btn-shimmer');
     const commSubscribe = information.querySelector('.account-communications-subscribe');
     const commUnsubscribe = information.querySelector('.account-communications-unsubscribe');
-    const commSuccess = information.querySelector('.account-communications-success');
     const commError = information.querySelector('.account-communications-error');
     if (commTitle) commTitle.textContent = comm.title || 'Communications';
-    if (commQuestion) {
-      commQuestion.textContent = comm.question
-        || 'Would you like us to send you periodic emails and newsletters from Vitamix?';
-    }
     if (commSubscribe) commSubscribe.textContent = comm.subscribe || 'Subscribe';
     if (commUnsubscribe) commUnsubscribe.textContent = comm.unsubscribe || 'Unsubscribe';
 
-    const setCommLoading = (loading) => {
-      [commSubscribe, commUnsubscribe].forEach((btn) => {
-        if (btn) {
-          btn.disabled = loading;
-        }
-      });
+    /** @type {boolean} */
+    let emailOptInStatus = false;
+
+    /** Buttons use a class for visibility — site `button.button { display: inline-block }` overrides `[hidden]`. */
+    const COMM_VISIBLE = 'is-visible';
+
+    const applyCommCopy = () => {
+      if (!commQuestionCopy) return;
+      const subscribed = emailOptInStatus === true;
+      commQuestionCopy.textContent = subscribed
+        ? (comm.questionSubscribed
+          || 'You are currently subscribed to periodic emails and newsletters from Vitamix.')
+        : (comm.question
+          || 'Would you like us to send you periodic emails and newsletters from Vitamix?');
     };
 
-    const showCommSuccess = (message) => {
-      if (commActions) commActions.hidden = true;
+    const setCommBusy = (busy) => {
+      commQuestionShimmer?.classList.toggle(COMM_VISIBLE, busy);
+      commBtnShimmer?.classList.toggle(COMM_VISIBLE, busy);
+      commQuestionCopy?.classList.toggle(COMM_VISIBLE, !busy);
+      if (busy) {
+        commSubscribe?.classList.remove(COMM_VISIBLE);
+        commUnsubscribe?.classList.remove(COMM_VISIBLE);
+      }
+    };
+
+    const hideCommError = () => {
       if (commError) {
         commError.hidden = true;
         commError.textContent = '';
-      }
-      if (commSuccess) {
-        commSuccess.textContent = message;
-        commSuccess.hidden = false;
       }
     };
 
@@ -132,6 +142,15 @@ export default async function decorate(widget) {
       if (!commError) return;
       commError.textContent = message;
       commError.hidden = false;
+    };
+
+    const applyCommOptInUi = () => {
+      applyCommCopy();
+      const subscribed = emailOptInStatus === true;
+      commSubscribe?.classList.toggle(COMM_VISIBLE, !subscribed);
+      commUnsubscribe?.classList.toggle(COMM_VISIBLE, subscribed);
+      if (commSubscribe) commSubscribe.disabled = false;
+      if (commUnsubscribe) commUnsubscribe.disabled = false;
     };
 
     const submitNewsletterPreference = async (emailOptIn) => {
@@ -148,11 +167,8 @@ export default async function decorate(widget) {
         emailOptIn,
         leadSource,
       };
-      setCommLoading(true);
-      if (commError) {
-        commError.hidden = true;
-        commError.textContent = '';
-      }
+      hideCommError();
+      setCommBusy(true);
       try {
         const url = getFormSubmissionUrl();
         const resp = await fetch(url, {
@@ -160,25 +176,34 @@ export default async function decorate(widget) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
-        let apiMessage = '';
-        try {
-          const body = await resp.json();
-          apiMessage = body?.data?.message != null ? String(body.data.message) : '';
-        } catch {
-          /* non-JSON */
-        }
         if (!resp.ok) {
           showCommError(comm.error || 'Something went wrong. Please try again.');
+          setCommBusy(false);
+          applyCommOptInUi();
           return;
         }
-        const fallback = emailOptIn
-          ? (comm.successSubscribe || 'You are subscribed to Vitamix emails.')
-          : (comm.successUnsubscribe || 'You are unsubscribed from Vitamix emails.');
-        showCommSuccess(apiMessage.trim() || fallback);
+        emailOptInStatus = emailOptIn;
+        setCommBusy(false);
+        applyCommOptInUi();
       } catch {
         showCommError(comm.error || 'Something went wrong. Please try again.');
+        setCommBusy(false);
+        applyCommOptInUi();
+      }
+    };
+
+    const loadCommunicationsProfile = async () => {
+      setCommBusy(true);
+      try {
+        const { profile } = await fetchFormsProfile();
+        if (profile && typeof profile.emailOptInStatus === 'boolean') {
+          emailOptInStatus = profile.emailOptInStatus;
+        }
+      } catch {
+        /* keep default not subscribed */
       } finally {
-        setCommLoading(false);
+        setCommBusy(false);
+        applyCommOptInUi();
       }
     };
 
@@ -190,6 +215,7 @@ export default async function decorate(widget) {
       commUnsubscribe?.addEventListener('click', () => {
         submitNewsletterPreference(false);
       });
+      loadCommunicationsProfile();
     }
   }
 

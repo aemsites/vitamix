@@ -269,6 +269,33 @@
   font-size: var(--commerce-font-size-sm);
   color: var(--commerce-color-text-muted);
   line-height: 1.55;
+  min-height: 1.55em;
+}
+
+.account-communications-question-copy:not(.is-visible) {
+  display: none;
+}
+
+.account-shimmer {
+  display: none;
+  border-radius: var(--commerce-input-radius, 4px);
+  background: linear-gradient(
+    90deg,
+    var(--commerce-color-border, #e0e0e0) 0%,
+    var(--commerce-color-background, #f5f5f5) 45%,
+    var(--commerce-color-border, #e0e0e0) 90%
+  );
+  background-size: 200% 100%;
+  animation: account-shimmer 1.2s ease-in-out infinite;
+}
+
+.account-shimmer.is-visible {
+  display: block;
+}
+
+.account-communications-question-shimmer {
+  width: min(100%, 28rem);
+  height: 1.1em;
 }
 
 .account-communications-actions {
@@ -276,21 +303,42 @@
   flex-wrap: wrap;
   gap: 12px;
   align-items: center;
+  min-height: 48px;
 }
 
-.account-communications-success,
+.account-communications-btn-shimmer {
+  width: 140px;
+  height: var(--commerce-button-height, 48px);
+}
+
+@keyframes account-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* `button.button { display: inline-block }` in styles.css overrides the [hidden] attribute */
+.account-communications-actions > .account-communications-btn-shimmer,
+.account-communications-actions > .button {
+  display: none !important;
+}
+
+.account-communications-actions > .account-communications-btn-shimmer.is-visible {
+  display: block !important;
+}
+
+.account-communications-actions > .button.is-visible {
+  display: inline-block !important;
+}
+
 .account-communications-error {
-  margin: 0;
+  margin: 12px 0 0;
   font-size: var(--commerce-font-size-sm);
   line-height: 1.5;
-}
-
-.account-communications-success {
-  color: var(--commerce-color-text);
-  font-weight: 500;
-}
-
-.account-communications-error {
   color: var(--commerce-color-danger, #b00020);
 }
 

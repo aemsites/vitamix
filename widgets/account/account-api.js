@@ -1,9 +1,50 @@
 import { createOptimizedPicture } from '../../scripts/aem.js';
 import { authFetch } from '../../scripts/auth-api.js';
 import { formatPrice, getConfig } from '../../scripts/commerce-config.js';
-import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { FORMS_ENDPOINT, getLocaleAndLanguage } from '../../scripts/scripts.js';
+
+/**
+ * GET URL for the signed-in user's forms profile (customer + newsletter opt-in status).
+ * @returns {string}
+ */
+function getFormsProfileUrl() {
+  const { locale, language } = getLocaleAndLanguage();
+  return `${FORMS_ENDPOINT}/${locale}/${language}/forms/profile`;
+}
 
 /* eslint-disable no-console -- VITAMIX_ACCOUNT_API_* payload logs for copy/paste integration */
+
+/**
+ * GET forms profile: customer record + newsletter opt-in status (requires Bearer token).
+ *
+ * @returns {Promise<{ customer: unknown, profile: { emailOptInStatus?: boolean, smsOptInStatus?: boolean, emailAddress?: string, mobile?: string | null } | null }>}
+ */
+export async function fetchFormsProfile() {
+  const url = getFormsProfileUrl();
+  const resp = await authFetch(url, { method: 'GET' });
+  const text = await resp.text();
+  console.log('VITAMIX_ACCOUNT_API_FORMS_PROFILE');
+  console.log(`HTTP_${resp.status}`);
+  console.log(text);
+  if (!resp.ok) {
+    throw new Error(`Profile request failed (${resp.status})`);
+  }
+  if (!text.trim()) {
+    return { customer: null, profile: null };
+  }
+  let payload = JSON.parse(text);
+  if (payload && typeof payload === 'object' && 'data' in payload && payload.data !== undefined) {
+    payload = payload.data;
+  }
+  const root = payload && typeof payload === 'object' ? /** @type {Record<string, unknown>} */ (payload) : {};
+  const profile = root.profile && typeof root.profile === 'object'
+    ? /** @type {{ emailOptInStatus?: boolean, smsOptInStatus?: boolean, emailAddress?: string, mobile?: string | null }} */ (root.profile)
+    : null;
+  return {
+    customer: root.customer ?? null,
+    profile,
+  };
+}
 
 /**
  * Base URL for customer-scoped APIs:

@@ -89,10 +89,9 @@
     "communications": {
       "title": "Communications",
       "question": "Would you like us to send you periodic emails and newsletters from Vitamix?",
+      "questionSubscribed": "You are currently subscribed to periodic emails and newsletters from Vitamix.",
       "subscribe": "Subscribe",
       "unsubscribe": "Unsubscribe",
-      "successSubscribe": "Your email preferences were updated. Thank you for subscribing.",
-      "successUnsubscribe": "Your email preferences were updated. You are unsubscribed from marketing emails.",
       "error": "Something went wrong. Please try again."
     },
     "orderDetail": {
@@ -198,10 +197,9 @@
     "communications": {
       "title": "Communications",
       "question": "Souhaitez-vous recevoir de temps à autre des courriels et bulletins Vitamix ?",
+      "questionSubscribed": "Vous êtes actuellement abonné aux courriels et bulletins périodiques de Vitamix.",
       "subscribe": "S'abonner",
       "unsubscribe": "Se désabonner",
-      "successSubscribe": "Vos préférences de courriel ont été mises à jour. Merci de votre inscription.",
-      "successUnsubscribe": "Vos préférences de courriel ont été mises à jour. Vous êtes désabonné des courriels marketing.",
       "error": "Une erreur s'est produite. Veuillez réessayer."
     },
     "orderDetail": {
@@ -307,10 +305,9 @@
     "communications": {
       "title": "Comunicaciones",
       "question": "¿Desea que le enviemos correos periódicos y boletines de Vitamix?",
+      "questionSubscribed": "Actualmente está suscrito a correos y boletines periódicos de Vitamix.",
       "subscribe": "Suscribirse",
       "unsubscribe": "Cancelar suscripción",
-      "successSubscribe": "Se actualizaron sus preferencias de correo. Gracias por suscribirse.",
-      "successUnsubscribe": "Se actualizaron sus preferencias de correo. Ya no recibirá correos de marketing.",
       "error": "Algo salió mal. Inténtelo de nuevo."
     },
     "orderDetail": {
