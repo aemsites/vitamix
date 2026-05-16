@@ -13,6 +13,22 @@ const debounce = (func, wait) => {
   };
 };
 
+/**
+ * @param {CartItem} item
+ * @returns {CartItem}
+ */
+function normalizeCartItem(item) {
+  const key = item.key || getCartItemKey(item);
+  const unitPrice = getItemUnitPrice(item);
+  return {
+    ...item,
+    key,
+    unitPrice,
+    selectedOptions: item.selectedOptions
+      ?? selectedOptionsWithWarranty([], item.warrantyOptions, item.selectedWarranty),
+  };
+}
+
 export class Cart {
   static get STORAGE_KEY() {
     return `cart:${getConfig().getLocale()}`;
@@ -28,18 +44,6 @@ export class Cart {
     this.#persistNow();
   }
 
-  #normalizeItem(item) {
-    const key = item.key || getCartItemKey(item);
-    const unitPrice = getItemUnitPrice(item);
-    return {
-      ...item,
-      key,
-      unitPrice,
-      selectedOptions: item.selectedOptions
-        ?? selectedOptionsWithWarranty([], item.warrantyOptions, item.selectedWarranty),
-    };
-  }
-
   #restore() {
     const cart = localStorage.getItem(Cart.STORAGE_KEY);
     if (cart) {
@@ -49,7 +53,7 @@ export class Cart {
         return;
       }
       this.#items = parsed.items.reduce((acc, raw) => {
-        const item = this.#normalizeItem(raw);
+        const item = normalizeCartItem(raw);
         acc[item.key] = item;
         return acc;
       }, {});
@@ -123,7 +127,7 @@ export class Cart {
    * @param {CartItem} item
    */
   addItem(item) {
-    const normalized = this.#normalizeItem(item);
+    const normalized = normalizeCartItem(item);
     const existing = this.#items[normalized.key];
     if (existing) {
       existing.quantity += normalized.quantity;
@@ -173,7 +177,7 @@ export class Cart {
     if (!item) {
       throw new Error(`Item with key ${key} not found`);
     }
-    const updated = this.#normalizeItem({
+    const updated = normalizeCartItem({
       ...item,
       selectedWarranty: warranty,
       selectedOptions: selectedOptionsWithWarranty(

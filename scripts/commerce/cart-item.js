@@ -16,13 +16,16 @@ const TRASH_ICON = /* html */`<svg width="14" height="14" viewBox="0 0 24 24" fi
 
 /**
  * @param {Object} item
- * @param {{ onQtyChange: Function, onRemove: Function, onWarrantyChange?: Function, currencyCode?: string }} callbacks
+ * @param {{ onQtyChange: Function, onRemove: Function,
+ *   onWarrantyChange?: Function, currencyCode?: string }} callbacks
  * @param {{ remove?: string, removeItem?: string, warranty?: string, free?: string }} [strings]
  * @returns {HTMLElement}
  */
 export default function buildCartItem(
   item,
-  { onQtyChange, onRemove, onWarrantyChange, currencyCode = 'USD' },
+  {
+    onQtyChange, onRemove, onWarrantyChange, currencyCode = 'USD',
+  },
   strings = {},
 ) {
   const {

@@ -47,7 +47,8 @@ export function cartItemDomId(key) {
 }
 
 /**
- * @param {{ basePrice?: number, price?: number|string|{ final?: number }, selectedWarranty?: object }} item
+ * @param {{ basePrice?: number, price?: number|string|{ final?: number },
+ *   selectedWarranty?: object }} item
  * @returns {number}
  */
 export function getItemUnitPrice(item) {

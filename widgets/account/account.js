@@ -96,7 +96,6 @@ export default async function decorate(widget) {
     const commTitle = information.querySelector('.account-communications-title');
     const commQuestionCopy = information.querySelector('.account-communications-question-copy');
     const commQuestionShimmer = information.querySelector('.account-communications-question-shimmer');
-    const commActions = information.querySelector('.account-communications-actions');
     const commBtnShimmer = information.querySelector('.account-communications-btn-shimmer');
     const commSubscribe = information.querySelector('.account-communications-subscribe');
     const commUnsubscribe = information.querySelector('.account-communications-unsubscribe');
@@ -108,7 +107,7 @@ export default async function decorate(widget) {
     /** @type {boolean} */
     let emailOptInStatus = false;
 
-    /** Buttons use a class for visibility — site `button.button { display: inline-block }` overrides `[hidden]`. */
+    /** Buttons use a class for visibility — site button styles override [hidden]. */
     const COMM_VISIBLE = 'is-visible';
 
     const applyCommCopy = () => {
