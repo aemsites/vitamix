@@ -17,7 +17,15 @@ function getFormsProfileUrl() {
 /**
  * GET forms profile: customer record + newsletter opt-in status (requires Bearer token).
  *
- * @returns {Promise<{ customer: unknown, profile: { emailOptInStatus?: boolean, smsOptInStatus?: boolean, emailAddress?: string, mobile?: string | null } | null }>}
+ * @returns {Promise<{
+ *   customer: unknown,
+ *   profile: {
+ *     emailOptInStatus?: boolean,
+ *     smsOptInStatus?: boolean,
+ *     emailAddress?: string,
+ *     mobile?: string | null,
+ *   } | null,
+ * }>}
  */
 export async function fetchFormsProfile() {
   const url = getFormsProfileUrl();
@@ -37,8 +45,16 @@ export async function fetchFormsProfile() {
     payload = payload.data;
   }
   const root = payload && typeof payload === 'object' ? /** @type {Record<string, unknown>} */ (payload) : {};
+  /**
+   * @type {{
+   *   emailOptInStatus?: boolean,
+   *   smsOptInStatus?: boolean,
+   *   emailAddress?: string,
+   *   mobile?: string | null,
+   * } | null}
+   */
   const profile = root.profile && typeof root.profile === 'object'
-    ? /** @type {{ emailOptInStatus?: boolean, smsOptInStatus?: boolean, emailAddress?: string, mobile?: string | null }} */ (root.profile)
+    ? root.profile
     : null;
   return {
     customer: root.customer ?? null,
