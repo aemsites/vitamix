@@ -136,15 +136,17 @@ These literals appear in more than one widget (good candidates for shared i18n).
 | **Address Line 2** | product-registration, manage-address |
 | **Additional comments** | wellness-program, media-contact |
 | **City** | product-registration, manage-address |
-| **Do you own a Vitamix?** | edit-account, create-account |
+| **Do you own a Vitamix?** | edit-account, create-account, made-in-giveaway |
 | **Email Address** | product-registration, media-contact, login, edit-account, create-account, contact-us |
+| **Enter your Email** | made-in-giveaway |
 | **First Name** | product-registration, media-contact, manage-address, edit-account, create-account, contact-us |
 | **Last Name** | product-registration, media-contact, manage-address, edit-account, create-account, contact-us |
 | **Phone Number** | product-registration, wellness-program, media-contact, manage-address |
 | **Postal code** | product-registration, manage-address, edit-account, create-account |
+| **Sign up** | made-in-giveaway |
 | **Submit** | wellness-program, media-contact, login, contact-us |
-| **Yes** | edit-account, create-account |
-| **No** | edit-account, create-account |
+| **Yes** | edit-account, create-account, made-in-giveaway |
+| **No** | edit-account, create-account, made-in-giveaway |
 
 ---
 
@@ -200,8 +202,9 @@ Forms use `labels` and `inputPlaceholders` from locale JSON; the following are t
 | Create account | create-account |
 | Default | article-center (sort) |
 | Domestic | contact-us |
-| Do you own a Vitamix? | edit-account, create-account |
+| Do you own a Vitamix? | edit-account, create-account, made-in-giveaway |
 | Email Address | product-registration, media-contact, login, edit-account, create-account, contact-us |
+| Enter your Email | made-in-giveaway |
 | Find your serial number | product-registration |
 | First Name | product-registration, media-contact, manage-address, edit-account, create-account, contact-us |
 | For commercial products | create-account |
@@ -231,11 +234,13 @@ Forms use `labels` and `inputPlaceholders` from locale JSON; the following are t
 | Select / Select an option | contact-us, product-registration |
 | Serial number / (18 digits) | product-registration |
 | Sending... / Searching... | multiple forms |
+| Sign up | made-in-giveaway |
 | Submit | wellness-program, media-contact, login, contact-us |
+| Thank you for entering. | made-in-giveaway |
 | Type of request | contact-us |
 | Use as default billing/shipping address | manage-address |
 | Verify Your Email / Enter verification code... | login |
-| Yes / No | edit-account, create-account |
+| Yes / No | edit-account, create-account, made-in-giveaway |
 | * Required fields | create-account |
 
 *(Form input-hint values are in each form’s `.json` under `inputPlaceholders`; the table above reflects the English defaults used in JS when the key is missing.)*
