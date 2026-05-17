@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="robots" content="noindex" />
+    <title>Vitamix Commerce Admin – Product selector (dev)</title>
+    <link rel="stylesheet" href="product-selector.css" />
+  </head>
+  <body class="ps-demo-body">
+    <main class="ps-demo-main">
+      <p class="ps-demo-back"><a href="index.html">← Commerce admin</a></p>
+      <h1>Product scope selector</h1>
+      <p class="ps-demo-lead">
+        Standalone playground for picking products (comma-separated catalog paths starting with
+        <code>/</code>) and categories (comma-separated kebab slugs). Data comes from the same AEM
+        product index as <a href="catalog.html">catalog.html</a>. Paste into the fields below or use
+        the picker; values stay in sync.
+      </p>
+
+      <div id="selector-mount" aria-label="Product scope selector"></div>
+
+      <section class="ps-demo-output" aria-label="Wire-format values">
+        <div>
+          <label for="demo-products">Products</label>
+          <input
+            type="text"
+            id="demo-products"
+            autocomplete="off"
+            placeholder="/us/en_us/products/foo, /us/en_us/products/bar|057728-04"
+          />
+          <p class="ps-demo-hint">Catalog paths; optional <code>path|sku</code> for a variant.</p>
+        </div>
+        <div>
+          <label for="demo-categories">Categories</label>
+          <input
+            type="text"
+            id="demo-categories"
+            autocomplete="off"
+            placeholder="blenders, containers-and-accessories"
+          />
+          <p class="ps-demo-hint">Category url keys from the product index.</p>
+        </div>
+      </section>
+    </main>
+    <script type="module">
+      import { mountProductSelector } from './product-selector.js';
+
+      const productsInput = document.getElementById('demo-products');
+      const categoriesInput = document.getElementById('demo-categories');
+
+      mountProductSelector(document.getElementById('selector-mount'), {
+        productsInput,
+        categoriesInput,
+      });
+    </script>
+  </body>
+</html>

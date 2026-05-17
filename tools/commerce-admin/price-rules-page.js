@@ -3,7 +3,7 @@
  * (`price-rules/catalog` → `{ promotions }`, `price-rules/cart` → JSON array).
  * Data comes only from ProductBus; failed loads show errors and empty lists.
  */
-import { waitForCommerceAuthReady } from './commerce-wait-auth-ready.js';
+import waitForCommerceAuthReady from './commerce-wait-auth-ready.js';
 import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
 import { createDetailModalHeaderCloseAndJson } from './commerce-detail-modal-json.js';
 import { mountPromoteProductionInToolbar } from './commerce-promote-production.js';

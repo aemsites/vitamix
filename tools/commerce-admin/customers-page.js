@@ -1,9 +1,10 @@
 /**
  * Customers list — ProductBus API (helix productbus-admin/customers.js pattern).
- * Row opens detail (coupon-style header, account extras, addresses, order numbers); Edit opens JSON.
+ * Row opens detail (coupon-style header, account extras, addresses, order numbers).
+ * Edit opens JSON.
  */
 import { apiFetch } from './commerce-otp-api.js';
-import { waitForCommerceAuthReady } from './commerce-wait-auth-ready.js';
+import waitForCommerceAuthReady from './commerce-wait-auth-ready.js';
 import { putOrPatchResource } from './commerce-resource-save.js';
 import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
 import { createDetailModalHeaderCloseAndJson } from './commerce-detail-modal-json.js';

@@ -158,20 +158,19 @@ export function collectCategorySlugsFromIndexRows(rows) {
   const addFromCustomCategories = (raw) => {
     if (raw == null || raw === '') return;
     if (!Array.isArray(raw)) return;
-    for (const c of raw) {
-      if (c && typeof c === 'object') {
-        const slug = String(c.url_key || c.urlKey || '').trim();
-        if (slug) set.add(slug);
-      }
-    }
+    raw.forEach((c) => {
+      if (!c || typeof c !== 'object') return;
+      const slug = String(c.url_key || c.urlKey || '').trim();
+      if (slug) set.add(slug);
+    });
   };
 
   if (!Array.isArray(rows)) return [];
-  for (const row of rows) {
-    if (!row || typeof row !== 'object') continue;
+  rows.forEach((row) => {
+    if (!row || typeof row !== 'object') return;
     addSlugListField(row.categoriesUrlKey);
     addFromCustomCategories(row.custom?.categories);
-  }
+  });
   return [...set].sort((a, b) => a.localeCompare(b));
 }
 

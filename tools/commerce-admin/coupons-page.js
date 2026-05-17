@@ -9,7 +9,7 @@
 // render, bindCodesEvents, and open* dialogs reference each other.
 // console: intentional debug logs for ProductBus coupon API failures.
 import { apiFetch, getApiEnvironment, getAuthState } from './commerce-otp-api.js';
-import { waitForCommerceAuthReady } from './commerce-wait-auth-ready.js';
+import waitForCommerceAuthReady from './commerce-wait-auth-ready.js';
 import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
 import { createDetailModalHeaderShell } from './commerce-detail-modal-json.js';
 import { mountPromoteProductionInToolbar } from './commerce-promote-production.js';
@@ -115,12 +115,12 @@ async function wireCouponCategorySuggestPanel(dlg) {
     if (!query) return list.slice(0, MAX_ROWS);
     const starts = [];
     const rest = [];
-    for (const s of list) {
+    list.forEach((s) => {
       const low = s.toLowerCase();
-      if (!low.includes(query)) continue;
+      if (!low.includes(query)) return;
       if (low.startsWith(query)) starts.push(s);
       else rest.push(s);
-    }
+    });
     starts.sort((a, b) => a.localeCompare(b));
     rest.sort((a, b) => a.localeCompare(b));
     return [...starts, ...rest].slice(0, MAX_ROWS);
@@ -133,7 +133,7 @@ async function wireCouponCategorySuggestPanel(dlg) {
     input.value = `${head}${slug}`;
   };
 
-  const render = () => {
+  const renderSuggestPanel = () => {
     if (!activeInput) return;
     const token = categoryLastToken(activeInput.value);
     const matches = filterSlugs(token);
@@ -146,7 +146,7 @@ async function wireCouponCategorySuggestPanel(dlg) {
         : 'No categories found in the product index for this locale.';
       panel.appendChild(empty);
     } else {
-      for (const slug of matches) {
+      matches.forEach((slug) => {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'cp-category-suggest-option';
@@ -159,7 +159,7 @@ async function wireCouponCategorySuggestPanel(dlg) {
           activeInput?.focus();
         });
         panel.appendChild(btn);
-      }
+      });
     }
     panel.hidden = false;
     reposition();
@@ -175,17 +175,22 @@ async function wireCouponCategorySuggestPanel(dlg) {
 
   const onFieldFocus = (/** @type {HTMLInputElement} */ input) => {
     activeInput = input;
-    render();
+    renderSuggestPanel();
   };
 
   const onFieldInput = (/** @type {HTMLInputElement} */ input) => {
-    if (activeInput === input) render();
+    if (activeInput === input) renderSuggestPanel();
   };
 
   const onFieldBlur = () => {
     window.setTimeout(() => {
       const ae = document.activeElement;
-      if (overPanel || panel.contains(ae) || ae === activeInput || inputs.includes(/** @type {any} */ (ae))) {
+      if (
+        overPanel
+        || panel.contains(ae)
+        || ae === activeInput
+        || inputs.includes(/** @type {any} */ (ae))
+      ) {
         return;
       }
       hide();
@@ -204,11 +209,11 @@ async function wireCouponCategorySuggestPanel(dlg) {
     dlg.querySelector('#cp-form-included'),
   ].filter(Boolean));
 
-  for (const input of inputs) {
+  inputs.forEach((input) => {
     input.addEventListener('focus', () => onFieldFocus(input));
     input.addEventListener('input', () => onFieldInput(input));
     input.addEventListener('blur', onFieldBlur);
-  }
+  });
 
   const refreshSlugBagFromMarkets = async () => {
     couponCategorySlugCache = { locale: '', slugs: [] };
@@ -217,7 +222,7 @@ async function wireCouponCategorySuggestPanel(dlg) {
     } catch {
       slugBag.slugs = [];
     }
-    if (activeInput && !panel.hidden) render();
+    if (activeInput && !panel.hidden) renderSuggestPanel();
   };
   dlg.querySelectorAll('input.cp-new-country-cb, input.cp-edit-country-cb').forEach((el) => {
     el.addEventListener('change', () => {

@@ -94,7 +94,12 @@ export function parseProductConditionsInput(raw) {
  * Read product conditions from helix cart rule conditions (new + legacy field names).
  *
  * @param {Record<string, unknown>} conditions
- * @returns {{ requiredProducts: string; excludedProducts: string; requiredCategories: string; excludedCategories: string }}
+ * @returns {{
+ *   requiredProducts: string;
+ *   excludedProducts: string;
+ *   requiredCategories: string;
+ *   excludedCategories: string;
+ * }}
  */
 export function cartRuleProductScopeFromConditions(conditions) {
   const c = conditions && typeof conditions === 'object' ? conditions : {};
@@ -112,7 +117,12 @@ export function cartRuleProductScopeFromConditions(conditions) {
 
 /**
  * @param {Record<string, unknown>} conditions
- * @param {{ requiredProducts: string; excludedProducts: string; requiredCategories: string; excludedCategories: string }} row
+ * @param {{
+ *   requiredProducts: string;
+ *   excludedProducts: string;
+ *   requiredCategories: string;
+ *   excludedCategories: string;
+ * }} row
  * @returns {Record<string, unknown>}
  */
 export function applyCartRuleProductScopeToConditions(conditions, row) {
@@ -146,7 +156,12 @@ export function applyCartRuleProductScopeToConditions(conditions, row) {
 /**
  * One-line scope summary for cart rule list / search.
  *
- * @param {{ requiredProducts?: string; excludedProducts?: string; requiredCategories?: string; excludedCategories?: string }} row
+ * @param {{
+ *   requiredProducts?: string;
+ *   excludedProducts?: string;
+ *   requiredCategories?: string;
+ *   excludedCategories?: string;
+ * }} row
  * @returns {string}
  */
 export function cartRuleScopeSummary(row) {

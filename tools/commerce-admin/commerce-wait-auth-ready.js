@@ -15,24 +15,32 @@ const MAX_WAIT_MS = 5 * 60 * 1000;
  * @param {string} site
  * @returns {Promise<boolean>} true if `getAuthState(…)?.token` is set before timeout
  */
-export async function waitForCommerceAuthReady(org, site) {
+export default function waitForCommerceAuthReady(org, site) {
   if (getAuthState(org, site)?.token) {
     console.log('[commerce-admin] wait-auth JWT already in sessionStorage');
-    return true;
+    return Promise.resolve(true);
   }
   console.log('[commerce-admin] wait-auth polling until JWT exists (org/site + current API env)');
   const start = Date.now();
   let ticks = 0;
-  while (Date.now() - start < MAX_WAIT_MS) {
-    if (getAuthState(org, site)?.token) {
-      console.log(`[commerce-admin] wait-auth JWT present after ${ticks} ticks (~${Date.now() - start}ms)`);
-      return true;
-    }
-    ticks += 1;
-    await new Promise((r) => {
-      setTimeout(r, TICK_MS);
-    });
-  }
-  console.log('[commerce-admin] wait-auth TIMEOUT no JWT after ~5min');
-  return false;
+
+  return new Promise((resolve) => {
+    const tick = () => {
+      if (getAuthState(org, site)?.token) {
+        console.log(
+          `[commerce-admin] wait-auth JWT present after ${ticks} ticks (~${Date.now() - start}ms)`,
+        );
+        resolve(true);
+        return;
+      }
+      if (Date.now() - start >= MAX_WAIT_MS) {
+        console.log('[commerce-admin] wait-auth TIMEOUT no JWT after ~5min');
+        resolve(false);
+        return;
+      }
+      ticks += 1;
+      setTimeout(tick, TICK_MS);
+    };
+    tick();
+  });
 }
