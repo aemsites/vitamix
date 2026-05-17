@@ -24,6 +24,12 @@ import {
   putCatalogPriceRules,
 } from './price-rules-api.js';
 import {
+  applyCartRuleProductScopeToConditions,
+  cartRuleProductScopeFromConditions,
+  cartRuleScopeSummary,
+  productConditionDisplayLabels,
+} from './product-conditions.js';
+import {
   commerceGroupBadgeHtml,
   commerceMarketEmojiHtml,
   escapeHtml,
@@ -56,8 +62,10 @@ const ET_TIMEZONE = 'America/New_York';
  * @property {string} minimumValue
  * @property {string} salesAmountOff
  * @property {string} freeShipping
- * @property {string} products
- * @property {string} categories
+ * @property {string} requiredProducts comma-separated paths (`path|sku` for variants)
+ * @property {string} excludedProducts
+ * @property {string} requiredCategories
+ * @property {string} excludedCategories
  */
 /** @typedef {object} PromotionRow
  * @property {string} start canonical UTC instant for API (or empty)
@@ -174,8 +182,7 @@ function helixCartRuleToRuleRow(rule) {
     salesAmountOff = `$${a.fixedOff}`;
   }
   const freeShipping = a.freeShipping === true ? 'Yes' : 'No';
-  const products = Array.isArray(c.products) ? c.products.join(', ') : '';
-  const categories = Array.isArray(c.categories) ? c.categories.join(', ') : '';
+  const scope = cartRuleProductScopeFromConditions(c);
   const hid = rule.id != null ? String(rule.id).trim() : '';
   return {
     id: hid,
@@ -183,8 +190,7 @@ function helixCartRuleToRuleRow(rule) {
     minimumValue,
     salesAmountOff,
     freeShipping,
-    products,
-    categories,
+    ...scope,
   };
 }
 
@@ -232,13 +238,11 @@ function ruleRowToHelixCartRule(market, row, existingRules, preserveFrom = null)
   const minNum = minRaw === '' ? 0 : Number(minRaw);
   const minimumSubtotal = Number.isFinite(minNum) && minNum >= 0 ? minNum : 0;
 
-  const products = String(row.products ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-  const categories = String(row.categories ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-
   /** @type {import('./price-rules-api.js').HelixCartPriceRule['conditions']} */
-  const conditions = { minimumSubtotal };
-  if (products.length) conditions.products = products;
-  if (categories.length) conditions.categories = categories;
+  const conditions = applyCartRuleProductScopeToConditions(
+    { minimumSubtotal },
+    row,
+  );
 
   const offRaw = String(row.salesAmountOff ?? '').trim();
   let percentVal = NaN;
@@ -1826,12 +1830,23 @@ function cartRuleAddFormHtml(initialMarket, formOptions = {}) {
         </select>
       </div>
       <div class="coupons-field coupons-field-full">
-        <label for="pr-cart-add-products">Products scope (optional)</label>
-        <input type="text" id="pr-cart-add-products" placeholder="HH Only" />
+        <label for="pr-cart-add-required-products">Required products (optional)</label>
+        <input type="text" id="pr-cart-add-required-products" autocomplete="off" placeholder="/us/en_us/products/foo, path|SKU" />
+        <p class="coupons-field-hint">Rule fires only when the cart contains at least one matching product path. Use <code>path|sku</code> to target a variant. Comma-separated.</p>
       </div>
       <div class="coupons-field coupons-field-full">
-        <label for="pr-cart-add-categories">Categories scope (optional)</label>
-        <input type="text" id="pr-cart-add-categories" placeholder="Ascent" />
+        <label for="pr-cart-add-excluded-products">Excluded products (optional)</label>
+        <input type="text" id="pr-cart-add-excluded-products" autocomplete="off" placeholder="/us/en_us/products/bar" />
+        <p class="coupons-field-hint">Rule is suppressed when the cart contains any matching product.</p>
+      </div>
+      <div class="coupons-field coupons-field-full">
+        <label for="pr-cart-add-required-categories">Required categories (optional)</label>
+        <input type="text" id="pr-cart-add-required-categories" autocomplete="off" placeholder="ascent-series" />
+        <p class="coupons-field-hint">Stored for future enforcement when category data is on cart lines.</p>
+      </div>
+      <div class="coupons-field coupons-field-full">
+        <label for="pr-cart-add-excluded-categories">Excluded categories (optional)</label>
+        <input type="text" id="pr-cart-add-excluded-categories" autocomplete="off" placeholder="refurbished" />
       </div>
     </div>`;
 }
@@ -1849,8 +1864,10 @@ function applyCartRuleFormPrefill(dlg, row) {
   setVal('#pr-cart-add-min', row.minimumValue != null ? String(row.minimumValue) : '');
   setVal('#pr-cart-add-off', row.salesAmountOff != null ? String(row.salesAmountOff) : '');
   setVal('#pr-cart-add-freeship', /^yes$/i.test(String(row.freeShipping || '').trim()) ? 'yes' : 'no');
-  setVal('#pr-cart-add-products', row.products || '');
-  setVal('#pr-cart-add-categories', row.categories || '');
+  setVal('#pr-cart-add-required-products', row.requiredProducts || '');
+  setVal('#pr-cart-add-excluded-products', row.excludedProducts || '');
+  setVal('#pr-cart-add-required-categories', row.requiredCategories || '');
+  setVal('#pr-cart-add-excluded-categories', row.excludedCategories || '');
 }
 
 /**
@@ -1867,8 +1884,10 @@ function readCartRuleAddForm(dlg) {
     minimumValue: dlg.querySelector('#pr-cart-add-min')?.value?.trim() || '',
     salesAmountOff: dlg.querySelector('#pr-cart-add-off')?.value?.trim() || '',
     freeShipping: fs,
-    products: dlg.querySelector('#pr-cart-add-products')?.value?.trim() || '',
-    categories: dlg.querySelector('#pr-cart-add-categories')?.value?.trim() || '',
+    requiredProducts: dlg.querySelector('#pr-cart-add-required-products')?.value?.trim() || '',
+    excludedProducts: dlg.querySelector('#pr-cart-add-excluded-products')?.value?.trim() || '',
+    requiredCategories: dlg.querySelector('#pr-cart-add-required-categories')?.value?.trim() || '',
+    excludedCategories: dlg.querySelector('#pr-cart-add-excluded-categories')?.value?.trim() || '',
   };
 }
 
@@ -2176,8 +2195,8 @@ function compareCartRuleRows(a, b, key) {
     case 'off': return String(a.salesAmountOff ?? '').localeCompare(String(b.salesAmountOff ?? ''), undefined, { numeric: true, sensitivity: 'base' });
     case 'freeship': return (/^yes$/i.test(String(a.freeShipping)) ? 1 : 0) - (/^yes$/i.test(String(b.freeShipping)) ? 1 : 0);
     case 'scope': {
-      const sa = [a.products, a.categories].map((x) => (x != null ? String(x).trim() : '')).filter(Boolean).join(' ');
-      const sb = [b.products, b.categories].map((x) => (x != null ? String(x).trim() : '')).filter(Boolean).join(' ');
+      const sa = cartRuleScopeSummary(a);
+      const sb = cartRuleScopeSummary(b);
       return sa.localeCompare(sb, undefined, { sensitivity: 'base' });
     }
     case 'market': return 0;
@@ -2329,12 +2348,34 @@ function cartRuleDetailModalInnerHtml(countryKey, countryLabel, rule, helixRuleI
     heroSub = 'benefit on qualifying orders';
   }
 
-  const scopeParts = [rule.products, rule.categories]
-    .map((x) => (x != null ? String(x).trim() : ''))
-    .filter(Boolean);
-  const scopeTags = scopeParts.length
-    ? scopeParts.map((p) => `<span class="coupons-mini-tag">${escapeHtml(p)}</span>`).join('')
-    : '<span class="coupons-muted">Default scope</span>';
+  const apiRule = state.cartDataSource === 'api' && helixRuleId
+    ? (state.cartRulesList || []).find((r) => String(r.id) === String(helixRuleId))
+    : null;
+  const cond = apiRule?.conditions && typeof apiRule.conditions === 'object'
+    ? apiRule.conditions
+    : {};
+  const reqProdTags = productConditionDisplayLabels(cond.requiredProducts ?? cond.products);
+  const exProdTags = productConditionDisplayLabels(cond.excludedProducts);
+  const reqCat = Array.isArray(cond.requiredCategories ?? cond.categories)
+    ? /** @type {string[]} */ (cond.requiredCategories ?? cond.categories)
+    : [];
+  const exCat = Array.isArray(cond.excludedCategories) ? cond.excludedCategories : [];
+  const scopeSections = [];
+  if (reqProdTags.length) {
+    scopeSections.push(`<p class="coupons-field-hint" style="margin:0 0 6px">Required products</p><div class="coupons-modal-tags">${reqProdTags.map((p) => `<span class="coupons-mini-tag">${escapeHtml(p)}</span>`).join('')}</div>`);
+  }
+  if (exProdTags.length) {
+    scopeSections.push(`<p class="coupons-field-hint" style="margin:0 0 6px">Excluded products</p><div class="coupons-modal-tags">${exProdTags.map((p) => `<span class="coupons-mini-tag">${escapeHtml(p)}</span>`).join('')}</div>`);
+  }
+  if (reqCat.length) {
+    scopeSections.push(`<p class="coupons-field-hint" style="margin:0 0 6px">Required categories</p><div class="coupons-modal-tags">${reqCat.map((c) => `<span class="coupons-mini-tag">${escapeHtml(String(c))}</span>`).join('')}</div>`);
+  }
+  if (exCat.length) {
+    scopeSections.push(`<p class="coupons-field-hint" style="margin:0 0 6px">Excluded categories</p><div class="coupons-modal-tags">${exCat.map((c) => `<span class="coupons-mini-tag">${escapeHtml(String(c))}</span>`).join('')}</div>`);
+  }
+  const scopeBody = scopeSections.length
+    ? scopeSections.join('')
+    : '<span class="coupons-muted">No product or category scope (all carts in this market)</span>';
 
   const pills = [
     promoPillHtml('Free shipping', fs),
@@ -2367,7 +2408,7 @@ function cartRuleDetailModalInnerHtml(countryKey, countryLabel, rule, helixRuleI
     <div class="coupons-modal-pills" aria-label="Rule flags">${pills}</div>
     <section class="coupons-modal-section">
       <h3 class="coupons-modal-section-title">Product / category scope</h3>
-      <div class="coupons-modal-tags">${scopeTags}</div>
+      ${scopeBody}
     </section>`;
 }
 
@@ -2470,8 +2511,11 @@ function renderCartRulesOverview() {
       r.minimumValue,
       r.salesAmountOff,
       r.freeShipping,
-      r.products,
-      r.categories,
+      r.requiredProducts,
+      r.excludedProducts,
+      r.requiredCategories,
+      r.excludedCategories,
+      cartRuleScopeSummary(r),
     ]
       .map((x) => String(x ?? '').toLowerCase())
       .join(' ');
@@ -2497,10 +2541,7 @@ function renderCartRulesOverview() {
           ? escapeHtml(String(r.salesAmountOff))
           : '—';
         const ship = /^yes$/i.test(String(r.freeShipping || '').trim()) ? 'Yes' : 'No';
-        const scope = [r.products, r.categories]
-          .map((x) => (x != null ? String(x).trim() : ''))
-          .filter(Boolean)
-          .join(' · ') || '—';
+        const scope = cartRuleScopeSummary(r) || '—';
         const scopeShort = scope.length > 56 ? `${escapeHtml(scope.slice(0, 53))}…` : escapeHtml(scope);
         const ruleId = (r.id && String(r.id).trim()) || ruleSlugFromName(r.name);
         const label = `Open rule ${r.name}`;

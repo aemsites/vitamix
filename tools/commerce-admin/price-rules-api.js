@@ -58,12 +58,22 @@ import { apiFetch } from './commerce-otp-api.js';
  */
 
 /**
+ * Product path (and optional variant SKU) for cart/coupon scoping.
+ *
+ * @typedef {{ path: string; sku?: string }} ProductCondition
+ */
+
+/**
  * Cart rule `conditions` / `actions` (see helix `src/schemas/PriceRules.js`).
  *
  * @typedef {object} HelixCartPriceRuleConditions
  * @property {number} [minimumSubtotal]
- * @property {string[]} [products]
- * @property {string[]} [categories]
+ * @property {ProductCondition[]} [requiredProducts]
+ * @property {ProductCondition[]} [excludedProducts]
+ * @property {string[]} [requiredCategories]
+ * @property {string[]} [excludedCategories]
+ * @property {string[]} [products] legacy SKU list (read-only compat in admin)
+ * @property {string[]} [categories] legacy alias for requiredCategories
  */
 
 /**

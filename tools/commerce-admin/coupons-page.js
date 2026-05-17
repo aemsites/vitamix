@@ -1,8 +1,9 @@
 /**
  * Coupons — ProductBus: types at …/coupons/types; codes at …/coupons;
  * batch at …/coupons/batch. UI: “coupon” / “code”; nav on selected coupon.
- * Coupon type bodies use camelCase fields such as `excludedCategories` and `includedCategories`
- * (string[]); the API may also return snake_case — the form normalizes on read.
+ * Coupon type bodies use camelCase fields such as `excludedCategories`, `includedCategories`,
+ * `includedProducts`, and `excludedProducts`; the API may also return snake_case — the form
+ * normalizes on read. Included/excluded product lists are mutually exclusive.
  */
 /* eslint-disable no-use-before-define, no-console */
 // render, bindCodesEvents, and open* dialogs reference each other.
@@ -20,6 +21,11 @@ import {
   showToast,
 } from './commerce-otp-ui.js';
 import { collectCategorySlugsFromIndexRows, fetchProductsIndexForLocale } from './pim.js';
+import {
+  formatProductConditionsForForm,
+  parseProductConditionsInput,
+  productConditionDisplayLabels,
+} from './product-conditions.js';
 
 async function readRespError(resp) {
   return resp.headers.get('x-error')
@@ -521,6 +527,15 @@ function couponDetailModalInnerHtml(d) {
     ? cats.map((c) => `<span class="coupons-mini-tag">${escapeHtml(String(c))}</span>`).join('')
     : '<span class="coupons-muted">None</span>';
 
+  const incProd = productConditionDisplayLabels(d.includedProducts ?? d.included_products);
+  const incProdTags = incProd.length
+    ? incProd.map((p) => `<span class="coupons-mini-tag">${escapeHtml(p)}</span>`).join('')
+    : '<span class="coupons-muted">None (any product unless excluded below)</span>';
+  const exProd = productConditionDisplayLabels(d.excludedProducts ?? d.excluded_products);
+  const exProdTags = exProd.length
+    ? exProd.map((p) => `<span class="coupons-mini-tag">${escapeHtml(p)}</span>`).join('')
+    : '<span class="coupons-muted">None</span>';
+
   const listBanner = state.detailFromListFallback
     ? '<div class="coupons-modal-banner">List snapshot only — edit and delete use the API path and may be unavailable.</div>'
     : '';
@@ -563,6 +578,15 @@ function couponDetailModalInnerHtml(d) {
     <section class="coupons-modal-section">
       <h3 class="coupons-modal-section-title">Excluded categories</h3>
       <div class="coupons-modal-tags">${catTags}</div>
+    </section>
+    <section class="coupons-modal-section">
+      <h3 class="coupons-modal-section-title">Included products</h3>
+      <p class="coupons-field-hint" style="margin:0 0 8px">When set, the coupon is valid only if the cart contains at least one matching product path (optional <code>path|sku</code> for a variant).</p>
+      <div class="coupons-modal-tags">${incProdTags}</div>
+    </section>
+    <section class="coupons-modal-section">
+      <h3 class="coupons-modal-section-title">Excluded products</h3>
+      <div class="coupons-modal-tags">${exProdTags}</div>
     </section>
     ${d.notes && String(d.notes).trim()
     ? `<section class="coupons-modal-section"><h3 class="coupons-modal-section-title">Notes</h3><div class="coupons-modal-notes">${escapeHtml(String(d.notes).trim())}</div></section>`
@@ -1204,6 +1228,16 @@ function couponFormHtml({ idReadonly }) {
         <p class="coupons-field-hint">Suggestions use the product index for the primary selected country (first among US → CA → MX when several are checked). Focus the field or keep typing to open the list.</p>
       </div>
       <div class="coupons-field coupons-field-full">
+        <label for="cp-form-included-products">Included product paths</label>
+        <input type="text" id="cp-form-included-products" autocomplete="off" placeholder="/us/en_us/products/foo, path|SKU" />
+        <p class="coupons-field-hint">Coupon applies only when the cart contains at least one matching product. Use <code>path|sku</code> for variant-level targeting. Cannot be set together with excluded products.</p>
+      </div>
+      <div class="coupons-field coupons-field-full">
+        <label for="cp-form-excluded-products">Excluded product paths</label>
+        <input type="text" id="cp-form-excluded-products" autocomplete="off" placeholder="/us/en_us/products/bar" />
+        <p class="coupons-field-hint">Coupon is rejected when the cart contains any matching product. Cannot be set together with included products.</p>
+      </div>
+      <div class="coupons-field coupons-field-full">
         <label class="coupons-checkbox-row"><input type="checkbox" id="cp-form-free-ship" /> Also grants <strong>free shipping</strong> when the coupon applies</label>
       </div>
       <div class="coupons-field coupons-field-full">
@@ -1269,6 +1303,15 @@ function readCouponBodyFromForm(dlg, { requireId }) {
   const includedCategories = includedRaw.split(',').map((s) => s.trim()).filter(Boolean);
   const excludedRaw = dlg.querySelector('#cp-form-excluded')?.value || '';
   const excludedCategories = excludedRaw.split(',').map((s) => s.trim()).filter(Boolean);
+  const includedProducts = parseProductConditionsInput(
+    dlg.querySelector('#cp-form-included-products')?.value || '',
+  );
+  const excludedProducts = parseProductConditionsInput(
+    dlg.querySelector('#cp-form-excluded-products')?.value || '',
+  );
+  if (includedProducts.length && excludedProducts.length) {
+    throw new Error('Included and excluded product paths cannot both be set on the same coupon.');
+  }
   const freeShipping = !!dlg.querySelector('#cp-form-free-ship')?.checked;
   const stackable = !!dlg.querySelector('#cp-form-stackable')?.checked;
   const autoApply = !!dlg.querySelector('#cp-form-auto')?.checked;
@@ -1287,6 +1330,8 @@ function readCouponBodyFromForm(dlg, { requireId }) {
     freeShipping,
     includedCategories,
     excludedCategories,
+    includedProducts,
+    excludedProducts,
     stackable,
     autoApply,
     allowManualEntry,
@@ -1387,6 +1432,14 @@ function fillCouponForm(dlg, d) {
   const exList = d.excludedCategories ?? d.excluded_categories;
   const ex = dlg.querySelector('#cp-form-excluded');
   if (ex) ex.value = Array.isArray(exList) ? exList.join(', ') : '';
+  const incProdEl = dlg.querySelector('#cp-form-included-products');
+  if (incProdEl) {
+    incProdEl.value = formatProductConditionsForForm(d.includedProducts ?? d.included_products);
+  }
+  const exProdEl = dlg.querySelector('#cp-form-excluded-products');
+  if (exProdEl) {
+    exProdEl.value = formatProductConditionsForForm(d.excludedProducts ?? d.excluded_products);
+  }
   dlg.querySelector('#cp-form-free-ship').checked = !!d.freeShipping;
   dlg.querySelector('#cp-form-stackable').checked = d.stackable !== false;
   dlg.querySelector('#cp-form-auto').checked = !!d.autoApply;
