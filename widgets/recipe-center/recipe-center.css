@@ -436,16 +436,6 @@
     padding: var(--spacing-600) var(--spacing-600) var(--spacing-600) var(--spacing-400);
     pointer-events: auto;
   }
-
-  /* results shares grid-area: results — must not intercept clicks when empty state is shown */
-  .recipe-center.has-no-results .results,
-  .recipe-center .no-results:not([hidden]) ~ .results {
-    display: none !important;
-  }
-
-  .recipe-center .results[hidden] {
-    display: none !important;
-  }
 }
 
 /* Results Grid */
@@ -560,6 +550,15 @@
 @media (width >= 1600px) {
   .recipe-center .results {
     grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* results shares grid-area: results — hide when empty state is shown (after .results grid rules) */
+@media (width >= 900px) {
+  .recipe-center.has-no-results > ul.results,
+  .recipe-center > .no-results:not([hidden]) ~ ul.results,
+  .recipe-center > ul.results[hidden] {
+    display: none;
   }
 }
 
