@@ -38,6 +38,55 @@ export function formatCommaList(items) {
   return items.join(', ');
 }
 
+/** @type {readonly string[]} */
+export const PRODUCT_SELECTOR_INDEX_LOCALES = ['us/en_us', 'ca/en_us', 'ca/fr_ca'];
+
+const VALID_INDEX_LOCALES = new Set(PRODUCT_SELECTOR_INDEX_LOCALES);
+
+const QS_INDEX = 'index';
+const QS_PRODUCTS = 'products';
+const QS_CATEGORIES = 'categories';
+
+/**
+ * @param {string} [search]
+ * @returns {{
+ *   index: string;
+ *   hasProducts: boolean;
+ *   products: string;
+ *   hasCategories: boolean;
+ *   categories: string;
+ * }}
+ */
+export function readProductSelectorUrlState(search = typeof window !== 'undefined' ? window.location.search : '') {
+  const params = new URLSearchParams(search);
+  return {
+    index: params.get(QS_INDEX) || '',
+    hasProducts: params.has(QS_PRODUCTS),
+    products: params.get(QS_PRODUCTS) || '',
+    hasCategories: params.has(QS_CATEGORIES),
+    categories: params.get(QS_CATEGORIES) || '',
+  };
+}
+
+/**
+ * @param {URL} url
+ * @param {{ localePath: string; products: string[]; categories: string[] }} state
+ */
+function writeProductSelectorUrlState(url, state) {
+  const index = String(state.localePath || '').trim();
+  if (index && index !== 'us/en_us' && VALID_INDEX_LOCALES.has(index)) {
+    url.searchParams.set(QS_INDEX, index);
+  } else {
+    url.searchParams.delete(QS_INDEX);
+  }
+  const productsStr = formatCommaList(state.products);
+  const categoriesStr = formatCommaList(state.categories);
+  if (productsStr) url.searchParams.set(QS_PRODUCTS, productsStr);
+  else url.searchParams.delete(QS_PRODUCTS);
+  if (categoriesStr) url.searchParams.set(QS_CATEGORIES, categoriesStr);
+  else url.searchParams.delete(QS_CATEGORIES);
+}
+
 /**
  * @param {string} localePath e.g. us/en_us
  * @param {object} product
@@ -213,6 +262,7 @@ export function categoryThumbGridHtml(imageUrls, gridClass = 'ps-picker-thumb-gr
  *   productsInput?: HTMLInputElement | HTMLTextAreaElement | null;
  *   categoriesInput?: HTMLInputElement | HTMLTextAreaElement | null;
  *   localePath?: string;
+ *   syncUrl?: boolean;
  *   onChange?: (values: { products: string; categories: string }) => void;
  * }} [options]
  * @returns {{
@@ -235,12 +285,29 @@ export function mountProductSelector(container, options = {}) {
     onChange = undefined,
   } = options;
 
+  const syncUrl = options.syncUrl !== false && typeof window !== 'undefined';
+
   /** @type {Set<string>} */
   let selectedProducts = new Set(parseCommaList(productsInput?.value));
   /** @type {Set<string>} */
   let selectedCategories = new Set(parseCommaList(categoriesInput?.value));
 
   let localePath = options.localePath || 'us/en_us';
+
+  if (syncUrl) {
+    const fromUrl = readProductSelectorUrlState();
+    if (fromUrl.index && VALID_INDEX_LOCALES.has(fromUrl.index)) {
+      localePath = fromUrl.index;
+    }
+    if (fromUrl.hasProducts) {
+      selectedProducts = new Set(parseCommaList(fromUrl.products));
+    }
+    if (fromUrl.hasCategories) {
+      selectedCategories = new Set(parseCommaList(fromUrl.categories));
+    }
+  }
+
+  let urlSyncMuted = false;
   /** @type {object[]} */
   let indexRows = [];
   /** @type {object[]} */
@@ -265,29 +332,22 @@ export function mountProductSelector(container, options = {}) {
   root.className = 'ps-root';
   root.innerHTML = `
     <div class="ps-layout">
-      <section class="ps-panel ps-panel-selection" aria-label="Current selection">
-        <div class="ps-panel-top">
-          <h2 class="ps-panel-heading">Current selection</h2>
-          <div class="ps-toolbar">
-            <label class="ps-index-label" for="ps-index-select">Index</label>
-            <select id="ps-index-select" class="ps-index-select" aria-label="Product index locale">
-              <option value="us/en_us">US (en-US)</option>
-              <option value="ca/en_ca">CA (en-CA)</option>
-              <option value="ca/fr_ca">CA (fr-CA)</option>
-            </select>
-            <span class="ps-status" id="ps-status" aria-live="polite"></span>
-          </div>
+      <div class="ps-toolbar-row">
+        <div class="ps-toolbar">
+          <label class="ps-index-label" for="ps-index-select">Index</label>
+          <select id="ps-index-select" class="ps-index-select" aria-label="Product index locale">
+            <option value="us/en_us">US (en-US)</option>
+            <option value="ca/en_us">CA (en-US)</option>
+            <option value="ca/fr_ca">CA (fr-CA)</option>
+          </select>
+          <span class="ps-status" id="ps-status" aria-live="polite"></span>
         </div>
-        <div class="ps-selection-block">
-          <div class="ps-selection-head">
-            <span class="ps-selection-title">Selected</span>
-            <button type="button" class="ps-clear-btn" data-clear="all">Clear all</button>
-          </div>
-          <div class="ps-pills" id="ps-selection-pills" aria-label="Selected products and categories"></div>
-        </div>
+        <button type="button" class="ps-clear-btn" data-clear="all">Clear all</button>
+      </div>
+      <section class="ps-panel ps-panel-selection" aria-label="Selected products and categories">
+        <div class="ps-pills" id="ps-selection-pills"></div>
       </section>
       <section class="ps-panel ps-panel-picker" aria-label="Browse product index">
-        <h2 class="ps-panel-heading">Browse index</h2>
         <input
           type="search"
           class="ps-search"
@@ -323,6 +383,55 @@ export function mountProductSelector(container, options = {}) {
 
   indexSelect.value = localePath;
 
+  function currentUrlState() {
+    return {
+      localePath,
+      products: [...selectedProducts],
+      categories: [...selectedCategories],
+    };
+  }
+
+  function pushUrlState() {
+    if (!syncUrl || urlSyncMuted) return;
+    const url = new URL(window.location.href);
+    writeProductSelectorUrlState(url, currentUrlState());
+    window.history.pushState({ productSelector: true }, '', url);
+  }
+
+  /**
+   * @returns {boolean} whether the index locale changed
+   */
+  function applyUrlState() {
+    if (!syncUrl) return false;
+    const fromUrl = readProductSelectorUrlState();
+    let localeChanged = false;
+    if (fromUrl.index && VALID_INDEX_LOCALES.has(fromUrl.index) && fromUrl.index !== localePath) {
+      localePath = fromUrl.index;
+      localeChanged = true;
+      indexSelect.value = localePath;
+    } else if (!fromUrl.index && localePath !== (options.localePath || 'us/en_us')) {
+      const fallback = options.localePath || 'us/en_us';
+      if (localePath !== fallback) {
+        localePath = fallback;
+        localeChanged = true;
+        indexSelect.value = localePath;
+      }
+    } else if (fromUrl.index && VALID_INDEX_LOCALES.has(fromUrl.index)) {
+      indexSelect.value = fromUrl.index;
+    }
+    if (fromUrl.hasProducts) {
+      selectedProducts = new Set(parseCommaList(fromUrl.products));
+    } else {
+      selectedProducts = new Set();
+    }
+    if (fromUrl.hasCategories) {
+      selectedCategories = new Set(parseCommaList(fromUrl.categories));
+    } else {
+      selectedCategories = new Set();
+    }
+    return localeChanged;
+  }
+
   function syncInputs() {
     const productsStr = formatCommaList([...selectedProducts]);
     const categoriesStr = formatCommaList([...selectedCategories]);
@@ -333,6 +442,7 @@ export function mountProductSelector(container, options = {}) {
       categoriesInput.value = categoriesStr;
     }
     onChange?.({ products: productsStr, categories: categoriesStr });
+    pushUrlState();
   }
 
   function rebuildProductMaps() {
@@ -696,6 +806,7 @@ export function mountProductSelector(container, options = {}) {
 
   indexSelect.addEventListener('change', () => {
     localePath = indexSelect.value;
+    pushUrlState();
     loadIndex();
   });
 
@@ -729,7 +840,38 @@ export function mountProductSelector(container, options = {}) {
   categoriesInput?.addEventListener('change', onCategoriesInputChange);
   categoriesInput?.addEventListener('blur', onCategoriesInputChange);
 
+  function onPopState() {
+    if (!syncUrl) return;
+    urlSyncMuted = true;
+    const localeChanged = applyUrlState();
+    const finish = () => {
+      renderAll();
+      const productsStr = formatCommaList([...selectedProducts]);
+      const categoriesStr = formatCommaList([...selectedCategories]);
+      if (productsInput && productsInput.value !== productsStr) {
+        productsInput.value = productsStr;
+      }
+      if (categoriesInput && categoriesInput.value !== categoriesStr) {
+        categoriesInput.value = categoriesStr;
+      }
+      onChange?.({ products: productsStr, categories: categoriesStr });
+      urlSyncMuted = false;
+    };
+    if (localeChanged) {
+      loadIndex().then(finish);
+    } else {
+      finish();
+    }
+  }
+
+  if (syncUrl) {
+    window.addEventListener('popstate', onPopState);
+  }
+
   function destroy() {
+    if (syncUrl) {
+      window.removeEventListener('popstate', onPopState);
+    }
     productsInput?.removeEventListener('change', onProductsInputChange);
     productsInput?.removeEventListener('blur', onProductsInputChange);
     categoriesInput?.removeEventListener('change', onCategoriesInputChange);
@@ -739,7 +881,9 @@ export function mountProductSelector(container, options = {}) {
 
   loadIndex();
   renderAll();
+  urlSyncMuted = true;
   syncInputs();
+  urlSyncMuted = false;
 
   return {
     getProducts: () => [...selectedProducts],

@@ -26,14 +26,26 @@
 .ps-layout {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
+}
+
+.ps-toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 12px;
 }
 
 .ps-panel {
   background: var(--ps-bg);
   border: 1px solid var(--ps-border);
   border-radius: 8px;
-  padding: 14px 16px;
+  padding: 10px 12px;
+}
+
+.ps-panel-selection {
+  padding: 10px 12px;
 }
 
 .ps-panel-heading {
@@ -43,21 +55,6 @@
   letter-spacing: 0.02em;
   text-transform: uppercase;
   color: var(--ps-muted);
-}
-
-.ps-panel-top {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px 16px;
-  margin-bottom: 14px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--ps-border);
-}
-
-.ps-panel-selection .ps-selection-block:first-of-type {
-  margin-top: 0;
 }
 
 .ps-toolbar {
@@ -96,10 +93,6 @@
   color: #6b2d1a;
 }
 
-.ps-panel-picker .ps-panel-heading {
-  margin-bottom: 12px;
-}
-
 .ps-search {
   width: 100%;
   padding: 8px 12px;
@@ -108,7 +101,7 @@
   border: 1px solid var(--ps-border);
   border-radius: 6px;
   background: var(--ps-bg);
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   box-sizing: border-box;
 }
 
@@ -122,7 +115,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .ps-filter-tab {
@@ -140,20 +133,6 @@
   background: #202223;
   border-color: #202223;
   color: #fff;
-}
-
-.ps-selection-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.ps-selection-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #202223;
 }
 
 .ps-clear-btn {
@@ -301,7 +280,6 @@
 
 .ps-picker-list .ps-picker-pill {
   max-width: none;
-  width: 100%;
   cursor: pointer;
 }
 
@@ -395,48 +373,7 @@
 .ps-demo-main {
   max-width: 1100px;
   margin: 0 auto;
-  padding: 24px 20px 48px;
-}
-
-.ps-demo-main h1 {
-  font-size: 1.35rem;
-  margin: 0 0 6px;
-}
-
-.ps-demo-lead {
-  margin: 0 0 20px;
-  color: #6d7175;
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-.ps-demo-output {
-  margin-top: 20px;
-  display: grid;
-  gap: 12px;
-}
-
-.ps-demo-output label {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
-  margin-bottom: 4px;
-}
-
-.ps-demo-output input {
-  width: 100%;
-  font: inherit;
-  font-size: 14px;
-  padding: 8px 10px;
-  border: 1px solid #e1e3e5;
-  border-radius: 6px;
-  box-sizing: border-box;
-}
-
-.ps-demo-output .ps-demo-hint {
-  margin: -4px 0 0;
-  font-size: 12px;
-  color: #6d7175;
+  padding: 16px 20px 32px;
 }
 
 .ps-demo-back {
