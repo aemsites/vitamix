@@ -20,12 +20,14 @@ import {
   escapeHtml,
   showToast,
 } from './commerce-otp-ui.js';
-import { collectCategorySlugsFromIndexRows, fetchProductsIndexForLocale } from './pim.js';
 import {
   formatProductConditionsForForm,
   parseProductConditionsInput,
-  productConditionDisplayLabels,
 } from './product-conditions.js';
+import {
+  hydrateProductScopePills,
+  mountProductSelectionField,
+} from './product-selection-field.js';
 
 async function readRespError(resp) {
   return resp.headers.get('x-error')
@@ -34,8 +36,6 @@ async function readRespError(resp) {
 }
 
 /** @type {{ locale: string, slugs: string[] }} */
-let couponCategorySlugCache = { locale: '', slugs: [] };
-
 /**
  * Map market tab + new-coupon country to AEM products index path (see catalog).
  * @returns {string} e.g. us/en_us
@@ -48,196 +48,91 @@ function localePathForCouponCategoryIndex(dlg) {
   return 'us/en_us';
 }
 
-/**
- * @param {string} localePath
- * @returns {Promise<string[]>}
- */
-async function getCategorySlugsForCoupons(localePath) {
-  if (couponCategorySlugCache.locale === localePath) {
-    return couponCategorySlugCache.slugs;
-  }
-  const json = await fetchProductsIndexForLocale(localePath);
-  const data = json.data || json;
-  const rows = Array.isArray(data) ? data : [];
-  const slugs = collectCategorySlugsFromIndexRows(rows);
-  couponCategorySlugCache = { locale: localePath, slugs };
-  return slugs;
+/** @param {Record<string, unknown>} d */
+function localePathFromCouponRecord(d) {
+  const seg = parseCouponTypePath(String(d?.id || ''));
+  const c = seg?.country || 'us';
+  if (c === 'ca') return 'ca/en_ca';
+  return 'us/en_us';
 }
 
+/** @param {ParentNode} root @param {Record<string, unknown>} d */
+function hydrateCouponDetailScopePills(root, d) {
+  const localePath = localePathFromCouponRecord(d);
+  root.querySelectorAll('[data-cp-scope-pills]').forEach((el) => {
+    if (!(el instanceof HTMLElement)) return;
+    const kind = el.getAttribute('data-cp-scope-pills');
+    const emptyText = el.getAttribute('data-cp-scope-empty') || 'None';
+    const productsRaw = kind === 'included'
+      ? (d.includedProducts ?? d.included_products)
+      : (d.excludedProducts ?? d.excluded_products);
+    const categoriesRaw = kind === 'included'
+      ? (d.includedCategories ?? d.included_categories)
+      : (d.excludedCategories ?? d.excluded_categories);
+    hydrateProductScopePills(el, {
+      productsRaw,
+      categoriesRaw,
+      localePath,
+      emptyText,
+    }).catch(() => {});
+  });
+}
+
+/** @type {Array<{ destroy: () => void; refresh: () => Promise<void> }>} */
+let couponProductSelectionFields = [];
+
 /**
- * Native `<datalist>` is unreliable inside modal `<dialog>` (top layer). Use an
- * in-dialog suggestion panel instead.
  * @param {HTMLDialogElement} dlg
  */
-async function wireCouponCategorySuggestPanel(dlg) {
-  const localePath = localePathForCouponCategoryIndex(dlg);
-  /** @type {{ slugs: string[] }} */
-  const slugBag = { slugs: [] };
-  try {
-    slugBag.slugs = await getCategorySlugsForCoupons(localePath);
-  } catch (err) {
-    console.warn('[commerce-admin/coupons] category index for suggestions failed', {
-      localePath,
-      message: err?.message || String(err),
-    });
+function wireCouponProductSelectionFields(dlg) {
+  couponProductSelectionFields.forEach((f) => f.destroy());
+  couponProductSelectionFields = [];
+
+  const includedMount = dlg.querySelector('[data-cp-psf-mount="included"]');
+  const excludedMount = dlg.querySelector('[data-cp-psf-mount="excluded"]');
+  const productsIncluded = /** @type {HTMLInputElement | null} */ (
+    dlg.querySelector('#cp-form-included-products')
+  );
+  const categoriesIncluded = /** @type {HTMLInputElement | null} */ (
+    dlg.querySelector('#cp-form-included')
+  );
+  const productsExcluded = /** @type {HTMLInputElement | null} */ (
+    dlg.querySelector('#cp-form-excluded-products')
+  );
+  const categoriesExcluded = /** @type {HTMLInputElement | null} */ (
+    dlg.querySelector('#cp-form-excluded')
+  );
+
+  if (includedMount && productsIncluded && categoriesIncluded) {
+    couponProductSelectionFields.push(mountProductSelectionField(includedMount, {
+      productsInput: productsIncluded,
+      categoriesInput: categoriesIncluded,
+      getLocalePath: () => localePathForCouponCategoryIndex(dlg),
+      label: 'Included products',
+      emptyText: 'None — click to add products or categories.',
+    }));
+  }
+  if (excludedMount && productsExcluded && categoriesExcluded) {
+    couponProductSelectionFields.push(mountProductSelectionField(excludedMount, {
+      productsInput: productsExcluded,
+      categoriesInput: categoriesExcluded,
+      getLocalePath: () => localePathForCouponCategoryIndex(dlg),
+      label: 'Excluded products',
+      emptyText: 'None — click to add products or categories.',
+    }));
   }
 
-  const panel = document.createElement('div');
-  panel.className = 'cp-category-suggest-panel';
-  panel.hidden = true;
-  panel.setAttribute('role', 'listbox');
-  dlg.appendChild(panel);
-
-  /** @type {HTMLInputElement|null} */
-  let activeInput = null;
-  let overPanel = false;
-
-  const reposition = () => {
-    if (!activeInput || panel.hidden) return;
-    const ir = activeInput.getBoundingClientRect();
-    const w = Math.min(Math.max(ir.width, 220), Math.max(160, window.innerWidth - ir.left - 12));
-    panel.style.position = 'fixed';
-    panel.style.top = `${ir.bottom + 4}px`;
-    panel.style.left = `${ir.left}px`;
-    panel.style.width = `${w}px`;
-    panel.style.zIndex = '2147483646';
-  };
-
-  const MAX_ROWS = 80;
-
-  const categoryLastToken = (value) => {
-    const parts = String(value || '').split(',');
-    return parts[parts.length - 1].trim().toLowerCase();
-  };
-
-  const filterSlugs = (query) => {
-    const list = slugBag.slugs;
-    if (!query) return list.slice(0, MAX_ROWS);
-    const starts = [];
-    const rest = [];
-    list.forEach((s) => {
-      const low = s.toLowerCase();
-      if (!low.includes(query)) return;
-      if (low.startsWith(query)) starts.push(s);
-      else rest.push(s);
-    });
-    starts.sort((a, b) => a.localeCompare(b));
-    rest.sort((a, b) => a.localeCompare(b));
-    return [...starts, ...rest].slice(0, MAX_ROWS);
-  };
-
-  const applyPick = (input, slug) => {
-    const v = String(input.value);
-    const li = v.lastIndexOf(',');
-    const head = li === -1 ? '' : `${v.slice(0, li + 1).replace(/\s*$/, '')}, `;
-    input.value = `${head}${slug}`;
-  };
-
-  const renderSuggestPanel = () => {
-    if (!activeInput) return;
-    const token = categoryLastToken(activeInput.value);
-    const matches = filterSlugs(token);
-    panel.replaceChildren();
-    if (matches.length === 0) {
-      const empty = document.createElement('div');
-      empty.className = 'cp-category-suggest-empty';
-      empty.textContent = slugBag.slugs.length
-        ? 'No matching categories — try another fragment or type a slug.'
-        : 'No categories found in the product index for this locale.';
-      panel.appendChild(empty);
-    } else {
-      matches.forEach((slug) => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'cp-category-suggest-option';
-        btn.textContent = slug;
-        btn.addEventListener('mousedown', (e) => {
-          e.preventDefault();
-          if (activeInput) applyPick(activeInput, slug);
-          panel.hidden = true;
-          panel.replaceChildren();
-          activeInput?.focus();
-        });
-        panel.appendChild(btn);
-      });
-    }
-    panel.hidden = false;
-    reposition();
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(reposition);
-    });
-  };
-
-  const hide = () => {
-    panel.hidden = true;
-    panel.replaceChildren();
-  };
-
-  const onFieldFocus = (/** @type {HTMLInputElement} */ input) => {
-    activeInput = input;
-    renderSuggestPanel();
-  };
-
-  const onFieldInput = (/** @type {HTMLInputElement} */ input) => {
-    if (activeInput === input) renderSuggestPanel();
-  };
-
-  const onFieldBlur = () => {
-    window.setTimeout(() => {
-      const ae = document.activeElement;
-      if (
-        overPanel
-        || panel.contains(ae)
-        || ae === activeInput
-        || inputs.includes(/** @type {any} */ (ae))
-      ) {
-        return;
-      }
-      hide();
-    }, 200);
-  };
-
-  panel.addEventListener('mouseenter', () => {
-    overPanel = true;
-  });
-  panel.addEventListener('mouseleave', () => {
-    overPanel = false;
-  });
-
-  const inputs = /** @type {HTMLInputElement[]} */ ([
-    dlg.querySelector('#cp-form-excluded'),
-    dlg.querySelector('#cp-form-included'),
-  ].filter(Boolean));
-
-  inputs.forEach((input) => {
-    input.addEventListener('focus', () => onFieldFocus(input));
-    input.addEventListener('input', () => onFieldInput(input));
-    input.addEventListener('blur', onFieldBlur);
-  });
-
-  const refreshSlugBagFromMarkets = async () => {
-    couponCategorySlugCache = { locale: '', slugs: [] };
-    try {
-      slugBag.slugs = await getCategorySlugsForCoupons(localePathForCouponCategoryIndex(dlg));
-    } catch {
-      slugBag.slugs = [];
-    }
-    if (activeInput && !panel.hidden) renderSuggestPanel();
-  };
   dlg.querySelectorAll('input.cp-new-country-cb, input.cp-edit-country-cb').forEach((el) => {
     el.addEventListener('change', () => {
-      refreshSlugBagFromMarkets().catch(() => {});
+      couponProductSelectionFields.forEach((f) => {
+        f.refresh().catch(() => {});
+      });
     });
   });
 
-  const ac = new AbortController();
-  const scrollHost = dlg.querySelector('.coupons-dialog-scroll');
-  (scrollHost || dlg).addEventListener('scroll', reposition, { capture: true, signal: ac.signal });
-  window.addEventListener('resize', reposition, { signal: ac.signal });
-  dlg.addEventListener('close', () => {
-    ac.abort();
-    hide();
-  }, { once: true });
+  couponProductSelectionFields.forEach((f) => {
+    f.refresh().catch(() => {});
+  });
 }
 
 /** Decoded coupon type id when `path` is `coupons/types/{segment}`. */
@@ -519,28 +414,6 @@ function couponDetailModalInnerHtml(d) {
     ? `$${Number(d.maximumDiscountAmount).toFixed(2)}`
     : 'No cap';
 
-  const incCats = Array.isArray(d.includedCategories ?? d.included_categories)
-    ? /** @type {string[]} */ (d.includedCategories ?? d.included_categories)
-    : [];
-  const incCatTags = incCats.length
-    ? incCats.map((c) => `<span class="coupons-mini-tag">${escapeHtml(String(c))}</span>`).join('')
-    : '<span class="coupons-muted">None (all eligible categories)</span>';
-  const cats = Array.isArray(d.excludedCategories ?? d.excluded_categories)
-    ? /** @type {string[]} */ (d.excludedCategories ?? d.excluded_categories)
-    : [];
-  const catTags = cats.length
-    ? cats.map((c) => `<span class="coupons-mini-tag">${escapeHtml(String(c))}</span>`).join('')
-    : '<span class="coupons-muted">None</span>';
-
-  const incProd = productConditionDisplayLabels(d.includedProducts ?? d.included_products);
-  const incProdTags = incProd.length
-    ? incProd.map((p) => `<span class="coupons-mini-tag">${escapeHtml(p)}</span>`).join('')
-    : '<span class="coupons-muted">None (any product unless excluded below)</span>';
-  const exProd = productConditionDisplayLabels(d.excludedProducts ?? d.excluded_products);
-  const exProdTags = exProd.length
-    ? exProd.map((p) => `<span class="coupons-mini-tag">${escapeHtml(p)}</span>`).join('')
-    : '<span class="coupons-muted">None</span>';
-
   const listBanner = state.detailFromListFallback
     ? '<div class="coupons-modal-banner">List snapshot only — edit and delete use the API path and may be unavailable.</div>'
     : '';
@@ -576,22 +449,14 @@ function couponDetailModalInnerHtml(d) {
       ${pillHtml('Manual entry', d.allowManualEntry !== false)}
     </div>
     <section class="coupons-modal-section">
-      <h3 class="coupons-modal-section-title">Included categories</h3>
-      <p class="coupons-field-hint" style="margin:0 0 8px">When set, the coupon applies only to cart lines in these categories. Leave empty to allow any category unless excluded below.</p>
-      <div class="coupons-modal-tags">${incCatTags}</div>
-    </section>
-    <section class="coupons-modal-section">
-      <h3 class="coupons-modal-section-title">Excluded categories</h3>
-      <div class="coupons-modal-tags">${catTags}</div>
-    </section>
-    <section class="coupons-modal-section">
       <h3 class="coupons-modal-section-title">Included products</h3>
-      <p class="coupons-field-hint" style="margin:0 0 8px">When set, the coupon is valid only if the cart contains at least one matching product path (optional <code>path|sku</code> for a variant).</p>
-      <div class="coupons-modal-tags">${incProdTags}</div>
+      <p class="coupons-field-hint" style="margin:0 0 8px">Products and categories the coupon applies to. Leave empty to allow any product unless excluded below.</p>
+      <div class="coupons-modal-tags ps-pills" data-cp-scope-pills="included" data-cp-scope-empty="None (any product unless excluded below)"></div>
     </section>
     <section class="coupons-modal-section">
       <h3 class="coupons-modal-section-title">Excluded products</h3>
-      <div class="coupons-modal-tags">${exProdTags}</div>
+      <p class="coupons-field-hint" style="margin:0 0 8px">Products and categories that disqualify the coupon when present in the cart.</p>
+      <div class="coupons-modal-tags ps-pills" data-cp-scope-pills="excluded" data-cp-scope-empty="None"></div>
     </section>
     ${d.notes && String(d.notes).trim()
     ? `<section class="coupons-modal-section"><h3 class="coupons-modal-section-title">Notes</h3><div class="coupons-modal-notes">${escapeHtml(String(d.notes).trim())}</div></section>`
@@ -697,6 +562,7 @@ function openCouponDetailModal() {
   const humanWrap = document.createElement('div');
   humanWrap.setAttribute('data-cp-human', '');
   humanWrap.innerHTML = couponDetailModalInnerHtml(d);
+  hydrateCouponDetailScopePills(humanWrap, d);
 
   const jsonPre = document.createElement('pre');
   jsonPre.className = 'commerce-detail-modal-json-pre';
@@ -1148,7 +1014,8 @@ async function openDialog(title, innerHtml, onSubmit, afterMount, dialogClass, s
     window.removeEventListener('beforeunload', onBeforeUnload);
     document.body.style.overflow = prevBodyOverflow;
     document.querySelector('datalist#cp-form-categories-datalist')?.remove();
-    dialog.querySelector('.cp-category-suggest-panel')?.remove();
+    couponProductSelectionFields.forEach((f) => f.destroy());
+    couponProductSelectionFields = [];
   };
   dialog.addEventListener('close', onDialogClose, { once: true });
   if (typeof afterMount === 'function') {
@@ -1223,24 +1090,18 @@ function couponFormHtml({ idReadonly }) {
         <input type="number" id="cp-form-max-cap" min="0" step="any" placeholder="empty = no cap" />
       </div>
       <div class="coupons-field coupons-field-full">
-        <label for="cp-form-included">Included category slugs</label>
-        <input type="text" id="cp-form-included" autocomplete="off" placeholder="Type or pick suggestions; comma separated" />
-        <p class="coupons-field-hint">When set, the coupon only applies to these categories. Leave empty for no include filter. Suggestions use the primary selected country (see Countries above).</p>
+        <label>Included products</label>
+        <p class="coupons-field-hint">Products and categories the coupon applies to. Leave empty for no include filter. Uses the product index for the primary selected country (see Countries above).</p>
+        <div data-cp-psf-mount="included"></div>
+        <input type="text" id="cp-form-included" autocomplete="off" />
+        <input type="text" id="cp-form-included-products" autocomplete="off" />
       </div>
       <div class="coupons-field coupons-field-full">
-        <label for="cp-form-excluded">Excluded category slugs</label>
-        <input type="text" id="cp-form-excluded" autocomplete="off" placeholder="Type or pick suggestions; comma separated" />
-        <p class="coupons-field-hint">Suggestions use the product index for the primary selected country (first among US → CA → MX when several are checked). Focus the field or keep typing to open the list.</p>
-      </div>
-      <div class="coupons-field coupons-field-full">
-        <label for="cp-form-included-products">Included product paths</label>
-        <input type="text" id="cp-form-included-products" autocomplete="off" placeholder="/us/en_us/products/foo, path|SKU" />
-        <p class="coupons-field-hint">Coupon applies only when the cart contains at least one matching product. Use <code>path|sku</code> for variant-level targeting. Cannot be set together with excluded products.</p>
-      </div>
-      <div class="coupons-field coupons-field-full">
-        <label for="cp-form-excluded-products">Excluded product paths</label>
-        <input type="text" id="cp-form-excluded-products" autocomplete="off" placeholder="/us/en_us/products/bar" />
-        <p class="coupons-field-hint">Coupon is rejected when the cart contains any matching product. Cannot be set together with included products.</p>
+        <label>Excluded products</label>
+        <p class="coupons-field-hint">Products and categories that disqualify the coupon. Cannot be set together with included product paths.</p>
+        <div data-cp-psf-mount="excluded"></div>
+        <input type="text" id="cp-form-excluded" autocomplete="off" />
+        <input type="text" id="cp-form-excluded-products" autocomplete="off" />
       </div>
       <div class="coupons-field coupons-field-full">
         <label class="coupons-checkbox-row"><input type="checkbox" id="cp-form-free-ship" /> Also grants <strong>free shipping</strong> when the coupon applies</label>
@@ -1691,7 +1552,7 @@ function openNewCouponDialog() {
         cb.addEventListener('change', syncPreview);
       });
       syncPreview();
-      await wireCouponCategorySuggestPanel(dlg);
+      wireCouponProductSelectionFields(dlg);
     },
     'coupons-dialog-wide',
   );
@@ -1720,7 +1581,7 @@ function openEditCouponDialog() {
     async (dlg) => {
       fillCouponForm(dlg, snap);
       wireCouponCountryCheckboxGuards(dlg);
-      await wireCouponCategorySuggestPanel(dlg);
+      wireCouponProductSelectionFields(dlg);
     },
     'coupons-dialog-wide',
   );

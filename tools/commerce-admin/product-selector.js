@@ -4,20 +4,27 @@
  */
 
 import {
-  collectCategorySlugsFromIndexRows,
-  fetchProductsIndexForLocale,
-  getParentProducts,
-  getUrlKeyFromProduct,
-  resolveImageUrlForLocale,
-} from './pim.js';
-import { productUrlToCatalogPath } from './price-rules-api.js';
-import { highlightMatch } from './search-highlight.js';
+  catalogPathForProduct,
+  createCategoryScopePillEl,
+  createProductScopePillEl,
+  loadProductScopeIndexContext,
+  productPathDisplayLabel,
+  renderProductScopePills,
+} from './product-scope-pills.js';
+
+export {
+  buildCategoryProductCounts,
+  buildCategoryThumbUrls,
+  catalogPathForProduct,
+  categorySlugsForProduct,
+  categoryThumbGridHtml,
+  formatCategoryProductCount,
+  productPathDisplayLabel,
+} from './product-scope-pills.js';
 
 /** @typedef {'all' | 'products' | 'categories'} PickerFilter */
 
 const MAX_PICKER_ROWS = 120;
-
-const PILL_THUMB_PLACEHOLDER = '<span class="ps-pill-thumb-placeholder" aria-hidden="true"></span>';
 
 /**
  * @param {string} raw
@@ -92,188 +99,6 @@ function writeProductSelectorUrlState(url, state) {
  * @param {object} product
  * @returns {string}
  */
-export function catalogPathForProduct(localePath, product) {
-  const rawUrl = product?.url;
-  if (typeof rawUrl === 'string' && rawUrl.trim().startsWith('/')) {
-    const normalized = productUrlToCatalogPath(rawUrl.trim());
-    if (normalized) return normalized;
-  }
-  const urlKey = getUrlKeyFromProduct(product);
-  const clean = String(localePath || '').replace(/^\/+/, '').replace(/\/+$/, '');
-  return `/${clean}/products/${urlKey}`;
-}
-
-/**
- * @param {string} path
- * @returns {string}
- */
-export function productPathDisplayLabel(path) {
-  const pipe = path.indexOf('|');
-  const p = pipe > 0 ? path.slice(0, pipe) : path;
-  const sku = pipe > 0 ? path.slice(pipe + 1).trim() : '';
-  const parts = p.split('/').filter(Boolean);
-  const tail = parts.length ? parts[parts.length - 1] : p;
-  return sku ? `${tail} (${sku})` : tail;
-}
-
-/**
- * @param {object[]} rows
- * @returns {Map<string, string>}
- */
-function buildCategoryLabels(rows) {
-  /** @type {Map<string, string>} */
-  const map = new Map();
-  if (!Array.isArray(rows)) return map;
-  rows.forEach((row) => {
-    const cats = row?.custom?.categories;
-    if (!Array.isArray(cats)) return;
-    cats.forEach((c) => {
-      if (!c || typeof c !== 'object') return;
-      const slug = String(c.url_key || c.urlKey || '').trim();
-      const name = String(c.name || '').trim();
-      if (slug && !map.has(slug)) map.set(slug, name || slug);
-    });
-  });
-  return map;
-}
-
-/**
- * Category slugs on an index row (same sources as {@link collectCategorySlugsFromIndexRows}).
- *
- * @param {object} row
- * @returns {string[]}
- */
-export function categorySlugsForProduct(row) {
-  /** @type {Set<string>} */
-  const slugs = new Set();
-
-  /** @param {unknown} raw */
-  const addSlugListField = (raw) => {
-    if (raw == null || raw === '') return;
-    if (Array.isArray(raw)) {
-      raw.forEach((x) => {
-        if (typeof x === 'string' && x.trim()) slugs.add(x.trim());
-      });
-      return;
-    }
-    if (typeof raw === 'string') {
-      raw.split(',').forEach((part) => {
-        const s = part.trim();
-        if (s) slugs.add(s);
-      });
-    }
-  };
-
-  if (!row || typeof row !== 'object') return [];
-  addSlugListField(row.categoriesUrlKey);
-  const customCats = row.custom?.categories;
-  if (Array.isArray(customCats)) {
-    customCats.forEach((c) => {
-      if (!c || typeof c !== 'object') return;
-      const slug = String(c.url_key || c.urlKey || '').trim();
-      if (slug) slugs.add(slug);
-    });
-  }
-  return [...slugs];
-}
-
-/**
- * First up to four product image URLs per category slug (index order, parents with images).
- *
- * @param {string} localePath
- * @param {object[]} products parent products from index
- * @returns {Map<string, string[]>}
- */
-export function buildCategoryThumbUrls(localePath, products) {
-  /** @type {Map<string, string[]>} */
-  const bySlug = new Map();
-  if (!Array.isArray(products)) return bySlug;
-
-  products.forEach((product) => {
-    if (!product?.image) return;
-    const imgUrl = resolveImageUrlForLocale(localePath, product.image);
-    if (!imgUrl) return;
-    categorySlugsForProduct(product).forEach((slug) => {
-      let list = bySlug.get(slug);
-      if (!list) {
-        list = [];
-        bySlug.set(slug, list);
-      }
-      if (list.length < 4) list.push(imgUrl);
-    });
-  });
-  return bySlug;
-}
-
-/**
- * Parent product count per category slug (index order).
- *
- * @param {object[]} products
- * @returns {Map<string, number>}
- */
-export function buildCategoryProductCounts(products) {
-  /** @type {Map<string, number>} */
-  const counts = new Map();
-  if (!Array.isArray(products)) return counts;
-
-  products.forEach((product) => {
-    categorySlugsForProduct(product).forEach((slug) => {
-      counts.set(slug, (counts.get(slug) || 0) + 1);
-    });
-  });
-  return counts;
-}
-
-/**
- * @param {number} count
- * @returns {string}
- */
-export function formatCategoryProductCount(count) {
-  const n = Number(count) || 0;
-  return n === 1 ? '1 product' : `${n} products`;
-}
-
-/**
- * 2×2 thumbnail grid from up to four product image URLs.
- *
- * @param {string[]} imageUrls
- * @param {string} [gridClass]
- * @returns {string}
- */
-export function categoryThumbGridHtml(imageUrls, gridClass = 'ps-picker-thumb-grid') {
-  const urls = Array.isArray(imageUrls) ? imageUrls.slice(0, 4) : [];
-  const cells = [];
-  for (let i = 0; i < 4; i += 1) {
-    const url = urls[i];
-    if (url) {
-      cells.push(
-        `<span class="ps-thumb-cell"><img src="${escapeAttr(url)}" alt="" loading="lazy" /></span>`,
-      );
-    } else {
-      cells.push('<span class="ps-thumb-cell ps-thumb-cell-empty" aria-hidden="true"></span>');
-    }
-  }
-  return `<div class="${escapeHtml(gridClass)}" aria-hidden="true">${cells.join('')}</div>`;
-}
-
-/**
- * @param {HTMLElement} container
- * @param {{
- *   productsInput?: HTMLInputElement | HTMLTextAreaElement | null;
- *   categoriesInput?: HTMLInputElement | HTMLTextAreaElement | null;
- *   localePath?: string;
- *   syncUrl?: boolean;
- *   onChange?: (values: { products: string; categories: string }) => void;
- * }} [options]
- * @returns {{
- *   getProducts: () => string[];
- *   getCategories: () => string[];
- *   setProducts: (items: string[]) => void;
- *   setCategories: (items: string[]) => void;
- *   reload: () => Promise<void>;
- *   destroy: () => void;
- * }}
- */
 export function mountProductSelector(container, options = {}) {
   if (!container) {
     throw new Error('mountProductSelector: container is required');
@@ -308,20 +133,12 @@ export function mountProductSelector(container, options = {}) {
   }
 
   let urlSyncMuted = false;
-  /** @type {object[]} */
-  let indexRows = [];
+  /** @type {import('./product-scope-pills.js').ProductScopeIndexContext | null} */
+  let scopeContext = null;
   /** @type {object[]} */
   let parentProducts = [];
   /** @type {string[]} */
   let categorySlugs = [];
-  /** @type {Map<string, string>} */
-  let categoryLabels = new Map();
-  /** @type {Map<string, string[]>} */
-  let categoryThumbUrls = new Map();
-  /** @type {Map<string, number>} */
-  let categoryProductCounts = new Map();
-  /** @type {Map<string, object>} */
-  let productByPath = new Map();
 
   let filterMode = /** @type {PickerFilter} */ ('all');
   let searchQuery = '';
@@ -445,14 +262,6 @@ export function mountProductSelector(container, options = {}) {
     pushUrlState();
   }
 
-  function rebuildProductMaps() {
-    productByPath = new Map();
-    parentProducts.forEach((p) => {
-      const path = catalogPathForProduct(localePath, p);
-      productByPath.set(path, p);
-    });
-  }
-
   function productDisplayName(product) {
     return String(product?.title || '').trim();
   }
@@ -467,7 +276,7 @@ export function mountProductSelector(container, options = {}) {
   function categoryMatchesSearch(slug) {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return true;
-    const name = String(categoryLabels.get(slug) || slug).trim().toLowerCase();
+    const name = String(scopeContext?.categoryLabels.get(slug) || slug).trim().toLowerCase();
     return name.includes(q);
   }
 
@@ -475,106 +284,6 @@ export function mountProductSelector(container, options = {}) {
     renderSelection();
     renderPicker();
     updateStatus();
-  }
-
-  /**
-   * @param {string} path
-   * @param {{ query?: string; removable?: boolean; picker?: boolean; selected?: boolean }} [opts]
-   * @returns {HTMLElement}
-   */
-  function createProductPillEl(path, opts = {}) {
-    const {
-      query = '', removable = false, picker = false, selected = false,
-    } = opts;
-    const product = productByPath.get(path);
-    const title = product?.title || product?.sku || productPathDisplayLabel(path);
-    const sub = productPathDisplayLabel(path);
-    const imgUrl = product?.image ? resolveImageUrlForLocale(localePath, product.image) : '';
-    const thumbHtml = imgUrl
-      ? `<img class="ps-pill-product-thumb" src="${escapeAttr(imgUrl)}" alt="" loading="lazy" width="39" height="39" />`
-      : PILL_THUMB_PLACEHOLDER;
-
-    const el = document.createElement('span');
-    if (picker) {
-      el.className = `ps-pill ps-pill-product ps-picker-pill${selected ? ' ps-pill-is-selected' : ''}`;
-      el.dataset.kind = 'product';
-      el.dataset.key = path;
-      el.setAttribute('role', 'option');
-      el.setAttribute('aria-selected', selected ? 'true' : 'false');
-      el.tabIndex = 0;
-      el.setAttribute(
-        'aria-label',
-        selected ? `Remove ${title} from selection` : `Add ${title} to selection`,
-      );
-    } else {
-      el.className = 'ps-pill ps-pill-product';
-      el.dataset.path = path;
-      el.title = path;
-    }
-
-    const removeHtml = removable
-      ? `<button type="button" class="ps-pill-remove" aria-label="Remove ${escapeAttr(title)}">×</button>`
-      : '';
-
-    el.innerHTML = `
-      ${thumbHtml}
-      <span class="ps-pill-text">
-        <span class="ps-pill-label">${highlightMatch(title, query)}</span>
-        <span class="ps-pill-meta">${escapeHtml(sub)}</span>
-      </span>
-      ${removeHtml}
-    `;
-    return el;
-  }
-
-  /**
-   * @param {string} slug
-   * @param {{ query?: string; removable?: boolean; picker?: boolean; selected?: boolean }} [opts]
-   * @returns {HTMLElement}
-   */
-  function createCategoryPillEl(slug, opts = {}) {
-    const {
-      query = '', removable = false, picker = false, selected = false,
-    } = opts;
-    const label = categoryLabels.get(slug) || slug;
-    const showSlug = label !== slug;
-    const thumbUrls = categoryThumbUrls.get(slug) || [];
-    const thumbHtml = thumbUrls.length
-      ? categoryThumbGridHtml(thumbUrls, 'ps-pill-thumb-grid')
-      : PILL_THUMB_PLACEHOLDER;
-    const countLabel = formatCategoryProductCount(categoryProductCounts.get(slug));
-    const metaParts = showSlug ? [slug, countLabel] : [countLabel];
-
-    const el = document.createElement('span');
-    if (picker) {
-      el.className = `ps-pill ps-pill-category ps-picker-pill${selected ? ' ps-pill-is-selected' : ''}`;
-      el.dataset.kind = 'category';
-      el.dataset.key = slug;
-      el.setAttribute('role', 'option');
-      el.setAttribute('aria-selected', selected ? 'true' : 'false');
-      el.tabIndex = 0;
-      el.setAttribute(
-        'aria-label',
-        selected ? `Remove ${label} from selection` : `Add ${label} to selection`,
-      );
-    } else {
-      el.className = 'ps-pill ps-pill-category';
-      el.dataset.slug = slug;
-    }
-
-    const removeHtml = removable
-      ? `<button type="button" class="ps-pill-remove" aria-label="Remove ${escapeAttr(slug)}">×</button>`
-      : '';
-
-    el.innerHTML = `
-      ${thumbHtml}
-      <span class="ps-pill-text">
-        <span class="ps-pill-label">${highlightMatch(label, query)}</span>
-        <span class="ps-pill-meta">${escapeHtml(metaParts.join(' · '))}</span>
-      </span>
-      ${removeHtml}
-    `;
-    return el;
   }
 
   function removeProduct(path) {
@@ -590,47 +299,18 @@ export function mountProductSelector(container, options = {}) {
   }
 
   function renderSelection() {
-    if (!selectionPillsEl) return;
-    selectionPillsEl.replaceChildren();
-
-    /** @type {Array<{ kind: 'product' | 'category'; key: string; label: string }>} */
-    const items = [];
-    selectedProducts.forEach((path) => {
-      const product = productByPath.get(path);
-      const label = product?.title || product?.sku || productPathDisplayLabel(path);
-      items.push({ kind: 'product', key: path, label });
+    if (!selectionPillsEl || !scopeContext) return;
+    const count = renderProductScopePills(selectionPillsEl, scopeContext, {
+      productPaths: selectedProducts,
+      categorySlugs: selectedCategories,
+      removable: true,
+      emptyText: 'Nothing selected yet — pick items below.',
     });
-    selectedCategories.forEach((slug) => {
-      items.push({
-        kind: 'category',
-        key: slug,
-        label: categoryLabels.get(slug) || slug,
-      });
-    });
-    items.sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
-
-    if (items.length === 0) {
-      const empty = document.createElement('span');
-      empty.className = 'ps-pills-empty';
-      empty.textContent = 'Nothing selected yet — pick items below.';
-      selectionPillsEl.appendChild(empty);
-    } else {
-      items.forEach((item) => {
-        if (item.kind === 'product') {
-          selectionPillsEl.appendChild(createProductPillEl(item.key, { removable: true }));
-        } else {
-          selectionPillsEl.appendChild(createCategoryPillEl(item.key, { removable: true }));
-        }
-      });
-    }
-
-    if (clearAllBtn) {
-      clearAllBtn.disabled = items.length === 0;
-    }
+    if (clearAllBtn) clearAllBtn.disabled = count === 0;
   }
 
   function renderPicker() {
-    if (!pickerEl) return;
+    if (!pickerEl || !scopeContext) return;
     pickerEl.replaceChildren();
 
     if (loading) return;
@@ -663,7 +343,7 @@ export function mountProductSelector(container, options = {}) {
         rows.push({
           kind: 'category',
           key: slug,
-          label: categoryLabels.get(slug) || slug,
+          label: scopeContext.categoryLabels.get(slug) || slug,
         });
       });
     }
@@ -683,13 +363,13 @@ export function mountProductSelector(container, options = {}) {
 
     capped.forEach((row) => {
       if (row.kind === 'product') {
-        pickerEl.appendChild(createProductPillEl(row.key, {
+        pickerEl.appendChild(createProductScopePillEl(scopeContext, row.key, {
           query: q,
           picker: true,
           selected: selectedProducts.has(row.key),
         }));
       } else {
-        pickerEl.appendChild(createCategoryPillEl(row.key, {
+        pickerEl.appendChild(createCategoryScopePillEl(scopeContext, row.key, {
           query: q,
           picker: true,
           selected: selectedCategories.has(row.key),
@@ -731,23 +411,14 @@ export function mountProductSelector(container, options = {}) {
     setLoadingUi(true);
     loadError = '';
     try {
-      const json = await fetchProductsIndexForLocale(localePath);
-      const data = json.data || json;
-      indexRows = Array.isArray(data) ? data : [];
-      parentProducts = getParentProducts(indexRows);
-      categorySlugs = collectCategorySlugsFromIndexRows(indexRows);
-      categoryLabels = buildCategoryLabels(indexRows);
-      categoryThumbUrls = buildCategoryThumbUrls(localePath, parentProducts);
-      categoryProductCounts = buildCategoryProductCounts(parentProducts);
-      rebuildProductMaps();
+      scopeContext = await loadProductScopeIndexContext(localePath);
+      parentProducts = scopeContext.parentProducts;
+      categorySlugs = scopeContext.categorySlugs;
     } catch (err) {
       loadError = err?.message || 'Failed to load product index';
+      scopeContext = null;
       parentProducts = [];
       categorySlugs = [];
-      categoryLabels = new Map();
-      categoryThumbUrls = new Map();
-      categoryProductCounts = new Map();
-      productByPath = new Map();
     } finally {
       setLoadingUi(false);
       renderAll();
@@ -901,15 +572,4 @@ export function mountProductSelector(container, options = {}) {
     reload: loadIndex,
     destroy,
   };
-}
-
-function escapeHtml(str) {
-  if (str == null) return '';
-  const div = document.createElement('div');
-  div.textContent = String(str);
-  return div.innerHTML;
-}
-
-function escapeAttr(str) {
-  return escapeHtml(str).replace(/"/g, '&quot;');
 }

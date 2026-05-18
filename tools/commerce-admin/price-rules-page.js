@@ -27,8 +27,11 @@ import {
   applyCartRuleProductScopeToConditions,
   cartRuleProductScopeFromConditions,
   cartRuleScopeSummary,
-  productConditionDisplayLabels,
 } from './product-conditions.js';
+import {
+  hydrateProductScopePills,
+  mountProductSelectionField,
+} from './product-selection-field.js';
 import {
   commerceGroupBadgeHtml,
   commerceMarketEmojiHtml,
@@ -1768,6 +1771,131 @@ async function openPromotionEditDialog(countryKey, promoId) {
  * @param {(typeof COUNTRIES)[number]} initialMarket
  * @param {boolean} [marketLocked] when true, market cannot be changed (edit mode)
  */
+/** @param {string} marketKey us|ca|mx */
+function localePathForCartRuleMarket(marketKey) {
+  const c = String(marketKey || 'us').trim().toLowerCase();
+  if (c === 'ca') return 'ca/en_ca';
+  return 'us/en_us';
+}
+
+/** @type {Array<{ destroy: () => void; refresh: () => Promise<void> }>} */
+let cartRuleProductSelectionFields = [];
+
+/** @param {HTMLDialogElement} dlg */
+function wireCartRuleProductSelectionFields(dlg) {
+  cartRuleProductSelectionFields.forEach((f) => f.destroy());
+  cartRuleProductSelectionFields = [];
+
+  const getLocalePath = () => {
+    const v = String(dlg.querySelector('#pr-cart-add-market')?.value ?? 'us').trim().toLowerCase();
+    return localePathForCartRuleMarket(v);
+  };
+
+  const requiredMount = dlg.querySelector('[data-pr-psf-mount="required"]');
+  const excludedMount = dlg.querySelector('[data-pr-psf-mount="excluded"]');
+  const productsRequired = /** @type {HTMLInputElement | null} */ (
+    dlg.querySelector('#pr-cart-add-required-products')
+  );
+  const categoriesRequired = /** @type {HTMLInputElement | null} */ (
+    dlg.querySelector('#pr-cart-add-required-categories')
+  );
+  const productsExcluded = /** @type {HTMLInputElement | null} */ (
+    dlg.querySelector('#pr-cart-add-excluded-products')
+  );
+  const categoriesExcluded = /** @type {HTMLInputElement | null} */ (
+    dlg.querySelector('#pr-cart-add-excluded-categories')
+  );
+
+  if (requiredMount && productsRequired && categoriesRequired) {
+    cartRuleProductSelectionFields.push(mountProductSelectionField(requiredMount, {
+      productsInput: productsRequired,
+      categoriesInput: categoriesRequired,
+      getLocalePath,
+      label: 'Required products',
+      emptyText: 'None — click to add products or categories.',
+    }));
+  }
+  if (excludedMount && productsExcluded && categoriesExcluded) {
+    cartRuleProductSelectionFields.push(mountProductSelectionField(excludedMount, {
+      productsInput: productsExcluded,
+      categoriesInput: categoriesExcluded,
+      getLocalePath,
+      label: 'Excluded products',
+      emptyText: 'None — click to add products or categories.',
+    }));
+  }
+
+  dlg.querySelector('#pr-cart-add-market')?.addEventListener('change', () => {
+    cartRuleProductSelectionFields.forEach((f) => {
+      f.refresh().catch(() => {});
+    });
+  });
+
+  cartRuleProductSelectionFields.forEach((f) => {
+    f.refresh().catch(() => {});
+  });
+
+  dlg.addEventListener('close', () => {
+    cartRuleProductSelectionFields.forEach((f) => f.destroy());
+    cartRuleProductSelectionFields = [];
+  }, { once: true });
+}
+
+/**
+ * @param {ParentNode} root
+ * @param {Record<string, unknown>} cond
+ * @param {string} countryKey
+ */
+/**
+ * @param {unknown} raw
+ * @returns {unknown[]}
+ */
+function scopeListRawForHydrate(raw) {
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string' && raw.trim()) {
+    return raw.split(',').map((s) => s.trim()).filter(Boolean);
+  }
+  return [];
+}
+
+/**
+ * @param {Record<string, unknown>} cond
+ * @param {RuleRow} rule
+ * @param {import('./price-rules-api.js').HelixCartPriceRule | null} apiRule
+ */
+function cartRuleConditionsForDetail(cond, rule, apiRule) {
+  if (apiRule?.conditions && typeof apiRule.conditions === 'object') {
+    return apiRule.conditions;
+  }
+  return {
+    requiredProducts: rule.requiredProducts || '',
+    excludedProducts: rule.excludedProducts || '',
+    requiredCategories: rule.requiredCategories || '',
+    excludedCategories: rule.excludedCategories || '',
+  };
+}
+
+function hydrateCartRuleDetailScopePills(root, cond, countryKey) {
+  const localePath = localePathForCartRuleMarket(countryKey);
+  root.querySelectorAll('[data-pr-scope-pills]').forEach((el) => {
+    if (!(el instanceof HTMLElement)) return;
+    const kind = el.getAttribute('data-pr-scope-pills');
+    const emptyText = el.getAttribute('data-pr-scope-empty') || 'None';
+    const productsRaw = kind === 'required'
+      ? scopeListRawForHydrate(cond.requiredProducts ?? cond.products)
+      : scopeListRawForHydrate(cond.excludedProducts);
+    const categoriesRaw = kind === 'required'
+      ? scopeListRawForHydrate(cond.requiredCategories ?? cond.categories)
+      : scopeListRawForHydrate(cond.excludedCategories);
+    hydrateProductScopePills(el, {
+      productsRaw,
+      categoriesRaw,
+      localePath,
+      emptyText,
+    }).catch(() => {});
+  });
+}
+
 function cartRuleNewMarketFieldsHtml(initialMarket, marketLocked = false) {
   const sk = COUNTRIES.includes(initialMarket) ? initialMarket : 'us';
   const opts = COUNTRIES.map((key) => {
@@ -1830,23 +1958,18 @@ function cartRuleAddFormHtml(initialMarket, formOptions = {}) {
         </select>
       </div>
       <div class="coupons-field coupons-field-full">
-        <label for="pr-cart-add-required-products">Required products (optional)</label>
-        <input type="text" id="pr-cart-add-required-products" autocomplete="off" placeholder="/us/en_us/products/foo, path|SKU" />
-        <p class="coupons-field-hint">Rule fires only when the cart contains at least one matching product path. Use <code>path|sku</code> to target a variant. Comma-separated.</p>
+        <label>Required products</label>
+        <p class="coupons-field-hint">Products and categories the rule requires in the cart. Leave empty for no requirement. Uses the product index for the selected market.</p>
+        <div data-pr-psf-mount="required"></div>
+        <input type="text" id="pr-cart-add-required-categories" autocomplete="off" />
+        <input type="text" id="pr-cart-add-required-products" autocomplete="off" />
       </div>
       <div class="coupons-field coupons-field-full">
-        <label for="pr-cart-add-excluded-products">Excluded products (optional)</label>
-        <input type="text" id="pr-cart-add-excluded-products" autocomplete="off" placeholder="/us/en_us/products/bar" />
-        <p class="coupons-field-hint">Rule is suppressed when the cart contains any matching product.</p>
-      </div>
-      <div class="coupons-field coupons-field-full">
-        <label for="pr-cart-add-required-categories">Required categories (optional)</label>
-        <input type="text" id="pr-cart-add-required-categories" autocomplete="off" placeholder="ascent-series" />
-        <p class="coupons-field-hint">Stored for future enforcement when category data is on cart lines.</p>
-      </div>
-      <div class="coupons-field coupons-field-full">
-        <label for="pr-cart-add-excluded-categories">Excluded categories (optional)</label>
-        <input type="text" id="pr-cart-add-excluded-categories" autocomplete="off" placeholder="refurbished" />
+        <label>Excluded products</label>
+        <p class="coupons-field-hint">Products and categories that suppress this rule when present in the cart.</p>
+        <div data-pr-psf-mount="excluded"></div>
+        <input type="text" id="pr-cart-add-excluded-categories" autocomplete="off" />
+        <input type="text" id="pr-cart-add-excluded-products" autocomplete="off" />
       </div>
     </div>`;
 }
@@ -1928,6 +2051,7 @@ async function openCartRuleAddDialog(defaultMarketKey) {
       </div>
     </div>`;
   document.body.appendChild(dialog);
+  wireCartRuleProductSelectionFields(dialog);
 
   const close = () => {
     dialog.close();
@@ -1995,6 +2119,7 @@ async function openCartRuleEditDialog(ruleId) {
     </div>`;
   document.body.appendChild(dialog);
   applyCartRuleFormPrefill(dialog, row);
+  wireCartRuleProductSelectionFields(dialog);
 
   const close = () => {
     dialog.close();
@@ -2348,35 +2473,6 @@ function cartRuleDetailModalInnerHtml(countryKey, countryLabel, rule, helixRuleI
     heroSub = 'benefit on qualifying orders';
   }
 
-  const apiRule = state.cartDataSource === 'api' && helixRuleId
-    ? (state.cartRulesList || []).find((r) => String(r.id) === String(helixRuleId))
-    : null;
-  const cond = apiRule?.conditions && typeof apiRule.conditions === 'object'
-    ? apiRule.conditions
-    : {};
-  const reqProdTags = productConditionDisplayLabels(cond.requiredProducts ?? cond.products);
-  const exProdTags = productConditionDisplayLabels(cond.excludedProducts);
-  const reqCat = Array.isArray(cond.requiredCategories ?? cond.categories)
-    ? /** @type {string[]} */ (cond.requiredCategories ?? cond.categories)
-    : [];
-  const exCat = Array.isArray(cond.excludedCategories) ? cond.excludedCategories : [];
-  const scopeSections = [];
-  if (reqProdTags.length) {
-    scopeSections.push(`<p class="coupons-field-hint" style="margin:0 0 6px">Required products</p><div class="coupons-modal-tags">${reqProdTags.map((p) => `<span class="coupons-mini-tag">${escapeHtml(p)}</span>`).join('')}</div>`);
-  }
-  if (exProdTags.length) {
-    scopeSections.push(`<p class="coupons-field-hint" style="margin:0 0 6px">Excluded products</p><div class="coupons-modal-tags">${exProdTags.map((p) => `<span class="coupons-mini-tag">${escapeHtml(p)}</span>`).join('')}</div>`);
-  }
-  if (reqCat.length) {
-    scopeSections.push(`<p class="coupons-field-hint" style="margin:0 0 6px">Required categories</p><div class="coupons-modal-tags">${reqCat.map((c) => `<span class="coupons-mini-tag">${escapeHtml(String(c))}</span>`).join('')}</div>`);
-  }
-  if (exCat.length) {
-    scopeSections.push(`<p class="coupons-field-hint" style="margin:0 0 6px">Excluded categories</p><div class="coupons-modal-tags">${exCat.map((c) => `<span class="coupons-mini-tag">${escapeHtml(String(c))}</span>`).join('')}</div>`);
-  }
-  const scopeBody = scopeSections.length
-    ? scopeSections.join('')
-    : '<span class="coupons-muted">No product or category scope (all carts in this market)</span>';
-
   const pills = [
     promoPillHtml('Free shipping', fs),
     promoPillHtml('Order minimum', hasMin),
@@ -2407,8 +2503,14 @@ function cartRuleDetailModalInnerHtml(countryKey, countryLabel, rule, helixRuleI
     </div>
     <div class="coupons-modal-pills" aria-label="Rule flags">${pills}</div>
     <section class="coupons-modal-section">
-      <h3 class="coupons-modal-section-title">Product / category scope</h3>
-      ${scopeBody}
+      <h3 class="coupons-modal-section-title">Required products</h3>
+      <p class="coupons-field-hint" style="margin:0 0 8px">Products and categories the rule requires in the cart. Leave empty when any cart in this market qualifies.</p>
+      <div class="coupons-modal-tags ps-pills" data-pr-scope-pills="required" data-pr-scope-empty="None (any product in this market)"></div>
+    </section>
+    <section class="coupons-modal-section">
+      <h3 class="coupons-modal-section-title">Excluded products</h3>
+      <p class="coupons-field-hint" style="margin:0 0 8px">Products and categories that suppress this rule when present in the cart.</p>
+      <div class="coupons-modal-tags ps-pills" data-pr-scope-pills="excluded" data-pr-scope-empty="None"></div>
     </section>`;
 }
 
@@ -2421,6 +2523,7 @@ function openCartRuleDetailModal(countryKey, ruleIndex) {
   const countryLabel = marketLabel(countryKey) || countryKey;
   closeCartRuleDetailDialog();
   const humanHtml = cartRuleDetailModalInnerHtml(countryKey, countryLabel, rule, apiRule?.id || '');
+  const detailCond = cartRuleConditionsForDetail({}, rule, apiRule);
   const dialog = document.createElement('dialog');
   dialog.className = 'pr-cart-rule-dialog coupons-detail-dialog';
 
@@ -2455,6 +2558,7 @@ function openCartRuleDetailModal(countryKey, ruleIndex) {
     getHumanNode() {
       const w = document.createElement('div');
       w.innerHTML = humanHtml;
+      hydrateCartRuleDetailScopePills(w, detailCond, countryKey);
       return w;
     },
     getJsonValue: () => apiRule || rule,

@@ -1,0 +1,147 @@
+/* Embeddable merged product + category scope field */
+
+.psf-value-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.psf-root {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.coupons-field:has(.psf-root) {
+  position: relative;
+}
+
+.psf-display {
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid #e1e3e5;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.psf-display-editable {
+  cursor: pointer;
+}
+
+.psf-display-editable:hover,
+.psf-display-editable:focus-visible {
+  border-color: #8ab4f8;
+  box-shadow: 0 0 0 1px #8ab4f8;
+  outline: none;
+}
+
+.psf-display-empty .psf-pills {
+  display: none;
+}
+
+.psf-empty {
+  display: block;
+  font-size: 13px;
+  color: #6d7175;
+}
+
+.psf-display-empty .psf-empty {
+  display: block;
+}
+
+.psf-display:not(.psf-display-empty) .psf-empty {
+  display: none;
+}
+
+.psf-pills {
+  gap: 9px;
+  min-height: 0;
+}
+
+.psf-display .ps-pill {
+  pointer-events: none;
+}
+
+.psf-edit-btn {
+  align-self: flex-start;
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #e1e3e5;
+  background: #f6f6f7;
+  color: #202223;
+  cursor: pointer;
+}
+
+.psf-edit-btn:hover {
+  background: #edeeef;
+}
+
+/* Product selector modal */
+.ps-modal-dialog {
+  width: min(980px, 96vw);
+  max-height: 92vh;
+  margin: auto;
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+}
+
+.ps-modal-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.ps-modal-inner {
+  display: flex;
+  flex-direction: column;
+  max-height: 92vh;
+}
+
+.ps-modal-title {
+  margin: 0;
+  padding: 16px 18px 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.ps-modal-body {
+  overflow: auto;
+  padding: 12px 18px 16px;
+  flex: 1 1 auto;
+}
+
+.ps-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 18px 16px;
+  border-top: 1px solid #e1e3e5;
+}
+
+.ps-modal-btn {
+  font: inherit;
+  font-size: 14px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid #e1e3e5;
+  background: #fff;
+  cursor: pointer;
+}
+
+.ps-modal-btn-primary {
+  background: #0b57d0;
+  border-color: #0b57d0;
+  color: #fff;
+}
+
+.ps-modal-btn-primary:hover {
+  background: #0842a0;
+}
