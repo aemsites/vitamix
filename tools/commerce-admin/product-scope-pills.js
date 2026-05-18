@@ -247,7 +247,9 @@ export async function loadProductScopeIndexContext(selectorLocalePath, options =
     const sku = String(variant.sku).trim();
     if (!sku) return;
     const token = `${parentPath}|${sku}`;
-    variantSkuEntries.push({ token, variant, parent, parentPath });
+    variantSkuEntries.push({
+      token, variant, parent, parentPath,
+    });
     variantByToken.set(token, { variant, parent, parentPath });
   });
 

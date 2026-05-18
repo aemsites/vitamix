@@ -9,7 +9,7 @@ import { openOrderContactEditDialog } from './order-contact-edit-dialog.js';
 import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
 import { createDetailModalHeaderCloseAndJson } from './commerce-detail-modal-json.js';
 import { PB_ORG, PB_SITE } from './commerce-pbus-config.js';
-import { escapeHtml, showToast } from './commerce-otp-ui.js';
+import { escapeHtml, showToast, commerceMarketEmojiHtml } from './commerce-otp-ui.js';
 import { highlightMatch } from './search-highlight.js';
 
 function getUrlParam(key) {
@@ -987,31 +987,45 @@ function renderTable(wrap, orders, query, onEditSaved) {
         <tr>
           <th>Order ID</th>
           <th>State</th>
-          <th>Billing</th>
-          <th>Shipping</th>
           <th>Items</th>
+          <th>Subtotal</th>
+          <th>Total</th>
+          <th>Market</th>
           <th>Created</th>
+          <th>Updated</th>
         </tr>
       </thead>
       <tbody>
         ${orders.map((o) => {
-    const bill = billingName(o);
-    const ship = shippingName(o);
-    const createdStr = o.createdAt ? new Date(o.createdAt).toLocaleString() : 'N/A';
+    const createdStr = o.createdAt ? new Date(o.createdAt).toLocaleString() : '—';
+    const updatedStr = o.updatedAt ? new Date(o.updatedAt).toLocaleString() : '—';
     const id = String(o.id || '');
     const compactId = orderIdForDisplay(o) || id;
     const formattedId = formatOrderIdChunks(compactId);
     const titleAttr = id && normalizeOrderIdKey(compactId) !== normalizeOrderIdKey(id)
       ? ` title="${escapeHtml(id)}"`
       : '';
+    let itemCountRaw = null;
+    if (o.itemCount != null) itemCountRaw = o.itemCount;
+    else if (Array.isArray(o.items)) itemCountRaw = o.items.length;
+    const itemCount = itemCountRaw != null ? String(itemCountRaw) : '—';
+    const subtotalStr = o.subtotal != null && String(o.subtotal).trim() !== ''
+      ? `$${String(o.subtotal).trim()}`
+      : '—';
+    const totalStr = o.total != null && String(o.total).trim() !== ''
+      ? `$${String(o.total).trim()}`
+      : '—';
+    const marketHtml = o.country ? commerceMarketEmojiHtml(o.country) : '—';
     return `
           <tr class="orders-row-open" data-id="${escapeHtml(id)}" tabindex="0" role="button" aria-label="Open order ${escapeHtml(formattedId)}">
             <td><code class="orders-id"${titleAttr}>${highlightOrderIdCell(formattedId, compactId, query)}</code></td>
             <td><span class="orders-badge ${orderStateBadgeClass(o.state)}">${highlightMatch(String(o.state || 'pending'), query)}</span></td>
-            <td class="orders-name-cell">${highlightMatch(bill, query)}</td>
-            <td class="orders-name-cell">${highlightMatch(ship, query)}</td>
-            <td>${highlightMatch(String(o.items?.length ?? '—'), query)}</td>
+            <td>${highlightMatch(itemCount, query)}</td>
+            <td>${highlightMatch(subtotalStr, query)}</td>
+            <td>${highlightMatch(totalStr, query)}</td>
+            <td>${marketHtml}</td>
             <td>${highlightMatch(createdStr, query)}</td>
+            <td>${highlightMatch(updatedStr, query)}</td>
           </tr>`;
   }).join('')}
       </tbody>
