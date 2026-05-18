@@ -1005,7 +1005,9 @@ function renderTable(wrap, orders, query, onEditSaved) {
     const titleAttr = id && normalizeOrderIdKey(compactId) !== normalizeOrderIdKey(id)
       ? ` title="${escapeHtml(id)}"`
       : '';
-    const itemCountRaw = o.itemCount != null ? o.itemCount : (Array.isArray(o.items) ? o.items.length : null);
+    let itemCountRaw = null;
+    if (o.itemCount != null) itemCountRaw = o.itemCount;
+    else if (Array.isArray(o.items)) itemCountRaw = o.items.length;
     const itemCount = itemCountRaw != null ? String(itemCountRaw) : '—';
     const subtotalStr = o.subtotal != null && String(o.subtotal).trim() !== ''
       ? `$${String(o.subtotal).trim()}`
