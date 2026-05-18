@@ -478,33 +478,37 @@ function getConfigFromURL() {
 }
 
 /**
+ * Whether a filter config entry should be written to the URL.
+ * @param {string} key - Config key
+ * @param {*} value - Config value
+ * @returns {boolean}
+ */
+function shouldIncludeInURL(key, value) {
+  if (key === 'page' && (value === 1 || value === '1')) return false;
+  if (typeof value === 'string') return value.trim().length > 0;
+  return value !== undefined && value !== null && value !== '';
+}
+
+/**
  * Updates URL query parameters to reflect current filter state.
+ * Omitted or empty values are removed from the query string.
  * @param {Object} filterConfig - Current filter configuration
+ * @param {boolean} [replace=false] - Use replaceState instead of pushState
  * @returns {void}
  */
-function updateURL(filterConfig) {
+function updateURL(filterConfig, replace = false) {
   const params = new URLSearchParams();
 
-  // Add all non-empty config values to URL params
   Object.keys(filterConfig).forEach((key) => {
-    // Skip page if it's 1 (default)
-    if (key === 'page' && filterConfig[key] === 1) {
-      return;
-    }
-
-    if (filterConfig[key] && filterConfig[key].trim && filterConfig[key].trim()) {
-      params.set(key, filterConfig[key]);
-    } else if (filterConfig[key] && !filterConfig[key].trim) {
-      // Handle non-string values (but still skip page=1)
-      if (key !== 'page' || filterConfig[key] !== 1) {
-        params.set(key, filterConfig[key]);
-      }
+    const value = filterConfig[key];
+    if (shouldIncludeInURL(key, value)) {
+      params.set(key, typeof value === 'string' ? value : String(value));
     }
   });
 
-  // Update URL without reloading page
   const newURL = params.toString() ? `${window.location.pathname}?${params.toString()}` : window.location.pathname;
-  window.history.pushState({ filterConfig }, '', newURL);
+  const historyFn = replace ? window.history.replaceState : window.history.pushState;
+  historyFn.call(window.history, { filterConfig }, '', newURL);
 }
 
 /**
@@ -530,6 +534,7 @@ function hasActiveFilters(filterConfig) {
 function buildRecipeFiltering(container, config = {}, copy = {}) {
   const ITEMS_PER_PAGE = 12;
   let currentPage = 1;
+  let searchGeneration = 0;
 
   const facetLabels = {
     difficulty: copy.difficulty || 'Difficulty',
@@ -541,6 +546,7 @@ function buildRecipeFiltering(container, config = {}, copy = {}) {
 
   // Reference existing DOM elements from static HTML
   const resultsElement = container.querySelector('.results');
+  const noResultsElement = container.querySelector('.no-results');
   const facetsElement = container.querySelector('.facets');
   const paginationElement = container.querySelector('.pagination');
   const resultsCountElement = container.querySelector('#results-count');
@@ -548,18 +554,20 @@ function buildRecipeFiltering(container, config = {}, copy = {}) {
   const resultsEndElement = container.querySelector('#results-end');
 
   // Set up facet panel event listeners
-  const applyButton = facetsElement.querySelector('.apply');
-  if (applyButton) {
-    applyButton.addEventListener('click', () => {
-      facetsElement.classList.remove('visible');
+  if (facetsElement) {
+    const applyButton = facetsElement.querySelector('.apply');
+    if (applyButton) {
+      applyButton.addEventListener('click', () => {
+        facetsElement.classList.remove('visible');
+      });
+    }
+
+    facetsElement.addEventListener('click', (event) => {
+      if (event.currentTarget === event.target) {
+        facetsElement.classList.remove('visible');
+      }
     });
   }
-
-  facetsElement.addEventListener('click', (event) => {
-    if (event.currentTarget === event.target) {
-      facetsElement.classList.remove('visible');
-    }
-  });
 
   // Get dropdown elements
   const dietarySelect = container.querySelector('#dietary-interests');
@@ -568,6 +576,21 @@ function buildRecipeFiltering(container, config = {}, copy = {}) {
   const goButton = container.querySelector('.go');
   const fulltextElement = container.querySelector('#fulltext');
   const form = container.querySelector('form.controls');
+
+  const scrollFiltersToTop = () => {
+    if (form) {
+      form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const scrollResultsToTop = () => {
+    const target = noResultsElement && !noResultsElement.hidden
+      ? noResultsElement
+      : resultsElement;
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   // Sort dropdown uses native <details> element
   const sortDetails = container.querySelector('.sort');
@@ -587,7 +610,7 @@ function buildRecipeFiltering(container, config = {}, copy = {}) {
     runSearch(filterConfig);
   };
 
-  sortMenu.addEventListener('click', (event) => {
+  sortMenu?.addEventListener('click', (event) => {
     const btn = event.target.closest('button[data-sort]');
     if (btn) selectSort(btn);
   });
@@ -606,8 +629,25 @@ function buildRecipeFiltering(container, config = {}, copy = {}) {
     }
   };
 
+  const hideNoResults = () => {
+    container.classList.remove('has-no-results');
+    if (noResultsElement) noResultsElement.hidden = true;
+    if (resultsElement) resultsElement.hidden = false;
+  };
+
+  const displayNoResults = () => {
+    container.classList.add('has-no-results');
+    if (resultsElement) {
+      resultsElement.innerHTML = '';
+      resultsElement.hidden = true;
+    }
+    if (paginationElement) paginationElement.innerHTML = '';
+    if (noResultsElement) noResultsElement.hidden = false;
+  };
+
   // renders recipe cards to the results area and highlights search terms
   const displayResults = async (results, page = 1) => {
+    hideNoResults();
     resultsElement.innerHTML = '';
 
     // Calculate pagination
@@ -726,7 +766,12 @@ function buildRecipeFiltering(container, config = {}, copy = {}) {
       else filterConfig[facetKey] = facetValue;
     });
 
-    filterConfig.fulltext = fulltextElement.value;
+    const trimmedFulltext = fulltextElement.value.trim();
+    if (trimmedFulltext) {
+      filterConfig.fulltext = fulltextElement.value;
+    } else {
+      delete filterConfig.fulltext;
+    }
 
     // Reset to page 1 when filters change, unless explicitly maintaining page
     if (resetPage) {
@@ -738,6 +783,37 @@ function buildRecipeFiltering(container, config = {}, copy = {}) {
 
     return filterConfig;
   };
+
+  const resetAllFilters = () => {
+    if (fulltextElement) {
+      fulltextElement.value = '';
+    }
+    dietarySelect.selectedIndex = 0;
+    courseSelect.selectedIndex = 0;
+    recipeTypeSelect.selectedIndex = 0;
+    container.querySelectorAll('input[type="checkbox"]:checked').forEach((cb) => {
+      cb.checked = false;
+    });
+    Object.keys(config).forEach((key) => {
+      delete config[key];
+    });
+    // eslint-disable-next-line no-use-before-define
+    const filterConfig = createFilterConfig(true);
+    delete filterConfig.fulltext;
+    // Clear query params immediately so fulltext/filters cannot be restored from the URL
+    updateURL(filterConfig, true);
+    // eslint-disable-next-line no-use-before-define
+    runSearch(filterConfig, false);
+  };
+
+  const resetSelector = '[data-action="reset-recipe-filters"], .reset-selections';
+
+  container.addEventListener('click', (event) => {
+    const resetBtn = event.target.closest(resetSelector);
+    if (!resetBtn || !container.contains(resetBtn)) return;
+    event.preventDefault();
+    resetAllFilters();
+  });
 
   // renders the filter facets UI with checkboxes, selected filter tags, and counts
   const displayFacets = (facets, filters) => {
@@ -862,6 +938,9 @@ function buildRecipeFiltering(container, config = {}, copy = {}) {
 
   // main search function that filters, sorts, and displays recipes
   const runSearch = async (filterConfig = config, updateURLState = true) => {
+    const generation = searchGeneration + 1;
+    searchGeneration = generation;
+
     const facets = {
       difficulty: {},
       'compatible-containers': {},
@@ -893,6 +972,10 @@ function buildRecipeFiltering(container, config = {}, copy = {}) {
     };
 
     let results = await lookupRecipes(filterConfig, facets);
+
+    if (generation !== searchGeneration) {
+      return;
+    }
 
     // Collapse recipes with the same title
     results = collapseRecipesByTitle(results);
@@ -940,11 +1023,16 @@ function buildRecipeFiltering(container, config = {}, copy = {}) {
     const showResults = hasActiveFilters(filterConfig);
     if (showResults) {
       container.classList.remove('suppress-results');
-      displayResults(results, page);
-      displayPagination(totalResults, page);
+      if (totalResults === 0) {
+        displayNoResults();
+      } else {
+        displayResults(results, page);
+        displayPagination(totalResults, page);
+      }
       displayFacets(facets, filterConfig);
     } else {
       container.classList.add('suppress-results');
+      hideNoResults();
       resultsElement.innerHTML = '';
       if (paginationElement) paginationElement.innerHTML = '';
       displayFacets(facets, filterConfig);
@@ -956,6 +1044,8 @@ function buildRecipeFiltering(container, config = {}, copy = {}) {
     }
   };
 
+  fulltextElement.addEventListener('focus', scrollFiltersToTop);
+
   fulltextElement.addEventListener('input', () => {
     runSearch(createFilterConfig(true)); // Reset to page 1 on search
   });
@@ -965,16 +1055,11 @@ function buildRecipeFiltering(container, config = {}, copy = {}) {
     runSearch(createFilterConfig(true)); // Reset to page 1 on filter change
   });
 
-  dietarySelect.addEventListener('change', () => {
-    runSearch(createFilterConfig(true)); // Reset to page 1 on filter change
-  });
-
-  courseSelect.addEventListener('change', () => {
-    runSearch(createFilterConfig(true)); // Reset to page 1 on filter change
-  });
-
-  recipeTypeSelect.addEventListener('change', () => {
-    runSearch(createFilterConfig(true)); // Reset to page 1 on filter change
+  [dietarySelect, courseSelect, recipeTypeSelect].forEach((select) => {
+    select.addEventListener('change', () => {
+      scrollFiltersToTop();
+      runSearch(createFilterConfig(true)); // Reset to page 1 on filter change
+    });
   });
 
   // Search button click (form submit)
@@ -986,8 +1071,9 @@ function buildRecipeFiltering(container, config = {}, copy = {}) {
   }
 
   // Also trigger search on Enter key
-  fulltextElement.addEventListener('keypress', (e) => {
+  fulltextElement.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
+      scrollResultsToTop();
       runSearch(createFilterConfig(true));
     }
   });
@@ -1160,6 +1246,27 @@ async function init() {
     const recipeTypeOption = recipeCenter.querySelector('#recipe-type option[value=""]');
     if (recipeTypeOption) {
       recipeTypeOption.textContent = copy.recipeType || 'Recipe Type';
+    }
+
+    const noResultsTitle = recipeCenter.querySelector('.no-results .no-results-title');
+    const noResultsEyebrow = recipeCenter.querySelector('.no-results .eyebrow');
+    const noResultsLead = recipeCenter.querySelector('.no-results .lead');
+    const resetSelectionsBtn = recipeCenter.querySelector('.no-results .reset-selections');
+    const noResultsImg = recipeCenter.querySelector('.no-results img');
+    if (noResultsTitle) {
+      noResultsTitle.textContent = copy.noResultsTitle || 'Your Plate is Empty';
+    }
+    if (noResultsEyebrow) {
+      noResultsEyebrow.textContent = copy.noResultsEyebrow || 'No Results Found';
+    }
+    if (noResultsLead) {
+      noResultsLead.textContent = copy.noResultsLead || 'We couldn\'t find any item matching your search. Try adjusting your selections, or start a new search by resetting your selections.';
+    }
+    if (resetSelectionsBtn) {
+      resetSelectionsBtn.textContent = copy.resetSelections || 'Reset Selections';
+    }
+    if (noResultsImg && copy.noResultsImageAlt) {
+      noResultsImg.alt = copy.noResultsImageAlt;
     }
 
     buildRecipeFiltering(recipeCenter, {}, copy);

@@ -292,6 +292,7 @@
 }
 
 .recipe-center .facet {
+  position: relative;
   border-bottom: var(--border-s) solid var(--color-gray-300);
 }
 
@@ -325,6 +326,8 @@
 
 .recipe-center .facet input[type="checkbox"] {
   position: absolute;
+  top: var(--spacing-100);
+  left: 0;
   width: 20px;
   height: 20px;
   margin: 0;
@@ -351,15 +354,97 @@
   .recipe-center .facets {
     display: block;
     position: static;
-    z-index: auto; /* only need z-index when fixed overlay on small screens */
+    z-index: 1;
     grid-area: facets;
     padding: var(--spacing-600) 30px var(--spacing-600) var(--spacing-600);
     background: none;
-    overflow: visible;
+    overflow: hidden; /* keep absolute facet inputs from overlapping the results column */
   }
 
   .recipe-center .facets .apply {
     display: none;
+  }
+}
+
+/* No results empty state */
+.recipe-center .no-results {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--spacing-l);
+  margin: var(--spacing-400) var(--spacing-600);
+  padding: var(--spacing-l);
+  background-color: var(--color-gray-300);
+  color: var(--color-charcoal);
+}
+
+.recipe-center .no-results[hidden] {
+  display: none;
+}
+
+@media (width >= 600px) {
+  .recipe-center .no-results {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--spacing-xl);
+  }
+}
+
+.recipe-center .no-results .img-wrapper {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  align-self: center;
+  justify-content: center;
+  padding: var(--spacing-m);
+  background-color: var(--color-white);
+}
+
+.recipe-center .no-results img {
+  display: block;
+  max-width: 234px;
+}
+
+.recipe-center .no-results .copy {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.recipe-center .no-results .no-results-title {
+  margin: 0 0 0.2em;
+  font-family: var(--heading-font-family);
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  font-weight: var(--weight-regular);
+}
+
+.recipe-center .no-results .lead {
+  margin: 1em 0;
+  line-height: var(--line-height-xl);
+}
+
+.recipe-center .no-results .button-wrapper {
+  margin: 0;
+}
+
+@media (width >= 900px) {
+  .recipe-center .no-results:not([hidden]) {
+    position: relative;
+    z-index: 2;
+    grid-area: results;
+    margin: 0;
+    padding: var(--spacing-600) var(--spacing-600) var(--spacing-600) var(--spacing-400);
+    pointer-events: auto;
+  }
+
+  /* results shares grid-area: results — must not intercept clicks when empty state is shown */
+  .recipe-center.has-no-results .results,
+  .recipe-center .no-results:not([hidden]) ~ .results {
+    display: none !important;
+  }
+
+  .recipe-center .results[hidden] {
+    display: none !important;
   }
 }
 
