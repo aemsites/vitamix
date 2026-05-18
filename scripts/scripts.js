@@ -687,7 +687,7 @@ function buildAutoBlocks(main) {
  * @param {boolean} [autoplay=true] - Whether to autoplay the video on intersection
  * @returns {HTMLVideoElement|null} Created <video> element (or `null` if no video link found)
  */
-export function buildVideo(el, autoplay = true) {
+export function buildVideo(el, autoplay = true, ariaLabel = '') {
   const vid = el.querySelector('a[href*=".mp4"]');
   if (vid) {
     const imgWrapper = vid.closest('.img-wrapper');
@@ -695,6 +695,7 @@ export function buildVideo(el, autoplay = true) {
     // create video element
     const video = document.createElement('video');
     video.playsInline = true;
+    video.setAttribute('aria-label', ariaLabel);
     video.setAttribute('preload', autoplay ? 'none' : 'metadata');
     if (autoplay) {
       video.loop = true;
