@@ -990,15 +990,19 @@ function renderTable(wrap, orders, query, onEditSaved) {
           <th>Items</th>
           <th>Subtotal</th>
           <th>Total</th>
+          <th>Coupon</th>
+          <th>Payment</th>
           <th>Market</th>
           <th>Created</th>
           <th>Updated</th>
+          <th>Synchronized</th>
         </tr>
       </thead>
       <tbody>
         ${orders.map((o) => {
     const createdStr = o.createdAt ? new Date(o.createdAt).toLocaleString() : '—';
     const updatedStr = o.updatedAt ? new Date(o.updatedAt).toLocaleString() : '—';
+    const syncedStr = o.syncedAt ? new Date(o.syncedAt).toLocaleString() : '—';
     const id = String(o.id || '');
     const compactId = orderIdForDisplay(o) || id;
     const formattedId = formatOrderIdChunks(compactId);
@@ -1015,6 +1019,12 @@ function renderTable(wrap, orders, query, onEditSaved) {
     const totalStr = o.total != null && String(o.total).trim() !== ''
       ? `$${String(o.total).trim()}`
       : '—';
+    const couponStr = o.coupon != null && String(o.coupon).trim() !== ''
+      ? String(o.coupon).trim()
+      : '—';
+    const paymentMethodStr = o.paymentMethod != null && String(o.paymentMethod).trim() !== ''
+      ? String(o.paymentMethod).trim()
+      : '—';
     const marketHtml = o.country ? commerceMarketEmojiHtml(o.country) : '—';
     return `
           <tr class="orders-row-open" data-id="${escapeHtml(id)}" tabindex="0" role="button" aria-label="Open order ${escapeHtml(formattedId)}">
@@ -1023,9 +1033,12 @@ function renderTable(wrap, orders, query, onEditSaved) {
             <td>${highlightMatch(itemCount, query)}</td>
             <td>${highlightMatch(subtotalStr, query)}</td>
             <td>${highlightMatch(totalStr, query)}</td>
+            <td>${highlightMatch(couponStr, query)}</td>
+            <td>${highlightMatch(paymentMethodStr, query)}</td>
             <td>${marketHtml}</td>
             <td>${highlightMatch(createdStr, query)}</td>
             <td>${highlightMatch(updatedStr, query)}</td>
+            <td>${highlightMatch(syncedStr, query)}</td>
           </tr>`;
   }).join('')}
       </tbody>
