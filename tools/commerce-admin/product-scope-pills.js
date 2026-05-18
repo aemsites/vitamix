@@ -8,6 +8,7 @@ import {
   fetchProductsIndexForLocale,
   getParentProducts,
   getUrlKeyFromProduct,
+  getVariantProducts,
   resolveImageUrlForLocale,
 } from './pim.js';
 import { productUrlToCatalogPath } from './price-rules-api.js';
@@ -21,6 +22,15 @@ export const PILL_THUMB_PLACEHOLDER = '<span class="ps-pill-thumb-placeholder" a
 
 /**
  * @typedef {{
+ *   token: string;
+ *   variant: object;
+ *   parent: object;
+ *   parentPath: string;
+ * }} VariantSkuEntry
+ */
+
+/**
+ * @typedef {{
  *   localePath: string;
  *   productByPath: Map<string, object>;
  *   categoryLabels: Map<string, string>;
@@ -28,6 +38,8 @@ export const PILL_THUMB_PLACEHOLDER = '<span class="ps-pill-thumb-placeholder" a
  *   categoryProductCounts: Map<string, number>;
  *   parentProducts: object[];
  *   categorySlugs: string[];
+ *   variantSkuEntries: VariantSkuEntry[];
+ *   variantByToken: Map<string, { variant: object; parent: object; parentPath: string }>;
  * }} ProductScopeIndexContext
  */
 
@@ -218,6 +230,27 @@ export async function loadProductScopeIndexContext(selectorLocalePath, options =
     productByPath.set(path, p);
   });
 
+  /** @type {Map<string, object>} */
+  const parentBySku = new Map();
+  parentProducts.forEach((p) => {
+    if (p.sku) parentBySku.set(String(p.sku), p);
+  });
+
+  /** @type {VariantSkuEntry[]} */
+  const variantSkuEntries = [];
+  /** @type {Map<string, { variant: object; parent: object; parentPath: string }>} */
+  const variantByToken = new Map();
+  getVariantProducts(indexRows).forEach((variant) => {
+    const parent = parentBySku.get(String(variant.parentSku));
+    if (!parent) return;
+    const parentPath = catalogPathForProduct(localePath, parent);
+    const sku = String(variant.sku).trim();
+    if (!sku) return;
+    const token = `${parentPath}|${sku}`;
+    variantSkuEntries.push({ token, variant, parent, parentPath });
+    variantByToken.set(token, { variant, parent, parentPath });
+  });
+
   return {
     localePath,
     productByPath,
@@ -226,6 +259,8 @@ export async function loadProductScopeIndexContext(selectorLocalePath, options =
     categoryProductCounts: buildCategoryProductCounts(parentProducts),
     parentProducts,
     categorySlugs: collectCategorySlugsFromIndexRows(indexRows),
+    variantSkuEntries,
+    variantByToken,
   };
 }
 
@@ -235,8 +270,44 @@ export async function loadProductScopeIndexContext(selectorLocalePath, options =
  * @returns {object|undefined}
  */
 function productForPath(ctx, pathToken) {
+  if (pathToken.includes('|')) {
+    const entry = ctx.variantByToken?.get(pathToken);
+    if (entry) return entry.variant;
+  }
   return ctx.productByPath.get(pathToken)
     || ctx.productByPath.get(pathToken.split('|')[0]);
+}
+
+/**
+ * Human label for a variant row (color/style), not the full product title.
+ * @param {object} [variant]
+ * @returns {string}
+ */
+function variantIdentLabel(variant) {
+  const color = String(variant?.color || '').trim();
+  if (color) return color;
+  const title = String(variant?.title || '').trim();
+  if (!title) return '';
+  const dash = title.lastIndexOf('-');
+  if (dash > 0 && dash < title.length - 1) {
+    return title.slice(dash + 1).trim();
+  }
+  return '';
+}
+
+/**
+ * @param {{ variant: object }} entry
+ * @param {string} pathToken `parentPath|sku`
+ * @returns {string}
+ */
+function variantScopePillMeta(entry, pathToken) {
+  const pipe = pathToken.indexOf('|');
+  const sku = String(entry.variant?.sku || '').trim()
+    || (pipe > 0 ? pathToken.slice(pipe + 1).trim() : '');
+  const variantLabel = variantIdentLabel(entry.variant);
+  if (variantLabel && sku) return `${variantLabel} · ${sku}`;
+  if (sku) return sku;
+  return variantLabel;
 }
 
 /**
@@ -255,8 +326,16 @@ export function createProductScopePillEl(ctx, path, opts = {}) {
     query = '', removable = false, picker = false, selected = false,
   } = opts;
   const product = productForPath(ctx, path);
-  const title = product?.title || product?.sku || productPathDisplayLabel(path);
-  const sub = productPathDisplayLabel(path);
+  const pipeIdx = path.indexOf('|');
+  let title = product?.title || product?.sku || productPathDisplayLabel(path);
+  let sub = productPathDisplayLabel(path);
+  if (pipeIdx > 0) {
+    const entry = ctx.variantByToken?.get(path);
+    if (entry) {
+      title = entry.variant?.title || entry.variant?.sku || path.slice(pipeIdx + 1);
+      sub = variantScopePillMeta(entry, path);
+    }
+  }
   const imgUrl = product?.image ? resolveImageUrlForLocale(ctx.localePath, product.image) : '';
   const thumbHtml = imgUrl
     ? `<img class="ps-pill-product-thumb" src="${escapeAttr(imgUrl)}" alt="" loading="lazy" width="39" height="39" />`

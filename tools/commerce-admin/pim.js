@@ -116,6 +116,16 @@ export function getParentProducts(data) {
 }
 
 /**
+ * Variant rows: have sku and parentSku pointing at a parent product.
+ * @param {Array<object>} data
+ * @returns {Array<object>}
+ */
+export function getVariantProducts(data) {
+  if (!Array.isArray(data)) return [];
+  return data.filter((item) => item.parentSku && item.sku);
+}
+
+/**
  * Count variants from variantSkus string.
  * @param {string} variantSkus - e.g. "057728-04,057725-04"
  * @returns {number}

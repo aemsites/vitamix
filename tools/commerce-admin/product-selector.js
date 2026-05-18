@@ -22,7 +22,7 @@ export {
   productPathDisplayLabel,
 } from './product-scope-pills.js';
 
-/** @typedef {'all' | 'products' | 'categories'} PickerFilter */
+/** @typedef {'all' | 'products' | 'categories' | 'skus'} PickerFilter */
 
 const MAX_PICKER_ROWS = 120;
 
@@ -177,6 +177,7 @@ export function mountProductSelector(container, options = {}) {
           <button type="button" class="ps-filter-tab" data-filter="all" aria-pressed="true">All</button>
           <button type="button" class="ps-filter-tab" data-filter="products" aria-pressed="false">Products</button>
           <button type="button" class="ps-filter-tab" data-filter="categories" aria-pressed="false">Categories</button>
+          <button type="button" class="ps-filter-tab" data-filter="skus" aria-pressed="false">SKUs</button>
         </div>
         <div id="ps-loading" class="ps-loading" hidden>
           <span class="ps-spinner" aria-hidden="true"></span>
@@ -273,6 +274,18 @@ export function mountProductSelector(container, options = {}) {
     return name.includes(q);
   }
 
+  function skuMatchesSearch(variant, parent) {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return true;
+    const haystack = [
+      String(variant?.sku || ''),
+      String(variant?.title || ''),
+      String(variant?.color || ''),
+      productDisplayName(parent),
+    ].join(' ').toLowerCase();
+    return haystack.includes(q);
+  }
+
   function categoryMatchesSearch(slug) {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return true;
@@ -348,6 +361,16 @@ export function mountProductSelector(container, options = {}) {
       });
     }
 
+    if (filterMode === 'skus') {
+      (scopeContext.variantSkuEntries || []).forEach(({ token, variant, parent }) => {
+        if (!skuMatchesSearch(variant, parent)) return;
+        const label = String(variant?.title || '').trim()
+          || String(variant?.sku || '').trim()
+          || productPathDisplayLabel(token);
+        rows.push({ kind: 'product', key: token, label });
+      });
+    }
+
     rows.sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
     const capped = rows.slice(0, MAX_PICKER_ROWS);
 
@@ -397,7 +420,12 @@ export function mountProductSelector(container, options = {}) {
       statusEl.classList.add('ps-status-error');
       return;
     }
-    statusEl.textContent = `${parentProducts.length} products · ${categorySlugs.length} categories`;
+    const skuCount = scopeContext?.variantSkuEntries?.length ?? 0;
+    if (filterMode === 'skus') {
+      statusEl.textContent = `${skuCount} SKUs`;
+    } else {
+      statusEl.textContent = `${parentProducts.length} products · ${categorySlugs.length} categories`;
+    }
   }
 
   function setLoadingUi(on) {
@@ -489,13 +517,19 @@ export function mountProductSelector(container, options = {}) {
   filterTabs.forEach((tab) => {
     tab.addEventListener('click', () => {
       const mode = tab.getAttribute('data-filter');
-      if (mode !== 'all' && mode !== 'products' && mode !== 'categories') return;
-      filterMode = mode;
+      if (mode !== 'all' && mode !== 'products' && mode !== 'categories' && mode !== 'skus') return;
+      filterMode = /** @type {PickerFilter} */ (mode);
       filterTabs.forEach((t) => {
         const pressed = t === tab;
         t.setAttribute('aria-pressed', pressed ? 'true' : 'false');
       });
+      if (searchEl) {
+        searchEl.placeholder = mode === 'skus'
+          ? 'Filter by SKU, variant name, or parent product…'
+          : 'Filter by product or category name…';
+      }
       renderPicker();
+      updateStatus();
     });
   });
 
