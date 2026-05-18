@@ -1,6 +1,10 @@
 /* eslint-disable max-len */
 
-import { loadCSS } from '../../scripts/aem.js';
+import {
+  filterVisibleContainers,
+  getHiddenContainers,
+} from '../../blocks/recipe/recipe-containers.js';
+import { fetchPlaceholders, loadCSS } from '../../scripts/aem.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 /**
@@ -80,7 +84,7 @@ function highlightMatch(text, searchTerm) {
  * @param {Object} facets - Optional object to populate with facet counts for UI filters.
  * @returns {Promise<Array<Object>>} Array of filtered recipe objects
  */
-async function lookupRecipes(config = {}, facets = {}) {
+async function lookupRecipes(config = {}, facets = {}, hiddenContainers = new Set()) {
   const { locale, language } = getLocaleAndLanguage();
   if (!window.recipeIndex) {
     // fetch the main recipe index
@@ -95,6 +99,18 @@ async function lookupRecipes(config = {}, facets = {}) {
     // parse and filter recipes - only include Updated or New status, exclude Deleted
     const recipes = data
       .map((d) => parseRecipeData(d))
+      .map((recipe) => {
+        if (hiddenContainers.size && recipe['compatible-containers']?.length) {
+          return {
+            ...recipe,
+            'compatible-containers': filterVisibleContainers(
+              recipe['compatible-containers'],
+              hiddenContainers,
+            ),
+          };
+        }
+        return recipe;
+      })
       .filter((recipe) => {
         const status = recipe.status ? recipe.status.toLowerCase() : '';
         return status === 'updated' || status === 'new';
@@ -531,7 +547,7 @@ function hasActiveFilters(filterConfig) {
  * @param {Object} copy - Widget copy (i18n labels)
  * @returns {void}
  */
-function buildRecipeFiltering(container, config = {}, copy = {}) {
+function buildRecipeFiltering(container, config = {}, copy = {}, hiddenContainers = new Set()) {
   const ITEMS_PER_PAGE = 12;
   let currentPage = 1;
   let searchGeneration = 0;
@@ -971,7 +987,7 @@ function buildRecipeFiltering(container, config = {}, copy = {}) {
       },
     };
 
-    let results = await lookupRecipes(filterConfig, facets);
+    let results = await lookupRecipes(filterConfig, facets, hiddenContainers);
 
     if (generation !== searchGeneration) {
       return;
@@ -1160,9 +1176,13 @@ function buildRecipeFiltering(container, config = {}, copy = {}) {
 async function init() {
   const recipeCenter = document.querySelector('.recipe-center');
   if (recipeCenter) {
-    const { language } = getLocaleAndLanguage();
+    const { locale, language } = getLocaleAndLanguage();
     const lang = (language || 'en_us').split('_')[0];
-    const copy = await loadWidgetCopy(lang);
+    const [copy, placeholders] = await Promise.all([
+      loadWidgetCopy(lang),
+      fetchPlaceholders(`/${locale}/${language}`),
+    ]);
+    const hiddenContainers = getHiddenContainers(placeholders);
 
     // Move existing H1 into recipe-center if it exists
     const existingH1 = document.querySelector('main h1');
@@ -1269,7 +1289,7 @@ async function init() {
       noResultsImg.alt = copy.noResultsImageAlt;
     }
 
-    buildRecipeFiltering(recipeCenter, {}, copy);
+    buildRecipeFiltering(recipeCenter, {}, copy, hiddenContainers);
   }
 }
 
