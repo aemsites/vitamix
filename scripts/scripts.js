@@ -685,6 +685,7 @@ function buildAutoBlocks(main) {
  * Replaces an MP4 anchor element with a <video> element.
  * @param {HTMLElement} el - Container element
  * @param {boolean} [autoplay=true] - Whether to autoplay the video on intersection
+ * @param {string} [ariaLabel=''] - Accessible label for non-autoplay (informational) videos
  * @returns {HTMLVideoElement|null} Created <video> element (or `null` if no video link found)
  */
 export function buildVideo(el, autoplay = true, ariaLabel = '') {
@@ -695,15 +696,15 @@ export function buildVideo(el, autoplay = true, ariaLabel = '') {
     // create video element
     const video = document.createElement('video');
     video.playsInline = true;
-    video.setAttribute('aria-label', ariaLabel);
     video.setAttribute('preload', autoplay ? 'none' : 'metadata');
     if (autoplay) {
+      video.setAttribute('aria-hidden', true);
       video.loop = true;
       video.muted = true;
       video.autoplay = true;
       video.setAttribute('autoplay', '');
       video.setAttribute('muted', '');
-    }
+    } else if (ariaLabel) video.setAttribute('aria-label', ariaLabel);
     // create source element
     const source = document.createElement('source');
     source.type = 'video/mp4';
