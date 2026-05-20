@@ -192,8 +192,11 @@ export class Cart {
   }
 
   /**
-   * Returns cart items in API-compatible format. `custom` and
-   * `selectedOptions` are forwarded verbatim when present.
+   * Returns cart items in API-compatible format. `custom` is forwarded
+   * verbatim when present. `selectedOptions` is not forwarded — it's
+   * cart-local data used by the cart UI; the Commerce API does not accept
+   * it on the order body today and will gain support alongside server-side
+   * bundle resolution.
    *
    * @returns {Array<object>}
    */
@@ -211,7 +214,6 @@ export class Cart {
       },
       ...(item.image ? { imageUrl: item.image } : {}),
       ...(item.url ? { productUrl: item.url } : {}),
-      ...(item.selectedOptions ? { selectedOptions: item.selectedOptions } : {}),
       ...(item.custom ? { custom: item.custom } : {}),
     }));
   }

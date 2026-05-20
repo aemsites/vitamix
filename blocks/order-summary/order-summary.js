@@ -254,6 +254,7 @@ export default async function decorate(block) {
               if (tier && !tier.isDefault && parseFloat(tier.price) > 0) {
                 cart.addItem({
                   sku: tier.sku,
+                  path: tier.path,
                   quantity: item.quantity,
                   price: tier.price,
                   name: tier.name,

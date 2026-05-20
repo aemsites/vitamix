@@ -225,11 +225,14 @@ export default function renderAddToCart(ph, block, parent) {
         // Normalize warranty options from Product Bus into the cart convention.
         // Stashed whenever the product has any warranty options — the cart-page
         // selector renders the default tier as a read-only "(included)" line
-        // for transparency even when there are no paid upgrades.
+        // for transparency even when there are no paid upgrades. Paid tiers
+        // carry `path` referencing the published warranty product so the
+        // Commerce API can validate the line's price.
         const warrantyOptions = (parent.custom?.options ?? []).map((opt) => ({
           sku: opt.sku,
           name: opt.name,
           price: opt.finalPrice ?? opt.price,
+          ...(opt.path ? { path: opt.path } : {}),
           ...(parseFloat(opt.finalPrice ?? opt.price) === 0 ? { isDefault: true } : {}),
         }));
         const availableWarranties = warrantyOptions.length > 0 ? warrantyOptions : null;
@@ -257,6 +260,7 @@ export default function renderAddToCart(ph, block, parent) {
         if (selectedTier && !selectedTier.isDefault) {
           await cartApi.addItem({
             sku: selectedTier.sku,
+            path: selectedTier.path,
             quantity: parseInt(quantity, 10),
             price: selectedTier.price,
             name: selectedTier.name,

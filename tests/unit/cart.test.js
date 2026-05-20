@@ -413,7 +413,8 @@ test('addItem throws when nested custom payloads differ', () => {
 
 // --- getItemsForAPI: passthrough --------------------------------------------
 
-test('getItemsForAPI forwards selectedOptions when present', () => {
+test('getItemsForAPI does not forward selectedOptions', () => {
+  // selectedOptions is cart-local; the Commerce API does not accept it.
   const cart = new Cart();
   cart.addItem({
     sku: 'foo',
@@ -422,19 +423,6 @@ test('getItemsForAPI forwards selectedOptions when present', () => {
     name: 'Foo',
     path: '/foo',
     selectedOptions: [{ id: 'color', value: 'Red' }],
-  });
-  const [api] = cart.getItemsForAPI();
-  assert.deepEqual(api.selectedOptions, [{ id: 'color', value: 'Red' }]);
-});
-
-test('getItemsForAPI omits selectedOptions when not present', () => {
-  const cart = new Cart();
-  cart.addItem({
-    sku: 'foo',
-    quantity: 1,
-    price: '10.00',
-    name: 'Foo',
-    path: '/foo',
   });
   const [api] = cart.getItemsForAPI();
   assert.equal('selectedOptions' in api, false);
