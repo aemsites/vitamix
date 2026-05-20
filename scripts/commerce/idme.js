@@ -62,7 +62,7 @@ export function initIDMe(insertAfterEl, discountInput) {
   if (!document.getElementById('idme-verification')) {
     outer.innerHTML = `
       <div class="idme-wrapper">
-        <style>.idme-unify-button:focus{outline:none}@media(max-width:768px){.idme-wrapper{padding:0 15px 15px}}</style>
+        <style>.idme-unify-button:focus{outline:none}@media(max-width:768px){.idme-wrapper{padding:0 15px 15px}}.idme-unify-button > img{height:unset;}</style>
         <span id="idme-verification">
           <div class="idme-trigger">
             <span class="idme-text">${getMetadata('idme-promotion-text') || 'Exclusive discounts are available for Military, Nurses, Medical Professionals, First Responders, and Teachers through ID.me.'}</span>
