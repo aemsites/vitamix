@@ -1,4 +1,5 @@
 import { getMetadata } from '../aem.js';
+import { getLocaleAndLanguage } from '../scripts.js';
 
 const isProd = window.location.hostname === 'www.vitamix.com';
 const IDME_CLIENT_ID = isProd ? '566879020d6a5533db11a112e307aed3' : 'f05216080667a3fb48ef1aed700d7b5f';
@@ -52,7 +53,14 @@ export function handleIDMeReturn(discountInput) {
  * @returns {string|null}
  */
 export function initIDMe(insertAfterEl, discountInput) {
-  const redirectOrigin = localStorage.getItem('idme-redirect-origin') || window.location.origin;
+  // only allow overrides via localStorage on non-prod hosts
+  let redirectOrigin = window.location.origin;
+  if (!isProd) {
+    const override = localStorage.getItem('idme-redirect-origin')?.trim();
+    if (override) {
+      redirectOrigin = override;
+    }
+  }
   const callbackUrl = `${redirectOrigin}/identity/idme/callback`;
 
   const outer = document.createElement('div');
