@@ -61,7 +61,7 @@ export function initIDMe(insertAfterEl, discountInput) {
       redirectOrigin = override;
     }
   }
-  const callbackUrl = `${redirectOrigin}/identity/idme/callback`;
+  const callbackUrl = `${redirectOrigin}/us/en_us/idme/callback`;
 
   const outer = document.createElement('div');
   outer.className = 'idme-verify';
