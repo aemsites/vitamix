@@ -4,12 +4,25 @@
  *
  * Keep this in sync with the real getConfig() contract — at minimum, the
  * fields cart.js reads: getLocale() and currency.
+ *
+ * Tests can override `currency` (string vs function) via __setCurrency,
+ * and __resetConfig restores defaults — wired into __resetTestState in setup.mjs.
  */
+let currencyOverride;
+
+export function __setCurrency(value) {
+  currencyOverride = value;
+}
+
+export function __resetConfig() {
+  currencyOverride = undefined;
+}
+
 export function getConfig() {
   return {
     getLocale: () => 'us',
     getLanguage: () => 'en_us',
-    currency: 'USD',
+    currency: currencyOverride !== undefined ? currencyOverride : 'USD',
     getStrings: () => ({}),
     getOrderPath: (key) => `/${key}`,
   };

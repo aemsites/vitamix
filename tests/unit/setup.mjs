@@ -13,6 +13,11 @@ import { register } from 'node:module';
 
 register('./loader.mjs', import.meta.url);
 
+// Import the mock by its real path so we can reset overrides between tests.
+// The loader redirects `commerce-config.js` imports to this same URL, so
+// production code under test sees the same module instance.
+const { __resetConfig } = await import('./mocks/commerce-config.mjs');
+
 // localStorage — in-memory Map with the Web Storage API surface cart.js uses.
 const storage = new Map();
 globalThis.localStorage = {
@@ -61,4 +66,5 @@ globalThis.__resetTestState = () => {
   storage.clear();
   cookies.clear();
   globalThis.__events.length = 0;
+  __resetConfig();
 };

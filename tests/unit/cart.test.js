@@ -13,6 +13,7 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { Cart } from '../../scripts/cart.js';
+import { __setCurrency } from './mocks/commerce-config.mjs';
 
 beforeEach(() => {
   globalThis.__resetTestState();
@@ -332,4 +333,158 @@ test('cart_items_count cookie is updated on persist', () => {
   cart.addItem(sampleItem({ quantity: 2 }));
   cart.clear(); // forces immediate persist; resets count to 0
   assert.match(document.cookie, /cart_items_count=0/);
+});
+
+// --- addItem: custom merge --------------------------------------------------
+
+test('addItem merges entries with deep-equal custom payloads', () => {
+  const cart = new Cart();
+  cart.addItem(sampleItem({ custom: { linkedTo: 'parent-sku' } }));
+  cart.addItem(sampleItem({
+    quantity: 2,
+    custom: { linkedTo: 'parent-sku' },
+  }));
+  assert.equal(cart.items.length, 1);
+  assert.equal(cart.items[0].quantity, 3);
+});
+
+test('addItem merges cleanly when neither item has a custom field', () => {
+  const cart = new Cart();
+  cart.addItem(sampleItem({ quantity: 1 }));
+  cart.addItem(sampleItem({ quantity: 2 }));
+  assert.equal(cart.items.length, 1);
+  assert.equal(cart.items[0].quantity, 3);
+  assert.equal('custom' in cart.items[0], false);
+});
+
+test('addItem throws when custom payloads differ', () => {
+  const cart = new Cart();
+  cart.addItem(sampleItem({ custom: { linkedTo: 'A' } }));
+  assert.throws(
+    () => cart.addItem(sampleItem({ custom: { linkedTo: 'B' } })),
+    /incompatible custom payloads/,
+  );
+});
+
+test('addItem throws when only one side has a custom field', () => {
+  const cart = new Cart();
+  cart.addItem(sampleItem({ custom: { linkedTo: 'A' } }));
+  assert.throws(
+    () => cart.addItem(sampleItem()),
+    /incompatible custom payloads/,
+  );
+});
+
+test('addItem merges deeply nested custom payloads when structurally equal', () => {
+  const cart = new Cart();
+  cart.addItem(sampleItem({
+    custom: {
+      availableWarranties: [
+        { sku: 'w1', name: '3yr', price: '75.00' },
+        { sku: 'w2', name: '5yr', price: '125.00' },
+      ],
+    },
+  }));
+  cart.addItem(sampleItem({
+    quantity: 2,
+    custom: {
+      availableWarranties: [
+        { sku: 'w1', name: '3yr', price: '75.00' },
+        { sku: 'w2', name: '5yr', price: '125.00' },
+      ],
+    },
+  }));
+  assert.equal(cart.items.length, 1);
+  assert.equal(cart.items[0].quantity, 3);
+});
+
+test('addItem throws when nested custom payloads differ', () => {
+  const cart = new Cart();
+  cart.addItem(sampleItem({
+    custom: { availableWarranties: [{ sku: 'w1', price: '75.00' }] },
+  }));
+  assert.throws(
+    () => cart.addItem(sampleItem({
+      custom: { availableWarranties: [{ sku: 'w1', price: '80.00' }] },
+    })),
+    /incompatible custom payloads/,
+  );
+});
+
+// --- getItemsForAPI: passthrough --------------------------------------------
+
+test('getItemsForAPI forwards selectedOptions when present', () => {
+  const cart = new Cart();
+  cart.addItem({
+    sku: 'foo',
+    quantity: 1,
+    price: '10.00',
+    name: 'Foo',
+    path: '/foo',
+    selectedOptions: [{ id: 'color', value: 'Red' }],
+  });
+  const [api] = cart.getItemsForAPI();
+  assert.deepEqual(api.selectedOptions, [{ id: 'color', value: 'Red' }]);
+});
+
+test('getItemsForAPI omits selectedOptions when not present', () => {
+  const cart = new Cart();
+  cart.addItem({
+    sku: 'foo',
+    quantity: 1,
+    price: '10.00',
+    name: 'Foo',
+    path: '/foo',
+  });
+  const [api] = cart.getItemsForAPI();
+  assert.equal('selectedOptions' in api, false);
+});
+
+test('getItemsForAPI forwards custom verbatim', () => {
+  const cart = new Cart();
+  cart.addItem({
+    sku: 'foo',
+    quantity: 1,
+    price: '10.00',
+    name: 'Foo',
+    path: '/foo',
+    custom: {
+      linkedTo: 'parent-sku',
+      showInCart: false,
+      availableWarranties: [{ sku: 'w1', name: '3yr', price: '75.00' }],
+    },
+  });
+  const [api] = cart.getItemsForAPI();
+  assert.deepEqual(api.custom, {
+    linkedTo: 'parent-sku',
+    showInCart: false,
+    availableWarranties: [{ sku: 'w1', name: '3yr', price: '75.00' }],
+  });
+});
+
+test('getItemsForAPI resolves currency from a function when config provides one', () => {
+  __setCurrency((locale) => (locale === 'us' ? 'USD' : 'EUR'));
+  const cart = new Cart();
+  cart.addItem({
+    sku: 'foo',
+    quantity: 1,
+    price: '10.00',
+    name: 'Foo',
+    path: '/foo',
+  });
+  const [api] = cart.getItemsForAPI();
+  assert.equal(api.price.currency, 'USD');
+});
+
+test('getItemsForAPI omits custom when not present', () => {
+  const cart = new Cart();
+  cart.addItem({
+    sku: 'foo',
+    quantity: 1,
+    price: '10.00',
+    name: 'Foo',
+    path: '/foo',
+  });
+  const [api] = cart.getItemsForAPI();
+  assert.equal('custom' in api, false);
 });

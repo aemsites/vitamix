@@ -8,6 +8,22 @@ const debounce = (func, wait) => {
   };
 };
 
+function deepEqual(a, b) {
+  if (a === b) return true;
+  if (typeof a !== typeof b) return false;
+  if (a === null || b === null) return false;
+  if (typeof a !== 'object') return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) {
+    if (a.length !== b.length) return false;
+    return a.every((v, i) => deepEqual(v, b[i]));
+  }
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+  return keysA.every((k) => k in b && deepEqual(a[k], b[k]));
+}
+
 export class Cart {
   static get STORAGE_KEY() {
     return `cart:${getConfig().getLocale()}`;
@@ -101,11 +117,19 @@ export class Cart {
   }
 
   /**
+   * Add an item to the cart. If an entry with the same SKU already exists,
+   * the merge succeeds only when the existing and incoming `custom` payloads
+   * are deep-equal; on merge, quantity is incremented by the incoming
+   * quantity. A `custom` mismatch throws — defensive guard against UI bugs.
+   *
    * @param {CartItem} item
    */
   addItem(item) {
     const existing = this.#items.find((i) => i.sku === item.sku);
     if (existing) {
+      if (!deepEqual(existing.custom, item.custom)) {
+        throw new Error(`Cannot merge cart item ${item.sku}: incompatible custom payloads`);
+      }
       existing.quantity += item.quantity;
     } else {
       this.#items.push(item);
@@ -168,9 +192,10 @@ export class Cart {
   }
 
   /**
-   * Returns cart items in API-compatible format.
-   * @returns {Array<{sku: string, path: string, quantity: number, name: string,
-   *   price: {final: string, currency: string}, imageUrl?: string, productUrl?: string}>}
+   * Returns cart items in API-compatible format. `custom` and
+   * `selectedOptions` are forwarded verbatim when present.
+   *
+   * @returns {Array<object>}
    */
   getItemsForAPI() {
     const { currency, getLocale } = getConfig();
@@ -186,6 +211,8 @@ export class Cart {
       },
       ...(item.image ? { imageUrl: item.image } : {}),
       ...(item.url ? { productUrl: item.url } : {}),
+      ...(item.selectedOptions ? { selectedOptions: item.selectedOptions } : {}),
+      ...(item.custom ? { custom: item.custom } : {}),
     }));
   }
 
