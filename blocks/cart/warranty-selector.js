@@ -53,8 +53,11 @@ export default function buildWarrantySelector(
     const tierPrice = parseFloat(tier.price);
     if (tier.isDefault || tierPrice === 0) {
       text.textContent = `${tier.name} (${included})`;
+    } else if (tier.coverageYears > 0) {
+      const perYear = tierPrice / tier.coverageYears;
+      text.textContent = `${tier.name} +${formatPrice(perYear, currencyCode)}/yr`;
     } else {
-      text.textContent = `${tier.name} +${formatPrice(tierPrice, currencyCode)} ea`;
+      text.textContent = `${tier.name} +${formatPrice(tierPrice, currencyCode)}`;
     }
 
     label.append(radio, text);
