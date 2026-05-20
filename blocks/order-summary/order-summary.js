@@ -3,6 +3,7 @@ import cart from '../../scripts/cart.js';
 import { getConfig, formatPrice } from '../../scripts/commerce-config.js';
 import buildCartItem from '../../scripts/commerce/cart-item.js';
 import { parsePreview } from '../../scripts/commerce-api.js';
+import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 const isProd = window.location.hostname === 'www.vitamix.com';
 
@@ -387,5 +388,7 @@ export default async function decorate(block) {
 
   syncVisibility();
   initMobileCollapse(block);
-  initIDMe(block, discountInput);
+  if (getLocaleAndLanguage().locale === 'us') {
+    initIDMe(block, discountInput);
+  }
 }
