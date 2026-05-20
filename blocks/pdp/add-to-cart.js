@@ -195,20 +195,15 @@ export default function renderAddToCart(ph, block, parent) {
     const quantity = document.querySelector('.quantity-container select')?.value || 1;
     const sku = getMetadata('sku');
 
-    // build array of selected options (variants, warranties, required bundles)
+    // Magento-format selectedOptions (base64 UIDs). Used only by the Magento
+    // branch below. The edge branch builds semantic {id, value} options inline.
     const selectedOptions = [];
-
-    // add selected variant option if available
     if (window.selectedVariant?.options?.uid) {
       selectedOptions.push(window.selectedVariant.options.uid);
     }
-
-    // add selected warranty if available
     if (window.selectedWarranty?.uid) {
       selectedOptions.push(window.selectedWarranty.uid);
     }
-
-    // add any required bundle options
     if (parent.custom && parent.custom.requiredBundleOptions) {
       selectedOptions.push(...parent.custom.requiredBundleOptions);
     }
@@ -218,6 +213,31 @@ export default function renderAddToCart(ph, block, parent) {
         const cartApi = (await import('../../scripts/cart.js')).default;
 
         const { sku: variantSku, price, name } = selectedVariant;
+
+        // Semantic {id, value} options for the edge cart. The edge cart
+        // carries no Magento-specific data — UIDs stay on the Magento side.
+        const semanticOptions = window.selectedVariant?.options
+          ? Object.entries(window.selectedVariant.options)
+            .filter(([k]) => k !== 'uid' && k !== 'name')
+            .map(([id, value]) => ({ id, value }))
+          : [];
+
+        // Normalize warranty options from Product Bus into the cart convention.
+        // Stashed whenever the product has any warranty options — the cart-page
+        // selector renders the default tier as a read-only "(included)" line
+        // for transparency even when there are no paid upgrades. Paid tiers
+        // carry `path` referencing the published warranty product so the
+        // Commerce API can validate the line's price.
+        const warrantyOptions = (parent.custom?.options ?? []).map((opt) => ({
+          sku: opt.sku,
+          name: opt.name,
+          price: opt.finalPrice ?? opt.price,
+          ...(opt.path ? { path: opt.path } : {}),
+          ...(opt.coverageYears ? { coverageYears: opt.coverageYears } : {}),
+          ...(parseFloat(opt.finalPrice ?? opt.price) === 0 ? { isDefault: true } : {}),
+        }));
+        const availableWarranties = warrantyOptions.length > 0 ? warrantyOptions : null;
+
         const item = {
           sku: variantSku ?? sku,
           parentSku: variantSku ? sku : undefined,
@@ -228,9 +248,32 @@ export default function renderAddToCart(ph, block, parent) {
           path: new URL(selectedVariant.url).pathname,
           image: selectedVariant.image[0],
           variant: window.selectedVariant?.options?.color || '',
-          selectedOptions,
+          selectedOptions: semanticOptions,
+          ...(parent.bundleItems ? { bundleItems: parent.bundleItems } : {}),
+          ...(availableWarranties ? { local: { availableWarranties } } : {}),
         };
         await cartApi.addItem(item);
+
+        // If the PDP warranty selector has a paid tier selected, commit it
+        // as a paired line item. The cart-page selector reads this state.
+        const selectedTier = warrantyOptions
+          .find((o) => o.sku === window.selectedWarranty?.sku);
+        if (selectedTier && !selectedTier.isDefault) {
+          await cartApi.addItem({
+            sku: selectedTier.sku,
+            path: selectedTier.path,
+            quantity: parseInt(quantity, 10),
+            price: selectedTier.price,
+            name: selectedTier.name,
+            custom: {
+              linkedTo: variantSku ?? sku,
+              ...(selectedTier.coverageYears
+                ? { coverageYears: selectedTier.coverageYears }
+                : {}),
+            },
+            local: { showInCart: false },
+          });
+        }
 
         // reenable button
         addToCartButton.textContent = 'Add to Cart';

@@ -2,6 +2,9 @@ import { createOrder, initiatePayment, previewOrder } from '../../scripts/commer
 import { collectAddress } from './checkout-address.js';
 import { updatePreview } from './checkout-shipping.js';
 import { FORMS_ENDPOINT, getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { validateLinkIntegrity } from './link-integrity.js';
+
+export { validateLinkIntegrity };
 
 /**
  * Writes checkout state to sessionStorage before a payment redirect.
@@ -160,6 +163,12 @@ export function initOrder(form, cart, state, config, strings) {
       saveCheckoutSession(email, c, preview, order)
     ),
     createOrder: async (orderBody) => {
+      const integrity = validateLinkIntegrity(orderBody.items || []);
+      if (!integrity.valid) {
+        // eslint-disable-next-line no-console
+        console.error(integrity.error);
+        throw new Error(integrity.error);
+      }
       const result = await createOrder(orderBody);
       subscribeNewsletter(new FormData(form));
       return result;
@@ -254,6 +263,14 @@ export function initOrder(form, cart, state, config, strings) {
       const formData = new FormData(form);
       const email = formData.get('email') || '';
       const orderBody = buildOrderJSON(formData, form, cart, state, config);
+
+      const integrity = validateLinkIntegrity(orderBody.items || []);
+      if (!integrity.valid) {
+        // eslint-disable-next-line no-console
+        console.error(integrity.error);
+        showError(form, integrity.error);
+        return;
+      }
 
       submitBtn.disabled = true;
       if (submitTextEl) submitTextEl.textContent = strings.processing;

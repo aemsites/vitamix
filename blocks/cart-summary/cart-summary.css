@@ -67,6 +67,11 @@ div.section.cart-section:has(.cart-summary-wrapper) > .cart-wrapper {
   margin-top: 0;
 }
 
+/* Hide order summary when cart is empty */
+.section:has(.cart-is-empty) .cart-summary-wrapper {
+  display: none;
+}
+
 @media (width <= 999px) {
   .section:has(.cart-summary-wrapper) {
     flex-direction: column;

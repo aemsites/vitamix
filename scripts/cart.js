@@ -8,6 +8,22 @@ const debounce = (func, wait) => {
   };
 };
 
+function deepEqual(a, b) {
+  if (a === b) return true;
+  if (typeof a !== typeof b) return false;
+  if (a === null || b === null) return false;
+  if (typeof a !== 'object') return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) {
+    if (a.length !== b.length) return false;
+    return a.every((v, i) => deepEqual(v, b[i]));
+  }
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+  return keysA.every((k) => k in b && deepEqual(a[k], b[k]));
+}
+
 export class Cart {
   static get STORAGE_KEY() {
     return `cart:${getConfig().getLocale()}`;
@@ -15,8 +31,8 @@ export class Cart {
 
   static STORAGE_VERSION = 1;
 
-  /** @type {Record<string, CartItem>} */
-  #items = {};
+  /** @type {CartItem[]} */
+  #items = [];
 
   constructor() {
     this.#restore();
@@ -31,10 +47,7 @@ export class Cart {
         localStorage.removeItem(Cart.STORAGE_KEY);
         return;
       }
-      this.#items = parsed.items.reduce((acc, item) => {
-        acc[item.sku] = item;
-        return acc;
-      }, {});
+      this.#items = parsed.items;
       document.dispatchEvent(
         new CustomEvent('cart:change', {
           detail: {
@@ -48,7 +61,7 @@ export class Cart {
 
   #persistNow() {
     const expires = new Date(Date.now() + 30 * 864e5).toUTCString();
-    document.cookie = `cart_items_count=${this.itemCount}; expires=${expires}; path=/`;
+    document.cookie = `cart_items_count=${this.visibleItemCount}; expires=${expires}; path=/`;
     localStorage.setItem(Cart.STORAGE_KEY, JSON.stringify(this));
   }
 
@@ -70,18 +83,31 @@ export class Cart {
   }
 
   get items() {
-    return Object.values(this.#items);
+    return this.#items;
   }
 
   get itemCount() {
-    return Object.values(this.#items).reduce(
+    return this.#items.reduce(
       (acc, item) => acc + item.quantity,
       0,
     );
   }
 
+  /**
+   * Quantity sum excluding entries flagged invisible via `local.showInCart`.
+   * Display surfaces (header badge, cart-page empty state, etc.) should prefer
+   * this over `itemCount` so hidden line items (e.g. linked add-ons) don't
+   * inflate the user-facing count.
+   */
+  get visibleItemCount() {
+    return this.#items.reduce(
+      (acc, item) => (item.local?.showInCart === false ? acc : acc + item.quantity),
+      0,
+    );
+  }
+
   get subtotal() {
-    return Object.values(this.#items).reduce(
+    return this.#items.reduce(
       (acc, item) => acc + item.quantity * (typeof item.price === 'string'
         ? parseFloat(item.price)
         : item.price / 100),
@@ -90,7 +116,7 @@ export class Cart {
   }
 
   clear() {
-    this.#items = {};
+    this.#items = [];
     this.#persistNow();
     document.dispatchEvent(
       new CustomEvent('cart:change', {
@@ -104,14 +130,22 @@ export class Cart {
   }
 
   /**
+   * Add an item to the cart. If an entry with the same SKU already exists,
+   * the merge succeeds only when the existing and incoming `custom` payloads
+   * are deep-equal; on merge, quantity is incremented by the incoming
+   * quantity. A `custom` mismatch throws — defensive guard against UI bugs.
+   *
    * @param {CartItem} item
    */
   addItem(item) {
-    const existing = this.#items[item.sku];
+    const existing = this.#items.find((i) => i.sku === item.sku);
     if (existing) {
+      if (!deepEqual(existing.custom, item.custom)) {
+        throw new Error(`Cannot merge cart item ${item.sku}: incompatible custom payloads`);
+      }
       existing.quantity += item.quantity;
     } else {
-      this.#items[item.sku] = item;
+      this.#items.push(item);
     }
     document.dispatchEvent(
       new CustomEvent('cart:change', {
@@ -130,15 +164,16 @@ export class Cart {
    * @param {number} quantity
    */
   updateItem(sku, quantity) {
-    if (!this.#items[sku]) {
+    const existing = this.#items.find((i) => i.sku === sku);
+    if (!existing) {
       throw new Error(`Item with sku ${sku} not found`);
     }
-    this.#items[sku].quantity = quantity;
+    existing.quantity = quantity;
     document.dispatchEvent(
       new CustomEvent('cart:change', {
         detail: {
           cart: this,
-          item: this.#items[sku],
+          item: existing,
           action: 'update',
         },
       }),
@@ -151,8 +186,11 @@ export class Cart {
    * @param {string} sku
    */
   removeItem(sku) {
-    const item = this.#items[sku];
-    delete this.#items[sku];
+    const index = this.#items.findIndex((i) => i.sku === sku);
+    const item = index === -1 ? undefined : this.#items[index];
+    if (index !== -1) {
+      this.#items.splice(index, 1);
+    }
     document.dispatchEvent(
       new CustomEvent('cart:change', {
         detail: {
@@ -168,8 +206,18 @@ export class Cart {
 
   /**
    * Returns cart items in API-compatible format.
-   * @returns {Array<{sku: string, path: string, quantity: number, name: string,
-   *   price: {final: string, currency: string}, imageUrl?: string, productUrl?: string}>}
+   *
+   * Fields forwarded to the order body:
+   *   - the projected scalar fields (`sku`, `path`, `quantity`, `name`,
+   *     `price`, optional `imageUrl` / `productUrl`)
+   *   - `custom` (verbatim) — site-defined fields the server reads
+   *
+   * Fields kept cart-local and not forwarded:
+   *   - `local` — site-defined data used by the cart UI only
+   *   - `selectedOptions` — cart-UI data today; gains a passthrough
+   *     alongside the bundle work's Commerce API change
+   *
+   * @returns {Array<object>}
    */
   getItemsForAPI() {
     const { currency, getLocale } = getConfig();
@@ -185,13 +233,14 @@ export class Cart {
       },
       ...(item.image ? { imageUrl: item.image } : {}),
       ...(item.url ? { productUrl: item.url } : {}),
+      ...(item.custom ? { custom: item.custom } : {}),
     }));
   }
 
   toJSON() {
     return {
       version: Cart.STORAGE_VERSION,
-      items: Object.values(this.#items),
+      items: this.#items,
     };
   }
 }

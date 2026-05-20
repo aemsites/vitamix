@@ -630,6 +630,8 @@ export default async function decorate(block) {
 
   // Read item count from locale-specific localStorage key (same logic as Cart.STORAGE_KEY)
   // to avoid stale domain-wide cookie when switching between locales (e.g. CA → US).
+  // Mirrors `cart.visibleItemCount`: skips entries flagged invisible via `local.showInCart`
+  // so hidden add-ons (e.g. paired warranties) don't inflate the header badge.
   const getStoredCartCount = () => {
     try {
       const locale = window.location.pathname.split('/')[1] || 'default';
@@ -637,7 +639,10 @@ export default async function decorate(block) {
       const stored = localStorage.getItem(key);
       if (!stored) return 0;
       const parsed = JSON.parse(stored);
-      return (parsed.items || []).reduce((acc, item) => acc + item.quantity, 0);
+      return (parsed.items || []).reduce(
+        (acc, item) => (item.local?.showInCart === false ? acc : acc + item.quantity),
+        0,
+      );
     } catch {
       return 0;
     }
@@ -651,10 +656,10 @@ export default async function decorate(block) {
 
   // update cart qty bubble on change
   document.addEventListener('cart:change', (e) => {
-    const { itemCount } = e.detail.cart;
-    if (itemCount > 0) {
-      cartLink.dataset.cartItems = itemCount;
-      cartLink.lastChild.textContent = `Cart (${itemCount})`;
+    const count = e.detail.cart.visibleItemCount;
+    if (count > 0) {
+      cartLink.dataset.cartItems = count;
+      cartLink.lastChild.textContent = `Cart (${count})`;
     } else {
       delete cartLink.dataset.cartItems;
       cartLink.lastChild.textContent = 'Cart';

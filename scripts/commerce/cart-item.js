@@ -10,12 +10,27 @@ const TRASH_ICON = /* html */`<svg width="14" height="14" viewBox="0 0 24 24" fi
 </svg>`;
 
 /**
+ * Builds a cart row for a generic line item. Site-specific row extensions
+ * (e.g. a warranty selector) are passed in via `extraContent` and appended
+ * below the row's primary content; this component has no knowledge of
+ * what they represent.
+ *
  * @param {Object} item              Cart item — sku, name, image, price, quantity, url?, variant?
- * @param {{ onQtyChange: Function, onRemove: Function, currencyCode?: string }} callbacks
+ * @param {{
+ *   onQtyChange: Function,
+ *   onRemove: Function,
+ *   currencyCode?: string,
+ *   extraContent?: HTMLElement|null,
+ * }} callbacks
  * @param {{ remove?: string, removeItem?: string }} [strings]
  * @returns {HTMLElement}
  */
-export default function buildCartItem(item, { onQtyChange, onRemove, currencyCode = 'USD' }, strings = {}) {
+export default function buildCartItem(item, {
+  onQtyChange,
+  onRemove,
+  currencyCode = 'USD',
+  extraContent = null,
+}, strings = {}) {
   const { remove = 'Remove', removeItem = 'Remove item' } = strings;
 
   const el = document.createElement('div');
@@ -103,6 +118,12 @@ export default function buildCartItem(item, { onQtyChange, onRemove, currencyCod
     onRemove(item.sku);
     el.remove();
   });
+
+  // Optional caller-provided content appended below the row (e.g. a
+  // site-specific add-on selector). Spans the full row width via CSS.
+  if (extraContent instanceof HTMLElement) {
+    el.appendChild(extraContent);
+  }
 
   return el;
 }
