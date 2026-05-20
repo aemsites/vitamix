@@ -1,5 +1,4 @@
 import { getMetadata } from '../aem.js';
-import { getLocaleAndLanguage } from '../scripts.js';
 
 const isProd = window.location.hostname === 'www.vitamix.com';
 const IDME_CLIENT_ID = isProd ? '566879020d6a5533db11a112e307aed3' : 'f05216080667a3fb48ef1aed700d7b5f';
