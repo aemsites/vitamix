@@ -61,7 +61,7 @@ export class Cart {
 
   #persistNow() {
     const expires = new Date(Date.now() + 30 * 864e5).toUTCString();
-    document.cookie = `cart_items_count=${this.itemCount}; expires=${expires}; path=/`;
+    document.cookie = `cart_items_count=${this.visibleItemCount}; expires=${expires}; path=/`;
     localStorage.setItem(Cart.STORAGE_KEY, JSON.stringify(this));
   }
 
@@ -89,6 +89,19 @@ export class Cart {
   get itemCount() {
     return this.#items.reduce(
       (acc, item) => acc + item.quantity,
+      0,
+    );
+  }
+
+  /**
+   * Quantity sum excluding entries flagged invisible via `local.showInCart`.
+   * Display surfaces (header badge, cart-page empty state, etc.) should prefer
+   * this over `itemCount` so hidden line items (e.g. linked add-ons) don't
+   * inflate the user-facing count.
+   */
+  get visibleItemCount() {
+    return this.#items.reduce(
+      (acc, item) => (item.local?.showInCart === false ? acc : acc + item.quantity),
       0,
     );
   }

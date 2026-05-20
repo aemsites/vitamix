@@ -144,6 +144,25 @@ test('itemCount sums quantities across entries', () => {
   assert.equal(cart.itemCount, 5);
 });
 
+test('visibleItemCount excludes entries with local.showInCart === false', () => {
+  const cart = new Cart();
+  cart.addItem(sampleItem({ sku: 'foo', quantity: 2 }));
+  cart.addItem(sampleItem({
+    sku: 'addon',
+    quantity: 2,
+    local: { showInCart: false },
+  }));
+  assert.equal(cart.itemCount, 4);
+  assert.equal(cart.visibleItemCount, 2);
+});
+
+test('visibleItemCount equals itemCount when no entries are hidden', () => {
+  const cart = new Cart();
+  cart.addItem(sampleItem({ sku: 'foo', quantity: 2 }));
+  cart.addItem(sampleItem({ sku: 'bar', quantity: 3, local: { showInCart: true } }));
+  assert.equal(cart.visibleItemCount, 5);
+});
+
 test('subtotal multiplies quantity by string price', () => {
   const cart = new Cart();
   cart.addItem(sampleItem({ sku: 'foo', quantity: 2, price: '10.00' }));
