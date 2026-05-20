@@ -464,6 +464,22 @@ test('getItemsForAPI resolves currency from a function when config provides one'
   assert.equal(api.price.currency, 'USD');
 });
 
+test('getItemsForAPI does not forward `local`', () => {
+  // `local` is site-defined cart-UI data; the cart class never sends it
+  // to the order body.
+  const cart = new Cart();
+  cart.addItem({
+    sku: 'foo',
+    quantity: 1,
+    price: '10.00',
+    name: 'Foo',
+    path: '/foo',
+    local: { availableWarranties: [{ sku: 'w1' }], showInCart: true },
+  });
+  const [api] = cart.getItemsForAPI();
+  assert.equal('local' in api, false);
+});
+
 test('getItemsForAPI omits custom when not present', () => {
   const cart = new Cart();
   cart.addItem({

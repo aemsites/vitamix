@@ -10,30 +10,28 @@ const TRASH_ICON = /* html */`<svg width="14" height="14" viewBox="0 0 24 24" fi
 </svg>`;
 
 /**
+ * Builds a cart row for a generic line item. Site-specific row extensions
+ * (e.g. a warranty selector) are passed in via `extraContent` and appended
+ * below the row's primary content; this component has no knowledge of
+ * what they represent.
+ *
  * @param {Object} item              Cart item — sku, name, image, price, quantity, url?, variant?
  * @param {{
  *   onQtyChange: Function,
  *   onRemove: Function,
  *   currencyCode?: string,
- *   linkedWarranty?: Object|null,
- *   onSelectWarranty?: Function,
+ *   extraContent?: HTMLElement|null,
  * }} callbacks
- * @param {{ remove?: string, removeItem?: string, warranty?: string, included?: string }} [strings]
+ * @param {{ remove?: string, removeItem?: string }} [strings]
  * @returns {HTMLElement}
  */
 export default function buildCartItem(item, {
   onQtyChange,
   onRemove,
   currencyCode = 'USD',
-  linkedWarranty = null,
-  onSelectWarranty,
+  extraContent = null,
 }, strings = {}) {
-  const {
-    remove = 'Remove',
-    removeItem = 'Remove item',
-    warranty: warrantyLabel = 'Warranty',
-    included = 'included',
-  } = strings;
+  const { remove = 'Remove', removeItem = 'Remove item' } = strings;
 
   const el = document.createElement('div');
   el.className = `cart-item cart-item-${item.sku}`;
@@ -121,47 +119,10 @@ export default function buildCartItem(item, {
     el.remove();
   });
 
-  // Warranty selector — rendered only when the product entry has available
-  // tiers and the caller wired an onSelectWarranty callback.
-  const tiers = item.custom?.availableWarranties;
-  if (Array.isArray(tiers) && tiers.length > 0 && typeof onSelectWarranty === 'function') {
-    const warrantyEl = document.createElement('div');
-    warrantyEl.className = 'cart-item-warranty';
-
-    const heading = document.createElement('div');
-    heading.className = 'cart-item-warranty-heading';
-    heading.textContent = warrantyLabel;
-    warrantyEl.appendChild(heading);
-
-    const groupName = `warranty-${item.sku}`;
-    tiers.forEach((tier) => {
-      const label = document.createElement('label');
-      label.className = 'cart-item-warranty-option';
-
-      const radio = document.createElement('input');
-      radio.type = 'radio';
-      radio.name = groupName;
-      radio.value = tier.sku;
-      radio.checked = linkedWarranty
-        ? linkedWarranty.sku === tier.sku
-        : Boolean(tier.isDefault);
-      radio.addEventListener('change', () => {
-        if (radio.checked) onSelectWarranty(tier);
-      });
-
-      const text = document.createElement('span');
-      const tierPrice = parseFloat(tier.price);
-      if (tier.isDefault || tierPrice === 0) {
-        text.textContent = `${tier.name} (${included})`;
-      } else {
-        text.textContent = `${tier.name} +${formatPrice(tierPrice, currencyCode)} ea`;
-      }
-
-      label.append(radio, text);
-      warrantyEl.appendChild(label);
-    });
-
-    el.appendChild(warrantyEl);
+  // Optional caller-provided content appended below the row (e.g. a
+  // site-specific add-on selector). Spans the full row width via CSS.
+  if (extraContent instanceof HTMLElement) {
+    el.appendChild(extraContent);
   }
 
   return el;

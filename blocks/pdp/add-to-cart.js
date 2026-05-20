@@ -249,7 +249,7 @@ export default function renderAddToCart(ph, block, parent) {
           variant: window.selectedVariant?.options?.color || '',
           selectedOptions: semanticOptions,
           ...(parent.bundleItems ? { bundleItems: parent.bundleItems } : {}),
-          ...(availableWarranties ? { custom: { availableWarranties } } : {}),
+          ...(availableWarranties ? { local: { availableWarranties } } : {}),
         };
         await cartApi.addItem(item);
 
@@ -264,10 +264,8 @@ export default function renderAddToCart(ph, block, parent) {
             quantity: parseInt(quantity, 10),
             price: selectedTier.price,
             name: selectedTier.name,
-            custom: {
-              linkedTo: variantSku ?? sku,
-              showInCart: false,
-            },
+            custom: { linkedTo: variantSku ?? sku },
+            local: { showInCart: false },
           });
         }
 

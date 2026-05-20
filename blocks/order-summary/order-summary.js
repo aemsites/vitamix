@@ -2,6 +2,7 @@ import { loadCSS } from '../../scripts/aem.js';
 import cart from '../../scripts/cart.js';
 import { getConfig, formatPrice } from '../../scripts/commerce-config.js';
 import buildCartItem from '../../scripts/commerce/cart-item.js';
+import buildWarrantySelector from '../cart/warranty-selector.js';
 import { parsePreview } from '../../scripts/commerce-api.js';
 
 function getStrings() {
@@ -231,10 +232,31 @@ export default async function decorate(block) {
     const currencyCode = getCurrencyCode();
 
     cart.items
-      .filter((item) => item.custom?.showInCart !== false)
+      .filter((item) => item.local?.showInCart !== false)
       .forEach((item) => {
         const linkedWarranty = cart.items
           .find((i) => i.custom?.linkedTo === item.sku) || null;
+
+        const extraContent = buildWarrantySelector(
+          item,
+          linkedWarranty,
+          (tier) => {
+            if (linkedWarranty) cart.removeItem(linkedWarranty.sku);
+            if (tier && !tier.isDefault && parseFloat(tier.price) > 0) {
+              cart.addItem({
+                sku: tier.sku,
+                path: tier.path,
+                quantity: item.quantity,
+                price: tier.price,
+                name: tier.name,
+                custom: { linkedTo: item.sku },
+                local: { showInCart: false },
+              });
+            }
+          },
+          currencyCode,
+          { heading: s.warranty, included: s.included },
+        );
 
         const itemEl = buildCartItem(
           item,
@@ -248,27 +270,9 @@ export default async function decorate(block) {
               cart.removeItem(sku);
             },
             currencyCode,
-            linkedWarranty,
-            onSelectWarranty: (tier) => {
-              if (linkedWarranty) cart.removeItem(linkedWarranty.sku);
-              if (tier && !tier.isDefault && parseFloat(tier.price) > 0) {
-                cart.addItem({
-                  sku: tier.sku,
-                  path: tier.path,
-                  quantity: item.quantity,
-                  price: tier.price,
-                  name: tier.name,
-                  custom: { linkedTo: item.sku, showInCart: false },
-                });
-              }
-            },
+            extraContent,
           },
-          {
-            remove: s.remove,
-            removeItem: s.removeItem,
-            warranty: s.warranty,
-            included: s.included,
-          },
+          { remove: s.remove, removeItem: s.removeItem },
         );
         itemsList.appendChild(itemEl);
       });
@@ -289,7 +293,7 @@ export default async function decorate(block) {
 
   const wrapper = block.closest('.order-summary-wrapper');
   const syncVisibility = () => {
-    const visible = cart.items.filter((i) => i.custom?.showInCart !== false);
+    const visible = cart.items.filter((i) => i.local?.showInCart !== false);
     wrapper?.toggleAttribute('hidden', visible.length === 0);
   };
 

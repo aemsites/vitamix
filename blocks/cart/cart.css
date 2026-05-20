@@ -93,6 +93,7 @@ div.section.cart-section .cart-wrapper {
   align-self: stretch;
 }
 
+/* stylelint-disable-next-line no-descending-specificity */
 .minicart .cart-items {
   padding: 0 16px;
 }

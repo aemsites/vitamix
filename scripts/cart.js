@@ -192,11 +192,17 @@ export class Cart {
   }
 
   /**
-   * Returns cart items in API-compatible format. `custom` is forwarded
-   * verbatim when present. `selectedOptions` is not forwarded — it's
-   * cart-local data used by the cart UI; the Commerce API does not accept
-   * it on the order body today and will gain support alongside server-side
-   * bundle resolution.
+   * Returns cart items in API-compatible format.
+   *
+   * Fields forwarded to the order body:
+   *   - the projected scalar fields (`sku`, `path`, `quantity`, `name`,
+   *     `price`, optional `imageUrl` / `productUrl`)
+   *   - `custom` (verbatim) — site-defined fields the server reads
+   *
+   * Fields kept cart-local and not forwarded:
+   *   - `local` — site-defined data used by the cart UI only
+   *   - `selectedOptions` — cart-UI data today; gains a passthrough
+   *     alongside the bundle work's Commerce API change
    *
    * @returns {Array<object>}
    */
