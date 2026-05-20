@@ -228,19 +228,49 @@ export default async function decorate(block) {
 
   const renderItems = () => {
     itemsList.innerHTML = '';
+    const currencyCode = getCurrencyCode();
 
-    cart.items.forEach((item) => {
-      const itemEl = buildCartItem(
-        item,
-        {
-          onQtyChange: (sku, qty) => cart.updateItem(sku, qty),
-          onRemove: (sku) => cart.removeItem(sku),
-          currencyCode: getCurrencyCode(),
-        },
-        { remove: s.remove, removeItem: s.removeItem },
-      );
-      itemsList.appendChild(itemEl);
-    });
+    cart.items
+      .filter((item) => item.custom?.showInCart !== false)
+      .forEach((item) => {
+        const linkedWarranty = cart.items
+          .find((i) => i.custom?.linkedTo === item.sku) || null;
+
+        const itemEl = buildCartItem(
+          item,
+          {
+            onQtyChange: (sku, qty) => {
+              cart.updateItem(sku, qty);
+              if (linkedWarranty) cart.updateItem(linkedWarranty.sku, qty);
+            },
+            onRemove: (sku) => {
+              if (linkedWarranty) cart.removeItem(linkedWarranty.sku);
+              cart.removeItem(sku);
+            },
+            currencyCode,
+            linkedWarranty,
+            onSelectWarranty: (tier) => {
+              if (linkedWarranty) cart.removeItem(linkedWarranty.sku);
+              if (tier && !tier.isDefault && parseFloat(tier.price) > 0) {
+                cart.addItem({
+                  sku: tier.sku,
+                  quantity: item.quantity,
+                  price: tier.price,
+                  name: tier.name,
+                  custom: { linkedTo: item.sku, showInCart: false },
+                });
+              }
+            },
+          },
+          {
+            remove: s.remove,
+            removeItem: s.removeItem,
+            warranty: s.warranty,
+            included: s.included,
+          },
+        );
+        itemsList.appendChild(itemEl);
+      });
   };
 
   const updateTotals = () => {
@@ -258,7 +288,8 @@ export default async function decorate(block) {
 
   const wrapper = block.closest('.order-summary-wrapper');
   const syncVisibility = () => {
-    wrapper?.toggleAttribute('hidden', cart.items.length === 0);
+    const visible = cart.items.filter((i) => i.custom?.showInCart !== false);
+    wrapper?.toggleAttribute('hidden', visible.length === 0);
   };
 
   document.addEventListener('cart:change', () => {

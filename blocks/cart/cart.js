@@ -53,8 +53,10 @@ export default async function decorate(block) {
   block.innerHTML = buildTemplate(s);
   block.querySelector('.cart-checkout').href = config.getOrderPath('checkout');
 
+  const isMinicart = Boolean(block.closest('.minicart'));
+
   const viewCartBtn = block.querySelector('.cart-view-cart');
-  if (block.closest('.minicart')) {
+  if (isMinicart) {
     viewCartBtn.href = config.getOrderPath('cart');
   } else {
     viewCartBtn.remove();
@@ -74,25 +76,62 @@ export default async function decorate(block) {
   }
 
   const updateEmptyState = () => {
-    cartEl.classList.toggle('cart-is-empty', cart.items.length === 0);
+    const visible = cart.items.filter((i) => i.custom?.showInCart !== false);
+    cartEl.classList.toggle('cart-is-empty', visible.length === 0);
   };
 
   const populatelist = () => {
     itemList.innerHTML = '';
     updateEmptyState();
 
-    cart.items.forEach((item) => {
-      const itemEl = buildCartItem(
-        item,
-        {
-          onQtyChange: (sku, qty) => cart.updateItem(sku, qty),
-          onRemove: (sku) => cart.removeItem(sku),
+    cart.items
+      .filter((item) => item.custom?.showInCart !== false)
+      .forEach((item) => {
+        const linkedWarranty = cart.items
+          .find((i) => i.custom?.linkedTo === item.sku) || null;
+
+        const callbacks = {
+          onQtyChange: (sku, qty) => {
+            cart.updateItem(sku, qty);
+            if (linkedWarranty) cart.updateItem(linkedWarranty.sku, qty);
+          },
+          onRemove: (sku) => {
+            if (linkedWarranty) cart.removeItem(linkedWarranty.sku);
+            cart.removeItem(sku);
+          },
           currencyCode,
-        },
-        { remove: s.remove, removeItem: s.removeItem },
-      );
-      itemList.appendChild(itemEl);
-    });
+        };
+
+        // The minicart keeps the row compact — the warranty selector renders
+        // only in the full cart view.
+        if (!isMinicart) {
+          callbacks.linkedWarranty = linkedWarranty;
+          callbacks.onSelectWarranty = (tier) => {
+            if (linkedWarranty) cart.removeItem(linkedWarranty.sku);
+            if (tier && !tier.isDefault && parseFloat(tier.price) > 0) {
+              cart.addItem({
+                sku: tier.sku,
+                quantity: item.quantity,
+                price: tier.price,
+                name: tier.name,
+                custom: { linkedTo: item.sku, showInCart: false },
+              });
+            }
+          };
+        }
+
+        const itemEl = buildCartItem(
+          item,
+          callbacks,
+          {
+            remove: s.remove,
+            removeItem: s.removeItem,
+            warranty: s.warranty,
+            included: s.included,
+          },
+        );
+        itemList.appendChild(itemEl);
+      });
   };
 
   populatelist();

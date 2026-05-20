@@ -156,3 +156,31 @@
 .cart-item-remove:hover {
   color: var(--commerce-color-text);
 }
+
+/* Warranty selector — spans the full row width below the product details. */
+.cart-item-warranty {
+  grid-column: 1 / -1;
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cart-item-warranty-heading {
+  font-size: var(--commerce-font-size-xs);
+  font-weight: 600;
+  color: var(--commerce-color-text);
+}
+
+.cart-item-warranty-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--commerce-font-size-xs);
+  color: var(--commerce-color-text);
+  cursor: pointer;
+}
+
+.cart-item-warranty-option input[type="radio"] {
+  margin: 0;
+}

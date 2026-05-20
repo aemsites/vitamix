@@ -11,12 +11,29 @@ const TRASH_ICON = /* html */`<svg width="14" height="14" viewBox="0 0 24 24" fi
 
 /**
  * @param {Object} item              Cart item — sku, name, image, price, quantity, url?, variant?
- * @param {{ onQtyChange: Function, onRemove: Function, currencyCode?: string }} callbacks
- * @param {{ remove?: string, removeItem?: string }} [strings]
+ * @param {{
+ *   onQtyChange: Function,
+ *   onRemove: Function,
+ *   currencyCode?: string,
+ *   linkedWarranty?: Object|null,
+ *   onSelectWarranty?: Function,
+ * }} callbacks
+ * @param {{ remove?: string, removeItem?: string, warranty?: string, included?: string }} [strings]
  * @returns {HTMLElement}
  */
-export default function buildCartItem(item, { onQtyChange, onRemove, currencyCode = 'USD' }, strings = {}) {
-  const { remove = 'Remove', removeItem = 'Remove item' } = strings;
+export default function buildCartItem(item, {
+  onQtyChange,
+  onRemove,
+  currencyCode = 'USD',
+  linkedWarranty = null,
+  onSelectWarranty,
+}, strings = {}) {
+  const {
+    remove = 'Remove',
+    removeItem = 'Remove item',
+    warranty: warrantyLabel = 'Warranty',
+    included = 'included',
+  } = strings;
 
   const el = document.createElement('div');
   el.className = `cart-item cart-item-${item.sku}`;
@@ -103,6 +120,49 @@ export default function buildCartItem(item, { onQtyChange, onRemove, currencyCod
     onRemove(item.sku);
     el.remove();
   });
+
+  // Warranty selector — rendered only when the product entry has available
+  // tiers and the caller wired an onSelectWarranty callback.
+  const tiers = item.custom?.availableWarranties;
+  if (Array.isArray(tiers) && tiers.length > 0 && typeof onSelectWarranty === 'function') {
+    const warrantyEl = document.createElement('div');
+    warrantyEl.className = 'cart-item-warranty';
+
+    const heading = document.createElement('div');
+    heading.className = 'cart-item-warranty-heading';
+    heading.textContent = warrantyLabel;
+    warrantyEl.appendChild(heading);
+
+    const groupName = `warranty-${item.sku}`;
+    tiers.forEach((tier) => {
+      const label = document.createElement('label');
+      label.className = 'cart-item-warranty-option';
+
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = groupName;
+      radio.value = tier.sku;
+      radio.checked = linkedWarranty
+        ? linkedWarranty.sku === tier.sku
+        : Boolean(tier.isDefault);
+      radio.addEventListener('change', () => {
+        if (radio.checked) onSelectWarranty(tier);
+      });
+
+      const text = document.createElement('span');
+      const tierPrice = parseFloat(tier.price);
+      if (tier.isDefault || tierPrice === 0) {
+        text.textContent = `${tier.name} (${included})`;
+      } else {
+        text.textContent = `${tier.name} +${formatPrice(tierPrice, currencyCode)} ea`;
+      }
+
+      label.append(radio, text);
+      warrantyEl.appendChild(label);
+    });
+
+    el.appendChild(warrantyEl);
+  }
 
   return el;
 }
