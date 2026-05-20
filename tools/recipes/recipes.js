@@ -15,10 +15,293 @@ const LOCALES = [{
   translateLocale: 'es-MX',
 }];
 
-const { context, token, actions } = await DA_SDK;
-const { daFetch } = actions;
-// eslint-disable-next-line no-console
-console.log('DA SDK loaded', context, token, actions);
+let daSdkPromise = null;
+
+/** DA SDK blocks on postMessage when not embedded in DA; load lazily for sync only. */
+async function loadDaSdk() {
+  if (!daSdkPromise) {
+    daSdkPromise = DA_SDK.then((sdk) => {
+      // eslint-disable-next-line no-console
+      console.log('DA SDK loaded', sdk.context, sdk.token, sdk.actions);
+      return sdk;
+    });
+  }
+  return daSdkPromise;
+}
+
+const AEM_ORIGIN = 'https://main--vitamix--aemsites.aem.page';
+const RECIPE_QUERY_INDEX_URL = `${AEM_ORIGIN}/us/en_us/recipes/query-index.json?limit=10000`;
+
+// Convert recipe name to kebab-case (matches DA filename convention)
+export function toKebabName(name) {
+  return name
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .trim();
+}
+
+function parsePositiveQuantity(qty) {
+  if (!qty) return null;
+  const num = parseFloat(qty);
+  if (Number.isNaN(num) || num <= 0) return null;
+  return num;
+}
+
+function formatQuantityDisplay(qty, num) {
+  return num % 1 === 0 ? String(num) : qty;
+}
+
+function formatIngredientLine(ingredient) {
+  const quantityImperial = ingredient.querySelector('Quantity_Imperial')?.textContent.trim() || '';
+  const unitImperial = ingredient.querySelector('Unit_Imperial')?.textContent.trim() || '';
+  const quantityMetric = ingredient.querySelector('Quantity_Metric')?.textContent.trim() || '';
+  const unitMetric = ingredient.querySelector('Unit_Metric')?.textContent.trim() || '';
+  const name = ingredient.querySelector('Name')?.textContent.trim() || '';
+  const preparation = ingredient.querySelector('Preparation')?.textContent.trim() || '';
+  const alternativeIngredient = ingredient.querySelector('AlternativeIngredient')?.textContent.trim() || '';
+
+  const imperialNum = parsePositiveQuantity(quantityImperial);
+  const metricNum = parsePositiveQuantity(quantityMetric);
+
+  let ingredientStr = '';
+
+  if (imperialNum !== null) {
+    ingredientStr += formatQuantityDisplay(quantityImperial, imperialNum);
+    if (unitImperial) {
+      ingredientStr += ` ${unitImperial}`;
+    }
+  }
+
+  if (metricNum !== null && unitMetric) {
+    if (ingredientStr) ingredientStr += ' ';
+    ingredientStr += `(${formatQuantityDisplay(quantityMetric, metricNum)} ${unitMetric})`;
+  }
+
+  if (name) {
+    if (ingredientStr) ingredientStr += ' ';
+    ingredientStr += name;
+  }
+
+  if (alternativeIngredient) {
+    ingredientStr += ` [or ${alternativeIngredient}]`;
+  }
+
+  if (preparation) {
+    ingredientStr += `, ${preparation}`;
+  }
+
+  return ingredientStr.trim();
+}
+
+function extractIngredientsFromXml(xmlDoc) {
+  const ingredients = [];
+  const ingredientElements = xmlDoc.querySelectorAll('Ingredients > Ingredient');
+  Array.from(ingredientElements).forEach((ingredient) => {
+    const line = formatIngredientLine(ingredient);
+    if (line) ingredients.push(line);
+  });
+  return ingredients;
+}
+
+function buildIngredientsHtml(ingredients) {
+  return ingredients.length > 0 ? `
+    <h2>Ingredients</h2>
+    <ul class="ingredients-list">
+      ${ingredients.map((ing) => `<li>${ing}</li>`).join('')}
+    </ul>
+  ` : '';
+}
+
+let recipeIndexCache = null;
+
+function extractRecipeNumberFromPath(path) {
+  const lastPart = path.split('-').pop();
+  if (lastPart && lastPart.toLowerCase().startsWith('r')) {
+    return lastPart.toUpperCase();
+  }
+  return null;
+}
+
+function extractKebabSlugFromPath(path) {
+  const match = (path || '').match(/\/recipes\/(.+)-r\d+$/i);
+  return match ? match[1] : null;
+}
+
+function isValidRecipeImage(imageUrl) {
+  if (!imageUrl || typeof imageUrl !== 'string') return false;
+  return !imageUrl.includes('default-meta-image');
+}
+
+/** Origin for recipe media — same host when on aem.page/localhost, else published AEM. */
+function getRecipeImageOrigin() {
+  const { hostname, origin } = window.location;
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return origin;
+  }
+  if (hostname.includes('aem.page') || hostname.includes('aem.live')) {
+    return origin;
+  }
+  return AEM_ORIGIN;
+}
+
+/**
+ * Rewrites query-index image URLs (often www.vitamix.com) to AEM/same-origin pathname only.
+ */
+function resolveRecipeImageUrl(imageUrl) {
+  if (!isValidRecipeImage(imageUrl)) return '';
+
+  try {
+    const parsed = imageUrl.startsWith('/')
+      ? new URL(imageUrl, AEM_ORIGIN)
+      : new URL(imageUrl);
+    return `${getRecipeImageOrigin()}${parsed.pathname}`;
+  } catch {
+    return imageUrl;
+  }
+}
+
+const LOCAL_QUERY_INDEX_URL = '/us/en_us/recipes/query-index.json?limit=10000';
+
+async function fetchRecipeIndexEntries() {
+  const corsProxy = 'https://fcors.org/?url=';
+  const corsKey = '&key=Mg23N96GgR8O3NjU';
+
+  const sources = [
+    { url: LOCAL_QUERY_INDEX_URL, proxied: false },
+    { url: RECIPE_QUERY_INDEX_URL, proxied: true },
+  ];
+
+  let lastError = null;
+
+  for (let i = 0; i < sources.length; i += 1) {
+    const { url, proxied } = sources[i];
+    const fetchUrl = proxied
+      ? `${corsProxy}${encodeURIComponent(url)}${corsKey}`
+      : url;
+
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const response = await fetch(fetchUrl, {
+        method: 'GET',
+        credentials: proxied ? 'include' : 'same-origin',
+      });
+
+      if (!response.ok) {
+        lastError = new Error(`HTTP error! status: ${response.status}`);
+        continue;
+      }
+
+      // eslint-disable-next-line no-await-in-loop
+      const data = await response.json();
+      return data.data || [];
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error('Failed to fetch recipe index');
+}
+
+async function getRecipeIndexCache() {
+  if (recipeIndexCache) return recipeIndexCache;
+
+  const entries = await fetchRecipeIndexEntries();
+  const byNumber = new Map();
+  const byTitle = new Map();
+
+  entries.forEach((entry) => {
+    const recipeNumber = extractRecipeNumberFromPath(entry.path);
+    if (recipeNumber) {
+      byNumber.set(recipeNumber, entry);
+    }
+
+    const titleKey = (entry.title || entry.name || '').trim().toLowerCase();
+    if (titleKey) {
+      if (!byTitle.has(titleKey)) byTitle.set(titleKey, []);
+      byTitle.get(titleKey).push(entry);
+    }
+  });
+
+  recipeIndexCache = { entries, byNumber, byTitle };
+  return recipeIndexCache;
+}
+
+async function fetchRecipePathByNumber() {
+  const { byNumber } = await getRecipeIndexCache();
+  const pathMap = new Map();
+  byNumber.forEach((entry, recipeNumber) => {
+    pathMap.set(recipeNumber, entry.path);
+  });
+  return pathMap;
+}
+
+function getSiblingIndexEntries(byTitle, entries, recipeNumber, kebabName, recipeName) {
+  const upperNumber = recipeNumber.toUpperCase();
+  const normalizedTitle = recipeName?.trim().toLowerCase() || '';
+  const siblings = [];
+  const seenPaths = new Set();
+
+  const addSibling = (entry) => {
+    const num = extractRecipeNumberFromPath(entry.path);
+    if (!num || num.toUpperCase() === upperNumber || seenPaths.has(entry.path)) return;
+    seenPaths.add(entry.path);
+    siblings.push(entry);
+  };
+
+  if (normalizedTitle && byTitle.has(normalizedTitle)) {
+    byTitle.get(normalizedTitle).forEach(addSibling);
+  }
+
+  entries.forEach((entry) => {
+    if (extractKebabSlugFromPath(entry.path) === kebabName) {
+      addSibling(entry);
+    }
+  });
+
+  return siblings;
+}
+
+/**
+ * Fetches recipe hero image from the published AEM recipe query-index.
+ * Tries exact recipe number match first, then other variants with the same title.
+ */
+async function fetchRecipeImageFromIndex(recipeNumber, kebabName, recipeName, onLog) {
+  try {
+    const { entries, byNumber, byTitle } = await getRecipeIndexCache();
+    const upperNumber = recipeNumber.toUpperCase();
+    const exact = byNumber.get(upperNumber);
+
+    if (exact?.image && isValidRecipeImage(exact.image)) {
+      onLog?.(`  ✓ Image found in recipe index (${exact.path})`, 'success');
+      return resolveRecipeImageUrl(exact.image);
+    }
+
+    if (exact) {
+      onLog?.(`  ⚠ Recipe in index has no image (${exact.path})`, 'warning');
+    }
+
+    const siblings = getSiblingIndexEntries(byTitle, entries, recipeNumber, kebabName, recipeName);
+
+    if (siblings.length > 0) {
+      onLog?.(`  Checking ${siblings.length} other container variant(s) in index...`, 'info');
+      for (let i = 0; i < siblings.length; i += 1) {
+        const entry = siblings[i];
+        if (entry.image && isValidRecipeImage(entry.image)) {
+          onLog?.(`  ✓ Image found from sibling: ${entry.path}`, 'success');
+          return resolveRecipeImageUrl(entry.image);
+        }
+      }
+    }
+
+    onLog?.('  ⚠ No image found in recipe index', 'warning');
+    return '';
+  } catch (error) {
+    onLog?.(`  ⚠ Could not load recipe index: ${error.message}`, 'warning');
+    return '';
+  }
+}
 
 // Parse query parameters
 export function getQueryParams() {
@@ -288,47 +571,9 @@ export async function fetchRecipeDetailsForSync(
     throw new Error('Recipe has no ingredients or procedure steps - API may have returned incomplete data');
   }
 
-  // Convert recipe name to kebab-case
-  const kebabName = xmlRecipeName
-    .toLowerCase()
-    .replace(/[^\w\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .trim();
+  const kebabName = toKebabName(xmlRecipeName);
 
-  const recipePageUrl = `https://www.vitamix.com/us/en_us/recipes/${kebabName}`;
-
-  // Fetch recipe image from Vitamix website
-  let recipeImageSrc = '';
-  try {
-    addLogEntry(`  Fetching image from ${recipePageUrl}`, 'info');
-    const corsProxy = 'https://fcors.org/?url=';
-    const corsKey = '&key=Mg23N96GgR8O3NjU';
-    const pageResponse = await fetch(corsProxy + encodeURIComponent(recipePageUrl) + corsKey, {
-      credentials: 'include',
-    });
-
-    if (pageResponse.ok) {
-      const htmlText = await pageResponse.text();
-      const htmlParser = new DOMParser();
-      const htmlDoc = htmlParser.parseFromString(htmlText, 'text/html');
-
-      const imageElement = htmlDoc.querySelector('.ognm-header-recipe__image-carousel__img');
-      if (imageElement) {
-        let src = imageElement.getAttribute('src') || '';
-        if (src && !src.startsWith('http')) {
-          const slash = src.startsWith('/') ? '' : '/';
-          src = `https://www.vitamix.com${slash}${src}`;
-        }
-        recipeImageSrc = src;
-        addLogEntry('  ✓ Image found', 'success');
-      } else {
-        addLogEntry('  ⚠ No image found', 'warning');
-      }
-    }
-  } catch (error) {
-    addLogEntry(`  ⚠ Failed to fetch image: ${error.message}`, 'warning');
-  }
+  const recipeImageSrc = await fetchRecipeImageFromIndex(recipeNumber, kebabName, xmlRecipeName, addLogEntry);
 
   // Extract metadata
   let totalTime = '';
@@ -430,68 +675,8 @@ export async function fetchRecipeDetailsForSync(
       </div>
     `).join('');
 
-  // Extract ingredients
-  const ingredients = [];
-  const ingredientElements = xmlDoc.querySelectorAll('Ingredients > Ingredient');
-  Array.from(ingredientElements).forEach((ingredient) => {
-    const quantityImperial = ingredient.querySelector('Quantity_Imperial')?.textContent.trim() || '';
-    const unitImperial = ingredient.querySelector('Unit_Imperial')?.textContent.trim() || '';
-    const quantityMetric = ingredient.querySelector('Quantity_Metric')?.textContent.trim() || '';
-    const unitMetric = ingredient.querySelector('Unit_Metric')?.textContent.trim() || '';
-    const name = ingredient.querySelector('Name')?.textContent.trim() || '';
-    const preparation = ingredient.querySelector('Preparation')?.textContent.trim() || '';
-    const alternativeIngredient = ingredient.querySelector('AlternativeIngredient')?.textContent.trim() || '';
-
-    // Format metric quantity (remove .00 decimals)
-    const formatQuantity = (qty) => {
-      if (!qty) return '';
-      const num = parseFloat(qty);
-      return num % 1 === 0 ? num.toString() : qty;
-    };
-
-    let ingredientStr = '';
-
-    // Add imperial quantity (with or without unit)
-    if (quantityImperial) {
-      ingredientStr += formatQuantity(quantityImperial);
-      if (unitImperial) {
-        ingredientStr += ` ${unitImperial}`;
-      }
-    }
-
-    // Add metric in parentheses
-    if (quantityMetric && unitMetric) {
-      if (ingredientStr) ingredientStr += ' ';
-      ingredientStr += `(${formatQuantity(quantityMetric)} ${unitMetric})`;
-    }
-
-    // Add ingredient name
-    if (name) {
-      if (ingredientStr) ingredientStr += ' ';
-      ingredientStr += name;
-    }
-
-    // Add alternative ingredient in brackets
-    if (alternativeIngredient) {
-      ingredientStr += ` [or ${alternativeIngredient}]`;
-    }
-
-    // Add preparation
-    if (preparation) {
-      ingredientStr += `, ${preparation}`;
-    }
-
-    if (ingredientStr.trim()) {
-      ingredients.push(ingredientStr.trim());
-    }
-  });
-
-  const ingredientsHtml = ingredients.length > 0 ? `
-    <h2>Ingredients</h2>
-    <ul class="ingredients-list">
-      ${ingredients.map((ing) => `<li>${ing}</li>`).join('')}
-    </ul>
-  ` : '';
+  const ingredients = extractIngredientsFromXml(xmlDoc);
+  const ingredientsHtml = buildIngredientsHtml(ingredients);
 
   // Extract directions and notes
   const procedureElement = xmlDoc.querySelector('Procedure');
@@ -620,13 +805,14 @@ ${recipeHtml}
 
 // Preview recipe on admin.hlx.page
 export async function previewRecipe(root, kebabName) {
+  const { token: daToken } = await loadDaSdk();
   // Remove .html extension if present
   const cleanName = kebabName.endsWith('.html') ? kebabName.slice(0, -5) : kebabName;
   const path = `${root}/recipes/${cleanName}`;
   const previewUrl = `https://admin.hlx.page/preview/aemsites/vitamix/main/${path}`;
 
   const opts = {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: `Bearer ${daToken}` },
     method: 'POST',
   };
 
@@ -643,13 +829,14 @@ export async function previewRecipe(root, kebabName) {
 
 // Publish recipe on admin.hlx.page
 export async function publishRecipe(root, kebabName) {
+  const { token: daToken } = await loadDaSdk();
   // Remove .html extension if present
   const cleanName = kebabName.endsWith('.html') ? kebabName.slice(0, -5) : kebabName;
   const path = `${root}/recipes/${cleanName}`;
   const publishUrl = `https://admin.hlx.page/live/aemsites/vitamix/main/${path}`;
 
   const opts = {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: `Bearer ${daToken}` },
     method: 'POST',
   };
 
@@ -710,7 +897,10 @@ export async function bulkSyncWithDA() {
     return;
   }
 
-  if (!token) {
+  const { context: daContext, token: daToken, actions } = await loadDaSdk();
+  const { daFetch } = actions;
+
+  if (!daToken) {
     showError('DA token not found. Please wait for the page to fully load and try again.');
     return;
   }
@@ -779,9 +969,9 @@ export async function bulkSyncWithDA() {
       const processPage = async (root, translateLocale) => {
         let html = htmlContent;
         if (translateLocale) {
-          context.sourcePath = `/${root}/recipes/${filename}`;
+          daContext.sourcePath = `/${root}/recipes/${filename}`;
           // eslint-disable-next-line max-len
-          html = await translate(htmlContent, translateLocale, context, undefined, daFetch);
+          html = await translate(htmlContent, translateLocale, daContext, undefined, daFetch);
         }
 
         const blob = new Blob([html], { type: 'text/html' });
@@ -789,7 +979,7 @@ export async function bulkSyncWithDA() {
         body.append('data', blob);
 
         const opts = {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${daToken}` },
           method: 'POST',
           body,
         };
@@ -886,12 +1076,7 @@ export async function bulkSyncWithDA() {
 
 // Sync recipe with DA
 export async function syncWithDA(recipeName, recipeNumber) {
-  const kebabName = recipeName
-    .toLowerCase()
-    .replace(/[^\w\s-]/g, '') // Remove special characters
-    .replace(/\s+/g, '-') // Replace spaces with hyphens
-    .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
-    .trim();
+  const kebabName = toKebabName(recipeName);
 
   const lowercaseNumber = recipeNumber.toLowerCase();
   const filename = `${kebabName}-${lowercaseNumber}.html`;
@@ -917,7 +1102,10 @@ ${recipeElement.innerHTML}
 </body>
 </html>`;
 
-  if (!token) {
+  const { context: daContext, token: daToken, actions } = await loadDaSdk();
+  const { daFetch } = actions;
+
+  if (!daToken) {
     throw new Error('DA token not found');
   }
 
@@ -926,9 +1114,9 @@ ${recipeElement.innerHTML}
     const locale = LOCALES[l];
     let html = htmlContent;
     if (locale.translateLocale) {
-      context.sourcePath = `/${locale.root}/recipes/${filename}`;
+      daContext.sourcePath = `/${locale.root}/recipes/${filename}`;
       // eslint-disable-next-line no-await-in-loop
-      html = await translate(htmlContent, locale.translateLocale, context, undefined, daFetch);
+      html = await translate(htmlContent, locale.translateLocale, daContext, undefined, daFetch);
     }
 
     // Create blob and form data
@@ -937,7 +1125,7 @@ ${recipeElement.innerHTML}
     body.append('data', blob);
 
     const opts = {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${daToken}` },
       method: 'POST',
       body,
     };
@@ -1025,13 +1213,7 @@ export async function displayRecipeDetails(recipeNumber) {
       throw new Error('Recipe has no ingredients or procedure steps - API may have returned incomplete data');
     }
 
-    // Convert recipe name to kebab-case
-    const kebabName = recipeName
-      .toLowerCase()
-      .replace(/[^\w\s-]/g, '') // Remove special characters
-      .replace(/\s+/g, '-') // Replace spaces with hyphens
-      .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
-      .trim();
+    const kebabName = toKebabName(recipeName);
 
     // Add "View on Vitamix.com" button to detail header
     const detailHeader = detailView.querySelector('.detail-header');
@@ -1082,7 +1264,8 @@ export async function displayRecipeDetails(recipeNumber) {
           for (let i = 0; i < results.length; i += 1) {
             const result = results[i];
             // Preview and Publish if enabled
-            if (enablePublish && token) {
+            const { token: daToken } = await loadDaSdk();
+            if (enablePublish && daToken) {
               try {
                 // eslint-disable-next-line no-await-in-loop
                 const previewUrl = await previewRecipe(result.root, result.filename);
@@ -1135,37 +1318,7 @@ export async function displayRecipeDetails(recipeNumber) {
       });
     }
 
-    // Fetch recipe image from Vitamix website
-    let recipeImageSrc = '';
-    try {
-      // Fetch the recipe page through CORS proxy
-      const corsProxy = 'https://fcors.org/?url=';
-      const corsKey = '&key=Mg23N96GgR8O3NjU';
-      const pageResponse = await fetch(corsProxy + encodeURIComponent(recipePageUrl) + corsKey, {
-        credentials: 'include',
-      });
-
-      if (pageResponse.ok) {
-        const htmlText = await pageResponse.text();
-        const htmlParser = new DOMParser();
-        const htmlDoc = htmlParser.parseFromString(htmlText, 'text/html');
-
-        // Find the image with the specific class
-        const imageElement = htmlDoc.querySelector('.ognm-header-recipe__image-carousel__img');
-        if (imageElement) {
-          let src = imageElement.getAttribute('src') || '';
-          // Prefix with origin if it's a relative path
-          if (src && !src.startsWith('http')) {
-            const slash = src.startsWith('/') ? '' : '/';
-            src = `https://www.vitamix.com${slash}${src}`;
-          }
-          recipeImageSrc = src;
-        }
-      }
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Error fetching recipe image:', error);
-    }
+    const recipeImageSrc = await fetchRecipeImageFromIndex(recipeNumber, kebabName, recipeName);
 
     // Extract metadata
     // Extract Total Time from Time element with Name "Total Time"
@@ -1285,68 +1438,8 @@ export async function displayRecipeDetails(recipeNumber) {
       </div>
     `).join('');
 
-    // Extract Ingredients
-    const ingredients = [];
-    const ingredientElements = xmlDoc.querySelectorAll('Ingredients > Ingredient');
-    Array.from(ingredientElements).forEach((ingredient) => {
-      const quantityImperial = ingredient.querySelector('Quantity_Imperial')?.textContent.trim() || '';
-      const unitImperial = ingredient.querySelector('Unit_Imperial')?.textContent.trim() || '';
-      const quantityMetric = ingredient.querySelector('Quantity_Metric')?.textContent.trim() || '';
-      const unitMetric = ingredient.querySelector('Unit_Metric')?.textContent.trim() || '';
-      const name = ingredient.querySelector('Name')?.textContent.trim() || '';
-      const preparation = ingredient.querySelector('Preparation')?.textContent.trim() || '';
-      const alternativeIngredient = ingredient.querySelector('AlternativeIngredient')?.textContent.trim() || '';
-
-      // Format metric quantity (remove .00 decimals)
-      const formatQuantity = (qty) => {
-        if (!qty) return '';
-        const num = parseFloat(qty);
-        return num % 1 === 0 ? num.toString() : qty;
-      };
-
-      let ingredientStr = '';
-
-      // Add imperial quantity (with or without unit)
-      if (quantityImperial) {
-        ingredientStr += formatQuantity(quantityImperial);
-        if (unitImperial) {
-          ingredientStr += ` ${unitImperial}`;
-        }
-      }
-
-      // Add metric in parentheses
-      if (quantityMetric && unitMetric) {
-        if (ingredientStr) ingredientStr += ' ';
-        ingredientStr += `(${formatQuantity(quantityMetric)} ${unitMetric})`;
-      }
-
-      // Add ingredient name
-      if (name) {
-        if (ingredientStr) ingredientStr += ' ';
-        ingredientStr += name;
-      }
-
-      // Add alternative ingredient in brackets
-      if (alternativeIngredient) {
-        ingredientStr += ` [or ${alternativeIngredient}]`;
-      }
-
-      // Add preparation
-      if (preparation) {
-        ingredientStr += `, ${preparation}`;
-      }
-
-      if (ingredientStr.trim()) {
-        ingredients.push(ingredientStr.trim());
-      }
-    });
-
-    const ingredientsHtml = ingredients.length > 0 ? `
-      <h2>Ingredients</h2>
-      <ul class="ingredients-list">
-        ${ingredients.map((ing) => `<li>${ing}</li>`).join('')}
-      </ul>
-    ` : '';
+    const ingredients = extractIngredientsFromXml(xmlDoc);
+    const ingredientsHtml = buildIngredientsHtml(ingredients);
 
     // Extract Directions/Procedure Steps
     const procedureElement = xmlDoc.querySelector('Procedure');
@@ -1474,32 +1567,8 @@ ${metadataRows}
 // Fetch imported recipes from AEM
 export async function fetchImportedRecipes() {
   try {
-    const corsProxy = 'https://fcors.org/?url=';
-    const corsKey = '&key=Mg23N96GgR8O3NjU';
-    const queryIndexUrl = 'https://main--vitamix--aemsites.aem.live/us/en_us/recipes/query-index.json?limit=10000';
-
-    const response = await fetch(corsProxy + encodeURIComponent(queryIndexUrl) + corsKey, {
-      method: 'GET',
-      credentials: 'include',
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const data = await response.json();
-
-    // Extract recipe numbers from paths
-    // Path format: /us/en_us/recipes/recipe-name-r00401
-    const importedRecipeNumbers = new Set();
-    data.data.forEach((recipe) => {
-      const pathParts = recipe.path.split('-');
-      const lastPart = pathParts[pathParts.length - 1]; // e.g., "r00401"
-      if (lastPart && lastPart.toLowerCase().startsWith('r')) {
-        importedRecipeNumbers.add(lastPart.toUpperCase());
-      }
-    });
-
-    return importedRecipeNumbers;
+    const pathMap = await fetchRecipePathByNumber();
+    return new Set(pathMap.keys());
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Error fetching imported recipes:', error);
