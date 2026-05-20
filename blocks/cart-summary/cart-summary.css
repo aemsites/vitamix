@@ -304,6 +304,20 @@ dialog.paypal-not-configured-dialog::backdrop {
   background: var(--commerce-color-text);
 }
 
+/* ID.me verification */
+.cart-summary .idme-verify {
+  margin-bottom: var(--commerce-card-padding);
+  padding-bottom: var(--commerce-card-padding);
+  border-bottom: 1px solid var(--commerce-color-border);
+}
+
+/* Remove bottom border from promo section when ID.me follows it */
+.cart-summary-promo:has(+ .idme-verify) {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: var(--commerce-card-padding);
+}
+
 /* Totals */
 .cart-summary-totals {
   display: flex;

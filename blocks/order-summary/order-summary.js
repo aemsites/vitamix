@@ -3,6 +3,8 @@ import cart from '../../scripts/cart.js';
 import { getConfig, formatPrice } from '../../scripts/commerce-config.js';
 import buildCartItem from '../../scripts/commerce/cart-item.js';
 import { parsePreview } from '../../scripts/commerce-api.js';
+import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { initIDMe } from '../../scripts/commerce/idme.js';
 
 function getStrings() {
   return getConfig().getStrings();
@@ -307,4 +309,7 @@ export default async function decorate(block) {
 
   syncVisibility();
   initMobileCollapse(block);
+  if (getLocaleAndLanguage().locale === 'us') {
+    initIDMe(block.querySelector('.order-summary-discount'), discountInput);
+  }
 }

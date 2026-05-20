@@ -6,6 +6,8 @@ import applePay from '../../scripts/payments/apple-pay.js';
 import googlePay from '../../scripts/payments/google-pay.js';
 import paypal from '../../scripts/payments/paypal.js';
 import { getActiveProviders } from '../checkout/checkout-payment.js';
+import { initIDMe } from '../../scripts/commerce/idme.js';
+import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 const ALL_PROVIDERS = [applePay, googlePay, paypal];
 
@@ -228,5 +230,14 @@ export default async function decorate(block) {
   if (available.length) {
     available.forEach((p) => p.renderExpressButton(expressContainer, callbacks));
     expressSection.hidden = false;
+  }
+
+  if (getLocaleAndLanguage().locale === 'us') {
+    const promoEl = block.querySelector('.cart-summary-promo');
+    const returnedCoupon = initIDMe(promoEl, discountInput);
+    if (returnedCoupon) {
+      promoEl.open = true;
+      showDiscountRow(returnedCoupon);
+    }
   }
 }

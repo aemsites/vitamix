@@ -211,6 +211,13 @@
   background: var(--commerce-color-text);
 }
 
+/* ID.me verification */
+.idme-verify {
+  margin-bottom: var(--commerce-card-padding);
+  padding-bottom: var(--commerce-card-padding);
+  border-bottom: 1px solid var(--commerce-color-border);
+}
+
 /* Totals */
 .order-summary-totals {
   display: flex;
