@@ -249,7 +249,10 @@ export default async function decorate(block) {
                 quantity: item.quantity,
                 price: tier.price,
                 name: tier.name,
-                custom: { linkedTo: item.sku },
+                custom: {
+                  linkedTo: item.sku,
+                  ...(tier.coverageYears ? { coverageYears: tier.coverageYears } : {}),
+                },
                 local: { showInCart: false },
               });
             }

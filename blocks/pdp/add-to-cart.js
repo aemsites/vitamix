@@ -233,6 +233,7 @@ export default function renderAddToCart(ph, block, parent) {
           name: opt.name,
           price: opt.finalPrice ?? opt.price,
           ...(opt.path ? { path: opt.path } : {}),
+          ...(opt.coverageYears ? { coverageYears: opt.coverageYears } : {}),
           ...(parseFloat(opt.finalPrice ?? opt.price) === 0 ? { isDefault: true } : {}),
         }));
         const availableWarranties = warrantyOptions.length > 0 ? warrantyOptions : null;
@@ -264,7 +265,12 @@ export default function renderAddToCart(ph, block, parent) {
             quantity: parseInt(quantity, 10),
             price: selectedTier.price,
             name: selectedTier.name,
-            custom: { linkedTo: variantSku ?? sku },
+            custom: {
+              linkedTo: variantSku ?? sku,
+              ...(selectedTier.coverageYears
+                ? { coverageYears: selectedTier.coverageYears }
+                : {}),
+            },
             local: { showInCart: false },
           });
         }
