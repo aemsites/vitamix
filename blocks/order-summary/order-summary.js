@@ -1,8 +1,14 @@
-import { loadCSS } from '../../scripts/aem.js';
+import { loadCSS, getMetadata } from '../../scripts/aem.js';
 import cart from '../../scripts/cart.js';
 import { getConfig, formatPrice } from '../../scripts/commerce-config.js';
 import buildCartItem from '../../scripts/commerce/cart-item.js';
 import { parsePreview } from '../../scripts/commerce-api.js';
+
+const isProd = window.location.hostname === 'www.vitamix.com';
+
+const IDME_SCOPES = 'military,medical,nurse,responder,teacher';
+const IDME_CLIENT_ID = isProd ? '566879020d6a5533db11a112e307aed3' : 'f05216080667a3fb48ef1aed700d7b5f';
+const IDME_API_BASE = isProd ? 'https://api.id.me' : 'https://api.idmelabs.com';
 
 function getStrings() {
   return getConfig().getStrings();
@@ -56,6 +62,80 @@ function buildTemplate(s) {
   </div>
 </div>
 `;
+}
+
+function handleIDMeReturn(discountInput) {
+  const params = new URLSearchParams(window.location.search);
+  const coupon = params.get('idme_coupon');
+  if (!coupon) return;
+  // Clean idme params from the URL without a page reload
+  params.delete('idme_coupon');
+  params.delete('idme_error');
+  const qs = params.size ? `?${params}` : '';
+  history.replaceState(null, '', window.location.pathname + qs);
+  discountInput.value = coupon;
+  sessionStorage.setItem('checkout_coupon_code', coupon);
+  document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
+}
+
+function buildIDMeAuthUrl(callbackUrl) {
+  // allow overrides via localStorage on non-prod hosts
+  let clientId = IDME_CLIENT_ID;
+  let idmeBase = IDME_API_BASE;
+  if (!isProd) {
+    let override = localStorage.getItem('idme-client-id')?.trim();
+    if (override) {
+      clientId = override;
+    }
+
+    override = localStorage.getItem('idme-api-base')?.trim();
+    if (override) {
+      idmeBase = override;
+    }
+  }
+  const returnUrl = `${window.location.origin}${window.location.pathname}`;
+  const state = btoa(JSON.stringify({ returnUrl }));
+  return `${idmeBase}/oauth/authorize?${new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: callbackUrl,
+    response_type: 'code',
+    scope: IDME_SCOPES,
+    state,
+    type: 'button',
+  })}`;
+}
+
+function initIDMe(block, discountInput) {
+  const redirectOrigin = localStorage.getItem('idme-redirect-origin') || window.location.origin;
+  const callbackUrl = `${redirectOrigin}/identity/idme/callback`;
+
+  const discountSection = block.querySelector('.order-summary-discount');
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'idme-verify';
+
+  const divider = document.createElement('p');
+  divider.className = 'idme-verify-divider';
+  divider.textContent = 'or verify your status';
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'idme-verify-btn';
+  btn.innerHTML = '<span class="idme-verify-logo" aria-hidden="true">ID</span><span>Verify with ID.me</span>';
+  btn.addEventListener('click', () => {
+    window.location.href = buildIDMeAuthUrl(callbackUrl);
+  });
+
+  const hint = document.createElement('p');
+  hint.className = 'idme-verify-hint';
+  hint.textContent = getMetadata('idme-promotion-text')
+    || 'Exclusive discounts are available for Military, Nurses, Medical Professionals, First Responders, and Teachers through ID.me.';
+
+  wrapper.append(divider, btn, hint);
+  discountSection.insertAdjacentElement('afterend', wrapper);
+
+  // Handle return from the server-side callback — coupon arrives as ?idme_coupon=
+  handleIDMeReturn(discountInput);
 }
 
 /**
@@ -307,4 +387,5 @@ export default async function decorate(block) {
 
   syncVisibility();
   initMobileCollapse(block);
+  initIDMe(block, discountInput);
 }

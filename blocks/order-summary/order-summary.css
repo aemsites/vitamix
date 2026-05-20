@@ -211,6 +211,64 @@
   background: var(--commerce-color-text);
 }
 
+/* ID.me verification */
+.idme-verify {
+  margin-bottom: var(--commerce-card-padding);
+  padding-bottom: var(--commerce-card-padding);
+  border-bottom: 1px solid var(--commerce-color-border);
+}
+
+.idme-verify-divider {
+  margin: 0 0 10px;
+  font-size: 11px;
+  text-align: center;
+  color: var(--commerce-color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.idme-verify-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 20px;
+  background: #0175ff;
+  color: #fff;
+  border: none;
+  border-radius: var(--commerce-button-radius);
+  font-size: var(--commerce-font-size-sm);
+  font-weight: var(--commerce-font-weight-bold);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.idme-verify-btn:hover {
+  background: #0060d6;
+}
+
+.idme-verify-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 18px;
+  background: rgb(255 255 255 / 20%);
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.idme-verify-hint {
+  margin: 10px 0 0;
+  font-size: 11px;
+  text-align: center;
+  color: var(--commerce-color-text-muted);
+}
+
 /* Totals */
 .order-summary-totals {
   display: flex;
