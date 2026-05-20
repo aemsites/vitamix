@@ -6,7 +6,6 @@ import { parsePreview } from '../../scripts/commerce-api.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 import { initIDMe } from '../../scripts/commerce/idme.js';
 
-
 function getStrings() {
   return getConfig().getStrings();
 }
@@ -60,7 +59,6 @@ function buildTemplate(s) {
 </div>
 `;
 }
-
 
 /**
  * If the order-summary is authored in its own section (separate from the
