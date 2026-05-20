@@ -15,8 +15,8 @@ export class Cart {
 
   static STORAGE_VERSION = 1;
 
-  /** @type {Record<string, CartItem>} */
-  #items = {};
+  /** @type {CartItem[]} */
+  #items = [];
 
   constructor() {
     this.#restore();
@@ -31,10 +31,7 @@ export class Cart {
         localStorage.removeItem(Cart.STORAGE_KEY);
         return;
       }
-      this.#items = parsed.items.reduce((acc, item) => {
-        acc[item.sku] = item;
-        return acc;
-      }, {});
+      this.#items = parsed.items;
       document.dispatchEvent(
         new CustomEvent('cart:change', {
           detail: {
@@ -70,18 +67,18 @@ export class Cart {
   }
 
   get items() {
-    return Object.values(this.#items);
+    return this.#items;
   }
 
   get itemCount() {
-    return Object.values(this.#items).reduce(
+    return this.#items.reduce(
       (acc, item) => acc + item.quantity,
       0,
     );
   }
 
   get subtotal() {
-    return Object.values(this.#items).reduce(
+    return this.#items.reduce(
       (acc, item) => acc + item.quantity * (typeof item.price === 'string'
         ? parseFloat(item.price)
         : item.price / 100),
@@ -90,7 +87,7 @@ export class Cart {
   }
 
   clear() {
-    this.#items = {};
+    this.#items = [];
     this.#persistNow();
     document.dispatchEvent(
       new CustomEvent('cart:change', {
@@ -107,11 +104,11 @@ export class Cart {
    * @param {CartItem} item
    */
   addItem(item) {
-    const existing = this.#items[item.sku];
+    const existing = this.#items.find((i) => i.sku === item.sku);
     if (existing) {
       existing.quantity += item.quantity;
     } else {
-      this.#items[item.sku] = item;
+      this.#items.push(item);
     }
     document.dispatchEvent(
       new CustomEvent('cart:change', {
@@ -130,15 +127,16 @@ export class Cart {
    * @param {number} quantity
    */
   updateItem(sku, quantity) {
-    if (!this.#items[sku]) {
+    const existing = this.#items.find((i) => i.sku === sku);
+    if (!existing) {
       throw new Error(`Item with sku ${sku} not found`);
     }
-    this.#items[sku].quantity = quantity;
+    existing.quantity = quantity;
     document.dispatchEvent(
       new CustomEvent('cart:change', {
         detail: {
           cart: this,
-          item: this.#items[sku],
+          item: existing,
           action: 'update',
         },
       }),
@@ -151,8 +149,11 @@ export class Cart {
    * @param {string} sku
    */
   removeItem(sku) {
-    const item = this.#items[sku];
-    delete this.#items[sku];
+    const index = this.#items.findIndex((i) => i.sku === sku);
+    const item = index === -1 ? undefined : this.#items[index];
+    if (index !== -1) {
+      this.#items.splice(index, 1);
+    }
     document.dispatchEvent(
       new CustomEvent('cart:change', {
         detail: {
@@ -191,7 +192,7 @@ export class Cart {
   toJSON() {
     return {
       version: Cart.STORAGE_VERSION,
-      items: Object.values(this.#items),
+      items: this.#items,
     };
   }
 }
