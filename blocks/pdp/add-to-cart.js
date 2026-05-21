@@ -227,7 +227,11 @@ export default function renderAddToCart(ph, block, parent) {
       if (window.useEdgeCheckout) {
         const cartApi = (await import('../../scripts/cart.js')).default;
 
-        const { sku: variantSku, price: rawPrice, name } = selectedVariant;
+        const { sku: variantSku, name } = selectedVariant;
+        // Prefer the selected variant's price so variant-specific pricing
+        // wins; fall back to offers[0] for simple products, where
+        // selectedVariant is the parent and has no top-level price.
+        const rawPrice = selectedVariant.price ?? parent.offers?.[0]?.price;
         const price = normalizeCartPrice(rawPrice);
 
         // Semantic {id, value} options for the edge cart. The edge cart

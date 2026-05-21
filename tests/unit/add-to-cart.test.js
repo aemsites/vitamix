@@ -38,15 +38,12 @@ test('normalizeCartPrice: falls back to regular when final is missing', () => {
 });
 
 test('normalizeCartPrice: regression for simple-product NaN bug', () => {
-  // Repro: a simple product with no `offers[]` returns the Product Bus price
-  // object directly. Before the fix this object was passed straight into the
-  // cart item, so `price * qty` evaluated to NaN and the cart rendered "$NaN".
-  const simpleProductPrice = {
-    currency: 'USD',
-    regular: '249.95',
-    final: '249.95',
-  };
-  const normalized = normalizeCartPrice(simpleProductPrice);
+  // Simple products' JSON-LD offer carries a numeric-string `price`. The cart
+  // line item used to receive `undefined` (parent fallback had no `price` and
+  // we weren't reading offers[0].price), serialize as null in localStorage,
+  // and render as "$NaN". After the fix the offer's string price flows in.
+  const offerPrice = '249.95';
+  const normalized = normalizeCartPrice(offerPrice);
   assert.equal(Number.isNaN(normalized), false);
   assert.equal(normalized * 2, 499.9);
 });
