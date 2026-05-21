@@ -75,6 +75,21 @@ function toggleFixedAddToCart(container) {
 }
 
 /**
+ * Normalize a price into a number for the edge cart line item.
+ * Offers expose a flat numeric price (string or number); simple products
+ * without offers expose the Product Bus shape `{ currency, regular, final }`.
+ * Returns `NaN` if no usable value can be extracted.
+ * @param {string|number|{final?: string|number, regular?: string|number}} value
+ * @returns {number}
+ */
+export function normalizeCartPrice(value) {
+  if (value && typeof value === 'object') {
+    return parseFloat(value.final ?? value.regular);
+  }
+  return parseFloat(value);
+}
+
+/**
  * Checks if a variant is available for sale.
  * @param {Object} variant - The variant object
  * @returns {boolean} True if the variant is available for sale, false otherwise
@@ -212,7 +227,8 @@ export default function renderAddToCart(ph, block, parent) {
       if (window.useEdgeCheckout) {
         const cartApi = (await import('../../scripts/cart.js')).default;
 
-        const { sku: variantSku, price, name } = selectedVariant;
+        const { sku: variantSku, price: rawPrice, name } = selectedVariant;
+        const price = normalizeCartPrice(rawPrice);
 
         // Semantic {id, value} options for the edge cart. The edge cart
         // carries no Magento-specific data — UIDs stay on the Magento side.

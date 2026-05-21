@@ -1,10 +1,10 @@
 /**
  * Node ESM loader hook for the unit-test runner.
  *
- * Intercepts any import that resolves to `commerce-config.js` and redirects it
- * to tests/unit/mocks/commerce-config.mjs. This lets cart.js (and any other
- * module under test) be imported without pulling in the real config — which
- * depends on browser globals and Helix-specific bootstrapping.
+ * Intercepts imports that pull in browser-only bootstrap code and redirects
+ * them to lightweight mocks under tests/unit/mocks. This lets modules under
+ * test be imported without depending on browser globals or Helix-specific
+ * bootstrapping.
  *
  * Registered from tests/unit/setup.mjs via `module.register`.
  */
@@ -12,11 +12,19 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, resolve as resolvePath } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const mockUrl = pathToFileURL(resolvePath(here, 'mocks/commerce-config.mjs')).href;
+const mockUrl = (file) => pathToFileURL(resolvePath(here, 'mocks', file)).href;
+
+const redirects = [
+  { match: (s) => s === './commerce-config.js' || s.endsWith('/commerce-config.js'), file: 'commerce-config.mjs' },
+  { match: (s) => s.endsWith('/scripts/aem.js'), file: 'aem.mjs' },
+  { match: (s) => s.endsWith('/scripts/scripts.js'), file: 'scripts.mjs' },
+];
 
 export async function resolve(specifier, context, nextResolve) {
-  if (specifier === './commerce-config.js' || specifier.endsWith('/commerce-config.js')) {
-    return { url: mockUrl, shortCircuit: true, format: 'module' };
+  for (const { match, file } of redirects) {
+    if (match(specifier)) {
+      return { url: mockUrl(file), shortCircuit: true, format: 'module' };
+    }
   }
   return nextResolve(specifier, context);
 }
