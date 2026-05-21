@@ -3,8 +3,9 @@ import { getMetadata } from '../aem.js';
 const isProd = window.location.hostname === 'www.vitamix.com';
 const IDME_CLIENT_ID = isProd ? '566879020d6a5533db11a112e307aed3' : 'f05216080667a3fb48ef1aed700d7b5f';
 const IDME_SCOPES = 'military,medical,nurse,responder,teacher';
-// ID.me Groups product — different domain from the standard OAuth API
-const IDME_GROUPS_BASE = isProd ? 'https://groups.id.me' : 'https://groups.idmelabs.com';
+// ID.me Groups product — single hostname for both sandbox and production.
+// The environment is determined by the client_id, not the URL.
+const IDME_GROUPS_BASE = 'https://groups.id.me';
 
 function buildIDMeAuthUrl(callbackUrl) {
   const clientId = (!isProd && localStorage.getItem('idme-client-id')?.trim()) || IDME_CLIENT_ID;
