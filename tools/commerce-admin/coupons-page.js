@@ -175,7 +175,7 @@ const COUPON_MARKETS = /** @type {const} */ ([
   { key: 'mx', label: 'Mexico' },
 ]);
 
-/** API / id segment order — “first country” for persistence until multi-country exists. */
+/** API / id segment order — single `country` or multi `countries` (mutually exclusive). */
 const COUPON_API_COUNTRIES = /** @type {const} */ (['us', 'ca', 'mx']);
 
 /**
@@ -198,6 +198,51 @@ function readCouponCountryCheckboxValues(dlg, checkboxSelector) {
     .filter((el) => el instanceof HTMLInputElement && el.checked && !el.disabled)
     .map((el) => String(el.value || '').trim().toLowerCase())
     .filter((k) => allowed.has(k));
+}
+
+/**
+ * @param {Record<string, unknown>} [d] coupon type list row or detail
+ * @returns {string[]} `us` | `ca` | `mx` in API order
+ */
+function normalizeCouponCountries(d) {
+  if (!d || typeof d !== 'object') return [];
+  const rawCountries = d.countries ?? d.country_codes ?? d.markets ?? d.countryCodes;
+  let keys = [];
+  if (Array.isArray(rawCountries) && rawCountries.length) {
+    const allowed = new Set(COUPON_API_COUNTRIES);
+    keys = rawCountries
+      .map((x) => String(x).trim().toLowerCase())
+      .filter((k) => allowed.has(k));
+  } else {
+    const single = d.country ?? d.market;
+    if (single != null && String(single).trim() !== '') {
+      const k = String(single).trim().toLowerCase();
+      if (COUPON_API_COUNTRIES.includes(k)) keys = [k];
+    }
+  }
+  if (!keys.length) {
+    const id = String(d.id ?? d.typeId ?? '').trim();
+    const seg = parseCouponTypePath(id);
+    if (seg) keys = [seg.country];
+    else {
+      const prefix = couponMarketPrefixFromId(id);
+      if (prefix) keys = [prefix];
+    }
+  }
+  const set = new Set(keys);
+  return COUPON_API_COUNTRIES.filter((k) => set.has(k));
+}
+
+/**
+ * @param {HTMLDialogElement} dlg
+ * @returns {string[]}
+ */
+function readCouponCountriesFromForm(dlg) {
+  const newSel = readCouponCountryCheckboxValues(dlg, 'input.cp-new-country-cb');
+  const editSel = readCouponCountryCheckboxValues(dlg, 'input.cp-edit-country-cb');
+  const raw = newSel.length ? newSel : editSel;
+  const set = new Set(raw);
+  return COUPON_API_COUNTRIES.filter((k) => set.has(k));
 }
 
 /**
@@ -265,6 +310,8 @@ function couponMarketPrefixFromId(id) {
 function couponsVisibleForMarket() {
   if (state.marketFilter === 'all') return state.coupons;
   return state.coupons.filter((row) => {
+    const countries = normalizeCouponCountries(row);
+    if (countries.length) return countries.includes(state.marketFilter);
     const prefix = couponMarketPrefixFromId(couponIdFromRow(row));
     return prefix === state.marketFilter;
   });
@@ -332,7 +379,7 @@ function newCouponCountryCheckboxesHtml() {
         <div class="coupons-market-tabs coupons-market-tabs--form" role="group" aria-labelledby="cp-new-country-legend" aria-describedby="cp-new-country-hint">
           ${tabs}
         </div>
-        <p id="cp-new-country-hint" class="coupons-field-hint">Select at least one. The coupon id uses the <strong>first</strong> country in US → Canada → Mexico order among your selection. Multi-market on the API is not wired yet.</p>
+        <p id="cp-new-country-hint" class="coupons-field-hint">Select at least one. One market saves as <code>country</code>; several save as <code>countries</code> (not both). The coupon id uses the <strong>first</strong> in US → Canada → Mexico order.</p>
       </div>`;
 }
 
@@ -351,7 +398,7 @@ function editCouponCountryFieldsHtml() {
         <div class="coupons-market-tabs coupons-market-tabs--form" role="group" aria-labelledby="cp-edit-country-legend">
           ${tabs}
         </div>
-        <p class="coupons-field-hint">Select at least one. <code>country</code> on save still follows the coupon id until the API supports multiple markets.</p>
+        <p class="coupons-field-hint">Select at least one. One market saves as <code>country</code>; several save as <code>countries</code> (not both).</p>
       </div>`;
 }
 
@@ -390,7 +437,7 @@ function couponDetailModalInnerHtml(d) {
   const id = String(d.id ?? state.selectedCouponId ?? '');
   const name = d.name != null ? String(d.name) : '';
   const pathSeg = parseCouponTypePath(id);
-  const market = pathSeg ? pathSeg.country : (couponMarketPrefixFromId(id) || '');
+  const countries = normalizeCouponCountries(d);
   const year = pathSeg ? pathSeg.year : '';
   const slugName = pathSeg ? pathSeg.name : '';
 
@@ -422,7 +469,7 @@ function couponDetailModalInnerHtml(d) {
     ${listBanner}
     <div class="coupons-modal-head">
       <div class="coupons-modal-badges">
-        ${market ? marketTagHtml(market) : ''}
+        ${countries.map((k) => marketTagHtml(k)).join('')}
         ${year ? commerceGroupBadgeHtml(year) : ''}
         ${slugName ? `<span class="coupons-tag coupons-tag-slug">${escapeHtml(slugName)}</span>` : ''}
       </div>
@@ -745,7 +792,7 @@ function couponOverviewSortValue(row, key) {
     case 'freeship': return row.freeShipping ? 1 : 0;
     case 'stack': return row.stackable !== false ? 1 : 0;
     case 'year': return pathSeg && pathSeg.year ? Number(pathSeg.year) || 0 : 0;
-    case 'market': return couponMarketPrefixFromId(id);
+    case 'market': return normalizeCouponCountries(row).join(',');
     default: return '';
   }
 }
@@ -808,7 +855,10 @@ function renderCouponsOverviewBody(filtered) {
     const ship = yn(row.freeShipping);
     const stack = yn(row.stackable !== false);
     const label = `Open coupon ${String(name)}`;
-    const mKey = couponMarketPrefixFromId(id);
+    const countries = normalizeCouponCountries(row);
+    const mHtml = countries.length
+      ? countries.map((k) => commerceMarketEmojiHtml(k)).join('')
+      : commerceMarketEmojiHtml(couponMarketPrefixFromId(id));
     return `<tr class="coupons-grid-row coupons-row-open" data-cp-coupon-id="${escapeHtml(id)}" tabindex="0" role="button" aria-label="${escapeHtml(label)}">
       <td class="coupons-grid-lead coupons-grid-name">${escapeHtml(String(name))}</td>
       <td><code class="coupons-grid-id">${escapeHtml(id || '—')}</code></td>
@@ -818,7 +868,7 @@ function renderCouponsOverviewBody(filtered) {
       <td>${escapeHtml(ship)}</td>
       <td>${escapeHtml(stack)}</td>
       <td class="coupons-grid-col-year">${commerceGroupBadgeHtml(year)}</td>
-      <td class="coupons-grid-col-market">${commerceMarketEmojiHtml(mKey)}</td>
+      <td class="coupons-grid-col-market">${mHtml}</td>
     </tr>`;
   }).join('');
 }
@@ -1206,11 +1256,18 @@ function readCouponBodyFromForm(dlg, { requireId }) {
     notes,
   };
   const seg = parseCouponTypePath(String(body.id || ''));
-  if (dlg.querySelector('input.cp-edit-country-cb')) {
-    const editSel = readCouponCountryCheckboxValues(dlg, 'input.cp-edit-country-cb');
-    if (!editSel.length) throw new Error('Select at least one country.');
-  }
-  if (seg && /^(us|ca|mx)$/.test(seg.country)) {
+  const countries = readCouponCountriesFromForm(dlg);
+  const hasCountryFields = dlg.querySelector('input.cp-new-country-cb')
+    || dlg.querySelector('input.cp-edit-country-cb');
+  if (hasCountryFields) {
+    if (!countries.length) throw new Error('Select at least one country.');
+    if (countries.length === 1) {
+      const [only] = countries;
+      body.country = only;
+    } else {
+      body.countries = countries;
+    }
+  } else if (seg && /^(us|ca|mx)$/.test(seg.country)) {
     body.country = seg.country;
   }
   if (seg && seg.year) {
@@ -1259,27 +1316,17 @@ function pickCouponExpires(c) {
 }
 
 /**
- * Edit dialog: pre-check country toggles from id (and optional future API list).
+ * Edit dialog: pre-check country toggles from API `countries` (or fallbacks).
  * @param {HTMLDialogElement} dlg
  * @param {object} d coupon type
  */
 function applyCouponCountryCheckboxesFromDetail(dlg, d) {
   const editCbs = dlg.querySelectorAll('input.cp-edit-country-cb');
   if (!editCbs.length) return;
-  const id = String(d.id ?? d.typeId ?? '').trim();
-  const seg = parseCouponTypePath(id);
-  const raw = d.countries ?? d.markets ?? d.countryCodes;
-  let keys = [];
-  if (Array.isArray(raw) && raw.length) {
-    const allowed = new Set(COUPON_API_COUNTRIES);
-    keys = raw
-      .map((x) => String(x).trim().toLowerCase())
-      .filter((k) => allowed.has(k));
-  }
-  if (!keys.length && seg) keys = [seg.country];
-  if (!keys.length) keys = ['us'];
+  const keys = normalizeCouponCountries(d);
+  const resolved = keys.length ? keys : ['us'];
   editCbs.forEach((cb) => {
-    if (cb instanceof HTMLInputElement) cb.checked = keys.includes(cb.value);
+    if (cb instanceof HTMLInputElement) cb.checked = resolved.includes(cb.value);
   });
 }
 
