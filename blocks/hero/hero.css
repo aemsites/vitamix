@@ -42,6 +42,10 @@
   opacity: 0.8;
 }
 
+.hero:not(.split) {
+  --image-color: var(--color-charcoal);
+}
+
 .hero picture[data-bg] img,
 .hero video {
   position: absolute;
@@ -96,6 +100,10 @@
   padding: var(--horizontal-spacing);
   padding-top: 55px;
   color: var(--color-gray-100);
+}
+
+.hero:not(.split) > div > div {
+  color: var(--color-white);
 }
 
 .hero.image-light > div > div,
