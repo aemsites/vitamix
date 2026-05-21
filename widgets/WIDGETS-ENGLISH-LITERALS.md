@@ -8,7 +8,8 @@ All user-facing English strings used as copy, fallbacks (`|| '...'`, `?? '...'`)
 
 | English literal | Widget(s) |
 |-----------------|-----------|
-| **—** (em dash, empty value) | compare-products |
+| **—** (em dash, empty value) | compare-products, tco |
+| **$** (currency prefix on cost outputs) | tco |
 | **×** (remove button) | compare-products |
 | **✓** (checkmark) | compare-products |
 | **0 of 5 stars** | recipe-center |
@@ -151,6 +152,9 @@ These literals appear in more than one widget (good candidates for shared i18n).
 ---
 
 ## By widget (summary)
+
+### tco
+All copy via `tco.json` (en/fr/es): form and results `aria-label`s, field labels, unit words (seconds, days, hours), and result term labels (break-even, warranty, cost-per-blend, faster blend time). Hardcoded literals: **—** (em dash, empty/pending state), **$** (currency prefix on cost-per-blend outputs), and model names (**Quick & Quiet™**, **The Quiet One®**, **Touch & Go™ Advance®**, **Drink Machine Advance®**, **Drink Machine Two-Speed**, **Vita-Prep® 3**, **Vita-Prep®**, **XL®**) in `tco.js`.
 
 ### compare-products
 Translation keys (via `t()`) used as UI text; actual copy comes from the widget’s local JSON. Hardcoded literals: feature row names (Series, Blending Programs, Variable Speed Control, Touch Buttons, Pulse, Digital Timer, Self-Detect Technology, Tamper Indicator, Plus 15 Second Button, Warranty, Dimensions (L × W × H), Colors), currency (USD, CAD), Countertop Blender, Color, and symbols ×, ✓, —.
