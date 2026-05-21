@@ -150,6 +150,11 @@ export default function renderAddToCart(ph, block, parent) {
     return renderFindDealer(ph, block);
   }
 
+  // fallback, not available for sale, don't allow add to cart
+  if (!isAvailableForSale) {
+    return '';
+  }
+
   // create main add to cart container
   const addToCartContainer = document.createElement('div');
   addToCartContainer.classList.add('add-to-cart');
