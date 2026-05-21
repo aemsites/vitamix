@@ -3,18 +3,20 @@ import { getMetadata } from '../aem.js';
 const isProd = window.location.hostname === 'www.vitamix.com';
 const IDME_CLIENT_ID = isProd ? '566879020d6a5533db11a112e307aed3' : 'f05216080667a3fb48ef1aed700d7b5f';
 const IDME_SCOPES = 'military,medical,nurse,responder,teacher';
-const IDME_API_BASE = isProd ? 'https://api.id.me' : 'https://api.idmelabs.com';
+// ID.me Groups product — different domain from the standard OAuth API
+const IDME_GROUPS_BASE = isProd ? 'https://groups.id.me' : 'https://groups.idmelabs.com';
 
 function buildIDMeAuthUrl(callbackUrl) {
   const clientId = (!isProd && localStorage.getItem('idme-client-id')?.trim()) || IDME_CLIENT_ID;
-  const idmeBase = (!isProd && localStorage.getItem('idme-api-base')?.trim()) || IDME_API_BASE;
+  const groupsBase = (!isProd && localStorage.getItem('idme-api-base')?.trim()) || IDME_GROUPS_BASE;
   const returnUrl = `${window.location.origin}${window.location.pathname}`;
   const state = btoa(JSON.stringify({ returnUrl }));
-  return `${idmeBase}/oauth/authorize?${new URLSearchParams({
+  // Groups endpoint uses 'scopes' (plural), not the standard OAuth 'scope'
+  return `${groupsBase}/?${new URLSearchParams({
     client_id: clientId,
     redirect_uri: callbackUrl,
     response_type: 'code',
-    scope: getMetadata('idme-scope') || IDME_SCOPES,
+    scopes: getMetadata('idme-scope') || IDME_SCOPES,
     state,
     type: 'button',
   })}`;
