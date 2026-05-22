@@ -1,5 +1,5 @@
 import { loadCSS, createOptimizedPicture } from '../aem.js';
-import { formatPrice } from '../commerce-config.js';
+import { formatPrice, getConfig } from '../commerce-config.js';
 
 loadCSS('/scripts/commerce/cart-item.css');
 
@@ -33,6 +33,12 @@ export default function buildCartItem(item, {
 }, strings = {}) {
   const { remove = 'Remove', removeItem = 'Remove item' } = strings;
 
+  // Per-item override (custom.maxCartQty) takes precedence over the global
+  // commerce-config default.
+  const configMax = getConfig().maxCartQty;
+  const itemMax = item.custom?.maxCartQty != null ? +item.custom.maxCartQty : null;
+  const maxQty = itemMax || configMax || Infinity;
+
   const el = document.createElement('div');
   el.className = `cart-item cart-item-${item.sku}`;
   el.innerHTML = /* html */`
@@ -42,7 +48,7 @@ export default function buildCartItem(item, {
       <div class="cart-item-actions">
         <div class="cart-item-qty-control">
           <button class="qty-dec" aria-label="Decrease quantity">&ndash;</button>
-          <input class="qty-input" type="number" value="1" min="1">
+          <input class="qty-input" type="number" value="1" min="1"${Number.isFinite(maxQty) ? ` max="${maxQty}"` : ''}>
           <button class="qty-inc" aria-label="Increase quantity">+</button>
         </div>
       </div>
@@ -97,6 +103,12 @@ export default function buildCartItem(item, {
   // Qty
   const qtyInput = el.querySelector('.qty-input');
   qtyInput.value = item.quantity;
+  const incBtn = el.querySelector('.qty-inc');
+
+  const syncIncDisabled = (qty) => {
+    incBtn.disabled = qty >= maxQty;
+  };
+  syncIncDisabled(item.quantity);
 
   const handleQtyChange = (newQty) => {
     if (newQty < 1) {
@@ -104,13 +116,15 @@ export default function buildCartItem(item, {
       el.remove();
       return;
     }
-    qtyInput.value = newQty;
-    updatePrice(newQty);
-    onQtyChange(item.sku, newQty);
+    const clamped = Math.min(newQty, maxQty);
+    qtyInput.value = clamped;
+    updatePrice(clamped);
+    syncIncDisabled(clamped);
+    onQtyChange(item.sku, clamped);
   };
 
   el.querySelector('.qty-dec').addEventListener('click', () => handleQtyChange(+qtyInput.value - 1));
-  el.querySelector('.qty-inc').addEventListener('click', () => handleQtyChange(+qtyInput.value + 1));
+  incBtn.addEventListener('click', () => handleQtyChange(+qtyInput.value + 1));
   qtyInput.addEventListener('change', (e) => handleQtyChange(+e.target.value));
 
   el.querySelector('.cart-item-remove').addEventListener('click', (ev) => {

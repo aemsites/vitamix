@@ -28,6 +28,7 @@ const defaults = {
   },
   currency: (locale) => (locale === 'ca' ? 'CAD' : 'USD'),
   cardProvider: 'chase',
+  maxCartQty: 3,
   getFraudToken() {
     try { return sessionStorage.getItem('forter_token') || undefined; } catch { return undefined; }
   },
