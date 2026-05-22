@@ -74,6 +74,23 @@ export async function estimateShipping(country, state, items) {
 }
 
 /**
+ * Validates a coupon code and returns the resulting discounts without requiring
+ * a shipping method. Backed by POST /estimate/price — throws CommerceApiError
+ * with errorHeader set to the coupon error code on any validation failure.
+ *
+ * @param {string} country - ISO 3166-1 alpha-2 country code (e.g. 'us', 'ca')
+ * @param {Array} items - Cart items in API format
+ * @param {string} couponCode - The coupon code to validate
+ * @returns {Promise<{ subtotal: number, discounts: Array, orderDiscountTotal: number }>}
+ * @throws {CommerceApiError}
+ */
+export async function estimatePrice(country, items, couponCode) {
+  return post('/estimate/price', {
+    country, items, couponCode,
+  });
+}
+
+/**
  * Fetches fully computed totals for all shipping methods at an address during Apple Pay
  * express checkout. Called inside `onshippingcontactselected` where only a partial address
  * (city, state, country, zip — no street) is available.

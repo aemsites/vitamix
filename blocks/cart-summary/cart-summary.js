@@ -1,7 +1,9 @@
 import { loadCSS } from '../../scripts/aem.js';
 import { getConfig, formatPrice } from '../../scripts/commerce-config.js';
 import cart from '../../scripts/cart.js';
-import { previewOrder, createOrder, initiatePayment } from '../../scripts/commerce-api.js';
+import {
+  previewOrder, createOrder, initiatePayment, estimatePrice,
+} from '../../scripts/commerce-api.js';
 import applePay from '../../scripts/payments/apple-pay.js';
 import googlePay from '../../scripts/payments/google-pay.js';
 import paypal from '../../scripts/payments/paypal.js';
@@ -212,15 +214,27 @@ export default async function decorate(block) {
     block.querySelector('.cart-summary-promo').open = true;
     showDiscountRow(savedCoupon);
   }
-  discountApply.addEventListener('click', () => {
+  discountApply.addEventListener('click', async () => {
     couponErrorEl.hidden = true;
     const code = discountInput.value.trim();
-    if (code) {
-      sessionStorage.setItem('checkout_coupon_code', code);
-      showDiscountRow(code);
-    } else {
+    if (!code) {
       sessionStorage.removeItem('checkout_coupon_code');
       hideDiscountRow();
+      return;
+    }
+
+    discountApply.disabled = true;
+    try {
+      const country = config.getLocale();
+      await estimatePrice(country, cart.getItemsForAPI(), code);
+      sessionStorage.setItem('checkout_coupon_code', code);
+      showDiscountRow(code);
+    } catch (err) {
+      couponErrorEl.textContent = getCouponErrorMessage(err?.errorHeader);
+      couponErrorEl.hidden = false;
+      block.querySelector('.cart-summary-promo').open = true;
+    } finally {
+      discountApply.disabled = false;
     }
   });
 

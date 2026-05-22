@@ -3,7 +3,7 @@ import cart from '../../scripts/cart.js';
 import { getConfig, formatPrice } from '../../scripts/commerce-config.js';
 import buildCartItem from '../../scripts/commerce/cart-item.js';
 import buildWarrantySelector from '../cart/warranty-selector.js';
-import { parsePreview } from '../../scripts/commerce-api.js';
+import { parsePreview, estimatePrice } from '../../scripts/commerce-api.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 import { initIDMe } from '../../scripts/commerce/idme.js';
 
@@ -249,17 +249,28 @@ export default async function decorate(block) {
     showPendingDiscount(savedCoupon);
   }
 
-  discountApply.addEventListener('click', () => {
+  discountApply.addEventListener('click', async () => {
     couponErrorEl.hidden = true;
     const code = discountInput.value.trim();
-    if (code) {
-      sessionStorage.setItem('checkout_coupon_code', code);
-      showPendingDiscount(code);
-    } else {
+    if (!code) {
       sessionStorage.removeItem('checkout_coupon_code');
       discountsEl.innerHTML = '';
+      return;
     }
-    document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
+
+    discountApply.disabled = true;
+    try {
+      const country = getLocaleAndLanguage().locale;
+      await estimatePrice(country, cart.getItemsForAPI(), code);
+      sessionStorage.setItem('checkout_coupon_code', code);
+      showPendingDiscount(code);
+      document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
+    } catch (err) {
+      couponErrorEl.textContent = getCouponErrorMessage(err?.errorHeader);
+      couponErrorEl.hidden = false;
+    } finally {
+      discountApply.disabled = false;
+    }
   });
 
   const renderItems = () => {
