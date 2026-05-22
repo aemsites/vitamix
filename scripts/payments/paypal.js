@@ -288,8 +288,10 @@ export default {
           } else {
             callbacks.showError(result.reason || 'PayPal payment failed. Please try again.');
           }
-        } catch {
-          callbacks.showError('PayPal payment failed. Please try again.');
+        } catch (err) {
+          callbacks.showError(err?.errorHeader?.toLowerCase().includes('recaptcha')
+            ? callbacks.strings.errorRecaptcha
+            : 'PayPal payment failed. Please try again.');
         }
       },
 
@@ -340,7 +342,9 @@ export default {
           createdOrder.order ?? createdOrder,
         );
       } catch (err) {
-        callbacks.showError(err.body?.message || 'Unable to place order. Please try again.');
+        callbacks.showError(err?.errorHeader?.toLowerCase().includes('recaptcha')
+          ? callbacks.strings.errorRecaptcha
+          : (err.body?.message || 'Unable to place order. Please try again.'));
         btn.disabled = false;
         return;
       }

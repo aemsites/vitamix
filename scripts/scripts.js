@@ -24,8 +24,8 @@ const { hostname } = window.location;
 // Format: '<locale>/<language>' (e.g., 'ca/fr_ca'). Add pairs as each region goes live.
 const EDGE_CHECKOUT_LOCALES = ['ca/fr_ca', 'ca/en_us', 'us/en_us'];
 
-const isEdgeHost = hostname.includes('localhost') || hostname.includes('edge-accounts') || hostname.includes('edge-orders') || hostname.includes('integration.vitamix.com') || hostname.includes('uat.vitamix.com');
-const isProdHost = hostname.includes('vitamix.com');
+export const isEdgeHost = hostname.includes('localhost') || hostname.includes('edge-accounts') || hostname.includes('edge-orders') || hostname.includes('integration.vitamix.com') || hostname.includes('uat.vitamix.com');
+export const isProdHost = hostname.includes('vitamix.com');
 
 // Affirm public API key — safe to expose client-side (used for PDP promo widgets).
 // Checkout gets its key from the server's checkout object so it always matches the

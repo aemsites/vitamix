@@ -41,8 +41,11 @@ export async function login(email, country, locale) {
     body: JSON.stringify({ email, country, locale }),
   });
   if (!resp.ok) {
-    const err = await resp.json().catch(() => ({}));
-    throw new Error(err.message || `Login failed: ${resp.status}`);
+    const data = await resp.json().catch(() => ({}));
+    const error = new Error(data.message || `Login failed: ${resp.status}`);
+    error.status = resp.status;
+    error.errorHeader = resp.headers.get('x-error') || null;
+    throw error;
   }
   return resp.json();
 }

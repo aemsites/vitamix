@@ -115,8 +115,8 @@ export async function updatePreview(form, cart, state, config) {
     state.currentEstimateToken = preview.estimateToken;
     state.currentPreview = preview;
     document.dispatchEvent(new CustomEvent('checkout:preview', { detail: { preview } }));
-  } catch {
-    document.dispatchEvent(new CustomEvent('checkout:preview', { detail: { preview: null } }));
+  } catch (err) {
+    document.dispatchEvent(new CustomEvent('checkout:preview', { detail: { preview: null, error: err } }));
   }
 }
 

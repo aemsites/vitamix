@@ -187,7 +187,9 @@ export default function createAuthPanel() {
         // eslint-disable-next-line no-use-before-define
         showCodeStep(email);
       } catch (err) {
-        errEl.textContent = err.message || 'Failed to send code';
+        errEl.textContent = err?.errorHeader?.toLowerCase().includes('recaptcha')
+          ? 'Security verification failed. Please refresh the page and try again.'
+          : (err.message || 'Failed to send code');
         btn.disabled = false;
         btn.textContent = 'Continue';
       }
