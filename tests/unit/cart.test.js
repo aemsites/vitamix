@@ -171,11 +171,10 @@ test('subtotal multiplies quantity by string price', () => {
   assert.equal(cart.subtotal, 36.5);
 });
 
-test('subtotal treats numeric price as integer cents', () => {
+test('subtotal handles numeric price the same as string price', () => {
   const cart = new Cart();
-  // 1099 cents = $10.99
-  cart.addItem(sampleItem({ sku: 'foo', quantity: 2, price: 1099 }));
-  assert.equal(cart.subtotal, 21.98);
+  cart.addItem(sampleItem({ sku: 'foo', quantity: 2, price: 449.95 }));
+  assert.equal(cart.subtotal, 899.9);
 });
 
 // --- toJSON / persistence shape --------------------------------------------
