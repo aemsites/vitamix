@@ -230,16 +230,36 @@ export default async function decorate(block) {
   const couponErrorEl = block.querySelector('.order-summary-coupon-error');
   currencyEl.textContent = getCurrencyCode();
 
+  const removeCoupon = () => {
+    sessionStorage.removeItem('checkout_coupon_code');
+    discountInput.value = '';
+    discountsEl.innerHTML = '';
+    couponErrorEl.hidden = true;
+    document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
+  };
+
+  const makeRemoveBtn = () => {
+    const btn = document.createElement('button');
+    btn.className = 'discount-remove';
+    btn.setAttribute('aria-label', 'Remove coupon');
+    btn.textContent = '×';
+    btn.addEventListener('click', removeCoupon);
+    return btn;
+  };
+
   const showPendingDiscount = (code) => {
     discountsEl.innerHTML = '';
     const row = document.createElement('div');
     row.className = 'order-summary-row order-summary-discount-item order-summary-discount-pending';
+    const labelGroup = document.createElement('span');
+    labelGroup.className = 'discount-label-group';
     const label = document.createElement('span');
     label.textContent = `${s.discount} (${code})`;
+    labelGroup.append(label, makeRemoveBtn());
     const amount = document.createElement('span');
     amount.className = 'order-summary-discount-amount';
     amount.textContent = '--';
-    row.append(label, amount);
+    row.append(labelGroup, amount);
     discountsEl.appendChild(row);
   };
 
@@ -383,12 +403,24 @@ export default async function decorate(block) {
     discounts.filter((d) => !d.freeShipping && d.amount > 0).forEach((d) => {
       const row = document.createElement('div');
       row.className = 'order-summary-row order-summary-discount-item';
-      const label = document.createElement('span');
-      label.textContent = d.name || s.discount;
-      const amount = document.createElement('span');
-      amount.className = 'order-summary-discount-amount';
-      amount.textContent = `-${formatPrice(d.amount, currency)}`;
-      row.append(label, amount);
+      if (d.source === 'coupon') {
+        const labelGroup = document.createElement('span');
+        labelGroup.className = 'discount-label-group';
+        const label = document.createElement('span');
+        label.textContent = d.name || s.discount;
+        labelGroup.append(label, makeRemoveBtn());
+        const amount = document.createElement('span');
+        amount.className = 'order-summary-discount-amount';
+        amount.textContent = `-${formatPrice(d.amount, currency)}`;
+        row.append(labelGroup, amount);
+      } else {
+        const label = document.createElement('span');
+        label.textContent = d.name || s.discount;
+        const amount = document.createElement('span');
+        amount.className = 'order-summary-discount-amount';
+        amount.textContent = `-${formatPrice(d.amount, currency)}`;
+        row.append(label, amount);
+      }
       discountsEl.appendChild(row);
     });
 

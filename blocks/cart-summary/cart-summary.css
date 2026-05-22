@@ -381,6 +381,33 @@ dialog.paypal-not-configured-dialog::backdrop {
   font-size: var(--commerce-font-size-sm);
 }
 
+/* Coupon remove button */
+.cart-summary-discount-row .discount-remove {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  line-height: 1;
+  font-size: 16px;
+  color: var(--commerce-color-text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.cart-summary-discount-row:hover .discount-remove {
+  opacity: 1;
+}
+
+.cart-summary-discount-row .discount-remove:hover {
+  color: var(--commerce-color-error);
+}
+
+@media (width <= 999px) {
+  .cart-summary-discount-row .discount-remove {
+    opacity: 1;
+  }
+}
+
 /* Coupon error */
 .cart-summary-coupon-error {
   margin: 8px 0 0;

@@ -259,6 +259,39 @@
   font-size: var(--commerce-font-size-total);
 }
 
+/* Coupon remove button */
+.discount-label-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.order-summary-discount-item .discount-remove {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  line-height: 1;
+  font-size: 16px;
+  color: var(--commerce-color-text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.order-summary-discount-item:hover .discount-remove {
+  opacity: 1;
+}
+
+.order-summary-discount-item .discount-remove:hover {
+  color: var(--commerce-color-error);
+}
+
+@media (width <= 999px) {
+  .order-summary-discount-item .discount-remove {
+    opacity: 1;
+  }
+}
+
 /* Coupon error */
 .order-summary-coupon-error {
   margin: 8px 0 0;

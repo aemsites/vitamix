@@ -129,7 +129,10 @@ function buildTemplate(s) {
         <span class="cart-summary-subtotal"></span>
       </div>
       <div class="cart-summary-row cart-summary-discount-row" hidden>
-        <span class="cart-summary-discount-label"></span>
+        <span class="discount-label-group">
+          <span class="cart-summary-discount-label"></span>
+          <button class="discount-remove" aria-label="Remove coupon">×</button>
+        </span>
         <span class="cart-summary-discount-pending">${s.discountPending}</span>
       </div>
       <div class="cart-summary-row">
@@ -207,6 +210,13 @@ export default async function decorate(block) {
     discountRow.hidden = false;
   };
   const hideDiscountRow = () => { discountRow.hidden = true; };
+
+  block.querySelector('.discount-remove').addEventListener('click', () => {
+    sessionStorage.removeItem('checkout_coupon_code');
+    discountInput.value = '';
+    couponErrorEl.hidden = true;
+    hideDiscountRow();
+  });
 
   const savedCoupon = sessionStorage.getItem('checkout_coupon_code') || '';
   if (savedCoupon) {
