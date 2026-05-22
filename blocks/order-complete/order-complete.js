@@ -100,9 +100,11 @@ export default async function decorate(block) {
   const orderIdEl = document.createElement('p');
   orderIdEl.className = 'order-id';
   const orderIdLabel = document.createElement('span');
-  orderIdLabel.textContent = 'Order ID: ';
+  orderIdLabel.textContent = 'Order number: ';
   const orderIdValue = document.createElement('strong');
-  orderIdValue.textContent = orderId;
+  const friendlyOrderNumber = order?.number || order?.orderNumber
+    || `#${orderId.replace(/-/g, '').slice(-8).toUpperCase()}`;
+  orderIdValue.textContent = friendlyOrderNumber;
   orderIdEl.append(orderIdLabel, orderIdValue);
   headerSection.appendChild(orderIdEl);
 
@@ -188,12 +190,21 @@ export default async function decorate(block) {
     const rows = [
       ['Subtotal', formatPrice(parseFloat(preview.subtotal), currencyCode)],
       ['Shipping', preview.shippingMethod?.rate === 0 ? 'Free' : formatPrice(parseFloat(preview.shippingMethod?.rate || 0), currencyCode)],
-      ['Tax', formatPrice(parseFloat(preview.taxAmount), currencyCode)],
     ];
 
-    rows.forEach(([label, value]) => {
+    if (preview.discounts?.length) {
+      preview.discounts.forEach((discount) => {
+        const label = discount.name || 'Discount';
+        const value = formatPrice(-Math.abs(parseFloat(discount.amount)), currencyCode);
+        rows.push([label, value, 'order-totals-discount']);
+      });
+    }
+
+    rows.push(['Tax', formatPrice(parseFloat(preview.taxAmount), currencyCode)]);
+
+    rows.forEach(([label, value, extraClass]) => {
       const row = document.createElement('div');
-      row.className = 'order-totals-row';
+      row.className = extraClass ? `order-totals-row ${extraClass}` : 'order-totals-row';
       const labelEl = document.createElement('span');
       labelEl.textContent = label;
       const valueEl = document.createElement('span');
