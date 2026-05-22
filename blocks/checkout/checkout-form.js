@@ -1,4 +1,5 @@
 import { getMetadata } from '../../scripts/aem.js';
+import { attachFieldValidation } from './checkout-validation.js';
 
 const SUBMIT_LOCK_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
 
@@ -136,6 +137,8 @@ function buildField(field, namePrefix = '') {
   input.id = fullName;
   if (field.required) input.required = true;
 
+  attachFieldValidation(input);
+
   const label = document.createElement('label');
   label.htmlFor = fullName;
   label.textContent = field.label;
@@ -181,6 +184,8 @@ export default function buildForm(container, config, strings) {
   const form = document.createElement('form');
   form.className = 'checkout-form';
   form.noValidate = true;
+  form.dataset.locale = config.getLocale();
+  form.dataset.lang = (config.getLanguage?.() || 'en').split('_')[0].toLowerCase();
 
   // Express checkout section (populated by checkout-payment.js)
   const expressSection = document.createElement('div');
