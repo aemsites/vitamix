@@ -381,6 +381,17 @@ dialog.paypal-not-configured-dialog::backdrop {
   font-size: var(--commerce-font-size-sm);
 }
 
+/* Coupon error */
+.cart-summary-coupon-error {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  background: var(--commerce-color-error-bg);
+  border: 1px solid var(--commerce-color-error-border);
+  border-radius: var(--commerce-radius-badge);
+  color: var(--commerce-color-error);
+  font-size: var(--commerce-font-size-sm);
+}
+
 /* Checkout CTA */
 .cart-summary-checkout-btn {
   display: block;

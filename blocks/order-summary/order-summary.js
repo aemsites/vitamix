@@ -255,12 +255,6 @@ export default async function decorate(block) {
     if (code) {
       sessionStorage.setItem('checkout_coupon_code', code);
       showPendingDiscount(code);
-      discountApply.textContent = s.applied;
-      discountApply.disabled = true;
-      setTimeout(() => {
-        discountApply.textContent = s.apply;
-        discountApply.disabled = false;
-      }, 2000);
     } else {
       sessionStorage.removeItem('checkout_coupon_code');
       discountsEl.innerHTML = '';

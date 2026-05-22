@@ -259,6 +259,17 @@
   font-size: var(--commerce-font-size-total);
 }
 
+/* Coupon error */
+.order-summary-coupon-error {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  background: var(--commerce-color-error-bg);
+  border: 1px solid var(--commerce-color-error-border);
+  border-radius: var(--commerce-radius-badge);
+  color: var(--commerce-color-error);
+  font-size: var(--commerce-font-size-sm);
+}
+
 /* Loading state */
 .order-summary-content.loading {
   position: relative;
