@@ -235,6 +235,19 @@ main > .section:has(.checkout-wrapper) {
   border-color: var(--commerce-input-border-focus);
 }
 
+.floating-label-field.has-error input,
+.floating-label-field.has-error select,
+.floating-label-field.has-error textarea {
+  border-color: var(--commerce-color-error, #c00);
+}
+
+.field-error {
+  display: block;
+  color: var(--commerce-color-error, #c00);
+  font-size: 0.7rem;
+  margin-top: 4px;
+}
+
 .floating-label-field input:-webkit-autofill,
 .floating-label-field input:-webkit-autofill:hover,
 .floating-label-field input:-webkit-autofill:focus {
