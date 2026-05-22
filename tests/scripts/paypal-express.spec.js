@@ -574,7 +574,6 @@ test.describe('button style config', () => {
     expect(BASE_STYLE.label).toBe('paypal');
     expect(BASE_STYLE.layout).toBe('horizontal');
   });
-
 });
 
 // Pay Later is included automatically by the horizontal layout when eligible
