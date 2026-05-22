@@ -51,6 +51,11 @@ const defaults = {
       or: 'or',
       orderSummary: 'Order summary',
       discountPlaceholder: 'Discount code or gift card',
+      cancelHeading: 'Payment not completed',
+      cancelCustomerCancelled: 'You cancelled the payment.',
+      cancelPaymentFailed: 'Your payment could not be processed. Please try again.',
+      cancelDeclined: 'Your payment was declined. Please try a different payment method.',
+      cancelReturnToCheckout: 'Return to checkout',
     },
     'fr-ca': {
       stepCart: 'Panier',
@@ -71,6 +76,11 @@ const defaults = {
       or: 'ou',
       orderSummary: 'Récapitulatif de commande',
       discountPlaceholder: 'Code de réduction ou carte-cadeau',
+      cancelHeading: 'Paiement non effectué',
+      cancelCustomerCancelled: 'Vous avez annulé le paiement.',
+      cancelPaymentFailed: "Votre paiement n'a pas pu être traité. Veuillez réessayer.",
+      cancelDeclined: 'Votre paiement a été refusé. Veuillez essayer un autre mode de paiement.',
+      cancelReturnToCheckout: 'Retourner à la caisse',
     },
   },
   getStrings() {
