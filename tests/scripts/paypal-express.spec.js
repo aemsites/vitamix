@@ -574,39 +574,10 @@ test.describe('button style config', () => {
     expect(BASE_STYLE.label).toBe('paypal');
     expect(BASE_STYLE.layout).toBe('horizontal');
   });
-
-  test('Pay Later button overrides color to silver and label to pay_later', () => {
-    const payLaterStyle = { ...BASE_STYLE, color: 'silver', label: 'pay_later' };
-    expect(payLaterStyle.color).toBe('silver');
-    expect(payLaterStyle.label).toBe('pay_later');
-    expect(payLaterStyle.layout).toBe('horizontal');
-  });
 });
 
-// ---------------------------------------------------------------------------
-// Pay Later eligibility
-// ---------------------------------------------------------------------------
-
-test.describe('Pay Later eligibility', () => {
-  function makePaypalMock(isEligible) {
-    return {
-      Buttons: () => ({ isEligible: () => isEligible, render: () => {} }),
-      FUNDING: { PAYLATER: 'paylater' },
-    };
-  }
-
-  test('renders Pay Later button when isEligible() returns true', () => {
-    const paypal = makePaypalMock(true);
-    const btn = paypal.Buttons({ fundingSource: paypal.FUNDING.PAYLATER });
-    expect(btn.isEligible()).toBe(true);
-  });
-
-  test('does not render Pay Later button when isEligible() returns false', () => {
-    const paypal = makePaypalMock(false);
-    const btn = paypal.Buttons({ fundingSource: paypal.FUNDING.PAYLATER });
-    expect(btn.isEligible()).toBe(false);
-  });
-});
+// Pay Later is included automatically by the horizontal layout when eligible
+// (via enable-funding=paylater in the SDK URL) — no separate button is rendered.
 
 // ---------------------------------------------------------------------------
 // Stub fallback (no window.paypal)
