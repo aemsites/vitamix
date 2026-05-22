@@ -1,7 +1,7 @@
 import { loadCSS } from '../../scripts/aem.js';
 import { getConfig } from '../../scripts/commerce-config.js';
 
-const STEP_KEYS = ['cart-new', 'checkout', 'complete'];
+const STEP_KEYS = ['cart', 'checkout', 'complete'];
 
 export default async function decorate(block) {
   await loadCSS('/styles/commerce-tokens.css');
@@ -10,7 +10,7 @@ export default async function decorate(block) {
   const currentPath = window.location.pathname;
 
   const steps = [
-    { key: 'cart-new', label: s.stepCart },
+    { key: 'cart', label: s.stepCart },
     { key: 'checkout', label: s.stepCheckout },
     { key: 'complete', label: s.stepConfirmation },
   ];
@@ -26,7 +26,7 @@ export default async function decorate(block) {
   steps.forEach(({ key, label }, i) => {
     const li = document.createElement('li');
     li.className = 'step';
-    li.classList.add(`step-${key}`);
+    li.classList.add(`step-page-${key}`);
 
     if (i < activeIndex) {
       li.classList.add('step-complete');
