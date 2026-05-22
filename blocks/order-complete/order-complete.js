@@ -11,6 +11,7 @@ import { getConfig, formatPrice } from '../../scripts/commerce-config.js';
  */
 export default async function decorate(block) {
   const config = getConfig();
+  const s = config.getStrings();
   const currencyCode = typeof config.currency === 'function' ? config.currency(config.getLocale()) : config.currency;
   const params = Object.fromEntries(new URLSearchParams(window.location.search).entries());
 
@@ -20,20 +21,20 @@ export default async function decorate(block) {
     container.className = 'order-result order-cancelled';
 
     const heading = document.createElement('h2');
-    heading.textContent = 'Payment not completed';
+    heading.textContent = s.orderPaymentNotCompleted;
     container.appendChild(heading);
 
     const msg = document.createElement('p');
     msg.textContent = params.reason === 'customer_cancelled'
-      ? 'You cancelled the payment.'
-      : 'Payment could not be processed. Please try again.';
+      ? s.orderPaymentCancelled
+      : s.orderPaymentFailed;
     container.appendChild(msg);
 
     const link = document.createElement('p');
     const returnLink = document.createElement('a');
     returnLink.href = getConfig().getOrderPath('checkout');
     returnLink.className = 'button emphasis';
-    returnLink.textContent = 'Return to checkout';
+    returnLink.textContent = s.orderReturnToCheckout;
     link.appendChild(returnLink);
     container.appendChild(link);
 
@@ -94,13 +95,13 @@ export default async function decorate(block) {
   headerSection.appendChild(checkmark);
 
   const heading = document.createElement('h2');
-  heading.textContent = 'Thank you for your order!';
+  heading.textContent = s.orderThankYou;
   headerSection.appendChild(heading);
 
   const orderIdEl = document.createElement('p');
   orderIdEl.className = 'order-id';
   const orderIdLabel = document.createElement('span');
-  orderIdLabel.textContent = 'Order number: ';
+  orderIdLabel.textContent = `${s.orderIdLabel} `;
   const orderIdValue = document.createElement('strong');
   const friendlyOrderNumber = order?.number || order?.orderNumber
     || `#${orderId.replace(/-/g, '').slice(-8).toUpperCase()}`;
@@ -111,7 +112,7 @@ export default async function decorate(block) {
   if (email) {
     const emailEl = document.createElement('p');
     emailEl.className = 'order-email';
-    emailEl.textContent = `A confirmation will be sent to ${email}.`;
+    emailEl.textContent = s.orderConfirmationEmail.replace('{email}', email);
     headerSection.appendChild(emailEl);
   }
 
@@ -132,7 +133,7 @@ export default async function decorate(block) {
     itemsSection.className = 'order-items';
 
     const itemsHeading = document.createElement('h3');
-    itemsHeading.textContent = 'Items ordered';
+    itemsHeading.textContent = s.orderItemsOrdered;
     itemsSection.appendChild(itemsHeading);
 
     displayItems.forEach((item) => {
@@ -166,7 +167,7 @@ export default async function decorate(block) {
 
       const qty = document.createElement('p');
       qty.className = 'order-item-qty';
-      qty.textContent = `Qty: ${item.quantity}`;
+      qty.textContent = `${s.orderQtyLabel} ${item.quantity}`;
       details.appendChild(qty);
 
       itemEl.appendChild(details);
@@ -189,17 +190,17 @@ export default async function decorate(block) {
 
     const shippingRate = preview.shippingMethod?.rate;
     const shippingDisplay = shippingRate === 0
-      ? 'Free'
+      ? s.free
       : formatPrice(parseFloat(shippingRate || 0), currencyCode);
 
     const rows = [
-      ['Subtotal', formatPrice(parseFloat(preview.subtotal), currencyCode)],
-      ['Shipping', shippingDisplay],
+      [s.subtotal, formatPrice(parseFloat(preview.subtotal), currencyCode)],
+      [s.shipping, shippingDisplay],
     ];
 
     if (preview.discounts?.length) {
       preview.discounts.forEach((discount) => {
-        const label = discount.name || 'Discount';
+        const label = discount.name || s.discount;
         const amount = discount.freeShipping
           ? parseFloat(shippingRate || 0)
           : Math.abs(parseFloat(discount.amount));
@@ -208,7 +209,7 @@ export default async function decorate(block) {
       });
     }
 
-    rows.push(['Tax', formatPrice(parseFloat(preview.taxAmount), currencyCode)]);
+    rows.push([s.orderTax, formatPrice(parseFloat(preview.taxAmount), currencyCode)]);
 
     rows.forEach(([label, value, extraClass]) => {
       const row = document.createElement('div');
@@ -224,7 +225,7 @@ export default async function decorate(block) {
     const totalRow = document.createElement('div');
     totalRow.className = 'order-totals-row order-totals-total';
     const totalLabel = document.createElement('strong');
-    totalLabel.textContent = 'Total';
+    totalLabel.textContent = s.total;
     const totalValue = document.createElement('strong');
     totalValue.textContent = formatPrice(parseFloat(preview.total), currencyCode);
     totalRow.append(totalLabel, totalValue);
@@ -244,7 +245,7 @@ export default async function decorate(block) {
     addrSection.className = 'order-shipping-address';
 
     const addrHeading = document.createElement('h3');
-    addrHeading.textContent = 'Shipping address';
+    addrHeading.textContent = s.orderShippingAddress;
     addrSection.appendChild(addrHeading);
 
     const addr = order.shipping;
@@ -271,7 +272,7 @@ export default async function decorate(block) {
     contactSection.className = 'order-contact';
 
     const contactHeading = document.createElement('h3');
-    contactHeading.textContent = 'Contact';
+    contactHeading.textContent = s.orderContact;
     contactSection.appendChild(contactHeading);
 
     const contactEmail = document.createElement('p');
@@ -296,7 +297,7 @@ export default async function decorate(block) {
   const continueLink = document.createElement('a');
   continueLink.href = '/';
   continueLink.className = 'button emphasis';
-  continueLink.textContent = 'Continue shopping';
+  continueLink.textContent = s.continueShopping;
   actions.appendChild(continueLink);
   container.appendChild(actions);
 
