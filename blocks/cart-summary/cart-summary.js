@@ -28,10 +28,52 @@ const LOCAL_STRINGS = {
   },
 };
 
+const COUPON_ERROR_MESSAGES = {
+  'en-us': {
+    coupon_invalid_format: 'Please enter a valid coupon code.',
+    coupon_not_found: 'This coupon code is not valid.',
+    coupon_inactive: 'This coupon code is no longer active.',
+    coupon_expired: 'This coupon code has expired.',
+    coupon_exhausted: 'This coupon has reached its usage limit.',
+    coupon_country_mismatch: 'This coupon is not available in your region.',
+    coupon_minimum_not_met: 'Your order total doesn\'t meet the minimum required for this coupon.',
+    coupon_product_not_eligible: 'No items in your cart are eligible for this coupon.',
+    coupon_manual_entry_rejected: 'This coupon cannot be entered manually.',
+    unauthorized: 'Please sign in to use this coupon.',
+    default: 'This coupon code could not be applied.',
+  },
+  'fr-ca': {
+    coupon_invalid_format: 'Veuillez entrer un code promo valide.',
+    coupon_not_found: 'Ce code promo n\'est pas valide.',
+    coupon_inactive: 'Ce code promo n\'est plus actif.',
+    coupon_expired: 'Ce code promo a expiré.',
+    coupon_exhausted: 'Ce coupon a atteint sa limite d\'utilisation.',
+    coupon_country_mismatch: 'Ce coupon n\'est pas disponible dans votre région.',
+    coupon_minimum_not_met: 'Le total de votre commande est inférieur au minimum requis pour ce coupon.',
+    coupon_product_not_eligible: 'Aucun article de votre panier n\'est éligible à ce coupon.',
+    coupon_manual_entry_rejected: 'Ce coupon ne peut pas être saisi manuellement.',
+    unauthorized: 'Veuillez vous connecter pour utiliser ce coupon.',
+    default: 'Ce code promo n\'a pas pu être appliqué.',
+  },
+};
+
+const COUPON_ERRORS = new Set([
+  'coupon_invalid_format', 'coupon_not_found', 'coupon_inactive', 'coupon_expired',
+  'coupon_exhausted', 'coupon_country_mismatch', 'coupon_minimum_not_met',
+  'coupon_product_not_eligible', 'coupon_manual_entry_rejected', 'unauthorized',
+]);
+
 function getStrings() {
   const config = getConfig();
   const lang = config.getLanguage().toLowerCase().replace('_', '-');
   return { ...config.getStrings(), ...(LOCAL_STRINGS[lang] || LOCAL_STRINGS['en-us']) };
+}
+
+function getCouponErrorMessage(errorCode) {
+  const config = getConfig();
+  const lang = config.getLanguage().toLowerCase().replace('_', '-');
+  const msgs = COUPON_ERROR_MESSAGES[lang] || COUPON_ERROR_MESSAGES['en-us'];
+  return msgs[errorCode] || msgs.default;
 }
 
 function getCurrencyCode() {
@@ -77,6 +119,7 @@ function buildTemplate(s) {
           class="discount-input" autocomplete="off">
         <button class="discount-apply">${s.apply}</button>
       </div>
+      <p class="cart-summary-coupon-error" hidden></p>
     </details>
     <div class="cart-summary-totals">
       <div class="cart-summary-row">
@@ -139,6 +182,7 @@ export default async function decorate(block) {
   const discountApply = block.querySelector('.discount-apply');
   const discountRow = block.querySelector('.cart-summary-discount-row');
   const discountRowLabel = block.querySelector('.cart-summary-discount-label');
+  const couponErrorEl = block.querySelector('.cart-summary-coupon-error');
   const errorEl = block.querySelector('.cart-summary-error');
   const checkoutBtn = block.querySelector('.cart-summary-checkout-btn');
 
@@ -169,6 +213,7 @@ export default async function decorate(block) {
     showDiscountRow(savedCoupon);
   }
   discountApply.addEventListener('click', () => {
+    couponErrorEl.hidden = true;
     const code = discountInput.value.trim();
     if (code) {
       sessionStorage.setItem('checkout_coupon_code', code);
@@ -194,10 +239,22 @@ export default async function decorate(block) {
     getState: () => state,
     previewOrderDirect: async (body) => {
       const couponCode = sessionStorage.getItem('checkout_coupon_code') || undefined;
-      const result = await previewOrder({ ...body, ...(couponCode ? { couponCode } : {}) });
-      if (result.estimateToken) state.currentEstimateToken = result.estimateToken;
-      state.currentPreview = result;
-      return result;
+      try {
+        const result = await previewOrder({ ...body, ...(couponCode ? { couponCode } : {}) });
+        if (result.estimateToken) state.currentEstimateToken = result.estimateToken;
+        state.currentPreview = result;
+        return result;
+      } catch (err) {
+        if (COUPON_ERRORS.has(err?.errorHeader)) {
+          sessionStorage.removeItem('checkout_coupon_code');
+          discountInput.value = '';
+          hideDiscountRow();
+          couponErrorEl.textContent = getCouponErrorMessage(err.errorHeader);
+          couponErrorEl.hidden = false;
+          block.querySelector('.cart-summary-promo').open = true;
+        }
+        throw err;
+      }
     },
     createOrder: (orderBody) => createOrder(orderBody),
     initiatePayment: (...args) => initiatePayment(...args),

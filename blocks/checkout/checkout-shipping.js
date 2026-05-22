@@ -115,8 +115,15 @@ export async function updatePreview(form, cart, state, config) {
     state.currentEstimateToken = preview.estimateToken;
     state.currentPreview = preview;
     document.dispatchEvent(new CustomEvent('checkout:preview', { detail: { preview } }));
-  } catch {
-    document.dispatchEvent(new CustomEvent('checkout:preview', { detail: { preview: null } }));
+  } catch (err) {
+    const COUPON_ERRORS = new Set([
+      'coupon_invalid_format', 'coupon_not_found', 'coupon_inactive', 'coupon_expired',
+      'coupon_exhausted', 'coupon_country_mismatch', 'coupon_minimum_not_met',
+      'coupon_product_not_eligible', 'coupon_manual_entry_rejected', 'unauthorized',
+    ]);
+    const couponError = COUPON_ERRORS.has(err?.errorHeader) ? err.errorHeader : null;
+    if (couponError) sessionStorage.removeItem('checkout_coupon_code');
+    document.dispatchEvent(new CustomEvent('checkout:preview', { detail: { preview: null, couponError } }));
   }
 }
 

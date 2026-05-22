@@ -7,8 +7,44 @@ import { parsePreview } from '../../scripts/commerce-api.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 import { initIDMe } from '../../scripts/commerce/idme.js';
 
+const COUPON_ERROR_MESSAGES = {
+  'en-us': {
+    coupon_invalid_format: 'Please enter a valid coupon code.',
+    coupon_not_found: 'This coupon code is not valid.',
+    coupon_inactive: 'This coupon code is no longer active.',
+    coupon_expired: 'This coupon code has expired.',
+    coupon_exhausted: 'This coupon has reached its usage limit.',
+    coupon_country_mismatch: 'This coupon is not available in your region.',
+    coupon_minimum_not_met: 'Your order total doesn\'t meet the minimum required for this coupon.',
+    coupon_product_not_eligible: 'No items in your cart are eligible for this coupon.',
+    coupon_manual_entry_rejected: 'This coupon cannot be entered manually.',
+    unauthorized: 'Please sign in to use this coupon.',
+    default: 'This coupon code could not be applied.',
+  },
+  'fr-ca': {
+    coupon_invalid_format: 'Veuillez entrer un code promo valide.',
+    coupon_not_found: 'Ce code promo n\'est pas valide.',
+    coupon_inactive: 'Ce code promo n\'est plus actif.',
+    coupon_expired: 'Ce code promo a expiré.',
+    coupon_exhausted: 'Ce coupon a atteint sa limite d\'utilisation.',
+    coupon_country_mismatch: 'Ce coupon n\'est pas disponible dans votre région.',
+    coupon_minimum_not_met: 'Le total de votre commande est inférieur au minimum requis pour ce coupon.',
+    coupon_product_not_eligible: 'Aucun article de votre panier n\'est éligible à ce coupon.',
+    coupon_manual_entry_rejected: 'Ce coupon ne peut pas être saisi manuellement.',
+    unauthorized: 'Veuillez vous connecter pour utiliser ce coupon.',
+    default: 'Ce code promo n\'a pas pu être appliqué.',
+  },
+};
+
 function getStrings() {
   return getConfig().getStrings();
+}
+
+function getCouponErrorMessage(errorCode) {
+  const { locale } = getLocaleAndLanguage();
+  const lang = locale === 'ca' ? 'fr-ca' : 'en-us';
+  const msgs = COUPON_ERROR_MESSAGES[lang] || COUPON_ERROR_MESSAGES['en-us'];
+  return msgs[errorCode] || msgs.default;
 }
 
 function getCurrencyCode() {
@@ -34,6 +70,7 @@ function buildTemplate(s) {
       <input type="text" placeholder="${s.discountPlaceholder}" class="discount-input">
       <button class="discount-apply">${s.apply}</button>
     </div>
+    <p class="order-summary-coupon-error" hidden></p>
     <div class="order-summary-totals">
       <div class="order-summary-row">
         <span>${s.subtotal}</span>
@@ -190,6 +227,7 @@ export default async function decorate(block) {
   const discountInput = block.querySelector('.discount-input');
   const discountApply = block.querySelector('.discount-apply');
   const discountsEl = block.querySelector('.order-summary-discounts');
+  const couponErrorEl = block.querySelector('.order-summary-coupon-error');
   currencyEl.textContent = getCurrencyCode();
 
   const showPendingDiscount = (code) => {
@@ -212,6 +250,7 @@ export default async function decorate(block) {
   }
 
   discountApply.addEventListener('click', () => {
+    couponErrorEl.hidden = true;
     const code = discountInput.value.trim();
     if (code) {
       sessionStorage.setItem('checkout_coupon_code', code);
@@ -315,7 +354,17 @@ export default async function decorate(block) {
 
   document.addEventListener('checkout:preview', (e) => {
     summaryContent?.classList.remove('loading');
-    const { preview } = e.detail || {};
+    const { preview, couponError } = e.detail || {};
+
+    if (couponError) {
+      discountsEl.innerHTML = '';
+      discountInput.value = '';
+      couponErrorEl.textContent = getCouponErrorMessage(couponError);
+      couponErrorEl.hidden = false;
+      return;
+    }
+
+    couponErrorEl.hidden = true;
     if (!preview) return;
 
     const {
