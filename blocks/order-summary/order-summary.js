@@ -3,12 +3,48 @@ import cart from '../../scripts/cart.js';
 import { getConfig, formatPrice } from '../../scripts/commerce-config.js';
 import buildCartItem from '../../scripts/commerce/cart-item.js';
 import buildWarrantySelector from '../cart/warranty-selector.js';
-import { parsePreview } from '../../scripts/commerce-api.js';
+import { parsePreview, estimatePrice } from '../../scripts/commerce-api.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 import { initIDMe } from '../../scripts/commerce/idme.js';
 
+const COUPON_ERROR_MESSAGES = {
+  'en-us': {
+    coupon_invalid_format: 'Please enter a valid coupon code.',
+    coupon_not_found: 'This coupon code is not valid.',
+    coupon_inactive: 'This coupon code is no longer active.',
+    coupon_expired: 'This coupon code has expired.',
+    coupon_exhausted: 'This coupon has reached its usage limit.',
+    coupon_country_mismatch: 'This coupon is not available in your region.',
+    coupon_minimum_not_met: 'Your order total doesn\'t meet the minimum required for this coupon.',
+    coupon_product_not_eligible: 'No items in your cart are eligible for this coupon.',
+    coupon_manual_entry_rejected: 'This coupon cannot be entered manually.',
+    unauthorized: 'Please sign in to use this coupon.',
+    default: 'This coupon code could not be applied.',
+  },
+  'fr-ca': {
+    coupon_invalid_format: 'Veuillez entrer un code promo valide.',
+    coupon_not_found: 'Ce code promo n\'est pas valide.',
+    coupon_inactive: 'Ce code promo n\'est plus actif.',
+    coupon_expired: 'Ce code promo a expiré.',
+    coupon_exhausted: 'Ce coupon a atteint sa limite d\'utilisation.',
+    coupon_country_mismatch: 'Ce coupon n\'est pas disponible dans votre région.',
+    coupon_minimum_not_met: 'Le total de votre commande est inférieur au minimum requis pour ce coupon.',
+    coupon_product_not_eligible: 'Aucun article de votre panier n\'est éligible à ce coupon.',
+    coupon_manual_entry_rejected: 'Ce coupon ne peut pas être saisi manuellement.',
+    unauthorized: 'Veuillez vous connecter pour utiliser ce coupon.',
+    default: 'Ce code promo n\'a pas pu être appliqué.',
+  },
+};
+
 function getStrings() {
   return getConfig().getStrings();
+}
+
+function getCouponErrorMessage(errorCode) {
+  const { locale } = getLocaleAndLanguage();
+  const lang = locale === 'ca' ? 'fr-ca' : 'en-us';
+  const msgs = COUPON_ERROR_MESSAGES[lang] || COUPON_ERROR_MESSAGES['en-us'];
+  return msgs[errorCode] || msgs.default;
 }
 
 function getCurrencyCode() {
@@ -33,6 +69,7 @@ function buildTemplate(s) {
     <div class="order-summary-discount">
       <input type="text" placeholder="${s.discountPlaceholder}" class="discount-input">
       <button class="discount-apply">${s.apply}</button>
+      <p class="order-summary-coupon-error" hidden></p>
     </div>
     <div class="order-summary-totals">
       <div class="order-summary-row">
@@ -190,18 +227,39 @@ export default async function decorate(block) {
   const discountInput = block.querySelector('.discount-input');
   const discountApply = block.querySelector('.discount-apply');
   const discountsEl = block.querySelector('.order-summary-discounts');
+  const couponErrorEl = block.querySelector('.order-summary-coupon-error');
   currencyEl.textContent = getCurrencyCode();
+
+  const removeCoupon = () => {
+    sessionStorage.removeItem('checkout_coupon_code');
+    discountInput.value = '';
+    discountsEl.innerHTML = '';
+    couponErrorEl.hidden = true;
+    document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
+  };
+
+  const makeRemoveBtn = () => {
+    const btn = document.createElement('button');
+    btn.className = 'discount-remove';
+    btn.setAttribute('aria-label', 'Remove coupon');
+    btn.textContent = '×';
+    btn.addEventListener('click', removeCoupon);
+    return btn;
+  };
 
   const showPendingDiscount = (code) => {
     discountsEl.innerHTML = '';
     const row = document.createElement('div');
     row.className = 'order-summary-row order-summary-discount-item order-summary-discount-pending';
+    const labelGroup = document.createElement('span');
+    labelGroup.className = 'discount-label-group';
     const label = document.createElement('span');
     label.textContent = `${s.discount} (${code})`;
+    labelGroup.append(label, makeRemoveBtn());
     const amount = document.createElement('span');
     amount.className = 'order-summary-discount-amount';
     amount.textContent = '--';
-    row.append(label, amount);
+    row.append(labelGroup, amount);
     discountsEl.appendChild(row);
   };
 
@@ -211,22 +269,28 @@ export default async function decorate(block) {
     showPendingDiscount(savedCoupon);
   }
 
-  discountApply.addEventListener('click', () => {
+  discountApply.addEventListener('click', async () => {
+    couponErrorEl.hidden = true;
     const code = discountInput.value.trim();
-    if (code) {
-      sessionStorage.setItem('checkout_coupon_code', code);
-      showPendingDiscount(code);
-      discountApply.textContent = s.applied;
-      discountApply.disabled = true;
-      setTimeout(() => {
-        discountApply.textContent = s.apply;
-        discountApply.disabled = false;
-      }, 2000);
-    } else {
+    if (!code) {
       sessionStorage.removeItem('checkout_coupon_code');
       discountsEl.innerHTML = '';
+      return;
     }
-    document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
+
+    discountApply.disabled = true;
+    try {
+      const country = getLocaleAndLanguage().locale;
+      await estimatePrice(country, cart.getItemsForAPI(), code);
+      sessionStorage.setItem('checkout_coupon_code', code);
+      showPendingDiscount(code);
+      document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
+    } catch (err) {
+      couponErrorEl.textContent = getCouponErrorMessage(err?.errorHeader);
+      couponErrorEl.hidden = false;
+    } finally {
+      discountApply.disabled = false;
+    }
   });
 
   const renderItems = () => {
@@ -315,7 +379,17 @@ export default async function decorate(block) {
 
   document.addEventListener('checkout:preview', (e) => {
     summaryContent?.classList.remove('loading');
-    const { preview } = e.detail || {};
+    const { preview, couponError } = e.detail || {};
+
+    if (couponError) {
+      discountsEl.innerHTML = '';
+      discountInput.value = '';
+      couponErrorEl.textContent = getCouponErrorMessage(couponError);
+      couponErrorEl.hidden = false;
+      return;
+    }
+
+    couponErrorEl.hidden = true;
     if (!preview) return;
 
     const {
@@ -326,15 +400,27 @@ export default async function decorate(block) {
     subtotalEl.textContent = formatPrice(subtotal, currency);
 
     discountsEl.innerHTML = '';
-    discounts.filter((d) => !d.freeShipping && d.amount > 0).forEach((d) => {
+    discounts.filter((d) => d.amount > 0).forEach((d) => {
       const row = document.createElement('div');
       row.className = 'order-summary-row order-summary-discount-item';
-      const label = document.createElement('span');
-      label.textContent = d.name || s.discount;
-      const amount = document.createElement('span');
-      amount.className = 'order-summary-discount-amount';
-      amount.textContent = `-${formatPrice(d.amount, currency)}`;
-      row.append(label, amount);
+      if (d.source === 'coupon') {
+        const labelGroup = document.createElement('span');
+        labelGroup.className = 'discount-label-group';
+        const label = document.createElement('span');
+        label.textContent = d.name || s.discount;
+        labelGroup.append(label, makeRemoveBtn());
+        const amount = document.createElement('span');
+        amount.className = 'order-summary-discount-amount';
+        amount.textContent = `-${formatPrice(d.amount, currency)}`;
+        row.append(labelGroup, amount);
+      } else {
+        const label = document.createElement('span');
+        label.textContent = d.name || s.discount;
+        const amount = document.createElement('span');
+        amount.className = 'order-summary-discount-amount';
+        amount.textContent = `-${formatPrice(d.amount, currency)}`;
+        row.append(label, amount);
+      }
       discountsEl.appendChild(row);
     });
 

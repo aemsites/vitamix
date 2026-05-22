@@ -275,6 +275,7 @@ dialog.paypal-not-configured-dialog::backdrop {
 
 .cart-summary-discount {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--commerce-gap-sm);
   margin-top: 12px;
 }
@@ -374,6 +375,45 @@ dialog.paypal-not-configured-dialog::backdrop {
 .cart-summary-error {
   margin-top: 12px;
   padding: 12px;
+  background: var(--commerce-color-error-bg);
+  border: 1px solid var(--commerce-color-error-border);
+  border-radius: var(--commerce-radius-badge);
+  color: var(--commerce-color-error);
+  font-size: var(--commerce-font-size-sm);
+}
+
+/* Coupon remove button */
+.cart-summary-discount-row .discount-remove {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  line-height: 1;
+  font-size: 16px;
+  color: var(--commerce-color-text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.cart-summary-discount-row:hover .discount-remove {
+  opacity: 1;
+}
+
+.cart-summary-discount-row .discount-remove:hover {
+  color: var(--commerce-color-error);
+}
+
+@media (width <= 999px) {
+  .cart-summary-discount-row .discount-remove {
+    opacity: 1;
+  }
+}
+
+/* Coupon error — lives inside .cart-summary-discount, wraps to its own row */
+.cart-summary-coupon-error {
+  flex-basis: 100%;
+  margin: 0;
+  padding: 10px 12px;
   background: var(--commerce-color-error-bg);
   border: 1px solid var(--commerce-color-error-border);
   border-radius: var(--commerce-radius-badge);

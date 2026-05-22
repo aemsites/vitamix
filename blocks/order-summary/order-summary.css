@@ -175,6 +175,7 @@
 /* Discount */
 .order-summary-discount {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--commerce-gap-sm);
   margin-bottom: var(--commerce-card-padding);
   padding-bottom: var(--commerce-card-padding);
@@ -257,6 +258,51 @@
 
 .order-summary-final-amount strong {
   font-size: var(--commerce-font-size-total);
+}
+
+/* Coupon remove button */
+.discount-label-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.order-summary-discount-item .discount-remove {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  line-height: 1;
+  font-size: 16px;
+  color: var(--commerce-color-text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.order-summary-discount-item:hover .discount-remove {
+  opacity: 1;
+}
+
+.order-summary-discount-item .discount-remove:hover {
+  color: var(--commerce-color-error);
+}
+
+@media (width <= 999px) {
+  .order-summary-discount-item .discount-remove {
+    opacity: 1;
+  }
+}
+
+/* Coupon error — lives inside .order-summary-discount, wraps to its own row */
+.order-summary-coupon-error {
+  flex-basis: 100%;
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--commerce-color-error-bg);
+  border: 1px solid var(--commerce-color-error-border);
+  border-radius: var(--commerce-radius-badge);
+  color: var(--commerce-color-error);
+  font-size: var(--commerce-font-size-sm);
 }
 
 /* Loading state */
