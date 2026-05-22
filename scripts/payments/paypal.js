@@ -303,18 +303,6 @@ export default {
     };
 
     window.paypal.Buttons(buttonConfig).render(container);
-
-    const payLaterBtn = window.paypal.Buttons({
-      ...buttonConfig,
-      fundingSource: window.paypal.FUNDING.PAYLATER,
-      style: { ...buttonConfig.style, color: 'silver' },
-    });
-    if (payLaterBtn.isEligible()) {
-      const wrapper = document.createElement('div');
-      wrapper.className = 'paypal-paylater-wrapper';
-      container.appendChild(wrapper);
-      payLaterBtn.render(wrapper);
-    }
   },
 
   renderCheckoutButton(container, callbacks) {
