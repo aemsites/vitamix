@@ -82,15 +82,11 @@ function normalizeOrderIdKey(s) {
   return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-/** Booking-style groups of 4 (e.g. `43KH-W5JM`) from compact short id; uppercase for legibility. */
+/** Compact short id for display (normalized, uppercase). */
 function formatOrderIdChunks(shortId) {
   const compact = normalizeOrderIdKey(shortId);
   if (!compact) return '—';
-  const parts = [];
-  for (let i = 0; i < compact.length; i += 4) {
-    parts.push(compact.slice(i, i + 4).toUpperCase());
-  }
-  return parts.join('-');
+  return compact.toUpperCase();
 }
 
 function highlightOrderIdCell(formattedDisplay, compactForMatch, query) {

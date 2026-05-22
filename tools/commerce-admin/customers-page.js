@@ -60,15 +60,11 @@ function orderIdForDisplay(order) {
   return s;
 }
 
-/** Groups of 4 for legibility (same as orders admin). */
+/** Compact short id for display (same as orders admin). */
 function formatOrderIdChunks(shortId) {
   const compact = normalizeOrderIdKey(shortId);
   if (!compact) return '—';
-  const parts = [];
-  for (let i = 0; i < compact.length; i += 4) {
-    parts.push(compact.slice(i, i + 4).toUpperCase());
-  }
-  return parts.join('-');
+  return compact.toUpperCase();
 }
 
 function formatOrderNumberLabel(orderOrRawId) {
