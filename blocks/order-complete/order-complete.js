@@ -187,9 +187,14 @@ export default async function decorate(block) {
     const totalsSection = document.createElement('div');
     totalsSection.className = 'order-totals';
 
+    const shippingRate = preview.shippingMethod?.rate;
+    const shippingDisplay = shippingRate === 0
+      ? 'Free'
+      : formatPrice(parseFloat(shippingRate || 0), currencyCode);
+
     const rows = [
       ['Subtotal', formatPrice(parseFloat(preview.subtotal), currencyCode)],
-      ['Shipping', preview.shippingMethod?.rate === 0 ? 'Free' : formatPrice(parseFloat(preview.shippingMethod?.rate || 0), currencyCode)],
+      ['Shipping', shippingDisplay],
     ];
 
     if (preview.discounts?.length) {
