@@ -19,7 +19,7 @@ import { loadScript } from './aem.js';
  * Empty string disables the integration (graceful degradation).
  */
 // TODO: Sitekey for api-stage only for Vitamix.
-export const RECAPTCHA_SITE_KEY = '6LfaNtosAAAAABpYKw5c-zu9FWjxxfZJDpVu4JjG';
+export const RECAPTCHA_SITE_KEY = '6LcITfcsAAAAADNTZV_Y2sKZAvdQa38GX4s29gS9';
 
 /** Action name constants mirroring the server's RECAPTCHA_ACTIONS. */
 export const RECAPTCHA_ACTIONS = Object.freeze({
