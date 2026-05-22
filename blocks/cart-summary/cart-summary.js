@@ -126,6 +126,12 @@ export default async function decorate(block) {
   const config = getConfig();
   const s = getStrings();
 
+  // Capture any authored link (e.g. Terms and Conditions) before innerHTML is replaced
+  const authoredLink = block.querySelector('a');
+  const termsLink = authoredLink
+    ? { href: authoredLink.href, text: authoredLink.textContent.trim() }
+    : null;
+
   // 1. Colocate with the cart section for two-column CSS layout
   colocateWithCart(block);
   block.innerHTML = buildTemplate(s);
@@ -145,6 +151,17 @@ export default async function decorate(block) {
   // 2. Set checkout href and currency
   checkoutBtn.href = config.getOrderPath('checkout');
   currencyEl.textContent = getCurrencyCode();
+
+  // Render terms link below the checkout button if authored
+  if (termsLink) {
+    const termsEl = document.createElement('p');
+    termsEl.className = 'cart-summary-terms';
+    const a = document.createElement('a');
+    a.href = termsLink.href;
+    a.textContent = termsLink.text;
+    termsEl.appendChild(a);
+    checkoutBtn.insertAdjacentElement('afterend', termsEl);
+  }
 
   // 3. Bind cart:change to keep totals in sync
   const updateTotals = () => {

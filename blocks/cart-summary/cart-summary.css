@@ -390,6 +390,23 @@ dialog.paypal-not-configured-dialog::backdrop {
   box-sizing: border-box;
 }
 
+/* Terms link below checkout button */
+.cart-summary-terms {
+  margin-top: 12px;
+  margin-bottom: 0;
+  text-align: center;
+  font-size: var(--commerce-font-size-sm);
+}
+
+.cart-summary-terms a {
+  color: var(--commerce-color-text-muted);
+  text-decoration: underline;
+}
+
+.cart-summary-terms a:hover {
+  color: var(--commerce-color-text);
+}
+
 /* Loading state */
 .cart-summary-content.loading {
   position: relative;
