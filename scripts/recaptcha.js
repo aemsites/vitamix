@@ -1,5 +1,6 @@
 import { loadScript } from './aem.js';
 
+import { isEdgeHost, isProdHost } from './scripts.js';
 /**
  * Google reCAPTCHA Enterprise integration for the protected unauthenticated
  * write endpoints on the Commerce API:
@@ -17,9 +18,11 @@ import { loadScript } from './aem.js';
  * reCAPTCHA Enterprise site key. Public — safe to expose client-side.
  *
  * Empty string disables the integration (graceful degradation).
+ * Edge/stage hosts (localhost, UAT, integration) use the stage key;
+ * production vitamix.com uses the live key.
  */
-// TODO: Sitekey for api-stage only for Vitamix.
-export const RECAPTCHA_SITE_KEY = '6LcITfcsAAAAADNTZV_Y2sKZAvdQa38GX4s29gS9';
+// eslint-disable-next-line no-nested-ternary
+export const RECAPTCHA_SITE_KEY = isProdHost ? '6LcITfcsAAAAADNTZV_Y2sKZAvdQa38GX4s29gS9' : (isEdgeHost ? '6LcITfcsAAAAADNTZV_Y2sKZAvdQa38GX4s29gS9' : '');
 
 /** Action name constants mirroring the server's RECAPTCHA_ACTIONS. */
 export const RECAPTCHA_ACTIONS = Object.freeze({
