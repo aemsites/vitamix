@@ -192,7 +192,7 @@ export default function renderAddToCart(ph, block, parent) {
     addToCartButton.setAttribute('aria-disabled', 'true');
 
     // get selected quantity and product SKU
-    const quantity = document.querySelector('.quantity-container select')?.value || 1;
+    const quantity = quantitySelect.value || 1;
     const sku = getMetadata('sku');
 
     // build array of selected options (variants, warranties, required bundles)
