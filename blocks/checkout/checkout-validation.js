@@ -2,7 +2,7 @@ const MESSAGES = {
   en: {
     required: 'This field is required.',
     name: 'Please use only letters, spaces, hyphens, or apostrophes.',
-    street: 'Please use only letters, numbers, and standard address characters (# . , -).',
+    street: 'Please use only letters, numbers, and standard address characters (. , -).',
     city: 'Please use only letters, spaces, hyphens, or periods.',
     zip: 'Please enter a valid 5-digit ZIP code.',
     postalCode: 'Please enter a valid postal code (e.g. A1B 2C3).',
@@ -12,7 +12,7 @@ const MESSAGES = {
   fr: {
     required: 'Ce champ est requis.',
     name: 'Veuillez utiliser uniquement des lettres, espaces, tirets ou apostrophes.',
-    street: "Veuillez utiliser uniquement des lettres, chiffres et caractères d'adresse standard (# . , -).",
+    street: "Veuillez utiliser uniquement des lettres, chiffres et caractères d'adresse standard (. , -).",
     city: 'Veuillez utiliser uniquement des lettres, espaces, tirets ou points.',
     zip: 'Veuillez entrer un code postal à 5 chiffres valide.',
     postalCode: 'Veuillez entrer un code postal valide (ex. A1B 2C3).',
@@ -23,8 +23,8 @@ const MESSAGES = {
 
 // Letters (including accented), spaces, hyphens, apostrophes
 const NAME_RE = /^[A-Za-zÀ-ÖØ-öø-ÿ''\- ]+$/;
-// Letters, numbers, spaces, and common address punctuation (#, ., ,, -, /)
-const STREET_RE = /^[A-Za-z0-9 #.,\-/]+$/;
+// Letters, numbers, spaces, and common address punctuation (., ,, -, /)
+const STREET_RE = /^[A-Za-z0-9 .,\-/]+$/;
 // Letters (including accented), spaces, hyphens, periods, apostrophes
 const CITY_RE = /^[A-Za-zÀ-ÖØ-öø-ÿ''\-. ]+$/;
 // US ZIP: 5 digits, optional +4, not all zeros
