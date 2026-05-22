@@ -15,45 +15,38 @@ beforeEach(() => {
   __resetScripts();
 });
 
-test('normalizeCartPrice: numeric string from an offer', () => {
-  assert.equal(normalizeCartPrice('249.95'), 249.95);
+test('normalizeCartPrice: numeric string from an offer passes through', () => {
+  assert.equal(normalizeCartPrice('249.95'), '249.95');
 });
 
-test('normalizeCartPrice: number passes through', () => {
-  assert.equal(normalizeCartPrice(249.95), 249.95);
+test('normalizeCartPrice: number is coerced to string', () => {
+  assert.equal(normalizeCartPrice(249.95), '249.95');
 });
 
 test('normalizeCartPrice: Product Bus price object uses final', () => {
   assert.equal(
     normalizeCartPrice({ currency: 'USD', regular: '299.95', final: '249.95' }),
-    249.95,
+    '249.95',
   );
 });
 
 test('normalizeCartPrice: falls back to regular when final is missing', () => {
   assert.equal(
     normalizeCartPrice({ currency: 'USD', regular: '299.95' }),
-    299.95,
+    '299.95',
   );
 });
 
-test('normalizeCartPrice: regression for simple-product NaN bug', () => {
-  // Simple products' JSON-LD offer carries a numeric-string `price`. The cart
-  // line item used to receive `undefined` (parent fallback had no `price` and
-  // we weren't reading offers[0].price), serialize as null in localStorage,
-  // and render as "$NaN". After the fix the offer's string price flows in.
-  const offerPrice = '249.95';
-  const normalized = normalizeCartPrice(offerPrice);
-  assert.equal(Number.isNaN(normalized), false);
-  assert.equal(normalized * 2, 499.9);
+test('normalizeCartPrice: preserves decimal precision without parseFloat roundtrip', () => {
+  assert.equal(normalizeCartPrice('449.90'), '449.90');
 });
 
-test('normalizeCartPrice: null returns NaN', () => {
-  assert.equal(Number.isNaN(normalizeCartPrice(null)), true);
+test('normalizeCartPrice: null returns "null"', () => {
+  assert.equal(normalizeCartPrice(null), 'null');
 });
 
-test('normalizeCartPrice: undefined returns NaN', () => {
-  assert.equal(Number.isNaN(normalizeCartPrice(undefined)), true);
+test('normalizeCartPrice: undefined returns "undefined"', () => {
+  assert.equal(normalizeCartPrice(undefined), 'undefined');
 });
 
 // --- isVariantAvailableForSale ---------------------------------------------

@@ -76,18 +76,17 @@ function toggleFixedAddToCart(container) {
 }
 
 /**
- * Normalize a price into a number for the edge cart line item.
- * Offers expose a flat numeric price (string or number); simple products
+ * Normalize a price into a string for the edge cart line item.
+ * Offers expose a flat price (string or number); simple products
  * without offers expose the Product Bus shape `{ currency, regular, final }`.
- * Returns `NaN` if no usable value can be extracted.
  * @param {string|number|{final?: string|number, regular?: string|number}} value
- * @returns {number}
+ * @returns {string}
  */
 export function normalizeCartPrice(value) {
   if (value && typeof value === 'object') {
-    return parseFloat(value.final ?? value.regular);
+    return String(value.final ?? value.regular);
   }
-  return parseFloat(value);
+  return String(value);
 }
 
 /**
