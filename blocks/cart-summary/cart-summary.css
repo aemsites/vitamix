@@ -275,6 +275,7 @@ dialog.paypal-not-configured-dialog::backdrop {
 
 .cart-summary-discount {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--commerce-gap-sm);
   margin-top: 12px;
 }
@@ -408,9 +409,10 @@ dialog.paypal-not-configured-dialog::backdrop {
   }
 }
 
-/* Coupon error */
+/* Coupon error — lives inside .cart-summary-discount, wraps to its own row */
 .cart-summary-coupon-error {
-  margin: 8px 0 0;
+  flex-basis: 100%;
+  margin: 0;
   padding: 10px 12px;
   background: var(--commerce-color-error-bg);
   border: 1px solid var(--commerce-color-error-border);

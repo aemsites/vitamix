@@ -69,8 +69,8 @@ function buildTemplate(s) {
     <div class="order-summary-discount">
       <input type="text" placeholder="${s.discountPlaceholder}" class="discount-input">
       <button class="discount-apply">${s.apply}</button>
+      <p class="order-summary-coupon-error" hidden></p>
     </div>
-    <p class="order-summary-coupon-error" hidden></p>
     <div class="order-summary-totals">
       <div class="order-summary-row">
         <span>${s.subtotal}</span>

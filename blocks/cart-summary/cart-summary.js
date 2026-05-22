@@ -120,8 +120,8 @@ function buildTemplate(s) {
         <input type="text" placeholder="${s.discountPlaceholder}"
           class="discount-input" autocomplete="off">
         <button class="discount-apply">${s.apply}</button>
+        <p class="cart-summary-coupon-error" hidden></p>
       </div>
-      <p class="cart-summary-coupon-error" hidden></p>
     </details>
     <div class="cart-summary-totals">
       <div class="cart-summary-row">

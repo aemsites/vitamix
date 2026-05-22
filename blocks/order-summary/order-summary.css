@@ -175,6 +175,7 @@
 /* Discount */
 .order-summary-discount {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--commerce-gap-sm);
   margin-bottom: var(--commerce-card-padding);
   padding-bottom: var(--commerce-card-padding);
@@ -292,9 +293,10 @@
   }
 }
 
-/* Coupon error */
+/* Coupon error — lives inside .order-summary-discount, wraps to its own row */
 .order-summary-coupon-error {
-  margin: 8px 0 0;
+  flex-basis: 100%;
+  margin: 0;
   padding: 10px 12px;
   background: var(--commerce-color-error-bg);
   border: 1px solid var(--commerce-color-error-border);
