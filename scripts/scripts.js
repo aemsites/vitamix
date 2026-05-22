@@ -20,7 +20,7 @@ import {
 
 const { hostname } = window.location;
 
-// Locale+language pairs enabled for edge checkout on production.
+// Locale+language pairs enabled for edge checkout on production. Caching check.
 // Format: '<locale>/<language>' (e.g., 'ca/fr_ca'). Add pairs as each region goes live.
 const EDGE_CHECKOUT_LOCALES = ['ca/fr_ca', 'ca/en_us', 'us/en_us'];
 
