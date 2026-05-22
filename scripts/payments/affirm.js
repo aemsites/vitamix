@@ -49,7 +49,9 @@ export default {
           createdOrder.order ?? createdOrder,
         );
       } catch (err) {
-        callbacks.showError(err.body?.message || 'Unable to place order. Please try again.');
+        callbacks.showError(err?.errorHeader?.toLowerCase().includes('recaptcha')
+          ? callbacks.strings.errorRecaptcha
+          : (err.body?.message || 'Unable to place order. Please try again.'));
         btn.disabled = false;
         return;
       }

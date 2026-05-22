@@ -138,6 +138,10 @@
   font-size: 16px;
 }
 
+.order-totals-discount {
+  color: #2e7d32;
+}
+
 /* Shipping address & contact */
 .order-shipping-address,
 .order-contact {

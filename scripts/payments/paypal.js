@@ -288,8 +288,10 @@ export default {
           } else {
             callbacks.showError(result.reason || 'PayPal payment failed. Please try again.');
           }
-        } catch {
-          callbacks.showError('PayPal payment failed. Please try again.');
+        } catch (err) {
+          callbacks.showError(err?.errorHeader?.toLowerCase().includes('recaptcha')
+            ? callbacks.strings.errorRecaptcha
+            : 'PayPal payment failed. Please try again.');
         }
       },
 
@@ -303,18 +305,6 @@ export default {
     };
 
     window.paypal.Buttons(buttonConfig).render(container);
-
-    const payLaterBtn = window.paypal.Buttons({
-      ...buttonConfig,
-      fundingSource: window.paypal.FUNDING.PAYLATER,
-      style: { ...buttonConfig.style, color: 'silver' },
-    });
-    if (payLaterBtn.isEligible()) {
-      const wrapper = document.createElement('div');
-      wrapper.className = 'paypal-paylater-wrapper';
-      container.appendChild(wrapper);
-      payLaterBtn.render(wrapper);
-    }
   },
 
   renderCheckoutButton(container, callbacks) {
@@ -352,7 +342,9 @@ export default {
           createdOrder.order ?? createdOrder,
         );
       } catch (err) {
-        callbacks.showError(err.body?.message || 'Unable to place order. Please try again.');
+        callbacks.showError(err?.errorHeader?.toLowerCase().includes('recaptcha')
+          ? callbacks.strings.errorRecaptcha
+          : (err.body?.message || 'Unable to place order. Please try again.'));
         btn.disabled = false;
         return;
       }
