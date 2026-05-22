@@ -1,5 +1,6 @@
 import { getMetadata } from '../../scripts/aem.js';
 import { checkVariantOutOfStock, getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { getConfig } from '../../scripts/commerce-config.js';
 
 /**
  * Renders "Find Locally" button container.
@@ -184,8 +185,9 @@ export default function renderAddToCart(ph, block, parent) {
   const quantitySelect = document.createElement('select');
   quantitySelect.id = 'pdp-quantity-select';
 
-  // set maximum quantity (default to 3 if not specified)
-  const maxQuantity = custom.maxCartQty ? +custom.maxCartQty : 3;
+  // per-product override (custom.maxCartQty) wins, otherwise use the global
+  // commerce-config default
+  const maxQuantity = custom.maxCartQty ? +custom.maxCartQty : (getConfig().maxCartQty || 3);
 
   // populate quantity dropdown with options from 1 to maxQuantity
   for (let i = 1; i <= maxQuantity; i += 1) {
