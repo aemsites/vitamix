@@ -52,13 +52,11 @@ const defaults = {
       or: 'or',
       orderSummary: 'Order summary',
       discountPlaceholder: 'Discount code or gift card',
-<<<<<<< worktree-order-cancel-block
       cancelHeading: 'Payment not completed',
       cancelCustomerCancelled: 'You cancelled the payment.',
       cancelPaymentFailed: 'Your payment could not be processed. Please try again.',
       cancelDeclined: 'Your payment was declined. Please try a different payment method.',
       cancelReturnToCheckout: 'Return to checkout',
-=======
       orderPaymentNotCompleted: 'Payment not completed',
       orderPaymentCancelled: 'You cancelled the payment.',
       orderPaymentFailed: 'Payment could not be processed. Please try again.',
@@ -71,7 +69,6 @@ const defaults = {
       orderTax: 'Tax',
       orderShippingAddress: 'Shipping address',
       orderContact: 'Contact',
->>>>>>> staginguat
     },
     'fr-ca': {
       stepCart: 'Panier',
@@ -92,13 +89,11 @@ const defaults = {
       or: 'ou',
       orderSummary: 'Récapitulatif de commande',
       discountPlaceholder: 'Code de réduction ou carte-cadeau',
-<<<<<<< worktree-order-cancel-block
       cancelHeading: 'Paiement non effectué',
       cancelCustomerCancelled: 'Vous avez annulé le paiement.',
       cancelPaymentFailed: "Votre paiement n'a pas pu être traité. Veuillez réessayer.",
       cancelDeclined: 'Votre paiement a été refusé. Veuillez essayer un autre mode de paiement.',
       cancelReturnToCheckout: 'Retourner à la caisse',
-=======
       orderPaymentNotCompleted: 'Paiement non complété',
       orderPaymentCancelled: 'Vous avez annulé le paiement.',
       orderPaymentFailed: 'Le paiement n\'a pas pu être traité. Veuillez réessayer.',
@@ -111,7 +106,6 @@ const defaults = {
       orderTax: 'Taxe',
       orderShippingAddress: 'Adresse de livraison',
       orderContact: 'Contact',
->>>>>>> staginguat
     },
   },
   getStrings() {
