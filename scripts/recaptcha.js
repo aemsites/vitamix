@@ -1,6 +1,6 @@
 import { loadScript } from './aem.js';
 
-import { isEdgeHost, isProdHost } from './scripts.js';
+import { isProdHost } from './scripts.js';
 /**
  * Google reCAPTCHA Enterprise integration for the protected unauthenticated
  * write endpoints on the Commerce API:
