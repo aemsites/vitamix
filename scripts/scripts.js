@@ -1470,6 +1470,13 @@ async function loadLazy(doc) {
   }
 }
 
+function decorateInternalLinks() {
+  const internalLinks = document.querySelectorAll('a[href^="https://www.vitamix.com/"]');
+  internalLinks.forEach((link) => {
+    link.href = link.href.replace('https://www.vitamix.com', window.location.origin);
+  });
+}
+
 function decorateExternalLinks() {
   const externalLinks = document.querySelectorAll('a[href^="https://"]');
   externalLinks.forEach((link) => {
@@ -1544,6 +1551,13 @@ async function loadDelayed() {
   if (sk) initContentScore();
   else {
     document.addEventListener('sidekick-ready', initContentScore, { once: true });
+  }
+
+  if (
+    window.location.hostname === 'localhost'
+    || (window.location.hostname.endsWith('.vitamix.com') && window.location.hostname !== 'www.vitamix.com')
+  ) {
+    setTimeout(decorateInternalLinks, 1000);
   }
 
   setTimeout(decorateExternalLinks, 1000);
