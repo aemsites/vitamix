@@ -188,7 +188,9 @@ export default async function decorate(block) {
 
     const rows = [
       [s.subtotal, formatPrice(parseFloat(preview.subtotal), currencyCode)],
-      [s.shipping, preview.shippingMethod?.rate === 0 ? s.free : formatPrice(parseFloat(preview.shippingMethod?.rate || 0), currencyCode)],
+      [s.shipping, preview.shippingMethod?.rate === 0
+        ? s.free
+        : formatPrice(parseFloat(preview.shippingMethod?.rate || 0), currencyCode)],
       [s.orderTax, formatPrice(parseFloat(preview.taxAmount), currencyCode)],
     ];
 
