@@ -22,7 +22,7 @@ import { isEdgeHost, isProdHost } from './scripts.js';
  * production vitamix.com uses the live key.
  */
 // eslint-disable-next-line no-nested-ternary
-export const RECAPTCHA_SITE_KEY = isProdHost ? '6LcITfcsAAAAADNTZV_Y2sKZAvdQa38GX4s29gS9' : (isEdgeHost ? '6LcITfcsAAAAADNTZV_Y2sKZAvdQa38GX4s29gS9' : '');
+export const RECAPTCHA_SITE_KEY = isProdHost ? '6LcITfcsAAAAADNTZV_Y2sKZAvdQa38GX4s29gS9' : '6LcITfcsAAAAADNTZV_Y2sKZAvdQa38GX4s29gS9';
 
 /** Action name constants mirroring the server's RECAPTCHA_ACTIONS. */
 export const RECAPTCHA_ACTIONS = Object.freeze({
