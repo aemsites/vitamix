@@ -400,7 +400,7 @@ export default async function decorate(block) {
     subtotalEl.textContent = formatPrice(subtotal, currency);
 
     discountsEl.innerHTML = '';
-    discounts.filter((d) => !d.freeShipping && d.amount > 0).forEach((d) => {
+    discounts.filter((d) => d.amount > 0).forEach((d) => {
       const row = document.createElement('div');
       row.className = 'order-summary-row order-summary-discount-item';
       if (d.source === 'coupon') {
