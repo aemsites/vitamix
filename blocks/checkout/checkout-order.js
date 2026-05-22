@@ -3,6 +3,7 @@ import { collectAddress } from './checkout-address.js';
 import { updatePreview } from './checkout-shipping.js';
 import { FORMS_ENDPOINT, getLocaleAndLanguage } from '../../scripts/scripts.js';
 import { validateLinkIntegrity } from './link-integrity.js';
+import { validateForm } from './checkout-validation.js';
 
 export { validateLinkIntegrity };
 
@@ -196,10 +197,7 @@ export function initOrder(form, cart, state, config, strings) {
       e.preventDefault();
       clearError(form);
 
-      if (!form.checkValidity()) {
-        form.reportValidity();
-        return;
-      }
+      if (!validateForm(form)) return;
 
       if (!state.selectedShippingMethodId) {
         showError(form, strings.errorSelectShipping);
