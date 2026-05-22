@@ -16,24 +16,24 @@ beforeEach(() => {
 });
 
 test('normalizeCartPrice: numeric string from an offer', () => {
-  assert.equal(normalizeCartPrice('249.95'), 249.95);
+  assert.equal(normalizeCartPrice('249.95'), '249.95');
 });
 
-test('normalizeCartPrice: number passes through', () => {
-  assert.equal(normalizeCartPrice(249.95), 249.95);
+test('normalizeCartPrice: number is stringified losslessly', () => {
+  assert.equal(normalizeCartPrice(249.95), '249.95');
 });
 
 test('normalizeCartPrice: Product Bus price object uses final', () => {
   assert.equal(
     normalizeCartPrice({ currency: 'USD', regular: '299.95', final: '249.95' }),
-    249.95,
+    '249.95',
   );
 });
 
 test('normalizeCartPrice: falls back to regular when final is missing', () => {
   assert.equal(
     normalizeCartPrice({ currency: 'USD', regular: '299.95' }),
-    299.95,
+    '299.95',
   );
 });
 
@@ -44,16 +44,16 @@ test('normalizeCartPrice: regression for simple-product NaN bug', () => {
   // and render as "$NaN". After the fix the offer's string price flows in.
   const offerPrice = '249.95';
   const normalized = normalizeCartPrice(offerPrice);
-  assert.equal(Number.isNaN(normalized), false);
-  assert.equal(normalized * 2, 499.9);
+  assert.equal(normalized, '249.95');
+  assert.equal(parseFloat(normalized) * 2, 499.9);
 });
 
-test('normalizeCartPrice: null returns NaN', () => {
-  assert.equal(Number.isNaN(normalizeCartPrice(null)), true);
+test('normalizeCartPrice: null stringifies to "null"', () => {
+  assert.equal(normalizeCartPrice(null), 'null');
 });
 
-test('normalizeCartPrice: undefined returns NaN', () => {
-  assert.equal(Number.isNaN(normalizeCartPrice(undefined)), true);
+test('normalizeCartPrice: undefined stringifies to "undefined"', () => {
+  assert.equal(normalizeCartPrice(undefined), 'undefined');
 });
 
 // --- isVariantAvailableForSale ---------------------------------------------

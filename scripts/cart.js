@@ -108,9 +108,7 @@ export class Cart {
 
   get subtotal() {
     return this.#items.reduce(
-      (acc, item) => acc + item.quantity * (typeof item.price === 'string'
-        ? parseFloat(item.price)
-        : item.price / 100),
+      (acc, item) => acc + item.quantity * parseFloat(item.price),
       0,
     );
   }

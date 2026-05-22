@@ -85,9 +85,9 @@ function toggleFixedAddToCart(container) {
  */
 export function normalizeCartPrice(value) {
   if (value && typeof value === 'object') {
-    return parseFloat(value.final ?? value.regular);
+    return String(value.final ?? value.regular);
   }
-  return parseFloat(value);
+  return String(value);
 }
 
 /**
