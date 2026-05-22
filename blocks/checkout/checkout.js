@@ -61,6 +61,7 @@ const LOCAL_STRINGS = {
     shippingPlaceholder: 'Enter your shipping address to see available methods.',
     errorSelectShipping: 'Please select a shipping method.',
     errorCalculateTotals: 'Unable to calculate totals. Please try again.',
+    errorRecaptcha: 'Security verification failed. Please refresh the page and try again.',
     errorGeneric: 'An error occurred. Please try again.',
     processing: 'Processing…',
   },
@@ -110,6 +111,7 @@ const LOCAL_STRINGS = {
     shippingPlaceholder: 'Entrez votre adresse de livraison pour voir les méthodes disponibles.',
     errorSelectShipping: 'Veuillez sélectionner une méthode de livraison.',
     errorCalculateTotals: 'Impossible de calculer les totaux. Veuillez réessayer.',
+    errorRecaptcha: 'Échec de la vérification de sécurité. Veuillez actualiser la page et réessayer.',
     errorGeneric: 'Une erreur est survenue. Veuillez réessayer.',
     processing: 'Traitement en cours…',
   },
@@ -188,8 +190,18 @@ export default async function decorate(block) {
 
     document.addEventListener('checkout:preview', (e) => {
       breakdownEl?.classList.remove('loading');
-      const { preview } = e.detail || {};
-      if (!preview) return;
+      const { preview, error } = e.detail || {};
+      if (!preview) {
+        if (error?.status === 403 && error?.errorHeader?.toLowerCase().includes('recaptcha')) {
+          const errorEl = form.querySelector('.checkout-error');
+          if (errorEl) {
+            errorEl.textContent = strings.errorRecaptcha;
+            errorEl.hidden = false;
+            errorEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }
+        }
+        return;
+      }
       const {
         subtotal, taxAmount, shippingRate, total,
       } = parsePreview(preview, cart.subtotal);

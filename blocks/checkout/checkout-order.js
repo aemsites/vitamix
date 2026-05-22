@@ -149,6 +149,7 @@ export function initOrder(form, cart, state, config, strings) {
   const callbacks = {
     getCart: () => cart,
     getConfig: () => config,
+    strings,
     getFormData: () => new FormData(form),
     getState: () => state,
     updatePreview: () => updatePreview(form, cart, state, config),
@@ -219,7 +220,7 @@ export function initOrder(form, cart, state, config, strings) {
           let msg = 'Apple Pay payment failed. Please try again.';
           if (err.message === 'not-available') msg = 'Apple Pay is not available. Please try a different payment method.';
           if (err.message === 'no-preview') msg = 'Please complete your shipping information first.';
-          if (err.message === 'recaptcha-blocked') msg = 'Payment was declined for security reasons. Please refresh the page and try again.';
+          if (err.message === 'recaptcha-blocked') msg = strings.errorRecaptcha;
           callbacks.showError(msg);
         } finally {
           submitBtn.disabled = false;
@@ -300,8 +301,8 @@ export function initOrder(form, cart, state, config, strings) {
           if (submitTextEl) submitTextEl.textContent = strings.continueToPayment;
         }
       } catch (err) {
-        const msg = err?.errorHeader === 'recaptcha score too low'
-          ? 'Payment was declined for security reasons. Please refresh the page and try again.'
+        const msg = err?.errorHeader?.toLowerCase().includes('recaptcha')
+          ? strings.errorRecaptcha
           : err.body?.message || strings.errorGeneric;
         showError(form, msg);
         submitBtn.disabled = false;

@@ -184,8 +184,8 @@ function startExpressSession(btn, config, callbacks) {
         }
       } catch (err) {
         session.completePayment(window.ApplePaySession.STATUS_FAILURE);
-        const msg = err?.errorHeader === 'recaptcha score too low'
-          ? 'Payment was declined for security reasons. Please refresh the page and try again.'
+        const msg = err?.errorHeader?.toLowerCase().includes('recaptcha')
+          ? callbacks.strings.errorRecaptcha
           : 'Apple Pay payment failed. Please try again.';
         callbacks.showError(msg);
       }
@@ -290,7 +290,7 @@ export function beginCheckoutSession(config, callbacks) {
         }
       } catch (err) {
         session.completePayment(window.ApplePaySession.STATUS_FAILURE);
-        const reason = err?.errorHeader === 'recaptcha score too low' ? 'recaptcha-blocked' : 'payment-failed';
+        const reason = err?.errorHeader?.toLowerCase().includes('recaptcha') ? 'recaptcha-blocked' : 'payment-failed';
         reject(new Error(reason));
       }
     };
