@@ -200,7 +200,10 @@ export default async function decorate(block) {
     if (preview.discounts?.length) {
       preview.discounts.forEach((discount) => {
         const label = discount.name || 'Discount';
-        const value = formatPrice(-Math.abs(parseFloat(discount.amount)), currencyCode);
+        const amount = discount.freeShipping
+          ? parseFloat(shippingRate || 0)
+          : Math.abs(parseFloat(discount.amount));
+        const value = formatPrice(-amount, currencyCode);
         rows.push([label, value, 'order-totals-discount']);
       });
     }
