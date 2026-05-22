@@ -103,7 +103,9 @@ export default async function decorate(block) {
   const orderIdLabel = document.createElement('span');
   orderIdLabel.textContent = `${s.orderIdLabel} `;
   const orderIdValue = document.createElement('strong');
-  orderIdValue.textContent = orderId;
+  const friendlyOrderNumber = order?.number || order?.orderNumber
+    || `#${orderId.replace(/-/g, '').slice(-8).toUpperCase()}`;
+  orderIdValue.textContent = friendlyOrderNumber;
   orderIdEl.append(orderIdLabel, orderIdValue);
   headerSection.appendChild(orderIdEl);
 
@@ -186,17 +188,32 @@ export default async function decorate(block) {
     const totalsSection = document.createElement('div');
     totalsSection.className = 'order-totals';
 
+    const shippingRate = preview.shippingMethod?.rate;
+    const shippingDisplay = shippingRate === 0
+      ? s.free
+      : formatPrice(parseFloat(shippingRate || 0), currencyCode);
+
     const rows = [
       [s.subtotal, formatPrice(parseFloat(preview.subtotal), currencyCode)],
-      [s.shipping, preview.shippingMethod?.rate === 0
-        ? s.free
-        : formatPrice(parseFloat(preview.shippingMethod?.rate || 0), currencyCode)],
-      [s.orderTax, formatPrice(parseFloat(preview.taxAmount), currencyCode)],
+      [s.shipping, shippingDisplay],
     ];
 
-    rows.forEach(([label, value]) => {
+    if (preview.discounts?.length) {
+      preview.discounts.forEach((discount) => {
+        const label = discount.name || s.discount;
+        const amount = discount.freeShipping
+          ? parseFloat(shippingRate || 0)
+          : Math.abs(parseFloat(discount.amount));
+        const value = formatPrice(-amount, currencyCode);
+        rows.push([label, value, 'order-totals-discount']);
+      });
+    }
+
+    rows.push([s.orderTax, formatPrice(parseFloat(preview.taxAmount), currencyCode)]);
+
+    rows.forEach(([label, value, extraClass]) => {
       const row = document.createElement('div');
-      row.className = 'order-totals-row';
+      row.className = extraClass ? `order-totals-row ${extraClass}` : 'order-totals-row';
       const labelEl = document.createElement('span');
       labelEl.textContent = label;
       const valueEl = document.createElement('span');

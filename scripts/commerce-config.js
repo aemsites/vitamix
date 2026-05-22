@@ -57,7 +57,7 @@ const defaults = {
       orderPaymentFailed: 'Payment could not be processed. Please try again.',
       orderReturnToCheckout: 'Return to checkout',
       orderThankYou: 'Thank you for your order!',
-      orderIdLabel: 'Order ID:',
+      orderIdLabel: 'Order number:',
       orderConfirmationEmail: 'A confirmation will be sent to {email}.',
       orderItemsOrdered: 'Items ordered',
       orderQtyLabel: 'Qty:',
