@@ -128,19 +128,18 @@ export class Cart {
   }
 
   /**
-   * Add an item to the cart. If an entry with the same SKU already exists,
-   * the merge succeeds only when the existing and incoming `custom` payloads
-   * are deep-equal; on merge, quantity is incremented by the incoming
-   * quantity. A `custom` mismatch throws — defensive guard against UI bugs.
+   * Add an item to the cart. Merges quantity into an existing entry only when
+   * both SKU and `custom` payload match exactly. Items with the same SKU but
+   * different `custom` payloads (e.g. the same warranty SKU linked to two
+   * different parent products) are kept as separate entries.
    *
    * @param {CartItem} item
    */
   addItem(item) {
-    const existing = this.#items.find((i) => i.sku === item.sku);
+    const existing = this.#items.find(
+      (i) => i.sku === item.sku && deepEqual(i.custom, item.custom),
+    );
     if (existing) {
-      if (!deepEqual(existing.custom, item.custom)) {
-        throw new Error(`Cannot merge cart item ${item.sku}: incompatible custom payloads`);
-      }
       existing.quantity += item.quantity;
     } else {
       this.#items.push(item);
@@ -182,9 +181,14 @@ export class Cart {
 
   /**
    * @param {string} sku
+   * @param {string} [linkedTo] When provided, removes only the entry whose
+   *   `custom.linkedTo` matches — needed when the same warranty SKU appears
+   *   multiple times linked to different parent products.
    */
-  removeItem(sku) {
-    const index = this.#items.findIndex((i) => i.sku === sku);
+  removeItem(sku, linkedTo = undefined) {
+    const index = this.#items.findIndex(
+      (i) => i.sku === sku && (linkedTo === undefined || i.custom?.linkedTo === linkedTo),
+    );
     const item = index === -1 ? undefined : this.#items[index];
     if (index !== -1) {
       this.#items.splice(index, 1);

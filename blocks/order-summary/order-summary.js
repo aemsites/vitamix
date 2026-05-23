@@ -310,7 +310,9 @@ export default async function decorate(block) {
           item,
           linkedWarranty,
           (tier) => {
-            if (linkedWarranty) cart.removeItem(linkedWarranty.sku);
+            if (linkedWarranty) {
+              cart.removeItem(linkedWarranty.sku, linkedWarranty.custom?.linkedTo);
+            }
             if (tier && !tier.isDefault && parseFloat(tier.price) > 0) {
               cart.addItem({
                 sku: tier.sku,
@@ -338,7 +340,9 @@ export default async function decorate(block) {
               if (linkedWarranty) cart.updateItem(linkedWarranty.sku, qty);
             },
             onRemove: (sku) => {
-              if (linkedWarranty) cart.removeItem(linkedWarranty.sku);
+              if (linkedWarranty) {
+                cart.removeItem(linkedWarranty.sku, linkedWarranty.custom?.linkedTo);
+              }
               cart.removeItem(sku);
             },
             currencyCode,
