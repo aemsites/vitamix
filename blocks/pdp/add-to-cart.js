@@ -76,6 +76,17 @@ function toggleFixedAddToCart(container) {
 }
 
 /**
+ * Returns how many units may be added given what is already in the cart.
+ * @param {number} requested - Quantity the user selected
+ * @param {number} existing - Quantity already in the cart for this SKU
+ * @param {number} max - Per-product maximum allowed quantity
+ * @returns {number}
+ */
+export function computeAllowedQty(requested, existing, max) {
+  return Math.max(0, Math.min(requested, max - existing));
+}
+
+/**
  * Normalize a price into a number for the edge cart line item.
  * Offers expose a flat numeric price (string or number); simple products
  * without offers expose the Product Bus shape `{ currency, regular, final }`.
@@ -230,6 +241,18 @@ export default function renderAddToCart(ph, block, parent) {
         const cartApi = (await import('../../scripts/cart.js')).default;
 
         const { sku: variantSku, name } = selectedVariant;
+        const targetSku = variantSku ?? sku;
+
+        // Clamp requested quantity so the cart line never exceeds maxQuantity.
+        const requestedQty = parseInt(quantity, 10);
+        const existingQty = cartApi.items.find((i) => i.sku === targetSku)?.quantity ?? 0;
+        const allowedQty = computeAllowedQty(requestedQty, existingQty, maxQuantity);
+        if (allowedQty <= 0) {
+          addToCartButton.textContent = ph.addToCart || 'Add to Cart';
+          addToCartButton.removeAttribute('aria-disabled');
+          return;
+        }
+
         // Prefer the selected variant's price so variant-specific pricing
         // wins; fall back to offers[0] for simple products, where
         // selectedVariant is the parent and has no top-level price.
@@ -261,9 +284,9 @@ export default function renderAddToCart(ph, block, parent) {
         const availableWarranties = warrantyOptions.length > 0 ? warrantyOptions : null;
 
         const item = {
-          sku: variantSku ?? sku,
+          sku: targetSku,
           parentSku: variantSku ? sku : undefined,
-          quantity: parseInt(quantity, 10),
+          quantity: allowedQty,
           price,
           name,
           url: selectedVariant.url,
@@ -284,11 +307,11 @@ export default function renderAddToCart(ph, block, parent) {
           await cartApi.addItem({
             sku: selectedTier.sku,
             path: selectedTier.path,
-            quantity: parseInt(quantity, 10),
+            quantity: allowedQty,
             price: selectedTier.price,
             name: selectedTier.name,
             custom: {
-              linkedTo: variantSku ?? sku,
+              linkedTo: targetSku,
               ...(selectedTier.coverageYears
                 ? { coverageYears: selectedTier.coverageYears }
                 : {}),

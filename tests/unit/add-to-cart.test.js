@@ -6,7 +6,7 @@
  */
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeCartPrice, isVariantAvailableForSale } from '../../blocks/pdp/add-to-cart.js';
+import { normalizeCartPrice, isVariantAvailableForSale, computeAllowedQty } from '../../blocks/pdp/add-to-cart.js';
 import { __setMetadata, __resetMetadata } from './mocks/aem.mjs';
 import { __setOutOfStockSkus, __resetScripts } from './mocks/scripts.mjs';
 
@@ -103,4 +103,26 @@ test('isVariantAvailableForSale: page metadata gate wins over variant flags', ()
     isVariantAvailableForSale(inStockVariant({ managedStock: '0' })),
     false,
   );
+});
+
+// --- computeAllowedQty -------------------------------------------------------
+
+test('computeAllowedQty: full quantity allowed when cart is empty', () => {
+  assert.equal(computeAllowedQty(3, 0, 3), 3);
+});
+
+test('computeAllowedQty: zero allowed when already at max', () => {
+  assert.equal(computeAllowedQty(3, 3, 3), 0);
+});
+
+test('computeAllowedQty: partial quantity allowed when cart is partially full', () => {
+  assert.equal(computeAllowedQty(3, 1, 3), 2);
+});
+
+test('computeAllowedQty: normal single-unit add', () => {
+  assert.equal(computeAllowedQty(1, 0, 3), 1);
+});
+
+test('computeAllowedQty: clamps to zero, not negative, when existing exceeds max', () => {
+  assert.equal(computeAllowedQty(1, 4, 3), 0);
 });
