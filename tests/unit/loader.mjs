@@ -16,8 +16,8 @@ const mockUrl = (file) => pathToFileURL(resolvePath(here, 'mocks', file)).href;
 
 const redirects = [
   { match: (s) => s === './commerce-config.js' || s.endsWith('/commerce-config.js'), file: 'commerce-config.mjs' },
-  { match: (s) => s.endsWith('/scripts/aem.js'), file: 'aem.mjs' },
-  { match: (s) => s.endsWith('/scripts/scripts.js'), file: 'scripts.mjs' },
+  { match: (s) => s === './aem.js' || s.endsWith('/scripts/aem.js'), file: 'aem.mjs' },
+  { match: (s) => s === './scripts.js' || s.endsWith('/scripts/scripts.js'), file: 'scripts.mjs' },
 ];
 
 export async function resolve(specifier, context, nextResolve) {

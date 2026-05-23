@@ -25,5 +25,6 @@ export function getConfig() {
     currency: currencyOverride !== undefined ? currencyOverride : 'USD',
     getStrings: () => ({}),
     getOrderPath: (key) => `/${key}`,
+    apiOrigin: 'https://api.test.com/test-org/sites/test-site',
   };
 }
