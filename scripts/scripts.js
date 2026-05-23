@@ -1386,11 +1386,12 @@ async function loadEager(doc) {
   const main = doc.querySelector('main');
   if (main) {
     decorateMain(main);
-    /* adjust shop images to locale root path, util all of shop is mapped */
-    if (window.location.pathname.includes('/shop/')
-      || window.location.pathname.includes('/foundation/')
-      || window.location.pathname.includes('/commercial/')
-      || window.location.pathname.includes('/catalog/product_compare/')) {
+    /* adjust images to locale root path, can be removed once migration is complete */
+    const innerPath = window.location.pathname.substring(9);
+    if (innerPath.startsWith('/shop/')
+      || innerPath.startsWith('/foundation/')
+      || innerPath.startsWith('/commercial/')
+      || innerPath.startsWith('/catalog/product_compare/')) {
       const images = doc.querySelectorAll('img[src*="/media_"]');
       images.forEach((img) => {
         img.setAttribute('src', `/us/en_us/media_${img.getAttribute('src').split('/media_').pop()}`);
