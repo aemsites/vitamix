@@ -76,7 +76,7 @@ function buildTemplate(s) {
         <span>${s.subtotal}</span>
         <span class="order-summary-subtotal"></span>
       </div>
-      <div class="order-summary-discounts"></div>
+      <div class="order-summary-discounts" hidden></div>
       <div class="order-summary-row">
         <span>${s.shipping}</span>
         <span class="order-summary-shipping"></span>
@@ -234,6 +234,7 @@ export default async function decorate(block) {
     sessionStorage.removeItem('checkout_coupon_code');
     discountInput.value = '';
     discountsEl.innerHTML = '';
+    discountsEl.hidden = true;
     couponErrorEl.hidden = true;
     document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
   };
@@ -249,6 +250,7 @@ export default async function decorate(block) {
 
   const showPendingDiscount = (code) => {
     discountsEl.innerHTML = '';
+    discountsEl.hidden = false;
     const row = document.createElement('div');
     row.className = 'order-summary-row order-summary-discount-item order-summary-discount-pending';
     const labelGroup = document.createElement('span');
@@ -275,6 +277,7 @@ export default async function decorate(block) {
     if (!code) {
       sessionStorage.removeItem('checkout_coupon_code');
       discountsEl.innerHTML = '';
+      discountsEl.hidden = true;
       return;
     }
 
@@ -400,7 +403,9 @@ export default async function decorate(block) {
     subtotalEl.textContent = formatPrice(subtotal, currency);
 
     discountsEl.innerHTML = '';
+    discountsEl.hidden = true;
     discounts.filter((d) => d.amount > 0).forEach((d) => {
+      discountsEl.hidden = false;
       const row = document.createElement('div');
       row.className = 'order-summary-row order-summary-discount-item';
       if (d.source === 'coupon') {
