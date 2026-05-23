@@ -29,3 +29,5 @@ export function checkVariantOutOfStock(sku) {
 export function getLocaleAndLanguage() {
   return locale;
 }
+
+export const isProdHost = false;
