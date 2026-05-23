@@ -10,7 +10,7 @@ export default {
   // Affirm SDK is bootstrapped after initiatePayment returns env-specific config
   load: async () => {},
 
-  isAvailable: () => true,
+  isAvailable: (total, config) => total == null || total >= (config?.affirmMinOrderTotal ?? 50),
 
   renderExpressButton: () => {},
 
