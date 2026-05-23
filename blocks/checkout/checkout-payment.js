@@ -217,7 +217,7 @@ export function renderPaymentSection(container, activeProviders, callbacks, stri
  * @param {Object} config
  * @param {Object} strings
  */
-export async function initPayment(container, providers, callbacks, config, strings) {
+export async function initPayment(container, providers, callbacks, config, strings, cartTotal) {
   const active = getActiveProviders(providers);
 
   await Promise.all(
@@ -229,7 +229,7 @@ export async function initPayment(container, providers, callbacks, config, strin
   );
 
   const available = active.filter((p) => {
-    try { return p.isAvailable(); } catch { return false; }
+    try { return p.isAvailable(cartTotal, config); } catch { return false; }
   });
 
   renderPaymentSection(container, available, callbacks, strings, config);
