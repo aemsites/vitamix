@@ -4,5 +4,6 @@ const debug = (
   );
 
 if (debug) {
+  /* eslint-disable-next-line no-console */
   console.log('Adobe Analytics instrumentation loaded');
 }
