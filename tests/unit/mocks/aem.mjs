@@ -19,3 +19,8 @@ export function __resetMetadata() {
 export function getMetadata(name) {
   return metadata[name] ?? '';
 }
+
+// eslint-disable-next-line no-empty-function
+export async function loadScript() {}
+// eslint-disable-next-line no-empty-function
+export async function loadCSS() {}

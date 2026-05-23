@@ -268,6 +268,20 @@ export async function validateApplePayMerchant(validationUrl, country, locale) {
 }
 
 /**
+ * Fetches a single order by order ID and customer email.
+ * No authentication required — knowing the email and order ID is sufficient
+ * proof for guest order lookups (post-checkout confirmation, order status).
+ *
+ * @param {string} email - Customer email address
+ * @param {string} orderId - The order ID returned by createOrder
+ * @returns {Promise<{ order: Object }>}
+ * @throws {CommerceApiError} If order not found or email doesn't match
+ */
+export async function getOrder(email, orderId) {
+  return request(`/customers/${email}/orders/${orderId}`, null, 'GET');
+}
+
+/**
  * Normalises a checkout:preview payload into scalar price values.
  * @param {Object} preview
  * @param {number} cartSubtotal - fallback when preview.subtotal is absent

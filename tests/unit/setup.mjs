@@ -4,10 +4,10 @@
  *
  *   1. Register the ESM loader (loader.mjs) so imports of commerce-config.js
  *      resolve to the test mock.
- *   2. Install browser-shaped globals (localStorage, document, window,
- *      CustomEvent) that the modules under test depend on.
- *   3. Expose `globalThis.__events` (dispatch log) and `globalThis.__resetTestState`
- *      (per-test isolation helper) for use in test files.
+ *   2. Install browser-shaped globals (localStorage, sessionStorage, document,
+ *      window, CustomEvent, fetch) that the modules under test depend on.
+ *   3. Expose `globalThis.__events` (dispatch log), `globalThis.__setFetchMock`,
+ *      and `globalThis.__resetTestState` (per-test isolation helper).
  */
 import { register } from 'node:module';
 
@@ -25,6 +25,25 @@ globalThis.localStorage = {
   setItem(key, value) { storage.set(key, String(value)); },
   removeItem(key) { storage.delete(key); },
   clear() { storage.clear(); },
+};
+
+// sessionStorage — same surface, separate backing store.
+const session = new Map();
+globalThis.sessionStorage = {
+  getItem(key) { return session.has(key) ? session.get(key) : null; },
+  setItem(key, value) { session.set(key, String(value)); },
+  removeItem(key) { session.delete(key); },
+  clear() { session.clear(); },
+};
+
+// fetch — configurable mock. Test files call __setFetchMock(fn) to install a
+// handler; the default handler throws so unconfigured calls are caught early.
+let fetchHandler = null;
+globalThis.__setFetchMock = (fn) => { fetchHandler = fn; };
+globalThis.__clearFetchMock = () => { fetchHandler = null; };
+globalThis.fetch = async (url, init) => {
+  if (!fetchHandler) throw new Error(`fetch called without a mock: ${url}`);
+  return fetchHandler(url, init);
 };
 
 // document.cookie — minimal jar that supports `key=value; attr=...; attr=...`.
@@ -64,7 +83,9 @@ globalThis.CustomEvent = class CustomEvent {
 globalThis.__events = [];
 globalThis.__resetTestState = () => {
   storage.clear();
+  session.clear();
   cookies.clear();
   globalThis.__events.length = 0;
+  fetchHandler = null;
   __resetConfig();
 };

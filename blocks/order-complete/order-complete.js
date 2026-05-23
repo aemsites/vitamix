@@ -1,4 +1,5 @@
 import { getConfig, formatPrice } from '../../scripts/commerce-config.js';
+import { getOrder } from '../../scripts/commerce-api.js';
 
 /**
  * Order confirmation / cancellation page.
@@ -7,7 +8,10 @@ import { getConfig, formatPrice } from '../../scripts/commerce-config.js';
  * Cancel:  Chase / PayPal → API → redirect here with ?orderId=...&reason=...
  *   reason values: customer_cancelled | payment_failed | declined
  *
- * Order display data comes from sessionStorage (saved before the payment redirect).
+ * Order display data is fetched from the API using the orderId and email from
+ * the URL / sessionStorage. sessionStorage is used as a fallback when the API
+ * call fails, and for totals (preview) and enriched item display data (cartItems)
+ * which are not stored on the order.
  */
 export default async function decorate(block) {
   const config = getConfig();
@@ -81,6 +85,16 @@ export default async function decorate(block) {
     // cart may not be available
   }
 
+  // fetch authoritative order data from the API; fall back to sessionStorage on failure
+  if (orderId && email) {
+    try {
+      const result = await getOrder(email, orderId);
+      order = result.order;
+    } catch {
+      // use sessionStorage order as fallback
+    }
+  }
+
   // build confirmation page
   const container = document.createElement('div');
   container.className = 'order-result order-confirmed';
@@ -103,7 +117,7 @@ export default async function decorate(block) {
   const orderIdLabel = document.createElement('span');
   orderIdLabel.textContent = `${s.orderIdLabel} `;
   const orderIdValue = document.createElement('strong');
-  const friendlyOrderNumber = order?.number || order?.orderNumber
+  const friendlyOrderNumber = order?.friendlyId || order?.number || order?.orderNumber
     || `#${orderId.replace(/-/g, '').slice(-8).toUpperCase()}`;
   orderIdValue.textContent = friendlyOrderNumber;
   orderIdEl.append(orderIdLabel, orderIdValue);
@@ -159,10 +173,13 @@ export default async function decorate(block) {
       name.textContent = item.name || item.sku;
       details.appendChild(name);
 
-      if (item.variant) {
+      const variantLabel = item.variant
+        || item.selectedOptions?.map((o) => o.value).join(' / ')
+        || null;
+      if (variantLabel) {
         const variant = document.createElement('p');
         variant.className = 'order-item-variant';
-        variant.textContent = item.variant;
+        variant.textContent = variantLabel;
         details.appendChild(variant);
       }
 
@@ -184,23 +201,32 @@ export default async function decorate(block) {
     leftCol.appendChild(itemsSection);
   }
 
-  // totals
-  if (preview) {
+  // totals — read from order.estimates (API); fall back to sessionStorage preview
+  const est = order?.estimates;
+  const totalsSubtotal = est
+    ? order.items?.reduce((acc, i) => acc + parseFloat(i.price?.final || 0) * i.quantity, 0) ?? 0
+    : parseFloat(preview?.subtotal);
+  const totalsShippingMethod = est ? (est.shippingMethod || {}) : (preview?.shippingMethod || {});
+  const totalsDiscounts = est ? (est.discounts || []) : (preview?.discounts || []);
+  const totalsTax = parseFloat(est ? (est.tax?.amount || 0) : (preview?.taxAmount || 0));
+  const totalsTotal = parseFloat(est ? (order.payment?.amount || 0) : (preview?.total || 0));
+
+  if (est || preview) {
     const totalsSection = document.createElement('div');
     totalsSection.className = 'order-totals';
 
-    const shippingRate = preview.shippingMethod?.rate;
+    const shippingRate = totalsShippingMethod.rate;
     const shippingDisplay = shippingRate === 0
       ? s.free
       : formatPrice(parseFloat(shippingRate || 0), currencyCode);
 
     const rows = [
-      [s.subtotal, formatPrice(parseFloat(preview.subtotal), currencyCode)],
+      [s.subtotal, formatPrice(totalsSubtotal, currencyCode)],
       [s.shipping, shippingDisplay],
     ];
 
-    if (preview.discounts?.length) {
-      preview.discounts.forEach((discount) => {
+    if (totalsDiscounts.length) {
+      totalsDiscounts.forEach((discount) => {
         const label = discount.name || s.discount;
         const amount = discount.freeShipping
           ? parseFloat(shippingRate || 0)
@@ -210,7 +236,7 @@ export default async function decorate(block) {
       });
     }
 
-    rows.push([s.orderTax, formatPrice(parseFloat(preview.taxAmount), currencyCode)]);
+    rows.push([s.orderTax, formatPrice(totalsTax, currencyCode)]);
 
     rows.forEach(([label, value, extraClass]) => {
       const row = document.createElement('div');
@@ -228,7 +254,7 @@ export default async function decorate(block) {
     const totalLabel = document.createElement('strong');
     totalLabel.textContent = s.total;
     const totalValue = document.createElement('strong');
-    totalValue.textContent = formatPrice(parseFloat(preview.total), currencyCode);
+    totalValue.textContent = formatPrice(totalsTotal, currencyCode);
     totalRow.append(totalLabel, totalValue);
     totalsSection.appendChild(totalRow);
 
