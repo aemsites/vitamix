@@ -36,6 +36,8 @@ if (pathname.startsWith('/us/en_us/')) {
   import('./consented/adobe-target.js');
 }
 
+import('./consented/instrumentation.js');
+
 /* eslint-disable */
 
 loadScript('https://www.googletagmanager.com/gtag/js?id=AW-1070742187', { 'data-cookieconsent': 'marketing' });
