@@ -154,16 +154,16 @@ export default async function decorate(block) {
       const itemEl = document.createElement('div');
       itemEl.className = 'order-item';
 
-      const itemImage = item.image || item.imageUrl;
-      if (itemImage) {
-        const imgWrapper = document.createElement('div');
-        imgWrapper.className = 'order-item-image';
+      const imgWrapper = document.createElement('div');
+      imgWrapper.className = 'order-item-image';
+      const imageSrc = item.image || (item.custom?.linkedTo ? '/icons/full-warranty.svg' : null);
+      if (imageSrc) {
         const img = document.createElement('img');
-        img.src = itemImage;
+        img.src = imageSrc;
         img.alt = item.name || '';
         imgWrapper.appendChild(img);
-        itemEl.appendChild(imgWrapper);
       }
+      itemEl.appendChild(imgWrapper);
 
       const details = document.createElement('div');
       details.className = 'order-item-details';
