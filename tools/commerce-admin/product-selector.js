@@ -299,16 +299,99 @@ export function mountProductSelector(container, options = {}) {
     updateStatus();
   }
 
-  function removeProduct(path) {
-    selectedProducts.delete(path);
+  function updateClearAllBtn() {
+    if (clearAllBtn) {
+      clearAllBtn.disabled = selectedProducts.size === 0 && selectedCategories.size === 0;
+    }
+  }
+
+  function setPickerPillSelected(pill, selected) {
+    pill.classList.toggle('ps-pill-is-selected', selected);
+    pill.setAttribute('aria-selected', selected ? 'true' : 'false');
+    const title = pill.querySelector('.ps-pill-label')?.textContent?.trim() || pill.dataset.key || '';
+    pill.setAttribute(
+      'aria-label',
+      selected ? `Remove ${title} from selection` : `Add ${title} to selection`,
+    );
+  }
+
+  function findPickerPill(kind, key) {
+    if (!pickerEl || !key) return null;
+    return pickerEl.querySelector(
+      `.ps-picker-pill[data-kind="${kind}"][data-key="${CSS.escape(key)}"]`,
+    );
+  }
+
+  function selectionPillInDom(kind, key) {
+    if (!selectionPillsEl || !key) return null;
+    if (kind === 'product') {
+      return selectionPillsEl.querySelector(`.ps-pill[data-path="${CSS.escape(key)}"]`);
+    }
+    return selectionPillsEl.querySelector(`.ps-pill[data-slug="${CSS.escape(key)}"]`);
+  }
+
+  function showSelectionEmpty() {
+    if (!selectionPillsEl) return;
+    if (selectionPillsEl.querySelector('.ps-pill')) return;
+    if (selectionPillsEl.querySelector('.ps-pills-empty')) return;
+    const empty = document.createElement('span');
+    empty.className = 'ps-pills-empty';
+    empty.textContent = 'Nothing selected yet — pick items below.';
+    selectionPillsEl.appendChild(empty);
+  }
+
+  function hideSelectionEmpty() {
+    selectionPillsEl?.querySelector('.ps-pills-empty')?.remove();
+  }
+
+  function insertSelectionPill(kind, key) {
+    if (!selectionPillsEl || !scopeContext || selectionPillInDom(kind, key)) return;
+    hideSelectionEmpty();
+    const newEl = kind === 'product'
+      ? createProductScopePillEl(scopeContext, key, { removable: true })
+      : createCategoryScopePillEl(scopeContext, key, { removable: true });
+    const label = newEl.querySelector('.ps-pill-label')?.textContent?.trim() || key;
+    const pills = [...selectionPillsEl.querySelectorAll('.ps-pill')];
+    const insertBefore = pills.find((pill) => {
+      const pillLabel = pill.querySelector('.ps-pill-label')?.textContent?.trim() || '';
+      return label.localeCompare(pillLabel, undefined, { sensitivity: 'base' }) < 0;
+    });
+    if (insertBefore) selectionPillsEl.insertBefore(newEl, insertBefore);
+    else selectionPillsEl.appendChild(newEl);
+  }
+
+  function removeSelectionPillFromDom(kind, key) {
+    selectionPillInDom(kind, key)?.remove();
+    showSelectionEmpty();
+  }
+
+  function applySelectionToggle(kind, key, selected, pickerPill = null) {
+    if (!key) return;
+    if (kind === 'product') {
+      if (selected) selectedProducts.add(key);
+      else selectedProducts.delete(key);
+    } else if (kind === 'category') {
+      if (selected) selectedCategories.add(key);
+      else selectedCategories.delete(key);
+    } else {
+      return;
+    }
     syncInputs();
-    renderAll();
+    if (selected) insertSelectionPill(kind, key);
+    else removeSelectionPillFromDom(kind, key);
+    const pickerElMatch = pickerPill || findPickerPill(kind, key);
+    if (pickerElMatch) setPickerPillSelected(pickerElMatch, selected);
+    updateClearAllBtn();
+  }
+
+  function removeProduct(path) {
+    if (!selectedProducts.has(path)) return;
+    applySelectionToggle('product', path, false);
   }
 
   function removeCategory(slug) {
-    selectedCategories.delete(slug);
-    syncInputs();
-    renderAll();
+    if (!selectedCategories.has(slug)) return;
+    applySelectionToggle('category', slug, false);
   }
 
   function renderSelection() {
@@ -324,14 +407,23 @@ export function mountProductSelector(container, options = {}) {
 
   function renderPicker() {
     if (!pickerEl || !scopeContext) return;
+    const { scrollTop } = pickerEl;
     pickerEl.replaceChildren();
 
-    if (loading) return;
+    const restoreScroll = () => {
+      pickerEl.scrollTop = scrollTop;
+    };
+
+    if (loading) {
+      restoreScroll();
+      return;
+    }
     if (loadError) {
       const err = document.createElement('span');
       err.className = 'ps-pills-empty';
       err.textContent = loadError;
       pickerEl.appendChild(err);
+      restoreScroll();
       return;
     }
 
@@ -381,6 +473,7 @@ export function mountProductSelector(container, options = {}) {
         ? 'No matches — try another search or switch the filter tab.'
         : 'Nothing to show for this filter.';
       pickerEl.appendChild(empty);
+      restoreScroll();
       return;
     }
 
@@ -406,6 +499,7 @@ export function mountProductSelector(container, options = {}) {
       more.textContent = `Showing first ${MAX_PICKER_ROWS} of ${rows.length} matches — refine your search.`;
       pickerEl.appendChild(more);
     }
+    restoreScroll();
   }
 
   function updateStatus() {
@@ -479,15 +573,11 @@ export function mountProductSelector(container, options = {}) {
     const { kind } = pill.dataset;
     const { key } = pill.dataset;
     if (!key) return;
-    if (kind === 'product') {
-      if (selectedProducts.has(key)) selectedProducts.delete(key);
-      else selectedProducts.add(key);
-    } else if (kind === 'category') {
-      if (selectedCategories.has(key)) selectedCategories.delete(key);
-      else selectedCategories.add(key);
-    }
-    syncInputs();
-    renderAll();
+    let selected = false;
+    if (kind === 'product') selected = !selectedProducts.has(key);
+    else if (kind === 'category') selected = !selectedCategories.has(key);
+    else return;
+    applySelectionToggle(kind, key, selected, pill);
   }
 
   pickerEl?.addEventListener('click', (e) => {
@@ -534,10 +624,24 @@ export function mountProductSelector(container, options = {}) {
   });
 
   clearAllBtn?.addEventListener('click', () => {
+    const prodKeys = [...selectedProducts];
+    const catKeys = [...selectedCategories];
     selectedProducts = new Set();
     selectedCategories = new Set();
     syncInputs();
-    renderAll();
+    if (selectionPillsEl) {
+      selectionPillsEl.replaceChildren();
+      showSelectionEmpty();
+    }
+    prodKeys.forEach((k) => {
+      const pill = findPickerPill('product', k);
+      if (pill) setPickerPillSelected(pill, false);
+    });
+    catKeys.forEach((k) => {
+      const pill = findPickerPill('category', k);
+      if (pill) setPickerPillSelected(pill, false);
+    });
+    updateClearAllBtn();
   });
 
   productsInput?.addEventListener('change', onProductsInputChange);
