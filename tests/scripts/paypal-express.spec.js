@@ -448,8 +448,8 @@ test.describe('onApprove callback', () => {
     expect(orderBody.customer.lastName).toBe('Doe');
     expect(orderBody.customer.email).toBe('john@example.com');
     expect(orderBody.customer.phone).toBe('');
-    expect(orderBody.shipping).toEqual(SESSION.shippingAddress);
-    expect(orderBody.billing).toEqual(SESSION.shippingAddress);
+    expect(orderBody.shipping).toEqual({ name: 'John Doe', ...SESSION.shippingAddress, email: 'john@example.com' });
+    expect(orderBody.billing).toEqual({ name: 'John Doe', ...SESSION.shippingAddress, email: 'john@example.com' });
     expect(orderBody.shippingMethod.id).toBe('std');
     expect(orderBody.estimateToken).toBe('est-tok');
     expect(orderBody.country).toBe('us');

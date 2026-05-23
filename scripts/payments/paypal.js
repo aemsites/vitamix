@@ -262,8 +262,16 @@ export default {
               email: session.payer.email,
               phone: '',
             },
-            shipping: { ...session.shippingAddress, email: session.payer.email },
-            billing: { ...session.shippingAddress, email: session.payer.email },
+            shipping: {
+              name: `${session.payer.firstName} ${session.payer.lastName}`.trim(),
+              ...session.shippingAddress,
+              email: session.payer.email,
+            },
+            billing: {
+              name: `${session.payer.firstName} ${session.payer.lastName}`.trim(),
+              ...session.shippingAddress,
+              email: session.payer.email,
+            },
             items: cart.getItemsForAPI(),
             shippingMethod: { id: session.selectedOptionId },
             estimateToken: state.currentEstimateToken,
