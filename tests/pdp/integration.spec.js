@@ -63,9 +63,22 @@ test.describe('PDP Integration Tests', () => {
     });
 
     test('add to cart button should work', async ({ page }) => {
+      await page.route('**/customer/section/load/**', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            cart: { items: [], summary_count: 0, data_id: 12345 },
+            customer: { data_id: 12345 },
+            'side-by-side': { cart_id: 'test-cart-id', data_id: 12345 },
+          }),
+        });
+      });
+
       await page.route('**/graphql', async (route) => {
         const requestBody = route.request().postDataJSON();
         expect(requestBody.variables).toEqual({
+          cartId: 'test-cart-id',
           cartItems: [
             {
               sku: 'Ascent X2',
@@ -99,7 +112,7 @@ test.describe('PDP Integration Tests', () => {
         });
       });
 
-      const productUrl = buildProductUrl(productPath, currentBranch);
+      const productUrl = buildProductUrl(productPath, currentBranch, { cart: 'magento' });
       await page.goto(productUrl);
 
       // Wait for add to cart button
@@ -121,9 +134,22 @@ test.describe('PDP Integration Tests', () => {
     });
 
     test('dialog should be shown if add to cart fails', async ({ page }) => {
+      await page.route('**/customer/section/load/**', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            cart: { items: [], summary_count: 0, data_id: 12345 },
+            customer: { data_id: 12345 },
+            'side-by-side': { cart_id: 'test-cart-id', data_id: 12345 },
+          }),
+        });
+      });
+
       await page.route('**/graphql', async (route) => {
         const requestBody = route.request().postDataJSON();
         expect(requestBody.variables).toEqual({
+          cartId: 'test-cart-id',
           cartItems: [
             {
               sku: 'Ascent X2',
@@ -166,7 +192,7 @@ test.describe('PDP Integration Tests', () => {
         });
       });
 
-      const productUrl = buildProductUrl(productPath, currentBranch);
+      const productUrl = buildProductUrl(productPath, currentBranch, { cart: 'magento' });
       await page.goto(productUrl);
 
       // Wait for add to cart button
@@ -225,7 +251,7 @@ test.describe('PDP Integration Tests', () => {
         });
       });
 
-      const productUrl = buildProductUrl(productPath, currentBranch, { COUPON: 'test' });
+      const productUrl = buildProductUrl(productPath, currentBranch, { cart: 'magento', COUPON: 'test' });
       console.log('productUrl: ', productUrl);
       await page.goto(productUrl);
 
@@ -309,9 +335,22 @@ test.describe('PDP Integration Tests', () => {
     });
 
     test('add to cart button should work', async ({ page }) => {
+      await page.route('**/customer/section/load/**', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            cart: { items: [], summary_count: 0, data_id: 12345 },
+            customer: { data_id: 12345 },
+            'side-by-side': { cart_id: 'test-cart-id', data_id: 12345 },
+          }),
+        });
+      });
+
       await page.route('**/graphql', async (route) => {
         const requestBody = route.request().postDataJSON();
         expect(requestBody.variables).toEqual({
+          cartId: 'test-cart-id',
           cartItems: [
             {
               sku: 'VBND5200LB',
@@ -348,7 +387,7 @@ test.describe('PDP Integration Tests', () => {
         });
       });
 
-      const productUrl = buildProductUrl(productPath, currentBranch);
+      const productUrl = buildProductUrl(productPath, currentBranch, { cart: 'magento' });
       await page.goto(productUrl);
 
       // Wait for add to cart button
@@ -410,7 +449,7 @@ test.describe('PDP Integration Tests', () => {
         });
       });
 
-      const productUrl = buildProductUrl(productPath, currentBranch);
+      const productUrl = buildProductUrl(productPath, currentBranch, { cart: 'magento' });
       await page.goto(productUrl);
 
       // Wait for add to cart button
@@ -488,7 +527,7 @@ test.describe('PDP Integration Tests', () => {
         await route.fulfill({ status: 200 });
       });
 
-      const productUrl = buildProductUrl(productPath, currentBranch);
+      const productUrl = buildProductUrl(productPath, currentBranch, { cart: 'magento' });
       await page.goto(productUrl);
       await waitForElement(page, '.quantity-container button');
 
@@ -534,9 +573,22 @@ test.describe('PDP Integration Tests', () => {
     });
 
     test('add to cart button should work', async ({ page }) => {
+      await page.route('**/customer/section/load/**', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            cart: { items: [], summary_count: 0, data_id: 12345 },
+            customer: { data_id: 12345 },
+            'side-by-side': { cart_id: 'test-cart-id', data_id: 12345 },
+          }),
+        });
+      });
+
       await page.route('**/graphql', async (route) => {
         const requestBody = route.request().postDataJSON();
         expect(requestBody.variables).toEqual({
+          cartId: 'test-cart-id',
           cartItems: [
             {
               sku: '056264',
@@ -568,7 +620,7 @@ test.describe('PDP Integration Tests', () => {
         });
       });
 
-      const productUrl = buildProductUrl(productPath, currentBranch);
+      const productUrl = buildProductUrl(productPath, currentBranch, { cart: 'magento' });
       await page.goto(productUrl);
 
       // Wait for add to cart button
