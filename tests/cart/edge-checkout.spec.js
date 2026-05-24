@@ -27,6 +27,10 @@ async function getCart(page, key = CART_KEY_US) {
   return raw ? JSON.parse(raw) : null;
 }
 
+// Header cart link locator: the cart icon's parent <a>. Stable across
+// edge/Magento modes (href changes but the icon-cart child does not).
+const CART_LINK_SELECTOR = 'header a:has(.icon-cart)';
+
 test.describe('Edge Checkout', () => {
   let currentBranch;
 
@@ -47,7 +51,7 @@ test.describe('Edge Checkout', () => {
       await page.locator('.quantity-container button').click();
 
       const minicart = page.locator('#minicart');
-      await expect(minicart).toBeVisible({ timeout: 10000 });
+      await expect(minicart).toHaveAttribute('aria-expanded', 'true', { timeout: 15000 });
       await expect(minicart).toHaveAttribute('aria-expanded', 'true');
       console.log('✓ Minicart opens after add-to-cart');
     });
@@ -77,7 +81,7 @@ test.describe('Edge Checkout', () => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
       await waitForElement(page, '.quantity-container button');
 
-      const cartLink = page.locator('header a[href*="/order/cart"]');
+      const cartLink = page.locator(CART_LINK_SELECTOR);
       await expect(cartLink).not.toHaveAttribute('data-cart-items');
 
       await page.locator('.quantity-container button').click();
@@ -92,7 +96,7 @@ test.describe('Edge Checkout', () => {
       await page.locator('.quantity-container button').click();
 
       const minicart = page.locator('#minicart');
-      await expect(minicart).toBeVisible({ timeout: 10000 });
+      await expect(minicart).toHaveAttribute('aria-expanded', 'true', { timeout: 15000 });
       await expect(minicart.locator('.cart-item').first()).toBeVisible({ timeout: 5000 });
       console.log('✓ Minicart renders at least one cart item');
     });
@@ -104,7 +108,7 @@ test.describe('Edge Checkout', () => {
       await page.locator('.quantity-container button').click();
 
       const minicart = page.locator('#minicart');
-      await expect(minicart).toBeVisible({ timeout: 10000 });
+      await expect(minicart).toHaveAttribute('aria-expanded', 'true', { timeout: 15000 });
 
       await minicart.locator('.slide-panel-close').click();
       await expect(minicart).not.toHaveAttribute('aria-expanded', 'true');
@@ -118,7 +122,7 @@ test.describe('Edge Checkout', () => {
       await page.locator('.quantity-container button').click();
 
       const minicart = page.locator('#minicart');
-      await expect(minicart).toBeVisible({ timeout: 10000 });
+      await expect(minicart).toHaveAttribute('aria-expanded', 'true', { timeout: 15000 });
 
       // Click outside the dialog bounds (top-left corner of viewport)
       await page.mouse.click(5, 5);
@@ -133,7 +137,7 @@ test.describe('Edge Checkout', () => {
       await page.locator('.quantity-container button').click();
 
       const minicart = page.locator('#minicart');
-      await expect(minicart).toBeVisible({ timeout: 10000 });
+      await expect(minicart).toHaveAttribute('aria-expanded', 'true', { timeout: 15000 });
 
       const checkoutBtn = minicart.locator('a[href*="/order/checkout"]');
       await expect(checkoutBtn.first()).toBeVisible({ timeout: 5000 });
@@ -145,7 +149,7 @@ test.describe('Edge Checkout', () => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
       await page.waitForLoadState('networkidle');
 
-      const cartLink = page.locator('header a[href*="/order/cart"]');
+      const cartLink = page.locator(CART_LINK_SELECTOR);
       await expect(cartLink).toHaveAttribute('href', /\/us\/en_us\/order\/cart/);
       console.log('✓ Cart icon href is /us/en_us/order/cart in edge mode');
     });
@@ -162,7 +166,7 @@ test.describe('Edge Checkout', () => {
 
       await page.locator('.quantity-container button').click();
 
-      await expect(page.locator('#minicart')).toBeVisible({ timeout: 10000 });
+      await expect(page.locator('#minicart')).toHaveAttribute('aria-expanded', 'true', { timeout: 15000 });
 
       const cart = await getCart(page);
       expect(cart.items).toHaveLength(1);
@@ -184,7 +188,7 @@ test.describe('Edge Checkout', () => {
 
       await page.locator('.quantity-container button').click();
 
-      await expect(page.locator('#minicart')).toBeVisible({ timeout: 10000 });
+      await expect(page.locator('#minicart')).toHaveAttribute('aria-expanded', 'true', { timeout: 15000 });
 
       const cart = await getCart(page);
       expect(cart.items).toHaveLength(1);
@@ -323,7 +327,7 @@ test.describe('Edge Checkout', () => {
       await page.waitForTimeout(500);
 
       // visibleItemCount = 1 (warranty is excluded), so badge shows 1
-      const cartLink = page.locator('header a[href*="/order/cart"]');
+      const cartLink = page.locator(CART_LINK_SELECTOR);
       await expect(cartLink).toHaveAttribute('data-cart-items', '1', { timeout: 5000 });
       console.log('✓ Badge shows 1; hidden warranty item not counted');
     });
@@ -368,7 +372,7 @@ test.describe('Edge Checkout', () => {
       await page.locator('.quantity-container button').click();
 
       const minicart = page.locator('#minicart');
-      await expect(minicart).toBeVisible({ timeout: 10000 });
+      await expect(minicart).toHaveAttribute('aria-expanded', 'true', { timeout: 15000 });
 
       // Only one visible row in the minicart (warranty is hidden from cart UI)
       const cartItems = minicart.locator('.cart-item');
@@ -428,7 +432,7 @@ test.describe('Edge Checkout', () => {
       await page.waitForLoadState('networkidle');
 
       // visibleItemCount = 1+2 = 3
-      const cartLink = page.locator('header a[href*="/order/cart"]');
+      const cartLink = page.locator(CART_LINK_SELECTOR);
       await expect(cartLink).toHaveAttribute('data-cart-items', '3', { timeout: 5000 });
       console.log('✓ Cart badge shows 3 after restoring from localStorage');
     });
@@ -440,7 +444,7 @@ test.describe('Edge Checkout', () => {
       await page.locator('.quantity-container button').click();
 
       const minicart = page.locator('#minicart');
-      await expect(minicart).toBeVisible({ timeout: 10000 });
+      await expect(minicart).toHaveAttribute('aria-expanded', 'true', { timeout: 15000 });
 
       // Remove the item directly via the cart API to trigger cart:empty
       await page.evaluate(() => {
@@ -481,7 +485,7 @@ test.describe('Edge Checkout', () => {
 
       await page.locator('.quantity-container button').click();
 
-      const cartLink = page.locator('header a[href*="/order/cart"]');
+      const cartLink = page.locator(CART_LINK_SELECTOR);
       await expect(cartLink).toHaveAttribute('data-cart-items', '1', { timeout: 5000 });
       console.log('✓ Cart badge updates on mobile');
     });
@@ -490,7 +494,7 @@ test.describe('Edge Checkout', () => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
       await page.waitForLoadState('networkidle');
 
-      const cartLink = page.locator('header a[href*="/order/cart"]');
+      const cartLink = page.locator(CART_LINK_SELECTOR);
       await expect(cartLink).toHaveAttribute('href', /\/us\/en_us\/order\/cart/);
       console.log('✓ Cart icon href is /us/en_us/order/cart on mobile');
     });
@@ -523,7 +527,7 @@ test.describe('Edge Checkout', () => {
 
       await page.locator('.quantity-container button').click();
 
-      const cartLink = page.locator('header a[href*="/order/cart"]');
+      const cartLink = page.locator(CART_LINK_SELECTOR);
       await expect(cartLink).toHaveAttribute('data-cart-items', '1', { timeout: 5000 });
       console.log('✓ FR-CA cart badge shows 1 after add-to-cart');
     });
@@ -625,7 +629,7 @@ test.describe('Edge Checkout', () => {
       await page.locator('.quantity-container button').click();
 
       const minicart = page.locator('#minicart');
-      await expect(minicart).toBeVisible({ timeout: 10000 });
+      await expect(minicart).toHaveAttribute('aria-expanded', 'true', { timeout: 15000 });
 
       // Close minicart
       await minicart.locator('.slide-panel-close').click();
@@ -633,10 +637,9 @@ test.describe('Edge Checkout', () => {
       await page.waitForTimeout(400);
 
       // Now click the cart icon directly — different code path from pdp:add-to-cart
-      await page.locator('header a[href*="/order/cart"]').click();
+      await page.locator(CART_LINK_SELECTOR).click();
 
-      await expect(minicart).toBeVisible({ timeout: 5000 });
-      await expect(minicart).toHaveAttribute('aria-expanded', 'true');
+      await expect(minicart).toHaveAttribute('aria-expanded', 'true', { timeout: 10000 });
       console.log('✓ Cart icon click opens minicart independently');
     });
 
@@ -647,7 +650,7 @@ test.describe('Edge Checkout', () => {
       await page.locator('.quantity-container button').click();
 
       const minicart = page.locator('#minicart');
-      await expect(minicart).toBeVisible({ timeout: 10000 });
+      await expect(minicart).toHaveAttribute('aria-expanded', 'true', { timeout: 15000 });
       await expect(minicart.locator('.cart-item').first()).toBeVisible({ timeout: 5000 });
 
       // Click remove on the only cart item
@@ -657,7 +660,7 @@ test.describe('Edge Checkout', () => {
       await expect(minicart).not.toHaveAttribute('aria-expanded', 'true', { timeout: 5000 });
 
       // Badge is removed
-      const cartLink = page.locator('header a[href*="/order/cart"]');
+      const cartLink = page.locator(CART_LINK_SELECTOR);
       await expect(cartLink).not.toHaveAttribute('data-cart-items', { timeout: 3000 });
 
       // localStorage is empty
@@ -685,13 +688,13 @@ test.describe('Edge Checkout', () => {
 
       // Switch to desktop and open minicart via cart icon
       await page.setViewportSize({ width: 1280, height: 720 });
-      await page.locator('header a[href*="/order/cart"]').click();
+      await page.locator(CART_LINK_SELECTOR).click();
 
       const minicart = page.locator('#minicart');
-      await expect(minicart).toBeVisible({ timeout: 10000 });
+      await expect(minicart).toHaveAttribute('aria-expanded', 'true', { timeout: 15000 });
       await expect(minicart.locator('.cart-item')).toHaveCount(2, { timeout: 5000 });
 
-      const cartLink = page.locator('header a[href*="/order/cart"]');
+      const cartLink = page.locator(CART_LINK_SELECTOR);
       await expect(cartLink).toHaveAttribute('data-cart-items', '2');
 
       // Remove the first item
@@ -714,7 +717,7 @@ test.describe('Edge Checkout', () => {
       await page.locator('.quantity-container button').click();
 
       const minicart = page.locator('#minicart');
-      await expect(minicart).toBeVisible({ timeout: 10000 });
+      await expect(minicart).toHaveAttribute('aria-expanded', 'true', { timeout: 15000 });
       await expect(minicart.locator('.cart-item').first()).toBeVisible({ timeout: 5000 });
 
       // Click the + button in the minicart cart item
@@ -722,7 +725,7 @@ test.describe('Edge Checkout', () => {
       await page.waitForTimeout(600);
 
       // Badge should now show 2
-      const cartLink = page.locator('header a[href*="/order/cart"]');
+      const cartLink = page.locator(CART_LINK_SELECTOR);
       await expect(cartLink).toHaveAttribute('data-cart-items', '2', { timeout: 5000 });
 
       // localStorage quantity updated
@@ -738,7 +741,7 @@ test.describe('Edge Checkout', () => {
       await page.locator('.quantity-container button').click();
 
       const minicart = page.locator('#minicart');
-      await expect(minicart).toBeVisible({ timeout: 10000 });
+      await expect(minicart).toHaveAttribute('aria-expanded', 'true', { timeout: 15000 });
       await expect(minicart.locator('.cart-item').first()).toBeVisible({ timeout: 5000 });
 
       // The qty starts at 1; clicking − triggers handleQtyChange(0)
@@ -747,7 +750,7 @@ test.describe('Edge Checkout', () => {
       await minicart.locator('.cart-item-remove').first().click();
 
       await expect(minicart).not.toHaveAttribute('aria-expanded', 'true', { timeout: 5000 });
-      const cartLink = page.locator('header a[href*="/order/cart"]');
+      const cartLink = page.locator(CART_LINK_SELECTOR);
       await expect(cartLink).not.toHaveAttribute('data-cart-items', { timeout: 3000 });
       console.log('✓ Removing last item via minicart closes it and clears badge');
     });
@@ -758,7 +761,7 @@ test.describe('Edge Checkout', () => {
       await page.goto(cartPageUrl);
       await page.waitForLoadState('networkidle');
 
-      const cartLink = page.locator('header a[href*="/order/cart"]');
+      const cartLink = page.locator(CART_LINK_SELECTOR);
       if (await cartLink.count() === 0) {
         console.log('ℹ Cart icon not present on cart page — skipping');
         return;

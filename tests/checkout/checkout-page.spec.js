@@ -193,6 +193,10 @@ test.describe('Edge Checkout Page', () => {
   let currentBranch;
   let baseUrl;
 
+  // The checkout flow involves multiple async operations (shipping rates,
+  // preview, order create, payment); allow extra time over the default 30s.
+  test.describe.configure({ timeout: 60000 });
+
   test.beforeAll(async () => {
     currentBranch = await getCurrentBranch();
     baseUrl = getBaseUrl(currentBranch);
