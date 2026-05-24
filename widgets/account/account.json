@@ -92,7 +92,12 @@
       "questionSubscribed": "You are currently subscribed to periodic emails and newsletters from Vitamix.",
       "subscribe": "Subscribe",
       "unsubscribe": "Unsubscribe",
-      "error": "Something went wrong. Please try again."
+      "error": "Something went wrong. Please try again.",
+      "smsPhone": "Mobile number",
+      "smsStatus": "Text messages",
+      "smsStatusOptedIn": "Subscribed",
+      "smsStatusOptedOut": "Not subscribed",
+      "smsOptInLabel": "Receive text notifications"
     },
     "orderDetail": {
       "back": "← All orders",
@@ -200,7 +205,12 @@
       "questionSubscribed": "Vous êtes actuellement abonné aux courriels et bulletins périodiques de Vitamix.",
       "subscribe": "S'abonner",
       "unsubscribe": "Se désabonner",
-      "error": "Une erreur s'est produite. Veuillez réessayer."
+      "error": "Une erreur s'est produite. Veuillez réessayer.",
+      "smsPhone": "Numéro de mobile",
+      "smsStatus": "Messages texte",
+      "smsStatusOptedIn": "Abonné",
+      "smsStatusOptedOut": "Non abonné",
+      "smsOptInLabel": "Recevoir des notifications par texto"
     },
     "orderDetail": {
       "back": "← Toutes les commandes",
@@ -308,7 +318,12 @@
       "questionSubscribed": "Actualmente está suscrito a correos y boletines periódicos de Vitamix.",
       "subscribe": "Suscribirse",
       "unsubscribe": "Cancelar suscripción",
-      "error": "Algo salió mal. Inténtelo de nuevo."
+      "error": "Algo salió mal. Inténtelo de nuevo.",
+      "smsPhone": "Número de móvil",
+      "smsStatus": "Mensajes de texto",
+      "smsStatusOptedIn": "Suscrito",
+      "smsStatusOptedOut": "No suscrito",
+      "smsOptInLabel": "Recibir notificaciones por mensaje de texto"
     },
     "orderDetail": {
       "back": "← Todos los pedidos",

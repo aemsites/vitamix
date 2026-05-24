@@ -216,6 +216,12 @@
   line-height: 1.55;
 }
 
+@media (width < 900px) {
+  .account-panel-body {
+    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px) + 2.5rem);
+  }
+}
+
 .account-mock-rows {
   margin: 0;
   max-width: 40rem;
@@ -340,6 +346,62 @@
   font-size: var(--commerce-font-size-sm);
   line-height: 1.5;
   color: var(--commerce-color-danger, #b00020);
+}
+
+.account-communications-sms {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--commerce-color-border);
+}
+
+.account-communications-sms .account-mock-row {
+  margin-bottom: 10px;
+}
+
+.account-communications-sms-opt {
+  margin-top: 12px;
+  min-height: 1.5rem;
+}
+
+.account-communications-sms-opt-label {
+  display: none;
+  flex-flow: row nowrap;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 10px;
+  margin: 0;
+  cursor: pointer;
+  color: var(--commerce-color-text);
+  font-size: var(--commerce-font-size-sm);
+  line-height: 1.35;
+}
+
+.account-communications-sms-opt-label.is-visible {
+  display: flex;
+}
+
+.account-communications-sms-checkbox {
+  width: auto;
+  min-width: 1rem;
+  height: auto;
+  margin: 0.15em 0 0;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.account-communications-sms-checkbox:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.account-communications-sms-opt-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.account-communications-sms-opt-shimmer {
+  width: min(100%, 16rem);
+  height: 1.25rem;
 }
 
 .account-address-list {

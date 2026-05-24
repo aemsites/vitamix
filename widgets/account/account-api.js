@@ -12,8 +12,6 @@ function getFormsProfileUrl() {
   return `${FORMS_ENDPOINT}/${locale}/${language}/forms/profile`;
 }
 
-/* eslint-disable no-console -- VITAMIX_ACCOUNT_API_* payload logs for copy/paste integration */
-
 /**
  * GET forms profile: customer record + newsletter opt-in status (requires Bearer token).
  *
@@ -31,9 +29,6 @@ export async function fetchFormsProfile() {
   const url = getFormsProfileUrl();
   const resp = await authFetch(url, { method: 'GET' });
   const text = await resp.text();
-  console.log('VITAMIX_ACCOUNT_API_FORMS_PROFILE');
-  console.log(`HTTP_${resp.status}`);
-  console.log(text);
   if (!resp.ok) {
     throw new Error(`Profile request failed (${resp.status})`);
   }
@@ -76,18 +71,14 @@ export function getCustomerApiBase(customerEmail) {
 }
 
 /**
- * Logs a fixed tag line then the raw response body string for copy/paste.
+ * Reads response body and parses JSON when present.
  *
- * @param {string} tag
  * @param {Response} resp
  * @param {{ throwIfNotOk?: boolean }} [options]
  * @returns {Promise<unknown>} Parsed JSON or null
  */
-async function readResponseAndLog(tag, resp, options = {}) {
+async function readResponse(resp, options = {}) {
   const text = await resp.text();
-  console.log(tag);
-  console.log(`HTTP_${resp.status}`);
-  console.log(text);
   if (options.throwIfNotOk && !resp.ok) {
     throw new Error(`Request failed (${resp.status})`);
   }
@@ -109,7 +100,7 @@ async function readResponseAndLog(tag, resp, options = {}) {
 export async function getLoggedInCustomer(customerEmail) {
   const url = getCustomerApiBase(customerEmail);
   const resp = await authFetch(url, { method: 'GET' });
-  return readResponseAndLog('VITAMIX_ACCOUNT_API_CUSTOMER', resp);
+  return readResponse(resp);
 }
 
 /**
@@ -120,7 +111,7 @@ export async function getLoggedInCustomer(customerEmail) {
 export async function getCustomerAddresses(customerEmail) {
   const url = `${getCustomerApiBase(customerEmail)}/addresses`;
   const resp = await authFetch(url, { method: 'GET' });
-  return readResponseAndLog('VITAMIX_ACCOUNT_API_ADDRESSES', resp);
+  return readResponse(resp);
 }
 
 /**
@@ -132,7 +123,7 @@ export async function getCustomerAddresses(customerEmail) {
 export async function getCustomerAddressById(customerEmail, addressId) {
   const url = `${getCustomerApiBase(customerEmail)}/addresses/${encodeURIComponent(addressId)}`;
   const resp = await authFetch(url, { method: 'GET' });
-  return readResponseAndLog('VITAMIX_ACCOUNT_API_ADDRESS_BY_ID', resp);
+  return readResponse(resp);
 }
 
 /**
@@ -144,7 +135,7 @@ export async function getCustomerAddressById(customerEmail, addressId) {
 export async function deleteCustomerAddress(customerEmail, addressId) {
   const url = `${getCustomerApiBase(customerEmail)}/addresses/${encodeURIComponent(addressId)}`;
   const resp = await authFetch(url, { method: 'DELETE' });
-  return readResponseAndLog('VITAMIX_ACCOUNT_API_ADDRESS_DELETE', resp, { throwIfNotOk: true });
+  return readResponse(resp, { throwIfNotOk: true });
 }
 
 /**
@@ -160,7 +151,7 @@ export async function createCustomerAddress(customerEmail, body) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  return readResponseAndLog('VITAMIX_ACCOUNT_API_ADDRESS_CREATE', resp, { throwIfNotOk: true });
+  return readResponse(resp, { throwIfNotOk: true });
 }
 
 /**
@@ -177,7 +168,7 @@ export async function updateCustomerAddress(customerEmail, addressId, body) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  return readResponseAndLog('VITAMIX_ACCOUNT_API_ADDRESS_UPDATE', resp, { throwIfNotOk: true });
+  return readResponse(resp, { throwIfNotOk: true });
 }
 
 /**
@@ -188,7 +179,7 @@ export async function updateCustomerAddress(customerEmail, addressId, body) {
 export async function getCustomerOrders(customerEmail) {
   const url = `${getCustomerApiBase(customerEmail)}/orders`;
   const resp = await authFetch(url, { method: 'GET' });
-  return readResponseAndLog('VITAMIX_ACCOUNT_API_ORDERS', resp);
+  return readResponse(resp);
 }
 
 /**
@@ -200,7 +191,7 @@ export async function getCustomerOrders(customerEmail) {
 export async function getCustomerOrderById(customerEmail, orderId) {
   const url = `${getCustomerApiBase(customerEmail)}/orders/${encodeURIComponent(orderId)}`;
   const resp = await authFetch(url, { method: 'GET' });
-  return readResponseAndLog('VITAMIX_ACCOUNT_API_ORDER_BY_ID', resp, { throwIfNotOk: true });
+  return readResponse(resp, { throwIfNotOk: true });
 }
 
 /**
@@ -1114,8 +1105,6 @@ export function wireOrderDetailInteractions(widget, copySlice = {}) {
     try {
       const payload = await getCustomerOrderById(customerEmail, orderId);
       const display = unwrapOrderDetail(payload);
-      console.log('VITAMIX_ACCOUNT_API_ORDER_DETAIL_PARSED');
-      console.log(JSON.stringify(display));
       if (readout && display && typeof display === 'object') {
         const orderRecord = /** @type {Record<string, unknown>} */ (display);
         renderOrderDetailReadout(readout, orderRecord, copySlice);
@@ -1128,8 +1117,6 @@ export function wireOrderDetailInteractions(widget, copySlice = {}) {
         errEl.hidden = false;
         errEl.textContent = od.error || (err instanceof Error ? err.message : String(err));
       }
-      console.log('VITAMIX_ACCOUNT_API_ORDER_DETAIL_EXCEPTION');
-      console.log(err instanceof Error ? err.message : String(err));
     }
   });
 }

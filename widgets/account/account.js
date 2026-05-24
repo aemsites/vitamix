@@ -100,12 +100,29 @@ export default async function decorate(widget) {
     const commSubscribe = information.querySelector('.account-communications-subscribe');
     const commUnsubscribe = information.querySelector('.account-communications-unsubscribe');
     const commError = information.querySelector('.account-communications-error');
+    const commSmsRoot = information.querySelector('.account-communications-sms');
+    const commSmsPhoneLabel = information.querySelector('.account-communications-sms-phone-label');
+    const commSmsPhoneValue = information.querySelector('.account-communications-sms-phone-value');
+    const commSmsStatusLabel = information.querySelector('.account-communications-sms-status-label');
+    const commSmsStatusValue = information.querySelector('.account-communications-sms-status-value');
+    const commSmsOptShimmer = information.querySelector('.account-communications-sms-opt-shimmer');
+    const commSmsCheckbox = /** @type {HTMLInputElement | null} */ (
+      information.querySelector('.account-communications-sms-checkbox')
+    );
+    const commSmsOptCopy = information.querySelector('.account-communications-sms-opt-copy');
     if (commTitle) commTitle.textContent = comm.title || 'Communications';
     if (commSubscribe) commSubscribe.textContent = comm.subscribe || 'Subscribe';
     if (commUnsubscribe) commUnsubscribe.textContent = comm.unsubscribe || 'Unsubscribe';
+    if (commSmsPhoneLabel) commSmsPhoneLabel.textContent = comm.smsPhone || 'Mobile number';
+    if (commSmsStatusLabel) commSmsStatusLabel.textContent = comm.smsStatus || 'Text messages';
+    if (commSmsOptCopy) commSmsOptCopy.textContent = comm.smsOptInLabel || 'Receive text notifications';
 
     /** @type {boolean} */
     let emailOptInStatus = false;
+    /** @type {boolean} */
+    let smsOptInStatus = false;
+    /** @type {string} */
+    let profileMobile = '';
 
     /**
      * Buttons use a class for visibility — site `button.button { display: inline-block }`
@@ -127,10 +144,14 @@ export default async function decorate(widget) {
       commQuestionShimmer?.classList.toggle(COMM_VISIBLE, busy);
       commBtnShimmer?.classList.toggle(COMM_VISIBLE, busy);
       commQuestionCopy?.classList.toggle(COMM_VISIBLE, !busy);
+      commSmsOptShimmer?.classList.toggle(COMM_VISIBLE, busy);
+      commSmsCheckbox?.closest('.account-communications-sms-opt-label')
+        ?.classList.toggle(COMM_VISIBLE, !busy);
       if (busy) {
         commSubscribe?.classList.remove(COMM_VISIBLE);
         commUnsubscribe?.classList.remove(COMM_VISIBLE);
       }
+      if (commSmsCheckbox) commSmsCheckbox.disabled = busy;
     };
 
     const hideCommError = () => {
@@ -155,18 +176,39 @@ export default async function decorate(widget) {
       if (commUnsubscribe) commUnsubscribe.disabled = false;
     };
 
-    const submitNewsletterPreference = async (emailOptIn) => {
+    const applySmsCommUi = () => {
+      const mobile = profileMobile.trim();
+      const showSms = Boolean(mobile) || smsOptInStatus === true;
+      if (commSmsRoot) commSmsRoot.hidden = !showSms;
+      if (commSmsPhoneValue) commSmsPhoneValue.textContent = mobile || '—';
+      if (commSmsStatusValue) {
+        commSmsStatusValue.textContent = smsOptInStatus === true
+          ? (comm.smsStatusOptedIn || 'Subscribed')
+          : (comm.smsStatusOptedOut || 'Not subscribed');
+      }
+      if (commSmsCheckbox) {
+        commSmsCheckbox.checked = smsOptInStatus === true;
+        commSmsCheckbox.disabled = !mobile;
+      }
+    };
+
+    /**
+     * @param {{ emailOptIn?: boolean, smsOptIn?: boolean }} [next]
+     */
+    const submitCommunicationsPreference = async (next = {}) => {
       const trimmed = (email || '').trim();
       if (!trimmed) return;
+      const nextEmail = next.emailOptIn !== undefined ? next.emailOptIn : emailOptInStatus;
+      const nextSms = next.smsOptIn !== undefined ? next.smsOptIn : smsOptInStatus;
       const country = window.location.pathname.split('/')[1] || 'us';
       const leadSource = `sub-em-account-${country}`;
       const payload = {
         formId: `${locale}/${language}/newsletter`,
         pageUrl: window.location.href,
         email: trimmed,
-        mobile: '',
-        smsOptIn: false,
-        emailOptIn,
+        mobile: profileMobile.trim(),
+        smsOptIn: nextSms,
+        emailOptIn: nextEmail,
         leadSource,
       };
       hideCommError();
@@ -182,15 +224,19 @@ export default async function decorate(widget) {
           showCommError(comm.error || 'Something went wrong. Please try again.');
           setCommBusy(false);
           applyCommOptInUi();
+          applySmsCommUi();
           return;
         }
-        emailOptInStatus = emailOptIn;
+        emailOptInStatus = nextEmail;
+        smsOptInStatus = nextSms;
         setCommBusy(false);
         applyCommOptInUi();
+        applySmsCommUi();
       } catch {
         showCommError(comm.error || 'Something went wrong. Please try again.');
         setCommBusy(false);
         applyCommOptInUi();
+        applySmsCommUi();
       }
     };
 
@@ -201,21 +247,35 @@ export default async function decorate(widget) {
         if (profile && typeof profile.emailOptInStatus === 'boolean') {
           emailOptInStatus = profile.emailOptInStatus;
         }
+        if (profile && typeof profile.smsOptInStatus === 'boolean') {
+          smsOptInStatus = profile.smsOptInStatus;
+        }
+        if (profile && profile.mobile != null) {
+          profileMobile = String(profile.mobile).trim();
+        }
       } catch {
-        /* keep default not subscribed */
+        /* keep defaults */
       } finally {
         setCommBusy(false);
         applyCommOptInUi();
+        applySmsCommUi();
       }
     };
 
     if (commRoot && email) {
       commRoot.hidden = false;
       commSubscribe?.addEventListener('click', () => {
-        submitNewsletterPreference(true);
+        submitCommunicationsPreference({ emailOptIn: true });
       });
       commUnsubscribe?.addEventListener('click', () => {
-        submitNewsletterPreference(false);
+        submitCommunicationsPreference({ emailOptIn: false });
+      });
+      commSmsCheckbox?.addEventListener('change', () => {
+        if (!profileMobile.trim()) {
+          applySmsCommUi();
+          return;
+        }
+        submitCommunicationsPreference({ smsOptIn: commSmsCheckbox.checked });
       });
       loadCommunicationsProfile();
     }
@@ -332,11 +392,8 @@ export default async function decorate(widget) {
     try {
       const data = await fetchAccountBundle(email);
       await applyAccountDataToWidget(widget, data, copyWithLocale);
-    } catch (err) {
-      // eslint-disable-next-line no-console -- integration: copy API bundle errors
-      console.log('VITAMIX_ACCOUNT_API_BUNDLE_EXCEPTION');
-      // eslint-disable-next-line no-console
-      console.log(err instanceof Error ? err.message : String(err));
+    } catch {
+      /* best-effort: overview/orders still render empty state */
     }
     wireAccountAddressBook(widget, email, lang, String(locale || 'us').toLowerCase(), copy);
   }
