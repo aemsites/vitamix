@@ -2,8 +2,9 @@
  * Coupons — ProductBus: types at …/coupons/types; codes at …/coupons;
  * batch at …/coupons/batch. UI: “coupon” / “code”; nav on selected coupon.
  * Coupon type bodies use camelCase fields such as `excludedCategories`, `includedCategories`,
- * `includedProducts`, and `excludedProducts`; the API may also return snake_case — the form
- * normalizes on read. Included/excluded product lists are mutually exclusive.
+ * `includedProducts`, `excludedProducts`, and `excludeDiscountedProducts`; the API may also
+ * return snake_case — the form normalizes on read. Included/excluded product lists are mutually
+ * exclusive.
  */
 /* eslint-disable no-use-before-define, no-console */
 // render, bindCodesEvents, and open* dialogs reference each other.
@@ -28,6 +29,35 @@ import {
   hydrateProductScopePills,
   mountProductSelectionField,
 } from './product-selection-field.js';
+
+/**
+ * ProductBus coupon type (`…/coupons/types`). Shapes match **helix-commerce-api**.
+ *
+ * @typedef {{ path: string; sku?: string }} ProductCondition
+ *
+ * @typedef {object} CouponType
+ * @property {string} id
+ * @property {string} name
+ * @property {'percentage'|'fixed'} discountType
+ * @property {number} discountValue
+ * @property {number} [minimumOrderAmount]
+ * @property {number|null} [maximumDiscountAmount]
+ * @property {boolean} [freeShipping]
+ * @property {string[]} [includedCategories]
+ * @property {string[]} [excludedCategories]
+ * @property {ProductCondition[]} [includedProducts]
+ * @property {ProductCondition[]} [excludedProducts]
+ * @property {boolean} [stackable]
+ * @property {boolean} [autoApply]
+ * @property {boolean} [allowManualEntry]
+ * @property {boolean} [excludeDiscountedProducts] When true, blocks coupon on catalog price-rule discounted products
+ * @property {number|null} [defaultUsageLimit]
+ * @property {number|null} [defaultUsesPerCode]
+ * @property {string} [notes]
+ * @property {string} [country]
+ * @property {string[]} [countries]
+ * @property {{ group?: string }} [custom]
+ */
 
 async function readRespError(resp) {
   return resp.headers.get('x-error')
@@ -492,6 +522,7 @@ function couponDetailModalInnerHtml(d) {
     <div class="coupons-modal-pills" aria-label="Program flags">
       ${pillHtml('Free shipping', !!d.freeShipping)}
       ${pillHtml('Stacks with rules', d.stackable !== false)}
+      ${pillHtml('Exclude sale prices', !!(d.excludeDiscountedProducts ?? d.exclude_discounted_products))}
       ${pillHtml('Auto-apply', !!d.autoApply)}
       ${pillHtml('Manual entry', d.allowManualEntry !== false)}
     </div>
@@ -1160,6 +1191,9 @@ function couponFormHtml({ idReadonly }) {
         <label class="coupons-checkbox-row"><input type="checkbox" id="cp-form-stackable" checked /> Allow stacking with automatic pricing rules</label>
       </div>
       <div class="coupons-field coupons-field-full">
+        <label class="coupons-checkbox-row"><input type="checkbox" id="cp-form-exclude-discounted" /> Do not apply to products already discounted by catalog price rules</label>
+      </div>
+      <div class="coupons-field coupons-field-full">
         <label class="coupons-checkbox-row"><input type="checkbox" id="cp-form-auto" /> Auto-apply hint (e.g. affiliate URL)</label>
       </div>
       <div class="coupons-field coupons-field-full">
@@ -1230,6 +1264,7 @@ function readCouponBodyFromForm(dlg, { requireId }) {
   }
   const freeShipping = !!dlg.querySelector('#cp-form-free-ship')?.checked;
   const stackable = !!dlg.querySelector('#cp-form-stackable')?.checked;
+  const excludeDiscountedProducts = !!dlg.querySelector('#cp-form-exclude-discounted')?.checked;
   const autoApply = !!dlg.querySelector('#cp-form-auto')?.checked;
   const allowManualEntry = !!dlg.querySelector('#cp-form-manual')?.checked;
   const defaultUsageLimit = readOptionalInt(dlg.querySelector('#cp-form-def-limit')?.value);
@@ -1249,6 +1284,7 @@ function readCouponBodyFromForm(dlg, { requireId }) {
     includedProducts,
     excludedProducts,
     stackable,
+    excludeDiscountedProducts,
     autoApply,
     allowManualEntry,
     defaultUsageLimit,
@@ -1355,6 +1391,9 @@ function fillCouponForm(dlg, d) {
   }
   dlg.querySelector('#cp-form-free-ship').checked = !!d.freeShipping;
   dlg.querySelector('#cp-form-stackable').checked = d.stackable !== false;
+  dlg.querySelector('#cp-form-exclude-discounted').checked = !!(
+    d.excludeDiscountedProducts ?? d.exclude_discounted_products
+  );
   dlg.querySelector('#cp-form-auto').checked = !!d.autoApply;
   dlg.querySelector('#cp-form-manual').checked = d.allowManualEntry !== false;
   dlg.querySelector('#cp-form-def-limit').value = d.defaultUsageLimit != null ? String(d.defaultUsageLimit) : '';
