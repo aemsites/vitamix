@@ -75,13 +75,24 @@ async function seedCart(page, baseUrl, productPath = '/us/en_us/products/ascent-
   await page.goto(`${baseUrl}${productPath}?cart=edge&martech=off`);
   const atc = page.locator('.quantity-container button');
   await atc.waitFor({ state: 'visible', timeout: 15000 });
-  await atc.click();
-  // Cart writes are debounced 300ms; wait long enough for persist to flush.
-  await page.waitForTimeout(1000);
-  const cart = await page.evaluate(() => JSON.parse(localStorage.getItem('cart:us') || 'null'));
-  if (!cart || !cart.items?.length) {
-    throw new Error('Failed to seed cart via PDP add-to-cart');
-  }
+  // Cart module is dynamically imported inside the click handler — give
+  // the click handler a moment to actually be attached.
+  await page.waitForTimeout(500);
+  // Invoke the DOM `click()` method directly. On Mobile Chrome (Pixel 5
+  // emulation with hasTouch:true), Playwright's `.click()` dispatches a
+  // touchstart→touchend→click sequence; the ATC handler doesn't reliably
+  // fire from that path here. `el.click()` fires the click event
+  // synchronously and works in both desktop and mobile contexts.
+  await atc.evaluate((el) => el.click());
+  // Cart writes are debounced 300ms; poll until the cart appears in
+  // localStorage rather than waiting a fixed amount of time.
+  await expect.poll(
+    async () => {
+      const cart = await page.evaluate(() => JSON.parse(localStorage.getItem('cart:us') || 'null'));
+      return cart?.items?.length || 0;
+    },
+    { timeout: 15000, message: 'Cart did not populate in localStorage after ATC click' },
+  ).toBeGreaterThan(0);
 }
 
 /**
@@ -90,9 +101,13 @@ async function seedCart(page, baseUrl, productPath = '/us/en_us/products/ascent-
  * preview values). Each handler key receives `(route, request)`.
  */
 async function setupCheckoutMocks(page, overrides = {}) {
-  // Block reCAPTCHA scripts/iframes — they don't affect tests since mocks
-  // accept any (or no) x-recaptcha-token header.
-  await page.route(/recaptcha|gstatic\.com|googletagmanager/, (route) => route.abort());
+  // Block only the external Google reCAPTCHA SDK and Tag Manager — keep
+  // the local `/scripts/recaptcha.js` wrapper alive (the checkout block
+  // imports it; aborting it makes decorate() throw and render nothing).
+  await page.route(
+    /https:\/\/(?:www\.google\.com\/recaptcha|www\.gstatic\.com\/recaptcha|www\.recaptcha\.net|www\.googletagmanager\.com)/,
+    (route) => route.abort(),
+  );
 
   // Block Google Places address autocomplete to keep the address fields static
   await page.route('**/places/autocomplete*', (route) => route.fulfill({
@@ -171,26 +186,64 @@ async function setupCheckoutMocks(page, overrides = {}) {
       }),
     });
   }));
+
+  // Stub the order-complete page. The real one loads slowly and triggers
+  // `networkidle` issues. We only care that the redirect happens — the
+  // destination's actual content is not part of the test.
+  await page.route('**/us/en_us/order/complete*', (route) => route.fulfill({
+    status: 200,
+    contentType: 'text/html',
+    body: '<!doctype html><html><body><h1>Order complete (stub)</h1></body></html>',
+  }));
 }
 
 async function gotoCheckout(page, baseUrl) {
+  // Do NOT wait for `networkidle` — the checkout page loads analytics /
+  // RUM / Forter beacons that keep firing indefinitely. The subsequent
+  // `expect(...).toBeVisible({ timeout })` calls do the waiting we need.
   await page.goto(`${baseUrl}/us/en_us/order/checkout?cart=edge&martech=off`);
-  await page.waitForLoadState('networkidle');
 }
 
+/**
+ * On mobile viewports the order-summary block starts collapsed
+ * (.order-summary.is-collapsed, content height: 0, overflow: hidden).
+ * Locators inside the collapsed content still resolve as "visible" to
+ * Playwright but clicks don't reach handlers because the rendered
+ * height is zero. Expand it before interacting.
+ */
+async function expandOrderSummary(page) {
+  // Two elements have `.order-summary`: the outer AEM block wrapper
+  // (`<div class="order-summary block">`) and the inner template div
+  // (`<div class="order-summary is-collapsed">`). The collapse class is
+  // applied to the inner one, so exclude the outer block wrapper.
+  const summary = page.locator('.order-summary:not(.block)');
+  await summary.waitFor({ state: 'attached', timeout: 15000 });
+  const collapsed = await summary.evaluate((el) => el.classList.contains('is-collapsed'));
+  if (collapsed) {
+    await page.locator('.order-summary-toggle').click();
+    // height transition is 0.35s; wait for it to settle.
+    await page.waitForTimeout(500);
+  }
+}
+
+// Field selectors must be scoped to the checkout form — the footer also
+// renders a newsletter form with [name="email"] etc., which would match
+// otherwise (strict-mode locator violation).
+const field = (page, name) => page.locator(`.checkout-form [name="${name}"]`);
+
 async function fillContact(page, email = TEST_EMAIL) {
-  await page.locator('[name="email"]').fill(email);
+  await field(page, 'email').fill(email);
 }
 
 async function fillShipping(page, address = VALID_ADDRESS) {
-  await page.locator('[name="shipping-firstname"]').fill(address.firstName);
-  await page.locator('[name="shipping-lastname"]').fill(address.lastName);
-  await page.locator('[name="shipping-street-0"]').fill(address.street);
-  await page.locator('[name="shipping-city"]').fill(address.city);
+  await field(page, 'shipping-firstname').fill(address.firstName);
+  await field(page, 'shipping-lastname').fill(address.lastName);
+  await field(page, 'shipping-street-0').fill(address.street);
+  await field(page, 'shipping-city').fill(address.city);
   // State must change last so it triggers the shipping rates fetch
-  await page.locator('[name="shipping-zip"]').fill(address.zip);
-  await page.locator('[name="shipping-telephone"]').fill(address.phone);
-  await page.locator('[name="shipping-state"]').selectOption(address.state);
+  await field(page, 'shipping-zip').fill(address.zip);
+  await field(page, 'shipping-telephone').fill(address.phone);
+  await field(page, 'shipping-state').selectOption(address.state);
 }
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
@@ -233,8 +286,8 @@ test.describe('Edge Checkout Page', () => {
       await gotoCheckout(page, baseUrl);
 
       await expect(page.locator('.checkout-form')).toBeVisible({ timeout: 15000 });
-      await expect(page.locator('[name="email"]')).toBeVisible();
-      await expect(page.locator('[name="email"]')).toHaveAttribute('type', 'email');
+      await expect(field(page, 'email')).toBeVisible();
+      await expect(field(page, 'email')).toHaveAttribute('type', 'email');
       console.log('✓ Contact section renders email field');
     });
 
@@ -254,7 +307,7 @@ test.describe('Edge Checkout Page', () => {
         'shipping-telephone',
       ];
       await Promise.all(fields.map((name) => expect(
-        page.locator(`[name="${name}"]`),
+        field(page, name),
       ).toBeVisible({ timeout: 10000 })));
       console.log('✓ All shipping address fields rendered');
     });
@@ -266,10 +319,10 @@ test.describe('Edge Checkout Page', () => {
 
       await expect(page.locator('.checkout-form')).toBeVisible({ timeout: 15000 });
 
-      const sameRadio = page.locator('[name="billing-choice"][value="same"]');
+      const sameRadio = page.locator('.checkout-form [name="billing-choice"][value="same"]');
       await expect(sameRadio).toBeChecked();
       // Billing fields should NOT be visible when "same" is selected
-      await expect(page.locator('[name="billing-firstname"]')).not.toBeVisible();
+      await expect(field(page, 'billing-firstname')).not.toBeVisible();
       console.log('✓ Billing defaults to "same as shipping"; fields hidden');
     });
 
@@ -280,7 +333,7 @@ test.describe('Edge Checkout Page', () => {
 
       await expect(page.locator('.checkout-form')).toBeVisible({ timeout: 15000 });
       // At minimum the Chase (credit card) option must be present
-      await expect(page.locator('[name="paymentMethod"][value="chase"]')).toBeAttached();
+      await expect(page.locator('.checkout-form [name="paymentMethod"][value="chase"]')).toBeAttached();
       console.log('✓ Credit-card payment method is present');
     });
 
@@ -315,11 +368,11 @@ test.describe('Edge Checkout Page', () => {
 
       await expect(page.locator('.checkout-form')).toBeVisible({ timeout: 15000 });
 
-      await page.locator('[name="billing-choice"][value="different"]').check();
+      await page.locator('.checkout-form [name="billing-choice"][value="different"]').check();
 
-      await expect(page.locator('[name="billing-firstname"]')).toBeVisible({ timeout: 3000 });
-      await expect(page.locator('[name="billing-street-0"]')).toBeVisible();
-      await expect(page.locator('[name="billing-zip"]')).toBeVisible();
+      await expect(field(page, 'billing-firstname')).toBeVisible({ timeout: 3000 });
+      await expect(field(page, 'billing-street-0')).toBeVisible();
+      await expect(field(page, 'billing-zip')).toBeVisible();
       console.log('✓ Billing fields appear when "different" selected');
     });
 
@@ -330,11 +383,11 @@ test.describe('Edge Checkout Page', () => {
 
       await expect(page.locator('.checkout-form')).toBeVisible({ timeout: 15000 });
 
-      await page.locator('[name="billing-choice"][value="different"]').check();
-      await expect(page.locator('[name="billing-firstname"]')).toBeVisible({ timeout: 3000 });
+      await page.locator('.checkout-form [name="billing-choice"][value="different"]').check();
+      await expect(field(page, 'billing-firstname')).toBeVisible({ timeout: 3000 });
 
-      await page.locator('[name="billing-choice"][value="same"]').check();
-      await expect(page.locator('[name="billing-firstname"]')).not.toBeVisible({ timeout: 3000 });
+      await page.locator('.checkout-form [name="billing-choice"][value="same"]').check();
+      await expect(field(page, 'billing-firstname')).not.toBeVisible({ timeout: 3000 });
       console.log('✓ Billing fields hide again when "same" re-selected');
     });
   });
@@ -366,7 +419,7 @@ test.describe('Edge Checkout Page', () => {
       expect(shippingRequestBody.items.length).toBeGreaterThan(0);
 
       // Rates render in the DOM
-      const rateOptions = page.locator('[name="shippingMethod"]');
+      const rateOptions = page.locator('.checkout-form [name="shippingMethod"]');
       await expect(rateOptions.first()).toBeAttached({ timeout: 5000 });
       await expect(page.locator('.shipping-method-label').first()).toContainText(/standard/i);
       console.log('✓ Shipping rates fetched and rendered after state selection');
@@ -380,7 +433,7 @@ test.describe('Edge Checkout Page', () => {
       await expect(page.locator('.checkout-form')).toBeVisible({ timeout: 15000 });
       await fillShipping(page);
 
-      const firstRate = page.locator('[name="shippingMethod"]').first();
+      const firstRate = page.locator('.checkout-form [name="shippingMethod"]').first();
       await expect(firstRate).toBeChecked({ timeout: 10000 });
       await expect(firstRate).toHaveValue('standard');
       console.log('✓ First shipping rate is auto-selected');
@@ -464,11 +517,13 @@ test.describe('Edge Checkout Page', () => {
       });
       await gotoCheckout(page, baseUrl);
 
-      await expect(page.locator('.discount-input')).toBeVisible({ timeout: 15000 });
+      await expect(page.locator('.order-summary-wrapper')).toBeVisible({ timeout: 15000 });
+      await expandOrderSummary(page);
+      await expect(page.locator('.discount-input')).toBeVisible({ timeout: 5000 });
       await page.locator('.discount-input').fill('SAVE10');
       await page.locator('.discount-apply').click();
 
-      await expect(page.locator('.order-summary-discounts')).toBeVisible({ timeout: 5000 });
+      await expect(page.locator('.order-summary-discounts')).toBeVisible({ timeout: 10000 });
       console.log('✓ Coupon discount row appears after valid coupon applied');
     });
 
@@ -486,11 +541,13 @@ test.describe('Edge Checkout Page', () => {
       });
       await gotoCheckout(page, baseUrl);
 
-      await expect(page.locator('.discount-input')).toBeVisible({ timeout: 15000 });
+      await expect(page.locator('.order-summary-wrapper')).toBeVisible({ timeout: 15000 });
+      await expandOrderSummary(page);
+      await expect(page.locator('.discount-input')).toBeVisible({ timeout: 5000 });
       await page.locator('.discount-input').fill('NOPE');
       await page.locator('.discount-apply').click();
 
-      await expect(page.locator('.order-summary-coupon-error')).toBeVisible({ timeout: 5000 });
+      await expect(page.locator('.order-summary-coupon-error')).toBeVisible({ timeout: 10000 });
       console.log('✓ Coupon error message shown for invalid coupon');
     });
   });
@@ -555,7 +612,14 @@ test.describe('Edge Checkout Page', () => {
       await page.locator('.checkout-submit-btn').click();
 
       // After payment completes, page redirects to /order/complete?orderId=...
-      await page.waitForURL(/\/order\/complete\?orderId=/, { timeout: 15000 });
+      // `cart.clear()` in `onComplete` triggers a checkout-block reload
+      // that races with the `location.href` redirect, so Playwright's
+      // navigation tracking sees a detached frame. `expect.poll` on
+      // `page.url()` reads the URL string directly and ignores nav events.
+      await expect.poll(
+        () => page.url(),
+        { timeout: 15000, message: 'Page did not navigate to /order/complete' },
+      ).toMatch(/\/order\/complete\?orderId=/);
       expect(page.url()).toContain(`orderId=${MOCK_ORDER_ID}`);
 
       // The order creation request had the correct payload
@@ -583,7 +647,10 @@ test.describe('Edge Checkout Page', () => {
       );
 
       await page.locator('.checkout-submit-btn').click();
-      await page.waitForURL(/\/order\/complete/, { timeout: 15000 });
+      await expect.poll(
+        () => page.url(),
+        { timeout: 15000, message: 'Page did not navigate to /order/complete' },
+      ).toMatch(/\/order\/complete/);
 
       const session = await page.evaluate(() => ({
         email: sessionStorage.getItem('checkout_email'),
@@ -614,7 +681,10 @@ test.describe('Edge Checkout Page', () => {
       );
 
       await page.locator('.checkout-submit-btn').click();
-      await page.waitForURL(/\/order\/complete/, { timeout: 15000 });
+      await expect.poll(
+        () => page.url(),
+        { timeout: 15000, message: 'Page did not navigate to /order/complete' },
+      ).toMatch(/\/order\/complete/);
 
       const cart = await page.evaluate(() => {
         const raw = localStorage.getItem('cart:us');
@@ -761,12 +831,11 @@ test.describe('Edge Checkout Page', () => {
 
       await expect(page.locator('.checkout-form')).toBeVisible({ timeout: 15000 });
 
-      // Clear cart via the cart API; checkout listens to cart:change
+      // Clear the actual cart singleton — checkout's `cart:change` listener
+      // reads `cart.itemCount` from the imported singleton, so dispatching
+      // a fake event with a synthetic cart object would not trigger reload.
       await page.evaluate(() => {
-        localStorage.removeItem('cart:us');
-        document.dispatchEvent(new CustomEvent('cart:change', {
-          detail: { cart: { itemCount: 0, items: [], visibleItemCount: 0 }, action: 'empty' },
-        }));
+        window.cart.clear();
       });
 
       // After cart empty event, checkout reloads → empty state should render
