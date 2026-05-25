@@ -25,19 +25,6 @@ import {
 
 const TEST_EMAIL = 'qa-test@example.com';
 
-const TEST_ITEM = {
-  sku: 'test-ascent-x2-black',
-  parentSku: 'Ascent X2',
-  quantity: 1,
-  price: '549.99',
-  name: 'Ascent X2 Blender',
-  url: 'https://www.vitamix.com/us/en_us/products/ascent-x2',
-  path: '/us/en_us/products/ascent-x2',
-  image: 'https://www.vitamix.com/dummy.jpg',
-  variant: 'Black',
-  selectedOptions: [{ id: 'color', value: 'black' }],
-};
-
 const VALID_ADDRESS = {
   firstName: 'Test',
   lastName: 'User',
@@ -72,10 +59,29 @@ const MOCK_ORDER_ID = 'mock-order-12345';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-async function seedCart(page, items = [TEST_ITEM]) {
-  await page.addInitScript((cart) => {
-    localStorage.setItem('cart:us', JSON.stringify(cart));
-  }, { version: 1, items });
+/**
+ * Seed the edge cart with a real product by visiting a PDP and clicking
+ * "Add to Cart". The cart persists to localStorage and survives the
+ * subsequent navigation to /us/en_us/order/checkout, so the checkout
+ * block renders the form instead of the empty state.
+ *
+ * Using addInitScript to seed cart:us directly did not work — the cart
+ * module on the checkout page does not pick up pre-seeded localStorage
+ * the same way it picks up cart items added through the real ATC flow.
+ *
+ * @param {string} productPath Defaults to Ascent X2 PDP.
+ */
+async function seedCart(page, baseUrl, productPath = '/us/en_us/products/ascent-x2') {
+  await page.goto(`${baseUrl}${productPath}?cart=edge&martech=off`);
+  const atc = page.locator('.quantity-container button');
+  await atc.waitFor({ state: 'visible', timeout: 15000 });
+  await atc.click();
+  // Cart writes are debounced 300ms; wait long enough for persist to flush.
+  await page.waitForTimeout(1000);
+  const cart = await page.evaluate(() => JSON.parse(localStorage.getItem('cart:us') || 'null'));
+  if (!cart || !cart.items?.length) {
+    throw new Error('Failed to seed cart via PDP add-to-cart');
+  }
 }
 
 /**
@@ -190,12 +196,12 @@ async function fillShipping(page, address = VALID_ADDRESS) {
 // ─── Tests ──────────────────────────────────────────────────────────────────
 
 test.describe('Edge Checkout Page', () => {
+  // No retries on these tests; failures need to be investigated, not retried.
+  // Allow extra time over the default 30s — the cart seed visits a PDP first.
+  test.describe.configure({ retries: 0, timeout: 90000 });
+
   let currentBranch;
   let baseUrl;
-
-  // The checkout flow involves multiple async operations (shipping rates,
-  // preview, order create, payment); allow extra time over the default 30s.
-  test.describe.configure({ timeout: 60000 });
 
   test.beforeAll(async () => {
     currentBranch = await getCurrentBranch();
@@ -222,7 +228,7 @@ test.describe('Edge Checkout Page', () => {
 
   test.describe('Form rendering', () => {
     test('renders contact section fields', async ({ page }) => {
-      await seedCart(page);
+      await seedCart(page, baseUrl);
       await setupCheckoutMocks(page);
       await gotoCheckout(page, baseUrl);
 
@@ -233,7 +239,7 @@ test.describe('Edge Checkout Page', () => {
     });
 
     test('renders all required shipping address fields', async ({ page }) => {
-      await seedCart(page);
+      await seedCart(page, baseUrl);
       await setupCheckoutMocks(page);
       await gotoCheckout(page, baseUrl);
 
@@ -254,7 +260,7 @@ test.describe('Edge Checkout Page', () => {
     });
 
     test('billing defaults to "same as shipping"', async ({ page }) => {
-      await seedCart(page);
+      await seedCart(page, baseUrl);
       await setupCheckoutMocks(page);
       await gotoCheckout(page, baseUrl);
 
@@ -268,7 +274,7 @@ test.describe('Edge Checkout Page', () => {
     });
 
     test('renders payment method radios', async ({ page }) => {
-      await seedCart(page);
+      await seedCart(page, baseUrl);
       await setupCheckoutMocks(page);
       await gotoCheckout(page, baseUrl);
 
@@ -279,7 +285,7 @@ test.describe('Edge Checkout Page', () => {
     });
 
     test('renders the submit / continue button', async ({ page }) => {
-      await seedCart(page);
+      await seedCart(page, baseUrl);
       await setupCheckoutMocks(page);
       await gotoCheckout(page, baseUrl);
 
@@ -288,7 +294,7 @@ test.describe('Edge Checkout Page', () => {
     });
 
     test('order-summary block is auto-injected and shows line items', async ({ page }) => {
-      await seedCart(page);
+      await seedCart(page, baseUrl);
       await setupCheckoutMocks(page);
       await gotoCheckout(page, baseUrl);
 
@@ -303,7 +309,7 @@ test.describe('Edge Checkout Page', () => {
 
   test.describe('Billing address toggle', () => {
     test('shows billing fields when "different" is selected', async ({ page }) => {
-      await seedCart(page);
+      await seedCart(page, baseUrl);
       await setupCheckoutMocks(page);
       await gotoCheckout(page, baseUrl);
 
@@ -318,7 +324,7 @@ test.describe('Edge Checkout Page', () => {
     });
 
     test('hides billing fields again when "same" is re-selected', async ({ page }) => {
-      await seedCart(page);
+      await seedCart(page, baseUrl);
       await setupCheckoutMocks(page);
       await gotoCheckout(page, baseUrl);
 
@@ -337,7 +343,7 @@ test.describe('Edge Checkout Page', () => {
 
   test.describe('Shipping rates', () => {
     test('fetches and displays rates after address state is selected', async ({ page }) => {
-      await seedCart(page);
+      await seedCart(page, baseUrl);
       await setupCheckoutMocks(page);
       await gotoCheckout(page, baseUrl);
 
@@ -367,7 +373,7 @@ test.describe('Edge Checkout Page', () => {
     });
 
     test('auto-selects the first shipping rate', async ({ page }) => {
-      await seedCart(page);
+      await seedCart(page, baseUrl);
       await setupCheckoutMocks(page);
       await gotoCheckout(page, baseUrl);
 
@@ -381,7 +387,7 @@ test.describe('Edge Checkout Page', () => {
     });
 
     test('shows an error / empty state when no rates are available', async ({ page }) => {
-      await seedCart(page);
+      await seedCart(page, baseUrl);
       await setupCheckoutMocks(page, {
         shipping: async (route) => {
           await route.fulfill({
@@ -404,19 +410,21 @@ test.describe('Edge Checkout Page', () => {
   // ─── Order totals ─────────────────────────────────────────────────────────
 
   test.describe('Order totals', () => {
-    test('order summary reflects subtotal from cart', async ({ page }) => {
-      await seedCart(page);
+    test('order summary shows a non-zero subtotal from cart', async ({ page }) => {
+      await seedCart(page, baseUrl);
       await setupCheckoutMocks(page);
       await gotoCheckout(page, baseUrl);
 
       const subtotalEl = page.locator('.order-summary-subtotal');
       await expect(subtotalEl).toBeVisible({ timeout: 15000 });
-      await expect(subtotalEl).toContainText(/549\.99/);
-      console.log('✓ Order summary subtotal matches cart');
+      // Cart subtotal depends on the real PDP price; just assert it's a
+      // currency-formatted value > 0, not a literal amount.
+      await expect(subtotalEl).toContainText(/\$\d+(?:,\d{3})*\.\d{2}/);
+      console.log('✓ Order summary subtotal rendered as currency');
     });
 
     test('total updates after a preview response is received', async ({ page }) => {
-      await seedCart(page);
+      await seedCart(page, baseUrl);
       await setupCheckoutMocks(page);
       await gotoCheckout(page, baseUrl);
 
@@ -430,8 +438,9 @@ test.describe('Edge Checkout Page', () => {
       );
 
       const total = page.locator('.order-summary-grand-total');
-      await expect(total).toContainText(/604\.10/, { timeout: 10000 });
-      console.log('✓ Order summary total reflects preview response');
+      // MOCK_PREVIEW.total = 604.10 — formatted as $604.10
+      await expect(total).toContainText('604.10', { timeout: 10000 });
+      console.log('✓ Order summary total reflects mocked preview response');
     });
   });
 
@@ -439,7 +448,7 @@ test.describe('Edge Checkout Page', () => {
 
   test.describe('Coupon code', () => {
     test('applying a valid coupon shows a discount line', async ({ page }) => {
-      await seedCart(page);
+      await seedCart(page, baseUrl);
       await setupCheckoutMocks(page, {
         estimatePrice: async (route) => {
           await route.fulfill({
@@ -464,7 +473,7 @@ test.describe('Edge Checkout Page', () => {
     });
 
     test('shows error for invalid coupon', async ({ page }) => {
-      await seedCart(page);
+      await seedCart(page, baseUrl);
       await setupCheckoutMocks(page, {
         estimatePrice: async (route) => {
           await route.fulfill({
@@ -490,7 +499,7 @@ test.describe('Edge Checkout Page', () => {
 
   test.describe('Place order - Chase credit card', () => {
     test('happy path: validates, previews, creates order, initiates payment, redirects to /order/complete', async ({ page }) => {
-      await seedCart(page);
+      await seedCart(page, baseUrl);
 
       const requestLog = [];
       await setupCheckoutMocks(page, {
@@ -561,7 +570,7 @@ test.describe('Edge Checkout Page', () => {
     });
 
     test('saves checkout session to sessionStorage after order creation', async ({ page }) => {
-      await seedCart(page);
+      await seedCart(page, baseUrl);
       await setupCheckoutMocks(page);
       await gotoCheckout(page, baseUrl);
 
@@ -585,12 +594,14 @@ test.describe('Edge Checkout Page', () => {
       expect(session.email).toBe(TEST_EMAIL);
       expect(session.order).toContain(MOCK_ORDER_ID);
       expect(session.preview).toContain(MOCK_PREVIEW.estimateToken);
-      expect(session.cartItems).toContain(TEST_ITEM.sku);
+      // cartItems is the serialised cart from the time of order creation;
+      // assert it has at least one item entry (sku depends on the real PDP)
+      expect(JSON.parse(session.cartItems).length).toBeGreaterThan(0);
       console.log('✓ Checkout session saved to sessionStorage');
     });
 
     test('clears the cart after successful order completion', async ({ page }) => {
-      await seedCart(page);
+      await seedCart(page, baseUrl);
       await setupCheckoutMocks(page);
       await gotoCheckout(page, baseUrl);
 
@@ -615,7 +626,7 @@ test.describe('Edge Checkout Page', () => {
 
     test('redirects to external payment URL when payment requires redirect', async ({ page }) => {
       const redirectUrl = 'https://payments.example.com/secure-form/xyz';
-      await seedCart(page);
+      await seedCart(page, baseUrl);
       await setupCheckoutMocks(page, {
         payment: async (route) => {
           await route.fulfill({
@@ -652,7 +663,7 @@ test.describe('Edge Checkout Page', () => {
     });
 
     test('does not submit when required fields are empty', async ({ page }) => {
-      await seedCart(page);
+      await seedCart(page, baseUrl);
 
       let orderCreateCalled = false;
       await setupCheckoutMocks(page, {
@@ -680,7 +691,7 @@ test.describe('Edge Checkout Page', () => {
 
   test.describe('Error handling', () => {
     test('shows an error if order creation fails', async ({ page }) => {
-      await seedCart(page);
+      await seedCart(page, baseUrl);
       await setupCheckoutMocks(page, {
         createOrder: async (route) => {
           if (route.request().method() !== 'POST') { await route.continue(); return; }
@@ -712,7 +723,7 @@ test.describe('Edge Checkout Page', () => {
     });
 
     test('shows reCAPTCHA error when api returns x-error: recaptcha', async ({ page }) => {
-      await seedCart(page);
+      await seedCart(page, baseUrl);
       await setupCheckoutMocks(page, {
         createOrder: async (route) => {
           if (route.request().method() !== 'POST') { await route.continue(); return; }
@@ -744,7 +755,7 @@ test.describe('Edge Checkout Page', () => {
     });
 
     test('reloads page when cart is cleared mid-checkout', async ({ page }) => {
-      await seedCart(page);
+      await seedCart(page, baseUrl);
       await setupCheckoutMocks(page);
       await gotoCheckout(page, baseUrl);
 
