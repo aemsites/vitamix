@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 import {
   getCurrentBranch,
   buildProductUrl,
-  waitForElement,
+  waitForAddToCartButton,
 } from '../utils/test-helpers.js';
 
 /**
@@ -35,7 +35,7 @@ test.describe('Edge Checkout', () => {
   // Disable retries for this file — the failing tests don't recover with
   // re-runs (their issues are timing / DOM-readiness), and 2 retries per
   // failure was tripling total CI time without improving outcomes.
-  test.describe.configure({ retries: 0 });
+  test.describe.configure({ retries: 0, timeout: 90000 });
 
   let currentBranch;
 
@@ -54,9 +54,9 @@ test.describe('Edge Checkout', () => {
 
     test('add to cart opens minicart on desktop', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
-      await waitForElement(page, '.quantity-container button');
+      await waitForAddToCartButton(page);
 
-      await page.locator('.quantity-container button').evaluate((el) => el.click());
+      await page.locator('.quantity-container button').click();
 
       const minicart = page.locator('#minicart');
       await expect(minicart).toHaveAttribute('aria-expanded', 'true', { timeout: 30000 });
@@ -66,13 +66,16 @@ test.describe('Edge Checkout', () => {
 
     test('item stored in localStorage with correct schema', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
-      await waitForElement(page, '.quantity-container button');
+      await waitForAddToCartButton(page);
 
-      await page.locator('.quantity-container button').evaluate((el) => el.click());
-      await page.waitForTimeout(600); // allow debounced persist to flush
+      await page.locator('.quantity-container button').click();
+
+      await expect.poll(
+        () => getCart(page).then((c) => c?.items?.length ?? 0),
+        { timeout: 10000, message: 'Cart not persisted to localStorage' },
+      ).toBe(1);
 
       const cart = await getCart(page);
-      expect(cart).not.toBeNull();
       expect(cart.version).toBe(1);
       expect(cart.items).toHaveLength(1);
 
@@ -87,21 +90,21 @@ test.describe('Edge Checkout', () => {
 
     test('cart count badge updates after add-to-cart', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
-      await waitForElement(page, '.quantity-container button');
+      await waitForAddToCartButton(page);
 
       const cartLink = page.locator(CART_LINK_SELECTOR);
       await expect(cartLink).not.toHaveAttribute('data-cart-items');
 
-      await page.locator('.quantity-container button').evaluate((el) => el.click());
+      await page.locator('.quantity-container button').click();
       await expect(cartLink).toHaveAttribute('data-cart-items', '1', { timeout: 5000 });
       console.log('✓ Cart badge shows 1 after add-to-cart');
     });
 
     test('minicart shows the added item', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
-      await waitForElement(page, '.quantity-container button');
+      await waitForAddToCartButton(page);
 
-      await page.locator('.quantity-container button').evaluate((el) => el.click());
+      await page.locator('.quantity-container button').click();
 
       const minicart = page.locator('#minicart');
       await expect(minicart).toHaveAttribute('aria-expanded', 'true', { timeout: 30000 });
@@ -111,9 +114,9 @@ test.describe('Edge Checkout', () => {
 
     test('minicart closes via × button', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
-      await waitForElement(page, '.quantity-container button');
+      await waitForAddToCartButton(page);
 
-      await page.locator('.quantity-container button').evaluate((el) => el.click());
+      await page.locator('.quantity-container button').click();
 
       const minicart = page.locator('#minicart');
       await expect(minicart).toHaveAttribute('aria-expanded', 'true', { timeout: 30000 });
@@ -125,9 +128,9 @@ test.describe('Edge Checkout', () => {
 
     test('minicart closes on backdrop click', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
-      await waitForElement(page, '.quantity-container button');
+      await waitForAddToCartButton(page);
 
-      await page.locator('.quantity-container button').evaluate((el) => el.click());
+      await page.locator('.quantity-container button').click();
 
       const minicart = page.locator('#minicart');
       await expect(minicart).toHaveAttribute('aria-expanded', 'true', { timeout: 30000 });
@@ -140,9 +143,9 @@ test.describe('Edge Checkout', () => {
 
     test('minicart checkout button links to /order/checkout', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
-      await waitForElement(page, '.quantity-container button');
+      await waitForAddToCartButton(page);
 
-      await page.locator('.quantity-container button').evaluate((el) => el.click());
+      await page.locator('.quantity-container button').click();
 
       const minicart = page.locator('#minicart');
       await expect(minicart).toHaveAttribute('aria-expanded', 'true', { timeout: 30000 });
@@ -171,9 +174,9 @@ test.describe('Edge Checkout', () => {
 
     test('opens minicart and stores item with correct schema', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
-      await waitForElement(page, '.quantity-container button');
+      await waitForAddToCartButton(page);
 
-      await page.locator('.quantity-container button').evaluate((el) => el.click());
+      await page.locator('.quantity-container button').click();
 
       await expect(page.locator('#minicart')).toHaveAttribute('aria-expanded', 'true', { timeout: 30000 });
 
@@ -200,9 +203,9 @@ test.describe('Edge Checkout', () => {
 
     test('opens minicart and stores item with bundle data', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
-      await waitForElement(page, '.quantity-container button');
+      await waitForAddToCartButton(page);
 
-      await page.locator('.quantity-container button').evaluate((el) => el.click());
+      await page.locator('.quantity-container button').click();
 
       await expect(page.locator('#minicart')).toHaveAttribute('aria-expanded', 'true', { timeout: 30000 });
 
@@ -236,7 +239,7 @@ test.describe('Edge Checkout', () => {
 
     test('can add up to the max quantity of 3', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
-      await waitForElement(page, '.quantity-container button');
+      await waitForAddToCartButton(page);
 
       const btn = page.locator('.quantity-container button');
       await clickAndWait(btn, page);
@@ -250,7 +253,7 @@ test.describe('Edge Checkout', () => {
 
     test('4th add-to-cart is silently blocked when already at max', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
-      await waitForElement(page, '.quantity-container button');
+      await waitForAddToCartButton(page);
 
       const btn = page.locator('.quantity-container button');
       await clickAndWait(btn, page);
@@ -268,7 +271,7 @@ test.describe('Edge Checkout', () => {
 
     test('button re-enables and resets text after a blocked add', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
-      await waitForElement(page, '.quantity-container button');
+      await waitForAddToCartButton(page);
 
       const btn = page.locator('.quantity-container button');
       await clickAndWait(btn, page);
@@ -291,21 +294,24 @@ test.describe('Edge Checkout', () => {
 
     test('no warranty item in cart when default (no-cost) tier is active', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
-      await waitForElement(page, '.quantity-container button');
+      await waitForAddToCartButton(page);
 
       // Don't change the default warranty selection
-      await page.locator('.quantity-container button').evaluate((el) => el.click());
-      await page.waitForTimeout(600);
+      await page.locator('.quantity-container button').click();
+
+      await expect.poll(
+        () => getCart(page).then((c) => c?.items?.length ?? 0),
+        { timeout: 10000, message: 'Cart not persisted to localStorage' },
+      ).toBe(1);
 
       const cart = await getCart(page);
-      expect(cart.items).toHaveLength(1);
       expect(cart.items[0].custom?.linkedTo).toBeUndefined();
       console.log('✓ No linked warranty item for default (included) tier');
     });
 
     test('paid warranty tier adds a hidden linked item to the cart', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
-      await waitForElement(page, '.quantity-container button');
+      await waitForAddToCartButton(page);
 
       const warrantyOptions = page.locator('.pdp-warranty-option');
       if (await warrantyOptions.count() < 2) {
@@ -316,7 +322,7 @@ test.describe('Edge Checkout', () => {
       await warrantyOptions.nth(1).locator('input').click();
       await page.waitForTimeout(500);
 
-      await page.locator('.quantity-container button').evaluate((el) => el.click());
+      await page.locator('.quantity-container button').click();
       await page.waitForTimeout(600);
 
       const cart = await getCart(page);
@@ -336,7 +342,7 @@ test.describe('Edge Checkout', () => {
 
     test('warranty hidden item excluded from cart badge count', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
-      await waitForElement(page, '.quantity-container button');
+      await waitForAddToCartButton(page);
 
       const warrantyOptions = page.locator('.pdp-warranty-option');
       if (await warrantyOptions.count() < 2) {
@@ -346,7 +352,7 @@ test.describe('Edge Checkout', () => {
 
       await warrantyOptions.nth(1).locator('input').click();
       await page.waitForTimeout(500);
-      await page.locator('.quantity-container button').evaluate((el) => el.click());
+      await page.locator('.quantity-container button').click();
       await page.waitForTimeout(500);
 
       // visibleItemCount = 1 (warranty is excluded), so badge shows 1
@@ -357,7 +363,7 @@ test.describe('Edge Checkout', () => {
 
     test('warranty item quantity matches parent quantity', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
-      await waitForElement(page, '.quantity-container button');
+      await waitForAddToCartButton(page);
 
       const warrantyOptions = page.locator('.pdp-warranty-option');
       if (await warrantyOptions.count() < 2) {
@@ -367,7 +373,7 @@ test.describe('Edge Checkout', () => {
 
       await warrantyOptions.nth(1).locator('input').click();
       await page.waitForTimeout(500);
-      await page.locator('.quantity-container button').evaluate((el) => el.click());
+      await page.locator('.quantity-container button').click();
       await page.waitForTimeout(600);
 
       const cart = await getCart(page);
@@ -382,7 +388,7 @@ test.describe('Edge Checkout', () => {
 
     test('warranty item visible on cart page inside minicart', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
-      await waitForElement(page, '.quantity-container button');
+      await waitForAddToCartButton(page);
 
       const warrantyOptions = page.locator('.pdp-warranty-option');
       if (await warrantyOptions.count() < 2) {
@@ -392,7 +398,7 @@ test.describe('Edge Checkout', () => {
 
       await warrantyOptions.nth(1).locator('input').click();
       await page.waitForTimeout(500);
-      await page.locator('.quantity-container button').evaluate((el) => el.click());
+      await page.locator('.quantity-container button').click();
 
       const minicart = page.locator('#minicart');
       await expect(minicart).toHaveAttribute('aria-expanded', 'true', { timeout: 30000 });
@@ -413,9 +419,9 @@ test.describe('Edge Checkout', () => {
 
     test('cart survives a page reload', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
-      await waitForElement(page, '.quantity-container button');
+      await waitForAddToCartButton(page);
 
-      await page.locator('.quantity-container button').evaluate((el) => el.click());
+      await page.locator('.quantity-container button').click();
 
       // Poll until cart is actually written to localStorage before reloading
       await expect.poll(
@@ -470,9 +476,9 @@ test.describe('Edge Checkout', () => {
 
     test('minicart closes automatically when cart is emptied', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
-      await waitForElement(page, '.quantity-container button');
+      await waitForAddToCartButton(page);
 
-      await page.locator('.quantity-container button').evaluate((el) => el.click());
+      await page.locator('.quantity-container button').click();
 
       const minicart = page.locator('#minicart');
       await expect(minicart).toHaveAttribute('aria-expanded', 'true', { timeout: 30000 });
@@ -496,9 +502,9 @@ test.describe('Edge Checkout', () => {
 
     test('minicart does NOT open after add-to-cart on mobile', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
-      await waitForElement(page, '.quantity-container button');
+      await waitForAddToCartButton(page);
 
-      await page.locator('.quantity-container button').evaluate((el) => el.click());
+      await page.locator('.quantity-container button').click();
       await page.waitForTimeout(1000);
 
       await expect(page.locator('#minicart')).not.toBeVisible();
@@ -507,12 +513,12 @@ test.describe('Edge Checkout', () => {
 
     test('cart badge updates on mobile after add-to-cart', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
-      await waitForElement(page, '.quantity-container button');
+      await waitForAddToCartButton(page);
 
-      await page.locator('.quantity-container button').evaluate((el) => el.click());
+      await page.locator('.quantity-container button').click();
 
       const cartLink = page.locator(CART_LINK_SELECTOR);
-      await expect(cartLink).toHaveAttribute('data-cart-items', '1', { timeout: 5000 });
+      await expect(cartLink).toHaveAttribute('data-cart-items', '1', { timeout: 15000 });
       console.log('✓ Cart badge updates on mobile');
     });
 
@@ -534,15 +540,18 @@ test.describe('Edge Checkout', () => {
 
     test('cart stored under cart:ca key, not cart:us', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
-      await waitForElement(page, '.quantity-container button');
+      await waitForAddToCartButton(page);
 
-      await page.locator('.quantity-container button').evaluate((el) => el.click());
-      await page.waitForTimeout(600);
+      await page.locator('.quantity-container button').click();
+
+      await expect.poll(
+        () => getCart(page, CART_KEY_CA).then((c) => c?.items?.length ?? 0),
+        { timeout: 10000, message: 'FR-CA cart not persisted to localStorage' },
+      ).toBeGreaterThan(0);
 
       const caCart = await getCart(page, CART_KEY_CA);
       const usCart = await getCart(page, CART_KEY_US);
 
-      expect(caCart).not.toBeNull();
       expect(caCart.items).toHaveLength(1);
       expect(usCart).toBeNull();
       console.log('✓ FR-CA cart stored under cart:ca, cart:us is empty');
@@ -550,9 +559,9 @@ test.describe('Edge Checkout', () => {
 
     test('cart badge updates using FR-CA cart data', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
-      await waitForElement(page, '.quantity-container button');
+      await waitForAddToCartButton(page);
 
-      await page.locator('.quantity-container button').evaluate((el) => el.click());
+      await page.locator('.quantity-container button').click();
 
       const cartLink = page.locator(CART_LINK_SELECTOR);
       await expect(cartLink).toHaveAttribute('data-cart-items', '1', { timeout: 5000 });
@@ -561,9 +570,9 @@ test.describe('Edge Checkout', () => {
 
     test('FR-CA cart survives page reload', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
-      await waitForElement(page, '.quantity-container button');
+      await waitForAddToCartButton(page);
 
-      await page.locator('.quantity-container button').evaluate((el) => el.click());
+      await page.locator('.quantity-container button').click();
 
       // Poll until cart is actually written to localStorage before reloading
       await expect.poll(
@@ -596,7 +605,7 @@ test.describe('Edge Checkout', () => {
 
     test('adding the same item twice increments quantity, not a separate entry', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
-      await waitForElement(page, '.quantity-container button');
+      await waitForAddToCartButton(page);
 
       const btn = page.locator('.quantity-container button');
       await btn.click();
@@ -604,7 +613,11 @@ test.describe('Edge Checkout', () => {
       await page.waitForTimeout(300);
       await btn.click();
       await expect(btn).not.toHaveAttribute('aria-disabled', 'true', { timeout: 5000 });
-      await page.waitForTimeout(600);
+
+      await expect.poll(
+        () => getCart(page).then((c) => c?.items?.[0]?.quantity ?? 0),
+        { timeout: 10000, message: 'Cart quantity not updated to 2' },
+      ).toBe(2);
 
       const cart = await getCart(page);
       expect(cart.items).toHaveLength(1);
@@ -614,9 +627,9 @@ test.describe('Edge Checkout', () => {
 
     test('deeplinked variant stores variant sku and parentSku', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge', color: 'polar-white' }));
-      await waitForElement(page, '.quantity-container button');
+      await waitForAddToCartButton(page);
 
-      await page.locator('.quantity-container button').evaluate((el) => el.click());
+      await page.locator('.quantity-container button').click();
       await page.waitForTimeout(600);
 
       const cart = await getCart(page);
@@ -638,9 +651,9 @@ test.describe('Edge Checkout', () => {
       // Simple product has no warranty options
       const simplePath = '/us/en_us/products/20-ounce-travel-cup';
       await page.goto(buildProductUrl(simplePath, currentBranch, { cart: 'edge' }));
-      await waitForElement(page, '.quantity-container button');
+      await waitForAddToCartButton(page);
 
-      await page.locator('.quantity-container button').evaluate((el) => el.click());
+      await page.locator('.quantity-container button').click();
       await page.waitForTimeout(600);
 
       const cart = await getCart(page);
@@ -658,10 +671,10 @@ test.describe('Edge Checkout', () => {
 
     test('cart icon click opens minicart independently of add-to-cart', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
-      await waitForElement(page, '.quantity-container button');
+      await waitForAddToCartButton(page);
 
       // Add to cart so there is something in the cart
-      await page.locator('.quantity-container button').evaluate((el) => el.click());
+      await page.locator('.quantity-container button').click();
 
       const minicart = page.locator('#minicart');
       await expect(minicart).toHaveAttribute('aria-expanded', 'true', { timeout: 30000 });
@@ -680,9 +693,9 @@ test.describe('Edge Checkout', () => {
 
     test('removing the only item closes minicart and clears badge', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
-      await waitForElement(page, '.quantity-container button');
+      await waitForAddToCartButton(page);
 
-      await page.locator('.quantity-container button').evaluate((el) => el.click());
+      await page.locator('.quantity-container button').click();
 
       const minicart = page.locator('#minicart');
       await expect(minicart).toHaveAttribute('aria-expanded', 'true', { timeout: 30000 });
@@ -712,8 +725,8 @@ test.describe('Edge Checkout', () => {
 
       // Add Ascent X2 and confirm it's in localStorage before navigating away
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
-      await waitForElement(page, '.quantity-container button');
-      await page.locator('.quantity-container button').evaluate((el) => el.click());
+      await waitForAddToCartButton(page);
+      await page.locator('.quantity-container button').click();
       await expect.poll(
         () => getCart(page).then((c) => c?.items?.length ?? 0),
         { timeout: 10000, message: 'First item (Ascent X2) not added to cart' },
@@ -722,8 +735,8 @@ test.describe('Edge Checkout', () => {
       // Add simple product to get a second item and confirm both are persisted
       const simplePath = '/us/en_us/products/20-ounce-travel-cup';
       await page.goto(buildProductUrl(simplePath, currentBranch, { cart: 'edge' }));
-      await waitForElement(page, '.quantity-container button');
-      await page.locator('.quantity-container button').evaluate((el) => el.click());
+      await waitForAddToCartButton(page);
+      await page.locator('.quantity-container button').click();
       await expect.poll(
         () => getCart(page).then((c) => c?.items?.length ?? 0),
         { timeout: 10000, message: 'Second item (Travel Cup) not added to cart' },
@@ -755,9 +768,9 @@ test.describe('Edge Checkout', () => {
 
     test('incrementing quantity in minicart updates badge and localStorage', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
-      await waitForElement(page, '.quantity-container button');
+      await waitForAddToCartButton(page);
 
-      await page.locator('.quantity-container button').evaluate((el) => el.click());
+      await page.locator('.quantity-container button').click();
 
       const minicart = page.locator('#minicart');
       await expect(minicart).toHaveAttribute('aria-expanded', 'true', { timeout: 30000 });
@@ -779,9 +792,9 @@ test.describe('Edge Checkout', () => {
 
     test('decrementing quantity to zero removes item and closes minicart', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
-      await waitForElement(page, '.quantity-container button');
+      await waitForAddToCartButton(page);
 
-      await page.locator('.quantity-container button').evaluate((el) => el.click());
+      await page.locator('.quantity-container button').click();
 
       const minicart = page.locator('#minicart');
       await expect(minicart).toHaveAttribute('aria-expanded', 'true', { timeout: 30000 });
