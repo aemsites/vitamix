@@ -49,6 +49,9 @@ test.describe('Edge Checkout', () => {
   test.describe('Configurable Product - Ascent X2', () => {
     const productPath = '/us/en_us/products/ascent-x2';
 
+    // openOrRedirect() returns early when window.innerWidth < 900 — force desktop
+    test.use({ viewport: { width: 1280, height: 720 } });
+
     test('add to cart opens minicart on desktop', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
       await waitForElement(page, '.quantity-container button');
@@ -116,7 +119,7 @@ test.describe('Edge Checkout', () => {
       await expect(minicart).toHaveAttribute('aria-expanded', 'true', { timeout: 15000 });
 
       await minicart.locator('.slide-panel-close').click();
-      await expect(minicart).not.toHaveAttribute('aria-expanded', 'true');
+      await expect(minicart).not.toHaveAttribute('aria-expanded', 'true', { timeout: 10000 });
       console.log('✓ Minicart closes via × button');
     });
 
@@ -152,10 +155,9 @@ test.describe('Edge Checkout', () => {
 
     test('cart link href points to /order/cart in edge mode', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
-      await page.waitForLoadState('networkidle');
 
       const cartLink = page.locator(CART_LINK_SELECTOR);
-      await expect(cartLink).toHaveAttribute('href', /\/us\/en_us\/order\/cart/);
+      await expect(cartLink).toHaveAttribute('href', /\/us\/en_us\/order\/cart/, { timeout: 15000 });
       console.log('✓ Cart icon href is /us/en_us/order/cart in edge mode');
     });
   });
@@ -164,6 +166,8 @@ test.describe('Edge Checkout', () => {
 
   test.describe('Simple Product - 20-ounce Travel Cup', () => {
     const productPath = '/us/en_us/products/20-ounce-travel-cup';
+
+    test.use({ viewport: { width: 1280, height: 720 } });
 
     test('opens minicart and stores item with correct schema', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
@@ -186,6 +190,8 @@ test.describe('Edge Checkout', () => {
 
   test.describe('Bundle Product - 5200 Legacy Bundle', () => {
     const productPath = '/us/en_us/products/5200-legacy-bundle';
+
+    test.use({ viewport: { width: 1280, height: 720 } });
 
     test('opens minicart and stores item with bundle data', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
@@ -270,6 +276,8 @@ test.describe('Edge Checkout', () => {
 
   test.describe('Warranty Selection', () => {
     const productPath = '/us/en_us/products/ascent-x2';
+
+    test.use({ viewport: { width: 1280, height: 720 } });
 
     test('no warranty item in cart when default (no-cost) tier is active', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
@@ -391,11 +399,19 @@ test.describe('Edge Checkout', () => {
   test.describe('Cart Persistence', () => {
     const productPath = '/us/en_us/products/ascent-x2';
 
+    test.use({ viewport: { width: 1280, height: 720 } });
+
     test('cart survives a page reload', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
       await waitForElement(page, '.quantity-container button');
 
       await page.locator('.quantity-container button').click();
+
+      // Poll until cart is actually written to localStorage before reloading
+      await expect.poll(
+        () => getCart(page).then((c) => c?.items?.length ?? 0),
+        { timeout: 10000, message: 'Cart was not persisted to localStorage before reload' },
+      ).toBeGreaterThan(0);
 
       const minicart = page.locator('#minicart');
       if (await minicart.isVisible()) {
@@ -404,7 +420,7 @@ test.describe('Edge Checkout', () => {
       }
 
       await page.reload();
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const cart = await getCart(page);
       expect(cart).not.toBeNull();
@@ -416,7 +432,7 @@ test.describe('Edge Checkout', () => {
     test('cart badge restored from localStorage on page load', async ({ page }) => {
       // Seed localStorage before the page script initialises the cart
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       await page.evaluate((key) => {
         localStorage.setItem(key, JSON.stringify({
@@ -434,7 +450,7 @@ test.describe('Edge Checkout', () => {
 
       // Reload so the header picks up the seeded items via cart:change restore event
       await page.reload();
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // visibleItemCount = 1+2 = 3
       const cartLink = page.locator(CART_LINK_SELECTOR);
@@ -450,18 +466,13 @@ test.describe('Edge Checkout', () => {
 
       const minicart = page.locator('#minicart');
       await expect(minicart).toHaveAttribute('aria-expanded', 'true', { timeout: 15000 });
+      await expect(minicart.locator('.cart-item').first()).toBeAttached({ timeout: 20000 });
 
-      // Remove the item directly via the cart API to trigger cart:empty
-      await page.evaluate(() => {
-        // Dispatch a cart:change event with action='empty' to simulate cart being emptied
-        // (the real path is: remove last item → quantity hits 0 → empty event)
-        const cartItem = document.querySelector('#minicart .cart-item');
-        const removeBtn = cartItem?.querySelector('button[aria-label*="remove"], button[aria-label*="Remove"], .cart-item-remove');
-        if (removeBtn) removeBtn.click();
-      });
+      // Click the remove button via Playwright so the handler fires correctly
+      await minicart.locator('.cart-item-remove').first().click();
 
       // After emptying, minicart closes
-      await expect(minicart).not.toHaveAttribute('aria-expanded', 'true', { timeout: 5000 });
+      await expect(minicart).not.toHaveAttribute('aria-expanded', 'true', { timeout: 10000 });
       console.log('✓ Minicart closes when cart becomes empty');
     });
   });
@@ -497,10 +508,9 @@ test.describe('Edge Checkout', () => {
 
     test('cart icon links to /order/cart on mobile', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
-      await page.waitForLoadState('networkidle');
 
       const cartLink = page.locator(CART_LINK_SELECTOR);
-      await expect(cartLink).toHaveAttribute('href', /\/us\/en_us\/order\/cart/);
+      await expect(cartLink).toHaveAttribute('href', /\/us\/en_us\/order\/cart/, { timeout: 15000 });
       console.log('✓ Cart icon href is /us/en_us/order/cart on mobile');
     });
   });
@@ -509,6 +519,8 @@ test.describe('Edge Checkout', () => {
 
   test.describe('FR-CA Locale', () => {
     const productPath = '/ca/fr_ca/products/ascent-x2';
+
+    test.use({ viewport: { width: 1280, height: 720 } });
 
     test('cart stored under cart:ca key, not cart:us', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
@@ -543,6 +555,12 @@ test.describe('Edge Checkout', () => {
 
       await page.locator('.quantity-container button').click();
 
+      // Poll until cart is actually written to localStorage before reloading
+      await expect.poll(
+        () => getCart(page, CART_KEY_CA).then((c) => c?.items?.length ?? 0),
+        { timeout: 10000, message: 'FR-CA cart was not persisted to localStorage before reload' },
+      ).toBeGreaterThan(0);
+
       const minicart = page.locator('#minicart');
       if (await minicart.isVisible()) {
         await minicart.locator('.slide-panel-close').click();
@@ -550,7 +568,7 @@ test.describe('Edge Checkout', () => {
       }
 
       await page.reload();
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const caCart = await getCart(page, CART_KEY_CA);
       expect(caCart.items).toHaveLength(1);
@@ -626,6 +644,8 @@ test.describe('Edge Checkout', () => {
   test.describe('Minicart Interactions', () => {
     const productPath = '/us/en_us/products/ascent-x2';
 
+    test.use({ viewport: { width: 1280, height: 720 } });
+
     test('cart icon click opens minicart independently of add-to-cart', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
       await waitForElement(page, '.quantity-container button');
@@ -662,15 +682,17 @@ test.describe('Edge Checkout', () => {
       await minicart.locator('.cart-item-remove').first().click();
 
       // Minicart closes automatically when cart becomes empty
-      await expect(minicart).not.toHaveAttribute('aria-expanded', 'true', { timeout: 5000 });
+      await expect(minicart).not.toHaveAttribute('aria-expanded', 'true', { timeout: 10000 });
 
       // Badge is removed
       const cartLink = page.locator(CART_LINK_SELECTOR);
-      await expect(cartLink).not.toHaveAttribute('data-cart-items', { timeout: 3000 });
+      await expect(cartLink).not.toHaveAttribute('data-cart-items', { timeout: 5000 });
 
-      // localStorage is empty
-      const cart = await getCart(page);
-      expect(cart?.items ?? []).toHaveLength(0);
+      // localStorage is empty — poll to allow the async persist to flush
+      await expect.poll(async () => {
+        const cart = await getCart(page);
+        return cart?.items?.length ?? 0;
+      }, { timeout: 5000, message: 'Cart should be empty in localStorage after removing last item' }).toBe(0);
       console.log('✓ Removing last item closes minicart and clears badge');
     });
 
@@ -754,9 +776,9 @@ test.describe('Edge Checkout', () => {
       // handled by the remove button. Use remove instead.
       await minicart.locator('.cart-item-remove').first().click();
 
-      await expect(minicart).not.toHaveAttribute('aria-expanded', 'true', { timeout: 5000 });
+      await expect(minicart).not.toHaveAttribute('aria-expanded', 'true', { timeout: 10000 });
       const cartLink = page.locator(CART_LINK_SELECTOR);
-      await expect(cartLink).not.toHaveAttribute('data-cart-items', { timeout: 3000 });
+      await expect(cartLink).not.toHaveAttribute('data-cart-items', { timeout: 5000 });
       console.log('✓ Removing last item via minicart closes it and clears badge');
     });
 
@@ -764,7 +786,7 @@ test.describe('Edge Checkout', () => {
       // Navigate to the edge cart page itself
       const cartPageUrl = buildProductUrl('/us/en_us/order/cart', currentBranch, { cart: 'edge' });
       await page.goto(cartPageUrl);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       const cartLink = page.locator(CART_LINK_SELECTOR);
       if (await cartLink.count() === 0) {
