@@ -128,19 +128,30 @@ export class Cart {
   }
 
   /**
-   * Add an item to the cart. Merges quantity into an existing entry only when
-   * both SKU and `custom` payload match exactly. Items with the same SKU but
-   * different `custom` payloads (e.g. the same warranty SKU linked to two
-   * different parent products) are kept as separate entries.
+   * Add an item to the cart. If an entry with the same SKU already exists,
+   * the merge succeeds only when the existing and incoming `custom` payloads
+   * are deep-equal; on merge, quantity is incremented by the incoming
+   * quantity. A `custom` mismatch throws — defensive guard against UI bugs.
+   *
+   * Pass `{ allowSeparateEntry: true }` when the same SKU legitimately needs
+   * multiple distinct entries with different `custom` payloads (e.g. the same
+   * warranty SKU linked to two different parent products).
    *
    * @param {CartItem} item
+   * @param {{ allowSeparateEntry?: boolean }} [opts]
    */
-  addItem(item) {
-    const existing = this.#items.find(
-      (i) => i.sku === item.sku && deepEqual(i.custom, item.custom),
-    );
+  addItem(item, { allowSeparateEntry = false } = {}) {
+    const existing = this.#items.find((i) => i.sku === item.sku);
     if (existing) {
-      existing.quantity += item.quantity;
+      if (!deepEqual(existing.custom, item.custom)) {
+        if (allowSeparateEntry) {
+          this.#items.push(item);
+        } else {
+          throw new Error(`Cannot merge cart item ${item.sku}: incompatible custom payloads`);
+        }
+      } else {
+        existing.quantity += item.quantity;
+      }
     } else {
       this.#items.push(item);
     }

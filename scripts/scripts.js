@@ -1348,6 +1348,11 @@ async function loadEager(doc) {
   if (localStorage.getItem('useEdgeCheckout') !== null) {
     window.useEdgeCheckout = localStorage.getItem('useEdgeCheckout') === 'true';
   }
+  // ?cart=magento or ?cart=edge overrides all other settings (useful for testing)
+  const cartModeParam = new URLSearchParams(window.location.search).get('cart');
+  if (cartModeParam !== null) {
+    window.useEdgeCheckout = cartModeParam !== 'magento';
+  }
 
   /* simulation date */
   const params = new URLSearchParams(window.location.search);

@@ -112,7 +112,7 @@ export default async function decorate(block) {
                   ...(tier.coverageYears ? { coverageYears: tier.coverageYears } : {}),
                 },
                 local: { showInCart: false },
-              });
+              }, { allowSeparateEntry: true });
             }
           },
           currencyCode,

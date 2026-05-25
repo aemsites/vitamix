@@ -76,7 +76,7 @@ test.describe('Stale Session Cart ID', () => {
     });
 
     // Load the product page
-    const productUrl = buildProductUrl(productPath, currentBranch);
+    const productUrl = buildProductUrl(productPath, currentBranch, { cart: 'magento' });
     await page.goto(productUrl);
     await page.waitForLoadState('networkidle');
 
