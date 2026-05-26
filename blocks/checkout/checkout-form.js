@@ -14,10 +14,10 @@ function getContactFields(strings) {
 function getAddressFields(strings, isCanada) {
   return [
     {
-      name: 'firstname', type: 'text', label: strings.firstName, required: true, autocomplete: 'given-name', width: 'half',
+      name: 'firstname', type: 'text', label: strings.firstName, required: true, autocomplete: 'given-name', width: 'half', maxlength: 50,
     },
     {
-      name: 'lastname', type: 'text', label: strings.lastName, required: true, autocomplete: 'family-name', width: 'half',
+      name: 'lastname', type: 'text', label: strings.lastName, required: true, autocomplete: 'family-name', width: 'half', maxlength: 50,
     },
     {
       name: 'street-0', type: 'text', label: strings.address, required: true, autocomplete: 'address-line1',
@@ -129,6 +129,7 @@ function buildField(field, namePrefix = '') {
     input.placeholder = ' ';
     if (field.autocomplete) input.autocomplete = field.autocomplete;
     if (field.inputmode) input.inputMode = field.inputmode;
+    if (field.maxlength) input.maxLength = field.maxlength;
     if (field.format === 'phone') attachPhoneFormatter(input);
   }
 

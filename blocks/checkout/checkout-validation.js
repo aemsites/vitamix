@@ -8,6 +8,7 @@ const MESSAGES = {
     postalCode: 'Please enter a valid postal code (e.g. A1B 2C3).',
     phone: 'Please enter a valid 10-digit phone number.',
     email: 'Please enter a valid email address.',
+    maxLength: 'Maximum {max} characters.',
   },
   fr: {
     required: 'Ce champ est requis.',
@@ -18,6 +19,7 @@ const MESSAGES = {
     postalCode: 'Veuillez entrer un code postal valide (ex. A1B 2C3).',
     phone: 'Veuillez entrer un numéro de téléphone à 10 chiffres valide.',
     email: 'Veuillez entrer une adresse courriel valide.',
+    maxLength: 'Maximum {max} caractères.',
   },
 };
 
@@ -125,10 +127,13 @@ export function attachFieldValidation(input) {
     else clearFieldError(input);
   });
 
-  // Clear error on typing so feedback is immediate
+  // Show max-length error when the limit is hit; clear it (or any other error) on input below limit
   if (!isSelect) {
     input.addEventListener('input', () => {
-      if (input.closest('.form-field')?.classList.contains('has-error')) {
+      if (input.maxLength > 0 && input.value.length >= input.maxLength) {
+        const msgs = getMessages(input.form);
+        showFieldError(input, msgs.maxLength.replace('{max}', input.maxLength));
+      } else if (input.closest('.form-field')?.classList.contains('has-error')) {
         clearFieldError(input);
       }
     });
