@@ -271,7 +271,7 @@ function loadErrorTranslations() {
 async function translateServerError(message, lang) {
   if (!message || !lang || lang === 'en') return message;
   const all = await loadErrorTranslations();
-  return all?.[lang]?.[message] ?? message;
+  return all?.[lang]?.[message.toLowerCase()] ?? message;
 }
 
 /**
