@@ -294,6 +294,11 @@ main > .section:has(.checkout-wrapper) {
   border-color: var(--commerce-color-error);
 }
 
+/* ── Gift message panel ──────────────────────────────────────────── */
+.gift-message-wrapper {
+  margin-top: 12px;
+}
+
 /* Gift message char count */
 .char-count {
   display: block;
