@@ -64,6 +64,14 @@ function shippingName(o) {
   return n || '—';
 }
 
+/** Non-empty gift message on the order root (ProductBus checkout payloads). */
+function orderGiftMessage(o) {
+  if (!o || typeof o !== 'object') return '';
+  const msg = o.giftMessage;
+  if (msg == null) return '';
+  return String(msg).trim();
+}
+
 /** Short id for UI: `friendlyId`, else suffix after `…Z-` in timestamp-prefixed ProductBus ids. */
 function orderIdForDisplay(order) {
   if (!order || typeof order !== 'object') return '';
@@ -458,6 +466,7 @@ function buildOrderRichHeader(o) {
   appendPill(pills, 'Payment details', pay);
   appendPill(pills, 'Terminal issue', cancelled);
   appendPill(pills, 'Shipping address', hasShip);
+  appendPill(pills, 'Gift message', Boolean(orderGiftMessage(o)));
   appendPill(pills, 'Multi-line', items.length > 1);
   wrap.appendChild(pills);
 
@@ -564,6 +573,16 @@ function buildOrderHumanView(payload) {
       pair.appendChild(sec);
     }
     root.appendChild(pair);
+  }
+
+  const giftMsg = orderGiftMessage(o);
+  if (giftMsg) {
+    const giftSec = section('Gift message');
+    const giftP = document.createElement('p');
+    giftP.className = 'orders-detail-address';
+    giftP.textContent = giftMsg;
+    giftSec.appendChild(giftP);
+    root.appendChild(giftSec);
   }
 
   const items = Array.isArray(o.items) ? o.items : [];
