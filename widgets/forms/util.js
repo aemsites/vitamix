@@ -1,4 +1,5 @@
 import { loadCSS } from '../../scripts/aem.js';
+import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 const TOAST_DURATION_MS = 5000;
 const TOAST_EXIT_MS = 250;
@@ -255,9 +256,29 @@ export function setupFormValidation(form, lang = 'en') {
   }, true);
 }
 
+let errorTranslationsPromise = null;
+
+function loadErrorTranslations() {
+  if (!errorTranslationsPromise) {
+    const url = `${window.hlx?.codeBasePath || ''}/widgets/forms/errors.json`;
+    errorTranslationsPromise = fetch(url)
+      .then((r) => (r.ok ? r.json() : {}))
+      .catch(() => ({}));
+  }
+  return errorTranslationsPromise;
+}
+
+async function translateServerError(message, lang) {
+  if (!message || !lang || lang === 'en') return message;
+  const all = await loadErrorTranslations();
+  return all?.[lang]?.[message.toLowerCase()] ?? message;
+}
+
 /**
  * Handles a non-ok form submission response. For a 400, extracts the preferred
  * error message and applies it inline to a matching input or shows a toast.
+ * Server messages are matched in English (the canonical form) and then
+ * translated via widgets/forms/errors.json before being shown to the user.
  * For any other non-ok status, shows a toast with the fallback message.
  * @param {Response} response - The fetch Response
  * @param {HTMLFormElement} form - Form whose inputs may be matched by field name
@@ -265,6 +286,8 @@ export function setupFormValidation(form, lang = 'en') {
  * @returns {Promise<void>}
  */
 export async function handleFormSubmitError(response, form, fallbackMessage) {
+  const { language } = getLocaleAndLanguage();
+  const lang = (language || 'en_us').split('_')[0];
   if (response?.status === 400) {
     let body = null;
     try {
@@ -277,10 +300,10 @@ export async function handleFormSubmitError(response, form, fallbackMessage) {
     if (messages.length) {
       const match = findMatchingInput(form, messages);
       if (match) {
-        applyInputError(match.input, match.message);
+        applyInputError(match.input, await translateServerError(match.message, lang));
         return;
       }
-      toast(messages[0], 'error');
+      toast(await translateServerError(messages[0], lang), 'error');
       return;
     }
   }
