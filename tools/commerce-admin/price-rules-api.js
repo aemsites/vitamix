@@ -11,9 +11,9 @@
  *   Each `CatalogPriceRule` requires `path`, `price` (string or number; server stores string).
  *   Optional `start` / `end` must be **ISO 8601** timestamps.
  *   Optional `custom` on each rule is string values only. Use **`custom.group`** for the
- *   admin calendar / grouping label. Optional **`custom.minimumSubtotal`**: plain number string
- *   (same as `regularPrice`); when set, the storefront may require cart subtotal ≥ this value
- *   before applying the promotion price.
+ *   admin calendar / grouping label.
+ *   Optional promotion-level **`conditions.minimumSubtotal`**: number; when set, the storefront
+ *   may require cart subtotal ≥ this value before applying the promotion.
  *   Optional `variants` maps sku → `{ sku, price, start?, end?, custom? }`.
  * - **Cart** `GET/PUT …/price-rules/cart`: JSON **array** of cart rules (`CartPriceRulesSchema`).
  *   Each rule may include optional **`country`** / **`locale`** (same patterns as catalog).
@@ -44,10 +44,18 @@ import { apiFetch } from './commerce-otp-api.js';
  */
 
 /**
+ * Promotion-level eligibility (helix catalog promotions).
+ *
+ * @typedef {object} CatalogPromotionConditions
+ * @property {number} [minimumSubtotal]
+ */
+
+/**
  * @typedef {object} CatalogPromotion
  * @property {string} id
  * @property {string} name
  * @property {CatalogPriceRule[]} rules
+ * @property {CatalogPromotionConditions} [conditions]
  * @property {string} [country] ISO 3166-1 alpha-2 (`^[a-z]{2}$`, helix `COUNTRY_PATTERN`)
  * @property {string} [locale] BCP-47 subset (helix `LOCALE_PATTERN`, e.g. `en-US`, `fr-CA`)
  */
@@ -381,14 +389,12 @@ export function catalogRuleToPromotionRow(rule) {
 }
 
 /**
- * Reads optional minimum-cart condition from catalog sale lines (`custom.minimumSubtotal`).
- * Uses the first strictly positive value found (rules are normally written with the same
- * threshold on every line).
+ * Legacy read: first strictly positive `custom.minimumSubtotal` on a sale line.
  *
  * @param {CatalogPriceRule[] | null | undefined} rules
- * @returns {string} normalized digit string for the API, or '' when absent
+ * @returns {string} normalized digit string, or '' when absent
  */
-export function promotionMinimumSubtotalFromRules(rules) {
+function legacyMinimumSubtotalFromRuleCustom(rules) {
   const arr = Array.isArray(rules) ? rules : [];
   const hit = arr.map((r) => {
     const c = catalogCustomStringMap(r?.custom);
@@ -399,6 +405,25 @@ export function promotionMinimumSubtotalFromRules(rules) {
     return Number.isFinite(n) && n > 0 ? digits : '';
   }).find((d) => d);
   return hit || '';
+}
+
+/**
+ * Minimum cart threshold for a catalog promotion (`conditions.minimumSubtotal`),
+ * with fallback to legacy per-rule `custom.minimumSubtotal`.
+ *
+ * @param {CatalogPromotion | null | undefined} promo
+ * @returns {string} normalized digit string for forms/display, or '' when absent
+ */
+export function promotionMinimumSubtotal(promo) {
+  if (!promo) return '';
+  const cond = promo.conditions && typeof promo.conditions === 'object' ? promo.conditions : {};
+  const raw = cond.minimumSubtotal;
+  if (raw != null && String(raw).trim() !== '') {
+    const digits = catalogPriceStringForApi(String(raw));
+    const n = parseFloat(digits);
+    if (Number.isFinite(n) && n > 0) return digits;
+  }
+  return legacyMinimumSubtotalFromRuleCustom(promo.rules);
 }
 
 /**

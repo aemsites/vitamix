@@ -18,7 +18,7 @@ import {
   fetchCartPriceRules,
   fetchCatalogPriceRules,
   promotionCatalogGroup,
-  promotionMinimumSubtotalFromRules,
+  promotionMinimumSubtotal,
   productUrlToCatalogPath,
   putCartPriceRules,
   putCatalogPriceRules,
@@ -83,8 +83,8 @@ const ET_TIMEZONE = 'America/New_York';
  * @property {string} id
  * @property {string} title
  * @property {PromotionRow[]} rows
- * @property {string} [minimumSubtotalDigits] normalized digits when any line has
- *   `custom.minimumSubtotal`
+ * @property {string} [minimumSubtotalDigits] normalized digits when promotion has
+ *   `conditions.minimumSubtotal`
  */
 
 const COUNTRIES = /** @type {const} */ (['us', 'ca', 'mx']);
@@ -687,11 +687,9 @@ function catalogCustomStringMap(raw) {
  * @param {import('./price-rules-api.js').CatalogPriceRule[] | undefined} [preserveFromRules]
  *   rules for this market before edit — merged by `path` so extra `custom` keys (e.g. `debug`)
  *   and `variants` survive Save
- * @param {{ enabled: boolean, amountRaw: string } | undefined} [minCartCondition]
- *   when `enabled`, writes `custom.minimumSubtotal` on each rule; otherwise removes that key
  * @returns {import('./price-rules-api.js').CatalogPriceRule[]}
  */
-function promotionRowsToCatalogRules(rows, group, preserveFromRules, minCartCondition) {
+function promotionRowsToCatalogRules(rows, group, preserveFromRules) {
   const g = String(group || '').trim() || String(new Date().getFullYear());
   /** @type {Map<string, import('./price-rules-api.js').CatalogPriceRule>} */
   const prevByPath = new Map(
@@ -714,14 +712,7 @@ function promotionRowsToCatalogRules(rows, group, preserveFromRules, minCartCond
     custom.group = g;
     if (regDigits) custom.regularPrice = regDigits;
     else delete custom.regularPrice;
-    if (minCartCondition && minCartCondition.enabled) {
-      const minDigits = catalogPriceStringForApi(minCartCondition.amountRaw);
-      const minN = parseFloat(minDigits);
-      if (Number.isFinite(minN) && minN > 0) custom.minimumSubtotal = minDigits;
-      else delete custom.minimumSubtotal;
-    } else {
-      delete custom.minimumSubtotal;
-    }
+    delete custom.minimumSubtotal;
     rule.custom = custom;
 
     if (prevRule?.variants && typeof prevRule.variants === 'object' && !Array.isArray(prevRule.variants)) {
@@ -762,6 +753,40 @@ function readPromotionMinCartCondition(dlg) {
   const enabled = cb instanceof HTMLInputElement && cb.checked;
   const raw = String(dlg.querySelector('#pr-promo-min-cart-amount')?.value ?? '').trim();
   return { enabled, amountRaw: raw };
+}
+
+/**
+ * Build promotion-level `conditions` from the min-cart form (clears legacy per-rule custom keys on save).
+ *
+ * @param {{ enabled: boolean, amountRaw: string }} minCart
+ * @param {import('./price-rules-api.js').CatalogPromotion | null | undefined} [preserveFrom]
+ * @returns {import('./price-rules-api.js').CatalogPromotionConditions | undefined}
+ */
+function buildPromotionConditionsFromMinCart(minCart, preserveFrom) {
+  const prev = preserveFrom?.conditions && typeof preserveFrom.conditions === 'object'
+    ? { ...preserveFrom.conditions }
+    : {};
+  if (minCart.enabled) {
+    const minDigits = catalogPriceStringForApi(minCart.amountRaw);
+    const minN = parseFloat(minDigits);
+    if (Number.isFinite(minN) && minN > 0) prev.minimumSubtotal = minN;
+    else delete prev.minimumSubtotal;
+  } else {
+    delete prev.minimumSubtotal;
+  }
+  return Object.keys(prev).length ? prev : undefined;
+}
+
+/**
+ * @param {import('./price-rules-api.js').CatalogPromotion} promo
+ * @param {{ enabled: boolean, amountRaw: string }} minCart
+ * @param {import('./price-rules-api.js').CatalogPromotion | null | undefined} [preserveFrom]
+ */
+function applyPromotionMinCartConditions(promo, minCart, preserveFrom) {
+  const conditions = buildPromotionConditionsFromMinCart(minCart, preserveFrom);
+  if (conditions) return { ...promo, conditions };
+  const { conditions: _drop, ...rest } = promo;
+  return rest;
 }
 
 /** @param {HTMLDialogElement} dlg */
@@ -1330,7 +1355,7 @@ function promotionEditFormInnerHtml(initialMarket, lines, opts = {}) {
           Require minimum cart subtotal
         </label>
         <input type="text" id="pr-promo-min-cart-amount" class="pr-promo-min-cart-amount-input" inputmode="decimal" placeholder="e.g. 100" disabled aria-label="Minimum cart subtotal (dollars)" />
-        <p class="coupons-field-hint">Optional. When enabled, each saved sale line includes <code>custom.minimumSubtotal</code> as a plain number (storefront applies the threshold when supported). Turn off to clear this condition.</p>
+        <p class="coupons-field-hint">Optional. When enabled, saved as <code>conditions.minimumSubtotal</code> on the promotion (storefront applies the threshold when supported). Turn off to clear this condition.</p>
       </div>
     </div>
     <div class="pr-promo-form-lines-header">
@@ -1587,7 +1612,7 @@ async function openPromotionAddDialog() {
       }
       const lineRows = readPromotionLineRowsFromDom(dialog);
       if (!lineRows.length) throw new Error('Add at least one sale line');
-      const rulesNew = promotionRowsToCatalogRules(lineRows, group, undefined, minCart);
+      const rulesNew = promotionRowsToCatalogRules(lineRows, group);
       for (let i = 0; i < rulesNew.length; i += 1) {
         if (countryKeyFromCatalogPath(rulesNew[i].path) !== market) {
           throw new Error(
@@ -1599,12 +1624,12 @@ async function openPromotionAddDialog() {
       const existing = Array.isArray(state.catalogPromotions) ? state.catalogPromotions : [];
       const slug = ruleSlugFromName(name);
       const id = uniquePromotionId(slug, existing);
-      const next = [...existing, {
+      const next = [...existing, applyPromotionMinCartConditions({
         id,
         name,
         country: market,
         rules: rulesNew,
-      }];
+      }, minCart)];
       await putCatalogPromotionsDocument(next);
       showToast('Promotion added', 'success');
       close();
@@ -1662,7 +1687,7 @@ async function openPromotionEditDialog(countryKey, promoId) {
   if (nameEl && 'value' in nameEl) /** @type {HTMLInputElement} */ (nameEl).value = promo.name || '';
   const groupEl = dialog.querySelector('#pr-promo-form-group');
   if (groupEl && 'value' in groupEl) /** @type {HTMLInputElement} */ (groupEl).value = groupGuess;
-  const minDigits = promotionMinimumSubtotalFromRules(rulesCo);
+  const minDigits = promotionMinimumSubtotal(promo);
   const minCb = dialog.querySelector('#pr-promo-min-cart-enabled');
   const minAmt = dialog.querySelector('#pr-promo-min-cart-amount');
   if (minCb instanceof HTMLInputElement && minAmt instanceof HTMLInputElement) {
@@ -1727,7 +1752,7 @@ async function openPromotionEditDialog(countryKey, promoId) {
       const prev = list[idx];
       const prevMarketRules = catalogRulesForCountryTab(prev, market);
       const rulesNew = lineRows.length
-        ? promotionRowsToCatalogRules(lineRows, group, prevMarketRules, minCart)
+        ? promotionRowsToCatalogRules(lineRows, group, prevMarketRules)
         : [];
       for (let i = 0; i < rulesNew.length; i += 1) {
         if (countryKeyFromCatalogPath(rulesNew[i].path) !== market) {
@@ -1746,12 +1771,12 @@ async function openPromotionEditDialog(countryKey, promoId) {
         );
       }
       const next = list.slice();
-      next[idx] = {
+      next[idx] = applyPromotionMinCartConditions({
         ...prev,
         name,
         country: market,
         rules: merged,
-      };
+      }, minCart, prev);
       await putCatalogPromotionsDocument(next);
       showToast('Promotion updated', 'success');
       close();
@@ -2240,7 +2265,7 @@ function allPromotionRowsForCountry() {
     const rulesForCo = catalogRulesForCountryTab(p, ck);
     if (!rulesForCo.length) return;
     const group = promotionCatalogGroup(p, ck);
-    const minCartDigits = promotionMinimumSubtotalFromRules(rulesForCo);
+    const minCartDigits = promotionMinimumSubtotal(p);
     rows.push({
       countryKey: ck,
       countryLabel: label,
@@ -3089,7 +3114,7 @@ async function openPromotionDetailModal(countryKey, promoId) {
     id: catalogPromo.id,
     title: catalogPromo.name,
     rows: rulesForCo.map(catalogRuleToPromotionRow),
-    minimumSubtotalDigits: promotionMinimumSubtotalFromRules(rulesForCo),
+    minimumSubtotalDigits: promotionMinimumSubtotal(catalogPromo),
   };
   const countryLabel = marketLabel(countryKey) || countryKey;
   closePromotionDetailDialog();
