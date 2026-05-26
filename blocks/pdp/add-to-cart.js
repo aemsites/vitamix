@@ -291,7 +291,10 @@ export default function renderAddToCart(ph, block, parent) {
           name,
           url: selectedVariant.url,
           path: new URL(selectedVariant.url).pathname,
-          image: selectedVariant.image[0],
+          // Variant may not declare its own image (e.g. a bundle's first color
+          // variant whose source `images` array is empty); fall back to the
+          // parent product's first image.
+          image: selectedVariant.image?.[0] ?? parent.image?.[0],
           variant: window.selectedVariant?.options?.color || '',
           selectedOptions: semanticOptions,
           ...(parent.bundleItems ? { bundleItems: parent.bundleItems } : {}),

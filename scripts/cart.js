@@ -227,8 +227,15 @@ export class Cart {
    *
    * Fields kept cart-local and not forwarded:
    *   - `local` — site-defined data used by the cart UI only
-   *   - `selectedOptions` — cart-UI data today; gains a passthrough
-   *     alongside the bundle work's Commerce API change
+   *   - `bundleItems` — reference data; the Commerce API re-reads the
+   *     authoritative bundle composition from Product Bus at preview time
+   *     so cart staleness can never affect billing or fulfillment.
+   *
+   * Fields forwarded that drive server-side bundle resolution:
+   *   - `selectedOptions` — `{id, value}` pairs; the Commerce API uses
+   *     them to pick which configurable bundle item variant ships.
+   *     Omitted when absent or empty so the server-side estimate-token
+   *     hash sees the same shape across calls.
    *
    * @returns {Array<object>}
    */
@@ -246,6 +253,7 @@ export class Cart {
       },
       ...(item.image ? { imageUrl: item.image } : {}),
       ...(item.url ? { productUrl: item.url } : {}),
+      ...(item.selectedOptions?.length ? { selectedOptions: item.selectedOptions } : {}),
       ...(item.custom ? { custom: item.custom } : {}),
     }));
   }

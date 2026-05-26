@@ -432,8 +432,9 @@ test('addItem throws when nested custom payloads differ', () => {
 
 // --- getItemsForAPI: passthrough --------------------------------------------
 
-test('getItemsForAPI does not forward selectedOptions', () => {
-  // selectedOptions is cart-local; the Commerce API does not accept it.
+test('getItemsForAPI forwards non-empty selectedOptions verbatim', () => {
+  // The Commerce API uses selectedOptions to resolve which configurable
+  // bundle item variant ships. Forwarded as `{id, value}` pairs.
   const cart = new Cart();
   cart.addItem({
     sku: 'foo',
@@ -444,7 +445,47 @@ test('getItemsForAPI does not forward selectedOptions', () => {
     selectedOptions: [{ id: 'color', value: 'Red' }],
   });
   const [api] = cart.getItemsForAPI();
-  assert.equal('selectedOptions' in api, false);
+  assert.deepEqual(api.selectedOptions, [{ id: 'color', value: 'Red' }]);
+});
+
+test('getItemsForAPI omits selectedOptions when empty or absent', () => {
+  // Empty and absent must hash identically server-side (estimate-token
+  // hash treats `selectedOptions?.length` as the gate). Match here.
+  const cart = new Cart();
+  cart.addItem({
+    sku: 'with-empty',
+    quantity: 1,
+    price: '10.00',
+    name: 'With empty',
+    path: '/a',
+    selectedOptions: [],
+  });
+  cart.addItem({
+    sku: 'with-absent',
+    quantity: 1,
+    price: '10.00',
+    name: 'With absent',
+    path: '/b',
+  });
+  const [a, b] = cart.getItemsForAPI();
+  assert.equal('selectedOptions' in a, false);
+  assert.equal('selectedOptions' in b, false);
+});
+
+test('getItemsForAPI does not forward bundleItems', () => {
+  // bundleItems on the cart entry is reference data only; the Commerce
+  // API re-reads the authoritative composition from Product Bus.
+  const cart = new Cart();
+  cart.addItem({
+    sku: 'bundle-parent',
+    quantity: 1,
+    price: '100.00',
+    name: 'Bundle Parent',
+    path: '/bundle',
+    bundleItems: [{ sku: 'comp-a', name: 'Component A', price: { final: '40.00' } }],
+  });
+  const [api] = cart.getItemsForAPI();
+  assert.equal('bundleItems' in api, false);
 });
 
 test('getItemsForAPI forwards custom verbatim', () => {
