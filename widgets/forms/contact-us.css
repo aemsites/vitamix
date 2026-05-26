@@ -1,8 +1,14 @@
 /* Contact us form – vertical stack, labels above, uses global form/input styles */
+
+.widget-container.forms-contact-us-container > div {
+  margin: var(--spacing-300) auto;
+}
+
 .forms-contact-us {
-  background-color: var(--color-gray-100);
-  padding: var(--spacing-300);
-  border-radius: var(--rounding-m);
+  background-color: transparent;
+  padding: var(--spacing-300) var(--spacing-300) var(--spacing-300) 0;
+  margin-left: 0;
+  border-radius: 0;
   max-width: 100%;
 }
 
