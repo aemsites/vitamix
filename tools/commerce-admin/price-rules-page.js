@@ -106,9 +106,12 @@ function marketLabel(ck) {
 }
 const AREAS = /** @type {const} */ (['rules', 'promotions']);
 
+/** @typedef {'all' | (typeof COUNTRIES)[number]} CartRuleCountryFilter */
+
 /**
  * @type {{
  *   country: (typeof COUNTRIES)[number],
+ *   cartRuleCountryFilter: CartRuleCountryFilter,
  *   area: (typeof AREAS)[number],
  *   promoListSearch: string,
  *   promoListGroupFilter: string,
@@ -127,6 +130,7 @@ const AREAS = /** @type {const} */ (['rules', 'promotions']);
  */
 const state = {
   country: 'us',
+  cartRuleCountryFilter: /** @type {CartRuleCountryFilter} */ ('all'),
   area: PR_APP_MODE === 'promotions' ? 'promotions' : 'rules',
   promoListSearch: '',
   promoListGroupFilter: '',
@@ -164,7 +168,28 @@ function cartRuleMarketFromRule(rule) {
 /** @param {string} ck */
 function rulesForCountryApi(ck) {
   if (state.cartDataSource !== 'api' || !Array.isArray(state.cartRulesList)) return [];
+  if (ck === 'all') return [...state.cartRulesList];
   return state.cartRulesList.filter((r) => cartRuleMarketFromRule(r) === ck);
+}
+
+/**
+ * @param {string} countryFilter
+ * @returns {Array<{
+ *   apiRule: import('./price-rules-api.js').HelixCartPriceRule;
+ *   row: RuleRow;
+ *   market: (typeof COUNTRIES)[number];
+ * }>}
+ */
+function cartRuleListEntries(countryFilter) {
+  return rulesForCountryApi(countryFilter).map((apiRule) => ({
+    apiRule,
+    row: helixCartRuleToRuleRow(apiRule),
+    market: cartRuleMarketFromRule(apiRule),
+  }));
+}
+
+function isCartRulesCountryTabsView() {
+  return PR_APP_MODE === 'cart-rules' || state.area === 'rules';
 }
 
 /**
@@ -1799,7 +1824,7 @@ async function openPromotionEditDialog(countryKey, promoId) {
 /** @param {string} marketKey us|ca|mx */
 function localePathForCartRuleMarket(marketKey) {
   const c = String(marketKey || 'us').trim().toLowerCase();
-  if (c === 'ca') return 'ca/en_ca';
+  if (COUNTRIES.includes(/** @type {(typeof COUNTRIES)[number]} */ (c))) return `${c}/en_us`;
   return 'us/en_us';
 }
 
@@ -2052,15 +2077,18 @@ function readCartRuleMarketKeyFromForm(dlg) {
 }
 
 /**
- * @param {string} [defaultMarketKey] initial Market select (defaults to list `state.country`)
+ * @param {string} [defaultMarketKey] initial Market select (defaults from list country filter)
  */
 async function openCartRuleAddDialog(defaultMarketKey) {
   const ok = await fetchCartRulesFromServerOrNotify();
   if (!ok) return;
 
-  let initial = typeof defaultMarketKey === 'string' ? defaultMarketKey.trim().toLowerCase() : state.country;
-  if (!COUNTRIES.includes(/** @type {(typeof COUNTRIES)[number]} */(initial))) {
-    initial = COUNTRIES.includes(state.country) ? state.country : 'us';
+  let initial = typeof defaultMarketKey === 'string' ? defaultMarketKey.trim().toLowerCase() : '';
+  if (!COUNTRIES.includes(/** @type {(typeof COUNTRIES)[number]} */ (initial))) {
+    const fromFilter = state.cartRuleCountryFilter === 'all'
+      ? 'us'
+      : state.cartRuleCountryFilter;
+    initial = COUNTRIES.includes(fromFilter) ? fromFilter : 'us';
   }
   const dialog = document.createElement('dialog');
   dialog.className = 'coupons-dialog coupons-dialog-wide pr-cart-rule-add-dialog';
@@ -2355,6 +2383,25 @@ function compareCartRuleRows(a, b, key) {
 }
 
 /**
+ * @param {ReturnType<typeof cartRuleListEntries>} list
+ * @param {'title'|'id'|'min'|'off'|'freeship'|'scope'|'market'} key
+ * @param {'asc'|'desc'} dir
+ */
+function sortCartRuleEntries(list, key, dir) {
+  const m = dir === 'desc' ? -1 : 1;
+  return list.slice().sort((ea, eb) => {
+    let c = 0;
+    if (key === 'market') {
+      c = ea.market.localeCompare(eb.market);
+    } else {
+      c = compareCartRuleRows(ea.row, eb.row, key);
+    }
+    if (c !== 0) return m * c;
+    return String(ea.row.name).localeCompare(String(eb.row.name), undefined, { sensitivity: 'base' });
+  });
+}
+
+/**
  * @param {RuleRow[]} list
  * @param {'title'|'id'|'min'|'off'|'freeship'|'scope'|'market'} key
  * @param {'asc'|'desc'} dir
@@ -2630,8 +2677,8 @@ function openCartRuleDetailModal(countryKey, ruleIndex) {
 }
 
 function renderCartRulesOverview() {
-  const ck = state.country;
-  const rules = rulesForCountry(ck);
+  const ck = state.cartRuleCountryFilter;
+  const entries = cartRuleListEntries(ck);
   const q = state.cartRuleSearch.trim().toLowerCase();
   const ruleSearchMatch = (r) => {
     const hay = [
@@ -2650,19 +2697,24 @@ function renderCartRulesOverview() {
       .join(' ');
     return hay.includes(q);
   };
-  const filtered = !q ? rules : rules.filter(ruleSearchMatch);
-  const displayRules = sortCartRuleRows(filtered, state.cartRuleSortKey, state.cartRuleSortDir);
+  const filtered = !q ? entries : entries.filter(({ row }) => ruleSearchMatch(row));
+  const displayEntries = sortCartRuleEntries(filtered, state.cartRuleSortKey, state.cartRuleSortDir);
   const searchVal = escapeHtml(state.cartRuleSearch);
 
   let tbodyHtml;
-  if (!rules.length) {
-    tbodyHtml = '<tr><td colspan="7" class="pr-empty-cell">No cart rules for this country.</td></tr>';
+  if (!entries.length) {
+    const emptyMsg = ck === 'all'
+      ? 'No cart rules yet.'
+      : 'No cart rules for this country.';
+    tbodyHtml = `<tr><td colspan="7" class="pr-empty-cell">${emptyMsg}</td></tr>`;
   } else if (!filtered.length) {
     tbodyHtml = '<tr><td colspan="7" class="pr-empty-cell">No rules match your search.</td></tr>';
   } else {
-    tbodyHtml = displayRules
-      .map((r) => {
-        const idx = rules.indexOf(r);
+    tbodyHtml = displayEntries
+      .map(({ row: r, market, apiRule }) => {
+        const countryApiRules = rulesForCountryApi(market);
+        const idx = countryApiRules.findIndex((rule) => rule === apiRule
+          || (apiRule.id && String(rule.id) === String(apiRule.id)));
         const min = r.minimumValue != null && String(r.minimumValue).trim() !== ''
           ? `$${escapeHtml(String(r.minimumValue))}`
           : '—';
@@ -2675,14 +2727,14 @@ function renderCartRulesOverview() {
         const ruleId = (r.id && String(r.id).trim()) || ruleSlugFromName(r.name);
         const label = `Open rule ${r.name}`;
         return `<tr class="pr-promo-grid-row pr-cart-rule-row" role="button" tabindex="0" aria-label="${escapeHtml(label)}"
-            data-pr-cart-rule-open data-pr-country="${escapeHtml(ck)}" data-pr-rule-idx="${idx}">
+            data-pr-cart-rule-open data-pr-country="${escapeHtml(market)}" data-pr-rule-idx="${idx}">
             <td class="pr-promo-col-title">${escapeHtml(r.name)}</td>
             <td><code class="pr-promo-id-code">${escapeHtml(ruleId)}</code></td>
             <td>${min}</td>
             <td>${off}</td>
             <td>${ship}</td>
             <td class="pr-cart-rule-scope">${scopeShort}</td>
-            <td class="pr-cart-rule-col-market">${commerceMarketEmojiHtml(ck)}</td>
+            <td class="pr-cart-rule-col-market">${commerceMarketEmojiHtml(market)}</td>
           </tr>`;
       })
       .join('');
@@ -2698,7 +2750,7 @@ function renderCartRulesOverview() {
       <div class="pr-promo-api-actions">
         <button type="button" class="coupons-btn coupons-btn-primary" data-pr-cart-add>Add cart rule…</button>
       </div>
-      <span class="pim-count pr-promo-count">${displayRules.length} rule${displayRules.length === 1 ? '' : 's'}</span>
+      <span class="pim-count pr-promo-count">${displayEntries.length} rule${displayEntries.length === 1 ? '' : 's'}</span>
     </div>
     <div class="pr-promo-table-wrap pim-list-wrapper">
       <table class="pr-data-table pr-promo-grid-table" aria-label="Cart rules">
@@ -3282,11 +3334,17 @@ function renderMockBanner() {
 }
 
 function renderCountryTabs() {
-  return COUNTRIES.map((key) => {
-    const sel = key === state.country ? 'true' : 'false';
+  const showAll = isCartRulesCountryTabsView();
+  const active = showAll ? state.cartRuleCountryFilter : state.country;
+  const allTab = showAll
+    ? `<button type="button" class="pr-tab" role="tab" aria-selected="${active === 'all' ? 'true' : 'false'}" data-pr-country="all">All</button>`
+    : '';
+  const countryTabs = COUNTRIES.map((key) => {
+    const sel = key === active ? 'true' : 'false';
     const label = marketLabel(key);
     return `<button type="button" class="pr-tab" role="tab" aria-selected="${sel}" data-pr-country="${key}">${escapeHtml(label)}</button>`;
   }).join('');
+  return `${allTab}${countryTabs}`;
 }
 
 function renderAreaTabs() {
@@ -3358,8 +3416,17 @@ function render() {
   mount.querySelectorAll('[data-pr-country]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const key = btn.getAttribute('data-pr-country');
-      if (!key || key === state.country) return;
-      state.country = /** @type {(typeof COUNTRIES)[number]} */ (key);
+      if (!key) return;
+      const cartRulesView = isCartRulesCountryTabsView();
+      if (cartRulesView) {
+        const next = /** @type {CartRuleCountryFilter} */ (key);
+        if (next !== 'all' && !COUNTRIES.includes(/** @type {(typeof COUNTRIES)[number]} */ (next))) return;
+        if (next === state.cartRuleCountryFilter) return;
+        state.cartRuleCountryFilter = next;
+      } else {
+        if (key === 'all' || key === state.country) return;
+        state.country = /** @type {(typeof COUNTRIES)[number]} */ (key);
+      }
       state.promoListSearch = '';
       state.promoListGroupFilter = '';
       state.cartRuleSearch = '';
@@ -3420,7 +3487,10 @@ function render() {
     });
 
     mount.querySelector('[data-pr-cart-add]')?.addEventListener('click', () => {
-      openCartRuleAddDialog(state.country).catch((err) => {
+      const defaultMarket = state.cartRuleCountryFilter === 'all'
+        ? 'us'
+        : state.cartRuleCountryFilter;
+      openCartRuleAddDialog(defaultMarket).catch((err) => {
         showToast(err?.message || 'Could not open add rule', 'error');
       });
     });

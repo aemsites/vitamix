@@ -47,15 +47,16 @@ export function localePathForProductSelector(localePath) {
 }
 
 /**
- * AEM index path used for fetch (may differ from selector locale dropdown value).
+ * AEM products index path for fetch — always `/<country>/en_us/` (storefront catalog index).
  *
  * @param {string} localePath
  * @returns {string}
  */
 export function indexFetchPathForLocale(localePath) {
   const p = String(localePath || '').trim() || 'us/en_us';
-  if (p === 'ca/en_us') return 'ca/en_ca';
-  return p;
+  const country = p.split('/')[0]?.toLowerCase();
+  if (country && /^[a-z]{2}$/.test(country)) return `${country}/en_us`;
+  return 'us/en_us';
 }
 
 /**
