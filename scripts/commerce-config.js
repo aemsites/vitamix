@@ -70,6 +70,7 @@ const defaults = {
       orderTax: 'Tax',
       orderShippingAddress: 'Shipping address',
       orderContact: 'Contact',
+      orderGiftMessage: 'Gift message',
     },
     'fr-ca': {
       stepCart: 'Panier',
@@ -107,6 +108,7 @@ const defaults = {
       orderTax: 'Taxe',
       orderShippingAddress: 'Adresse de livraison',
       orderContact: 'Contact',
+      orderGiftMessage: 'Message cadeau',
     },
   },
   getStrings() {

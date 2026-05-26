@@ -1,4 +1,3 @@
-import { getMetadata } from '../../scripts/aem.js';
 import { attachFieldValidation } from './checkout-validation.js';
 
 const SUBMIT_LOCK_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
@@ -228,35 +227,6 @@ export default function buildForm(container, config, strings) {
   // Shipping address
   form.appendChild(buildAddressSection('shipping-', strings.shippingAddress, strings, isCanada));
 
-  // Gift message (conditional)
-  if (getMetadata('gift-message') === 'true') {
-    const giftSection = document.createElement('div');
-    giftSection.className = 'form-section gift-message-section';
-    const giftHeading = document.createElement('h3');
-    giftHeading.textContent = strings.giftMessage;
-    giftSection.appendChild(giftHeading);
-    const giftField = document.createElement('div');
-    giftField.className = 'form-field floating-label-field';
-    const textarea = document.createElement('textarea');
-    textarea.name = 'gift-message';
-    textarea.id = 'gift-message';
-    textarea.maxLength = 500;
-    textarea.placeholder = ' ';
-    textarea.rows = 3;
-    const giftLabel = document.createElement('label');
-    giftLabel.htmlFor = 'gift-message';
-    giftLabel.textContent = strings.giftMessagePlaceholder;
-    const charCount = document.createElement('span');
-    charCount.className = 'char-count';
-    charCount.textContent = '0 / 500';
-    textarea.addEventListener('input', () => {
-      charCount.textContent = `${textarea.value.length} / 500`;
-    });
-    giftField.append(textarea, giftLabel, charCount);
-    giftSection.appendChild(giftField);
-    form.appendChild(giftSection);
-  }
-
   // Billing address section
   const billingSection = document.createElement('div');
   billingSection.className = 'form-section billing-section';
@@ -327,6 +297,64 @@ export default function buildForm(container, config, strings) {
   shippingLegend.textContent = strings.shipping;
   shippingMethodsContainer.appendChild(shippingLegend);
   form.appendChild(shippingMethodsContainer);
+
+  // Gift message panel
+  const giftSection = document.createElement('div');
+  giftSection.className = 'form-section gift-message-section';
+
+  const giftHeading = document.createElement('h3');
+  giftHeading.textContent = strings.giftMessage;
+  giftSection.appendChild(giftHeading);
+
+  const giftCheckboxWrapper = document.createElement('div');
+  giftCheckboxWrapper.className = 'form-field form-field-checkbox';
+  const giftCheckboxLabel = document.createElement('label');
+  const giftCheckbox = document.createElement('input');
+  giftCheckbox.type = 'checkbox';
+  giftCheckbox.name = 'is-gift';
+  giftCheckbox.id = 'is-gift';
+  const giftCheckboxSpan = document.createElement('span');
+  giftCheckboxSpan.textContent = strings.isThisAGift;
+  giftCheckboxLabel.append(giftCheckbox, giftCheckboxSpan);
+  giftCheckboxWrapper.appendChild(giftCheckboxLabel);
+  giftSection.appendChild(giftCheckboxWrapper);
+
+  const giftMessageWrapper = document.createElement('div');
+  giftMessageWrapper.className = 'gift-message-wrapper';
+  giftMessageWrapper.hidden = true;
+
+  const giftField = document.createElement('div');
+  giftField.className = 'form-field floating-label-field';
+  const giftTextarea = document.createElement('textarea');
+  giftTextarea.name = 'gift-message';
+  giftTextarea.id = 'gift-message';
+  giftTextarea.maxLength = 250;
+  giftTextarea.placeholder = ' ';
+  giftTextarea.rows = 3;
+  const giftLabel = document.createElement('label');
+  giftLabel.htmlFor = 'gift-message';
+  giftLabel.textContent = strings.giftMessagePlaceholder;
+  const charCount = document.createElement('span');
+  charCount.className = 'char-count';
+  charCount.textContent = '0 / 250';
+  giftTextarea.addEventListener('input', () => {
+    charCount.textContent = `${giftTextarea.value.length} / 250`;
+  });
+  giftField.append(giftTextarea, giftLabel, charCount);
+  giftMessageWrapper.appendChild(giftField);
+  giftSection.appendChild(giftMessageWrapper);
+
+  giftCheckbox.addEventListener('change', () => {
+    giftMessageWrapper.hidden = !giftCheckbox.checked;
+    if (giftCheckbox.checked) {
+      giftTextarea.focus();
+    } else {
+      giftTextarea.value = '';
+      charCount.textContent = '0 / 250';
+    }
+  });
+
+  form.appendChild(giftSection);
 
   // Payment method section (populated by checkout-payment.js)
   const paymentSection = document.createElement('fieldset');

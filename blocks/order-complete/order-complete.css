@@ -142,14 +142,16 @@
   color: #2e7d32;
 }
 
-/* Shipping address & contact */
+/* Shipping address, contact & gift message */
 .order-shipping-address,
-.order-contact {
+.order-contact,
+.order-gift-message {
   margin-bottom: 24px;
 }
 
 .order-shipping-address p,
-.order-contact p {
+.order-contact p,
+.order-gift-message p {
   margin: 0;
   font-size: 14px;
   line-height: 1.6;

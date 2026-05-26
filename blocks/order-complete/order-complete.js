@@ -315,6 +315,21 @@ export default async function decorate(block) {
     rightCol.appendChild(contactSection);
   }
 
+  if (order?.giftMessage) {
+    const giftSection = document.createElement('div');
+    giftSection.className = 'order-gift-message';
+
+    const giftHeading = document.createElement('h3');
+    giftHeading.textContent = s.orderGiftMessage;
+    giftSection.appendChild(giftHeading);
+
+    const giftText = document.createElement('p');
+    giftText.textContent = order.giftMessage;
+    giftSection.appendChild(giftText);
+
+    rightCol.appendChild(giftSection);
+  }
+
   detailsGrid.appendChild(rightCol);
   container.appendChild(detailsGrid);
 
