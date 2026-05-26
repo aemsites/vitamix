@@ -672,7 +672,7 @@ function buildAutoBlocks(main) {
       section.classList.add('section');
       section.append(toc);
       main.prepend(section);
-    } else if (getMetadata('template') === 'corp') {
+    } else if ((getMetadata('template') === 'corp') && !document.querySelector('.toc')) {
       document.body.classList.add('corp-no-toc');
     }
   } catch (error) {
