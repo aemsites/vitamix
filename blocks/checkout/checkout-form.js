@@ -44,7 +44,7 @@ function getAddressFields(strings, isCanada) {
 function formatPhoneDisplay(raw) {
   let digits = raw.replace(/\D/g, '');
   // Strip the +1 country code if present — North America only, so leading digit is always 1
-  if (digits.length === 11) digits = digits.slice(1);
+  if (digits.length === 11 && digits[0] === '1') digits = digits.slice(1);
   digits = digits.slice(0, 10);
   if (digits.length < 4) return digits;
   if (digits.length < 7) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
