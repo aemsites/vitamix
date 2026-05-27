@@ -39,7 +39,7 @@
   /* ── Inputs ────────────────────────────────────────────────── */
   --commerce-input-radius: 6px;
   --commerce-input-border: var(--commerce-color-border);
-  --commerce-input-border-focus: var(--commerce-color-primary);
+  --commerce-input-border-focus: var(--commerce-step-color-active);
   --commerce-input-background: var(--commerce-color-background);
   --commerce-input-height: 52px;
 

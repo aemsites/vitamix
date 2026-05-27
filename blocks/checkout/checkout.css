@@ -235,6 +235,13 @@ main > .section:has(.checkout-wrapper) {
   border-color: var(--commerce-input-border-focus);
 }
 
+/* Suppress browser default red glow on empty required fields before validation */
+.floating-label-field input:invalid,
+.floating-label-field select:invalid,
+.floating-label-field textarea:invalid {
+  box-shadow: none;
+}
+
 .floating-label-field.has-error input,
 .floating-label-field.has-error select,
 .floating-label-field.has-error textarea {
@@ -287,11 +294,6 @@ main > .section:has(.checkout-wrapper) {
 .floating-label-field:has(textarea:not(:placeholder-shown)) label {
   top: 8px;
   font-size: 0.7rem;
-}
-
-.floating-label-field input.field-required,
-.floating-label-field select.field-required {
-  border-color: var(--commerce-color-error);
 }
 
 /* ── Gift message panel ──────────────────────────────────────────── */
