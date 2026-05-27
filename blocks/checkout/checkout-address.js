@@ -235,72 +235,305 @@ function showAddressError(section, message) {
   }
 }
 
+const ICON_PIN = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z"/></svg>';
+const ICON_INFO = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11 17h2v-6h-2v6zm1-8.5c.55 0 1-.45 1-1s-.45-1-1-1-1 .45-1 1 .45 1 1 1zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/></svg>';
+const ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>';
+const ICON_CLOSE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>';
+
 /**
- * Shows a native <dialog> asking the customer to accept a Google-suggested address
- * or to add a missing subpremise (unit number).
- *
- * @param {'CONFIRM'|'CONFIRM_ADD_SUBPREMISES'} action
- * @param {string|null} formattedAddress
- * @param {Object} strings
- * @returns {Promise<'accept'|'keep'|'add-unit'>}
+ * Formats the entered shipping address from the form into display lines.
+ * @param {FormData} formData
+ * @returns {string[]}
  */
-function showCorrectionModal(action, formattedAddress, strings) {
+function formatEnteredAddressLines(formData) {
+  const line1 = (formData.get('shipping-street-0') || '').toString().trim();
+  const line2 = (formData.get('shipping-street-1') || '').toString().trim();
+  const city = (formData.get('shipping-city') || '').toString().trim();
+  const state = (formData.get('shipping-state') || '').toString().trim();
+  const zip = (formData.get('shipping-zip') || '').toString().trim();
+  const cityStateZip = [city, [state, zip].filter(Boolean).join(' ')]
+    .filter(Boolean).join(', ');
+  return [line1, line2, cityStateZip].filter(Boolean);
+}
+
+/**
+ * Formats Google's addressComponents array into display lines.
+ * @param {Array<{ longText: string, shortText: string, types: string[] }>} components
+ * @returns {string[]}
+ */
+function formatSuggestedAddressLines(components) {
+  const c = {};
+  components.forEach((comp) => {
+    comp.types.forEach((type) => { c[type] = comp; });
+  });
+  const street = [c.street_number?.longText, c.route?.longText].filter(Boolean).join(' ');
+  const unit = c.subpremise?.longText ? `Apt ${c.subpremise.longText}` : '';
+  const city = (c.locality || c.sublocality || c.postal_town)?.longText || '';
+  const state = c.administrative_area_level_1?.shortText || '';
+  const zip = c.postal_code?.longText || '';
+  const cityStateZip = [city, [state, zip].filter(Boolean).join(' ')]
+    .filter(Boolean).join(', ');
+  return [street, unit, cityStateZip].filter(Boolean);
+}
+
+/**
+ * Builds the standard dialog shell: close button, icon badge, eyebrow, heading, subtitle.
+ * @param {Object} opts
+ * @returns {{ dialog: HTMLDialogElement, body: HTMLElement, setChosen: Function }}
+ */
+function buildDialogShell({
+  iconSvg, eyebrow, heading, subtitle, onClose,
+}) {
+  const dialog = document.createElement('dialog');
+  dialog.className = 'address-validation-dialog';
+
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.className = 'address-validation-close';
+  closeBtn.setAttribute('aria-label', 'Close');
+  closeBtn.innerHTML = ICON_CLOSE;
+  closeBtn.addEventListener('click', onClose);
+
+  const header = document.createElement('div');
+  header.className = 'address-validation-header';
+
+  const icon = document.createElement('div');
+  icon.className = 'address-validation-icon';
+  icon.innerHTML = iconSvg;
+
+  const titleGroup = document.createElement('div');
+  titleGroup.className = 'address-validation-title-group';
+
+  const eyebrowEl = document.createElement('div');
+  eyebrowEl.className = 'address-validation-eyebrow';
+  eyebrowEl.textContent = eyebrow;
+
+  const headingEl = document.createElement('h2');
+  headingEl.className = 'address-validation-heading';
+  headingEl.textContent = heading;
+
+  const subtitleEl = document.createElement('p');
+  subtitleEl.className = 'address-validation-subtitle';
+  subtitleEl.textContent = subtitle;
+
+  titleGroup.append(eyebrowEl, headingEl, subtitleEl);
+  header.append(icon, titleGroup);
+  dialog.append(closeBtn, header);
+
+  const body = document.createElement('div');
+  body.className = 'address-validation-body';
+  dialog.append(body);
+
+  return { dialog, body };
+}
+
+/**
+ * Builds an address card showing a list of address lines.
+ * @param {Object} opts
+ * @returns {HTMLElement}
+ */
+function buildAddressCard({
+  label, lines, variant, badge, comparisonLines,
+}) {
+  const card = document.createElement('div');
+  card.className = `address-card address-card-${variant}`;
+
+  if (badge) {
+    const badgeEl = document.createElement('span');
+    badgeEl.className = 'address-card-badge';
+    badgeEl.innerHTML = `<span class="address-card-badge-icon">${ICON_CHECK}</span>${badge}`;
+    card.append(badgeEl);
+  }
+
+  if (label) {
+    const labelEl = document.createElement('div');
+    labelEl.className = 'address-card-label';
+    labelEl.textContent = label;
+    card.append(labelEl);
+  }
+
+  const linesEl = document.createElement('div');
+  linesEl.className = 'address-card-lines';
+  lines.forEach((line, i) => {
+    const lineEl = document.createElement('div');
+    const other = comparisonLines?.[i] ?? null;
+    const changed = other !== null && line.trim().toLowerCase() !== other.trim().toLowerCase();
+    lineEl.className = `address-line${changed ? ' address-line-changed' : ''}`;
+    lineEl.textContent = line;
+    linesEl.append(lineEl);
+  });
+  card.append(linesEl);
+
+  return card;
+}
+
+/**
+ * Shows the CONFIRM dialog: side-by-side entered vs. suggested address with diff highlighting.
+ *
+ * @param {Object} opts
+ * @returns {Promise<{ choice: 'accept'|'keep' }>}
+ */
+function showConfirmModal({ addressComponents, formData, strings }) {
   return new Promise((resolve) => {
-    const dialog = document.createElement('dialog');
-    dialog.className = 'address-validation-dialog';
+    let chosen = null;
 
-    const message = document.createElement('p');
-    message.className = 'address-validation-message';
+    const { dialog, body } = buildDialogShell({
+      iconSvg: ICON_PIN,
+      eyebrow: strings.addressEyebrow || 'Address verification',
+      heading: strings.addressHeading || 'We found a more accurate version',
+      subtitle: strings.addressSubtitle || 'Choose which address to use for shipping.',
+      onClose: () => { chosen = { choice: 'keep' }; dialog.close(); },
+    });
 
-    if (action === 'CONFIRM') {
-      message.textContent = strings.addressSuggested || 'We found a more accurate address:';
-      const suggested = document.createElement('p');
-      suggested.className = 'address-validation-suggested';
-      suggested.textContent = formattedAddress || '';
-      dialog.append(message, suggested);
-    } else {
-      message.textContent = strings.addressMissingUnit
-        || 'Your address may be missing a unit or apartment number.';
-      dialog.append(message);
-    }
+    const enteredLines = formatEnteredAddressLines(formData);
+    const suggestedLines = addressComponents
+      ? formatSuggestedAddressLines(addressComponents)
+      : [];
+
+    const comparison = document.createElement('div');
+    comparison.className = 'address-validation-comparison';
+
+    comparison.append(buildAddressCard({
+      label: strings.addressWhatEntered || 'What you entered',
+      lines: enteredLines,
+      variant: 'entered',
+    }));
+    comparison.append(buildAddressCard({
+      label: strings.addressSuggestedBy || 'Suggested',
+      lines: suggestedLines,
+      variant: 'suggested',
+      badge: strings.addressRecommended || 'Recommended',
+      comparisonLines: enteredLines,
+    }));
+    body.append(comparison);
 
     const actions = document.createElement('div');
     actions.className = 'address-validation-actions';
 
-    if (action === 'CONFIRM') {
-      const useSuggested = document.createElement('button');
-      useSuggested.type = 'button';
-      useSuggested.className = 'button';
-      useSuggested.textContent = strings.addressUseSuggested || 'Use suggested address';
-      useSuggested.addEventListener('click', () => { dialog.close(); resolve('accept'); });
+    const useSuggested = document.createElement('button');
+    useSuggested.type = 'button';
+    useSuggested.className = 'button address-validation-primary';
+    useSuggested.innerHTML = `<span class="address-validation-btn-icon">${ICON_CHECK}</span>${strings.addressUseSuggested || 'Use suggested address'}`;
+    useSuggested.addEventListener('click', () => {
+      chosen = { choice: 'accept' };
+      dialog.close();
+    });
 
-      const keepMine = document.createElement('button');
-      keepMine.type = 'button';
-      keepMine.className = 'button secondary';
-      keepMine.textContent = strings.addressKeepMine || 'Keep my address';
-      keepMine.addEventListener('click', () => { dialog.close(); resolve('keep'); });
+    const keepMine = document.createElement('button');
+    keepMine.type = 'button';
+    keepMine.className = 'button secondary';
+    keepMine.textContent = strings.addressKeepMine || 'Keep my address';
+    keepMine.addEventListener('click', () => {
+      chosen = { choice: 'keep' };
+      dialog.close();
+    });
 
-      actions.append(useSuggested, keepMine);
-    } else {
-      const addUnit = document.createElement('button');
-      addUnit.type = 'button';
-      addUnit.className = 'button';
-      addUnit.textContent = strings.addressAddUnit || 'Add unit number';
-      addUnit.addEventListener('click', () => { dialog.close(); resolve('add-unit'); });
+    actions.append(useSuggested, keepMine);
+    body.append(actions);
 
-      const continueWithout = document.createElement('button');
-      continueWithout.type = 'button';
-      continueWithout.className = 'button secondary';
-      continueWithout.textContent = strings.addressContinueWithout || 'Continue without';
-      continueWithout.addEventListener('click', () => { dialog.close(); resolve('keep'); });
-
-      actions.append(addUnit, continueWithout);
-    }
-
-    dialog.append(actions);
     document.body.append(dialog);
     dialog.showModal();
-    dialog.addEventListener('close', () => dialog.remove());
+    dialog.addEventListener('close', () => {
+      resolve(chosen ?? { choice: 'keep' });
+      dialog.remove();
+    });
+  });
+}
+
+/**
+ * Shows the CONFIRM_ADD_SUBPREMISES dialog: address card plus unit number input.
+ *
+ * @param {Object} opts
+ * @returns {Promise<{ choice: 'add-unit', unit: string } | { choice: 'keep' }>}
+ */
+function showAddUnitModal({ addressComponents, formData, strings }) {
+  return new Promise((resolve) => {
+    let chosen = null;
+
+    const { dialog, body } = buildDialogShell({
+      iconSvg: ICON_INFO,
+      eyebrow: strings.addressUnitEyebrow || 'One more thing',
+      heading: strings.addressUnitHeading || 'Add an apartment or unit number?',
+      subtitle: strings.addressUnitSubtitle
+        || 'Your building has multiple units. Adding one helps couriers reach you on the first try.',
+      onClose: () => { chosen = { choice: 'keep' }; dialog.close(); },
+    });
+
+    const displayLines = addressComponents
+      ? formatSuggestedAddressLines(addressComponents).filter((line) => !line.startsWith('Apt '))
+      : formatEnteredAddressLines(formData);
+
+    const addressCard = document.createElement('div');
+    addressCard.className = 'address-card address-card-display';
+    const pinIcon = document.createElement('span');
+    pinIcon.className = 'address-card-pin';
+    pinIcon.innerHTML = ICON_PIN;
+    const linesEl = document.createElement('div');
+    linesEl.className = 'address-card-lines';
+    displayLines.forEach((line) => {
+      const lineEl = document.createElement('div');
+      lineEl.className = 'address-line';
+      lineEl.textContent = line;
+      linesEl.append(lineEl);
+    });
+    addressCard.append(pinIcon, linesEl);
+    body.append(addressCard);
+
+    const inputField = document.createElement('div');
+    inputField.className = 'address-unit-input';
+    const inputLabel = document.createElement('label');
+    inputLabel.className = 'address-unit-label';
+    inputLabel.textContent = strings.addressUnitLabel || 'Apartment, suite, floor, or unit';
+    const inputWrap = document.createElement('div');
+    inputWrap.className = 'address-unit-input-wrap';
+    const inputIcon = document.createElement('span');
+    inputIcon.className = 'address-unit-input-icon';
+    inputIcon.innerHTML = ICON_INFO;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'address-unit-input-field';
+    input.placeholder = strings.addressUnitPlaceholder || 'Apt 4B, Floor 12, Suite 200…';
+    inputLabel.append(inputWrap);
+    inputWrap.append(inputIcon, input);
+    inputField.append(inputLabel);
+    body.append(inputField);
+
+    const actions = document.createElement('div');
+    actions.className = 'address-validation-actions';
+
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'button address-validation-primary';
+    addBtn.innerHTML = `<span class="address-validation-btn-icon">${ICON_CHECK}</span>${strings.addressUnitContinue || 'Add unit & continue'}`;
+    addBtn.disabled = true;
+    addBtn.addEventListener('click', () => {
+      chosen = { choice: 'add-unit', unit: input.value.trim() };
+      dialog.close();
+    });
+
+    const noUnit = document.createElement('button');
+    noUnit.type = 'button';
+    noUnit.className = 'button secondary';
+    noUnit.textContent = strings.addressUnitNoUnit || "I don't have one — continue";
+    noUnit.addEventListener('click', () => {
+      chosen = { choice: 'keep' };
+      dialog.close();
+    });
+
+    actions.append(addBtn, noUnit);
+    body.append(actions);
+
+    input.addEventListener('input', () => {
+      addBtn.disabled = input.value.trim() === '';
+    });
+
+    document.body.append(dialog);
+    dialog.showModal();
+    setTimeout(() => input.focus(), 0);
+    dialog.addEventListener('close', () => {
+      resolve(chosen ?? { choice: 'keep' });
+      dialog.remove();
+    });
   });
 }
 
@@ -313,8 +546,10 @@ function showCorrectionModal(action, formattedAddress, strings) {
  * 3. Call the validate endpoint; fail open on network/API error.
  * 4. ACCEPT or unknown action → collapse.
  * 5. FIX → show inline error, stay open.
- * 6. CONFIRM/CONFIRM_ADD_SUBPREMISES → show modal; on 'accept' fill corrected fields
- *    then collapse; on 'add-unit' focus street-2 and stay open; on 'keep' collapse.
+ * 6. CONFIRM → side-by-side modal; 'accept' fills corrected fields then collapses;
+ *    'keep' collapses without changes.
+ * 7. CONFIRM_ADD_SUBPREMISES → unit-input modal; 'add-unit' writes the unit to street-2
+ *    then collapses; 'keep' collapses without changes.
  *
  * @param {HTMLElement} section
  * @param {Function} collapse
@@ -343,7 +578,7 @@ export async function validateAndCollapseShipping(section, collapse, config, str
     return;
   }
 
-  const { action, formattedAddress, addressComponents } = result;
+  const { action, addressComponents } = result;
 
   if (!action || action === 'ACCEPT') {
     collapse();
@@ -358,15 +593,25 @@ export async function validateAndCollapseShipping(section, collapse, config, str
     return;
   }
 
-  if (action === 'CONFIRM' || action === 'CONFIRM_ADD_SUBPREMISES') {
-    const choice = await showCorrectionModal(action, formattedAddress, strings);
-
+  if (action === 'CONFIRM') {
+    const { choice } = await showConfirmModal({ addressComponents, formData, strings });
     if (choice === 'accept' && addressComponents) {
       const addressInput = section.querySelector('[autocomplete="address-line1"]');
       if (addressInput) fillAddressFields(section, addressInput, addressComponents);
-    } else if (choice === 'add-unit') {
-      section.querySelector('[autocomplete="address-line2"]')?.focus();
-      return;
+    }
+    collapse();
+    return;
+  }
+
+  if (action === 'CONFIRM_ADD_SUBPREMISES') {
+    const result2 = await showAddUnitModal({ addressComponents, formData, strings });
+    if (result2.choice === 'add-unit' && result2.unit) {
+      const address2Input = section.querySelector('[autocomplete="address-line2"]');
+      if (address2Input) {
+        address2Input.value = result2.unit;
+        address2Input.dispatchEvent(new Event('input', { bubbles: true }));
+        address2Input.dispatchEvent(new Event('change', { bubbles: true }));
+      }
     }
     collapse();
     return;
