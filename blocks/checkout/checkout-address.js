@@ -610,6 +610,14 @@ export async function validateAndCollapseShipping(section, collapse, config, str
   if (action === 'CONFIRM_ADD_SUBPREMISES') {
     const result2 = await showAddUnitModal({ addressComponents, formData, strings });
     if (result2.choice === 'add-unit' && result2.unit) {
+      // Google's addressComponents in CONFIRM_ADD_SUBPREMISES still contains the
+      // canonical version of the rest of the address — apply those corrections
+      // (zip, city, state) before writing the user-typed unit so the form ends up
+      // with the fully validated address, not just the unit on top of bad inputs.
+      if (addressComponents) {
+        const addressInput = section.querySelector('[name$="street-0"]');
+        if (addressInput) fillAddressFields(section, addressInput, addressComponents);
+      }
       const address2Input = section.querySelector('[autocomplete="address-line2"]');
       if (address2Input) {
         address2Input.value = result2.unit;
