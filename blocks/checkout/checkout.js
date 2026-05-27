@@ -63,6 +63,13 @@ const LOCAL_STRINGS = {
     errorCalculateTotals: 'Unable to calculate totals. Please try again.',
     errorGeneric: 'An error occurred. Please try again.',
     processing: 'Processing…',
+    addressSuggested: 'We found a more accurate address:',
+    addressUseSuggested: 'Use suggested address',
+    addressKeepMine: 'Keep my address',
+    addressMissingUnit: 'Your address may be missing a unit or apartment number.',
+    addressAddUnit: 'Add unit number',
+    addressContinueWithout: 'Continue without',
+    addressInvalid: "We couldn't verify this address. Please check and try again.",
   },
   'fr-ca': {
     signIn: 'Se connecter pour un paiement plus rapide',
@@ -112,6 +119,13 @@ const LOCAL_STRINGS = {
     errorCalculateTotals: 'Impossible de calculer les totaux. Veuillez réessayer.',
     errorGeneric: 'Une erreur est survenue. Veuillez réessayer.',
     processing: 'Traitement en cours…',
+    addressSuggested: 'Nous avons trouvé une adresse plus précise :',
+    addressUseSuggested: "Utiliser l'adresse suggérée",
+    addressKeepMine: 'Garder mon adresse',
+    addressMissingUnit: "Votre adresse manque peut-être d'un numéro d'appartement.",
+    addressAddUnit: 'Ajouter un numéro de suite',
+    addressContinueWithout: 'Continuer sans',
+    addressInvalid: "Nous n'avons pas pu vérifier cette adresse. Veuillez vérifier et réessayer.",
   },
 };
 
@@ -202,7 +216,7 @@ export default async function decorate(block) {
   }
 
   // Wire address fields and billing toggle
-  initAddress(form, state, config, strings);
+  const { validateAndCollapse } = initAddress(form, state, config, strings);
 
   // Section collapse — contact
   const contactSection = form.querySelector('.contact-section');
@@ -215,18 +229,35 @@ export default async function decorate(block) {
   }, strings);
 
   // Section collapse — shipping address
+  // autoCollapse is disabled so focusout triggers address validation before collapsing.
   const shippingAddrSection = form.querySelector('.shipping-address-section');
-  initCollapse(shippingAddrSection, {
-    getIsValid: () => [...shippingAddrSection.querySelectorAll('[required]')].every((el) => el.checkValidity()),
+  const { collapse: collapseShipping } = initCollapse(shippingAddrSection, {
+    getIsValid: () => [...shippingAddrSection.querySelectorAll('[required]')].every(
+      (el) => el.checkValidity(),
+    ),
     getSummary: () => {
       const data = new FormData(form);
+      // eslint-disable-next-line max-len
       const name = `${data.get('shipping-firstname') || ''} ${data.get('shipping-lastname') || ''}`.trim();
       const city = data.get('shipping-city') || '';
       const stateCode = data.get('shipping-state') || '';
       const location = [city, stateCode].filter(Boolean).join(', ');
       return [name, location].filter(Boolean).join(' · ');
     },
+    autoCollapse: false,
   }, strings);
+
+  let validatingShipping = false;
+  shippingAddrSection.addEventListener('focusout', async (e) => {
+    if (shippingAddrSection.contains(e.relatedTarget)) return;
+    if (validatingShipping) return;
+    validatingShipping = true;
+    try {
+      await validateAndCollapse(collapseShipping);
+    } finally {
+      validatingShipping = false;
+    }
+  });
 
   // Wire shipping rate fetching and preview
   const shippingContainer = form.querySelector('.shipping-methods');

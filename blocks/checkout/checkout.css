@@ -950,6 +950,41 @@ button.checkout-submit-btn {
   font-size: 0.75rem;
 }
 
+/* ── Address validation dialog ──────────────────────────────────── */
+.address-validation-dialog {
+  border: 1px solid var(--commerce-color-border);
+  border-radius: var(--commerce-radius-card);
+  padding: 24px;
+  max-width: 400px;
+  width: 90%;
+}
+
+.address-validation-dialog::backdrop {
+  background: rgb(0 0 0 / 40%);
+}
+
+.address-validation-message {
+  margin: 0 0 8px;
+  font-size: var(--commerce-font-size-base);
+  font-weight: var(--commerce-font-weight-bold);
+}
+
+.address-validation-suggested {
+  margin: 0 0 20px;
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-text-muted);
+}
+
+.address-validation-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.address-validation-error {
+  margin-top: 8px;
+}
+
 /* ── Mobile ──────────────────────────────────────────────────────── */
 @media (width < 480px) {
   .form-field.field-half,
