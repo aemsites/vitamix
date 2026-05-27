@@ -1,21 +1,70 @@
-import { loadCSS } from '../../scripts/aem.js';
+import { loadCSS, createOptimizedPicture } from '../../scripts/aem.js';
 import cart from '../../scripts/cart.js';
-import { getConfig } from '../../scripts/commerce-config.js';
+import { getConfig, formatPrice } from '../../scripts/commerce-config.js';
 import buildCartItem from '../../scripts/commerce/cart-item.js';
 import buildWarrantySelector from './warranty-selector.js';
+import { ensurePriceRulesLoaded, evaluateGWP } from '../../scripts/gift-with-purchase.js';
 
 const LOCAL_STRINGS = {
   'en-us': {
     cartEmpty: 'Your cart is empty.',
     viewCart: 'View cart',
     checkout: 'Checkout',
+    freeGift: 'Free gift',
+    free: 'Free',
   },
   'fr-ca': {
     cartEmpty: 'Votre panier est vide.',
     viewCart: 'Voir le panier',
     checkout: 'Passer à la caisse',
+    freeGift: 'Cadeau gratuit',
+    free: 'Gratuit',
   },
 };
+
+function buildGiftItem(item, s, currencyCode) {
+  const el = document.createElement('div');
+  el.className = `cart-item cart-item-gift cart-item-${item.sku}`;
+  el.innerHTML = /* html */`
+    <div class="cart-item-image"></div>
+    <div class="cart-item-details">
+      <span class="cart-item-gift-badge">${s.freeGift}</span>
+      <p class="cart-item-name"></p>
+    </div>
+    <div class="cart-item-right">
+      <div class="cart-item-price"></div>
+    </div>`;
+  el.querySelector('.cart-item-image').appendChild(
+    createOptimizedPicture(item.image, item.name || '', true),
+  );
+  const nameEl = el.querySelector('.cart-item-name');
+  if (item.url) {
+    const a = document.createElement('a');
+    a.textContent = item.name;
+    try {
+      a.href = new URL(item.url, window.location.origin).pathname;
+    } catch {
+      a.href = item.url;
+    }
+    nameEl.appendChild(a);
+  } else {
+    nameEl.textContent = item.name;
+  }
+  const priceEl = el.querySelector('.cart-item-price');
+  const regularPrice = item.custom?.regularPrice;
+  if (regularPrice) {
+    const original = document.createElement('span');
+    original.className = 'cart-item-price-original';
+    original.textContent = formatPrice(parseFloat(regularPrice), currencyCode);
+    const free = document.createElement('span');
+    free.className = 'cart-item-price-free';
+    free.textContent = s.free;
+    priceEl.append(original, free);
+  } else {
+    priceEl.textContent = s.free;
+  }
+  return el;
+}
 
 function getStrings(config) {
   const lang = config.getLanguage().toLowerCase().replace('_', '-');
@@ -77,7 +126,10 @@ export default async function decorate(block) {
   }
 
   const updateEmptyState = () => {
-    const visible = cart.items.filter((i) => i.local?.showInCart !== false);
+    // Empty state ignores GWP lines — a cart with nothing but free gifts is
+    // still empty from the customer's perspective.
+    const visible = cart.items.filter((i) => i.local?.showInCart !== false
+      && !i.custom?.giftWithPurchase);
     cartEl.classList.toggle('cart-is-empty', visible.length === 0);
   };
 
@@ -87,7 +139,15 @@ export default async function decorate(block) {
 
     cart.items
       .filter((item) => item.local?.showInCart !== false)
+      // Free gifts always render last, regardless of insertion order.
+      .slice()
+      .sort((a, b) => (a.custom?.giftWithPurchase ? 1 : 0) - (b.custom?.giftWithPurchase ? 1 : 0))
       .forEach((item) => {
+        if (item.custom?.giftWithPurchase) {
+          itemList.appendChild(buildGiftItem(item, s, currencyCode));
+          return;
+        }
+
         const linkedWarranty = cart.items
           .find((i) => i.custom?.linkedTo === item.sku) || null;
 
@@ -143,4 +203,8 @@ export default async function decorate(block) {
 
   populatelist();
   document.addEventListener('cart:change', populatelist);
+
+  // Visiting cart/minicart is always a GWP trigger — populate/refresh rules
+  // and reconcile. populatelist re-renders on the resulting cart:change.
+  ensurePriceRulesLoaded({ reason: 'cart-block-init' }).then(() => evaluateGWP());
 }

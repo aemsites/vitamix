@@ -968,6 +968,339 @@ button.checkout-submit-btn {
   font-size: 0.75rem;
 }
 
+/* stylelint-disable no-descending-specificity */
+
+/* ── Address validation dialog ──────────────────────────────────── */
+.address-validation-dialog {
+  --dialog-accent: var(--color-link, var(--commerce-color-primary));
+  --dialog-accent-hover: var(--color-link-hover, var(--commerce-color-primary-hover));
+
+  border: none;
+  border-radius: 16px;
+  padding: 28px;
+  max-width: 560px;
+  width: calc(100% - 32px);
+  box-shadow: 0 24px 64px rgb(0 0 0 / 18%);
+  position: relative;
+}
+
+.address-validation-dialog::backdrop {
+  background: rgb(0 0 0 / 45%);
+}
+
+.address-validation-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 28px;
+  height: 28px;
+  padding: 4px;
+  background: none;
+  border: none;
+  border-radius: 50%;
+  color: var(--commerce-color-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.address-validation-close:hover {
+  background: var(--commerce-color-surface);
+  color: var(--commerce-color-text);
+}
+
+.address-validation-close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.address-validation-header {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  margin-bottom: 18px;
+  padding-right: 32px;
+}
+
+.address-validation-icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--dialog-accent) 15%, white);
+  color: var(--dialog-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.address-validation-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.address-validation-title-group {
+  flex: 1;
+  min-width: 0;
+}
+
+.address-validation-eyebrow {
+  font-size: 11px;
+  font-weight: var(--commerce-font-weight-bold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--commerce-color-text-muted);
+  margin-bottom: 4px;
+}
+
+.address-validation-heading {
+  font-size: 22px;
+  font-weight: var(--commerce-font-weight-bold);
+  line-height: 1.25;
+  margin: 0 0 6px;
+  color: var(--commerce-color-text);
+}
+
+.address-validation-subtitle {
+  font-size: var(--commerce-font-size-sm);
+  line-height: 1.45;
+  color: var(--commerce-color-text-muted);
+  margin: 0;
+}
+
+.address-validation-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* Address comparison cards (CONFIRM) */
+.address-validation-comparison {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.address-card {
+  background: var(--commerce-color-surface);
+  border: 1px solid var(--commerce-color-border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  position: relative;
+}
+
+.address-card-entered {
+  background: var(--commerce-color-surface);
+}
+
+.address-card-suggested {
+  background: color-mix(in srgb, var(--dialog-accent) 8%, white);
+  border-color: color-mix(in srgb, var(--dialog-accent) 30%, white);
+}
+
+.address-card-badge {
+  position: absolute;
+  top: -10px;
+  left: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--dialog-accent);
+  color: var(--commerce-color-primary-text);
+  font-size: 10px;
+  font-weight: var(--commerce-font-weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: 999px;
+}
+
+.address-card-badge-icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.address-card-badge-icon svg {
+  width: 10px;
+  height: 10px;
+}
+
+.address-card-label {
+  font-size: 10px;
+  font-weight: var(--commerce-font-weight-bold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--commerce-color-text-muted);
+  margin-bottom: 6px;
+}
+
+.address-card-suggested .address-card-label {
+  color: color-mix(in srgb, var(--dialog-accent) 80%, black);
+  margin-top: 6px;
+}
+
+.address-card-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.address-line {
+  font-size: var(--commerce-font-size-sm);
+  line-height: 1.45;
+  color: var(--commerce-color-text);
+}
+
+.address-line-changed {
+  background: color-mix(in srgb, var(--dialog-accent) 22%, white);
+  border-radius: 3px;
+  padding: 0 4px;
+  margin: 0 -4px;
+  align-self: flex-start;
+  font-weight: var(--commerce-font-weight-bold);
+}
+
+/* Display-only address card (unit dialog) */
+.address-card-display {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.address-card-pin {
+  flex-shrink: 0;
+  color: var(--commerce-color-text-muted);
+  display: inline-flex;
+}
+
+.address-card-pin svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Unit input (CONFIRM_ADD_SUBPREMISES) */
+.address-unit-input {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.address-unit-label {
+  font-size: var(--commerce-font-size-sm);
+  font-weight: var(--commerce-font-weight-bold);
+  color: var(--commerce-color-text);
+}
+
+.address-unit-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.address-unit-input-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--commerce-color-text-muted);
+  display: inline-flex;
+  pointer-events: none;
+}
+
+.address-unit-input-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.address-unit-input-field {
+  width: 100%;
+  padding: 10px 12px 10px 36px;
+  font-size: var(--commerce-font-size-sm);
+  background: var(--commerce-color-background);
+  border: 1px solid var(--commerce-color-border);
+  border-radius: 10px;
+  color: var(--commerce-color-text);
+  font-family: inherit;
+}
+
+.address-unit-input-field:focus {
+  outline: none;
+  border-color: var(--dialog-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dialog-accent) 18%, transparent);
+}
+
+/* Action buttons — use Vitamix's .button + .emphasis with dialog-specific overrides */
+.address-validation-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.address-validation-actions button.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 18px;
+  font-size: var(--commerce-font-size-sm);
+  font-weight: var(--commerce-font-weight-bold);
+  text-transform: none;
+  border-radius: 10px;
+}
+
+/* Primary filled button — uses Vitamix's brand link color */
+.address-validation-actions button.button.emphasis {
+  background-color: var(--dialog-accent);
+  border-color: var(--dialog-accent);
+  color: var(--commerce-color-primary-text);
+}
+
+.address-validation-actions button.button.emphasis:hover:not(:disabled),
+.address-validation-actions button.button.emphasis:focus:not(:disabled) {
+  background-color: var(--dialog-accent-hover);
+  border-color: var(--dialog-accent-hover);
+}
+
+.address-validation-actions button.button.emphasis:disabled,
+.address-validation-actions button.button.emphasis:disabled:hover {
+  background-color: color-mix(in srgb, var(--dialog-accent) 35%, white);
+  border-color: color-mix(in srgb, var(--dialog-accent) 35%, white);
+  color: #fff;
+  cursor: not-allowed;
+}
+
+.address-validation-btn-icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.address-validation-btn-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Side-by-side layout on wider screens */
+@media (width >= 480px) {
+  .address-validation-comparison {
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+
+  .address-validation-actions {
+    flex-direction: row;
+    gap: 12px;
+  }
+
+  .address-validation-actions .button {
+    flex: 1;
+  }
+}
+
+.address-validation-error {
+  margin-top: 8px;
+}
+
 /* ── Mobile ──────────────────────────────────────────────────────── */
 @media (width < 480px) {
   .form-field.field-half,
