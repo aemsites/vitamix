@@ -132,8 +132,11 @@ function fillAddressFields(section, addressInput, addressComponents) {
     comp.types.forEach((type) => { c[type] = comp; });
   });
 
+  // Only overwrite a field when Google actually returned the corresponding component.
+  // Clearing an existing user-typed value can blank a required field and make the
+  // section fail validation, which silently prevents collapse() from collapsing.
   const street = [c.street_number?.longText, c.route?.longText].filter(Boolean).join(' ');
-  addressInput.value = street;
+  if (street) addressInput.value = street;
 
   const address2Input = section.querySelector('[autocomplete="address-line2"]');
   if (address2Input && c.subpremise) {
@@ -141,15 +144,16 @@ function fillAddressFields(section, addressInput, addressComponents) {
   }
 
   const cityInput = section.querySelector('[autocomplete="address-level2"]');
-  if (cityInput) {
-    cityInput.value = (c.locality || c.sublocality || c.postal_town)?.longText || '';
+  const cityValue = (c.locality || c.sublocality || c.postal_town)?.longText;
+  if (cityInput && cityValue) {
+    cityInput.value = cityValue;
   }
 
   const zipInput = section.querySelector('[autocomplete="postal-code"]');
-  if (zipInput) {
-    const zip = c.postal_code?.longText || '';
+  if (zipInput && c.postal_code?.longText) {
+    const zip = c.postal_code.longText;
     const zipSuffix = c.postal_code_suffix?.longText || '';
-    zipInput.value = zip && zipSuffix ? `${zip}-${zipSuffix}` : zip;
+    zipInput.value = zipSuffix ? `${zip}-${zipSuffix}` : zip;
   }
 
   // Set state last so FormData is complete when the change event triggers fetchAndPreview.
@@ -433,12 +437,15 @@ function showConfirmModal({ addressComponents, formData, strings }) {
     actions.append(useSuggested, keepMine);
     body.append(actions);
 
-    document.body.append(dialog);
-    dialog.showModal();
+    // Register close listener before showModal so we never miss a close event.
     dialog.addEventListener('close', () => {
       resolve(chosen ?? { choice: 'keep' });
       dialog.remove();
     });
+    // Remove any stale dialog (defensive — should never have more than one).
+    document.querySelectorAll('.address-validation-dialog').forEach((d) => d.remove());
+    document.body.append(dialog);
+    dialog.showModal();
   });
 }
 
@@ -529,13 +536,25 @@ function showAddUnitModal({ addressComponents, formData, strings }) {
       addBtn.disabled = input.value.trim() === '';
     });
 
-    document.body.append(dialog);
-    dialog.showModal();
-    setTimeout(() => input.focus(), 0);
+    // Pressing Enter in the input submits when the button is enabled.
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !addBtn.disabled) {
+        e.preventDefault();
+        chosen = { choice: 'add-unit', unit: input.value.trim() };
+        dialog.close();
+      }
+    });
+
+    // Register close listener before showModal so we never miss a close event.
     dialog.addEventListener('close', () => {
       resolve(chosen ?? { choice: 'keep' });
       dialog.remove();
     });
+    // Remove any stale dialog (defensive — should never have more than one).
+    document.querySelectorAll('.address-validation-dialog').forEach((d) => d.remove());
+    document.body.append(dialog);
+    dialog.showModal();
+    setTimeout(() => input.focus(), 0);
   });
 }
 
