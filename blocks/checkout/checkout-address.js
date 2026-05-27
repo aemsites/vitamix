@@ -235,8 +235,8 @@ function showAddressError(section, message) {
   }
 }
 
-const ICON_PIN = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z"/></svg>';
-const ICON_INFO = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11 17h2v-6h-2v6zm1-8.5c.55 0 1-.45 1-1s-.45-1-1-1-1 .45-1 1 .45 1 1 1zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/></svg>';
+const ICON_PIN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>';
+const ICON_INFO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>';
 const ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>';
 const ICON_CLOSE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>';
 
@@ -412,7 +412,7 @@ function showConfirmModal({ addressComponents, formData, strings }) {
 
     const useSuggested = document.createElement('button');
     useSuggested.type = 'button';
-    useSuggested.className = 'button address-validation-primary';
+    useSuggested.className = 'button emphasis address-validation-primary';
     useSuggested.innerHTML = `<span class="address-validation-btn-icon">${ICON_CHECK}</span>${strings.addressUseSuggested || 'Use suggested address'}`;
     useSuggested.addEventListener('click', () => {
       chosen = { choice: 'accept' };
@@ -421,7 +421,7 @@ function showConfirmModal({ addressComponents, formData, strings }) {
 
     const keepMine = document.createElement('button');
     keepMine.type = 'button';
-    keepMine.className = 'button secondary';
+    keepMine.className = 'button address-validation-secondary';
     keepMine.textContent = strings.addressKeepMine || 'Keep my address';
     keepMine.addEventListener('click', () => {
       chosen = { choice: 'keep' };
@@ -503,7 +503,7 @@ function showAddUnitModal({ addressComponents, formData, strings }) {
 
     const addBtn = document.createElement('button');
     addBtn.type = 'button';
-    addBtn.className = 'button address-validation-primary';
+    addBtn.className = 'button emphasis address-validation-primary';
     addBtn.innerHTML = `<span class="address-validation-btn-icon">${ICON_CHECK}</span>${strings.addressUnitContinue || 'Add unit & continue'}`;
     addBtn.disabled = true;
     addBtn.addEventListener('click', () => {
@@ -513,7 +513,7 @@ function showAddUnitModal({ addressComponents, formData, strings }) {
 
     const noUnit = document.createElement('button');
     noUnit.type = 'button';
-    noUnit.className = 'button secondary';
+    noUnit.className = 'button address-validation-secondary';
     noUnit.textContent = strings.addressUnitNoUnit || "I don't have one — continue";
     noUnit.addEventListener('click', () => {
       chosen = { choice: 'keep' };
