@@ -954,6 +954,9 @@ button.checkout-submit-btn {
 
 /* ── Address validation dialog ──────────────────────────────────── */
 .address-validation-dialog {
+  --dialog-accent: var(--color-link, var(--commerce-color-primary));
+  --dialog-accent-hover: var(--color-link-hover, var(--commerce-color-primary-hover));
+
   border: none;
   border-radius: 16px;
   padding: 28px;
@@ -1007,8 +1010,8 @@ button.checkout-submit-btn {
   width: 40px;
   height: 40px;
   border-radius: 10px;
-  background: color-mix(in srgb, var(--commerce-color-primary) 15%, white);
-  color: var(--commerce-color-primary);
+  background: color-mix(in srgb, var(--dialog-accent) 15%, white);
+  color: var(--dialog-accent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1074,8 +1077,8 @@ button.checkout-submit-btn {
 }
 
 .address-card-suggested {
-  background: color-mix(in srgb, var(--commerce-color-primary) 8%, white);
-  border-color: color-mix(in srgb, var(--commerce-color-primary) 30%, white);
+  background: color-mix(in srgb, var(--dialog-accent) 8%, white);
+  border-color: color-mix(in srgb, var(--dialog-accent) 30%, white);
 }
 
 .address-card-badge {
@@ -1085,7 +1088,7 @@ button.checkout-submit-btn {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background: var(--commerce-color-primary);
+  background: var(--dialog-accent);
   color: var(--commerce-color-primary-text);
   font-size: 10px;
   font-weight: var(--commerce-font-weight-bold);
@@ -1115,7 +1118,7 @@ button.checkout-submit-btn {
 }
 
 .address-card-suggested .address-card-label {
-  color: color-mix(in srgb, var(--commerce-color-primary) 80%, black);
+  color: color-mix(in srgb, var(--dialog-accent) 80%, black);
   margin-top: 6px;
 }
 
@@ -1132,7 +1135,7 @@ button.checkout-submit-btn {
 }
 
 .address-line-changed {
-  background: color-mix(in srgb, var(--commerce-color-primary) 22%, white);
+  background: color-mix(in srgb, var(--dialog-accent) 22%, white);
   border-radius: 3px;
   padding: 0 4px;
   margin: 0 -4px;
@@ -1204,8 +1207,8 @@ button.checkout-submit-btn {
 
 .address-unit-input-field:focus {
   outline: none;
-  border-color: var(--commerce-color-primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--commerce-color-primary) 18%, transparent);
+  border-color: var(--dialog-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dialog-accent) 18%, transparent);
 }
 
 /* Action buttons — use Vitamix's .button + .emphasis with dialog-specific overrides */
@@ -1228,23 +1231,23 @@ button.checkout-submit-btn {
   border-radius: 10px;
 }
 
-/* Primary filled button — orange, white text, white check icon */
+/* Primary filled button — uses Vitamix's brand link color */
 .address-validation-actions button.button.emphasis {
-  background-color: var(--commerce-color-primary);
-  border-color: var(--commerce-color-primary);
+  background-color: var(--dialog-accent);
+  border-color: var(--dialog-accent);
   color: var(--commerce-color-primary-text);
 }
 
 .address-validation-actions button.button.emphasis:hover:not(:disabled),
 .address-validation-actions button.button.emphasis:focus:not(:disabled) {
-  background-color: var(--commerce-color-primary-hover);
-  border-color: var(--commerce-color-primary-hover);
+  background-color: var(--dialog-accent-hover);
+  border-color: var(--dialog-accent-hover);
 }
 
 .address-validation-actions button.button.emphasis:disabled,
 .address-validation-actions button.button.emphasis:disabled:hover {
-  background-color: color-mix(in srgb, var(--commerce-color-primary) 35%, white);
-  border-color: color-mix(in srgb, var(--commerce-color-primary) 35%, white);
+  background-color: color-mix(in srgb, var(--dialog-accent) 35%, white);
+  border-color: color-mix(in srgb, var(--dialog-accent) 35%, white);
   color: #fff;
   cursor: not-allowed;
 }
