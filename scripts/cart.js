@@ -94,16 +94,18 @@ export class Cart {
   }
 
   /**
-   * Quantity sum excluding entries flagged invisible via `local.showInCart`.
-   * Display surfaces (header badge, cart-page empty state, etc.) should prefer
-   * this over `itemCount` so hidden line items (e.g. linked add-ons) don't
+   * Quantity sum excluding entries flagged invisible via `local.showInCart`
+   * and free gift-with-purchase lines. Display surfaces (header badge,
+   * cart-page empty state, etc.) should prefer this over `itemCount` so
+   * hidden line items (e.g. linked add-ons) and promotional gifts don't
    * inflate the user-facing count.
    */
   get visibleItemCount() {
-    return this.#items.reduce(
-      (acc, item) => (item.local?.showInCart === false ? acc : acc + item.quantity),
-      0,
-    );
+    return this.#items.reduce((acc, item) => {
+      if (item.local?.showInCart === false) return acc;
+      if (item.custom?.giftWithPurchase) return acc;
+      return acc + item.quantity;
+    }, 0);
   }
 
   get subtotal() {
@@ -192,13 +194,17 @@ export class Cart {
 
   /**
    * @param {string} sku
-   * @param {string} [linkedTo] When provided, removes only the entry whose
-   *   `custom.linkedTo` matches — needed when the same warranty SKU appears
-   *   multiple times linked to different parent products.
+   * @param {string|((item: CartItem) => boolean)} [matcher] Disambiguator when
+   *   the same SKU has multiple entries. A string matches `custom.linkedTo`
+   *   (back-compat with the warranty flow); a function is a custom predicate
+   *   evaluated against each candidate item.
    */
-  removeItem(sku, linkedTo = undefined) {
+  removeItem(sku, matcher = undefined) {
+    const predicate = typeof matcher === 'function'
+      ? matcher
+      : (item) => matcher === undefined || item.custom?.linkedTo === matcher;
     const index = this.#items.findIndex(
-      (i) => i.sku === sku && (linkedTo === undefined || i.custom?.linkedTo === linkedTo),
+      (i) => i.sku === sku && predicate(i),
     );
     const item = index === -1 ? undefined : this.#items[index];
     if (index !== -1) {
