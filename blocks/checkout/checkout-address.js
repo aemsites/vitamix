@@ -563,14 +563,16 @@ function showAddUnitModal({ addressComponents, formData, strings }) {
  * Falls open (collapses without error) on network failures so checkout is never blocked.
  *
  * 1. Clear any existing inline error.
- * 2. Build the address payload from the form.
- * 3. Call the validate endpoint; fail open on network/API error.
- * 4. ACCEPT or unknown action → collapse.
- * 5. FIX → show inline error, stay open.
- * 6. CONFIRM → side-by-side modal; 'accept' fills corrected fields then collapses;
- *    'keep' collapses without changes.
- * 7. CONFIRM_ADD_SUBPREMISES → unit-input modal; 'add-unit' writes the unit to street-2
- *    then collapses; 'keep' collapses without changes.
+ * 2. Loop (up to MAX_ITERATIONS): build payload, call validate, handle the action.
+ *    - ACCEPT / unknown → collapse and return.
+ *    - FIX → show inline error and return (section stays expanded).
+ *    - CONFIRM → side-by-side modal; 'accept' applies corrections then collapses;
+ *      'keep' collapses without changes.
+ *    - CONFIRM_ADD_SUBPREMISES → unit-input modal. If the user adds a unit,
+ *      write it to street-2 and continue the loop to re-validate with the unit
+ *      included — Google explicitly doesn't issue a verdict for this case, so the
+ *      corrected zip/city/state only appears on the second pass. If the user
+ *      declines, just collapse.
  *
  * @param {HTMLElement} section
  * @param {Function} collapse
@@ -586,69 +588,77 @@ export async function validateAndCollapseShipping(section, collapse, config, str
   if (!form) { collapse(); return; }
 
   const regionCode = config.getLocale() === 'ca' ? 'CA' : 'US';
-  const formData = new FormData(form);
-  const payload = buildAddressPayload(formData, regionCode);
+  const MAX_ITERATIONS = 3;
 
-  if (!payload.address.addressLines.length) { collapse(); return; }
+  for (let i = 0; i < MAX_ITERATIONS; i += 1) {
+    const formData = new FormData(form);
+    const payload = buildAddressPayload(formData, regionCode);
 
-  let result;
-  try {
-    result = await callValidateAddress(config.apiOrigin, payload, getToken?.() ?? null);
-  } catch {
-    collapse();
-    return;
-  }
+    if (!payload.address.addressLines.length) { collapse(); return; }
 
-  const { action, addressComponents } = result;
-
-  if (!action || action === 'ACCEPT') {
-    collapse();
-    return;
-  }
-
-  if (action === 'FIX') {
-    showAddressError(
-      section,
-      strings.addressInvalid || "We couldn't verify this address. Please check and try again.",
-    );
-    return;
-  }
-
-  if (action === 'CONFIRM') {
-    const { choice } = await showConfirmModal({ addressComponents, formData, strings });
-    if (choice === 'accept' && addressComponents) {
-      // Use [name$="street-0"] — the autocomplete attr is rewritten to "off"
-      // by initPlacesAutocomplete to suppress Chrome's autofill dropdown.
-      const addressInput = section.querySelector('[name$="street-0"]');
-      if (addressInput) fillAddressFields(section, addressInput, addressComponents);
+    let result;
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      result = await callValidateAddress(config.apiOrigin, payload, getToken?.() ?? null);
+    } catch {
+      collapse();
+      return;
     }
-    collapse();
-    return;
-  }
 
-  if (action === 'CONFIRM_ADD_SUBPREMISES') {
-    const result2 = await showAddUnitModal({ addressComponents, formData, strings });
-    if (result2.choice === 'add-unit' && result2.unit) {
-      // Google's addressComponents in CONFIRM_ADD_SUBPREMISES still contains the
-      // canonical version of the rest of the address — apply those corrections
-      // (zip, city, state) before writing the user-typed unit so the form ends up
-      // with the fully validated address, not just the unit on top of bad inputs.
-      if (addressComponents) {
+    const { action, addressComponents } = result;
+
+    if (!action || action === 'ACCEPT') {
+      collapse();
+      return;
+    }
+
+    if (action === 'FIX') {
+      showAddressError(
+        section,
+        strings.addressInvalid || "We couldn't verify this address. Please check and try again.",
+      );
+      return;
+    }
+
+    if (action === 'CONFIRM') {
+      // eslint-disable-next-line no-await-in-loop
+      const { choice } = await showConfirmModal({ addressComponents, formData, strings });
+      if (choice === 'accept' && addressComponents) {
+        // Use [name$="street-0"] — the autocomplete attr is rewritten to "off"
+        // by initPlacesAutocomplete to suppress Chrome's autofill dropdown.
         const addressInput = section.querySelector('[name$="street-0"]');
         if (addressInput) fillAddressFields(section, addressInput, addressComponents);
       }
+      collapse();
+      return;
+    }
+
+    if (action === 'CONFIRM_ADD_SUBPREMISES') {
+      // eslint-disable-next-line no-await-in-loop
+      const result2 = await showAddUnitModal({ addressComponents, formData, strings });
+      if (result2.choice !== 'add-unit' || !result2.unit) {
+        // User declined — accept the address as-is.
+        collapse();
+        return;
+      }
+      // Write the unit and let the loop iterate to re-validate. Google explicitly
+      // does NOT issue corrections for CONFIRM_ADD_SUBPREMISES (per spec), so any
+      // zip or city fixes only appear on the next validate call with the unit
+      // included.
       const address2Input = section.querySelector('[autocomplete="address-line2"]');
       if (address2Input) {
         address2Input.value = result2.unit;
         address2Input.dispatchEvent(new Event('input', { bubbles: true }));
         address2Input.dispatchEvent(new Event('change', { bubbles: true }));
       }
+    } else {
+      // Unknown action — fail open
+      collapse();
+      return;
     }
-    collapse();
-    return;
   }
 
-  // Unknown action — fail open
+  // Hit max iterations without resolving — just collapse.
   collapse();
 }
 
