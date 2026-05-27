@@ -11,6 +11,7 @@ import { initShipping, updatePreview } from './checkout-shipping.js';
 import { initOrder } from './checkout-order.js';
 import { initPayment } from './checkout-payment.js';
 import { parsePreview } from '../../scripts/commerce-api.js';
+import { ensurePriceRulesLoaded, evaluateGWP } from '../../scripts/gift-with-purchase.js';
 
 const ALL_PROVIDERS = [chase, applePay, paypal, affirm];
 
@@ -160,6 +161,12 @@ export default async function decorate(block) {
   await loadCSS('/styles/commerce-tokens.css');
   const config = getConfig();
   const strings = getStrings(config);
+
+  // Reconcile gift-with-purchase before the empty-cart guard — a returning
+  // visitor whose cart no longer qualifies needs the stale gift removed,
+  // and a visitor who newly qualifies needs the gift added so totals reflect
+  // it. Fire-and-forget; the cart:change re-render path picks up the result.
+  ensurePriceRulesLoaded({ reason: 'checkout-block-init' }).then(() => evaluateGWP());
 
   // Empty cart guard
   if (cart.itemCount === 0) {
