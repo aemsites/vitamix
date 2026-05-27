@@ -233,3 +233,184 @@ test.describe('callValidateAddress', () => {
       .rejects.toThrow('network error');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Inlined formatEnteredAddressLines
+// ---------------------------------------------------------------------------
+
+function formatEnteredAddressLines(formData) {
+  const line1 = (formData.get('shipping-street-0') || '').toString().trim();
+  const line2 = (formData.get('shipping-street-1') || '').toString().trim();
+  const city = (formData.get('shipping-city') || '').toString().trim();
+  const state = (formData.get('shipping-state') || '').toString().trim();
+  const zip = (formData.get('shipping-zip') || '').toString().trim();
+  const cityStateZip = [city, [state, zip].filter(Boolean).join(' ')]
+    .filter(Boolean).join(', ');
+  return [line1, line2, cityStateZip].filter(Boolean);
+}
+
+// ---------------------------------------------------------------------------
+// Inlined formatSuggestedAddressLines
+// ---------------------------------------------------------------------------
+
+function formatSuggestedAddressLines(components) {
+  const c = {};
+  components.forEach((comp) => {
+    comp.types.forEach((type) => { c[type] = comp; });
+  });
+  const street = [c.street_number?.longText, c.route?.longText].filter(Boolean).join(' ');
+  const unit = c.subpremise?.longText ? `Apt ${c.subpremise.longText}` : '';
+  const city = (c.locality || c.sublocality || c.postal_town)?.longText || '';
+  const state = c.administrative_area_level_1?.shortText || '';
+  const zip = c.postal_code?.longText || '';
+  const cityStateZip = [city, [state, zip].filter(Boolean).join(' ')]
+    .filter(Boolean).join(', ');
+  return [street, unit, cityStateZip].filter(Boolean);
+}
+
+// ---------------------------------------------------------------------------
+// formatEnteredAddressLines tests
+// ---------------------------------------------------------------------------
+
+test.describe('formatEnteredAddressLines', () => {
+  test('formats a full address into three lines', () => {
+    const fd = new FormData();
+    fd.set('shipping-street-0', '123 William St');
+    fd.set('shipping-street-1', '#123');
+    fd.set('shipping-city', 'New York');
+    fd.set('shipping-state', 'NY');
+    fd.set('shipping-zip', '10038');
+    expect(formatEnteredAddressLines(fd)).toEqual([
+      '123 William St',
+      '#123',
+      'New York, NY 10038',
+    ]);
+  });
+
+  test('omits empty street-1', () => {
+    const fd = new FormData();
+    fd.set('shipping-street-0', '123 Main St');
+    fd.set('shipping-city', 'Springfield');
+    fd.set('shipping-state', 'IL');
+    fd.set('shipping-zip', '62701');
+    expect(formatEnteredAddressLines(fd)).toEqual([
+      '123 Main St',
+      'Springfield, IL 62701',
+    ]);
+  });
+
+  test('trims whitespace from each field', () => {
+    const fd = new FormData();
+    fd.set('shipping-street-0', '  123 Main St  ');
+    fd.set('shipping-city', '  Springfield  ');
+    fd.set('shipping-state', 'IL');
+    fd.set('shipping-zip', '62701');
+    expect(formatEnteredAddressLines(fd)).toEqual([
+      '123 Main St',
+      'Springfield, IL 62701',
+    ]);
+  });
+
+  test('handles zip-only on third line', () => {
+    const fd = new FormData();
+    fd.set('shipping-street-0', '123 Main St');
+    fd.set('shipping-zip', '62701');
+    expect(formatEnteredAddressLines(fd)).toEqual([
+      '123 Main St',
+      '62701',
+    ]);
+  });
+
+  test('returns empty array when everything is blank', () => {
+    expect(formatEnteredAddressLines(new FormData())).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatSuggestedAddressLines tests
+// ---------------------------------------------------------------------------
+
+test.describe('formatSuggestedAddressLines', () => {
+  const usAddress = [
+    { longText: '123', shortText: '123', types: ['street_number'] },
+    { longText: 'William Street', shortText: 'William St', types: ['route'] },
+    { longText: 'New York', shortText: 'New York', types: ['locality'] },
+    { longText: 'New York', shortText: 'NY', types: ['administrative_area_level_1'] },
+    { longText: '10038', shortText: '10038', types: ['postal_code'] },
+  ];
+
+  test('formats a full US address into two lines', () => {
+    expect(formatSuggestedAddressLines(usAddress)).toEqual([
+      '123 William Street',
+      'New York, NY 10038',
+    ]);
+  });
+
+  test('uses shortText for state but longText for everything else', () => {
+    // The state row has longText "California" but shortText "CA" — we want CA.
+    // City row has longText "Mountain View" — we want the longText.
+    const addr = [
+      { longText: '1600', shortText: '1600', types: ['street_number'] },
+      { longText: 'Amphitheatre Parkway', shortText: 'Amphitheatre Pkwy', types: ['route'] },
+      { longText: 'Mountain View', shortText: 'Mountain View', types: ['locality'] },
+      { longText: 'California', shortText: 'CA', types: ['administrative_area_level_1'] },
+      { longText: '94043', shortText: '94043', types: ['postal_code'] },
+    ];
+    expect(formatSuggestedAddressLines(addr)).toEqual([
+      '1600 Amphitheatre Parkway',
+      'Mountain View, CA 94043',
+    ]);
+  });
+
+  test('inserts an "Apt N" line when subpremise is present', () => {
+    const addr = [
+      ...usAddress,
+      { longText: '4B', shortText: '4B', types: ['subpremise'] },
+    ];
+    expect(formatSuggestedAddressLines(addr)).toEqual([
+      '123 William Street',
+      'Apt 4B',
+      'New York, NY 10038',
+    ]);
+  });
+
+  test('falls back to sublocality when locality is missing', () => {
+    const addr = [
+      { longText: '1', shortText: '1', types: ['street_number'] },
+      { longText: 'Main', shortText: 'Main', types: ['route'] },
+      { longText: 'Brooklyn', shortText: 'Brooklyn', types: ['sublocality'] },
+      { longText: 'New York', shortText: 'NY', types: ['administrative_area_level_1'] },
+      { longText: '11201', shortText: '11201', types: ['postal_code'] },
+    ];
+    expect(formatSuggestedAddressLines(addr)).toEqual([
+      '1 Main',
+      'Brooklyn, NY 11201',
+    ]);
+  });
+
+  test('falls back to postal_town when locality and sublocality are missing', () => {
+    const addr = [
+      { longText: '10', shortText: '10', types: ['street_number'] },
+      { longText: 'Downing St', shortText: 'Downing St', types: ['route'] },
+      { longText: 'London', shortText: 'London', types: ['postal_town'] },
+      { longText: 'England', shortText: 'England', types: ['administrative_area_level_1'] },
+      { longText: 'SW1A 2AA', shortText: 'SW1A 2AA', types: ['postal_code'] },
+    ];
+    expect(formatSuggestedAddressLines(addr)).toEqual([
+      '10 Downing St',
+      'London, England SW1A 2AA',
+    ]);
+  });
+
+  test('handles missing components gracefully', () => {
+    const addr = [
+      { longText: '1', shortText: '1', types: ['street_number'] },
+      { longText: 'Main', shortText: 'Main', types: ['route'] },
+    ];
+    expect(formatSuggestedAddressLines(addr)).toEqual(['1 Main']);
+  });
+
+  test('returns empty array when components list is empty', () => {
+    expect(formatSuggestedAddressLines([])).toEqual([]);
+  });
+});
