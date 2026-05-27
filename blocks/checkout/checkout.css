@@ -955,7 +955,7 @@ button.checkout-submit-btn {
   border: 1px solid var(--commerce-color-border);
   border-radius: var(--commerce-radius-card);
   padding: 24px;
-  max-width: 400px;
+  max-width: 520px;
   width: 90%;
 }
 
@@ -979,6 +979,18 @@ button.checkout-submit-btn {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* Side-by-side buttons on wider screens */
+@media (width >= 480px) {
+  .address-validation-actions {
+    flex-direction: row;
+    gap: 12px;
+  }
+
+  .address-validation-actions .button {
+    flex: 1;
+  }
 }
 
 .address-validation-error {
