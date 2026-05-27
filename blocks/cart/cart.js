@@ -139,6 +139,9 @@ export default async function decorate(block) {
 
     cart.items
       .filter((item) => item.local?.showInCart !== false)
+      // Free gifts always render last, regardless of insertion order.
+      .slice()
+      .sort((a, b) => (a.custom?.giftWithPurchase ? 1 : 0) - (b.custom?.giftWithPurchase ? 1 : 0))
       .forEach((item) => {
         if (item.custom?.giftWithPurchase) {
           itemList.appendChild(buildGiftItem(item, s, currencyCode));
