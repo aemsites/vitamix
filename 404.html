@@ -36,22 +36,6 @@
   </script>
   <script src="/scripts/scripts.js" type="module"></script>
   <script type="module">
-    window.addEventListener('load', () => {
-      if (document.referrer) {
-        const { origin, pathname } = new URL(document.referrer);
-        if (origin === window.location.origin) {
-          const backBtn = document.createElement('a');
-          backBtn.classList.add('button', 'error-button-back');
-          backBtn.href = pathname;
-          backBtn.textContent = 'Go back';
-          backBtn.title = 'Go back';
-          const btnContainer = document.querySelector('.button-container');
-          btnContainer.append(backBtn);
-        }
-      }
-    });
-  </script>
-  <script type="module">
     import { sampleRUM } from '/scripts/aem.js';
     sampleRUM('404', { source: document.referrer });
   </script>
@@ -59,6 +43,14 @@
     main.error div.section {
       min-height: calc(100vh - var(--nav-height));
       align-items: center;
+    }
+
+    .error-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--spacing-m, 1rem);
+      justify-content: center;
+      margin-top: var(--spacing-l, 1.5rem);
     }
   </style>
   <link rel="stylesheet" href="/styles/styles.css">
@@ -70,60 +62,74 @@
   <main class="error">
     <div class="section">
       <h2 class="error-message">We're sorry that page is missing.</h2>
-      <div class="fragment" style="display: none;">
-        <a href="" data-fragment-path="/footer/404"></a>
+      <div class="error-actions">
+        <a class="button error-home" href="/us/en_us/">Home</a>
+        <a class="button error-search" href="/us/en_us/search-result">Search</a>
       </div>
     </div>
   </main>
+  <script>
+    (function injectRecipe404Widget() {
+      if (!window.location.pathname.includes('/recipes/')) return;
+      var section = document.querySelector('main.error .section');
+      if (!section) return;
+      var msg = section.querySelector('.error-message');
+      if (msg) msg.remove();
+      var actions = section.querySelector('.error-actions');
+      if (actions) actions.remove();
+      var a = document.createElement('a');
+      a.href = '/widgets/404/recipes';
+      a.textContent = a.href;
+      section.appendChild(a);
+    })();
+  </script>
   <footer></footer>
-</body>
-<script>
-  function getCountryAndLanguage() {
-    const pathSegments = window.location.pathname.split('/').filter(Boolean);
-    const country = pathSegments[0] || 'us';
-    const language = pathSegments[1] || 'en_us';
-    return { country, language };
-  }
-
-  function localizeErrorMessage() {
-    const pathSegments = window.location.pathname.split('/').filter(Boolean);
-    const language = (pathSegments[1] || navigator.language || '').toLowerCase();
-    const lang = language.startsWith('fr') ? 'fr' : language.startsWith('es') ? 'es' : null;
-    const el = document.querySelector('.error-message');
-    if (!el || !lang) return;
-    const messages = {
-      es: "Lo sentimos, esa página no existe.",
-      fr: "Nous sommes désolés, cette page est introuvable."
-    };
-    el.textContent = messages[lang];
-  }
-  localizeErrorMessage();
-
-  (function setFragmentPath() {
-    const { country, language } = getCountryAndLanguage();
-    const path = `/${country}/${language}/footer/404`;
-    const link = document.querySelector('.fragment a[data-fragment-path]');
-    if (link) {
-      link.href = path;
-      link.textContent = path;
-    }
-  })();
-
-  (function observeFragmentLoad() {
-    const fragment = document.querySelector('.fragment');
-    if (!fragment) return;
-    const observer = new MutationObserver(function (mutations) {
-      for (const mutation of mutations) {
-        if (mutation.addedNodes.length) {
-          fragment.style.display = '';
-          observer.disconnect();
-          return;
-        }
+  <script>
+    function setDefault404NavLinks() {
+      var home = document.querySelector('.error-home');
+      var search = document.querySelector('.error-search');
+      if (!home && !search) return;
+      var loc = getCountryAndLanguage();
+      var base = '/' + loc.locale + '/' + loc.language;
+      if (home) {
+        home.href = base + '/';
+        home.title = 'Home';
       }
-    });
-    observer.observe(fragment, { childList: true, subtree: true });
-  })();
+      if (search) {
+        search.href = base + '/search-result';
+        search.title = 'Search';
+      }
+    }
 
-</script>
+    function localizeErrorMessage() {
+      const pathSegments = window.location.pathname.split('/').filter(Boolean);
+      const language = (pathSegments[1] || navigator.language || '').toLowerCase();
+      const lang = language.startsWith('fr') ? 'fr' : language.startsWith('es') ? 'es' : null;
+      const el = document.querySelector('.error-message');
+      if (el && lang) {
+        const messages = {
+          es: 'Lo sentimos, esa página no existe.',
+          fr: 'Nous sommes désolés, cette page est introuvable.',
+        };
+        el.textContent = messages[lang];
+      }
+      const home = document.querySelector('.error-home');
+      const search = document.querySelector('.error-search');
+      if (home && search && lang) {
+        const navLabels = {
+          es: { home: 'Inicio', search: 'Buscar' },
+          fr: { home: 'Accueil', search: 'Rechercher' },
+        };
+        const labels = navLabels[lang];
+        home.textContent = labels.home;
+        search.textContent = labels.search;
+        home.title = labels.home;
+        search.title = labels.search;
+      }
+    }
 
+    setDefault404NavLinks();
+    localizeErrorMessage();
+  </script>
+</body>
 </html>

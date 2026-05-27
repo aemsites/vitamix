@@ -147,6 +147,10 @@ function decorateJump(block, ul, row) {
             if (popoverLink) popoverLink.setAttribute('aria-current', 'location');
           }
 
+          const allLinks = [...links];
+          if (link === allLinks[0]) wrapper.dataset.scroll = 'start';
+          else if (link === allLinks[allLinks.length - 1]) wrapper.dataset.scroll = 'end';
+
           const mobile = !window.matchMedia('(width >= 800px)').matches;
           const sticky = Math.abs(block.getBoundingClientRect().top) < 1;
           if (!mobile && sticky) link.scrollIntoView({ behavior: 'smooth', inline: 'center' });
@@ -194,6 +198,7 @@ function decorateDefault(block, ul, row) {
     const link = li.querySelector('a');
     if (link && link.pathname === currentPath) {
       li.setAttribute('data-current', '');
+      link.setAttribute('aria-current', 'page');
       return;
     }
     const subUl = subLists[i];
@@ -354,6 +359,11 @@ export default function decorate(block) {
         el.classList.add(i < ulIndex ? 'pre-nav' : 'post-nav');
       }
     });
+
+    const navParts = [];
+    if (siblings.some((el, i) => i < ulIndex && el.classList.contains('button-wrapper'))) navParts.push('pre');
+    if (siblings.some((el, i) => i > ulIndex && el.classList.contains('button-wrapper'))) navParts.push('post');
+    if (navParts.length) block.dataset.nav = navParts.join(',');
 
     if (variants.includes('jump')) {
       decorateJump(block, ul, row);

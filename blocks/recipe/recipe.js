@@ -1,5 +1,6 @@
 import { getMetadata, toClassName, fetchPlaceholders } from '../../scripts/aem.js';
 import { formatTime, formatServings, getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { getHiddenContainers, isHiddenContainer } from './recipe-containers.js';
 
 function wrapInDiv(element, className) {
   if (!element) return;
@@ -148,6 +149,7 @@ function writeDietaryInterests(data, locale, language) {
 export default async function decorate(block) {
   const { locale, language } = getLocaleAndLanguage();
   const placeholders = await fetchPlaceholders(`/${locale}/${language}`);
+  const hiddenContainers = getHiddenContainers(placeholders);
 
   const totalTime = getMetadata('total-time');
   const yields = getMetadata('yield');
@@ -313,6 +315,7 @@ export default async function decorate(block) {
         if (recipe['compatible-containers']) {
           const names = recipe['compatible-containers'].split(',').map((c) => c.trim()).filter(Boolean);
           names.forEach((name) => {
+            if (isHiddenContainer(name, hiddenContainers)) return;
             if (!containerMap.has(name)) {
               containerMap.set(name, recipe.path);
             }
