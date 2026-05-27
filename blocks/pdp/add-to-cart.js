@@ -240,7 +240,7 @@ export default function renderAddToCart(ph, block, parent) {
       if (window.useEdgeCheckout) {
         const cartApi = (await import('../../scripts/cart.js')).default;
 
-        const { sku: variantSku, name } = selectedVariant;
+        const { sku: variantSku } = selectedVariant;
         const targetSku = variantSku ?? sku;
 
         // Clamp requested quantity so the cart line never exceeds maxQuantity.
@@ -288,7 +288,7 @@ export default function renderAddToCart(ph, block, parent) {
           parentSku: variantSku ? sku : undefined,
           quantity: allowedQty,
           price,
-          name,
+          name: parent.name,
           url: selectedVariant.url,
           path: new URL(selectedVariant.url).pathname,
           // Variant may not declare its own image (e.g. a bundle's first color
