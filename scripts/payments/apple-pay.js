@@ -1,4 +1,5 @@
 import { validateApplePayMerchant, estimateExpressCheckout } from '../commerce-api.js';
+import { getUser, isLoggedIn } from '../auth-api.js';
 
 const APPLE_PAY_SDK_URL = 'https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js';
 
@@ -145,11 +146,15 @@ function startExpressSession(btn, config, callbacks) {
           email: contact.emailAddress || '',
         };
 
+        // When the user is signed in, use their account email so the order is linked
+        // to the right account. The Apple Pay contact email may differ from the
+        // commerce account email, which causes assertEmail to reject the request.
+        const customerEmail = (isLoggedIn() && getUser()?.email) || contact.emailAddress || '';
         const orderBody = {
           customer: {
             firstName: contact.givenName || '',
             lastName: contact.familyName || '',
-            email: contact.emailAddress || '',
+            email: customerEmail,
             phone: contact.phoneNumber || '',
           },
           shipping: shippingAddr,
