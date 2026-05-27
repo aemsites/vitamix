@@ -147,7 +147,9 @@ function fillAddressFields(section, addressInput, addressComponents) {
 
   const zipInput = section.querySelector('[autocomplete="postal-code"]');
   if (zipInput) {
-    zipInput.value = c.postal_code?.longText || '';
+    const zip = c.postal_code?.longText || '';
+    const zipSuffix = c.postal_code_suffix?.longText || '';
+    zipInput.value = zip && zipSuffix ? `${zip}-${zipSuffix}` : zip;
   }
 
   // Set state last so FormData is complete when the change event triggers fetchAndPreview.
@@ -596,7 +598,9 @@ export async function validateAndCollapseShipping(section, collapse, config, str
   if (action === 'CONFIRM') {
     const { choice } = await showConfirmModal({ addressComponents, formData, strings });
     if (choice === 'accept' && addressComponents) {
-      const addressInput = section.querySelector('[autocomplete="address-line1"]');
+      // Use [name$="street-0"] — the autocomplete attr is rewritten to "off"
+      // by initPlacesAutocomplete to suppress Chrome's autofill dropdown.
+      const addressInput = section.querySelector('[name$="street-0"]');
       if (addressInput) fillAddressFields(section, addressInput, addressComponents);
     }
     collapse();
