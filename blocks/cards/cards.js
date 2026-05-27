@@ -49,6 +49,8 @@ function setCardDefaults(block, ul, variants) {
       li.classList.add('filled');
     } else if (captioned && !body && !image) {
       li.classList.add('captioned');
+      if (!variants.includes('captioned')) variants.push('captioned');
+      block.classList.add('captioned');
     }
 
     if (body) {
@@ -161,7 +163,7 @@ export default function decorate(block) {
     variants = setCardDefaults(block, ul, variants);
   }
 
-  const clickable = ['knockout', 'articles', 'linked', 'overlay', 'highlight'];
+  const clickable = ['knockout', 'articles', 'linked', 'overlay', 'highlight', 'captioned'];
   if (variants.some((v) => clickable.includes(v))) {
     enableClick(ul);
   }

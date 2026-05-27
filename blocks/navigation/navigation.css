@@ -76,6 +76,10 @@ main > .navigation-container.section ~ .section h6 {
   gap: 1ch;
 }
 
+.navigation:not([data-nav*="post"]) .menu {
+  grid-template-columns: 44px 1fr;
+}
+
 .navigation .menu .pre-nav {
   align-self: stretch;
   align-items: center;
@@ -140,10 +144,15 @@ main > .navigation-container.section ~ .section h6 {
 .navigation .menu nav ul {
   display: flex;
   align-items: stretch;
+  width: 100%;
 }
 
 .navigation .menu nav ul {
   gap: 1ch;
+}
+
+.navigation:not([data-nav*="post"]) .menu nav ul {
+  justify-content: space-between;
 }
 
 .navigation .menu nav ul > li {
@@ -151,14 +160,27 @@ main > .navigation-container.section ~ .section h6 {
   align-items: center;
 }
 
+/* stylelint-disable-next-line no-descending-specificity */
+.navigation .menu nav ul > li a {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  padding: calc(17px + 0.75em) 0;
+  text-align: center;
+  word-break: normal;
+}
+
 .navigation .menu nav button {
   align-self: stretch;
-  position: relative;
   text-transform: uppercase;
   transition: color 0.2s;
 }
 
-.navigation .menu nav button[data-current]::after {
+.navigation .menu nav [data-current] {
+  position: relative;
+}
+
+.navigation .menu nav [data-current]::after {
   content: "";
   position: absolute;
   top: 0;
@@ -182,6 +204,11 @@ main > .navigation-container.section ~ .section h6 {
 }
 
 /* toggle */
+.navigation .menu .toggle {
+  justify-self: end;
+  padding: calc(17px + 0.75em) 0;
+}
+
 .navigation .menu .toggle i {
   width: 28px;
 }
@@ -340,6 +367,10 @@ main > .navigation-container.section ~ .section h6 {
   grid-template-columns: 1fr max-content;
 }
 
+.navigation.jump:not([data-nav*="post"]) .menu {
+  grid-template-columns: 1fr;
+}
+
 .navigation.jump .menu nav {
   display: flex;
   text-transform: uppercase;
@@ -365,12 +396,8 @@ main > .navigation-container.section ~ .section h6 {
 }
 
 .navigation.jump .menu nav ul > li a {
-  align-self: stretch;
-  display: flex;
-  align-items: center;
   gap: 1ch;
   width: 100%;
-  padding: calc(17px + 0.75em) 0;
 }
 
 .navigation.jump .menu nav ul > li a::after {

@@ -1,0 +1,23 @@
+.forms-giveaway form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-200);
+}
+
+.forms-giveaway [data-required]::after {
+  content: '*';
+  margin-left: 0.5ch;
+  color: var(--color-red);
+}
+
+.forms-giveaway .radio-group legend {
+  margin-bottom: 0.5em;
+}
+
+.forms-giveaway .radio-group .radio-option {
+  cursor: pointer;
+}
+
+.forms-giveaway .giveaway-thank-you {
+  color: var(--color-asparagus);
+}
