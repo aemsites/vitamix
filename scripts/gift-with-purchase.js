@@ -224,7 +224,7 @@ async function resolveProductByPath(path) {
   if (!inMemoryCache) return null;
   if (inMemoryCache.productsByPath[path]) return inMemoryCache.productsByPath[path];
   try {
-    const res = await fetch(path, { credentials: 'omit' });
+    const res = await fetch(path, { credentials: 'same-origin' });
     if (!res.ok) throw new Error(`product page ${res.status}`);
     const html = await res.text();
     const product = extractProductFromJsonLd(html);
