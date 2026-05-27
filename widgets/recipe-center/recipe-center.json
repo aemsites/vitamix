@@ -22,7 +22,12 @@
     "previous": "Previous",
     "next": "Next",
     "clearAll": "Clear All",
-    "matchingContainersAria": "Matching containers"
+    "matchingContainersAria": "Matching containers",
+    "noResultsTitle": "Your Plate is Empty",
+    "noResultsEyebrow": "No Results Found",
+    "noResultsLead": "We couldn't find any item matching your search. Try adjusting your selections, or start a new search by resetting your selections.",
+    "resetSelections": "Reset Selections",
+    "noResultsImageAlt": "Illustration of an empty plate with fork and knife"
   },
   "fr": {
     "searchRecipes": "Rechercher des recettes",
@@ -47,7 +52,12 @@
     "previous": "Précédent",
     "next": "Suivant",
     "clearAll": "Tout effacer",
-    "matchingContainersAria": "Contenants correspondants"
+    "matchingContainersAria": "Contenants correspondants",
+    "noResultsTitle": "Votre assiette est vide",
+    "noResultsEyebrow": "Aucun résultat",
+    "noResultsLead": "Nous n'avons trouvé aucun élément correspondant à votre recherche. Modifiez vos sélections ou réinitialisez-les pour recommencer.",
+    "resetSelections": "Réinitialiser les sélections",
+    "noResultsImageAlt": "Illustration d'une assiette vide avec une fourchette et un couteau"
   },
   "es": {
     "searchRecipes": "Buscar recetas",
@@ -72,6 +82,11 @@
     "previous": "Anterior",
     "next": "Siguiente",
     "clearAll": "Borrar todo",
-    "matchingContainersAria": "Contenedores coincidentes"
+    "matchingContainersAria": "Contenedores coincidentes",
+    "noResultsTitle": "Tu plato está vacío",
+    "noResultsEyebrow": "No se encontraron resultados",
+    "noResultsLead": "No encontramos ningún elemento que coincida con tu búsqueda. Prueba a ajustar tus selecciones o restablecerlas para empezar de nuevo.",
+    "resetSelections": "Restablecer selecciones",
+    "noResultsImageAlt": "Ilustración de un plato vacío con tenedor y cuchillo"
   }
 }

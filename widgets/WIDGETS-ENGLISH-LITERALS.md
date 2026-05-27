@@ -8,7 +8,8 @@ All user-facing English strings used as copy, fallbacks (`|| '...'`, `?? '...'`)
 
 | English literal | Widget(s) |
 |-----------------|-----------|
-| **—** (em dash, empty value) | compare-products |
+| **—** (em dash, empty value) | compare-products, tco |
+| **$** (currency prefix on cost outputs) | tco |
 | **×** (remove button) | compare-products |
 | **✓** (checkmark) | compare-products |
 | **0 of 5 stars** | recipe-center |
@@ -136,19 +137,24 @@ These literals appear in more than one widget (good candidates for shared i18n).
 | **Address Line 2** | product-registration, manage-address |
 | **Additional comments** | wellness-program, media-contact |
 | **City** | product-registration, manage-address |
-| **Do you own a Vitamix?** | edit-account, create-account |
+| **Do you own a Vitamix?** | edit-account, create-account, made-in-giveaway |
 | **Email Address** | product-registration, media-contact, login, edit-account, create-account, contact-us |
+| **Enter your Email** | made-in-giveaway |
 | **First Name** | product-registration, media-contact, manage-address, edit-account, create-account, contact-us |
 | **Last Name** | product-registration, media-contact, manage-address, edit-account, create-account, contact-us |
 | **Phone Number** | product-registration, wellness-program, media-contact, manage-address |
 | **Postal code** | product-registration, manage-address, edit-account, create-account |
+| **Sign up** | made-in-giveaway |
 | **Submit** | wellness-program, media-contact, login, contact-us |
-| **Yes** | edit-account, create-account |
-| **No** | edit-account, create-account |
+| **Yes** | edit-account, create-account, made-in-giveaway |
+| **No** | edit-account, create-account, made-in-giveaway |
 
 ---
 
 ## By widget (summary)
+
+### tco
+All copy via `tco.json` (en/fr/es): form and results `aria-label`s, field labels, unit words (seconds, days, hours), and result term labels (break-even, warranty, cost-per-blend, faster blend time). Hardcoded literals: **—** (em dash, empty/pending state), **$** (currency prefix on cost-per-blend outputs), and model names (**Quick & Quiet™**, **The Quiet One®**, **Touch & Go™ Advance®**, **Drink Machine Advance®**, **Drink Machine Two-Speed**, **Vita-Prep® 3**, **Vita-Prep®**, **XL®**) in `tco.js`.
 
 ### compare-products
 Translation keys (via `t()`) used as UI text; actual copy comes from the widget’s local JSON. Hardcoded literals: feature row names (Series, Blending Programs, Variable Speed Control, Touch Buttons, Pulse, Digital Timer, Self-Detect Technology, Tamper Indicator, Plus 15 Second Button, Warranty, Dimensions (L × W × H), Colors), currency (USD, CAD), Countertop Blender, Color, and symbols ×, ✓, —.
@@ -200,8 +206,9 @@ Forms use `labels` and `inputPlaceholders` from locale JSON; the following are t
 | Create account | create-account |
 | Default | article-center (sort) |
 | Domestic | contact-us |
-| Do you own a Vitamix? | edit-account, create-account |
+| Do you own a Vitamix? | edit-account, create-account, made-in-giveaway |
 | Email Address | product-registration, media-contact, login, edit-account, create-account, contact-us |
+| Enter your Email | made-in-giveaway |
 | Find your serial number | product-registration |
 | First Name | product-registration, media-contact, manage-address, edit-account, create-account, contact-us |
 | For commercial products | create-account |
@@ -231,11 +238,13 @@ Forms use `labels` and `inputPlaceholders` from locale JSON; the following are t
 | Select / Select an option | contact-us, product-registration |
 | Serial number / (18 digits) | product-registration |
 | Sending... / Searching... | multiple forms |
+| Sign up | made-in-giveaway |
 | Submit | wellness-program, media-contact, login, contact-us |
+| Thank you for entering. | made-in-giveaway |
 | Type of request | contact-us |
 | Use as default billing/shipping address | manage-address |
 | Verify Your Email / Enter verification code... | login |
-| Yes / No | edit-account, create-account |
+| Yes / No | edit-account, create-account, made-in-giveaway |
 | * Required fields | create-account |
 
 *(Form input-hint values are in each form’s `.json` under `inputPlaceholders`; the table above reflects the English defaults used in JS when the key is missing.)*

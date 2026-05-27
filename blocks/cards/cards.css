@@ -57,6 +57,22 @@
   text-transform: uppercase;
 }
 
+/* Make the entire captioned card clickable via stretched link */
+.cards li.captioned {
+  position: relative;
+}
+
+.cards li.captioned .card-captioned a[href] {
+  text-decoration: none;
+  color: inherit;
+}
+
+.cards li.captioned .card-captioned a[href]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
 .cards .card-click {
   cursor: pointer;
 }

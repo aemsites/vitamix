@@ -1,7 +1,8 @@
 /* Media Contact form – vertical stack, labels above, uses global form/input styles */
 .forms-media-contact {
   background-color: var(--color-gray-100);
-  padding: var(--spacing-300);
+  padding: var(--spacing-300) var(--spacing-300) var(--spacing-300) 0;
+  margin-left: 0;
   border-radius: var(--rounding-m);
   max-width: 100%;
 }

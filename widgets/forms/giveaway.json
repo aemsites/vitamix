@@ -1,0 +1,44 @@
+{
+  "en": {
+    "labels": {
+      "ownsVitamix": "Do you own a Vitamix?",
+      "yes": "Yes",
+      "no": "No",
+      "email": "Enter your Email",
+      "submit": "Sign up",
+      "sending": "Sending...",
+      "thankYou": "Thank you for entering."
+    },
+    "inputPlaceholders": {
+      "email": ""
+    }
+  },
+  "fr": {
+    "labels": {
+      "ownsVitamix": "Possédez-vous un Vitamix?",
+      "yes": "Oui",
+      "no": "Non",
+      "email": "Entrez votre adresse courriel",
+      "submit": "S'inscrire",
+      "sending": "Envoi en cours...",
+      "thankYou": "Merci de votre participation."
+    },
+    "inputPlaceholders": {
+      "email": ""
+    }
+  },
+  "es": {
+    "labels": {
+      "ownsVitamix": "¿Tiene un Vitamix?",
+      "yes": "Sí",
+      "no": "No",
+      "email": "Ingrese su correo electrónico",
+      "submit": "Registrarse",
+      "sending": "Enviando...",
+      "thankYou": "Gracias por participar."
+    },
+    "inputPlaceholders": {
+      "email": ""
+    }
+  }
+}

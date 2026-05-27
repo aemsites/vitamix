@@ -925,3 +925,7 @@ body.corp main .default-content-wrapper h2 {
   text-decoration: underline;
 }
 
+body.corp-no-toc main .default-content-wrapper {
+  max-width: 800px;
+  margin: 0 auto;
+}
