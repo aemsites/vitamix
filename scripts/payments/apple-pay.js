@@ -23,7 +23,7 @@ function createApplePayButton(locale) {
 }
 
 function startExpressSession(btn, config, callbacks) {
-  btn.addEventListener('click', async () => {
+  btn.addEventListener('click', () => {
     const cart = callbacks.getCart();
     const locale = config.getLocale();
     const language = config.getLanguage();
