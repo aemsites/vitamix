@@ -65,6 +65,22 @@ const LOCAL_STRINGS = {
     errorRecaptcha: 'Security verification failed. Please refresh the page and try again.',
     errorGeneric: 'An error occurred. Please try again.',
     processing: 'Processing…',
+    addressEyebrow: 'Address verification',
+    addressHeading: 'We found a more accurate version',
+    addressSubtitle: 'Choose which address to use for shipping.',
+    addressWhatEntered: 'What you entered',
+    addressSuggestedBy: 'Suggested',
+    addressRecommended: 'Recommended',
+    addressUseSuggested: 'Use suggested address',
+    addressKeepMine: 'Keep my address',
+    addressUnitEyebrow: 'One more thing',
+    addressUnitHeading: 'Add an apartment or unit number?',
+    addressUnitSubtitle: 'Your building has multiple units. Adding one helps couriers reach you on the first try.',
+    addressUnitLabel: 'Apartment, suite, floor, or unit',
+    addressUnitPlaceholder: 'Apt 4B, Floor 12, Suite 200…',
+    addressUnitContinue: 'Add unit & continue',
+    addressUnitNoUnit: "I don't have one — continue",
+    addressInvalid: "We couldn't verify this address. Please check and try again.",
   },
   'fr-ca': {
     signIn: 'Se connecter pour un paiement plus rapide',
@@ -116,6 +132,22 @@ const LOCAL_STRINGS = {
     errorRecaptcha: 'Échec de la vérification de sécurité. Veuillez actualiser la page et réessayer.',
     errorGeneric: 'Une erreur est survenue. Veuillez réessayer.',
     processing: 'Traitement en cours…',
+    addressEyebrow: "Vérification d'adresse",
+    addressHeading: 'Nous avons trouvé une version plus précise',
+    addressSubtitle: 'Choisissez quelle adresse utiliser pour la livraison.',
+    addressWhatEntered: 'Ce que vous avez saisi',
+    addressSuggestedBy: 'Suggérée',
+    addressRecommended: 'Recommandée',
+    addressUseSuggested: "Utiliser l'adresse suggérée",
+    addressKeepMine: 'Garder mon adresse',
+    addressUnitEyebrow: 'Encore une chose',
+    addressUnitHeading: "Ajouter un numéro d'appartement ou de suite ?",
+    addressUnitSubtitle: 'Votre immeuble compte plusieurs unités. En ajouter une aide les livreurs à vous trouver du premier coup.',
+    addressUnitLabel: 'Appartement, suite, étage ou unité',
+    addressUnitPlaceholder: 'App. 4B, étage 12, suite 200…',
+    addressUnitContinue: 'Ajouter et continuer',
+    addressUnitNoUnit: "Je n'en ai pas — continuer",
+    addressInvalid: "Nous n'avons pas pu vérifier cette adresse. Veuillez vérifier et réessayer.",
   },
 };
 
@@ -216,7 +248,7 @@ export default async function decorate(block) {
   }
 
   // Wire address fields and billing toggle
-  initAddress(form, state, config, strings);
+  const { validateAndCollapse } = initAddress(form, state, config, strings);
 
   // Section collapse — contact
   const contactSection = form.querySelector('.contact-section');
@@ -229,18 +261,35 @@ export default async function decorate(block) {
   }, strings);
 
   // Section collapse — shipping address
+  // autoCollapse is disabled so focusout triggers address validation before collapsing.
   const shippingAddrSection = form.querySelector('.shipping-address-section');
-  initCollapse(shippingAddrSection, {
-    getIsValid: () => [...shippingAddrSection.querySelectorAll('[required]')].every((el) => el.checkValidity()),
+  const { collapse: collapseShipping } = initCollapse(shippingAddrSection, {
+    getIsValid: () => [...shippingAddrSection.querySelectorAll('[required]')].every(
+      (el) => el.checkValidity(),
+    ),
     getSummary: () => {
       const data = new FormData(form);
+      // eslint-disable-next-line max-len
       const name = `${data.get('shipping-firstname') || ''} ${data.get('shipping-lastname') || ''}`.trim();
       const city = data.get('shipping-city') || '';
       const stateCode = data.get('shipping-state') || '';
       const location = [city, stateCode].filter(Boolean).join(', ');
       return [name, location].filter(Boolean).join(' · ');
     },
+    autoCollapse: false,
   }, strings);
+
+  let validatingShipping = false;
+  shippingAddrSection.addEventListener('focusout', async (e) => {
+    if (shippingAddrSection.contains(e.relatedTarget)) return;
+    if (validatingShipping) return;
+    validatingShipping = true;
+    try {
+      await validateAndCollapse(collapseShipping);
+    } finally {
+      validatingShipping = false;
+    }
+  });
 
   // Wire shipping rate fetching and preview
   const shippingContainer = form.querySelector('.shipping-methods');
