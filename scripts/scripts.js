@@ -1079,29 +1079,36 @@ export async function loggedFetch(input, init) {
   if (hostname.includes('www.vitamix.com')) return fetch(input, init);
   const response = await fetch(input, init);
   if (!response.ok) {
+    const xError = response.headers.get('x-error');
+    const xErrorCode = response.headers.get('x-error-code');
     try {
-      const xError = response.headers.get('x-error');
-      const xErrorCode = response.headers.get('x-error-code');
       response.clone().text().then((text) => {
         let data = text;
         try {
           data = JSON.parse(text);
-        } catch {
-          // noop
-        }
+        } catch { /* noop */ }
+        let requestBody = init?.body;
+        try {
+          requestBody = JSON.parse(requestBody);
+        } catch { /* noop */ }
+
+        /* eslint-disable no-console */
         console.group(`Error response from: ${input.toString()}`);
-        console.error('status: ', response.status);
-        console.error('method: ', init?.method ?? 'GET');
-        console.error('request headers: ', init?.headers);
-        console.error('request body: ', init?.body);
-        console.error('response body: ', data);
-        console.error('x-error: ', xError);
-        console.error('x-error-code: ', xErrorCode);
+        console.error(JSON.stringify({
+          status: response.status,
+          method: init?.method ?? 'GET',
+          requestHeaders: init?.headers,
+          requestBody,
+          responseBody: data,
+          xError,
+          xErrorCode,
+        }, null, 2));
         console.groupEnd();
       });
     } catch (e) {
-      console.error('Error logging response', e);
+      console.error('Error logging response for:', input.toString(), e, xError, xErrorCode);
       console.warn(response);
+      /* eslint-enable no-console */
     }
   }
   return response;
