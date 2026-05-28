@@ -35,7 +35,7 @@ function getAddressFields(strings, isCanada) {
       name: 'zip', type: 'text', label: isCanada ? strings.postalCode : strings.zip, required: true, autocomplete: 'postal-code', width: 'third', inputmode: isCanada ? undefined : 'numeric',
     },
     {
-      name: 'telephone', type: 'tel', label: strings.phone, autocomplete: 'tel', format: 'phone', maxlength: 14,
+      name: 'telephone', type: 'tel', label: strings.phone, autocomplete: 'tel', format: 'phone',
     },
   ];
 }
@@ -82,6 +82,9 @@ function attachPhoneFormatter(input) {
     input.value = formatPhoneDisplay(pasted);
     input.setSelectionRange(input.value.length, input.value.length);
   });
+
+  input.maxLength = 14;
+  input.dataset.phoneFormatter = 'true';
 }
 
 function buildBreakdownRow(label, cls) {
@@ -180,6 +183,32 @@ function buildAddressSection(prefix, legend, strings, isCanada) {
 }
 
 /**
+ * Makes Tab/Shift+Tab cycle through individual radio buttons in a group rather
+ * than treating the radio group as a single tab stop (the HTML spec default).
+ * At the group's first/last radio, default Tab behavior takes over so focus
+ * exits the group normally.
+ *
+ * @param {HTMLElement} container - Element containing the radio inputs
+ * @param {string} name - Shared `name` attribute of the radios
+ */
+export function wireRadioTabNav(container, name) {
+  container.addEventListener('keydown', (e) => {
+    if (e.key !== 'Tab') return;
+    const { target } = e;
+    if (!(target instanceof HTMLInputElement) || target.type !== 'radio' || target.name !== name) {
+      return;
+    }
+    const radios = [...container.querySelectorAll(`input[type="radio"][name="${name}"]`)];
+    const idx = radios.indexOf(target);
+    if (idx === -1) return;
+    const nextIdx = e.shiftKey ? idx - 1 : idx + 1;
+    if (nextIdx < 0 || nextIdx >= radios.length) return;
+    e.preventDefault();
+    radios[nextIdx].focus();
+  });
+}
+
+/**
  * Builds and returns the checkout form element.
  * @param {HTMLElement} container
  * @param {Object} config
@@ -258,7 +287,6 @@ export default function buildForm(container, config, strings) {
   sameRadio.name = 'billing-choice';
   sameRadio.value = 'same';
   sameRadio.checked = true;
-  sameRadio.tabIndex = 0;
   const sameContent = document.createElement('div');
   sameContent.className = 'billing-option-content';
   const sameLabelSpan = document.createElement('span');
@@ -275,7 +303,6 @@ export default function buildForm(container, config, strings) {
   differentRadio.type = 'radio';
   differentRadio.name = 'billing-choice';
   differentRadio.value = 'different';
-  differentRadio.tabIndex = 0;
   const differentContent = document.createElement('div');
   differentContent.className = 'billing-option-content';
   const differentLabelSpan = document.createElement('span');
@@ -286,6 +313,7 @@ export default function buildForm(container, config, strings) {
 
   billingOptions.append(sameCard, differentCard);
   billingSection.appendChild(billingOptions);
+  wireRadioTabNav(billingOptions, 'billing-choice');
 
   const billingFieldsWrapper = document.createElement('div');
   billingFieldsWrapper.className = 'billing-fields-wrapper';
