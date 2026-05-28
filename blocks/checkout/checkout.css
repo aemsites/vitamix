@@ -536,6 +536,14 @@ main > .section:has(.checkout-wrapper) {
   accent-color: var(--commerce-color-text);
 }
 
+/* Restore focus ring on radio buttons — global outline:0 on input:focus suppresses it */
+.shipping-method-option input[type="radio"]:focus-visible,
+.billing-option-card input[type="radio"]:focus-visible,
+.payment-option-card input[type="radio"]:focus-visible {
+  outline: 2px solid var(--commerce-color-text);
+  outline-offset: 2px;
+}
+
 .payment-option-icon {
   display: flex;
   align-items: center;

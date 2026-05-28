@@ -51,7 +51,7 @@ export function renderShippingMethods(container, rates, strings, currencyCode = 
       body.appendChild(eta);
     }
 
-    label.append(body, radio);
+    label.append(radio, body);
 
     container.appendChild(label);
   });
