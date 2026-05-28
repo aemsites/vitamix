@@ -1637,6 +1637,19 @@ async function deletePromotionById(promoId) {
   }
 }
 
+/**
+ * @param {'add' | 'edit'} action
+ * @param {unknown} err
+ */
+function logPromotionFormSaveFailure(action, err) {
+  const message = err instanceof Error ? err.message : String(err ?? '');
+  /* eslint-disable-next-line no-console -- toast can sit behind modal <dialog>; log for DevTools */
+  console.warn(`[commerce-admin/promotions] promotion ${action} validation/save failed`, {
+    message,
+    err,
+  });
+}
+
 async function openPromotionAddDialog() {
   const ok = await fetchCatalogFromServerOrNotify();
   if (!ok) return;
@@ -1691,7 +1704,6 @@ async function openPromotionAddDialog() {
         }
       }
       const lineRows = readPromotionLineRowsFromDom(dialog);
-      if (!lineRows.length) throw new Error('Add at least one sale line');
       const rulesNew = promotionRowsToCatalogRules(lineRows, group);
       for (let i = 0; i < rulesNew.length; i += 1) {
         if (countryKeyFromCatalogPath(rulesNew[i].path) !== market) {
@@ -1715,6 +1727,7 @@ async function openPromotionAddDialog() {
       close();
       render();
     } catch (err) {
+      logPromotionFormSaveFailure('add', err);
       showToast(err?.message || 'Failed to add promotion', 'error');
     }
   });
@@ -1845,11 +1858,6 @@ async function openPromotionEditDialog(countryKey, promoId) {
       const onTab = new Set(catalogRulesForCountryTab(prev, market));
       const rulesOther = (prev.rules || []).filter((r) => !onTab.has(r));
       const merged = [...rulesOther, ...rulesNew];
-      if (!merged.length) {
-        throw new Error(
-          'This would remove all sale lines. Delete the promotion instead, or keep at least one line.',
-        );
-      }
       const next = list.slice();
       next[idx] = applyPromotionMinCartConditions({
         ...prev,
@@ -1862,6 +1870,7 @@ async function openPromotionEditDialog(countryKey, promoId) {
       close();
       render();
     } catch (err) {
+      logPromotionFormSaveFailure('edit', err);
       showToast(err?.message || 'Failed to update promotion', 'error');
     }
   });
