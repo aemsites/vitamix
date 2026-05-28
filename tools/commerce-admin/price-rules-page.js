@@ -64,7 +64,7 @@ const ET_TIMEZONE = 'America/New_York';
  * @property {string} [id] helix rule id when loaded from API (empty for new rows)
  * @property {string} minimumValue
  * @property {string} salesAmountOff
- * @property {string} freeShipping
+ * @property {string} shippingMode `none` | `standard` | `standard-priority`
  * @property {string} requiredProducts comma-separated paths (`path|sku` for variants)
  * @property {string} excludedProducts
  * @property {string} requiredCategories
@@ -165,6 +165,66 @@ function cartRuleMarketFromRule(rule) {
   return 'us';
 }
 
+/** @typedef {'none' | 'standard' | 'standard-priority'} CartRuleShippingMode */
+
+/** @type {ReadonlyArray<{ value: CartRuleShippingMode, label: string }>} */
+const CART_RULE_SHIPPING_OPTIONS = [
+  { value: 'none', label: 'No Free Shipping' },
+  { value: 'standard', label: 'Free Standard Shipping' },
+  { value: 'standard-priority', label: 'Free Priority and Standard Shipping' },
+];
+
+/**
+ * @param {unknown} raw
+ * @returns {CartRuleShippingMode}
+ */
+function normalizeCartRuleShippingMode(raw) {
+  const s = String(raw ?? '').trim().toLowerCase();
+  if (s === 'standard-priority' || s === 'standard_priority') return 'standard-priority';
+  if (s === 'standard' || s === 'yes') return 'standard';
+  return 'none';
+}
+
+/**
+ * @param {import('./price-rules-api.js').HelixCartPriceRule['actions']} [a]
+ * @returns {CartRuleShippingMode}
+ */
+function cartRuleShippingModeFromActions(a) {
+  if (!a || a.freeShipping !== true) return 'none';
+  const types = Array.isArray(a.includedShippingTypes)
+    ? a.includedShippingTypes.map((t) => String(t).trim().toLowerCase()).filter(Boolean)
+    : [];
+  const hasPriority = types.includes('priority');
+  const hasStandard = types.includes('standard') || types.length === 0;
+  if (hasStandard && hasPriority) return 'standard-priority';
+  if (hasStandard) return 'standard';
+  return 'standard';
+}
+
+/**
+ * @param {CartRuleShippingMode} mode
+ * @returns {import('./price-rules-api.js').HelixCartPriceRule['actions']}
+ */
+function cartRuleActionsShippingFromMode(mode) {
+  if (mode === 'standard') {
+    return { freeShipping: true, includedShippingTypes: ['standard'] };
+  }
+  if (mode === 'standard-priority') {
+    return { freeShipping: true, includedShippingTypes: ['standard', 'priority'] };
+  }
+  return { freeShipping: false };
+}
+
+/**
+ * @param {CartRuleShippingMode | string} mode
+ * @returns {string}
+ */
+function cartRuleShippingModeLabel(mode) {
+  const m = normalizeCartRuleShippingMode(mode);
+  const hit = CART_RULE_SHIPPING_OPTIONS.find((o) => o.value === m);
+  return hit ? hit.label : CART_RULE_SHIPPING_OPTIONS[0].label;
+}
+
 /** @param {string} ck */
 function rulesForCountryApi(ck) {
   if (state.cartDataSource !== 'api' || !Array.isArray(state.cartRulesList)) return [];
@@ -209,7 +269,7 @@ function helixCartRuleToRuleRow(rule) {
   } else if (a.fixedOff != null && Number.isFinite(Number(a.fixedOff))) {
     salesAmountOff = `$${a.fixedOff}`;
   }
-  const freeShipping = a.freeShipping === true ? 'Yes' : 'No';
+  const shippingMode = cartRuleShippingModeFromActions(a);
   const scope = cartRuleProductScopeFromConditions(c);
   const hid = rule.id != null ? String(rule.id).trim() : '';
   return {
@@ -217,7 +277,7 @@ function helixCartRuleToRuleRow(rule) {
     name: String(rule.name || ''),
     minimumValue,
     salesAmountOff,
-    freeShipping,
+    shippingMode,
     ...scope,
   };
 }
@@ -288,22 +348,17 @@ function ruleRowToHelixCartRule(market, row, existingRules, preserveFrom = null)
   }
   const hasPct = Number.isFinite(percentVal);
   const hasFixed = Number.isFinite(fixedVal);
-  const fs = /^yes$/i.test(String(row.freeShipping || '').trim());
+  const shippingMode = normalizeCartRuleShippingMode(row.shippingMode);
+  const ship = cartRuleActionsShippingFromMode(shippingMode);
 
   /** @type {import('./price-rules-api.js').HelixCartPriceRule['actions']} */
   let actions;
-  if (fs && hasPct) {
-    actions = { percentOff: percentVal, fixedOff: null, freeShipping: true };
-  } else if (fs && hasFixed) {
-    actions = { percentOff: null, fixedOff: fixedVal, freeShipping: true };
-  } else if (fs) {
-    actions = { freeShipping: true };
-  } else if (hasPct) {
-    actions = { percentOff: percentVal };
+  if (hasPct) {
+    actions = { percentOff: percentVal, fixedOff: null, ...ship };
   } else if (hasFixed) {
-    actions = { fixedOff: fixedVal };
+    actions = { percentOff: null, fixedOff: fixedVal, ...ship };
   } else {
-    actions = { freeShipping: false };
+    actions = { ...ship };
   }
 
   /** @type {import('./price-rules-api.js').HelixCartPriceRule} */
@@ -1965,6 +2020,21 @@ function cartRuleNewMarketFieldsHtml(initialMarket, marketLocked = false) {
       </div>`;
 }
 
+function cartRuleShippingSelectOptionsHtml(selected) {
+  const sel = normalizeCartRuleShippingMode(selected);
+  return CART_RULE_SHIPPING_OPTIONS.map((o) => {
+    const picked = o.value === sel ? ' selected' : '';
+    return `<option value="${escapeHtml(o.value)}"${picked}>${escapeHtml(o.label)}</option>`;
+  }).join('');
+}
+
+function cartRuleShippingModeSortRank(mode) {
+  const m = normalizeCartRuleShippingMode(mode);
+  if (m === 'standard-priority') return 2;
+  if (m === 'standard') return 1;
+  return 0;
+}
+
 /**
  * @param {(typeof COUNTRIES)[number]} initialMarket
  * @param {{ marketLocked?: boolean, ruleId?: string }} [formOptions]
@@ -2001,10 +2071,9 @@ function cartRuleAddFormHtml(initialMarket, formOptions = {}) {
         <input type="text" id="pr-cart-add-off" placeholder="25% or blank" />
       </div>
       <div class="coupons-field">
-        <label for="pr-cart-add-freeship">Free shipping</label>
+        <label for="pr-cart-add-freeship">Shipping benefit</label>
         <select id="pr-cart-add-freeship">
-          <option value="no">No</option>
-          <option value="yes">Yes</option>
+          ${cartRuleShippingSelectOptionsHtml('none')}
         </select>
       </div>
       <div class="coupons-field coupons-field-full">
@@ -2036,7 +2105,7 @@ function applyCartRuleFormPrefill(dlg, row) {
   setVal('#pr-cart-add-name', row.name || '');
   setVal('#pr-cart-add-min', row.minimumValue != null ? String(row.minimumValue) : '');
   setVal('#pr-cart-add-off', row.salesAmountOff != null ? String(row.salesAmountOff) : '');
-  setVal('#pr-cart-add-freeship', /^yes$/i.test(String(row.freeShipping || '').trim()) ? 'yes' : 'no');
+  setVal('#pr-cart-add-freeship', normalizeCartRuleShippingMode(row.shippingMode));
   setVal('#pr-cart-add-required-products', row.requiredProducts || '');
   setVal('#pr-cart-add-excluded-products', row.excludedProducts || '');
   setVal('#pr-cart-add-required-categories', row.requiredCategories || '');
@@ -2050,13 +2119,12 @@ function applyCartRuleFormPrefill(dlg, row) {
 function readCartRuleAddForm(dlg) {
   const name = dlg.querySelector('#pr-cart-add-name')?.value?.trim();
   if (!name) throw new Error('Rule name is required');
-  const fs = dlg.querySelector('#pr-cart-add-freeship')?.value === 'yes' ? 'Yes' : 'No';
   return {
     id: '',
     name,
     minimumValue: dlg.querySelector('#pr-cart-add-min')?.value?.trim() || '',
     salesAmountOff: dlg.querySelector('#pr-cart-add-off')?.value?.trim() || '',
-    freeShipping: fs,
+    shippingMode: normalizeCartRuleShippingMode(dlg.querySelector('#pr-cart-add-freeship')?.value),
     requiredProducts: dlg.querySelector('#pr-cart-add-required-products')?.value?.trim() || '',
     excludedProducts: dlg.querySelector('#pr-cart-add-excluded-products')?.value?.trim() || '',
     requiredCategories: dlg.querySelector('#pr-cart-add-required-categories')?.value?.trim() || '',
@@ -2371,7 +2439,9 @@ function compareCartRuleRows(a, b, key) {
       return na - nb;
     }
     case 'off': return String(a.salesAmountOff ?? '').localeCompare(String(b.salesAmountOff ?? ''), undefined, { numeric: true, sensitivity: 'base' });
-    case 'freeship': return (/^yes$/i.test(String(a.freeShipping)) ? 1 : 0) - (/^yes$/i.test(String(b.freeShipping)) ? 1 : 0);
+    case 'freeship': {
+      return cartRuleShippingModeSortRank(a.shippingMode) - cartRuleShippingModeSortRank(b.shippingMode);
+    }
     case 'scope': {
       const sa = cartRuleScopeSummary(a);
       const sb = cartRuleScopeSummary(b);
@@ -2529,7 +2599,9 @@ function cartRuleDetailModalInnerHtml(countryKey, countryLabel, rule, helixRuleI
   const offDisplay = rule.salesAmountOff != null && String(rule.salesAmountOff).trim() !== ''
     ? String(rule.salesAmountOff).trim()
     : '—';
-  const fs = /^yes$/i.test(String(rule.freeShipping || '').trim());
+  const shippingMode = normalizeCartRuleShippingMode(rule.shippingMode);
+  const shipLabel = cartRuleShippingModeLabel(shippingMode);
+  const hasShipping = shippingMode !== 'none';
   const hasMin = Boolean(rule.minimumValue != null && String(rule.minimumValue).trim() !== '');
   const hasOff = Boolean(rule.salesAmountOff != null && String(rule.salesAmountOff).trim() !== '');
   let heroMain = '—';
@@ -2537,16 +2609,16 @@ function cartRuleDetailModalInnerHtml(countryKey, countryLabel, rule, helixRuleI
   if (hasOff) {
     heroMain = offDisplay;
     heroSub = 'off qualifying subtotal';
-  } else if (fs && hasMin) {
+  } else if (hasShipping && hasMin) {
     heroMain = `≥ ${minDisplay}`;
-    heroSub = 'cart for free shipping';
-  } else if (fs) {
-    heroMain = 'Free shipping';
+    heroSub = shipLabel.toLowerCase();
+  } else if (hasShipping) {
+    heroMain = shipLabel;
     heroSub = 'benefit on qualifying orders';
   }
 
   const pills = [
-    promoPillHtml('Free shipping', fs),
+    promoPillHtml('Shipping benefit', hasShipping),
     promoPillHtml('Order minimum', hasMin),
     promoPillHtml('Percent / amount off', hasOff),
   ].join('');
@@ -2571,7 +2643,7 @@ function cartRuleDetailModalInnerHtml(countryKey, countryLabel, rule, helixRuleI
       <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Market</span><span class="coupons-modal-stat-value">${escapeHtml(countryLabel)}</span></div>
       <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Minimum cart</span><span class="coupons-modal-stat-value">${escapeHtml(minDisplay)}</span></div>
       <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Amount off</span><span class="coupons-modal-stat-value">${escapeHtml(offDisplay)}</span></div>
-      <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Free shipping</span><span class="coupons-modal-stat-value">${escapeHtml(fs ? 'Yes' : 'No')}</span></div>
+      <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Shipping benefit</span><span class="coupons-modal-stat-value">${escapeHtml(shipLabel)}</span></div>
     </div>
     <div class="coupons-modal-pills" aria-label="Rule flags">${pills}</div>
     <section class="coupons-modal-section">
@@ -2686,7 +2758,8 @@ function renderCartRulesOverview() {
       r.id,
       r.minimumValue,
       r.salesAmountOff,
-      r.freeShipping,
+      r.shippingMode,
+      cartRuleShippingModeLabel(r.shippingMode),
       r.requiredProducts,
       r.excludedProducts,
       r.requiredCategories,
@@ -2721,7 +2794,7 @@ function renderCartRulesOverview() {
         const off = r.salesAmountOff != null && String(r.salesAmountOff).trim() !== ''
           ? escapeHtml(String(r.salesAmountOff))
           : '—';
-        const ship = /^yes$/i.test(String(r.freeShipping || '').trim()) ? 'Yes' : 'No';
+        const ship = escapeHtml(cartRuleShippingModeLabel(r.shippingMode));
         const scope = cartRuleScopeSummary(r) || '—';
         const scopeShort = scope.length > 56 ? `${escapeHtml(scope.slice(0, 53))}…` : escapeHtml(scope);
         const ruleId = (r.id && String(r.id).trim()) || ruleSlugFromName(r.name);
@@ -2760,7 +2833,7 @@ function renderCartRulesOverview() {
             ${prCartSortTh('id', 'Id')}
             ${prCartSortTh('min', 'Min cart')}
             ${prCartSortTh('off', 'Off')}
-            ${prCartSortTh('freeship', 'Free ship')}
+            ${prCartSortTh('freeship', 'Shipping')}
             ${prCartSortTh('scope', 'Scope')}
             ${prCartSortTh('market', 'Market', 'pr-cart-rule-col-market')}
           </tr>

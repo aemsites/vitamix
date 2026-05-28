@@ -89,6 +89,7 @@ import { apiFetch } from './commerce-otp-api.js';
  * @property {number|null} [percentOff]
  * @property {number|null} [fixedOff]
  * @property {boolean} [freeShipping]
+ * @property {string[]} [includedShippingTypes] e.g. `standard`, `priority`
  */
 
 /**
