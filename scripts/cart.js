@@ -204,6 +204,12 @@ export class Cart {
     if (index !== -1) {
       this.#items.splice(index, 1);
     }
+    // Persist synchronously when the cart becomes empty so that any immediate
+    // page reload (e.g. from the checkout empty-cart listener) sees the correct
+    // state rather than restoring the stale pre-removal localStorage snapshot.
+    if (this.#items.length === 0) {
+      this.#persistNow();
+    }
     document.dispatchEvent(
       new CustomEvent('cart:change', {
         detail: {

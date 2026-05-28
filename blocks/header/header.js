@@ -718,6 +718,7 @@ export default async function decorate(block) {
       headerRow.append(cartTitle);
 
       const cartClose = document.createElement('button');
+      cartClose.type = 'button';
       cartClose.className = 'slide-panel-close';
       cartClose.textContent = '\u00D7';
       cartClose.setAttribute('aria-label', 'Close');

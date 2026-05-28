@@ -47,16 +47,16 @@ export default function buildCartItem(item, {
       <p class="cart-item-name"></p>
       <div class="cart-item-actions">
         <div class="cart-item-qty-control">
-          <button class="qty-dec" aria-label="Decrease quantity">&ndash;</button>
+          <button type="button" class="qty-dec" aria-label="Decrease quantity">&ndash;</button>
           <input class="qty-input" type="number" value="1" min="1"${Number.isFinite(maxQty) ? ` max="${maxQty}"` : ''}>
-          <button class="qty-inc" aria-label="Increase quantity">+</button>
+          <button type="button" class="qty-inc" aria-label="Increase quantity">+</button>
         </div>
       </div>
     </div>
     <div class="cart-item-right">
       <div class="cart-item-price"></div>
       <div class="cart-item-per-unit"></div>
-      <button class="cart-item-remove" aria-label="${removeItem}">
+      <button type="button" class="cart-item-remove" aria-label="${removeItem}">
         ${TRASH_ICON}<span>${remove}</span>
       </button>
     </div>`;
