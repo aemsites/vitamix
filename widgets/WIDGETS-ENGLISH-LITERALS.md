@@ -139,15 +139,15 @@ These literals appear in more than one widget (good candidates for shared i18n).
 | **City** | product-registration, manage-address |
 | **Do you own a Vitamix?** | edit-account, create-account, giveaway |
 | **Email Address** | product-registration, media-contact, login, edit-account, create-account, contact-us |
-| **Enter your Email** | giveaway, pb |
+| **Enter your Email** | giveaway, pb, wineandfood |
 | **First Name** | product-registration, media-contact, manage-address, edit-account, create-account, contact-us |
 | **Last Name** | product-registration, media-contact, manage-address, edit-account, create-account, contact-us |
 | **Phone Number** | product-registration, wellness-program, media-contact, manage-address |
 | **Postal code** | product-registration, manage-address, edit-account, create-account |
-| **Sign up** | giveaway, pb |
+| **Sign up** | giveaway, pb, wineandfood |
 | **Submit** | wellness-program, media-contact, login, contact-us |
-| **Yes** | edit-account, create-account, giveaway, pb |
-| **No** | edit-account, create-account, giveaway, pb |
+| **Yes** | edit-account, create-account, giveaway, pb, wineandfood |
+| **No** | edit-account, create-account, giveaway, pb, wineandfood |
 
 ---
 
@@ -206,11 +206,12 @@ Forms use `labels` and `inputPlaceholders` from locale JSON; the following are t
 | Create account | create-account |
 | Default | article-center (sort) |
 | Did you attend a Vitamix Series Dining Event during the festival? | pb |
+| Did you attend a Wine and Food Dinner? | wineandfood |
 | Did you learn anything new about Vitamix Blenders? | pb |
 | Domestic | contact-us |
 | Do you own a Vitamix? | edit-account, create-account, giveaway |
 | Email Address | product-registration, media-contact, login, edit-account, create-account, contact-us |
-| Enter your Email | giveaway, pb |
+| Enter your Email | giveaway, pb, wineandfood |
 | Find your serial number | product-registration |
 | First Name | product-registration, media-contact, manage-address, edit-account, create-account, contact-us |
 | For commercial products | create-account |
@@ -240,14 +241,15 @@ Forms use `labels` and `inputPlaceholders` from locale JSON; the following are t
 | Select / Select an option | contact-us, product-registration |
 | Serial number / (18 digits) | product-registration |
 | Sending... / Searching... | multiple forms |
-| Sign up | giveaway, pb |
+| Sign up | giveaway, pb, wineandfood |
 | Submit | wellness-program, media-contact, login, contact-us |
-| Thank you for entering. | giveaway, pb |
+| Thank you for entering. | giveaway, pb, wineandfood |
 | Type of request | contact-us |
 | Use as default billing/shipping address | manage-address |
 | Verify Your Email / Enter verification code... | login |
-| Which one? | pb |
-| Yes / No | edit-account, create-account, giveaway, pb |
+| What would you make in a Vitamix Blender? | wineandfood |
+| Which one? | pb, wineandfood |
+| Yes / No | edit-account, create-account, giveaway, pb, wineandfood |
 | * Required fields | create-account |
 
 *(Form input-hint values are in each form’s `.json` under `inputPlaceholders`; the table above reflects the English defaults used in JS when the key is missing.)*
