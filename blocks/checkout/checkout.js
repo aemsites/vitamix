@@ -308,9 +308,20 @@ export default async function decorate(block) {
     }
   });
 
+  // Re-apply shipping section collapse state from session storage. When the user
+  // returns to checkout after navigating away, the address fields are restored by
+  // restoreFormState but the section UI starts expanded. If the address was already
+  // validated and collapsed when they left, collapse it again so the summary shows.
+  (() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(formStateKey(locale)));
+      if (saved?.shippingCollapsed) collapseShipping();
+    } catch { /* ignore */ }
+  })();
+
   // Wire shipping rate fetching and preview
   const shippingContainer = form.querySelector('.shipping-methods');
-  initShipping(form, shippingContainer, cart, state, config, strings);
+  const refreshShipping = initShipping(form, shippingContainer, cart, state, config, strings);
 
   // When the cart changes mid-checkout, invalidate the stale estimate and
   // re-run the preview so totals stay accurate. The empty-cart listener above
@@ -338,9 +349,11 @@ export default async function decorate(block) {
     });
   });
 
-  // Re-run preview when a coupon code is applied from the order summary sidebar.
+  // Re-fetch shipping rates when a coupon is applied or removed so the method
+  // list reflects any free-shipping discount. updatePreview is called inside
+  // refreshShipping after the rates are rendered.
   document.addEventListener('checkout:coupon-apply', () => {
-    if (state.selectedShippingMethodId) updatePreview(form, cart, state, config);
+    refreshShipping();
   });
 
   // Wire Chase submit and get shared callbacks for providers

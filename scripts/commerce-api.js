@@ -62,14 +62,16 @@ async function post(path, body, recaptchaAction) {
  * @param {string} state - State or province code (e.g. 'QC', 'CA')
  * @param {Array<{sku: string, path: string, quantity: number, price: Object}>} items
  *   Cart items in API format
- * @returns {Promise<{ rates: Array<{ id: string, label: string, rate: number }> }>}
+ * @param {string} [couponCode] - coupon code; free-shipping discounts apply when provided
+ * @returns {Promise<{ rates: Array<{ id: string, label: string, rate: string }> }>}
  * @throws {CommerceApiError}
  */
-export async function estimateShipping(country, state, items) {
+export async function estimateShipping(country, state, items, couponCode) {
   return post('/estimate/shipping', {
     country,
     shipping: { country, state },
     items,
+    ...(couponCode ? { couponCode } : {}),
   });
 }
 

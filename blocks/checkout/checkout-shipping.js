@@ -38,7 +38,7 @@ export function renderShippingMethods(container, rates, strings, currencyCode = 
     labelText.className = 'shipping-method-label';
     labelText.textContent = rate.label;
 
-    const isFree = rate.rate === 0;
+    const isFree = parseFloat(rate.rate) === 0;
     const price = document.createElement('span');
     price.className = isFree ? 'shipping-method-price shipping-method-price-free' : 'shipping-method-price';
     price.textContent = isFree ? strings.free : formatPrice(parseFloat(rate.rate), currencyCode);
@@ -146,13 +146,19 @@ async function fetchAndPreview(form, shippingContainer, cart, state, config, str
   const locale = config.getLocale();
   const country = locale === 'ca' ? 'ca' : 'us';
 
+  const couponCode = sessionStorage.getItem('checkout_coupon_code') || undefined;
+
   try {
-    const result = await estimateShipping(country, stateCode, cart.getItemsForAPI());
+    const result = await estimateShipping(country, stateCode, cart.getItemsForAPI(), couponCode);
     renderShippingMethods(shippingContainer, result.rates || [], strings, currencyCode);
 
-    const firstRadio = shippingContainer.querySelector('input[type="radio"]');
-    if (firstRadio) {
-      state.selectedShippingMethodId = firstRadio.value;
+    // Preserve the user's previous selection; fall back to the first method.
+    const previousId = state.selectedShippingMethodId;
+    const targetRadio = (previousId && shippingContainer.querySelector(`input[value="${previousId}"]`))
+      || shippingContainer.querySelector('input[type="radio"]');
+    if (targetRadio) {
+      targetRadio.checked = true;
+      state.selectedShippingMethodId = targetRadio.value;
       shippingContainer.dispatchEvent(new CustomEvent('checkout:shipping-selected', { bubbles: true }));
       await updatePreview(form, cart, state, config);
     }
@@ -197,4 +203,6 @@ export function initShipping(form, shippingContainer, cart, state, config, strin
       updatePreview(form, cart, state, config);
     }
   });
+
+  return () => fetchAndPreview(form, shippingContainer, cart, state, config, strings, currencyCode);
 }
