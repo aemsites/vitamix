@@ -626,6 +626,7 @@ test.describe('Edge Checkout Page', () => {
       const orderRequest = requestLog.find((r) => r.url === '/orders');
       expect(orderRequest).toBeDefined();
       expect(orderRequest.body.customer.email).toBe(TEST_EMAIL);
+      expect(orderRequest.body.customer.phone).toBe(VALID_ADDRESS.phone);
       expect(orderRequest.body.shipping.city).toBe(VALID_ADDRESS.city);
       expect(orderRequest.body.shipping.state).toBe(VALID_ADDRESS.state);
       expect(orderRequest.body.estimateToken).toBe(MOCK_PREVIEW.estimateToken);
