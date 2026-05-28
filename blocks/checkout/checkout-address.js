@@ -802,6 +802,11 @@ export function initAddress(form, state, config, strings) {
     : null;
   if (billingSection) initPlacesAutocomplete(billingSection, config);
 
+  // Clear the section-level address-validation error as soon as the user edits any field.
+  if (shippingSection) {
+    shippingSection.addEventListener('input', () => clearAddressError(shippingSection));
+  }
+
   // Invalidate estimate token when estimate-affecting fields change
   form.addEventListener('change', (e) => {
     if (ESTIMATE_FIELDS.has(e.target.name)) {

@@ -13,6 +13,7 @@ import { initPayment } from './checkout-payment.js';
 import { parsePreview } from '../../scripts/commerce-api.js';
 import { ensurePriceRulesLoaded, evaluateGWP } from '../../scripts/gift-with-purchase.js';
 import { validateField } from './checkout-validation.js';
+import { formStateKey, saveFormState, restoreFormState } from './checkout-session-state.js';
 
 const ALL_PROVIDERS = [chase, applePay, paypal, affirm];
 
@@ -162,6 +163,7 @@ export default async function decorate(block) {
   await loadCSS('/styles/commerce-tokens.css');
   const config = getConfig();
   const strings = getStrings(config);
+  const locale = config.getLocale();
 
   // Reconcile gift-with-purchase before the empty-cart guard — a returning
   // visitor whose cart no longer qualifies needs the stale gift removed,
@@ -258,6 +260,13 @@ export default async function decorate(block) {
   // Wire address fields and billing toggle
   const { validateAndCollapse } = initAddress(form, state, config, strings);
 
+  // Restore any previously entered form data (e.g. after browser back from payment page)
+  restoreFormState(form, locale);
+  form.addEventListener('input', () => saveFormState(form, locale));
+  form.addEventListener('change', () => saveFormState(form, locale));
+  // pagehide fires reliably before any navigation and covers autofill (which may skip input/change)
+  window.addEventListener('pagehide', () => saveFormState(form, locale));
+
   // Section collapse — contact
   const contactSection = form.querySelector('.contact-section');
   initCollapse(contactSection, {
@@ -337,6 +346,13 @@ export default async function decorate(block) {
   // Wire Chase submit and get shared callbacks for providers
   const callbacks = initOrder(form, cart, state, config, strings);
 
+  // Clear saved form state when the order completes so a fresh checkout starts clean
+  const { onComplete } = callbacks;
+  callbacks.onComplete = (createdOrder) => {
+    try { sessionStorage.removeItem(formStateKey(locale)); } catch { /* ignore */ }
+    onComplete(createdOrder);
+  };
+
   // Apple Pay must be initiated synchronously from the submit button's trusted click gesture
   callbacks.beginApplePay = () => beginCheckoutSession(config, callbacks);
 
@@ -371,6 +387,8 @@ export default async function decorate(block) {
         const submitTextEl = submitBtn.querySelector('.submit-btn-text');
         if (submitTextEl) submitTextEl.textContent = strings.continueToPayment;
       }
+      // decorate() doesn't re-run for bfcache hits — restore form data here
+      restoreFormState(form, locale);
     }
   });
 }

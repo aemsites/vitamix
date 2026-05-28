@@ -1,4 +1,5 @@
 import { getMetadata } from '../../scripts/aem.js';
+import { wireRadioTabNav } from './checkout-form.js';
 
 /**
  * Filters the provider list using the `disabled-providers` metadata kill switch.
@@ -102,7 +103,6 @@ export function renderPaymentSection(container, activeProviders, callbacks, stri
     cardRadio.value = cardProviderId;
     cardRadio.checked = true;
     cardRadio.id = 'payment-credit-card';
-    cardRadio.tabIndex = 0;
 
     const cardIcon = document.createElement('span');
     cardIcon.className = 'payment-option-icon';
@@ -146,7 +146,6 @@ export function renderPaymentSection(container, activeProviders, callbacks, stri
     radio.name = 'paymentMethod';
     radio.value = provider.id;
     radio.id = `payment-${provider.id}`;
-    radio.tabIndex = 0;
 
     const optIcon = document.createElement('span');
     optIcon.className = 'payment-option-icon';
@@ -178,6 +177,7 @@ export function renderPaymentSection(container, activeProviders, callbacks, stri
   });
 
   container.appendChild(optionsWrapper);
+  wireRadioTabNav(optionsWrapper, 'paymentMethod');
 
   // When Chase is disabled, default-select the first available provider
   if (!chaseActive) {

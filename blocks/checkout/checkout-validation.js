@@ -130,7 +130,8 @@ export function attachFieldValidation(input) {
   // Show max-length error when the limit is hit; clear it (or any other error) on input below limit
   if (!isSelect) {
     input.addEventListener('input', () => {
-      if (input.maxLength > 0 && input.value.length >= input.maxLength) {
+      const atMax = input.maxLength > 0 && input.value.length >= input.maxLength;
+      if (atMax && !input.dataset.phoneFormatter) {
         const msgs = getMessages(input.form);
         showFieldError(input, msgs.maxLength.replace('{max}', input.maxLength));
       } else if (input.closest('.form-field')?.classList.contains('has-error')) {

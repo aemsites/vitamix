@@ -1,5 +1,6 @@
 import { estimateShipping, previewOrder } from '../../scripts/commerce-api.js';
 import { formatPrice } from '../../scripts/commerce-config.js';
+import { wireRadioTabNav } from './checkout-form.js';
 
 /**
  * Renders shipping method radio buttons into the container.
@@ -28,7 +29,6 @@ export function renderShippingMethods(container, rates, strings, currencyCode = 
     radio.type = 'radio';
     radio.name = 'shippingMethod';
     radio.value = rate.id;
-    radio.tabIndex = 0;
     if (i === 0) radio.checked = true;
 
     const body = document.createElement('div');
@@ -177,6 +177,8 @@ export function initShipping(form, shippingContainer, cart, state, config, strin
   placeholder.className = 'shipping-methods-placeholder';
   placeholder.textContent = strings.shippingPlaceholder;
   shippingContainer.appendChild(placeholder);
+
+  wireRadioTabNav(shippingContainer, 'shippingMethod');
 
   // Fetch rates when state/province changes
   const stateSelect = form.querySelector('[name="shipping-state"]');
