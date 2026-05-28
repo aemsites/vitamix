@@ -1070,6 +1070,42 @@ export function applyImgColor(block) {
 }
 
 /**
+ * Logs error to the console
+ * @param {RequestInfo|URL} input
+ * @param {RequestInit} [init]
+ * @returns {Promise<Response>}
+ */
+export async function loggedFetch(input, init) {
+  if (hostname.includes('www.vitamix.com')) return fetch(input, init);
+  const response = await fetch(input, init);
+  if (!response.ok) {
+    try {
+      response.clone().text().then((text) => {
+        let data = text;
+        try {
+          data = JSON.parse(text);
+        } catch {
+          // noop
+        }
+        console.group(`Error response from: ${input.toString()}`);
+        console.error('status: ', response.status);
+        console.error('method: ', init?.method ?? 'GET');
+        console.error('request headers: ', Object.fromEntries(init?.headers?.entries() ?? []));
+        console.error('request body: ', init?.body);
+        console.error('response body: ', data);
+        console.error('x-error: ', response.headers.get('x-error'));
+        console.error('x-error-code: ', response.headers.get('x-error-code'));
+        console.groupEnd();
+      });
+    } catch (e) {
+      console.error('Error logging response', e);
+      console.warn(response);
+    }
+  }
+  return response;
+}
+
+/**
  * Determines if a given date falls within US Eastern Daylight Saving Time.
  * DST starts: 2nd Sunday of March at 2:00 AM
  * DST ends: 1st Sunday of November at 2:00 AM
