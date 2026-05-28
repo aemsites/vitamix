@@ -1,12 +1,12 @@
 /**
- * Unit tests for scripts/commerce-api.js — getOrder function.
+ * Unit tests for scripts/commerce-api.js — getOrder and estimateShipping functions.
  *
  * Run with `npm run test:unit`. The setup file installs the fetch mock and
  * browser globals (sessionStorage) that commerce-api.js depends on.
  */
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { getOrder } from '../../scripts/commerce-api.js';
+import { getOrder, estimateShipping } from '../../scripts/commerce-api.js';
 
 const API_ORIGIN = 'https://api.test.com/test-org/sites/test-site';
 
@@ -122,4 +122,40 @@ test('getOrder: throws with status 500 on server error', async () => {
       return true;
     },
   );
+});
+
+// --- estimateShipping -------------------------------------------------------
+
+test('estimateShipping: omits couponCode when not provided', async () => {
+  mockFetch(200, { rates: [] });
+  await estimateShipping('us', 'CA', []);
+  const body = JSON.parse(lastInit.body);
+  assert.ok(!Object.prototype.hasOwnProperty.call(body, 'couponCode'), 'couponCode should be absent');
+});
+
+test('estimateShipping: includes couponCode in request body when provided', async () => {
+  mockFetch(200, { rates: [] });
+  await estimateShipping('us', 'CA', [], 'FREESHIP');
+  const body = JSON.parse(lastInit.body);
+  assert.equal(body.couponCode, 'FREESHIP');
+});
+
+test('estimateShipping: sends correct country, shipping, and items', async () => {
+  const items = [{ sku: 'abc', quantity: 1, price: { final: '50.00' } }];
+  mockFetch(200, { rates: [] });
+  await estimateShipping('ca', 'ON', items);
+  const body = JSON.parse(lastInit.body);
+  assert.equal(body.country, 'ca');
+  assert.deepEqual(body.shipping, { country: 'ca', state: 'ON' });
+  assert.deepEqual(body.items, items);
+});
+
+test('estimateShipping: returns rates array from response', async () => {
+  const rates = [
+    { id: '1', type: 'standard', rate: '0.00', label: 'Standard' },
+    { id: '2', type: 'priority', rate: '25.00', label: 'Priority' },
+  ];
+  mockFetch(200, { rates });
+  const result = await estimateShipping('us', 'NY', []);
+  assert.deepEqual(result.rates, rates);
 });

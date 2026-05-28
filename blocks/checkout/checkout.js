@@ -321,7 +321,7 @@ export default async function decorate(block) {
 
   // Wire shipping rate fetching and preview
   const shippingContainer = form.querySelector('.shipping-methods');
-  initShipping(form, shippingContainer, cart, state, config, strings);
+  const refreshShipping = initShipping(form, shippingContainer, cart, state, config, strings);
 
   // When the cart changes mid-checkout, invalidate the stale estimate and
   // re-run the preview so totals stay accurate. The empty-cart listener above
@@ -349,9 +349,11 @@ export default async function decorate(block) {
     });
   });
 
-  // Re-run preview when a coupon code is applied from the order summary sidebar.
+  // Re-fetch shipping rates when a coupon is applied or removed so the method
+  // list reflects any free-shipping discount. updatePreview is called inside
+  // refreshShipping after the rates are rendered.
   document.addEventListener('checkout:coupon-apply', () => {
-    if (state.selectedShippingMethodId) updatePreview(form, cart, state, config);
+    refreshShipping();
   });
 
   // Wire Chase submit and get shared callbacks for providers
