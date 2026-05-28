@@ -28,6 +28,7 @@ export function renderShippingMethods(container, rates, strings, currencyCode = 
     radio.type = 'radio';
     radio.name = 'shippingMethod';
     radio.value = rate.id;
+    radio.tabIndex = 0;
     if (i === 0) radio.checked = true;
 
     const body = document.createElement('div');

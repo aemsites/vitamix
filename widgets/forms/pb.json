@@ -1,0 +1,29 @@
+{
+  "labels": {
+    "attendance": "Did you attend a Vitamix Series Dining Event during the festival?",
+    "yes": "Yes",
+    "no": "No",
+    "whichDinner": "Which one?",
+    "openText": "Did you learn anything new about Vitamix Blenders?",
+    "email": "Enter your Email",
+    "submit": "Sign up",
+    "sending": "Sending...",
+    "thankYou": "Thank you for entering."
+  },
+  "inputPlaceholders": {
+    "email": ""
+  },
+  "dinners": [
+    "Flavors of the Mediterranean: Lunch hosted by Marc Murphy, Ayesha Nurdjaja, and Zac Young part of the Vitamix® Series",
+    "A Journey through Mexico: Lunch hosted by Val M. Cantú, Ana Castro, and Michael Diaz de Leon part of the Vitamix® Series",
+    "The Foundation Table: Dinner hosted by Antonia Lofaso and Geoffrey Zakarian part of the Vitamix® Series",
+    "A Taste of La Mar: Dinner hosted by Gastón Acurio, Kaoru Chang, Jesús Delgado, Victoriano Lopez, and Diego Oka part of the Vitamix® Series",
+    "The French Table: Dinner hosted by Markus Glocker, Lenny Messina, and Camari Mick part of the Vitamix® Series",
+    "Celebrating 75 years of Jonathan Waxman: Dinner hosted by Jimmy Bradley, Joey Campanaro, Paul Kahan, and Michael Symon part of the Vitamix® Series",
+    "Modern American: Lunch hosted by Esther Choi, Claudette Zepeda, and Francis Ang part of the Vitamix® Series",
+    "Feast of the Garden presented by GreenLeaf: Lunch hosted by Nyesha Arrington, Maneet Chauhan, and Rob Rubba part of the Vitamix® Series",
+    "Flavors of Italy: Dinner hosted by Karen Akunowicz, Amy Brandwein, and David Nayfeld part of the Vitamix® Series",
+    "The 50 Year Judgment of Paris: Dinner hosted by Elizabeth Falkner, Philip Tessier, and Duskie Estes part of the Vitamix® Series",
+    "Sunday Brunch hosted by Caroline Schiff, Alex Seidel, and Michael Schwartz part of the Vitamix® Series"
+  ]
+}

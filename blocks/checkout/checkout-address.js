@@ -266,6 +266,19 @@ function formatEnteredAddressLines(formData) {
 }
 
 /**
+ * Splits a formattedAddress string into two display lines: street on line 1,
+ * city/state/zip/country on line 2.
+ * @param {string} formattedAddress
+ * @returns {string[]}
+ */
+export function splitFormattedAddress(formattedAddress) {
+  const commaIdx = formattedAddress.indexOf(',');
+  return commaIdx >= 0
+    ? [formattedAddress.slice(0, commaIdx).trim(), formattedAddress.slice(commaIdx + 1).trim()]
+    : [formattedAddress];
+}
+
+/**
  * Formats Google's addressComponents array into display lines.
  * @param {Array<{ longText: string, shortText: string, types: string[] }>} components
  * @returns {string[]}
@@ -382,7 +395,9 @@ function buildAddressCard({
  * @param {Object} opts
  * @returns {Promise<{ choice: 'accept'|'keep' }>}
  */
-function showConfirmModal({ addressComponents, formData, strings }) {
+function showConfirmModal({
+  addressComponents, formattedAddress, formData, strings,
+}) {
   return new Promise((resolve) => {
     let chosen = null;
 
@@ -395,9 +410,12 @@ function showConfirmModal({ addressComponents, formData, strings }) {
     });
 
     const enteredLines = formatEnteredAddressLines(formData);
-    const suggestedLines = addressComponents
-      ? formatSuggestedAddressLines(addressComponents)
-      : [];
+    let suggestedLines;
+    if (formattedAddress) {
+      suggestedLines = splitFormattedAddress(formattedAddress);
+    } else {
+      suggestedLines = addressComponents ? formatSuggestedAddressLines(addressComponents) : [];
+    }
 
     const comparison = document.createElement('div');
     comparison.className = 'address-validation-comparison';
@@ -458,7 +476,9 @@ function showConfirmModal({ addressComponents, formData, strings }) {
  * @param {Object} opts
  * @returns {Promise<{ choice: 'add-unit', unit: string } | { choice: 'keep' }>}
  */
-function showAddUnitModal({ addressComponents, formData, strings }) {
+function showAddUnitModal({
+  addressComponents, formattedAddress, formData, strings,
+}) {
   return new Promise((resolve) => {
     let chosen = null;
 
@@ -471,9 +491,14 @@ function showAddUnitModal({ addressComponents, formData, strings }) {
       onClose: () => { chosen = { choice: 'keep' }; dialog.close(); },
     });
 
-    const displayLines = addressComponents
-      ? formatSuggestedAddressLines(addressComponents).filter((line) => !line.startsWith('Apt '))
-      : formatEnteredAddressLines(formData);
+    let displayLines;
+    if (formattedAddress) {
+      displayLines = splitFormattedAddress(formattedAddress);
+    } else if (addressComponents) {
+      displayLines = formatSuggestedAddressLines(addressComponents).filter((line) => !line.startsWith('Apt '));
+    } else {
+      displayLines = formatEnteredAddressLines(formData);
+    }
 
     const addressCard = document.createElement('div');
     addressCard.className = 'address-card address-card-display';
@@ -608,7 +633,7 @@ export async function validateAndCollapseShipping(section, collapse, config, str
       return;
     }
 
-    const { action, addressComponents } = result;
+    const { action, addressComponents, formattedAddress } = result;
 
     if (!action || action === 'ACCEPT') {
       collapse();
@@ -625,7 +650,9 @@ export async function validateAndCollapseShipping(section, collapse, config, str
 
     if (action === 'CONFIRM') {
       // eslint-disable-next-line no-await-in-loop
-      const { choice } = await showConfirmModal({ addressComponents, formData, strings });
+      const { choice } = await showConfirmModal({
+        addressComponents, formattedAddress, formData, strings,
+      });
       if (choice === 'accept' && addressComponents) {
         // Use [name$="street-0"] — the autocomplete attr is rewritten to "off"
         // by initPlacesAutocomplete to suppress Chrome's autofill dropdown.
@@ -638,7 +665,9 @@ export async function validateAndCollapseShipping(section, collapse, config, str
 
     if (action === 'CONFIRM_ADD_SUBPREMISES') {
       // eslint-disable-next-line no-await-in-loop
-      const result2 = await showAddUnitModal({ addressComponents, formData, strings });
+      const result2 = await showAddUnitModal({
+        addressComponents, formattedAddress, formData, strings,
+      });
       if (result2.choice !== 'add-unit' || !result2.unit) {
         // User declined — accept the address as-is.
         collapse();

@@ -258,6 +258,7 @@ export default function buildForm(container, config, strings) {
   sameRadio.name = 'billing-choice';
   sameRadio.value = 'same';
   sameRadio.checked = true;
+  sameRadio.tabIndex = 0;
   const sameContent = document.createElement('div');
   sameContent.className = 'billing-option-content';
   const sameLabelSpan = document.createElement('span');
@@ -274,6 +275,7 @@ export default function buildForm(container, config, strings) {
   differentRadio.type = 'radio';
   differentRadio.name = 'billing-choice';
   differentRadio.value = 'different';
+  differentRadio.tabIndex = 0;
   const differentContent = document.createElement('div');
   differentContent.className = 'billing-option-content';
   const differentLabelSpan = document.createElement('span');
