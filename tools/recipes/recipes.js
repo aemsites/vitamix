@@ -8,6 +8,10 @@ const LOCALES = [{
 }, {
   root: 'ca/en_us',
 }, {
+  root: 'mx/en_us',
+}, {
+  root: 'vr/en_us',
+}, {
   root: 'ca/fr_ca',
   translateLocale: 'fr-CA',
 }, {
