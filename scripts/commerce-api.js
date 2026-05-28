@@ -1,7 +1,7 @@
 import { getConfig } from './commerce-config.js';
 import { AUTH_TOKEN_KEY } from './auth-api.js';
 import { mintRecaptchaToken, RECAPTCHA_ACTIONS, RECAPTCHA_HEADER } from './recaptcha.js';
-import { getLocaleAndLanguage } from './scripts.js';
+import { getLocaleAndLanguage, loggedFetch } from './scripts.js';
 
 /**
  * Error thrown when the Commerce API returns a non-2xx response.
@@ -41,7 +41,7 @@ async function post(path, body, recaptchaAction) {
     if (recaptchaToken) headers[RECAPTCHA_HEADER] = recaptchaToken;
   }
 
-  const resp = await fetch(`${getConfig().apiOrigin}${path}`, {
+  const resp = await loggedFetch(`${getConfig().apiOrigin}${path}`, {
     method: 'POST',
     headers,
     body: JSON.stringify(body),

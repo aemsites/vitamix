@@ -1070,6 +1070,51 @@ export function applyImgColor(block) {
 }
 
 /**
+ * Logs error to the console
+ * @param {RequestInfo|URL} input
+ * @param {RequestInit} [init]
+ * @returns {Promise<Response>}
+ */
+export async function loggedFetch(input, init) {
+  if (hostname.includes('www.vitamix.com')) return fetch(input, init);
+  const response = await fetch(input, init);
+  if (!response.ok) {
+    const xError = response.headers.get('x-error');
+    const xErrorCode = response.headers.get('x-error-code');
+    try {
+      response.clone().text().then((text) => {
+        let data = text;
+        try {
+          data = JSON.parse(text);
+        } catch { /* noop */ }
+        let requestBody = init?.body;
+        try {
+          requestBody = JSON.parse(requestBody);
+        } catch { /* noop */ }
+
+        /* eslint-disable no-console */
+        console.group(`Error response from: ${input.toString()}`);
+        console.error(JSON.stringify({
+          status: response.status,
+          method: init?.method ?? 'GET',
+          requestHeaders: init?.headers,
+          requestBody,
+          responseBody: data,
+          xError,
+          xErrorCode,
+        }, null, 2));
+        console.groupEnd();
+      });
+    } catch (e) {
+      console.error('Error logging response for:', input.toString(), e, xError, xErrorCode);
+      console.warn(response);
+      /* eslint-enable no-console */
+    }
+  }
+  return response;
+}
+
+/**
  * Determines if a given date falls within US Eastern Daylight Saving Time.
  * DST starts: 2nd Sunday of March at 2:00 AM
  * DST ends: 1st Sunday of November at 2:00 AM
