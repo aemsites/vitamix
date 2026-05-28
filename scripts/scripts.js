@@ -1080,6 +1080,8 @@ export async function loggedFetch(input, init) {
   const response = await fetch(input, init);
   if (!response.ok) {
     try {
+      const xError = response.headers.get('x-error');
+      const xErrorCode = response.headers.get('x-error-code');
       response.clone().text().then((text) => {
         let data = text;
         try {
@@ -1093,8 +1095,8 @@ export async function loggedFetch(input, init) {
         console.error('request headers: ', init?.headers);
         console.error('request body: ', init?.body);
         console.error('response body: ', data);
-        console.error('x-error: ', response.headers.get('x-error'));
-        console.error('x-error-code: ', response.headers.get('x-error-code'));
+        console.error('x-error: ', xError);
+        console.error('x-error-code: ', xErrorCode);
         console.groupEnd();
       });
     } catch (e) {
