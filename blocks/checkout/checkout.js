@@ -308,6 +308,17 @@ export default async function decorate(block) {
     }
   });
 
+  // Re-apply shipping section collapse state from session storage. When the user
+  // returns to checkout after navigating away, the address fields are restored by
+  // restoreFormState but the section UI starts expanded. If the address was already
+  // validated and collapsed when they left, collapse it again so the summary shows.
+  (() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(formStateKey(locale)));
+      if (saved?.shippingCollapsed) collapseShipping();
+    } catch { /* ignore */ }
+  })();
+
   // Wire shipping rate fetching and preview
   const shippingContainer = form.querySelector('.shipping-methods');
   initShipping(form, shippingContainer, cart, state, config, strings);

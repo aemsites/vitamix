@@ -13,6 +13,10 @@ export function saveFormState(form, locale) {
         data[el.name] = el.value;
       }
     });
+    const shippingSection = form.querySelector('.shipping-address-section');
+    if (shippingSection) {
+      data.shippingCollapsed = shippingSection.classList.contains('is-collapsed');
+    }
     sessionStorage.setItem(formStateKey(locale), JSON.stringify(data));
   } catch { /* ignore quota / private-mode errors */ }
 }

@@ -236,7 +236,7 @@ function showAddressError(section, message) {
   const error = document.createElement('p');
   error.className = 'address-validation-error checkout-error';
   error.textContent = message;
-  const formGrid = section.querySelector('.form-grid');
+  const formGrid = section.querySelector('.form-fields');
   if (formGrid) {
     formGrid.insertAdjacentElement('afterend', error);
   } else {
@@ -802,9 +802,13 @@ export function initAddress(form, state, config, strings) {
     : null;
   if (billingSection) initPlacesAutocomplete(billingSection, config);
 
-  // Clear the section-level address-validation error as soon as the user edits any field.
+  // Clear the section-level address-validation error when the user edits any field.
+  // Only fires for trusted (user-initiated) events — programmatic input dispatches
+  // (e.g. the unit-number write in CONFIRM_ADD_SUBPREMISES) must not clear it.
   if (shippingSection) {
-    shippingSection.addEventListener('input', () => clearAddressError(shippingSection));
+    shippingSection.addEventListener('input', (e) => {
+      if (e.isTrusted) clearAddressError(shippingSection);
+    });
   }
 
   // Invalidate estimate token when estimate-affecting fields change
