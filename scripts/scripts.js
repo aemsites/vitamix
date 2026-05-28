@@ -1090,7 +1090,7 @@ export async function loggedFetch(input, init) {
         console.group(`Error response from: ${input.toString()}`);
         console.error('status: ', response.status);
         console.error('method: ', init?.method ?? 'GET');
-        console.error('request headers: ', Object.fromEntries(init?.headers?.entries() ?? []));
+        console.error('request headers: ', init?.headers);
         console.error('request body: ', init?.body);
         console.error('response body: ', data);
         console.error('x-error: ', response.headers.get('x-error'));
