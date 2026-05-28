@@ -51,7 +51,7 @@ export function buildOrderJSON(formData, form, cart, state, config) {
       firstName: formData.get('shipping-firstname') || '',
       lastName: formData.get('shipping-lastname') || '',
       email,
-      phone: formData.get('shipping-telephone') || '',
+      phone: (formData.get('shipping-telephone') || '').replace(/\D/g, ''),
     },
     shipping: cleanAddr(shippingAddr),
     billing: cleanAddr(billingAddr ?? shippingAddr),

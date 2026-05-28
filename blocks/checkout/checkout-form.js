@@ -35,13 +35,13 @@ function getAddressFields(strings, isCanada) {
       name: 'zip', type: 'text', label: isCanada ? strings.postalCode : strings.zip, required: true, autocomplete: 'postal-code', width: 'third', inputmode: isCanada ? undefined : 'numeric',
     },
     {
-      name: 'telephone', type: 'tel', label: strings.phone, autocomplete: 'tel', format: 'phone',
+      name: 'telephone', type: 'tel', label: strings.phone, autocomplete: 'tel', format: 'phone', maxlength: 14,
     },
   ];
 }
 
 // North American Numbering Plan: (555) 123-4567
-function formatPhoneDisplay(raw) {
+export function formatPhoneDisplay(raw) {
   let digits = raw.replace(/\D/g, '');
   // Strip the +1 country code if present — North America only, so leading digit is always 1
   if (digits.length === 11 && digits[0] === '1') digits = digits.slice(1);
@@ -74,6 +74,13 @@ function attachPhoneFormatter(input) {
     while (newPos < formatted.length && !/\d/.test(formatted[newPos])) newPos += 1;
 
     input.setSelectionRange(newPos, newPos);
+  });
+
+  input.addEventListener('paste', (e) => {
+    e.preventDefault();
+    const pasted = (e.clipboardData || window.clipboardData).getData('text');
+    input.value = formatPhoneDisplay(pasted);
+    input.setSelectionRange(input.value.length, input.value.length);
   });
 }
 
