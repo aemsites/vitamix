@@ -413,4 +413,48 @@ test.describe('formatSuggestedAddressLines', () => {
   test('returns empty array when components list is empty', () => {
     expect(formatSuggestedAddressLines([])).toEqual([]);
   });
+
+  test('uses locality over sublocality_level_1 when both are present', () => {
+    // sublocality_level_1 is not the same key as sublocality — locality wins.
+    // The CONFIRM modal uses formattedAddress directly to avoid this ambiguity.
+    const addr = [
+      { longText: '50', shortText: '50', types: ['street_number'] },
+      { longText: 'Queen Elizabeth Boulevard', shortText: 'Queen Elizabeth Blvd', types: ['route'] },
+      { longText: 'Toronto', shortText: 'Toronto', types: ['locality'] },
+      { longText: 'ON', shortText: 'ON', types: ['administrative_area_level_1'] },
+      { longText: 'M8Z 1M1', shortText: 'M8Z 1M1', types: ['postal_code'] },
+      { longText: 'Etobicoke', shortText: 'Etobicoke', types: ['sublocality_level_1'] },
+    ];
+    expect(formatSuggestedAddressLines(addr)).toEqual([
+      '50 Queen Elizabeth Boulevard',
+      'Toronto, ON M8Z 1M1',
+    ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// splitFormattedAddress
+// ---------------------------------------------------------------------------
+
+function splitFormattedAddress(formattedAddress) {
+  const commaIdx = formattedAddress.indexOf(',');
+  return commaIdx >= 0
+    ? [formattedAddress.slice(0, commaIdx).trim(), formattedAddress.slice(commaIdx + 1).trim()]
+    : [formattedAddress];
+}
+
+test.describe('splitFormattedAddress', () => {
+  test('splits at first comma into street and rest', () => {
+    expect(splitFormattedAddress('50 Queen Elizabeth Boulevard, Etobicoke, ON M8Z 1M1, Canada'))
+      .toEqual(['50 Queen Elizabeth Boulevard', 'Etobicoke, ON M8Z 1M1, Canada']);
+  });
+
+  test('returns single-element array when no comma present', () => {
+    expect(splitFormattedAddress('123 Main St')).toEqual(['123 Main St']);
+  });
+
+  test('trims whitespace around the split', () => {
+    expect(splitFormattedAddress('123 Main St , Springfield, IL'))
+      .toEqual(['123 Main St', 'Springfield, IL']);
+  });
 });

@@ -161,8 +161,12 @@ export function validateForm(form) {
   });
 
   if (firstInvalid) {
+    const section = firstInvalid.closest('.form-section');
+    if (section?.classList.contains('is-collapsed')) {
+      section.querySelector('.section-edit-btn')?.click();
+    }
     firstInvalid.focus();
-    firstInvalid.closest('.form-section')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    section?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   return !firstInvalid;

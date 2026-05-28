@@ -12,6 +12,7 @@ import { initOrder } from './checkout-order.js';
 import { initPayment } from './checkout-payment.js';
 import { parsePreview } from '../../scripts/commerce-api.js';
 import { ensurePriceRulesLoaded, evaluateGWP } from '../../scripts/gift-with-purchase.js';
+import { validateField } from './checkout-validation.js';
 
 const ALL_PROVIDERS = [chase, applePay, paypal, affirm];
 
@@ -272,7 +273,7 @@ export default async function decorate(block) {
   const shippingAddrSection = form.querySelector('.shipping-address-section');
   const { collapse: collapseShipping } = initCollapse(shippingAddrSection, {
     getIsValid: () => [...shippingAddrSection.querySelectorAll('[required]')].every(
-      (el) => el.checkValidity(),
+      (el) => el.checkValidity() && !validateField(el),
     ),
     getSummary: () => {
       const data = new FormData(form);

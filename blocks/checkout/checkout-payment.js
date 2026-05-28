@@ -102,6 +102,7 @@ export function renderPaymentSection(container, activeProviders, callbacks, stri
     cardRadio.value = cardProviderId;
     cardRadio.checked = true;
     cardRadio.id = 'payment-credit-card';
+    cardRadio.tabIndex = 0;
 
     const cardIcon = document.createElement('span');
     cardIcon.className = 'payment-option-icon';
@@ -145,6 +146,7 @@ export function renderPaymentSection(container, activeProviders, callbacks, stri
     radio.name = 'paymentMethod';
     radio.value = provider.id;
     radio.id = `payment-${provider.id}`;
+    radio.tabIndex = 0;
 
     const optIcon = document.createElement('span');
     optIcon.className = 'payment-option-icon';
