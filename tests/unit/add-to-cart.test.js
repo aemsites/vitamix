@@ -6,7 +6,12 @@
  */
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeCartPrice, isVariantAvailableForSale, computeAllowedQty } from '../../blocks/pdp/add-to-cart.js';
+import {
+  normalizeCartPrice,
+  isVariantAvailableForSale,
+  computeAllowedQty,
+  shippingDimensionsFromOffer,
+} from '../../blocks/pdp/add-to-cart.js';
 import { __setMetadata, __resetMetadata } from './mocks/aem.mjs';
 import { __setOutOfStockSkus, __resetScripts } from './mocks/scripts.mjs';
 
@@ -125,4 +130,56 @@ test('computeAllowedQty: normal single-unit add', () => {
 
 test('computeAllowedQty: clamps to zero, not negative, when existing exceeds max', () => {
   assert.equal(computeAllowedQty(1, 4, 3), 0);
+});
+
+// --- shippingDimensionsFromOffer -------------------------------------------
+
+test('shippingDimensionsFromOffer: extracts weight from JSON-LD QuantitativeValue', () => {
+  const offer = {
+    '@type': 'Offer',
+    shippingDetails: {
+      '@type': 'OfferShippingDetails',
+      weight: {
+        '@type': 'QuantitativeValue', value: 14.25, unitCode: 'LBR', unitText: 'lb',
+      },
+    },
+  };
+  assert.deepEqual(
+    shippingDimensionsFromOffer(offer),
+    { weight: { value: 14.25, unit: 'lb' } },
+  );
+});
+
+test('shippingDimensionsFromOffer: returns undefined when offer has no shippingDetails', () => {
+  assert.equal(shippingDimensionsFromOffer({ '@type': 'Offer', sku: 'foo' }), undefined);
+});
+
+test('shippingDimensionsFromOffer: returns undefined when shippingDetails has no weight', () => {
+  assert.equal(
+    shippingDimensionsFromOffer({ shippingDetails: { '@type': 'OfferShippingDetails' } }),
+    undefined,
+  );
+});
+
+test('shippingDimensionsFromOffer: returns undefined when weight has no unitText', () => {
+  const offer = {
+    shippingDetails: {
+      weight: { '@type': 'QuantitativeValue', value: 14.25, unitCode: 'LBR' },
+    },
+  };
+  assert.equal(shippingDimensionsFromOffer(offer), undefined);
+});
+
+test('shippingDimensionsFromOffer: returns undefined when value is not numeric', () => {
+  const offer = {
+    shippingDetails: {
+      weight: { '@type': 'QuantitativeValue', value: '14.25', unitText: 'lb' },
+    },
+  };
+  assert.equal(shippingDimensionsFromOffer(offer), undefined);
+});
+
+test('shippingDimensionsFromOffer: returns undefined for null/undefined input', () => {
+  assert.equal(shippingDimensionsFromOffer(null), undefined);
+  assert.equal(shippingDimensionsFromOffer(undefined), undefined);
 });

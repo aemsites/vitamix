@@ -102,6 +102,24 @@ export function normalizeCartPrice(value) {
 }
 
 /**
+ * Extract shippingDimensions from a JSON-LD Offer's `shippingDetails`, converting
+ * each schema.org `QuantitativeValue` back to the Product Bus `{ value, unit }` shape
+ * the Commerce API expects on cart items. Returns `undefined` when the offer has no
+ * shipping data, so callers can spread it conditionally onto the cart item.
+ *
+ * The pipeline preserves the original unit on `unitText` (e.g. `"lb"`) for this
+ * round-trip, distinct from the UN/CEFACT `unitCode` (e.g. `"LBR"`).
+ *
+ * @param {Object} offer - A schema.org Offer object from the page JSON-LD
+ * @returns {{weight: {value: number, unit: string}} | undefined}
+ */
+export function shippingDimensionsFromOffer(offer) {
+  const w = offer?.shippingDetails?.weight;
+  if (!w || typeof w.value !== 'number' || !w.unitText) return undefined;
+  return { weight: { value: w.value, unit: w.unitText } };
+}
+
+/**
  * Checks if a variant is available for sale.
  * @param {Object} variant - The variant object
  * @returns {boolean} True if the variant is available for sale, false otherwise
@@ -283,6 +301,13 @@ export default function renderAddToCart(ph, block, parent) {
         }));
         const availableWarranties = warrantyOptions.length > 0 ? warrantyOptions : null;
 
+        // For simple products, `selectedVariant === parent` and shippingDetails
+        // lives on the auto-generated single Offer; for variants it lives on
+        // the variant offer itself. Read from the variant first, fall back to
+        // the parent's first Offer for the simple-product case.
+        const shippingDimensions = shippingDimensionsFromOffer(selectedVariant)
+          ?? shippingDimensionsFromOffer(parent.offers?.[0]);
+
         const item = {
           sku: targetSku,
           parentSku: variantSku ? sku : undefined,
@@ -299,6 +324,7 @@ export default function renderAddToCart(ph, block, parent) {
           selectedOptions: semanticOptions,
           ...(parent.bundleItems ? { bundleItems: parent.bundleItems } : {}),
           ...(availableWarranties ? { local: { availableWarranties } } : {}),
+          ...(shippingDimensions ? { shippingDimensions } : {}),
         };
         await cartApi.addItem(item);
 
