@@ -272,6 +272,7 @@ export default async function decorate(block) {
     getCart: () => cart,
     getConfig: () => config,
     getState: () => state,
+    strings: getStrings(),
     previewOrderDirect: async (body) => {
       const couponCode = sessionStorage.getItem('checkout_coupon_code') || undefined;
       try {
