@@ -432,7 +432,7 @@ function enableFooterSignUp(form) {
       sms_optin: optIn ? '1' : '0',
       lead_source: leadSource,
       pageUrl: window.location.href,
-      actionUrl: '/us/en_us/rest/V1/vitamix-api/newslettersubscribe',
+      actionUrl: `/${country}/${language}/rest/V1/vitamix-api/newslettersubscribe`,
     };
     const params = new URLSearchParams(payload);
     try {
