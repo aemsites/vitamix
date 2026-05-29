@@ -323,6 +323,15 @@ export default async function decorate(block) {
   const shippingContainer = form.querySelector('.shipping-methods');
   const refreshShipping = initShipping(form, shippingContainer, cart, state, config, strings);
 
+  // If the address was restored from sessionStorage on this page load, the
+  // state select has a value but no `change` event ever fired — so the
+  // estimate/preview chain never ran. Trigger it once now. fetchAndPreview
+  // self-guards on missing state or empty cart, so calling it
+  // unconditionally is safe.
+  if (form.elements['shipping-state']?.value) {
+    refreshShipping();
+  }
+
   // When the cart changes mid-checkout, invalidate the stale estimate and
   // re-run the preview so totals stay accurate. The empty-cart listener above
   // handles the zero-items case via reload; this handles qty changes and
@@ -402,6 +411,11 @@ export default async function decorate(block) {
       }
       // decorate() doesn't re-run for bfcache hits — restore form data here
       restoreFormState(form, locale);
+      // ...and re-trigger the estimate/preview chain for the restored address,
+      // matching the initial-load path above.
+      if (form.elements['shipping-state']?.value) {
+        refreshShipping();
+      }
     }
   });
 }
