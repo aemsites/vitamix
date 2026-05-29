@@ -698,6 +698,8 @@ function initPlacesAutocomplete(section, config) {
   const addressInput = section.querySelector('[autocomplete="address-line1"]');
   if (!addressInput) return null;
 
+  const regionCode = config.getLocale() === 'ca' ? 'CA' : 'US';
+
   const wrapper = document.createElement('div');
   wrapper.className = 'places-autocomplete-wrapper';
   addressInput.parentElement.insertBefore(wrapper, addressInput);
@@ -766,7 +768,9 @@ function initPlacesAutocomplete(section, config) {
 
     debounceTimer = setTimeout(async () => {
       try {
-        const params = new URLSearchParams({ input: value, sessiontoken: sessionToken });
+        const params = new URLSearchParams({
+          input: value, sessiontoken: sessionToken, regioncode: regionCode,
+        });
         const resp = await fetch(`${config.apiOrigin}/places/autocomplete?${params}`);
         if (!resp.ok) return;
         const data = await resp.json();
