@@ -267,6 +267,7 @@ export class Cart {
       ...(item.url ? { productUrl: item.url } : {}),
       ...(item.selectedOptions?.length ? { selectedOptions: item.selectedOptions } : {}),
       ...(item.custom ? { custom: item.custom } : {}),
+      ...(item.shippingDimensions ? { shippingDimensions: item.shippingDimensions } : {}),
     }));
   }
 

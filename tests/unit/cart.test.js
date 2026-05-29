@@ -283,6 +283,33 @@ test('getItemsForAPI omits imageUrl/productUrl when not present', () => {
   assert.equal('productUrl' in api[0], false);
 });
 
+test('getItemsForAPI forwards shippingDimensions when present', () => {
+  const cart = new Cart();
+  cart.addItem({
+    sku: 'foo',
+    quantity: 1,
+    price: '10.00',
+    name: 'Foo',
+    path: '/products/foo',
+    shippingDimensions: { weight: { value: 14.25, unit: 'lb' } },
+  });
+  const api = cart.getItemsForAPI();
+  assert.deepEqual(api[0].shippingDimensions, { weight: { value: 14.25, unit: 'lb' } });
+});
+
+test('getItemsForAPI omits shippingDimensions when not present', () => {
+  const cart = new Cart();
+  cart.addItem({
+    sku: 'foo',
+    quantity: 1,
+    price: '10.00',
+    name: 'Foo',
+    path: '/products/foo',
+  });
+  const api = cart.getItemsForAPI();
+  assert.equal('shippingDimensions' in api[0], false);
+});
+
 // --- cart:change events -----------------------------------------------------
 
 const eventsByAction = (action) => globalThis.__events.filter((e) => e.detail.action === action);
