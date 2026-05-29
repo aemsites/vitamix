@@ -71,6 +71,9 @@ const defaults = {
       orderShippingAddress: 'Shipping address',
       orderContact: 'Contact',
       orderGiftMessage: 'Gift message',
+      errorApplePayCountry: 'Shipping is not available to this country.',
+      errorApplePayGeneric: 'Unable to process your order. Please try a different address or payment method.',
+      errorRecaptcha: 'Unable to complete checkout. Please refresh the page and try again.',
     },
     'fr-ca': {
       stepCart: 'Panier',
@@ -109,6 +112,9 @@ const defaults = {
       orderShippingAddress: 'Adresse de livraison',
       orderContact: 'Contact',
       orderGiftMessage: 'Message cadeau',
+      errorApplePayCountry: 'La livraison n\'est pas disponible dans ce pays.',
+      errorApplePayGeneric: 'Impossible de traiter votre commande. Veuillez essayer une autre adresse ou un autre mode de paiement.',
+      errorRecaptcha: 'Impossible de finaliser la commande. Veuillez actualiser la page et réessayer.',
     },
   },
   getStrings() {

@@ -59,7 +59,7 @@ function startExpressSession(btn, config, callbacks) {
 
       if (contact.countryCode && contact.countryCode.toLowerCase() !== locale) {
         session.completeShippingContactSelection({
-          errors: [new window.ApplePayError('shippingContactInvalid', 'countryCode', 'Shipping is not available to this country.')],
+          errors: [new window.ApplePayError('shippingContactInvalid', 'countryCode', callbacks.strings?.errorApplePayCountry || 'Shipping is not available to this country.')],
           newTotal: { label: config.site || 'Store', amount: cart.subtotal.toFixed(2) },
           newShippingMethods: [],
           newLineItems: [],
@@ -138,7 +138,7 @@ function startExpressSession(btn, config, callbacks) {
         });
       } catch {
         session.abort();
-        callbacks.showError('Unable to process your order. Please try a different address or payment method.');
+        callbacks.showError(callbacks.strings?.errorApplePayGeneric || 'Unable to process your order. Please try a different address or payment method.');
       }
     };
 
