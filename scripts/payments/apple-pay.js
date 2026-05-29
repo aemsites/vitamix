@@ -56,6 +56,17 @@ function startExpressSession(btn, config, callbacks) {
     session.onshippingcontactselected = async (e) => {
       lastShippingContact = e.shippingContact;
       const contact = e.shippingContact;
+
+      if (contact.countryCode && contact.countryCode.toLowerCase() !== locale) {
+        session.completeShippingContactSelection({
+          errors: [new window.ApplePayError('shippingContactInvalid', 'countryCode', 'Shipping is not available to this country.')],
+          newTotal: { label: config.site || 'Store', amount: cart.subtotal.toFixed(2) },
+          newShippingMethods: [],
+          newLineItems: [],
+        });
+        return;
+      }
+
       try {
         const result = await estimateExpressCheckout(
           contact.countryCode,
@@ -127,6 +138,7 @@ function startExpressSession(btn, config, callbacks) {
         });
       } catch {
         session.abort();
+        callbacks.showError('Unable to process your order. Please try a different address or payment method.');
       }
     };
 
