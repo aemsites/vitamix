@@ -30,8 +30,13 @@ export function getLocaleAndLanguage() {
   return locale;
 }
 
+<<<<<<< HEAD
 export async function loggedFetch(...args) {
   return fetch(...args);
+=======
+export function loggedFetch(input, init) {
+  return fetch(input, init);
+>>>>>>> f40146d (fix(checkout): show Discover card badge)
 }
 
 export const isProdHost = false;

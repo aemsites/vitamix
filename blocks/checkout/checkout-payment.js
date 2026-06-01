@@ -123,7 +123,7 @@ export function renderPaymentSection(container, activeProviders, callbacks, stri
 
     const cardBadges = document.createElement('div');
     cardBadges.className = 'payment-option-badges';
-    ['VISA', 'MC', 'AMEX'].forEach((name) => {
+    ['VISA', 'MC', 'AMEX', 'DISCOVER'].forEach((name) => {
       const badge = document.createElement('span');
       badge.className = 'card-badge';
       badge.textContent = name;
