@@ -266,6 +266,17 @@ export default function renderAddToCart(ph, block, parent) {
         const existingQty = cartApi.items.find((i) => i.sku === targetSku)?.quantity ?? 0;
         const allowedQty = computeAllowedQty(requestedQty, existingQty, maxQuantity);
         if (allowedQty <= 0) {
+          window.cartQtyLimitAlerts ||= new Set();
+          window.cartQtyLimitAlerts.add(targetSku);
+          document.dispatchEvent(new CustomEvent('cart:limit', {
+            detail: { sku: targetSku },
+          }));
+          document.dispatchEvent(new CustomEvent('pdp:add-to-cart', {
+            detail: {
+              item: { sku: targetSku },
+              overLimit: true,
+            },
+          }));
           addToCartButton.textContent = ph.addToCart || 'Add to Cart';
           addToCartButton.removeAttribute('aria-disabled');
           return;

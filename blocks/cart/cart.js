@@ -203,6 +203,7 @@ export default async function decorate(block) {
 
   populatelist();
   document.addEventListener('cart:change', populatelist);
+  document.addEventListener('cart:limit', populatelist);
 
   // Visiting cart/minicart is always a GWP trigger — populate/refresh rules
   // and reconcile. populatelist re-renders on the resulting cart:change.

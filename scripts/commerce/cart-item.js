@@ -3,6 +3,13 @@ import { formatPrice, getConfig } from '../commerce-config.js';
 
 loadCSS('/scripts/commerce/cart-item.css');
 
+const getQtyLimitAlerts = () => {
+  if (!window.cartQtyLimitAlerts) {
+    window.cartQtyLimitAlerts = new Set();
+  }
+  return window.cartQtyLimitAlerts;
+};
+
 const TRASH_ICON = /* html */`<svg width="14" height="14" viewBox="0 0 24 24" fill="none"
   stroke="currentColor" stroke-width="1.5" aria-hidden="true">
   <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14
@@ -115,14 +122,22 @@ export default function buildCartItem(item, {
 
   const showQtyLimit = () => {
     if (!hasMaxQty) return;
+    getQtyLimitAlerts().add(item.sku);
     limitMessage.hidden = false;
     incBtn.disabled = true;
   };
 
   const clearQtyLimit = () => {
+    getQtyLimitAlerts().delete(item.sku);
     limitMessage.hidden = true;
     incBtn.disabled = false;
   };
+
+  if (getQtyLimitAlerts().has(item.sku) && item.quantity >= maxQty) {
+    showQtyLimit();
+  } else {
+    clearQtyLimit();
+  }
 
   const handleQtyChange = (newQty) => {
     if (newQty < 1) {
