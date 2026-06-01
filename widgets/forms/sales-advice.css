@@ -1,7 +1,6 @@
 /* Sales advice form – same layout pattern as contact-us / consult-expert */
 .forms-sales-advice {
   background-color: var(--color-gray-100);
-  padding: var(--spacing-300);
   border-radius: var(--rounding-m);
   max-width: 100%;
 }
@@ -12,7 +11,6 @@
   gap: var(--spacing-200);
   max-width: 32rem;
   width: 100%;
-  margin-inline: auto;
 }
 
 .forms-sales-advice .sales-advice-field {
