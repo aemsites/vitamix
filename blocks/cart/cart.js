@@ -2,7 +2,6 @@ import { loadCSS, createOptimizedPicture } from '../../scripts/aem.js';
 import cart from '../../scripts/cart.js';
 import { getConfig, formatPrice } from '../../scripts/commerce-config.js';
 import buildCartItem from '../../scripts/commerce/cart-item.js';
-import buildWarrantySelector from './warranty-selector.js';
 import { ensurePriceRulesLoaded, evaluateGWP } from '../../scripts/gift-with-purchase.js';
 
 const LOCAL_STRINGS = {
@@ -71,6 +70,23 @@ function getStrings(config) {
   return { ...config.getStrings(), ...(LOCAL_STRINGS[lang] || LOCAL_STRINGS['en-us']) };
 }
 
+async function loadCartItemExtensions(config) {
+  const configuredExtensions = config.cartItemExtensions || [];
+  const extensionModules = await Promise.all(
+    (config.cartItemExtensionModules || []).map((modulePath) => import(modulePath)),
+  );
+  return [
+    ...configuredExtensions,
+    ...extensionModules.map((module) => module.default).filter(Boolean),
+  ];
+}
+
+function buildCartItemExtensions(extensions, context) {
+  return extensions
+    .map((buildExtension) => buildExtension(context))
+    .filter((content) => content instanceof HTMLElement);
+}
+
 function buildTemplate(s) {
   return /* html */`
 <div class="cart">
@@ -99,6 +115,7 @@ export default async function decorate(block) {
   const config = getConfig();
   const s = getStrings(config);
   const currencyCode = typeof config.currency === 'function' ? config.currency(config.getLocale()) : config.currency;
+  const cartItemExtensions = await loadCartItemExtensions(config);
 
   block.innerHTML = buildTemplate(s);
   block.querySelector('.cart-checkout').href = config.getOrderPath('checkout');
@@ -148,48 +165,33 @@ export default async function decorate(block) {
           return;
         }
 
-        const linkedWarranty = cart.items
-          .find((i) => i.custom?.linkedTo === item.sku) || null;
-
-        // The minicart keeps the row compact — the warranty selector renders
-        // only in the full cart view.
-        const extraContent = isMinicart ? null : buildWarrantySelector(
-          item,
-          linkedWarranty,
-          (tier) => {
-            if (linkedWarranty) {
-              cart.removeItem(linkedWarranty.sku, linkedWarranty.custom?.linkedTo);
-            }
-            if (tier && !tier.isDefault && parseFloat(tier.price) > 0) {
-              cart.addItem({
-                sku: tier.sku,
-                path: tier.path,
-                quantity: item.quantity,
-                price: tier.price,
-                name: tier.name,
-                custom: {
-                  linkedTo: item.sku,
-                  ...(tier.coverageYears ? { coverageYears: tier.coverageYears } : {}),
-                },
-                local: { showInCart: false },
-              }, { allowSeparateEntry: true });
-            }
-          },
-          currencyCode,
-          { heading: s.warranty, included: s.included },
-        );
+        const extraContent = [
+          ...buildCartItemExtensions(cartItemExtensions, {
+            item,
+            items: cart.items,
+            cart,
+            isMinicart,
+            strings: s,
+            currencyCode,
+          }),
+        ].filter(Boolean);
 
         const itemEl = buildCartItem(
           item,
           {
             onQtyChange: (sku, qty) => {
               cart.updateItem(sku, qty);
-              if (linkedWarranty) cart.updateItem(linkedWarranty.sku, qty);
+              cart.items
+                .filter((i) => i.custom?.linkedTo === sku)
+                .forEach((linkedItem) => cart.updateItem(linkedItem.sku, qty));
             },
             onRemove: (sku) => {
-              if (linkedWarranty) {
-                cart.removeItem(linkedWarranty.sku, linkedWarranty.custom?.linkedTo);
-              }
+              cart.items
+                .filter((i) => i.custom?.linkedTo === sku)
+                .forEach((linkedItem) => cart.removeItem(
+                  linkedItem.sku,
+                  linkedItem.custom?.linkedTo,
+                ));
               cart.removeItem(sku);
             },
             currencyCode,

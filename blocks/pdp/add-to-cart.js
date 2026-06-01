@@ -119,6 +119,16 @@ export function shippingDimensionsFromOffer(offer) {
   return { weight: { value: w.value, unit: w.unitText } };
 }
 
+function getCartCompatibility(parent) {
+  const { type, compatibleWith, compatibilityGroup } = parent.custom || {};
+  if (!compatibleWith && !compatibilityGroup) return null;
+  return {
+    ...(type ? { type } : {}),
+    ...(compatibleWith ? { compatibleWith } : {}),
+    ...(compatibilityGroup ? { compatibilityGroup } : {}),
+  };
+}
+
 /**
  * Checks if a variant is available for sale.
  * @param {Object} variant - The variant object
@@ -311,6 +321,7 @@ export default function renderAddToCart(ph, block, parent) {
           ...(parseFloat(opt.finalPrice ?? opt.price) === 0 ? { isDefault: true } : {}),
         }));
         const availableWarranties = warrantyOptions.length > 0 ? warrantyOptions : null;
+        const compatibility = getCartCompatibility(parent);
 
         // For simple products, `selectedVariant === parent` and shippingDetails
         // lives on the auto-generated single Offer; for variants it lives on
@@ -334,7 +345,12 @@ export default function renderAddToCart(ph, block, parent) {
           variant: window.selectedVariant?.options?.color || '',
           selectedOptions: semanticOptions,
           ...(parent.bundleItems ? { bundleItems: parent.bundleItems } : {}),
-          ...(availableWarranties ? { local: { availableWarranties } } : {}),
+          ...((availableWarranties || compatibility) ? {
+            local: {
+              ...(availableWarranties ? { availableWarranties } : {}),
+              ...(compatibility ? { compatibility } : {}),
+            },
+          } : {}),
           ...(shippingDimensions ? { shippingDimensions } : {}),
         };
         await cartApi.addItem(item);

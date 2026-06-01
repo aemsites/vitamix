@@ -44,6 +44,10 @@ const siteLocale = window.location.pathname.split('/').filter(Boolean)[0] || 'us
 window.CommerceConfig = {
   org: 'aemsites',
   site: 'vitamix',
+  cartItemExtensionModules: [
+    '/blocks/cart/warranty-selector-extension.js',
+    '/scripts/cart-compatibility.js',
+  ],
   paypal: {
     clientId: PAYPAL_CLIENT_IDS[siteLocale] ?? PAYPAL_CLIENT_IDS.us,
     intent: 'authorize',
