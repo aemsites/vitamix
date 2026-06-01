@@ -27,7 +27,7 @@ const TRASH_ICON = /* html */`<svg width="14" height="14" viewBox="0 0 24 24" fi
  *   onQtyChange: Function,
  *   onRemove: Function,
  *   currencyCode?: string,
- *   extraContent?: HTMLElement|null,
+ *   extraContent?: HTMLElement|HTMLElement[]|null,
  * }} callbacks
  * @param {{ remove?: string, removeItem?: string, maxQtyMessage?: string }} [strings]
  * @returns {HTMLElement}
@@ -170,9 +170,10 @@ export default function buildCartItem(item, {
 
   // Optional caller-provided content appended below the row (e.g. a
   // site-specific add-on selector). Spans the full row width via CSS.
-  if (extraContent instanceof HTMLElement) {
-    el.appendChild(extraContent);
-  }
+  const extraContentItems = Array.isArray(extraContent) ? extraContent : [extraContent];
+  extraContentItems
+    .filter((content) => content instanceof HTMLElement)
+    .forEach((content) => el.appendChild(content));
 
   return el;
 }

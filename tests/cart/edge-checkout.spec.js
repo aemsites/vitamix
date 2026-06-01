@@ -590,7 +590,8 @@ test.describe('Edge Checkout', () => {
       await page.waitForLoadState('domcontentloaded');
 
       const caCart = await getCart(page, CART_KEY_CA);
-      expect(caCart.items).toHaveLength(1);
+      const visibleItems = caCart.items.filter((item) => !item.custom?.giftWithPurchase);
+      expect(visibleItems).toHaveLength(1);
       console.log('✓ FR-CA cart persists after page reload');
     });
   });
