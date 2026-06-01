@@ -140,7 +140,7 @@ export default async function decorate(widget) {
       if (!resp.ok) {
         throw new Error(`Sheet logger responded with ${resp.status}`);
       }
-      const thankYouPath = `/${locale}/${language}/consult-expert-thankyou`;
+      const thankYouPath = `/${locale}/${language}/commercial/consult-expert-thankyou`;
       window.location.href = thankYouPath;
     } catch (err) {
       // eslint-disable-next-line no-console

@@ -19,7 +19,9 @@ function getOfferPricing(offer) {
   if (!offer) return null;
   return {
     final: parseFloat(offer.price),
-    regular: offer.priceSpecification?.price || null,
+    regular: offer.custom?.originalPrice
+      ? parseFloat(offer.custom.originalPrice)
+      : (offer.priceSpecification?.price || null),
   };
 }
 
@@ -92,6 +94,37 @@ test.describe('getOfferPricing', () => {
     const result = getOfferPricing(offer);
     expect(result.final).toBe(349.95);
     expect(result.regular).toBeNull();
+  });
+
+  test('uses custom.originalPrice as the regular price when present', () => {
+    const offer = {
+      price: '499.95',
+      priceCurrency: 'USD',
+      custom: { originalPrice: '549.95' },
+    };
+    const result = getOfferPricing(offer);
+    expect(result.final).toBe(499.95);
+    expect(result.regular).toBe(549.95);
+  });
+
+  test('prefers custom.originalPrice over priceSpecification', () => {
+    const offer = {
+      price: '499.95',
+      priceSpecification: { price: 519.95 },
+      custom: { originalPrice: '549.95' },
+    };
+    const result = getOfferPricing(offer);
+    expect(result.regular).toBe(549.95);
+  });
+
+  test('falls back to priceSpecification when custom.originalPrice is absent', () => {
+    const offer = {
+      price: '349.95',
+      priceSpecification: { price: 399.95 },
+      custom: {},
+    };
+    const result = getOfferPricing(offer);
+    expect(result.regular).toBe(399.95);
   });
 
   test('returns null for null offer', () => {

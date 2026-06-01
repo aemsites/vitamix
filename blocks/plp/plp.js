@@ -39,6 +39,7 @@ function parseData(data, locale, language) {
         break;
       case 'price':
       case 'regularPrice':
+      case 'originalPrice':
         // convert price strings to numeric values
         parsed[key] = parseFloat(value, 10);
         break;
@@ -286,12 +287,16 @@ function createProductPrice(product, ph) {
   const price = document.createElement('p');
   price.className = 'plp-price';
   price.textContent = product.price ? formatPrice(product.price, ph) : '';
-  if (product.regularPrice && product.regularPrice > product.price) {
-    const savings = (product.regularPrice - product.price).toFixed(2);
+  // Reconditioned products carry the original (pre-reconditioned) price in
+  // originalPrice; use it as the regular/"was" price when present, otherwise
+  // fall back to the regular price.
+  const regular = product.originalPrice || product.regularPrice;
+  if (regular && regular > product.price) {
+    const savings = (regular - product.price).toFixed(2);
     const saleInfo = document.createElement('span');
     saleInfo.textContent = `| ${ph.save || 'Save'} ${formatPrice(savings, ph)}`;
     const regularPrice = document.createElement('del');
-    regularPrice.textContent = formatPrice(product.regularPrice, ph);
+    regularPrice.textContent = formatPrice(regular, ph);
     saleInfo.prepend(regularPrice);
     price.append(' ', saleInfo);
   }

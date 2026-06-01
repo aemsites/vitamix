@@ -1,0 +1,30 @@
+<form method="post" action="" aria-label="Wine and Food Giveaway">
+  <fieldset class="field radio-group">
+    <legend data-required></legend>
+    <div class="radio-options">
+      <label class="radio-option">
+        <input type="radio" name="vitamixfoodandwine" value="True" required aria-required="true">
+        <span class="radio-label"></span>
+      </label>
+      <label class="radio-option">
+        <input type="radio" name="vitamixfoodandwine" value="False">
+        <span class="radio-label"></span>
+      </label>
+    </div>
+  </fieldset>
+  <div class="field">
+    <label for="wf-dinner"></label>
+    <select id="wf-dinner" name="name_of_dinner"></select>
+  </div>
+  <div class="field">
+    <label for="wf-open-text"></label>
+    <input id="wf-open-text" type="text" name="open-text-question-fw" autocomplete="off">
+  </div>
+  <div class="field">
+    <label for="wf-email" data-required></label>
+    <input id="wf-email" type="email" name="food-and-wine-email" required aria-required="true" placeholder="" autocomplete="email">
+  </div>
+  <p class="button-wrapper">
+    <button type="submit" class="button emphasis"></button>
+  </p>
+</form>

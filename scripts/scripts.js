@@ -44,7 +44,12 @@ export function getOfferPricing(offer) {
   if (!offer) return null;
   return {
     final: parseFloat(offer.price),
-    regular: offer.priceSpecification?.price || null,
+    // Reconditioned products carry the original (pre-reconditioned) price in
+    // custom.originalPrice and use it as the regular/was price. Fall back to the
+    // offer's list price when originalPrice is not present.
+    regular: offer.custom?.originalPrice
+      ? parseFloat(offer.custom.originalPrice)
+      : (offer.priceSpecification?.price || null),
   };
 }
 
@@ -672,7 +677,7 @@ function buildAutoBlocks(main) {
       section.classList.add('section');
       section.append(toc);
       main.prepend(section);
-    } else if (getMetadata('template') === 'corp') {
+    } else if ((getMetadata('template') === 'corp') && !document.querySelector('.toc')) {
       document.body.classList.add('corp-no-toc');
     }
   } catch (error) {
