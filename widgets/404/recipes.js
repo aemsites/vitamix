@@ -49,26 +49,26 @@ function slugFromRecipePath(path) {
  * from the index slug, then prefix match on the full slug.
  * @param {string} locale — two-letter country code (e.g. 'us')
  * @param {string} language — locale+language code (e.g. 'en_us')
- * @returns {Promise<void>}
+ * @returns {Promise<boolean>} True when a redirect to a recipe page was started
  */
 async function tryRedirectFromRecipeIndex(locale, language) {
   const targetSlug = normalizeKebabLower(lastPathSegment(window.location.pathname));
-  if (!targetSlug || targetSlug === 'recipes') return;
+  if (!targetSlug || targetSlug === 'recipes') return false;
 
   const indexUrl = `/${locale}/${language}/recipes/query-index.json`;
   let resp;
   try {
     resp = await fetch(indexUrl);
   } catch {
-    return;
+    return false;
   }
-  if (!resp.ok) return;
+  if (!resp.ok) return false;
 
   let payload;
   try {
     payload = await resp.json();
   } catch {
-    return;
+    return false;
   }
   const rows = Array.isArray(payload?.data) ? payload.data : [];
   const recipes = rows.filter((r) => {
@@ -87,7 +87,7 @@ async function tryRedirectFromRecipeIndex(locale, language) {
     return [];
   });
 
-  if (matches.length === 0) return;
+  if (matches.length === 0) return false;
 
   // Higher score first; same score: shortest slug (prefix tier avoids …mini-chopper…).
   matches.sort((a, b) => b.score - a.score || a.slug.length - b.slug.length);
@@ -95,9 +95,10 @@ async function tryRedirectFromRecipeIndex(locale, language) {
   const target = best.path.startsWith('/') ? best.path : `/${best.path}`;
   const here = window.location.pathname.replace(/\/$/, '') || '/';
   const there = target.replace(/\/$/, '') || '/';
-  if (here === there) return;
+  if (here === there) return false;
 
   window.location.assign(target);
+  return true;
 }
 
 /**
@@ -105,11 +106,13 @@ async function tryRedirectFromRecipeIndex(locale, language) {
  * @param {HTMLElement} widget - Widget root (`.widget` / `.404-recipes`)
  */
 export default async function decorate(widget) {
+  const content = widget.querySelector('.recipes-404');
   const pathSegments = window.location.pathname.split('/').filter(Boolean);
   const locale = pathSegments[0] || 'us';
   const language = pathSegments[1] || 'en_us';
 
-  await tryRedirectFromRecipeIndex(locale, language);
+  const willRedirect = await tryRedirectFromRecipeIndex(locale, language);
+  if (willRedirect) return;
 
   const rawLang = (language || 'en_us').toLowerCase();
   let langKey = 'en';
@@ -150,4 +153,6 @@ export default async function decorate(widget) {
     browse.title = copy.recipesCta;
   }
   if (img && copy.imageAlt) img.alt = copy.imageAlt;
+
+  if (content) content.classList.add('ready');
 }

@@ -53,3 +53,7 @@
 .recipes-404 .button-wrapper {
   margin: 0;
 }
+
+.recipes-404:not(.ready) {
+  display: none;
+}
