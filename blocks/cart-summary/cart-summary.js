@@ -114,15 +114,15 @@ function buildTemplate(s) {
       <div class="cart-summary-express-buttons"></div>
       <div class="cart-summary-express-divider"><span>${s.or}</span></div>
     </div>
-    <details class="cart-summary-promo">
-      <summary class="cart-summary-promo-toggle">${s.havePromoCode}</summary>
+    <div class="cart-summary-promo">
+      <div class="cart-summary-promo-toggle">${s.havePromoCode}</div>
       <div class="cart-summary-discount">
         <input type="text" placeholder="${s.discountPlaceholder}"
           class="discount-input" autocomplete="off">
         <button class="discount-apply">${s.apply}</button>
         <p class="cart-summary-coupon-error" hidden></p>
       </div>
-    </details>
+    </div>
     <div class="cart-summary-totals">
       <div class="cart-summary-row">
         <span>${s.subtotal}</span>
@@ -238,7 +238,6 @@ export default async function decorate(block) {
   const savedCoupon = sessionStorage.getItem('checkout_coupon_code') || '';
   if (savedCoupon) {
     discountInput.value = savedCoupon;
-    block.querySelector('.cart-summary-promo').open = true;
     showDiscountRow(savedCoupon);
   }
   discountApply.addEventListener('click', async () => {
@@ -259,7 +258,6 @@ export default async function decorate(block) {
     } catch (err) {
       couponErrorEl.textContent = getCouponErrorMessage(err?.errorHeader);
       couponErrorEl.hidden = false;
-      block.querySelector('.cart-summary-promo').open = true;
     } finally {
       discountApply.disabled = false;
     }
@@ -287,7 +285,6 @@ export default async function decorate(block) {
           hideDiscountRow();
           couponErrorEl.textContent = getCouponErrorMessage(err.errorHeader);
           couponErrorEl.hidden = false;
-          block.querySelector('.cart-summary-promo').open = true;
         }
         throw err;
       }
@@ -329,7 +326,6 @@ export default async function decorate(block) {
     const promoEl = block.querySelector('.cart-summary-promo');
     const returnedCoupon = initIDMe(promoEl, discountInput);
     if (returnedCoupon) {
-      promoEl.open = true;
       showDiscountRow(returnedCoupon);
     }
   }
