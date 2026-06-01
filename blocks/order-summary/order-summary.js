@@ -373,11 +373,14 @@ export default async function decorate(block) {
     wrapper?.toggleAttribute('hidden', visible.length === 0);
   };
 
-  document.addEventListener('cart:change', () => {
+  const refreshSummary = () => {
     renderItems();
     updateTotals();
     syncVisibility();
-  });
+  };
+
+  document.addEventListener('cart:change', refreshSummary);
+  document.addEventListener('cart:limit', refreshSummary);
 
   const summaryContent = block.querySelector('.order-summary-content');
   document.addEventListener('checkout:preview-loading', () => {
