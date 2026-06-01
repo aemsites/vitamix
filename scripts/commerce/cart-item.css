@@ -72,6 +72,13 @@
 }
 
 /* Qty control */
+.cart-item-qty-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
 .cart-item-qty-control {
   display: flex;
   align-items: center;
@@ -99,6 +106,11 @@
   background: var(--commerce-color-surface);
 }
 
+.cart-item-qty-control button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .cart-item-qty-control .qty-input {
   width: 32px;
   height: 28px;
@@ -117,6 +129,14 @@
 .cart-item-qty-control .qty-input::-webkit-outer-spin-button {
   appearance: none;
   margin: 0;
+}
+
+.cart-item-qty-limit-message {
+  margin: 0;
+  font-size: var(--commerce-font-size-xs);
+  font-style: italic;
+  line-height: 1.3;
+  color: var(--commerce-color-error, var(--color-red, #b42318));
 }
 
 /* Right column: price + remove */

@@ -2,8 +2,8 @@
  * Minimal mock of scripts/scripts.js for unit tests.
  *
  * The real module bootstraps the page at import time, which crashes outside
- * a browser. add-to-cart.js only needs `checkVariantOutOfStock` and
- * `getLocaleAndLanguage` from this module.
+ * a browser. Tests currently import modules that need `checkVariantOutOfStock`,
+ * `getLocaleAndLanguage`, and `loggedFetch` from this module.
  */
 
 let outOfStockSkus = new Set();
@@ -28,6 +28,10 @@ export function checkVariantOutOfStock(sku) {
 
 export function getLocaleAndLanguage() {
   return locale;
+}
+
+export async function loggedFetch(...args) {
+  return fetch(...args);
 }
 
 export const isProdHost = false;

@@ -22,7 +22,7 @@ const TRASH_ICON = /* html */`<svg width="14" height="14" viewBox="0 0 24 24" fi
  *   currencyCode?: string,
  *   extraContent?: HTMLElement|null,
  * }} callbacks
- * @param {{ remove?: string, removeItem?: string }} [strings]
+ * @param {{ remove?: string, removeItem?: string, maxQtyMessage?: string }} [strings]
  * @returns {HTMLElement}
  */
 export default function buildCartItem(item, {
@@ -31,11 +31,12 @@ export default function buildCartItem(item, {
   currencyCode = 'USD',
   extraContent = null,
 }, strings = {}) {
-  const { remove = 'Remove', removeItem = 'Remove item' } = strings;
+  const { remove = 'Remove', removeItem = 'Remove item', maxQtyMessage } = strings;
 
   // Per-item override (custom.maxCartQty) takes precedence over the global
   // commerce-config default.
-  const configMax = getConfig().maxCartQty;
+  const config = getConfig();
+  const configMax = config.maxCartQty;
   const itemMax = item.custom?.maxCartQty != null ? +item.custom.maxCartQty : null;
   const maxQty = itemMax || configMax || Infinity;
 
@@ -46,10 +47,13 @@ export default function buildCartItem(item, {
     <div class="cart-item-details">
       <p class="cart-item-name"></p>
       <div class="cart-item-actions">
-        <div class="cart-item-qty-control">
-          <button class="qty-dec" aria-label="Decrease quantity">&ndash;</button>
-          <input class="qty-input" type="number" value="1" min="1"${Number.isFinite(maxQty) ? ` max="${maxQty}"` : ''}>
-          <button class="qty-inc" aria-label="Increase quantity">+</button>
+        <div class="cart-item-qty-group">
+          <div class="cart-item-qty-control">
+            <button class="qty-dec" aria-label="Decrease quantity">&ndash;</button>
+            <input class="qty-input" type="number" value="1" min="1"${Number.isFinite(maxQty) ? ` max="${maxQty}"` : ''}>
+            <button class="qty-inc" aria-label="Increase quantity">+</button>
+          </div>
+          <p class="cart-item-qty-limit-message" aria-live="polite" hidden></p>
         </div>
       </div>
     </div>
@@ -104,11 +108,21 @@ export default function buildCartItem(item, {
   const qtyInput = el.querySelector('.qty-input');
   qtyInput.value = item.quantity;
   const incBtn = el.querySelector('.qty-inc');
+  const limitMessage = el.querySelector('.cart-item-qty-limit-message');
+  const hasMaxQty = Number.isFinite(maxQty);
+  const messageTemplate = maxQtyMessage || config.getStrings?.().maxCartQtyMessage;
+  limitMessage.textContent = messageTemplate?.replace('{max}', maxQty) || `Maximum ${maxQty} per order.`;
 
-  const syncIncDisabled = (qty) => {
-    incBtn.disabled = qty >= maxQty;
+  const showQtyLimit = () => {
+    if (!hasMaxQty) return;
+    limitMessage.hidden = false;
+    incBtn.disabled = true;
   };
-  syncIncDisabled(item.quantity);
+
+  const clearQtyLimit = () => {
+    limitMessage.hidden = true;
+    incBtn.disabled = false;
+  };
 
   const handleQtyChange = (newQty) => {
     if (newQty < 1) {
@@ -116,11 +130,17 @@ export default function buildCartItem(item, {
       el.remove();
       return;
     }
+    const currentQty = +qtyInput.value;
     const clamped = Math.min(newQty, maxQty);
+    const exceededMax = hasMaxQty && newQty > maxQty;
     qtyInput.value = clamped;
     updatePrice(clamped);
-    syncIncDisabled(clamped);
-    onQtyChange(item.sku, clamped);
+    if (exceededMax) {
+      showQtyLimit();
+    } else {
+      clearQtyLimit();
+    }
+    if (clamped !== currentQty) onQtyChange(item.sku, clamped);
   };
 
   el.querySelector('.qty-dec').addEventListener('click', () => handleQtyChange(+qtyInput.value - 1));
