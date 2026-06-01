@@ -252,25 +252,7 @@ dialog.paypal-not-configured-dialog::backdrop {
 
 .cart-summary-promo-toggle {
   font-size: var(--commerce-font-size-sm);
-  cursor: pointer;
-  list-style: none;
-  display: flex;
-  align-items: center;
   color: var(--commerce-color-text);
-}
-
-.cart-summary-promo-toggle::-webkit-details-marker {
-  display: none;
-}
-
-.cart-summary-promo-toggle::after {
-  content: '+';
-  font-size: 16px;
-  margin-left: auto;
-}
-
-.cart-summary-promo[open] .cart-summary-promo-toggle::after {
-  content: '−';
 }
 
 .cart-summary-discount {
