@@ -35,7 +35,3 @@ export async function loggedFetch(...args) {
 }
 
 export const isProdHost = false;
-
-export function loggedFetch(...args) {
-  return fetch(...args);
-}
