@@ -56,8 +56,38 @@ function capitalizeFirstLetter(str) {
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 }
 
+/** Recipe fields included in fulltext search (besides title). */
+const FULLTEXT_SEARCH_FIELDS = ['compatible-containers', 'dietary-interests', 'course', 'recipe-type'];
+
 /**
- * Highlights matching substring within text (for container name pills).
+ * Returns field values that contain the search term (case-insensitive).
+ * @param {string|string[]} values - Field value(s) to search
+ * @param {string} searchTerm - Fulltext query
+ * @returns {string[]} Matching values
+ */
+function getMatchingFieldValues(values, searchTerm) {
+  if (!values || !searchTerm) return [];
+  const list = Array.isArray(values) ? values : [values];
+  const termLower = searchTerm.toLowerCase();
+  return list.filter((v) => v && v.toLowerCase().includes(termLower));
+}
+
+/**
+ * Whether a recipe matches a fulltext query on title or searchable facet fields.
+ * @param {Object} recipe - Recipe object
+ * @param {string} searchTerm - Fulltext query
+ * @returns {boolean}
+ */
+function recipeMatchesFulltext(recipe, searchTerm) {
+  const termLower = searchTerm.toLowerCase().trim();
+  if ((recipe.title || '').toLowerCase().includes(termLower)) return true;
+  return FULLTEXT_SEARCH_FIELDS.some(
+    (field) => getMatchingFieldValues(recipe[field], termLower).length > 0,
+  );
+}
+
+/**
+ * Highlights matching substring within text (for search match pills).
  * @param {string} text - The full text
  * @param {string} searchTerm - The term to highlight
  * @returns {string} HTML string with highlighted match
@@ -175,16 +205,11 @@ async function lookupRecipes(config = {}, facets = {}, hiddenContainers = new Se
     filterKeys.forEach((filterKey) => {
       let matched = false;
 
-      // special case: full-text search on recipe title and compatible container names
+      // special case: full-text search on title, containers, dietary, course, and recipe type
       if (filterKey === 'fulltext') {
         // Only apply fulltext filter if it has actual content
         if (config.fulltext && config.fulltext.trim().length > 0) {
-          const searchTerm = config.fulltext.toLowerCase().trim();
-          const titleLower = (recipe.title || '').toLowerCase();
-          matched = titleLower.includes(searchTerm);
-          if (!matched && recipe['compatible-containers'] && Array.isArray(recipe['compatible-containers'])) {
-            matched = recipe['compatible-containers'].some((c) => c.toLowerCase().includes(searchTerm));
-          }
+          matched = recipeMatchesFulltext(recipe, config.fulltext);
         } else {
           // Empty fulltext matches everything
           matched = true;
@@ -455,18 +480,18 @@ function createRecipeCard(recipe, copy = {}) {
 
   link.append(image, title, rating, meta);
 
-  if (recipe.matchedContainers && recipe.matchedContainers.length > 0 && recipe.fulltextHighlight) {
+  if (recipe.matchedTags && recipe.matchedTags.length > 0 && recipe.fulltextHighlight) {
     const tagsContainer = document.createElement('div');
     tagsContainer.className = 'matched-tags';
     tagsContainer.setAttribute('role', 'group');
     tagsContainer.setAttribute(
       'aria-label',
-      copy.matchingContainersAria || 'Matching containers',
+      copy.matchingTagsAria || copy.matchingContainersAria || 'Matching search terms',
     );
-    recipe.matchedContainers.forEach((containerName) => {
+    recipe.matchedTags.forEach((tag) => {
       const tagSpan = document.createElement('span');
       tagSpan.className = 'tag';
-      tagSpan.innerHTML = highlightMatch(containerName, recipe.fulltextHighlight);
+      tagSpan.innerHTML = highlightMatch(tag, recipe.fulltextHighlight);
       tagsContainer.appendChild(tagSpan);
     });
     link.appendChild(tagsContainer);
@@ -1000,13 +1025,14 @@ function buildRecipeFiltering(container, config = {}, copy = {}, hiddenContainer
     if (fulltextTrimmed) {
       const termLower = fulltextTrimmed.toLowerCase();
       results.forEach((recipe) => {
-        const containers = recipe['compatible-containers'] || [];
-        recipe.matchedContainers = containers.filter((c) => c.toLowerCase().includes(termLower));
+        recipe.matchedTags = FULLTEXT_SEARCH_FIELDS.flatMap(
+          (field) => getMatchingFieldValues(recipe[field], termLower),
+        );
         recipe.fulltextHighlight = fulltextTrimmed;
       });
     } else {
       results.forEach((recipe) => {
-        recipe.matchedContainers = [];
+        recipe.matchedTags = [];
         recipe.fulltextHighlight = '';
       });
     }
