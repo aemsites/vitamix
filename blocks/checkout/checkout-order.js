@@ -211,6 +211,18 @@ export function initOrder(form, cart, state, config, strings) {
         }
       }
 
+      const useDifferentBilling = form.querySelector('[name="billing-choice"]:checked')?.value === 'different';
+      if (useDifferentBilling && !state.billingAddressValidated) {
+        const validBillingAddress = await state.ensureValidBillingAddress?.();
+        if (!validBillingAddress) {
+          showError(
+            form,
+            strings.addressCompleteRequired || 'Please complete and verify your billing address before continuing.',
+          );
+          return;
+        }
+      }
+
       if (!state.selectedShippingMethodId) {
         showError(form, strings.errorSelectShipping);
         return;

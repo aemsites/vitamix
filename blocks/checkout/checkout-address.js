@@ -181,12 +181,12 @@ function fillAddressFields(section, addressInput, addressComponents) {
  * @param {string} [regionCode] - ISO 3166-1 alpha-2 country code, e.g. 'US' or 'CA'
  * @returns {{ address: { addressLines: string[], regionCode?: string } }}
  */
-export function buildAddressPayload(formData, regionCode) {
-  const line1 = formData.get('shipping-street-0') || '';
-  const line2 = formData.get('shipping-street-1') || '';
-  const city = formData.get('shipping-city') || '';
-  const state = formData.get('shipping-state') || '';
-  const zip = formData.get('shipping-zip') || '';
+export function buildAddressPayload(formData, regionCode, prefix = 'shipping-') {
+  const line1 = formData.get(`${prefix}street-0`) || '';
+  const line2 = formData.get(`${prefix}street-1`) || '';
+  const city = formData.get(`${prefix}city`) || '';
+  const state = formData.get(`${prefix}state`) || '';
+  const zip = formData.get(`${prefix}zip`) || '';
 
   const streetLines = [line1, line2].filter(Boolean);
   const cityStateZip = [city, [state, zip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
@@ -256,12 +256,12 @@ const ICON_CLOSE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
  * @param {FormData} formData
  * @returns {string[]}
  */
-function formatEnteredAddressLines(formData) {
-  const line1 = (formData.get('shipping-street-0') || '').toString().trim();
-  const line2 = (formData.get('shipping-street-1') || '').toString().trim();
-  const city = (formData.get('shipping-city') || '').toString().trim();
-  const state = (formData.get('shipping-state') || '').toString().trim();
-  const zip = (formData.get('shipping-zip') || '').toString().trim();
+function formatEnteredAddressLines(formData, prefix = 'shipping-') {
+  const line1 = (formData.get(`${prefix}street-0`) || '').toString().trim();
+  const line2 = (formData.get(`${prefix}street-1`) || '').toString().trim();
+  const city = (formData.get(`${prefix}city`) || '').toString().trim();
+  const state = (formData.get(`${prefix}state`) || '').toString().trim();
+  const zip = (formData.get(`${prefix}zip`) || '').toString().trim();
   const cityStateZip = [city, [state, zip].filter(Boolean).join(' ')]
     .filter(Boolean).join(', ');
   return [line1, line2, cityStateZip].filter(Boolean);
@@ -405,7 +405,7 @@ function buildAddressCard({
  * @returns {Promise<{ choice: 'accept'|'edit' }>}
  */
 function showConfirmModal({
-  addressComponents, formattedAddress, formData, strings,
+  addressComponents, formattedAddress, formData, strings, prefix = 'shipping-',
 }) {
   return new Promise((resolve) => {
     let chosen = null;
@@ -420,7 +420,7 @@ function showConfirmModal({
       preventDismiss: true,
     });
 
-    const enteredLines = formatEnteredAddressLines(formData);
+    const enteredLines = formatEnteredAddressLines(formData, prefix);
     let suggestedLines;
     if (formattedAddress) {
       suggestedLines = splitFormattedAddress(formattedAddress);
@@ -488,7 +488,7 @@ function showConfirmModal({
  * @returns {Promise<{ choice: 'add-unit', unit: string } | { choice: 'edit' }>}
  */
 function showAddUnitModal({
-  addressComponents, formattedAddress, formData, strings,
+  addressComponents, formattedAddress, formData, strings, prefix = 'shipping-',
 }) {
   return new Promise((resolve) => {
     let chosen = null;
@@ -510,7 +510,7 @@ function showAddUnitModal({
     } else if (addressComponents) {
       displayLines = formatSuggestedAddressLines(addressComponents).filter((line) => !line.startsWith('Apt '));
     } else {
-      displayLines = formatEnteredAddressLines(formData);
+      displayLines = formatEnteredAddressLines(formData, prefix);
     }
 
     const addressCard = document.createElement('div');
@@ -622,7 +622,14 @@ function showAddUnitModal({
  * @param {Function} [getToken] - returns the current Places session token string
  * @returns {Promise<boolean>}
  */
-export async function validateAndCollapseShipping(section, collapse, config, strings, getToken) {
+export async function validateAndCollapseAddress(
+  section,
+  collapse,
+  config,
+  strings,
+  getToken,
+  prefix = 'shipping-',
+) {
   clearAddressError(section);
 
   const form = section?.closest('form');
@@ -643,7 +650,7 @@ export async function validateAndCollapseShipping(section, collapse, config, str
 
   for (let i = 0; i < MAX_ITERATIONS; i += 1) {
     const formData = new FormData(form);
-    const payload = buildAddressPayload(formData, regionCode);
+    const payload = buildAddressPayload(formData, regionCode, prefix);
 
     if (!payload.address.addressLines.length) {
       showAddressError(
@@ -683,7 +690,7 @@ export async function validateAndCollapseShipping(section, collapse, config, str
     if (action === 'CONFIRM') {
       // eslint-disable-next-line no-await-in-loop
       const { choice } = await showConfirmModal({
-        addressComponents, formattedAddress, formData, strings,
+        addressComponents, formattedAddress, formData, strings, prefix,
       });
       if (choice !== 'accept') return false;
       if (!addressComponents) {
@@ -704,7 +711,7 @@ export async function validateAndCollapseShipping(section, collapse, config, str
     if (action === 'CONFIRM_ADD_SUBPREMISES') {
       // eslint-disable-next-line no-await-in-loop
       const result2 = await showAddUnitModal({
-        addressComponents, formattedAddress, formData, strings,
+        addressComponents, formattedAddress, formData, strings, prefix,
       });
       if (result2.choice !== 'add-unit' || !result2.unit) return false;
       // Write the unit and let the loop iterate to re-validate. Google explicitly
@@ -732,6 +739,11 @@ export async function validateAndCollapseShipping(section, collapse, config, str
   );
   return false;
 }
+
+export const validateAndCollapseShipping = (...args) => validateAndCollapseAddress(
+  ...args,
+  'shipping-',
+);
 
 function initPlacesAutocomplete(section, config) {
   const addressInput = section.querySelector('[autocomplete="address-line1"]');
@@ -830,7 +842,8 @@ function initPlacesAutocomplete(section, config) {
  * @param {Object} state
  * @param {Object} config
  * @param {Object} strings
- * @returns {{ validateAndCollapse: (collapse: Function) => Promise<boolean> }}
+ * @returns {{ validateAndCollapse: (collapse: Function) => Promise<boolean>,
+ *   validateBillingAndCollapse: (collapse: Function) => Promise<boolean> }}
  */
 export function initAddress(form, state, config, strings) {
   const isCanada = config.getLocale() === 'ca';
@@ -843,7 +856,9 @@ export function initAddress(form, state, config, strings) {
   const shippingAutoComplete = shippingSection
     ? initPlacesAutocomplete(shippingSection, config)
     : null;
-  if (billingSection) initPlacesAutocomplete(billingSection, config);
+  const billingAutoComplete = billingSection
+    ? initPlacesAutocomplete(billingSection, config)
+    : null;
 
   // Clear the section-level address-validation error when the user edits any field.
   // Only fires for trusted (user-initiated) events — programmatic input dispatches
@@ -857,6 +872,20 @@ export function initAddress(form, state, config, strings) {
       state.shippingAddressValidated = false;
     });
   }
+  if (billingSection) {
+    billingSection.addEventListener('input', (e) => {
+      state.billingAddressValidated = false;
+      if (e.isTrusted) clearAddressError(billingSection);
+    });
+    billingSection.addEventListener('change', () => {
+      state.billingAddressValidated = false;
+    });
+  }
+  form.querySelectorAll('[name="billing-choice"]').forEach((radio) => {
+    radio.addEventListener('change', () => {
+      state.billingAddressValidated = false;
+    });
+  });
 
   // Invalidate estimate token when estimate-affecting fields change
   form.addEventListener('change', (e) => {
@@ -868,14 +897,32 @@ export function initAddress(form, state, config, strings) {
 
   return {
     validateAndCollapse: async (collapse) => {
-      const isValid = await validateAndCollapseShipping(
+      const isValid = await validateAndCollapseAddress(
         shippingSection,
         collapse,
         config,
         strings,
         shippingAutoComplete?.getSessionToken,
+        'shipping-',
       );
       state.shippingAddressValidated = isValid;
+      return isValid;
+    },
+    validateBillingAndCollapse: async (collapse) => {
+      const isDifferent = form.querySelector('[name="billing-choice"]:checked')?.value === 'different';
+      if (!isDifferent) {
+        state.billingAddressValidated = true;
+        return true;
+      }
+      const isValid = await validateAndCollapseAddress(
+        billingSection,
+        collapse,
+        config,
+        strings,
+        billingAutoComplete?.getSessionToken,
+        'billing-',
+      );
+      state.billingAddressValidated = isValid;
       return isValid;
     },
   };

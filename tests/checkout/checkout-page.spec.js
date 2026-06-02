@@ -35,6 +35,16 @@ const VALID_ADDRESS = {
   phone: '5551234567',
 };
 
+const BILLING_ADDRESS = {
+  firstName: 'Billing',
+  lastName: 'User',
+  street: '500 Market St',
+  city: 'San Francisco',
+  state: 'CA',
+  zip: '94105',
+  phone: '5559876543',
+};
+
 const MOCK_RATES = [
   {
     id: 'standard', label: 'Standard Shipping', rate: 5.99, eta: '3-5 business days',
@@ -251,6 +261,16 @@ async function fillShipping(page, address = VALID_ADDRESS) {
   await field(page, 'shipping-zip').fill(address.zip);
   await field(page, 'shipping-telephone').fill(address.phone);
   await field(page, 'shipping-state').selectOption(address.state);
+}
+
+async function fillBilling(page, address = VALID_ADDRESS) {
+  await field(page, 'billing-firstname').fill(address.firstName);
+  await field(page, 'billing-lastname').fill(address.lastName);
+  await field(page, 'billing-street-0').fill(address.street);
+  await field(page, 'billing-city').fill(address.city);
+  await field(page, 'billing-zip').fill(address.zip);
+  await field(page, 'billing-telephone').fill(address.phone);
+  await field(page, 'billing-state').selectOption(address.state);
 }
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
@@ -605,6 +625,46 @@ test.describe('Edge Checkout Page', () => {
       expect(orderCreateCalled).toBe(false);
       expect(page.url()).toContain('/order/checkout');
       console.log('✓ FIX address verdict blocks payment');
+    });
+
+    test('blocks payment when different billing address validation returns FIX', async ({ page }) => {
+      await seedCart(page, baseUrl);
+
+      let orderCreateCalled = false;
+      await setupCheckoutMocks(page, {
+        validateAddress: async (route) => {
+          const body = route.request().postDataJSON();
+          const isBilling = body?.address?.addressLines?.[0] === BILLING_ADDRESS.street;
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ action: isBilling ? 'FIX' : 'ACCEPT' }),
+          });
+        },
+        createOrder: async (route) => {
+          orderCreateCalled = true;
+          await route.continue();
+        },
+      });
+      await gotoCheckout(page, baseUrl);
+
+      await expect(page.locator('.checkout-form')).toBeVisible({ timeout: 15000 });
+      await fillContact(page);
+      await fillShipping(page);
+      await page.waitForResponse(
+        (res) => res.url().includes('/orders/preview') && res.request().method() === 'POST',
+        { timeout: 15000 },
+      );
+      await page.locator('.checkout-form [name="billing-choice"][value="different"]').check();
+      await fillBilling(page, BILLING_ADDRESS);
+
+      await page.locator('.checkout-submit-btn').click();
+
+      await expect(page.locator('.billing-fields-wrapper .address-validation-error'))
+        .toBeVisible({ timeout: 10000 });
+      expect(orderCreateCalled).toBe(false);
+      expect(page.url()).toContain('/order/checkout');
+      console.log('✓ FIX billing address verdict blocks payment');
     });
 
     test('does not allow suggestion dialog dismissal to approve the address', async ({ page }) => {
