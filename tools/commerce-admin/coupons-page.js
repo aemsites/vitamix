@@ -50,7 +50,8 @@ import {
  * @property {boolean} [stackable]
  * @property {boolean} [autoApply]
  * @property {boolean} [allowManualEntry]
- * @property {boolean} [excludeDiscountedProducts] When true, blocks coupon on catalog price-rule discounted products
+ * @property {boolean} [excludeDiscountedProducts] When true, blocks coupon on
+ *   catalog price-rule discounted products
  * @property {number|null} [defaultUsageLimit]
  * @property {number|null} [defaultUsesPerCode]
  * @property {string} [notes]
