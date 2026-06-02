@@ -29,6 +29,14 @@ import {
   cartRuleScopeSummary,
 } from './product-conditions.js';
 import {
+  normalizeShippingBenefitMode as normalizeCartRuleShippingMode,
+  shippingBenefitFieldsFromMode as cartRuleActionsShippingFromMode,
+  shippingBenefitModeFromFields as cartRuleShippingModeFromActions,
+  shippingBenefitModeLabel as cartRuleShippingModeLabel,
+  shippingBenefitModeSortRank as cartRuleShippingModeSortRank,
+  shippingBenefitSelectOptionsHtml,
+} from './shipping-benefit.js';
+import {
   hydrateProductScopePills,
   mountProductSelectionField,
 } from './product-selection-field.js';
@@ -166,64 +174,6 @@ function cartRuleMarketFromRule(rule) {
 }
 
 /** @typedef {'none' | 'standard' | 'standard-priority'} CartRuleShippingMode */
-
-/** @type {ReadonlyArray<{ value: CartRuleShippingMode, label: string }>} */
-const CART_RULE_SHIPPING_OPTIONS = [
-  { value: 'none', label: 'No Free Shipping' },
-  { value: 'standard', label: 'Free Standard Shipping' },
-  { value: 'standard-priority', label: 'Free Priority and Standard Shipping' },
-];
-
-/**
- * @param {unknown} raw
- * @returns {CartRuleShippingMode}
- */
-function normalizeCartRuleShippingMode(raw) {
-  const s = String(raw ?? '').trim().toLowerCase();
-  if (s === 'standard-priority' || s === 'standard_priority') return 'standard-priority';
-  if (s === 'standard' || s === 'yes') return 'standard';
-  return 'none';
-}
-
-/**
- * @param {import('./price-rules-api.js').HelixCartPriceRule['actions']} [a]
- * @returns {CartRuleShippingMode}
- */
-function cartRuleShippingModeFromActions(a) {
-  if (!a || a.freeShipping !== true) return 'none';
-  const types = Array.isArray(a.includedShippingTypes)
-    ? a.includedShippingTypes.map((t) => String(t).trim().toLowerCase()).filter(Boolean)
-    : [];
-  const hasPriority = types.includes('priority');
-  const hasStandard = types.includes('standard') || types.length === 0;
-  if (hasStandard && hasPriority) return 'standard-priority';
-  if (hasStandard) return 'standard';
-  return 'standard';
-}
-
-/**
- * @param {CartRuleShippingMode} mode
- * @returns {import('./price-rules-api.js').HelixCartPriceRule['actions']}
- */
-function cartRuleActionsShippingFromMode(mode) {
-  if (mode === 'standard') {
-    return { freeShipping: true, includedShippingTypes: ['standard'] };
-  }
-  if (mode === 'standard-priority') {
-    return { freeShipping: true, includedShippingTypes: ['standard', 'priority'] };
-  }
-  return { freeShipping: false };
-}
-
-/**
- * @param {CartRuleShippingMode | string} mode
- * @returns {string}
- */
-function cartRuleShippingModeLabel(mode) {
-  const m = normalizeCartRuleShippingMode(mode);
-  const hit = CART_RULE_SHIPPING_OPTIONS.find((o) => o.value === m);
-  return hit ? hit.label : CART_RULE_SHIPPING_OPTIONS[0].label;
-}
 
 /** @param {string} ck */
 function rulesForCountryApi(ck) {
@@ -2030,18 +1980,7 @@ function cartRuleNewMarketFieldsHtml(initialMarket, marketLocked = false) {
 }
 
 function cartRuleShippingSelectOptionsHtml(selected) {
-  const sel = normalizeCartRuleShippingMode(selected);
-  return CART_RULE_SHIPPING_OPTIONS.map((o) => {
-    const picked = o.value === sel ? ' selected' : '';
-    return `<option value="${escapeHtml(o.value)}"${picked}>${escapeHtml(o.label)}</option>`;
-  }).join('');
-}
-
-function cartRuleShippingModeSortRank(mode) {
-  const m = normalizeCartRuleShippingMode(mode);
-  if (m === 'standard-priority') return 2;
-  if (m === 'standard') return 1;
-  return 0;
+  return shippingBenefitSelectOptionsHtml(selected, escapeHtml);
 }
 
 /**

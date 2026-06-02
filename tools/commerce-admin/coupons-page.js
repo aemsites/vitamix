@@ -22,6 +22,14 @@ import {
   showToast,
 } from './commerce-otp-ui.js';
 import {
+  couponShippingModeFromRow,
+  normalizeShippingBenefitMode,
+  shippingBenefitFieldsFromMode,
+  shippingBenefitModeLabel,
+  shippingBenefitModeSortRank,
+  shippingBenefitSelectOptionsHtml,
+} from './shipping-benefit.js';
+import {
   formatProductConditionsForForm,
   parseProductConditionsInput,
 } from './product-conditions.js';
@@ -43,6 +51,7 @@ import {
  * @property {number} [minimumOrderAmount]
  * @property {number|null} [maximumDiscountAmount]
  * @property {boolean} [freeShipping]
+ * @property {string[]} [includedShippingTypes] e.g. `standard`, `priority`
  * @property {string[]} [includedCategories]
  * @property {string[]} [excludedCategories]
  * @property {ProductCondition[]} [includedProducts]
@@ -516,11 +525,12 @@ function couponDetailModalInnerHtml(d) {
     <div class="coupons-modal-stats" role="list">
       <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Minimum order</span><span class="coupons-modal-stat-value">${escapeHtml(min)}</span></div>
       <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Discount cap</span><span class="coupons-modal-stat-value">${escapeHtml(cap)}</span></div>
+      <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Shipping benefit</span><span class="coupons-modal-stat-value">${escapeHtml(shippingBenefitModeLabel(couponShippingModeFromRow(d)))}</span></div>
       <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Total cap per code</span><span class="coupons-modal-stat-value">${escapeHtml(d.defaultUsageLimit != null ? String(d.defaultUsageLimit) : '—')}</span></div>
       <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Cap per customer</span><span class="coupons-modal-stat-value">${escapeHtml(d.defaultUsesPerCode != null ? String(d.defaultUsesPerCode) : '—')}</span></div>
     </div>
     <div class="coupons-modal-pills" aria-label="Program flags">
-      ${pillHtml('Free shipping', !!d.freeShipping)}
+      ${pillHtml('Shipping benefit', couponShippingModeFromRow(d) !== 'none')}
       ${pillHtml('Stacks with rules', d.stackable !== false)}
       ${pillHtml('Exclude sale prices', !!(d.excludeDiscountedProducts ?? d.exclude_discounted_products))}
       ${pillHtml('Auto-apply', !!d.autoApply)}
@@ -605,10 +615,22 @@ function wireCouponDetailModal(dialog) {
   });
 }
 
-function openCouponDetailModal() {
+async function openCouponDetailModal() {
   closeCouponDetailDialog();
   const d = state.couponDetail;
   if (!d || !state.selectedCouponId) return;
+  try {
+    await fetchCodesForCoupon();
+  } catch (err) {
+    console.warn('[commerce-admin/coupons] load codes on modal open failed', {
+      couponId: state.selectedCouponId,
+      message: err?.message,
+    });
+    state.codes = [];
+    state.codesNextCursor = '';
+    setError(err.message || 'Could not load codes for this coupon.');
+    showToast(err.message || 'Failed to load codes', 'error');
+  }
   const dialog = document.createElement('dialog');
   dialog.className = 'coupons-detail-dialog';
 
@@ -820,7 +842,7 @@ function couponOverviewSortValue(row, key) {
       const n = Number(row.maximumDiscountAmount);
       return Number.isFinite(n) ? n : 0;
     }
-    case 'freeship': return row.freeShipping ? 1 : 0;
+    case 'freeship': return shippingBenefitModeSortRank(couponShippingModeFromRow(row));
     case 'stack': return row.stackable !== false ? 1 : 0;
     case 'year': return pathSeg && pathSeg.year ? Number(pathSeg.year) || 0 : 0;
     case 'market': return normalizeCouponCountries(row).join(',');
@@ -883,7 +905,7 @@ function renderCouponsOverviewBody(filtered) {
     const disc = overviewDiscountText(row);
     const min = overviewMinOrder(row);
     const cap = overviewCap(row);
-    const ship = yn(row.freeShipping);
+    const ship = shippingBenefitModeLabel(couponShippingModeFromRow(row));
     const stack = yn(row.stackable !== false);
     const label = `Open coupon ${String(name)}`;
     const countries = normalizeCouponCountries(row);
@@ -1185,7 +1207,11 @@ function couponFormHtml({ idReadonly }) {
         <input type="text" id="cp-form-excluded-products" autocomplete="off" />
       </div>
       <div class="coupons-field coupons-field-full">
-        <label class="coupons-checkbox-row"><input type="checkbox" id="cp-form-free-ship" /> Also grants <strong>free shipping</strong> when the coupon applies</label>
+        <label for="cp-form-shipping">Shipping benefit</label>
+        <select id="cp-form-shipping">
+          ${shippingBenefitSelectOptionsHtml('none', escapeHtml)}
+        </select>
+        <p class="coupons-field-hint">Same options as cart rules: standard only, or standard and priority.</p>
       </div>
       <div class="coupons-field coupons-field-full">
         <label class="coupons-checkbox-row"><input type="checkbox" id="cp-form-stackable" checked /> Allow stacking with automatic pricing rules</label>
@@ -1262,7 +1288,8 @@ function readCouponBodyFromForm(dlg, { requireId }) {
   if (includedProducts.length && excludedProducts.length) {
     throw new Error('Included and excluded product paths cannot both be set on the same coupon.');
   }
-  const freeShipping = !!dlg.querySelector('#cp-form-free-ship')?.checked;
+  const shippingMode = normalizeShippingBenefitMode(dlg.querySelector('#cp-form-shipping')?.value);
+  const shipFields = shippingBenefitFieldsFromMode(shippingMode);
   const stackable = !!dlg.querySelector('#cp-form-stackable')?.checked;
   const excludeDiscountedProducts = !!dlg.querySelector('#cp-form-exclude-discounted')?.checked;
   const autoApply = !!dlg.querySelector('#cp-form-auto')?.checked;
@@ -1278,7 +1305,7 @@ function readCouponBodyFromForm(dlg, { requireId }) {
     discountValue,
     minimumOrderAmount: Number.isFinite(minimumOrderAmount) ? minimumOrderAmount : 0,
     maximumDiscountAmount: maxCap,
-    freeShipping,
+    ...shipFields,
     includedCategories,
     excludedCategories,
     includedProducts,
@@ -1389,7 +1416,10 @@ function fillCouponForm(dlg, d) {
   if (exProdEl) {
     exProdEl.value = formatProductConditionsForForm(d.excludedProducts ?? d.excluded_products);
   }
-  dlg.querySelector('#cp-form-free-ship').checked = !!d.freeShipping;
+  const shipEl = dlg.querySelector('#cp-form-shipping');
+  if (shipEl instanceof HTMLSelectElement) {
+    shipEl.value = couponShippingModeFromRow(d);
+  }
   dlg.querySelector('#cp-form-stackable').checked = d.stackable !== false;
   dlg.querySelector('#cp-form-exclude-discounted').checked = !!(
     d.excludeDiscountedProducts ?? d.exclude_discounted_products
@@ -1418,12 +1448,12 @@ function renderCodesSection() {
       const exp = expRaw ? escapeHtml(expRaw) : '—';
       return `<tr><td><code>${code}</code></td><td>${active ? 'Yes' : 'No'}</td><td>${escapeHtml(String(usage))}</td><td>${exp}</td></tr>`;
     }).join('')
-    : '<tr><td colspan="4" class="coupons-empty" style="padding:16px">No codes in the list yet — use <strong>Show codes</strong>.</td></tr>';
+    : '<tr><td colspan="4" class="coupons-empty" style="padding:16px">No codes for this coupon yet.</td></tr>';
 
   return `
     <h3 class="coupons-section-title">Codes for this coupon</h3>
     <div class="coupons-detail-actions">
-      <button type="button" class="coupons-btn coupons-btn-primary" data-cp-show-codes>Show codes</button>
+      <button type="button" class="coupons-btn" data-cp-refresh-codes>Refresh</button>
       <button type="button" class="coupons-btn" data-cp-add-codes>Add new codes...</button>
       <button type="button" class="coupons-btn" data-cp-batch>Generate batch</button>
       ${state.codesNextCursor ? '<button type="button" class="coupons-btn" data-cp-next-codes>Next page</button>' : ''}
@@ -1437,13 +1467,13 @@ function renderCodesSection() {
 }
 
 function bindCodesEvents(mount) {
-  mount.querySelector('[data-cp-show-codes]')?.addEventListener('click', async () => {
+  mount.querySelector('[data-cp-refresh-codes]')?.addEventListener('click', async () => {
     try {
       await fetchCodesForCoupon();
       setError('');
       afterCodesRefresh();
     } catch (err) {
-      console.warn('[commerce-admin/coupons] show codes failed', {
+      console.warn('[commerce-admin/coupons] refresh codes failed', {
         couponId: state.selectedCouponId,
         message: err?.message,
       });
@@ -1498,7 +1528,7 @@ function render() {
               ${couponSortableTh('discount', 'Discount')}
               ${couponSortableTh('min', 'Min order')}
               ${couponSortableTh('cap', 'Cap')}
-              ${couponSortableTh('freeship', 'Free ship')}
+              ${couponSortableTh('freeship', 'Shipping')}
               ${couponSortableTh('stack', 'Stack')}
               ${couponSortableTh('year', 'Year', 'coupons-grid-col-year')}
               ${couponSortableTh('market', 'Market', 'coupons-grid-col-market')}
@@ -1553,7 +1583,7 @@ function render() {
       try {
         await refreshSelection();
         render();
-        openCouponDetailModal();
+        await openCouponDetailModal();
       } catch (err) {
         console.warn('[commerce-admin/coupons] open coupon failed', {
           couponId: id,
@@ -1603,7 +1633,7 @@ function openNewCouponDialog() {
       state.selectedCouponId = body.id;
       await refreshCouponList();
       render();
-      openCouponDetailModal();
+      await openCouponDetailModal();
     },
     async (dlg) => {
       dlg.querySelector('#cp-form-stackable').checked = true;
