@@ -200,6 +200,17 @@ export function initOrder(form, cart, state, config, strings) {
 
       if (!validateForm(form)) return;
 
+      if (!state.shippingAddressValidated) {
+        const validShippingAddress = await state.ensureValidShippingAddress?.();
+        if (!validShippingAddress) {
+          showError(
+            form,
+            strings.addressCompleteRequired || 'Please complete and verify your shipping address before continuing.',
+          );
+          return;
+        }
+      }
+
       if (!state.selectedShippingMethodId) {
         showError(form, strings.errorSelectShipping);
         return;

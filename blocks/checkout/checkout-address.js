@@ -1,3 +1,5 @@
+import { validateField } from './checkout-validation.js';
+
 const US_STATES = [
   ['AL', 'Alabama'], ['AK', 'Alaska'], ['AS', 'American Samoa'], ['AZ', 'Arizona'],
   ['AR', 'Arkansas'], ['AE', 'Armed Forces Africa'], ['AA', 'Armed Forces Americas'],
@@ -304,17 +306,24 @@ function formatSuggestedAddressLines(components) {
  * @returns {{ dialog: HTMLDialogElement, body: HTMLElement, setChosen: Function }}
  */
 function buildDialogShell({
-  iconSvg, eyebrow, heading, subtitle, onClose,
+  iconSvg, eyebrow, heading, subtitle, onClose, showClose = true, preventDismiss = false,
 }) {
   const dialog = document.createElement('dialog');
   dialog.className = 'address-validation-dialog';
+  dialog.addEventListener('cancel', (e) => {
+    e.preventDefault();
+    if (!preventDismiss) onClose?.();
+  });
 
-  const closeBtn = document.createElement('button');
-  closeBtn.type = 'button';
-  closeBtn.className = 'address-validation-close';
-  closeBtn.setAttribute('aria-label', 'Close');
-  closeBtn.innerHTML = ICON_CLOSE;
-  closeBtn.addEventListener('click', onClose);
+  if (showClose) {
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'address-validation-close';
+    closeBtn.setAttribute('aria-label', 'Close');
+    closeBtn.innerHTML = ICON_CLOSE;
+    closeBtn.addEventListener('click', onClose);
+    dialog.append(closeBtn);
+  }
 
   const header = document.createElement('div');
   header.className = 'address-validation-header';
@@ -340,7 +349,7 @@ function buildDialogShell({
 
   titleGroup.append(eyebrowEl, headingEl, subtitleEl);
   header.append(icon, titleGroup);
-  dialog.append(closeBtn, header);
+  dialog.append(header);
 
   const body = document.createElement('div');
   body.className = 'address-validation-body';
@@ -393,7 +402,7 @@ function buildAddressCard({
  * Shows the CONFIRM dialog: side-by-side entered vs. suggested address with diff highlighting.
  *
  * @param {Object} opts
- * @returns {Promise<{ choice: 'accept'|'keep' }>}
+ * @returns {Promise<{ choice: 'accept'|'edit' }>}
  */
 function showConfirmModal({
   addressComponents, formattedAddress, formData, strings,
@@ -405,8 +414,10 @@ function showConfirmModal({
       iconSvg: ICON_PIN,
       eyebrow: strings.addressEyebrow || 'Address verification',
       heading: strings.addressHeading || 'We found a more accurate version',
-      subtitle: strings.addressSubtitle || 'Choose which address to use for shipping.',
-      onClose: () => { chosen = { choice: 'keep' }; dialog.close(); },
+      subtitle: strings.addressSubtitle || 'Use the suggested address or edit your address before continuing.',
+      onClose: () => { chosen = { choice: 'edit' }; dialog.close(); },
+      showClose: false,
+      preventDismiss: true,
     });
 
     const enteredLines = formatEnteredAddressLines(formData);
@@ -446,21 +457,21 @@ function showConfirmModal({
       dialog.close();
     });
 
-    const keepMine = document.createElement('button');
-    keepMine.type = 'button';
-    keepMine.className = 'button address-validation-secondary';
-    keepMine.textContent = strings.addressKeepMine || 'Keep my address';
-    keepMine.addEventListener('click', () => {
-      chosen = { choice: 'keep' };
+    const editAddress = document.createElement('button');
+    editAddress.type = 'button';
+    editAddress.className = 'button address-validation-secondary';
+    editAddress.textContent = strings.addressEdit || 'Edit address';
+    editAddress.addEventListener('click', () => {
+      chosen = { choice: 'edit' };
       dialog.close();
     });
 
-    actions.append(useSuggested, keepMine);
+    actions.append(useSuggested, editAddress);
     body.append(actions);
 
     // Register close listener before showModal so we never miss a close event.
     dialog.addEventListener('close', () => {
-      resolve(chosen ?? { choice: 'keep' });
+      resolve(chosen ?? { choice: 'edit' });
       dialog.remove();
     });
     // Remove any stale dialog (defensive — should never have more than one).
@@ -474,7 +485,7 @@ function showConfirmModal({
  * Shows the CONFIRM_ADD_SUBPREMISES dialog: address card plus unit number input.
  *
  * @param {Object} opts
- * @returns {Promise<{ choice: 'add-unit', unit: string } | { choice: 'keep' }>}
+ * @returns {Promise<{ choice: 'add-unit', unit: string } | { choice: 'edit' }>}
  */
 function showAddUnitModal({
   addressComponents, formattedAddress, formData, strings,
@@ -487,8 +498,10 @@ function showAddUnitModal({
       eyebrow: strings.addressUnitEyebrow || 'One more thing',
       heading: strings.addressUnitHeading || 'Add an apartment or unit number?',
       subtitle: strings.addressUnitSubtitle
-        || 'Your building has multiple units. Adding one helps couriers reach you on the first try.',
-      onClose: () => { chosen = { choice: 'keep' }; dialog.close(); },
+        || 'Your building has multiple units. Add a unit or edit your address before continuing.',
+      onClose: () => { chosen = { choice: 'edit' }; dialog.close(); },
+      showClose: false,
+      preventDismiss: true,
     });
 
     let displayLines;
@@ -548,16 +561,16 @@ function showAddUnitModal({
       dialog.close();
     });
 
-    const noUnit = document.createElement('button');
-    noUnit.type = 'button';
-    noUnit.className = 'button address-validation-secondary';
-    noUnit.textContent = strings.addressUnitNoUnit || "I don't have one — continue";
-    noUnit.addEventListener('click', () => {
-      chosen = { choice: 'keep' };
+    const editAddress = document.createElement('button');
+    editAddress.type = 'button';
+    editAddress.className = 'button address-validation-secondary';
+    editAddress.textContent = strings.addressEdit || 'Edit address';
+    editAddress.addEventListener('click', () => {
+      chosen = { choice: 'edit' };
       dialog.close();
     });
 
-    actions.append(addBtn, noUnit);
+    actions.append(addBtn, editAddress);
     body.append(actions);
 
     input.addEventListener('input', () => {
@@ -575,7 +588,7 @@ function showAddUnitModal({
 
     // Register close listener before showModal so we never miss a close event.
     dialog.addEventListener('close', () => {
-      resolve(chosen ?? { choice: 'keep' });
+      resolve(chosen ?? { choice: 'edit' });
       dialog.remove();
     });
     // Remove any stale dialog (defensive — should never have more than one).
@@ -588,32 +601,42 @@ function showAddUnitModal({
 
 /**
  * Validates the shipping address via the Commerce API and collapses the section on success.
- * Falls open (collapses without error) on network failures so checkout is never blocked.
+ * Checkout must not advance until this returns true.
  *
  * 1. Clear any existing inline error.
- * 2. Loop (up to MAX_ITERATIONS): build payload, call validate, handle the action.
- *    - ACCEPT / unknown → collapse and return.
- *    - FIX → show inline error and return (section stays expanded).
- *    - CONFIRM → side-by-side modal; 'accept' applies corrections then collapses;
- *      'keep' collapses without changes.
+ * 2. Ensure required address fields pass browser and custom field validation.
+ * 3. Loop (up to MAX_ITERATIONS): build payload, call validate, handle the action.
+ *    - ACCEPT → collapse and return true.
+ *    - FIX → show inline error and return false (section stays expanded).
+ *    - CONFIRM → side-by-side modal; 'accept' applies corrections and collapses;
+ *      'edit' returns false so the customer can correct the address.
  *    - CONFIRM_ADD_SUBPREMISES → unit-input modal. If the user adds a unit,
  *      write it to street-2 and continue the loop to re-validate with the unit
- *      included — Google explicitly doesn't issue a verdict for this case, so the
- *      corrected zip/city/state only appears on the second pass. If the user
- *      declines, just collapse.
+ *      included. If the user chooses edit, return false.
+ *    - Unknown action / validation failure → show inline error and return false.
  *
  * @param {HTMLElement} section
  * @param {Function} collapse
  * @param {Object} config
  * @param {Object} strings
  * @param {Function} [getToken] - returns the current Places session token string
- * @returns {Promise<void>}
+ * @returns {Promise<boolean>}
  */
 export async function validateAndCollapseShipping(section, collapse, config, strings, getToken) {
   clearAddressError(section);
 
-  const form = section.closest('form');
-  if (!form) { collapse(); return; }
+  const form = section?.closest('form');
+  if (!form) return false;
+
+  const requiredFieldsValid = [...section.querySelectorAll('[required]')]
+    .every((el) => el.checkValidity() && !validateField(el));
+  if (!requiredFieldsValid) {
+    showAddressError(
+      section,
+      strings.addressCompleteRequired || 'Please complete and correct your shipping address before continuing.',
+    );
+    return false;
+  }
 
   const regionCode = config.getLocale() === 'ca' ? 'CA' : 'US';
   const MAX_ITERATIONS = 3;
@@ -622,22 +645,31 @@ export async function validateAndCollapseShipping(section, collapse, config, str
     const formData = new FormData(form);
     const payload = buildAddressPayload(formData, regionCode);
 
-    if (!payload.address.addressLines.length) { collapse(); return; }
+    if (!payload.address.addressLines.length) {
+      showAddressError(
+        section,
+        strings.addressCompleteRequired || 'Please complete and correct your shipping address before continuing.',
+      );
+      return false;
+    }
 
     let result;
     try {
       // eslint-disable-next-line no-await-in-loop
       result = await callValidateAddress(config.apiOrigin, payload, getToken?.() ?? null);
     } catch {
-      collapse();
-      return;
+      showAddressError(
+        section,
+        strings.addressValidationUnavailable || 'Unable to verify this address. Please check it and try again.',
+      );
+      return false;
     }
 
     const { action, addressComponents, formattedAddress } = result;
 
     if (!action || action === 'ACCEPT') {
       collapse();
-      return;
+      return true;
     }
 
     if (action === 'FIX') {
@@ -645,7 +677,7 @@ export async function validateAndCollapseShipping(section, collapse, config, str
         section,
         strings.addressInvalid || "We couldn't verify this address. Please check and try again.",
       );
-      return;
+      return false;
     }
 
     if (action === 'CONFIRM') {
@@ -653,14 +685,20 @@ export async function validateAndCollapseShipping(section, collapse, config, str
       const { choice } = await showConfirmModal({
         addressComponents, formattedAddress, formData, strings,
       });
-      if (choice === 'accept' && addressComponents) {
-        // Use [name$="street-0"] — the autocomplete attr is rewritten to "off"
-        // by initPlacesAutocomplete to suppress Chrome's autofill dropdown.
-        const addressInput = section.querySelector('[name$="street-0"]');
-        if (addressInput) fillAddressFields(section, addressInput, addressComponents);
+      if (choice !== 'accept') return false;
+      if (!addressComponents) {
+        showAddressError(
+          section,
+          strings.addressInvalid || "We couldn't verify this address. Please check and try again.",
+        );
+        return false;
       }
+      // Use [name$="street-0"] — the autocomplete attr is rewritten to "off"
+      // by initPlacesAutocomplete to suppress Chrome's autofill dropdown.
+      const addressInput = section.querySelector('[name$="street-0"]');
+      if (addressInput) fillAddressFields(section, addressInput, addressComponents);
       collapse();
-      return;
+      return true;
     }
 
     if (action === 'CONFIRM_ADD_SUBPREMISES') {
@@ -668,11 +706,7 @@ export async function validateAndCollapseShipping(section, collapse, config, str
       const result2 = await showAddUnitModal({
         addressComponents, formattedAddress, formData, strings,
       });
-      if (result2.choice !== 'add-unit' || !result2.unit) {
-        // User declined — accept the address as-is.
-        collapse();
-        return;
-      }
+      if (result2.choice !== 'add-unit' || !result2.unit) return false;
       // Write the unit and let the loop iterate to re-validate. Google explicitly
       // does NOT issue corrections for CONFIRM_ADD_SUBPREMISES (per spec), so any
       // zip or city fixes only appear on the next validate call with the unit
@@ -684,14 +718,19 @@ export async function validateAndCollapseShipping(section, collapse, config, str
         address2Input.dispatchEvent(new Event('change', { bubbles: true }));
       }
     } else {
-      // Unknown action — fail open
-      collapse();
-      return;
+      showAddressError(
+        section,
+        strings.addressInvalid || "We couldn't verify this address. Please check and try again.",
+      );
+      return false;
     }
   }
 
-  // Hit max iterations without resolving — just collapse.
-  collapse();
+  showAddressError(
+    section,
+    strings.addressInvalid || "We couldn't verify this address. Please check and try again.",
+  );
+  return false;
 }
 
 function initPlacesAutocomplete(section, config) {
@@ -791,7 +830,7 @@ function initPlacesAutocomplete(section, config) {
  * @param {Object} state
  * @param {Object} config
  * @param {Object} strings
- * @returns {{ validateAndCollapse: (collapse: Function) => Promise<void> }}
+ * @returns {{ validateAndCollapse: (collapse: Function) => Promise<boolean> }}
  */
 export function initAddress(form, state, config, strings) {
   const isCanada = config.getLocale() === 'ca';
@@ -811,7 +850,11 @@ export function initAddress(form, state, config, strings) {
   // (e.g. the unit-number write in CONFIRM_ADD_SUBPREMISES) must not clear it.
   if (shippingSection) {
     shippingSection.addEventListener('input', (e) => {
+      state.shippingAddressValidated = false;
       if (e.isTrusted) clearAddressError(shippingSection);
+    });
+    shippingSection.addEventListener('change', () => {
+      state.shippingAddressValidated = false;
     });
   }
 
@@ -824,12 +867,16 @@ export function initAddress(form, state, config, strings) {
   });
 
   return {
-    validateAndCollapse: (collapse) => validateAndCollapseShipping(
-      shippingSection,
-      collapse,
-      config,
-      strings,
-      shippingAutoComplete?.getSessionToken,
-    ),
+    validateAndCollapse: async (collapse) => {
+      const isValid = await validateAndCollapseShipping(
+        shippingSection,
+        collapse,
+        config,
+        strings,
+        shippingAutoComplete?.getSessionToken,
+      );
+      state.shippingAddressValidated = isValid;
+      return isValid;
+    },
   };
 }
