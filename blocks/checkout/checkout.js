@@ -311,6 +311,7 @@ export default async function decorate(block) {
 
   shippingAddrSection.addEventListener('focusout', async (e) => {
     if (shippingAddrSection.contains(e.relatedTarget)) return;
+    if (e.relatedTarget?.closest?.('.checkout-submit-btn')) return;
     await runShippingValidation();
   });
 
