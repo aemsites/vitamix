@@ -1,6 +1,26 @@
 import { getConfig, formatPrice } from '../../scripts/commerce-config.js';
 import { getOrder } from '../../scripts/commerce-api.js';
 
+export function normalizeTotalsDiscounts(discounts = []) {
+  return discounts.filter((discount) => Math.abs(parseFloat(discount?.amount)) > 0);
+}
+
+export function calculateConfirmationTotal({
+  subtotal = 0,
+  tax = 0,
+  shippingRate = 0,
+  discounts = [],
+} = {}) {
+  const hasFreeShipping = discounts.some((discount) => discount?.freeShipping);
+  const shippingAmount = hasFreeShipping ? 0 : (parseFloat(shippingRate) || 0);
+  const discountAmount = normalizeTotalsDiscounts(discounts).reduce(
+    (sum, discount) => sum + (Math.abs(parseFloat(discount.amount)) || 0),
+    0,
+  );
+
+  return Math.round(Math.max(0, subtotal - discountAmount + shippingAmount + tax) * 100) / 100;
+}
+
 /**
  * Order confirmation / cancellation page.
  *
@@ -209,15 +229,21 @@ export default async function decorate(block) {
   const totalsShippingMethod = est ? (est.shippingMethod || {}) : (preview?.shippingMethod || {});
   const totalsDiscounts = est ? (est.discounts || []) : (preview?.discounts || []);
   const totalsTax = parseFloat(est ? (est.tax?.amount || 0) : (preview?.taxAmount || 0));
-  const totalsTotal = parseFloat(est ? (order.payment?.amount || 0) : (preview?.total || 0));
+  const totalsTotal = calculateConfirmationTotal({
+    subtotal: totalsSubtotal,
+    tax: totalsTax,
+    shippingRate: totalsShippingMethod.rate,
+    discounts: totalsDiscounts,
+  });
 
   if (est || preview) {
     const totalsSection = document.createElement('div');
     totalsSection.className = 'order-totals';
 
     const shippingRate = totalsShippingMethod.rate;
-    const shippingDisplay = shippingRate === 0
-      ? s.free
+    const hasFreeShipping = totalsDiscounts.some((discount) => discount?.freeShipping);
+    const shippingDisplay = hasFreeShipping || shippingRate === 0
+      ? (s.free || 'Free')
       : formatPrice(parseFloat(shippingRate || 0), currencyCode);
 
     const rows = [
@@ -225,16 +251,12 @@ export default async function decorate(block) {
       [s.shipping, shippingDisplay],
     ];
 
-    if (totalsDiscounts.length) {
-      totalsDiscounts.forEach((discount) => {
-        const label = discount.name || s.discount;
-        const amount = discount.freeShipping
-          ? parseFloat(shippingRate || 0)
-          : Math.abs(parseFloat(discount.amount));
-        const value = formatPrice(-amount, currencyCode);
-        rows.push([label, value, 'order-totals-discount']);
-      });
-    }
+    normalizeTotalsDiscounts(totalsDiscounts).forEach((discount) => {
+      const label = discount.name || s.discount;
+      const amount = Math.abs(parseFloat(discount.amount));
+      const value = formatPrice(-amount, currencyCode);
+      rows.push([label, value, 'order-totals-discount']);
+    });
 
     rows.push([s.orderTax, formatPrice(totalsTax, currencyCode)]);
 
