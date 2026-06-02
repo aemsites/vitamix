@@ -193,6 +193,7 @@ export default async function decorate(block) {
   const discountApply = block.querySelector('.discount-apply');
   const discountRow = block.querySelector('.cart-summary-discount-row');
   const discountRowLabel = block.querySelector('.cart-summary-discount-label');
+  const discountRowAmount = block.querySelector('.cart-summary-discount-pending');
   const couponErrorEl = block.querySelector('.cart-summary-coupon-error');
   const errorEl = block.querySelector('.cart-summary-error');
   const checkoutBtn = block.querySelector('.cart-summary-checkout-btn');
@@ -222,23 +223,66 @@ export default async function decorate(block) {
   document.addEventListener('cart:change', updateTotals);
 
   // 4. Restore saved promo code; persist to sessionStorage on apply
-  const showDiscountRow = (code) => {
+  const showDiscountRow = (code, amount = '--') => {
     discountRowLabel.textContent = `${s.discount} (${code})`;
+    discountRowAmount.textContent = amount;
     discountRow.hidden = false;
   };
   const hideDiscountRow = () => { discountRow.hidden = true; };
+
+  let priceEstimateRequest = 0;
+  const renderPriceEstimate = (couponCode, estimate) => {
+    const currency = getCurrencyCode();
+    const subtotal = parseFloat(estimate.subtotal) || cart.subtotal;
+    const discountTotal = parseFloat(estimate.orderDiscountTotal) || 0;
+    const total = Math.max(0, subtotal - discountTotal);
+    subtotalEl.textContent = formatPrice(subtotal, currency);
+    grandTotalEl.textContent = formatPrice(total, currency);
+    showDiscountRow(couponCode, `-${formatPrice(discountTotal, currency)}`);
+  };
+
+  const updatePriceEstimate = async () => {
+    const couponCode = sessionStorage.getItem('checkout_coupon_code') || '';
+    if (!couponCode || !cart.itemCount) {
+      hideDiscountRow();
+      updateTotals();
+      return;
+    }
+
+    priceEstimateRequest += 1;
+    const requestId = priceEstimateRequest;
+    showDiscountRow(couponCode);
+
+    try {
+      const estimate = await estimatePrice(config.getLocale(), cart.getItemsForAPI(), couponCode);
+      if (requestId !== priceEstimateRequest) return;
+      renderPriceEstimate(couponCode, estimate);
+    } catch (err) {
+      if (requestId !== priceEstimateRequest) return;
+      sessionStorage.removeItem('checkout_coupon_code');
+      discountInput.value = '';
+      hideDiscountRow();
+      updateTotals();
+      couponErrorEl.textContent = getCouponErrorMessage(err?.errorHeader);
+      couponErrorEl.hidden = false;
+    }
+  };
+
+  document.addEventListener('cart:change', updatePriceEstimate);
 
   block.querySelector('.discount-remove').addEventListener('click', () => {
     sessionStorage.removeItem('checkout_coupon_code');
     discountInput.value = '';
     couponErrorEl.hidden = true;
     hideDiscountRow();
+    updateTotals();
   });
 
   const savedCoupon = sessionStorage.getItem('checkout_coupon_code') || '';
   if (savedCoupon) {
     discountInput.value = savedCoupon;
     showDiscountRow(savedCoupon);
+    updatePriceEstimate();
   }
   discountApply.addEventListener('click', async () => {
     couponErrorEl.hidden = true;
@@ -246,16 +290,20 @@ export default async function decorate(block) {
     if (!code) {
       sessionStorage.removeItem('checkout_coupon_code');
       hideDiscountRow();
+      updateTotals();
       return;
     }
 
     discountApply.disabled = true;
     try {
       const country = config.getLocale();
-      await estimatePrice(country, cart.getItemsForAPI(), code);
+      const estimate = await estimatePrice(country, cart.getItemsForAPI(), code);
       sessionStorage.setItem('checkout_coupon_code', code);
-      showDiscountRow(code);
+      renderPriceEstimate(code, estimate);
     } catch (err) {
+      sessionStorage.removeItem('checkout_coupon_code');
+      hideDiscountRow();
+      updateTotals();
       couponErrorEl.textContent = getCouponErrorMessage(err?.errorHeader);
       couponErrorEl.hidden = false;
     } finally {
@@ -327,6 +375,7 @@ export default async function decorate(block) {
     const returnedCoupon = initIDMe(promoEl, discountInput);
     if (returnedCoupon) {
       showDiscountRow(returnedCoupon);
+      updatePriceEstimate();
     }
   }
 }

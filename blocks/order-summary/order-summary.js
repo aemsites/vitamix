@@ -248,6 +248,33 @@ export default async function decorate(block) {
     return btn;
   };
 
+  const renderDiscountRows = (discounts, currency) => {
+    discountsEl.innerHTML = '';
+    discountsEl.hidden = true;
+    discounts.filter((d) => parseFloat(d.amount) > 0).forEach((d) => {
+      discountsEl.hidden = false;
+      const row = document.createElement('div');
+      row.className = 'order-summary-row order-summary-discount-item';
+      const amount = document.createElement('span');
+      amount.className = 'order-summary-discount-amount';
+      amount.textContent = `-${formatPrice(parseFloat(d.amount), currency)}`;
+
+      if (d.source === 'coupon') {
+        const labelGroup = document.createElement('span');
+        labelGroup.className = 'discount-label-group';
+        const label = document.createElement('span');
+        label.textContent = d.name || s.discount;
+        labelGroup.append(label, makeRemoveBtn());
+        row.append(labelGroup, amount);
+      } else {
+        const label = document.createElement('span');
+        label.textContent = d.name || s.discount;
+        row.append(label, amount);
+      }
+      discountsEl.appendChild(row);
+    });
+  };
+
   const showPendingDiscount = (code) => {
     discountsEl.innerHTML = '';
     discountsEl.hidden = false;
@@ -263,6 +290,47 @@ export default async function decorate(block) {
     amount.textContent = '--';
     row.append(labelGroup, amount);
     discountsEl.appendChild(row);
+  };
+
+  let priceEstimateRequest = 0;
+  let hasOrderPreview = false;
+  const renderPriceEstimate = (estimate) => {
+    if (hasOrderPreview) return;
+    const currency = getCurrencyCode();
+    const subtotal = parseFloat(estimate.subtotal) || cart.subtotal;
+    const discountTotal = parseFloat(estimate.orderDiscountTotal) || 0;
+    const total = Math.max(0, subtotal - discountTotal);
+    subtotalEl.textContent = formatPrice(subtotal, currency);
+    renderDiscountRows(estimate.discounts ?? [], currency);
+    shippingEl.textContent = '--';
+    taxesEl.textContent = '--';
+    grandTotalEl.textContent = formatPrice(total, currency);
+    headerTotalEl.textContent = formatPrice(total, currency);
+  };
+
+  const updatePriceEstimate = async () => {
+    const couponCode = sessionStorage.getItem('checkout_coupon_code') || '';
+    if (!couponCode || !cart.itemCount) {
+      discountsEl.innerHTML = '';
+      discountsEl.hidden = true;
+      return;
+    }
+
+    priceEstimateRequest += 1;
+    const requestId = priceEstimateRequest;
+    showPendingDiscount(couponCode);
+
+    try {
+      const estimate = await estimatePrice(
+        getLocaleAndLanguage().locale,
+        cart.getItemsForAPI(),
+        couponCode,
+      );
+      if (requestId !== priceEstimateRequest) return;
+      renderPriceEstimate(estimate);
+    } catch {
+      if (requestId === priceEstimateRequest) showPendingDiscount(couponCode);
+    }
   };
 
   const savedCoupon = sessionStorage.getItem('checkout_coupon_code') || '';
@@ -284,9 +352,9 @@ export default async function decorate(block) {
     discountApply.disabled = true;
     try {
       const country = getLocaleAndLanguage().locale;
-      await estimatePrice(country, cart.getItemsForAPI(), code);
+      const estimate = await estimatePrice(country, cart.getItemsForAPI(), code);
       sessionStorage.setItem('checkout_coupon_code', code);
-      showPendingDiscount(code);
+      renderPriceEstimate(estimate);
       document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
     } catch (err) {
       couponErrorEl.textContent = getCouponErrorMessage(err?.errorHeader);
@@ -366,6 +434,7 @@ export default async function decorate(block) {
 
   renderItems();
   updateTotals();
+  updatePriceEstimate();
 
   const wrapper = block.closest('.order-summary-wrapper');
   const syncVisibility = () => {
@@ -376,6 +445,7 @@ export default async function decorate(block) {
   const refreshSummary = () => {
     renderItems();
     updateTotals();
+    updatePriceEstimate();
     syncVisibility();
   };
 
@@ -384,12 +454,14 @@ export default async function decorate(block) {
 
   const summaryContent = block.querySelector('.order-summary-content');
   document.addEventListener('checkout:preview-loading', () => {
+    hasOrderPreview = true;
     summaryContent?.classList.add('loading');
   });
 
   document.addEventListener('checkout:preview', (e) => {
     summaryContent?.classList.remove('loading');
     const { preview, couponError } = e.detail || {};
+    hasOrderPreview = Boolean(preview);
 
     if (couponError) {
       discountsEl.innerHTML = '';
@@ -409,32 +481,7 @@ export default async function decorate(block) {
     const currency = getCurrencyCode();
     subtotalEl.textContent = formatPrice(subtotal, currency);
 
-    discountsEl.innerHTML = '';
-    discountsEl.hidden = true;
-    discounts.filter((d) => d.amount > 0).forEach((d) => {
-      discountsEl.hidden = false;
-      const row = document.createElement('div');
-      row.className = 'order-summary-row order-summary-discount-item';
-      if (d.source === 'coupon') {
-        const labelGroup = document.createElement('span');
-        labelGroup.className = 'discount-label-group';
-        const label = document.createElement('span');
-        label.textContent = d.name || s.discount;
-        labelGroup.append(label, makeRemoveBtn());
-        const amount = document.createElement('span');
-        amount.className = 'order-summary-discount-amount';
-        amount.textContent = `-${formatPrice(d.amount, currency)}`;
-        row.append(labelGroup, amount);
-      } else {
-        const label = document.createElement('span');
-        label.textContent = d.name || s.discount;
-        const amount = document.createElement('span');
-        amount.className = 'order-summary-discount-amount';
-        amount.textContent = `-${formatPrice(d.amount, currency)}`;
-        row.append(label, amount);
-      }
-      discountsEl.appendChild(row);
-    });
+    renderDiscountRows(discounts, currency);
 
     shippingEl.textContent = shippingRate === 0
       ? s.free
