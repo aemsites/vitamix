@@ -224,6 +224,11 @@ export function initOrder(form, cart, state, config, strings) {
       }
 
       if (!state.selectedShippingMethodId) {
+        const checkedShippingMethod = form.querySelector('[name="shippingMethod"]:checked')?.value;
+        if (checkedShippingMethod) state.selectedShippingMethodId = checkedShippingMethod;
+      }
+
+      if (!state.selectedShippingMethodId) {
         showError(form, strings.errorSelectShipping);
         return;
       }

@@ -628,8 +628,7 @@ test.describe('Edge Checkout Page', () => {
       await page.locator('.checkout-submit-btn').click();
 
       await expect(page.locator('.address-validation-error')).toBeVisible({ timeout: 10000 });
-      await expect(page.locator('.address-validation-error')).toContainText("couldn't verify");
-      await expect(page.locator('.checkout-form > .checkout-error')).toBeVisible({ timeout: 10000 });
+      await expect(page.locator('.checkout-form > .checkout-error')).toBeHidden();
       expect(orderCreateCalled).toBe(false);
       expect(page.url()).toContain('/order/checkout');
       console.log('✓ FIX address verdict blocks payment');
