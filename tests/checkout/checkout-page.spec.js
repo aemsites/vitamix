@@ -590,6 +590,14 @@ test.describe('Edge Checkout Page', () => {
       { longText: '94103', shortText: '94103', types: ['postal_code'] },
     ];
 
+    const BILLING_SUGGESTED_COMPONENTS = [
+      { longText: '501', shortText: '501', types: ['street_number'] },
+      { longText: 'Market Street', shortText: 'Market St', types: ['route'] },
+      { longText: 'San Francisco', shortText: 'San Francisco', types: ['locality'] },
+      { longText: 'California', shortText: 'CA', types: ['administrative_area_level_1'] },
+      { longText: '94105', shortText: '94105', types: ['postal_code'] },
+    ];
+
     test('blocks payment when address validation returns FIX', async ({ page }) => {
       await seedCart(page, baseUrl);
 
@@ -665,6 +673,119 @@ test.describe('Edge Checkout Page', () => {
       expect(orderCreateCalled).toBe(false);
       expect(page.url()).toContain('/order/checkout');
       console.log('✓ FIX billing address verdict blocks payment');
+    });
+
+    test('uses suggested different billing address before continuing to payment', async ({ page }) => {
+      await seedCart(page, baseUrl);
+
+      const requestLog = [];
+      await setupCheckoutMocks(page, {
+        validateAddress: async (route) => {
+          const body = route.request().postDataJSON();
+          const isBilling = body?.address?.addressLines?.[0] === BILLING_ADDRESS.street;
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(isBilling ? {
+              action: 'CONFIRM',
+              formattedAddress: '501 Market Street, San Francisco, CA 94105, USA',
+              addressComponents: BILLING_SUGGESTED_COMPONENTS,
+            } : { action: 'ACCEPT' }),
+          });
+        },
+        createOrder: async (route) => {
+          if (route.request().method() !== 'POST') { await route.continue(); return; }
+          requestLog.push({ url: '/orders', body: route.request().postDataJSON() });
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              order: {
+                id: MOCK_ORDER_ID,
+                customer: {
+                  firstName: VALID_ADDRESS.firstName,
+                  lastName: VALID_ADDRESS.lastName,
+                  email: TEST_EMAIL,
+                },
+              },
+            }),
+          });
+        },
+      });
+      await gotoCheckout(page, baseUrl);
+
+      await expect(page.locator('.checkout-form')).toBeVisible({ timeout: 15000 });
+      await fillContact(page);
+      await fillShipping(page);
+      await page.waitForResponse(
+        (res) => res.url().includes('/orders/preview') && res.request().method() === 'POST',
+        { timeout: 15000 },
+      );
+      await page.locator('.checkout-form [name="billing-choice"][value="different"]').check();
+      await fillBilling(page, BILLING_ADDRESS);
+
+      await page.locator('.checkout-submit-btn').click();
+      const dialog = page.locator('.address-validation-dialog');
+      await expect(dialog).toBeVisible({ timeout: 10000 });
+      await dialog.locator('button', { hasText: 'Use this address' }).click();
+
+      await expect.poll(
+        () => page.url(),
+        { timeout: 15000, message: 'Page did not navigate to /order/complete' },
+      ).toMatch(/\/order\/complete\?orderId=/);
+
+      const orderRequest = requestLog.find((r) => r.url === '/orders');
+      expect(orderRequest).toBeDefined();
+      expect(orderRequest.body.billing.address1).toBe('501 Market Street');
+      expect(orderRequest.body.billing.zip).toBe('94105');
+      console.log('✓ Suggested billing address is applied before payment');
+    });
+
+    test('billing validation does not trigger order preview recalculation', async ({ page }) => {
+      await seedCart(page, baseUrl);
+
+      let previewCount = 0;
+      await setupCheckoutMocks(page, {
+        validateAddress: async (route) => {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ action: 'ACCEPT' }),
+          });
+        },
+        preview: async (route) => {
+          previewCount += 1;
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(MOCK_PREVIEW),
+          });
+        },
+      });
+      await gotoCheckout(page, baseUrl);
+
+      await expect(page.locator('.checkout-form')).toBeVisible({ timeout: 15000 });
+      await fillContact(page);
+      await fillShipping(page);
+      await page.waitForResponse(
+        (res) => res.url().includes('/orders/preview') && res.request().method() === 'POST',
+        { timeout: 15000 },
+      );
+      previewCount = 0;
+
+      await page.locator('.checkout-form [name="billing-choice"][value="different"]').check();
+      await fillBilling(page, BILLING_ADDRESS);
+      await field(page, 'billing-telephone').focus();
+      const billingValidate = page.waitForResponse(
+        (res) => res.url().includes('/places/validate') && res.request().method() === 'POST',
+        { timeout: 15000 },
+      );
+      await page.keyboard.press('Tab');
+      await billingValidate;
+      await page.waitForTimeout(500);
+
+      expect(previewCount).toBe(0);
+      console.log('✓ Billing validation does not recalculate order preview');
     });
 
     test('does not allow suggestion dialog dismissal to approve the address', async ({ page }) => {
