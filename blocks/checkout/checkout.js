@@ -403,16 +403,16 @@ export default async function decorate(block) {
     refreshShipping();
   }
 
-  // When the cart changes mid-checkout, invalidate the stale estimate and
-  // re-run the preview so totals stay accurate. The empty-cart listener above
-  // handles the zero-items case via reload; this handles qty changes and
-  // partial removes while items remain.
+  // When the cart changes mid-checkout, invalidate stale estimates and
+  // re-fetch shipping rates before previewing. Some shipping providers issue
+  // quantity/weight-specific method ids, so reusing the previous id can make
+  // the preview request invalid after a quantity change.
   document.addEventListener('cart:change', () => {
     if (cart.itemCount === 0) return;
     state.currentEstimateToken = null;
     state.currentPreview = null;
     if (state.selectedShippingMethodId) {
-      updatePreview(form, cart, state, config);
+      refreshShipping();
     }
   });
 

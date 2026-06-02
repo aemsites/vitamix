@@ -18,6 +18,10 @@ export function __resetConfig() {
   currencyOverride = undefined;
 }
 
+export function formatPrice(value, currency = 'USD') {
+  return `${currency} ${Number(value).toFixed(2)}`;
+}
+
 export function getConfig() {
   return {
     getLocale: () => 'us',
