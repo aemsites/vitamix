@@ -1012,7 +1012,13 @@ button.checkout-submit-btn {
   max-width: 560px;
   width: calc(100% - 32px);
   box-shadow: 0 24px 64px rgb(0 0 0 / 18%);
-  position: relative;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0;
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
 }
 
 .address-validation-dialog::backdrop {
