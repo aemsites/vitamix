@@ -466,6 +466,89 @@ test.describe('Edge Checkout Page', () => {
       console.log('✓ First shipping rate is auto-selected');
     });
 
+    test('re-estimates shipping and previews with the new method id after quantity changes', async ({ page }) => {
+      const shippingRequests = [];
+      const previewRequests = [];
+      const idByQty = { 2: '797', 3: '798' };
+
+      await seedCart(page, baseUrl);
+      await setupCheckoutMocks(page, {
+        shipping: async (route) => {
+          const body = route.request().postDataJSON();
+          shippingRequests.push(body);
+          const qty = body.items?.[0]?.quantity ?? 1;
+          const standardId = idByQty[qty] || '796';
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              rates: [
+                {
+                  id: standardId,
+                  label: 'Standard Shipping',
+                  type: 'standard',
+                  rate: '0.00',
+                },
+                {
+                  id: `priority-${qty}`,
+                  label: 'Priority Shipping',
+                  type: 'priority',
+                  rate: '19.99',
+                },
+              ],
+            }),
+          });
+        },
+        preview: async (route) => {
+          const body = route.request().postDataJSON();
+          previewRequests.push(body);
+          const qty = body.items?.[0]?.quantity ?? 1;
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              ...MOCK_PREVIEW,
+              subtotal: qty * 549.99,
+              taxAmount: qty * 48.12,
+              shippingMethod: {
+                id: body.shippingMethod.id,
+                label: 'Standard Shipping',
+                type: 'standard',
+                rate: '0.00',
+              },
+              total: qty * 598.11,
+            }),
+          });
+        },
+      });
+      await gotoCheckout(page, baseUrl);
+      await expect(page.locator('.checkout-form')).toBeVisible({ timeout: 15000 });
+      await expandOrderSummary(page);
+
+      // Start from quantity 2, then select a shipping address. The first
+      // estimate/preview should use the qty-2 standard id.
+      await page.locator('.order-summary-items .qty-inc').first().click();
+      await fillShipping(page);
+      await expect(page.locator('.checkout-form [name="shippingMethod"][value="797"]')).toBeChecked({ timeout: 10000 });
+      await expect.poll(() => previewRequests.some(
+        (body) => body.items?.[0]?.quantity === 2 && body.shippingMethod?.id === '797',
+      )).toBe(true);
+
+      // Changing quantity invalidates the provider-specific shipping id. The
+      // checkout should re-fetch rates, preserve the Standard service by type,
+      // and preview with the new qty-3 id — never the stale qty-2 id.
+      await page.locator('.order-summary-items .qty-inc').first().click();
+      await expect(page.locator('.checkout-form [name="shippingMethod"][value="798"]')).toBeChecked({ timeout: 10000 });
+      await expect.poll(() => previewRequests.some(
+        (body) => body.items?.[0]?.quantity === 3 && body.shippingMethod?.id === '798',
+      )).toBe(true);
+      expect(previewRequests.some(
+        (body) => body.items?.[0]?.quantity === 3 && body.shippingMethod?.id === '797',
+      )).toBe(false);
+      expect(shippingRequests.some((body) => body.items?.[0]?.quantity === 3)).toBe(true);
+      console.log('✓ Quantity changes re-estimate shipping and preview with the new method id');
+    });
+
     test('shows an error / empty state when no rates are available', async ({ page }) => {
       await seedCart(page, baseUrl);
       await setupCheckoutMocks(page, {

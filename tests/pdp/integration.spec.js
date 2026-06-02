@@ -390,8 +390,9 @@ test.describe('PDP Integration Tests', () => {
       const productUrl = buildProductUrl(productPath, currentBranch, { cart: 'magento' });
       await page.goto(productUrl);
 
-      // Wait for add to cart button
-      await waitForElement(page, '.quantity-container button');
+      // Wait for add to cart button. Bundle PDP data can take longer to hydrate
+      // on branch previews, especially while AEM cache is warming.
+      await waitForElement(page, '.quantity-container button', 30000);
 
       const addToCartButton = page.locator('.quantity-container button');
       await expect(addToCartButton).toContainText(/add to cart/i);
