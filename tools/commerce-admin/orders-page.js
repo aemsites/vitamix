@@ -214,6 +214,31 @@ function orderStateBadgeClass(state) {
   return 'orders-badge-neutral';
 }
 
+function isValidTimestamp(value) {
+  if (value == null || value === '') return false;
+  const t = new Date(value).getTime();
+  return !Number.isNaN(t);
+}
+
+function syncStatusCell(o, query) {
+  const { syncError, syncedAt } = o;
+  if (syncError != null) {
+    const text = typeof syncError === 'object' ? JSON.stringify(syncError) : String(syncError);
+    return `<span class="orders-badge orders-badge-danger">${highlightMatch(text, query)}</span>`;
+  }
+  if (isValidTimestamp(syncedAt)) {
+    const title = escapeHtml(new Date(syncedAt).toLocaleString());
+    return `<span class="orders-sync-icon orders-sync-icon-success" role="img" aria-label="Synced" title="Synced ${title}">`
+      + '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">'
+      + '<path fill="currentColor" d="M6.2 11.3 3.1 8.2l1.1-1.1 2 2 4.6-4.6 1.1 1.1z"/>'
+      + '</svg></span>';
+  }
+  return '<span class="orders-sync-icon orders-sync-icon-pending" role="img" aria-label="Sync pending" title="Sync pending">'
+    + '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">'
+    + '<path fill="currentColor" d="M8 1.5A6.5 6.5 0 1 0 14.5 8 6.51 6.51 0 0 0 8 1.5zm0 11.7A5.2 5.2 0 1 1 13.2 8 5.2 5.2 0 0 1 8 13.2zm.65-8.45h-1.3v3.6l3.05 1.83.65-1.07-2.4-1.43z"/>'
+    + '</svg></span>';
+}
+
 function orderCountryTagClass(country) {
   const c = String(country || '').toLowerCase();
   if (c === 'us') return 'coupons-tag-us';
@@ -1008,16 +1033,14 @@ function renderTable(wrap, orders, query, onEditSaved) {
           <th>Coupon</th>
           <th>Payment</th>
           <th>Market</th>
-          <th>Created</th>
           <th>Updated</th>
-          <th>Synchronized</th>
+          <th>Sync Status</th>
         </tr>
       </thead>
       <tbody>
         ${orders.map((o) => {
-    const createdStr = o.createdAt ? new Date(o.createdAt).toLocaleString() : '—';
     const updatedStr = o.updatedAt ? new Date(o.updatedAt).toLocaleString() : '—';
-    const syncedStr = o.syncedAt ? new Date(o.syncedAt).toLocaleString() : '—';
+    const syncStatusHtml = syncStatusCell(o, query);
     const id = String(o.id || '');
     const compactId = orderIdForDisplay(o) || id;
     const formattedId = formatOrderIdChunks(compactId);
@@ -1051,9 +1074,8 @@ function renderTable(wrap, orders, query, onEditSaved) {
             <td>${highlightMatch(couponStr, query)}</td>
             <td>${highlightMatch(paymentMethodStr, query)}</td>
             <td>${marketHtml}</td>
-            <td>${highlightMatch(createdStr, query)}</td>
             <td>${highlightMatch(updatedStr, query)}</td>
-            <td>${highlightMatch(syncedStr, query)}</td>
+            <td>${syncStatusHtml}</td>
           </tr>`;
   }).join('')}
       </tbody>
@@ -1105,7 +1127,7 @@ async function init() {
   }
 
   const initialQ = getUrlParam('q');
-  const initialState = getUrlParam('state');
+  const initialState = getUrlParam('state') || 'payment_completed';
   const initialSort = getUrlParam('sort') === 'oldest' ? 'oldest' : 'newest';
 
   search.value = initialQ;

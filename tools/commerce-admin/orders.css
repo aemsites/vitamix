@@ -223,6 +223,20 @@
   color: #454749;
 }
 
+.orders-sync-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.orders-sync-icon-success {
+  color: #0d6b4f;
+}
+
+.orders-sync-icon-pending {
+  color: #8a6116;
+}
+
 .orders-detail-rich {
   margin: -6px 0 20px;
 }

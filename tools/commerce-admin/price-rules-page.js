@@ -786,7 +786,8 @@ function readPromotionMinCartCondition(dlg) {
 }
 
 /**
- * Build promotion-level `conditions` from the min-cart form (clears legacy per-rule custom keys on save).
+ * Build promotion-level `conditions` from the min-cart form
+ * (clears legacy per-rule custom keys on save).
  *
  * @param {{ enabled: boolean, amountRaw: string }} minCart
  * @param {import('./price-rules-api.js').CatalogPromotion | null | undefined} [preserveFrom]
@@ -2388,7 +2389,8 @@ function compareCartRuleRows(a, b, key) {
     }
     case 'off': return String(a.salesAmountOff ?? '').localeCompare(String(b.salesAmountOff ?? ''), undefined, { numeric: true, sensitivity: 'base' });
     case 'freeship': {
-      return cartRuleShippingModeSortRank(a.shippingMode) - cartRuleShippingModeSortRank(b.shippingMode);
+      return cartRuleShippingModeSortRank(a.shippingMode)
+        - cartRuleShippingModeSortRank(b.shippingMode);
     }
     case 'scope': {
       const sa = cartRuleScopeSummary(a);
@@ -2416,20 +2418,6 @@ function sortCartRuleEntries(list, key, dir) {
     }
     if (c !== 0) return m * c;
     return String(ea.row.name).localeCompare(String(eb.row.name), undefined, { sensitivity: 'base' });
-  });
-}
-
-/**
- * @param {RuleRow[]} list
- * @param {'title'|'id'|'min'|'off'|'freeship'|'scope'|'market'} key
- * @param {'asc'|'desc'} dir
- */
-function sortCartRuleRows(list, key, dir) {
-  const m = dir === 'desc' ? -1 : 1;
-  return list.slice().sort((a, b) => {
-    const c = compareCartRuleRows(a, b, key);
-    if (c !== 0) return m * c;
-    return String(a.name).localeCompare(String(b.name), undefined, { sensitivity: 'base' });
   });
 }
 
@@ -2719,7 +2707,11 @@ function renderCartRulesOverview() {
     return hay.includes(q);
   };
   const filtered = !q ? entries : entries.filter(({ row }) => ruleSearchMatch(row));
-  const displayEntries = sortCartRuleEntries(filtered, state.cartRuleSortKey, state.cartRuleSortDir);
+  const displayEntries = sortCartRuleEntries(
+    filtered,
+    state.cartRuleSortKey,
+    state.cartRuleSortDir,
+  );
   const searchVal = escapeHtml(state.cartRuleSearch);
 
   let tbodyHtml;
