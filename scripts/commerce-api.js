@@ -63,15 +63,17 @@ async function post(path, body, recaptchaAction) {
  * @param {Array<{sku: string, path: string, quantity: number, price: Object}>} items
  *   Cart items in API format
  * @param {string} [couponCode] - coupon code; free-shipping discounts apply when provided
+ * @param {string} [couponSource] - coupon source, for verified/auto-applied coupons
  * @returns {Promise<{ rates: Array<{ id: string, label: string, rate: string }> }>}
  * @throws {CommerceApiError}
  */
-export async function estimateShipping(country, state, items, couponCode) {
+export async function estimateShipping(country, state, items, couponCode, couponSource) {
   return post('/estimate/shipping', {
     country,
     shipping: { country, state },
     items,
     ...(couponCode ? { couponCode } : {}),
+    ...(couponCode && couponSource ? { couponSource } : {}),
   });
 }
 
@@ -83,12 +85,16 @@ export async function estimateShipping(country, state, items, couponCode) {
  * @param {string} country - ISO 3166-1 alpha-2 country code (e.g. 'us', 'ca')
  * @param {Array} items - Cart items in API format
  * @param {string} couponCode - The coupon code to validate
+ * @param {string} [couponSource] - coupon source, for verified/auto-applied coupons
  * @returns {Promise<{ subtotal: number, discounts: Array, orderDiscountTotal: number }>}
  * @throws {CommerceApiError}
  */
-export async function estimatePrice(country, items, couponCode) {
+export async function estimatePrice(country, items, couponCode, couponSource) {
   return post('/estimate/price', {
-    country, items, couponCode,
+    country,
+    items,
+    couponCode,
+    ...(couponCode && couponSource ? { couponSource } : {}),
   });
 }
 

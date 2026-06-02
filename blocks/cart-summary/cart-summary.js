@@ -243,6 +243,7 @@ export default async function decorate(block) {
 
   const updatePriceEstimate = async () => {
     const couponCode = sessionStorage.getItem('checkout_coupon_code') || '';
+    const couponSource = sessionStorage.getItem('checkout_coupon_source') || undefined;
     if (!couponCode || !cart.itemCount) {
       hideDiscountRow();
       updateTotals();
@@ -254,12 +255,18 @@ export default async function decorate(block) {
     showDiscountRow(couponCode);
 
     try {
-      const estimate = await estimatePrice(config.getLocale(), cart.getItemsForAPI(), couponCode);
+      const estimate = await estimatePrice(
+        config.getLocale(),
+        cart.getItemsForAPI(),
+        couponCode,
+        couponSource,
+      );
       if (requestId !== priceEstimateRequest) return;
       renderPriceEstimate(couponCode, estimate);
     } catch (err) {
       if (requestId !== priceEstimateRequest) return;
       sessionStorage.removeItem('checkout_coupon_code');
+      sessionStorage.removeItem('checkout_coupon_source');
       discountInput.value = '';
       hideDiscountRow();
       updateTotals();
@@ -272,6 +279,7 @@ export default async function decorate(block) {
 
   block.querySelector('.discount-remove').addEventListener('click', () => {
     sessionStorage.removeItem('checkout_coupon_code');
+    sessionStorage.removeItem('checkout_coupon_source');
     discountInput.value = '';
     couponErrorEl.hidden = true;
     hideDiscountRow();
@@ -279,18 +287,23 @@ export default async function decorate(block) {
   });
 
   const savedCoupon = sessionStorage.getItem('checkout_coupon_code') || '';
+  const savedCouponSource = sessionStorage.getItem('checkout_coupon_source') || '';
   if (savedCoupon) {
-    discountInput.value = savedCoupon;
+    if (savedCouponSource !== 'auto') discountInput.value = savedCoupon;
     showDiscountRow(savedCoupon);
     updatePriceEstimate();
   }
   discountApply.addEventListener('click', async () => {
     couponErrorEl.hidden = true;
     const code = discountInput.value.trim();
+    const existingCouponSource = sessionStorage.getItem('checkout_coupon_source') || '';
     if (!code) {
-      sessionStorage.removeItem('checkout_coupon_code');
-      hideDiscountRow();
-      updateTotals();
+      if (existingCouponSource !== 'auto') {
+        sessionStorage.removeItem('checkout_coupon_code');
+        sessionStorage.removeItem('checkout_coupon_source');
+        hideDiscountRow();
+        updateTotals();
+      }
       return;
     }
 
@@ -299,11 +312,15 @@ export default async function decorate(block) {
       const country = config.getLocale();
       const estimate = await estimatePrice(country, cart.getItemsForAPI(), code);
       sessionStorage.setItem('checkout_coupon_code', code);
+      sessionStorage.removeItem('checkout_coupon_source');
       renderPriceEstimate(code, estimate);
     } catch (err) {
-      sessionStorage.removeItem('checkout_coupon_code');
-      hideDiscountRow();
-      updateTotals();
+      if (existingCouponSource !== 'auto') {
+        sessionStorage.removeItem('checkout_coupon_code');
+        sessionStorage.removeItem('checkout_coupon_source');
+        hideDiscountRow();
+        updateTotals();
+      }
       couponErrorEl.textContent = getCouponErrorMessage(err?.errorHeader);
       couponErrorEl.hidden = false;
     } finally {
@@ -321,14 +338,20 @@ export default async function decorate(block) {
     strings: getStrings(),
     previewOrderDirect: async (body) => {
       const couponCode = sessionStorage.getItem('checkout_coupon_code') || undefined;
+      const couponSource = sessionStorage.getItem('checkout_coupon_source') || undefined;
       try {
-        const result = await previewOrder({ ...body, ...(couponCode ? { couponCode } : {}) });
+        const result = await previewOrder({
+          ...body,
+          ...(couponCode ? { couponCode } : {}),
+          ...(couponCode && couponSource ? { couponSource } : {}),
+        });
         if (result.estimateToken) state.currentEstimateToken = result.estimateToken;
         state.currentPreview = result;
         return result;
       } catch (err) {
         if (COUPON_ERRORS.has(err?.errorHeader)) {
           sessionStorage.removeItem('checkout_coupon_code');
+          sessionStorage.removeItem('checkout_coupon_source');
           discountInput.value = '';
           hideDiscountRow();
           couponErrorEl.textContent = getCouponErrorMessage(err.errorHeader);
