@@ -369,6 +369,18 @@ export default async function decorate(block) {
   };
   state.ensureValidBillingAddress = runBillingValidation;
 
+  // Re-apply billing section collapse state from session storage after the
+  // collapse controller exists, matching the shipping-address restore path.
+  (() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(formStateKey(locale)));
+      if (saved?.billingCollapsed) {
+        state.billingAddressValidated = true;
+        collapseBilling();
+      }
+    } catch { /* ignore */ }
+  })();
+
   const billingFieldsWrapper = billingSection.querySelector('.billing-fields-wrapper');
   billingFieldsWrapper?.addEventListener('focusout', async (e) => {
     await Promise.resolve();

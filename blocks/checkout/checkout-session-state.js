@@ -17,6 +17,10 @@ export function saveFormState(form, locale) {
     if (shippingSection) {
       data.shippingCollapsed = shippingSection.classList.contains('is-collapsed');
     }
+    const billingSection = form.querySelector('.billing-section');
+    if (billingSection) {
+      data.billingCollapsed = billingSection.classList.contains('is-collapsed');
+    }
     sessionStorage.setItem(formStateKey(locale), JSON.stringify(data));
   } catch { /* ignore quota / private-mode errors */ }
 }
