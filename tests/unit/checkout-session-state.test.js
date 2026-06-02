@@ -49,10 +49,23 @@ function makeEl(opts) {
   return el;
 }
 
-function buildForm(fieldDefs) {
+function makeSection(collapsed = false) {
+  return {
+    classList: {
+      _set: new Set(collapsed ? ['is-collapsed'] : []),
+      contains(cls) { return this._set.has(cls); },
+    },
+  };
+}
+
+function buildForm(fieldDefs, opts = {}) {
   const elements = fieldDefs.map(makeEl);
+  const shippingSection = opts.shippingSection ? makeSection(opts.shippingCollapsed) : null;
+  const billingSection = opts.billingSection ? makeSection(opts.billingCollapsed) : null;
 
   function querySelector(selector) {
+    if (selector === '.shipping-address-section') return shippingSection;
+    if (selector === '.billing-section') return billingSection;
     const checkedMatch = selector.match(/\[name="([^"]+)"\]:checked/);
     if (checkedMatch) {
       const n = checkedMatch[1].replace(/\\/g, '');
@@ -134,6 +147,22 @@ describe('saveFormState', () => {
     const saved = JSON.parse(sessionStorage.getItem(FORM_STATE_KEY));
     assert.equal(Object.keys(saved).length, 1);
     assert.equal(saved.email, 'kept@example.com');
+  });
+
+  test('saves shipping and billing collapsed state', () => {
+    const form = buildForm(
+      [{ name: 'email', type: 'email', value: 'test@example.com' }],
+      {
+        shippingSection: true,
+        shippingCollapsed: true,
+        billingSection: true,
+        billingCollapsed: true,
+      },
+    );
+    saveFormState(form, LOCALE);
+    const saved = JSON.parse(sessionStorage.getItem(FORM_STATE_KEY));
+    assert.equal(saved.shippingCollapsed, true);
+    assert.equal(saved.billingCollapsed, true);
   });
 });
 

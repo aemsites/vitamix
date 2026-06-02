@@ -70,20 +70,21 @@ const LOCAL_STRINGS = {
     processing: 'Processing…',
     addressEyebrow: 'Address verification',
     addressHeading: 'We found a more accurate version',
-    addressSubtitle: 'Choose which address to use for shipping.',
+    addressSubtitle: 'Use the suggested address or edit your address before continuing.',
     addressWhatEntered: 'What you entered',
     addressSuggestedBy: 'Suggested',
     addressRecommended: 'Recommended',
-    addressUseSuggested: 'Use suggested address',
-    addressKeepMine: 'Keep my address',
+    addressUseSuggested: 'Use this address',
+    addressEdit: 'Edit address',
     addressUnitEyebrow: 'One more thing',
     addressUnitHeading: 'Add an apartment or unit number?',
-    addressUnitSubtitle: 'Your building has multiple units. Adding one helps couriers reach you on the first try.',
+    addressUnitSubtitle: 'Your building has multiple units. Add a unit or edit your address before continuing.',
     addressUnitLabel: 'Apartment, suite, floor, or unit',
     addressUnitPlaceholder: 'Apt 4B, Floor 12, Suite 200…',
     addressUnitContinue: 'Add unit & continue',
-    addressUnitNoUnit: "I don't have one — continue",
     addressInvalid: "We couldn't verify this address. Please check and try again.",
+    addressCompleteRequired: 'Please complete and verify your address before continuing.',
+    addressValidationUnavailable: 'Unable to verify this address. Please check it and try again.',
   },
   'fr-ca': {
     signIn: 'Se connecter pour un paiement plus rapide',
@@ -137,20 +138,21 @@ const LOCAL_STRINGS = {
     processing: 'Traitement en cours…',
     addressEyebrow: "Vérification d'adresse",
     addressHeading: 'Nous avons trouvé une version plus précise',
-    addressSubtitle: 'Choisissez quelle adresse utiliser pour la livraison.',
+    addressSubtitle: "Utilisez l'adresse suggérée ou modifiez votre adresse avant de continuer.",
     addressWhatEntered: 'Ce que vous avez saisi',
     addressSuggestedBy: 'Suggérée',
     addressRecommended: 'Recommandée',
-    addressUseSuggested: "Utiliser l'adresse suggérée",
-    addressKeepMine: 'Garder mon adresse',
+    addressUseSuggested: 'Utiliser cette adresse',
+    addressEdit: "Modifier l'adresse",
     addressUnitEyebrow: 'Encore une chose',
     addressUnitHeading: "Ajouter un numéro d'appartement ou de suite ?",
-    addressUnitSubtitle: 'Votre immeuble compte plusieurs unités. En ajouter une aide les livreurs à vous trouver du premier coup.',
+    addressUnitSubtitle: 'Votre immeuble compte plusieurs unités. Ajoutez une unité ou modifiez votre adresse avant de continuer.',
     addressUnitLabel: 'Appartement, suite, étage ou unité',
     addressUnitPlaceholder: 'App. 4B, étage 12, suite 200…',
     addressUnitContinue: 'Ajouter et continuer',
-    addressUnitNoUnit: "Je n'en ai pas — continuer",
     addressInvalid: "Nous n'avons pas pu vérifier cette adresse. Veuillez vérifier et réessayer.",
+    addressCompleteRequired: 'Veuillez compléter et vérifier votre adresse avant de continuer.',
+    addressValidationUnavailable: 'Impossible de vérifier cette adresse. Veuillez la vérifier et réessayer.',
   },
 };
 
@@ -199,6 +201,10 @@ export default async function decorate(block) {
     selectedShippingMethodId: null,
     currentEstimateToken: null,
     currentPreview: null,
+    shippingAddressValidated: false,
+    billingAddressValidated: false,
+    ensureValidShippingAddress: null,
+    ensureValidBillingAddress: null,
   };
 
   // Build form
@@ -258,7 +264,10 @@ export default async function decorate(block) {
   }
 
   // Wire address fields and billing toggle
-  const { validateAndCollapse } = initAddress(form, state, config, strings);
+  const {
+    validateAndCollapse,
+    validateBillingAndCollapse,
+  } = initAddress(form, state, config, strings);
 
   // Restore any previously entered form data (e.g. after browser back from payment page)
   restoreFormState(form, locale);
@@ -296,16 +305,21 @@ export default async function decorate(block) {
     autoCollapse: false,
   }, strings);
 
-  let validatingShipping = false;
+  let shippingValidationPromise = null;
+  const runShippingValidation = () => {
+    if (shippingValidationPromise) return shippingValidationPromise;
+    shippingValidationPromise = validateAndCollapse(collapseShipping)
+      .finally(() => { shippingValidationPromise = null; });
+    return shippingValidationPromise;
+  };
+  state.ensureValidShippingAddress = runShippingValidation;
+
   shippingAddrSection.addEventListener('focusout', async (e) => {
-    if (shippingAddrSection.contains(e.relatedTarget)) return;
-    if (validatingShipping) return;
-    validatingShipping = true;
-    try {
-      await validateAndCollapse(collapseShipping);
-    } finally {
-      validatingShipping = false;
-    }
+    await Promise.resolve();
+    const nextTarget = e.relatedTarget || document.activeElement;
+    if (shippingAddrSection.contains(nextTarget)) return;
+    if (nextTarget?.closest?.('.checkout-submit-btn')) return;
+    await runShippingValidation();
   });
 
   // Re-apply shipping section collapse state from session storage. When the user
@@ -315,9 +329,66 @@ export default async function decorate(block) {
   (() => {
     try {
       const saved = JSON.parse(sessionStorage.getItem(formStateKey(locale)));
-      if (saved?.shippingCollapsed) collapseShipping();
+      if (saved?.shippingCollapsed) {
+        state.shippingAddressValidated = true;
+        collapseShipping();
+      }
     } catch { /* ignore */ }
   })();
+
+  // Section collapse — billing address
+  const billingSection = form.querySelector('.billing-section');
+  const { collapse: collapseBilling } = initCollapse(billingSection, {
+    getIsValid: () => {
+      const useDifferent = form.querySelector('[name="billing-choice"]:checked')?.value === 'different';
+      if (!useDifferent) return true;
+      const billingFields = billingSection.querySelector('.billing-fields-wrapper');
+      return [...billingFields.querySelectorAll('[required]')].every(
+        (el) => el.checkValidity() && !validateField(el),
+      );
+    },
+    getSummary: () => {
+      const useDifferent = form.querySelector('[name="billing-choice"]:checked')?.value === 'different';
+      if (!useDifferent) return strings.billingSame;
+      const data = new FormData(form);
+      const name = `${data.get('billing-firstname') || ''} ${data.get('billing-lastname') || ''}`.trim();
+      const city = data.get('billing-city') || '';
+      const stateCode = data.get('billing-state') || '';
+      const location = [city, stateCode].filter(Boolean).join(', ');
+      return [name, location].filter(Boolean).join(' · ');
+    },
+    autoCollapse: false,
+  }, strings);
+
+  let billingValidationPromise = null;
+  const runBillingValidation = () => {
+    if (billingValidationPromise) return billingValidationPromise;
+    billingValidationPromise = validateBillingAndCollapse(collapseBilling)
+      .finally(() => { billingValidationPromise = null; });
+    return billingValidationPromise;
+  };
+  state.ensureValidBillingAddress = runBillingValidation;
+
+  // Re-apply billing section collapse state from session storage after the
+  // collapse controller exists, matching the shipping-address restore path.
+  (() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(formStateKey(locale)));
+      if (saved?.billingCollapsed) {
+        state.billingAddressValidated = true;
+        collapseBilling();
+      }
+    } catch { /* ignore */ }
+  })();
+
+  const billingFieldsWrapper = billingSection.querySelector('.billing-fields-wrapper');
+  billingFieldsWrapper?.addEventListener('focusout', async (e) => {
+    await Promise.resolve();
+    const nextTarget = e.relatedTarget || document.activeElement;
+    if (billingFieldsWrapper.contains(nextTarget)) return;
+    if (nextTarget?.closest?.('.checkout-submit-btn')) return;
+    await runBillingValidation();
+  });
 
   // Wire shipping rate fetching and preview
   const shippingContainer = form.querySelector('.shipping-methods');

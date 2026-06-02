@@ -200,6 +200,34 @@ export function initOrder(form, cart, state, config, strings) {
 
       if (!validateForm(form)) return;
 
+      if (!state.shippingAddressValidated) {
+        const validShippingAddress = await state.ensureValidShippingAddress?.();
+        if (!validShippingAddress) {
+          showError(
+            form,
+            strings.addressCompleteRequired || 'Please complete and verify your shipping address before continuing.',
+          );
+          return;
+        }
+      }
+
+      const useDifferentBilling = form.querySelector('[name="billing-choice"]:checked')?.value === 'different';
+      if (useDifferentBilling && !state.billingAddressValidated) {
+        const validBillingAddress = await state.ensureValidBillingAddress?.();
+        if (!validBillingAddress) {
+          showError(
+            form,
+            strings.addressCompleteRequired || 'Please complete and verify your billing address before continuing.',
+          );
+          return;
+        }
+      }
+
+      if (!state.selectedShippingMethodId) {
+        const checkedShippingMethod = form.querySelector('[name="shippingMethod"]:checked')?.value;
+        if (checkedShippingMethod) state.selectedShippingMethodId = checkedShippingMethod;
+      }
+
       if (!state.selectedShippingMethodId) {
         showError(form, strings.errorSelectShipping);
         return;
