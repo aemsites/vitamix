@@ -466,7 +466,7 @@ function showConfirmModal({
       dialog.close();
     });
 
-    actions.append(useSuggested, editAddress);
+    actions.append(editAddress, useSuggested);
     body.append(actions);
 
     // Register close listener before showModal so we never miss a close event.
