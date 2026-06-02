@@ -120,6 +120,13 @@ async function setupCheckoutMocks(page, overrides = {}) {
     contentType: 'application/json',
     body: JSON.stringify({ result: null }),
   }));
+  await page.route('**/places/validate*', overrides.validateAddress || (async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ action: 'ACCEPT' }),
+    });
+  }));
 
   // Shipping rates
   await page.route('**/estimate/shipping', overrides.shipping || (async (route) => {
@@ -549,6 +556,169 @@ test.describe('Edge Checkout Page', () => {
 
       await expect(page.locator('.order-summary-coupon-error')).toBeVisible({ timeout: 10000 });
       console.log('✓ Coupon error message shown for invalid coupon');
+    });
+  });
+
+  // ─── Address validation ───────────────────────────────────────────────────
+
+  test.describe('Address validation', () => {
+    const SUGGESTED_COMPONENTS = [
+      { longText: '124', shortText: '124', types: ['street_number'] },
+      { longText: 'Main Street', shortText: 'Main St', types: ['route'] },
+      { longText: 'San Francisco', shortText: 'San Francisco', types: ['locality'] },
+      { longText: 'California', shortText: 'CA', types: ['administrative_area_level_1'] },
+      { longText: '94103', shortText: '94103', types: ['postal_code'] },
+    ];
+
+    test('blocks payment when address validation returns FIX', async ({ page }) => {
+      await seedCart(page, baseUrl);
+
+      let orderCreateCalled = false;
+      await setupCheckoutMocks(page, {
+        validateAddress: async (route) => {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ action: 'FIX' }),
+          });
+        },
+        createOrder: async (route) => {
+          orderCreateCalled = true;
+          await route.continue();
+        },
+      });
+      await gotoCheckout(page, baseUrl);
+
+      await expect(page.locator('.checkout-form')).toBeVisible({ timeout: 15000 });
+      await fillContact(page);
+      await fillShipping(page);
+      await page.waitForResponse(
+        (res) => res.url().includes('/orders/preview') && res.request().method() === 'POST',
+        { timeout: 15000 },
+      );
+
+      await page.locator('.checkout-submit-btn').click();
+
+      await expect(page.locator('.address-validation-error')).toBeVisible({ timeout: 10000 });
+      await expect(page.locator('.address-validation-error')).toContainText("couldn't verify");
+      await expect(page.locator('.checkout-form > .checkout-error')).toBeVisible({ timeout: 10000 });
+      expect(orderCreateCalled).toBe(false);
+      expect(page.url()).toContain('/order/checkout');
+      console.log('✓ FIX address verdict blocks payment');
+    });
+
+    test('does not allow suggestion dialog dismissal to approve the address', async ({ page }) => {
+      await seedCart(page, baseUrl);
+
+      let orderCreateCalled = false;
+      await setupCheckoutMocks(page, {
+        validateAddress: async (route) => {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              action: 'CONFIRM',
+              formattedAddress: '124 Main Street, San Francisco, CA 94103, USA',
+              addressComponents: SUGGESTED_COMPONENTS,
+            }),
+          });
+        },
+        createOrder: async (route) => {
+          orderCreateCalled = true;
+          await route.continue();
+        },
+      });
+      await gotoCheckout(page, baseUrl);
+
+      await expect(page.locator('.checkout-form')).toBeVisible({ timeout: 15000 });
+      await fillContact(page);
+      await fillShipping(page);
+      await page.waitForResponse(
+        (res) => res.url().includes('/orders/preview') && res.request().method() === 'POST',
+        { timeout: 15000 },
+      );
+
+      await page.locator('.checkout-submit-btn').click();
+
+      const dialog = page.locator('.address-validation-dialog');
+      await expect(dialog).toBeVisible({ timeout: 10000 });
+      await expect(dialog.locator('button', { hasText: 'Use this address' })).toBeVisible();
+      await expect(dialog.locator('button', { hasText: 'Edit address' })).toBeVisible();
+      await expect(dialog.locator('button', { hasText: 'Keep my address' })).toHaveCount(0);
+      await expect(dialog.locator('.address-validation-close')).toHaveCount(0);
+
+      await page.keyboard.press('Escape');
+      await expect(dialog).toBeVisible();
+      expect(orderCreateCalled).toBe(false);
+
+      await dialog.locator('button', { hasText: 'Edit address' }).click();
+      await expect(dialog).toHaveCount(0);
+      await expect(page.locator('.checkout-form > .checkout-error')).toBeVisible({ timeout: 10000 });
+      expect(orderCreateCalled).toBe(false);
+      expect(page.url()).toContain('/order/checkout');
+      console.log('✓ Suggestion dialog only allows approved address or edit');
+    });
+
+    test('uses the suggested address before continuing to payment', async ({ page }) => {
+      await seedCart(page, baseUrl);
+
+      const requestLog = [];
+      await setupCheckoutMocks(page, {
+        validateAddress: async (route) => {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              action: 'CONFIRM',
+              formattedAddress: '124 Main Street, San Francisco, CA 94103, USA',
+              addressComponents: SUGGESTED_COMPONENTS,
+            }),
+          });
+        },
+        createOrder: async (route) => {
+          if (route.request().method() !== 'POST') { await route.continue(); return; }
+          requestLog.push({ url: '/orders', body: route.request().postDataJSON() });
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              order: {
+                id: MOCK_ORDER_ID,
+                customer: {
+                  firstName: VALID_ADDRESS.firstName,
+                  lastName: VALID_ADDRESS.lastName,
+                  email: TEST_EMAIL,
+                },
+              },
+            }),
+          });
+        },
+      });
+      await gotoCheckout(page, baseUrl);
+
+      await expect(page.locator('.checkout-form')).toBeVisible({ timeout: 15000 });
+      await fillContact(page);
+      await fillShipping(page);
+      await page.waitForResponse(
+        (res) => res.url().includes('/orders/preview') && res.request().method() === 'POST',
+        { timeout: 15000 },
+      );
+
+      await page.locator('.checkout-submit-btn').click();
+      const dialog = page.locator('.address-validation-dialog');
+      await expect(dialog).toBeVisible({ timeout: 10000 });
+      await dialog.locator('button', { hasText: 'Use this address' }).click();
+
+      await expect.poll(
+        () => page.url(),
+        { timeout: 15000, message: 'Page did not navigate to /order/complete' },
+      ).toMatch(/\/order\/complete\?orderId=/);
+
+      const orderRequest = requestLog.find((r) => r.url === '/orders');
+      expect(orderRequest).toBeDefined();
+      expect(orderRequest.body.shipping.address1).toBe('124 Main Street');
+      expect(orderRequest.body.shipping.zip).toBe('94103');
+      console.log('✓ Suggested address is applied before payment');
     });
   });
 
