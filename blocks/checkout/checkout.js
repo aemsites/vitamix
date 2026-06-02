@@ -315,9 +315,10 @@ export default async function decorate(block) {
   state.ensureValidShippingAddress = runShippingValidation;
 
   shippingAddrSection.addEventListener('focusout', async (e) => {
-    if (!e.relatedTarget) return;
-    if (shippingAddrSection.contains(e.relatedTarget)) return;
-    if (e.relatedTarget.closest?.('.checkout-submit-btn')) return;
+    await Promise.resolve();
+    const nextTarget = e.relatedTarget || document.activeElement;
+    if (shippingAddrSection.contains(nextTarget)) return;
+    if (nextTarget?.closest?.('.checkout-submit-btn')) return;
     await runShippingValidation();
   });
 
@@ -370,9 +371,10 @@ export default async function decorate(block) {
 
   const billingFieldsWrapper = billingSection.querySelector('.billing-fields-wrapper');
   billingFieldsWrapper?.addEventListener('focusout', async (e) => {
-    if (!e.relatedTarget) return;
-    if (billingFieldsWrapper.contains(e.relatedTarget)) return;
-    if (e.relatedTarget.closest?.('.checkout-submit-btn')) return;
+    await Promise.resolve();
+    const nextTarget = e.relatedTarget || document.activeElement;
+    if (billingFieldsWrapper.contains(nextTarget)) return;
+    if (nextTarget?.closest?.('.checkout-submit-btn')) return;
     await runBillingValidation();
   });
 
