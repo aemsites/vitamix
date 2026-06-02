@@ -71,7 +71,11 @@ export function buildOrderJSON(formData, form, cart, state, config) {
   }
 
   const couponCode = sessionStorage.getItem('checkout_coupon_code') || undefined;
-  if (couponCode) order.couponCode = couponCode;
+  const couponSource = sessionStorage.getItem('checkout_coupon_source') || undefined;
+  if (couponCode) {
+    order.couponCode = couponCode;
+    if (couponSource) order.couponSource = couponSource;
+  }
 
   order.locale = `${language.split('_')[0]}-${(language.split('_')[1] || locale).toUpperCase()}`;
   order.country = locale;
@@ -155,7 +159,13 @@ export function initOrder(form, cart, state, config, strings) {
     getState: () => state,
     updatePreview: () => updatePreview(form, cart, state, config),
     previewOrderDirect: async (body) => {
-      const result = await previewOrder(body);
+      const couponCode = sessionStorage.getItem('checkout_coupon_code') || undefined;
+      const couponSource = sessionStorage.getItem('checkout_coupon_source') || undefined;
+      const result = await previewOrder({
+        ...body,
+        ...(couponCode && !body.couponCode ? { couponCode } : {}),
+        ...(couponCode && couponSource && !body.couponSource ? { couponSource } : {}),
+      });
       if (result.estimateToken) state.currentEstimateToken = result.estimateToken;
       state.currentPreview = result;
       return result;

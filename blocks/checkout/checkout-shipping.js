@@ -119,7 +119,11 @@ export async function updatePreview(form, cart, state, config) {
   };
 
   const couponCode = sessionStorage.getItem('checkout_coupon_code') || undefined;
-  if (couponCode) orderBody.couponCode = couponCode;
+  const couponSource = sessionStorage.getItem('checkout_coupon_source') || undefined;
+  if (couponCode) {
+    orderBody.couponCode = couponCode;
+    if (couponSource) orderBody.couponSource = couponSource;
+  }
 
   if (email && firstName && lastName) {
     orderBody.customer = {
@@ -144,7 +148,10 @@ export async function updatePreview(form, cart, state, config) {
       'coupon_product_not_eligible', 'coupon_manual_entry_rejected', 'unauthorized',
     ]);
     const couponError = COUPON_ERRORS.has(err?.errorHeader) ? err.errorHeader : null;
-    if (couponError) sessionStorage.removeItem('checkout_coupon_code');
+    if (couponError) {
+      sessionStorage.removeItem('checkout_coupon_code');
+      sessionStorage.removeItem('checkout_coupon_source');
+    }
     document.dispatchEvent(new CustomEvent('checkout:preview', { detail: { preview: null, couponError } }));
   }
 }
@@ -168,6 +175,7 @@ async function fetchAndPreview(form, shippingContainer, cart, state, config, str
   const country = locale === 'ca' ? 'ca' : 'us';
 
   const couponCode = sessionStorage.getItem('checkout_coupon_code') || undefined;
+  const couponSource = sessionStorage.getItem('checkout_coupon_source') || undefined;
 
   try {
     const previousRadio = shippingContainer.querySelector('input[name="shippingMethod"]:checked');
@@ -177,7 +185,13 @@ async function fetchAndPreview(form, shippingContainer, cart, state, config, str
       label: previousRadio?.dataset.shippingLabel,
     };
 
-    const result = await estimateShipping(country, stateCode, cart.getItemsForAPI(), couponCode);
+    const result = await estimateShipping(
+      country,
+      stateCode,
+      cart.getItemsForAPI(),
+      couponCode,
+      couponSource,
+    );
     renderShippingMethods(shippingContainer, result.rates || [], strings, currencyCode);
 
     // Preserve the user's previous selection; fall back to the first method.

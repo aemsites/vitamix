@@ -229,6 +229,7 @@ function setAffiliateCoupon() {
 
   if (COUPON) {
     sessionStorage.setItem('checkout_coupon_code', COUPON);
+    sessionStorage.removeItem('checkout_coupon_source');
 
     // TODO: remove once all locales migrate off Magento — applies the coupon to the PHP cart
     const { locale, language } = getLocaleAndLanguage();

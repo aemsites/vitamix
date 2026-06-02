@@ -232,6 +232,7 @@ export default async function decorate(block) {
 
   const removeCoupon = () => {
     sessionStorage.removeItem('checkout_coupon_code');
+    sessionStorage.removeItem('checkout_coupon_source');
     discountInput.value = '';
     discountsEl.innerHTML = '';
     discountsEl.hidden = true;
@@ -310,6 +311,7 @@ export default async function decorate(block) {
 
   const updatePriceEstimate = async () => {
     const couponCode = sessionStorage.getItem('checkout_coupon_code') || '';
+    const couponSource = sessionStorage.getItem('checkout_coupon_source') || undefined;
     if (!couponCode || !cart.itemCount) {
       discountsEl.innerHTML = '';
       discountsEl.hidden = true;
@@ -325,6 +327,7 @@ export default async function decorate(block) {
         getLocaleAndLanguage().locale,
         cart.getItemsForAPI(),
         couponCode,
+        couponSource,
       );
       if (requestId !== priceEstimateRequest) return;
       renderPriceEstimate(estimate);
@@ -334,18 +337,23 @@ export default async function decorate(block) {
   };
 
   const savedCoupon = sessionStorage.getItem('checkout_coupon_code') || '';
+  const savedCouponSource = sessionStorage.getItem('checkout_coupon_source') || '';
   if (savedCoupon) {
-    discountInput.value = savedCoupon;
+    if (savedCouponSource !== 'auto') discountInput.value = savedCoupon;
     showPendingDiscount(savedCoupon);
   }
 
   discountApply.addEventListener('click', async () => {
     couponErrorEl.hidden = true;
     const code = discountInput.value.trim();
+    const existingCouponSource = sessionStorage.getItem('checkout_coupon_source') || '';
     if (!code) {
-      sessionStorage.removeItem('checkout_coupon_code');
-      discountsEl.innerHTML = '';
-      discountsEl.hidden = true;
+      if (existingCouponSource !== 'auto') {
+        sessionStorage.removeItem('checkout_coupon_code');
+        sessionStorage.removeItem('checkout_coupon_source');
+        discountsEl.innerHTML = '';
+        discountsEl.hidden = true;
+      }
       return;
     }
 
@@ -354,6 +362,7 @@ export default async function decorate(block) {
       const country = getLocaleAndLanguage().locale;
       const estimate = await estimatePrice(country, cart.getItemsForAPI(), code);
       sessionStorage.setItem('checkout_coupon_code', code);
+      sessionStorage.removeItem('checkout_coupon_source');
       renderPriceEstimate(estimate);
       document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
     } catch (err) {
@@ -464,6 +473,7 @@ export default async function decorate(block) {
     hasOrderPreview = Boolean(preview);
 
     if (couponError) {
+      sessionStorage.removeItem('checkout_coupon_source');
       discountsEl.innerHTML = '';
       discountInput.value = '';
       couponErrorEl.textContent = getCouponErrorMessage(couponError);

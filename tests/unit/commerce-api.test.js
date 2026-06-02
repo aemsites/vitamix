@@ -6,7 +6,7 @@
  */
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { getOrder, estimateShipping } from '../../scripts/commerce-api.js';
+import { getOrder, estimateShipping, estimatePrice } from '../../scripts/commerce-api.js';
 
 const API_ORIGIN = 'https://api.test.com/test-org/sites/test-site';
 
@@ -140,6 +140,14 @@ test('estimateShipping: includes couponCode in request body when provided', asyn
   assert.equal(body.couponCode, 'FREESHIP');
 });
 
+test('estimateShipping: includes couponSource when provided with couponCode', async () => {
+  mockFetch(200, { rates: [] });
+  await estimateShipping('us', 'CA', [], 'IDME10', 'auto');
+  const body = JSON.parse(lastInit.body);
+  assert.equal(body.couponCode, 'IDME10');
+  assert.equal(body.couponSource, 'auto');
+});
+
 test('estimateShipping: sends correct country, shipping, and items', async () => {
   const items = [{ sku: 'abc', quantity: 1, price: { final: '50.00' } }];
   mockFetch(200, { rates: [] });
@@ -158,4 +166,13 @@ test('estimateShipping: returns rates array from response', async () => {
   mockFetch(200, { rates });
   const result = await estimateShipping('us', 'NY', []);
   assert.deepEqual(result.rates, rates);
+});
+
+test('estimatePrice: includes couponSource when provided with couponCode', async () => {
+  mockFetch(200, { discounts: [], orderDiscountTotal: 0 });
+  await estimatePrice('us', [], 'IDME10', 'auto');
+  const body = JSON.parse(lastInit.body);
+  assert.equal(lastUrl, `${API_ORIGIN}/estimate/price`);
+  assert.equal(body.couponCode, 'IDME10');
+  assert.equal(body.couponSource, 'auto');
 });

@@ -24,13 +24,12 @@ function buildIDMeAuthUrl(callbackUrl) {
 }
 
 /**
- * Reads ?idme_coupon= from the current URL, populates the discount input,
- * fires checkout:coupon-apply, and cleans the param from the address bar.
- * Returns the coupon code if found, otherwise null.
- * @param {HTMLInputElement} discountInput
+ * Reads ?idme_coupon= from the current URL, stores it as an auto-applied
+ * coupon, fires checkout:coupon-apply, and cleans the param from the address
+ * bar. Returns the coupon code if found, otherwise null.
  * @returns {string|null}
  */
-export function handleIDMeReturn(discountInput) {
+export function handleIDMeReturn() {
   const params = new URLSearchParams(window.location.search);
   const coupon = params.get('idme_coupon');
   if (!coupon) return null;
@@ -38,8 +37,8 @@ export function handleIDMeReturn(discountInput) {
   params.delete('idme_error');
   const qs = params.size ? `?${params}` : '';
   window.history.replaceState(null, '', window.location.pathname + qs);
-  discountInput.value = coupon;
   sessionStorage.setItem('checkout_coupon_code', coupon);
+  sessionStorage.setItem('checkout_coupon_source', 'auto');
   document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
   return coupon;
 }
@@ -51,10 +50,9 @@ export function handleIDMeReturn(discountInput) {
  * Returns the coupon code if the page was loaded after an ID.me redirect,
  * otherwise null.
  * @param {HTMLElement} insertAfterEl
- * @param {HTMLInputElement} discountInput
  * @returns {string|null}
  */
-export function initIDMe(insertAfterEl, discountInput) {
+export function initIDMe(insertAfterEl) {
   // only allow overrides via localStorage on non-prod hosts
   let redirectOrigin = window.location.origin;
   if (!isProd) {
@@ -94,5 +92,5 @@ export function initIDMe(insertAfterEl, discountInput) {
   }
 
   insertAfterEl.insertAdjacentElement('afterend', outer);
-  return handleIDMeReturn(discountInput);
+  return handleIDMeReturn();
 }
