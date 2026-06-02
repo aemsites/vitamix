@@ -233,6 +233,10 @@ function syncStatusCell(o, query) {
       + '<path fill="currentColor" d="M6.2 11.3 3.1 8.2l1.1-1.1 2 2 4.6-4.6 1.1 1.1z"/>'
       + '</svg></span>';
   }
+  const state = String(o.state || '').toLowerCase().replace(/\s+/g, '_');
+  if (state === 'payment_cancelled' || state === 'payment_processing') {
+    return '—';
+  }
   return '<span class="orders-sync-icon orders-sync-icon-pending" role="img" aria-label="Sync pending" title="Sync pending">'
     + '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">'
     + '<path fill="currentColor" d="M8 1.5A6.5 6.5 0 1 0 14.5 8 6.51 6.51 0 0 0 8 1.5zm0 11.7A5.2 5.2 0 1 1 13.2 8 5.2 5.2 0 0 1 8 13.2zm.65-8.45h-1.3v3.6l3.05 1.83.65-1.07-2.4-1.43z"/>'
