@@ -788,8 +788,29 @@ button.checkout-submit-btn {
 }
 
 @media (width < 1000px) {
-  .card-badge {
-    display: none;
+  .payment-option-card {
+    display: grid;
+    grid-template-columns: 18px 40px 1fr;
+    align-items: center;
+    gap: 6px 12px;
+  }
+
+  .payment-option-card input[type="radio"] {
+    grid-column: 1;
+  }
+
+  .payment-option-icon {
+    grid-column: 2;
+  }
+
+  .payment-option-content {
+    grid-column: 3;
+  }
+
+  .payment-option-badges {
+    grid-column: 3;
+    display: flex;
+    flex-wrap: wrap;
   }
 
   .order-total-breakdown {
