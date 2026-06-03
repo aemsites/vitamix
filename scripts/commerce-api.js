@@ -2,6 +2,7 @@ import { getConfig } from './commerce-config.js';
 import { AUTH_TOKEN_KEY } from './auth-api.js';
 import { mintRecaptchaToken, RECAPTCHA_ACTIONS, RECAPTCHA_HEADER } from './recaptcha.js';
 import { getLocaleAndLanguage, loggedFetch } from './scripts.js';
+import { logApiError } from './operations-log.js';
 
 /**
  * Error thrown when the Commerce API returns a non-2xx response.
@@ -48,6 +49,9 @@ async function post(path, body, recaptchaAction) {
   });
   const data = await resp.json();
   if (!resp.ok) {
+    logApiError({
+      method: 'POST', path, status: resp.status, responseBody: data, requestBody: body,
+    });
     throw new CommerceApiError(resp.status, data, resp.headers.get('x-error'));
   }
   return data;
@@ -196,6 +200,9 @@ async function request(path, body, method) {
   });
   const data = await resp.json();
   if (!resp.ok) {
+    logApiError({
+      method, path, status: resp.status, responseBody: data, requestBody: body,
+    });
     throw new CommerceApiError(resp.status, data, resp.headers.get('x-error'));
   }
   return data;

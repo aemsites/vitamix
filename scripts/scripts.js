@@ -17,8 +17,39 @@ import {
   loadScript,
   getMetadata,
 } from './aem.js';
+import { logError } from './operations-log.js';
 
 const { hostname } = window.location;
+
+// Files considered "AEM scope" for error logging — only errors originating from
+// our own JS are logged, not third-party/payment-SDK noise.
+const AEM_SCOPE = /\/(scripts|blocks|tools|widgets)\//;
+const isInAemScope = (str) => typeof str === 'string' && AEM_SCOPE.test(str);
+
+/**
+ * Registers global listeners that log uncaught errors and unhandled promise
+ * rejections originating from AEM-scope JS to the operations-log endpoint.
+ * Independent of aem.js's RUM error handler. Idempotent.
+ */
+let errorLoggingRegistered = false;
+function registerErrorLogging() {
+  if (errorLoggingRegistered) return;
+  errorLoggingRegistered = true;
+  window.addEventListener('error', (event) => {
+    const stack = event.error?.stack || '';
+    if (!isInAemScope(event.filename) && !isInAemScope(stack)) return;
+    logError('window.error', event.error || { message: event.message }, {
+      filename: event.filename,
+      lineno: event.lineno,
+      colno: event.colno,
+    });
+  });
+  window.addEventListener('unhandledrejection', (event) => {
+    const { reason } = event;
+    if (!isInAemScope(reason?.stack || '')) return;
+    logError('unhandledrejection', reason instanceof Error ? reason : { message: String(reason) });
+  });
+}
 
 // Locale+language pairs enabled for edge checkout on production.
 // Format: '<locale>/<language>' (e.g., 'ca/fr_ca'). Add pairs as each region goes live.
@@ -1398,6 +1429,7 @@ async function simulatePDPPreview() {
  * @param {Element} doc The container element
  */
 async function loadEager(doc) {
+  registerErrorLogging();
   const { locale, language } = getLocaleAndLanguage();
   document.documentElement.lang = language ? language.split('_')[0] : 'en';
 
