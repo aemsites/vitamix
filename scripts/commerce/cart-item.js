@@ -17,6 +17,63 @@ const TRASH_ICON = /* html */`<svg width="14" height="14" viewBox="0 0 24 24" fi
 </svg>`;
 
 /**
+ * Builds a cart row for a gift-with-purchase (free gift) line item. Unlike a
+ * regular row it carries a "free gift" badge, has no quantity control and no
+ * remove button — the gift is managed by the GWP rules, not the customer.
+ *
+ * @param {Object} item  Cart item — sku, name, image, url?, custom.regularPrice?
+ * @param {{ currencyCode?: string, freeGift?: string, free?: string }} [options]
+ * @returns {HTMLElement}
+ */
+export function buildGiftItem(item, {
+  currencyCode = 'USD',
+  freeGift = 'Free gift',
+  free = 'Free',
+} = {}) {
+  const el = document.createElement('div');
+  el.className = `cart-item cart-item-gift cart-item-${item.sku}`;
+  el.innerHTML = /* html */`
+    <div class="cart-item-image"></div>
+    <div class="cart-item-details">
+      <span class="cart-item-gift-badge">${freeGift}</span>
+      <p class="cart-item-name"></p>
+    </div>
+    <div class="cart-item-right">
+      <div class="cart-item-price"></div>
+    </div>`;
+  el.querySelector('.cart-item-image').appendChild(
+    createOptimizedPicture(item.image, item.name || '', true),
+  );
+  const nameEl = el.querySelector('.cart-item-name');
+  if (item.url) {
+    const a = document.createElement('a');
+    a.textContent = item.name;
+    try {
+      a.href = new URL(item.url, window.location.origin).pathname;
+    } catch {
+      a.href = item.url;
+    }
+    nameEl.appendChild(a);
+  } else {
+    nameEl.textContent = item.name;
+  }
+  const priceEl = el.querySelector('.cart-item-price');
+  const regularPrice = item.custom?.regularPrice;
+  if (regularPrice) {
+    const original = document.createElement('span');
+    original.className = 'cart-item-price-original';
+    original.textContent = formatPrice(parseFloat(regularPrice), currencyCode);
+    const freeEl = document.createElement('span');
+    freeEl.className = 'cart-item-price-free';
+    freeEl.textContent = free;
+    priceEl.append(original, freeEl);
+  } else {
+    priceEl.textContent = free;
+  }
+  return el;
+}
+
+/**
  * Builds a cart row for a generic line item. Site-specific row extensions
  * (e.g. a warranty selector) are passed in via `extraContent` and appended
  * below the row's primary content; this component has no knowledge of
