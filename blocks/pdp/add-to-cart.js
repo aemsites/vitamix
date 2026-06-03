@@ -1,7 +1,7 @@
 import { getMetadata } from '../../scripts/aem.js';
 import { checkVariantOutOfStock, getLocaleAndLanguage } from '../../scripts/scripts.js';
 import { getConfig } from '../../scripts/commerce-config.js';
-import { logOperation } from '../../scripts/operations-log.js';
+import { logOperation, logError } from '../../scripts/operations-log.js';
 
 /**
  * Renders "Find Locally" button container.
@@ -403,6 +403,9 @@ export default function renderAddToCart(ph, block, parent) {
       const { locale, language } = getLocaleAndLanguage();
       window.location.href = `/${locale}/${language}/checkout/cart/`;
     } catch (error) {
+      // `flow` distinguishes the edge vs. Magento cart stack so Magento
+      // add-to-cart errors can be filtered out of analysis if needed.
+      logError('pdp.add-to-cart', error, { flow: window.useEdgeCheckout ? 'edge' : 'magento' });
       // eslint-disable-next-line no-console
       console.error('Failed to add item to cart', error);
     } finally {
