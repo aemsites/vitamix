@@ -1,5 +1,6 @@
 import { getConfig } from '../../scripts/commerce-config.js';
 import { logOperation, getCheckoutId } from '../../scripts/operations-log.js';
+import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 /**
  * Order cancellation page block.
@@ -22,6 +23,8 @@ import { logOperation, getCheckoutId } from '../../scripts/operations-log.js';
 export default async function decorate(block) {
   const config = getConfig();
   const strings = config.getStrings();
+  const { locale, language } = getLocaleAndLanguage();
+  const storeRootPath = `/${locale}/${language}/`;
   const params = Object.fromEntries(new URLSearchParams(window.location.search).entries());
 
   const reason = params.reason || '';
@@ -85,7 +88,7 @@ export default async function decorate(block) {
   actions.appendChild(returnLink);
 
   const shopLink = document.createElement('a');
-  shopLink.href = `/${config.getLocale()}/${config.getLanguage()}`;
+  shopLink.href = storeRootPath;
   shopLink.className = 'button secondary';
   shopLink.textContent = strings.continueShopping;
   actions.appendChild(shopLink);

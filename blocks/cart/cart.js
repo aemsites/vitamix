@@ -4,6 +4,7 @@ import { getConfig } from '../../scripts/commerce-config.js';
 import buildCartItem, { buildGiftItem } from '../../scripts/commerce/cart-item.js';
 import { ensurePriceRulesLoaded, evaluateGWP } from '../../scripts/gift-with-purchase.js';
 import { logOperation } from '../../scripts/operations-log.js';
+import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 const LOCAL_STRINGS = {
   'en-us': {
@@ -40,7 +41,7 @@ function buildCartItemExtensions(extensions, context) {
     .filter((content) => content instanceof HTMLElement);
 }
 
-function buildTemplate(s) {
+function buildTemplate(s, storeRootPath) {
   return /* html */`
 <div class="cart">
     <div class="cart-items">
@@ -49,7 +50,7 @@ function buildTemplate(s) {
     </div>
     <div class="cart-empty-message">
         <p>${s.cartEmpty}</p>
-        <a href="/" class="button">${s.continueShopping}</a>
+        <a href="${storeRootPath}" class="button">${s.continueShopping}</a>
     </div>
     <div class="cart-controls">
         <a href="#" class="button cart-view-cart">${s.viewCart}</a>
@@ -67,10 +68,12 @@ export default async function decorate(block) {
 
   const config = getConfig();
   const s = getStrings(config);
+  const { locale, language } = getLocaleAndLanguage();
+  const storeRootPath = `/${locale}/${language}/`;
   const currencyCode = typeof config.currency === 'function' ? config.currency(config.getLocale()) : config.currency;
   const cartItemExtensions = await loadCartItemExtensions(config);
 
-  block.innerHTML = buildTemplate(s);
+  block.innerHTML = buildTemplate(s, storeRootPath);
   block.querySelector('.cart-checkout').href = config.getOrderPath('checkout');
 
   const isMinicart = Boolean(block.closest('.minicart'));
@@ -87,9 +90,8 @@ export default async function decorate(block) {
 
   const heading = block.closest('.section')?.querySelector('.default-content-wrapper h1, .default-content-wrapper h2');
   if (heading) {
-    const shopRoot = `/${config.getLocale()}/${config.getLanguage()}/`;
     const link = document.createElement('a');
-    link.href = shopRoot;
+    link.href = storeRootPath;
     link.className = 'cart-continue-shopping';
     link.textContent = s.continueShopping;
     heading.insertAdjacentElement('afterend', link);

@@ -15,6 +15,7 @@ import { ensurePriceRulesLoaded, evaluateGWP } from '../../scripts/gift-with-pur
 import { validateField } from './checkout-validation.js';
 import { formStateKey, saveFormState, restoreFormState } from './checkout-session-state.js';
 import { logOperation, getCheckoutId } from '../../scripts/operations-log.js';
+import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 const ALL_PROVIDERS = [chase, applePay, paypal, affirm];
 
@@ -167,6 +168,8 @@ export default async function decorate(block) {
   const config = getConfig();
   const strings = getStrings(config);
   const locale = config.getLocale();
+  const { locale: currentLocale, language } = getLocaleAndLanguage();
+  const storeRootPath = `/${currentLocale}/${language}/`;
 
   // Reconcile gift-with-purchase before the empty-cart guard — a returning
   // visitor whose cart no longer qualifies needs the stale gift removed,
@@ -182,7 +185,7 @@ export default async function decorate(block) {
     const p = document.createElement('p');
     p.textContent = strings.cartEmpty;
     const link = document.createElement('a');
-    link.href = '/';
+    link.href = storeRootPath;
     link.className = 'button';
     link.textContent = strings.continueShopping;
     empty.append(p, link);

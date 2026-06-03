@@ -1,6 +1,7 @@
 import { getConfig, formatPrice } from '../../scripts/commerce-config.js';
 import { getOrder } from '../../scripts/commerce-api.js';
 import { logOperation, getCheckoutId, clearCheckoutId } from '../../scripts/operations-log.js';
+import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 export function normalizeTotalsDiscounts(discounts = []) {
   return discounts.filter((discount) => Math.abs(parseFloat(discount?.amount)) > 0);
@@ -37,6 +38,8 @@ export function calculateConfirmationTotal({
 export default async function decorate(block) {
   const config = getConfig();
   const s = config.getStrings();
+  const { locale, language } = getLocaleAndLanguage();
+  const storeRootPath = `/${locale}/${language}/`;
   const currencyCode = typeof config.currency === 'function' ? config.currency(config.getLocale()) : config.currency;
   const params = Object.fromEntries(new URLSearchParams(window.location.search).entries());
 
@@ -89,7 +92,7 @@ export default async function decorate(block) {
   const cartItemsData = sessionStorage.getItem('checkout_cart_items');
 
   if (!orderId) {
-    window.location.href = '/';
+    window.location.href = storeRootPath;
     return;
   }
 
@@ -374,7 +377,7 @@ export default async function decorate(block) {
   const actions = document.createElement('div');
   actions.className = 'order-actions';
   const continueLink = document.createElement('a');
-  continueLink.href = '/';
+  continueLink.href = storeRootPath;
   continueLink.className = 'button emphasis';
   continueLink.textContent = s.continueShopping;
   actions.appendChild(continueLink);
