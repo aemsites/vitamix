@@ -1,5 +1,6 @@
 import { validateApplePayMerchant, estimateExpressCheckout } from '../commerce-api.js';
 import { getUser, isLoggedIn } from '../auth-api.js';
+import { logOperation, getCheckoutId } from '../operations-log.js';
 
 const APPLE_PAY_SDK_URL = 'https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js';
 
@@ -197,10 +198,23 @@ function startExpressSession(btn, config, callbacks) {
           callbacks.onComplete(createdOrder);
         } else {
           session.completePayment(window.ApplePaySession.STATUS_FAILURE);
+          logOperation('checkout-failed', {
+            checkoutId: getCheckoutId(),
+            orderId: createdOrder.order?.id ?? createdOrder.id,
+            provider: 'apple-pay',
+            status: result.status,
+            reason: result.reason,
+          });
           callbacks.showError(result.reason || 'Apple Pay payment failed.');
         }
       } catch (err) {
         session.completePayment(window.ApplePaySession.STATUS_FAILURE);
+        logOperation('checkout-failed', {
+          checkoutId: getCheckoutId(),
+          provider: 'apple-pay',
+          status: err?.status,
+          message: err?.body?.message || err?.message,
+        });
         const msg = err?.errorHeader?.toLowerCase().includes('recaptcha')
           ? callbacks.strings.errorRecaptcha
           : 'Apple Pay payment failed. Please try again.';
@@ -303,10 +317,23 @@ export function beginCheckoutSession(config, callbacks) {
           resolve('success');
         } else {
           session.completePayment(window.ApplePaySession.STATUS_FAILURE);
+          logOperation('checkout-failed', {
+            checkoutId: getCheckoutId(),
+            orderId: createdOrder.order?.id ?? createdOrder.id,
+            provider: 'apple-pay',
+            status: result.status,
+            reason: result.reason,
+          });
           reject(new Error(result.reason || 'payment-failed'));
         }
       } catch (err) {
         session.completePayment(window.ApplePaySession.STATUS_FAILURE);
+        logOperation('checkout-failed', {
+          checkoutId: getCheckoutId(),
+          provider: 'apple-pay',
+          status: err?.status,
+          message: err?.body?.message || err?.message,
+        });
         const reason = err?.errorHeader?.toLowerCase().includes('recaptcha') ? 'recaptcha-blocked' : 'payment-failed';
         reject(new Error(reason));
       }

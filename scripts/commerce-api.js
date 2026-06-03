@@ -2,6 +2,7 @@ import { getConfig } from './commerce-config.js';
 import { AUTH_TOKEN_KEY } from './auth-api.js';
 import { mintRecaptchaToken, RECAPTCHA_ACTIONS, RECAPTCHA_HEADER } from './recaptcha.js';
 import { getLocaleAndLanguage, loggedFetch } from './scripts.js';
+import { logApiError, logNetworkError } from './operations-log.js';
 
 /**
  * Error thrown when the Commerce API returns a non-2xx response.
@@ -41,13 +42,25 @@ async function post(path, body, recaptchaAction) {
     if (recaptchaToken) headers[RECAPTCHA_HEADER] = recaptchaToken;
   }
 
-  const resp = await loggedFetch(`${getConfig().apiOrigin}${path}`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body),
-  });
-  const data = await resp.json();
+  let resp;
+  let data;
+  try {
+    resp = await loggedFetch(`${getConfig().apiOrigin}${path}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
+    data = await resp.json();
+  } catch (err) {
+    logNetworkError({
+      method: 'POST', path, error: err, requestBody: body,
+    });
+    throw err;
+  }
   if (!resp.ok) {
+    logApiError({
+      method: 'POST', path, status: resp.status, responseBody: data, requestBody: body,
+    });
     throw new CommerceApiError(resp.status, data, resp.headers.get('x-error'));
   }
   return data;
@@ -189,13 +202,25 @@ async function request(path, body, method) {
   const token = sessionStorage.getItem(AUTH_TOKEN_KEY);
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const resp = await fetch(`${getConfig().apiOrigin}${path}`, {
-    method,
-    headers,
-    ...(body !== null ? { body: JSON.stringify(body) } : {}),
-  });
-  const data = await resp.json();
+  let resp;
+  let data;
+  try {
+    resp = await fetch(`${getConfig().apiOrigin}${path}`, {
+      method,
+      headers,
+      ...(body !== null ? { body: JSON.stringify(body) } : {}),
+    });
+    data = await resp.json();
+  } catch (err) {
+    logNetworkError({
+      method, path, error: err, requestBody: body,
+    });
+    throw err;
+  }
   if (!resp.ok) {
+    logApiError({
+      method, path, status: resp.status, responseBody: data, requestBody: body,
+    });
     throw new CommerceApiError(resp.status, data, resp.headers.get('x-error'));
   }
   return data;

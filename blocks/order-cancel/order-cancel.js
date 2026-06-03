@@ -1,4 +1,5 @@
 import { getConfig } from '../../scripts/commerce-config.js';
+import { logOperation, getCheckoutId } from '../../scripts/operations-log.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 /**
@@ -28,6 +29,20 @@ export default async function decorate(block) {
 
   const reason = params.reason || '';
   const processorMessage = params.message || '';
+
+  // This page is only reached when a processor redirects back after a cancel or
+  // failure — log the redirect return and the failure (keep the checkoutId so a
+  // retry stays correlated; don't clear it).
+  logOperation('checkout-redirect-return', {
+    checkoutId: getCheckoutId(),
+    orderId: params.orderId,
+    ...(reason ? { reason } : {}),
+  });
+  logOperation('checkout-failed', {
+    checkoutId: getCheckoutId(),
+    orderId: params.orderId,
+    reason: reason || 'payment_failed',
+  });
 
   let bodyText;
   if (reason === 'customer_cancelled') {

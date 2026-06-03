@@ -4,6 +4,7 @@ import {
   getPayPalSession,
 } from '../commerce-api.js';
 import { getLocaleAndLanguage } from '../scripts.js';
+import { logOperation, getCheckoutId } from '../operations-log.js';
 
 let sdkLoadPromise = null;
 
@@ -362,21 +363,31 @@ export default {
         try { return sessionStorage.getItem('forter_token') || undefined; } catch { return undefined; }
       })();
 
+      const orderId = createdOrder.order?.id ?? createdOrder.id;
       try {
         const payment = await callbacks.initiatePayment(
-          createdOrder.order?.id ?? createdOrder.id,
+          orderId,
           idempotencyKey,
           fraudToken,
           'paypal',
           'paypal',
         );
         if (payment.action === 'redirect' && payment.redirectUrl) {
+          logOperation('checkout-redirect-start', {
+            checkoutId: getCheckoutId(), orderId, provider: 'paypal',
+          });
           window.location.href = payment.redirectUrl;
         } else {
+          logOperation('checkout-failed', {
+            checkoutId: getCheckoutId(), orderId, provider: 'paypal', status: payment.status,
+          });
           callbacks.showError('Unexpected payment response. Please try again.');
           btn.disabled = false;
         }
       } catch (err) {
+        logOperation('checkout-failed', {
+          checkoutId: getCheckoutId(), orderId, provider: 'paypal', status: err?.status, message: err?.body?.message || err?.message,
+        });
         callbacks.showError(err.body?.message || 'Something went wrong. Please try again.');
         btn.disabled = false;
       }

@@ -4,6 +4,7 @@ import { updatePreview } from './checkout-shipping.js';
 import { FORMS_ENDPOINT, getLocaleAndLanguage } from '../../scripts/scripts.js';
 import { validateLinkIntegrity } from './link-integrity.js';
 import { validateForm } from './checkout-validation.js';
+import { logOperation, getCheckoutId } from '../../scripts/operations-log.js';
 
 export { validateLinkIntegrity };
 
@@ -313,10 +314,11 @@ export function initOrder(form, cart, state, config, strings) {
         subscribeNewsletter(formData);
         saveCheckoutSession(email, cart, state.currentPreview, createdOrder.order ?? createdOrder);
 
+        const orderId = createdOrder.order?.id ?? createdOrder.id;
         const fraudToken = config.getFraudToken?.();
         const idempotencyKey = crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`;
         const payment = await initiatePayment(
-          createdOrder.order?.id ?? createdOrder.id,
+          orderId,
           idempotencyKey,
           fraudToken,
           config.cardProvider || 'chase',
@@ -324,15 +326,26 @@ export function initOrder(form, cart, state, config, strings) {
         );
 
         if (payment.action === 'redirect' && payment.redirectUrl) {
+          logOperation('checkout-redirect-start', {
+            checkoutId: getCheckoutId(), orderId, provider: config.cardProvider || 'chase',
+          });
           window.location.href = payment.redirectUrl;
         } else if (payment.status === 'completed') {
           callbacks.onComplete(createdOrder);
         } else {
+          logOperation('checkout-failed', {
+            checkoutId: getCheckoutId(), orderId, status: payment.status, reason: payment.reason,
+          });
           showError(form, payment.reason || strings.errorGeneric);
           submitBtn.disabled = false;
           if (submitTextEl) submitTextEl.textContent = strings.continueToPayment;
         }
       } catch (err) {
+        logOperation('checkout-failed', {
+          checkoutId: getCheckoutId(),
+          status: err?.status,
+          message: err?.body?.message || err?.message,
+        });
         const msg = err?.errorHeader?.toLowerCase().includes('recaptcha')
           ? strings.errorRecaptcha
           : err.body?.message || strings.errorGeneric;

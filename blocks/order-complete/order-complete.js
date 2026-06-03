@@ -1,5 +1,6 @@
 import { getConfig, formatPrice } from '../../scripts/commerce-config.js';
 import { getOrder } from '../../scripts/commerce-api.js';
+import { logOperation, getCheckoutId, clearCheckoutId } from '../../scripts/operations-log.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 export function normalizeTotalsDiscounts(discounts = []) {
@@ -42,8 +43,22 @@ export default async function decorate(block) {
   const currencyCode = typeof config.currency === 'function' ? config.currency(config.getLocale()) : config.currency;
   const params = Object.fromEntries(new URLSearchParams(window.location.search).entries());
 
+  // Landing on the confirmation page is the return point of the checkout
+  // journey (whether or not a payment redirect was involved).
+  logOperation('checkout-redirect-return', {
+    checkoutId: getCheckoutId(),
+    orderId: params.orderId || params.id,
+    ...(params.reason ? { reason: params.reason } : {}),
+  });
+
   // cancelled or failed payment
   if (params.reason) {
+    logOperation('checkout-failed', {
+      checkoutId: getCheckoutId(),
+      orderId: params.orderId || params.id,
+      reason: params.reason,
+    });
+
     const container = document.createElement('div');
     container.className = 'order-result order-cancelled';
 
@@ -369,4 +384,12 @@ export default async function decorate(block) {
   container.appendChild(actions);
 
   block.replaceChildren(container);
+
+  logOperation('checkout-complete', {
+    checkoutId: getCheckoutId(),
+    orderId,
+    total: totalsTotal,
+    itemCount: displayItems?.reduce((acc, i) => acc + (i.quantity || 0), 0),
+  });
+  clearCheckoutId();
 }
