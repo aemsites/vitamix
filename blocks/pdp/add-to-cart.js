@@ -1,6 +1,7 @@
 import { getMetadata } from '../../scripts/aem.js';
 import { checkVariantOutOfStock, getLocaleAndLanguage } from '../../scripts/scripts.js';
 import { getConfig } from '../../scripts/commerce-config.js';
+import { logOperation } from '../../scripts/operations-log.js';
 
 /**
  * Renders "Find Locally" button container.
@@ -379,6 +380,7 @@ export default function renderAddToCart(ph, block, parent) {
         // reenable button
         addToCartButton.textContent = 'Add to Cart';
         addToCartButton.removeAttribute('aria-disabled');
+        logOperation('added-to-cart', { sku: targetSku, quantity: allowedQty });
         document.dispatchEvent(new CustomEvent('pdp:add-to-cart', { detail: { item } }));
         return;
       }
@@ -395,6 +397,7 @@ export default function renderAddToCart(ph, block, parent) {
 
       // add product to cart with selected options and quantity
       await cartApi.addToCart(sku, selectedOptions, quantity);
+      logOperation('added-to-cart', { sku, quantity });
 
       // redirect to cart page after successful addition
       const { locale, language } = getLocaleAndLanguage();

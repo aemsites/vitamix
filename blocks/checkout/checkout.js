@@ -14,6 +14,7 @@ import { parsePreview } from '../../scripts/commerce-api.js';
 import { ensurePriceRulesLoaded, evaluateGWP } from '../../scripts/gift-with-purchase.js';
 import { validateField } from './checkout-validation.js';
 import { formStateKey, saveFormState, restoreFormState } from './checkout-session-state.js';
+import { logOperation, getCheckoutId } from '../../scripts/operations-log.js';
 
 const ALL_PROVIDERS = [chase, applePay, paypal, affirm];
 
@@ -190,6 +191,12 @@ export default async function decorate(block) {
   }
 
   block.innerHTML = '';
+
+  logOperation('checkout-start', {
+    checkoutId: getCheckoutId(),
+    itemCount: cart.itemCount,
+    subtotal: cart.subtotal,
+  });
 
   // If cart is emptied during checkout, reload to show the empty state
   document.addEventListener('cart:change', () => {

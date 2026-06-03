@@ -1,4 +1,5 @@
 import { getLocaleAndLanguage } from '../scripts.js';
+import { logOperation, getCheckoutId } from '../operations-log.js';
 
 /** @type {import('./types').PaymentProvider} */
 export default {
@@ -49,6 +50,9 @@ export default {
           createdOrder.order ?? createdOrder,
         );
       } catch (err) {
+        logOperation('checkout-failed', {
+          checkoutId: getCheckoutId(), provider: 'affirm', status: err?.status, message: err?.body?.message || err?.message,
+        });
         callbacks.showError(err?.errorHeader?.toLowerCase().includes('recaptcha')
           ? callbacks.strings.errorRecaptcha
           : (err.body?.message || 'Unable to place order. Please try again.'));
@@ -56,17 +60,21 @@ export default {
         return;
       }
 
+      const orderId = createdOrder.order?.id ?? createdOrder.id;
       const idempotencyKey = crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`;
       let payment;
       try {
         payment = await callbacks.initiatePayment(
-          createdOrder.order?.id ?? createdOrder.id,
+          orderId,
           idempotencyKey,
           undefined,
           'affirm',
           'bnpl',
         );
       } catch (err) {
+        logOperation('checkout-failed', {
+          checkoutId: getCheckoutId(), orderId, provider: 'affirm', status: err?.status, message: err?.body?.message || err?.message,
+        });
         const message = err.body?.error === 'ORDER_TOTAL_OUT_OF_RANGE'
           ? 'Affirm is not available for this order total.'
           : err.body?.message || 'Affirm is unavailable. Please try another payment method.';
@@ -104,6 +112,9 @@ export default {
         affirm.checkout(payment.checkoutObject);
         const openOpts = payment.checkoutMode === 'modal' ? {
           onSuccess: ({ checkout_token: checkoutToken }) => {
+            logOperation('checkout-redirect-start', {
+              checkoutId: getCheckoutId(), orderId, provider: 'affirm',
+            });
             const confirmUrl = payment.checkoutObject.merchant.user_confirmation_url;
             window.location.href = `${confirmUrl}&checkout_token=${encodeURIComponent(checkoutToken)}`;
           },

@@ -3,6 +3,7 @@ import cart from '../../scripts/cart.js';
 import { getConfig } from '../../scripts/commerce-config.js';
 import buildCartItem, { buildGiftItem } from '../../scripts/commerce/cart-item.js';
 import { ensurePriceRulesLoaded, evaluateGWP } from '../../scripts/gift-with-purchase.js';
+import { logOperation } from '../../scripts/operations-log.js';
 
 const LOCAL_STRINGS = {
   'en-us': {
@@ -142,6 +143,8 @@ export default async function decorate(block) {
                 .forEach((linkedItem) => cart.updateItem(linkedItem.sku, qty));
             },
             onRemove: (sku) => {
+              const removed = cart.items.find((i) => i.sku === sku);
+              logOperation('removed-from-cart', { sku, quantity: removed?.quantity });
               cart.items
                 .filter((i) => i.custom?.linkedTo === sku)
                 .forEach((linkedItem) => cart.removeItem(
@@ -162,6 +165,16 @@ export default async function decorate(block) {
   populatelist();
   document.addEventListener('cart:change', populatelist);
   document.addEventListener('cart:limit', populatelist);
+
+  // Log views of the full cart page only (minicart is built once per page load
+  // and toggled via UI, so logging it here would not reflect actual opens).
+  if (!isMinicart) {
+    logOperation('cart-view', {
+      itemCount: cart.visibleItemCount,
+      subtotal: cart.subtotal,
+      skus: cart.items.filter((i) => i.local?.showInCart !== false).map((i) => i.sku),
+    });
+  }
 
   // Visiting cart/minicart is always a GWP trigger — populate/refresh rules
   // and reconcile. populatelist re-renders on the resulting cart:change.
