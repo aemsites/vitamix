@@ -35,12 +35,45 @@ function stripTrailingRecipeId(slug) {
 }
 
 /**
+ * Removes equipment-variant suffixes from a recipe slug for fallback matching.
+ * @param {string} slug - Already kebab-lowercased segment
+ * @returns {string}
+ */
+function stripEquipmentSuffixFromSlug(slug) {
+  return (slug || '').replace(/-immersion-blender|-food-processor-attachment|-mini-chopper-attachment/g, '');
+}
+
+/**
  * Slug from a recipe index `path` (basename, normalized).
  * @param {string} path — recipe's path field from the query-index
  * @returns {string}
  */
 function slugFromRecipePath(path) {
   return normalizeKebabLower(lastPathSegment(path));
+}
+
+/**
+ * Best recipe index row for a target slug, or null when none match.
+ * @param {Object[]} recipes - Filtered query-index rows
+ * @param {string} targetSlug - Normalized last path segment to match
+ * @returns {{ path: string, slug: string, score: number } | null}
+ */
+function findBestRecipeMatch(recipes, targetSlug) {
+  const matches = recipes.flatMap((r) => {
+    const path = (r.path || '').trim();
+    const slug = slugFromRecipePath(path);
+    if (!slug) return [];
+    if (slug === targetSlug) return [{ path, slug, score: 3 }];
+    const slugBase = stripTrailingRecipeId(slug);
+    if (slugBase === targetSlug) return [{ path, slug, score: 2 }];
+    if (targetSlug.length >= 3 && slug.startsWith(targetSlug)) return [{ path, slug, score: 1 }];
+    return [];
+  });
+
+  if (matches.length === 0) return null;
+
+  matches.sort((a, b) => b.score - a.score || a.slug.length - b.slug.length);
+  return matches[0];
 }
 
 /**
@@ -76,22 +109,14 @@ async function tryRedirectFromRecipeIndex(locale, language) {
     return (status === 'updated' || status === 'new') && (r.path || '').trim();
   });
 
-  const matches = recipes.flatMap((r) => {
-    const path = (r.path || '').trim();
-    const slug = slugFromRecipePath(path);
-    if (!slug) return [];
-    if (slug === targetSlug) return [{ path, slug, score: 3 }];
-    const slugBase = stripTrailingRecipeId(slug);
-    if (slugBase === targetSlug) return [{ path, slug, score: 2 }];
-    if (targetSlug.length >= 3 && slug.startsWith(targetSlug)) return [{ path, slug, score: 1 }];
-    return [];
-  });
-
-  if (matches.length === 0) return false;
-
-  // Higher score first; same score: shortest slug (prefix tier avoids …mini-chopper…).
-  matches.sort((a, b) => b.score - a.score || a.slug.length - b.slug.length);
-  const best = matches[0];
+  let best = findBestRecipeMatch(recipes, targetSlug);
+  if (!best) {
+    const simplifiedSlug = stripEquipmentSuffixFromSlug(targetSlug);
+    if (simplifiedSlug && simplifiedSlug !== targetSlug) {
+      best = findBestRecipeMatch(recipes, simplifiedSlug);
+    }
+  }
+  if (!best) return false;
   const target = best.path.startsWith('/') ? best.path : `/${best.path}`;
   const here = window.location.pathname.replace(/\/$/, '') || '/';
   const there = target.replace(/\/$/, '') || '/';
