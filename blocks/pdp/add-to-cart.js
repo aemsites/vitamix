@@ -404,8 +404,13 @@ export default function renderAddToCart(ph, block, parent) {
       window.location.href = `/${locale}/${language}/checkout/cart/`;
     } catch (error) {
       // `flow` distinguishes the edge vs. Magento cart stack so Magento
-      // add-to-cart errors can be filtered out of analysis if needed.
-      logError('pdp.add-to-cart', error, { flow: window.useEdgeCheckout ? 'edge' : 'magento' });
+      // add-to-cart errors can be filtered out of analysis if needed. `sku` is
+      // the PDP's product SKU (variant SKU isn't in scope here).
+      logError('pdp.add-to-cart', error, {
+        flow: window.useEdgeCheckout ? 'edge' : 'magento',
+        sku,
+        quantity,
+      });
       // eslint-disable-next-line no-console
       console.error('Failed to add item to cart', error);
     } finally {
