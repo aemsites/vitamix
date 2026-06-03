@@ -162,3 +162,26 @@ export function logApiError({
     requestBody: anonymize(requestBody),
   });
 }
+
+/**
+ * Logs a transport-level Commerce API failure — a rejected fetch (offline, DNS,
+ * CORS, connection reset, timeout) or an unparseable response body. These never
+ * produce an HTTP status, so they bypass `logApiError`. The request body is
+ * anonymized before logging.
+ * @param {Object} info
+ * @param {string} info.method - HTTP verb.
+ * @param {string} info.path - API path.
+ * @param {*} info.error - The thrown error.
+ * @param {*} info.requestBody - Request body (will be anonymized).
+ */
+export function logNetworkError({
+  method, path, error, requestBody,
+}) {
+  logOperation('error', {
+    kind: 'network',
+    method,
+    path,
+    message: error?.message || String(error),
+    requestBody: anonymize(requestBody),
+  });
+}

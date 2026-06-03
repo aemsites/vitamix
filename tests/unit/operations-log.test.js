@@ -7,7 +7,7 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  logOperation, getCheckoutId, clearCheckoutId, anonymize, logApiError,
+  logOperation, getCheckoutId, clearCheckoutId, anonymize, logApiError, logNetworkError,
 } from '../../scripts/operations-log.js';
 
 const PATH = '/us/en_us/products/operations-log';
@@ -147,4 +147,23 @@ test('logApiError: logs error action with anonymized request body', () => {
   assert.deepEqual(body.responseBody, { message: 'bad' });
   assert.deepEqual(body.requestBody, { country: 'us' });
   assert.equal(body.requestBody.customer, undefined);
+});
+
+// --- logNetworkError --------------------------------------------------------
+
+test('logNetworkError: logs error action with kind network and anonymized body', () => {
+  captureFetch();
+  logNetworkError({
+    method: 'POST',
+    path: '/orders',
+    error: new TypeError('Failed to fetch'),
+    requestBody: { country: 'us', shipping: { state: 'CA', street: '1 Main St' } },
+  });
+  const body = JSON.parse(lastInit.body);
+  assert.equal(body.action, 'error');
+  assert.equal(body.kind, 'network');
+  assert.equal(body.path, '/orders');
+  assert.equal(body.message, 'Failed to fetch');
+  // undefined keys (country/zip) are dropped by JSON serialization.
+  assert.deepEqual(body.requestBody, { country: 'us', shipping: { state: 'CA' } });
 });
