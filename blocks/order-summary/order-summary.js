@@ -1,7 +1,7 @@
 import { loadCSS } from '../../scripts/aem.js';
 import cart from '../../scripts/cart.js';
 import { getConfig, formatPrice } from '../../scripts/commerce-config.js';
-import buildCartItem from '../../scripts/commerce/cart-item.js';
+import buildCartItem, { buildGiftItem } from '../../scripts/commerce/cart-item.js';
 import buildWarrantySelector from '../cart/warranty-selector.js';
 import { parsePreview, estimatePrice } from '../../scripts/commerce-api.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
@@ -379,7 +379,19 @@ export default async function decorate(block) {
 
     cart.items
       .filter((item) => item.local?.showInCart !== false)
+      // Free gifts always render last, regardless of insertion order.
+      .slice()
+      .sort((a, b) => (a.custom?.giftWithPurchase ? 1 : 0) - (b.custom?.giftWithPurchase ? 1 : 0))
       .forEach((item) => {
+        if (item.custom?.giftWithPurchase) {
+          itemsList.appendChild(buildGiftItem(item, {
+            currencyCode,
+            freeGift: s.freeGift,
+            free: s.free,
+          }));
+          return;
+        }
+
         const linkedWarranty = cart.items
           .find((i) => i.custom?.linkedTo === item.sku) || null;
 
