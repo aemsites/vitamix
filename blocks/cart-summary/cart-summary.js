@@ -8,6 +8,7 @@ import applePay from '../../scripts/payments/apple-pay.js';
 import googlePay from '../../scripts/payments/google-pay.js';
 import paypal from '../../scripts/payments/paypal.js';
 import { getActiveProviders } from '../checkout/checkout-payment.js';
+import formatDiscountLabel from '../../scripts/commerce/discount-label.js';
 import { initIDMe, syncIDMeVisibility } from '../../scripts/commerce/idme.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 
@@ -224,7 +225,7 @@ export default async function decorate(block) {
 
   // 4. Restore saved promo code; persist to sessionStorage on apply
   const showDiscountRow = (code, amount = '--') => {
-    discountRowLabel.textContent = `${s.discount} (${code})`;
+    discountRowLabel.textContent = `${s.discount} (${formatDiscountLabel(code)})`;
     discountRowAmount.textContent = amount;
     discountRow.hidden = false;
   };

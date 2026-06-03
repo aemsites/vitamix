@@ -1,5 +1,6 @@
 import { getConfig, formatPrice } from '../../scripts/commerce-config.js';
 import { getOrder } from '../../scripts/commerce-api.js';
+import formatDiscountLabel from '../../scripts/commerce/discount-label.js';
 
 export function normalizeTotalsDiscounts(discounts = []) {
   return discounts.filter((discount) => Math.abs(parseFloat(discount?.amount)) > 0);
@@ -252,7 +253,7 @@ export default async function decorate(block) {
     ];
 
     normalizeTotalsDiscounts(totalsDiscounts).forEach((discount) => {
-      const label = discount.name || s.discount;
+      const label = formatDiscountLabel(discount.name || s.discount);
       const amount = Math.abs(parseFloat(discount.amount));
       const value = formatPrice(-amount, currencyCode);
       rows.push([label, value, 'order-totals-discount']);

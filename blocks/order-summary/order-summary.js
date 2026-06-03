@@ -5,6 +5,7 @@ import buildCartItem, { buildGiftItem } from '../../scripts/commerce/cart-item.j
 import buildWarrantySelector from '../cart/warranty-selector.js';
 import { parsePreview, estimatePrice } from '../../scripts/commerce-api.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import formatDiscountLabel from '../../scripts/commerce/discount-label.js';
 import { initIDMe, syncIDMeVisibility } from '../../scripts/commerce/idme.js';
 
 const COUPON_ERROR_MESSAGES = {
@@ -264,12 +265,12 @@ export default async function decorate(block) {
         const labelGroup = document.createElement('span');
         labelGroup.className = 'discount-label-group';
         const label = document.createElement('span');
-        label.textContent = d.name || s.discount;
+        label.textContent = formatDiscountLabel(d.name || s.discount);
         labelGroup.append(label, makeRemoveBtn());
         row.append(labelGroup, amount);
       } else {
         const label = document.createElement('span');
-        label.textContent = d.name || s.discount;
+        label.textContent = formatDiscountLabel(d.name || s.discount);
         row.append(label, amount);
       }
       discountsEl.appendChild(row);
@@ -284,7 +285,7 @@ export default async function decorate(block) {
     const labelGroup = document.createElement('span');
     labelGroup.className = 'discount-label-group';
     const label = document.createElement('span');
-    label.textContent = `${s.discount} (${code})`;
+    label.textContent = `${s.discount} (${formatDiscountLabel(code)})`;
     labelGroup.append(label, makeRemoveBtn());
     const amount = document.createElement('span');
     amount.className = 'order-summary-discount-amount';
