@@ -40,7 +40,7 @@ function stripTrailingRecipeId(slug) {
  * @returns {string}
  */
 function stripEquipmentSuffixFromSlug(slug) {
-  return (slug || '').replace(/-immersion-blender|-food-processor-attachment|-mini-chopper/g, '');
+  return (slug || '').replace(/-immersion-blender|-food-processor-attachment|-mini-chopper-attachment/g, '');
 }
 
 /**
