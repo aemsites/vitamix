@@ -217,6 +217,11 @@
   margin-bottom: var(--commerce-card-padding);
   padding-bottom: var(--commerce-card-padding);
   border-bottom: 1px solid var(--commerce-color-border);
+  text-align: left;
+}
+
+.idme-verify .idme-trigger-link {
+  width: fit-content;
 }
 
 /* Totals */

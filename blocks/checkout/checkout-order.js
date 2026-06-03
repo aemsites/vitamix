@@ -72,11 +72,7 @@ export function buildOrderJSON(formData, form, cart, state, config) {
   }
 
   const couponCode = sessionStorage.getItem('checkout_coupon_code') || undefined;
-  const couponSource = sessionStorage.getItem('checkout_coupon_source') || undefined;
-  if (couponCode) {
-    order.couponCode = couponCode;
-    if (couponSource) order.couponSource = couponSource;
-  }
+  if (couponCode) order.couponCode = couponCode;
 
   order.locale = `${language.split('_')[0]}-${(language.split('_')[1] || locale).toUpperCase()}`;
   order.country = locale;

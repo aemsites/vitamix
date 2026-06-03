@@ -297,6 +297,11 @@ dialog.paypal-not-configured-dialog::backdrop {
   margin-bottom: var(--commerce-card-padding);
   padding-bottom: var(--commerce-card-padding);
   border-bottom: 1px solid var(--commerce-color-border);
+  text-align: left;
+}
+
+.cart-summary .idme-verify .idme-trigger-link {
+  width: fit-content;
 }
 
 /* Remove bottom border from promo section when ID.me follows it */
