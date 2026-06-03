@@ -5,7 +5,7 @@ import buildCartItem from '../../scripts/commerce/cart-item.js';
 import buildWarrantySelector from '../cart/warranty-selector.js';
 import { parsePreview, estimatePrice } from '../../scripts/commerce-api.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
-import { initIDMe } from '../../scripts/commerce/idme.js';
+import { initIDMe, syncIDMeVisibility } from '../../scripts/commerce/idme.js';
 
 const COUPON_ERROR_MESSAGES = {
   'en-us': {
@@ -293,6 +293,16 @@ export default async function decorate(block) {
     discountsEl.appendChild(row);
   };
 
+  const updateTotals = () => {
+    const currency = getCurrencyCode();
+    const subtotal = formatPrice(cart.subtotal, currency);
+    subtotalEl.textContent = subtotal;
+    shippingEl.textContent = '--';
+    taxesEl.textContent = '--';
+    grandTotalEl.textContent = subtotal;
+    headerTotalEl.textContent = subtotal;
+  };
+
   let priceEstimateRequest = 0;
   let hasOrderPreview = false;
   const renderPriceEstimate = (estimate) => {
@@ -315,6 +325,7 @@ export default async function decorate(block) {
     if (!couponCode || !cart.itemCount) {
       discountsEl.innerHTML = '';
       discountsEl.hidden = true;
+      updateTotals();
       return;
     }
 
@@ -431,16 +442,6 @@ export default async function decorate(block) {
       });
   };
 
-  const updateTotals = () => {
-    const currency = getCurrencyCode();
-    const subtotal = formatPrice(cart.subtotal, currency);
-    subtotalEl.textContent = subtotal;
-    shippingEl.textContent = '--';
-    taxesEl.textContent = '--';
-    grandTotalEl.textContent = subtotal;
-    headerTotalEl.textContent = subtotal;
-  };
-
   renderItems();
   updateTotals();
   updatePriceEstimate();
@@ -460,6 +461,12 @@ export default async function decorate(block) {
 
   document.addEventListener('cart:change', refreshSummary);
   document.addEventListener('cart:limit', refreshSummary);
+  document.addEventListener('checkout:coupon-apply', () => {
+    syncIDMeVisibility();
+    const couponCode = sessionStorage.getItem('checkout_coupon_code') || '';
+    const couponSource = sessionStorage.getItem('checkout_coupon_source') || '';
+    if (!couponCode || couponSource === 'auto') updatePriceEstimate();
+  });
 
   const summaryContent = block.querySelector('.order-summary-content');
   document.addEventListener('checkout:preview-loading', () => {
@@ -478,6 +485,7 @@ export default async function decorate(block) {
       discountInput.value = '';
       couponErrorEl.textContent = getCouponErrorMessage(couponError);
       couponErrorEl.hidden = false;
+      syncIDMeVisibility();
       return;
     }
 
@@ -504,6 +512,6 @@ export default async function decorate(block) {
   syncVisibility();
   initMobileCollapse(block);
   if (getLocaleAndLanguage().locale === 'us') {
-    initIDMe(block.querySelector('.order-summary-discount'), discountInput);
+    initIDMe(block.querySelector('.order-summary-discount'));
   }
 }

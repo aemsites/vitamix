@@ -6,6 +6,7 @@ const IDME_SCOPES = 'military,medical,nurse,responder,teacher';
 // ID.me Groups product — single hostname for both sandbox and production.
 // The environment is determined by the client_id, not the URL.
 const IDME_GROUPS_BASE = 'https://groups.id.me';
+const IDME_COUPON_SOURCE = 'auto';
 
 function buildIDMeAuthUrl(callbackUrl) {
   const clientId = (!isProd && localStorage.getItem('idme-client-id')?.trim()) || IDME_CLIENT_ID;
@@ -23,6 +24,89 @@ function buildIDMeAuthUrl(callbackUrl) {
   })}`;
 }
 
+function hasIDMeCoupon() {
+  return sessionStorage.getItem('checkout_coupon_source') === IDME_COUPON_SOURCE
+    && !!sessionStorage.getItem('checkout_coupon_code');
+}
+
+export function syncIDMeVisibility() {
+  const hidden = hasIDMeCoupon();
+  document.querySelectorAll('.idme-verify').forEach((el) => {
+    el.hidden = hidden;
+  });
+}
+
+function applyIDMeCoupon(coupon) {
+  sessionStorage.setItem('checkout_coupon_code', coupon);
+  sessionStorage.setItem('checkout_coupon_source', IDME_COUPON_SOURCE);
+  syncIDMeVisibility();
+  document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
+}
+
+function notifyOpenerIDMeCoupon(coupon) {
+  if (!window.opener || window.opener.closed) return false;
+  window.opener.postMessage({ type: 'idme:coupon', coupon }, window.location.origin);
+  return true;
+}
+
+function openIDMePopup(url) {
+  const width = 775;
+  const height = 850;
+  const screenLeft = window.screenLeft ?? window.screenX ?? 0;
+  const screenTop = window.screenTop ?? window.screenY ?? 0;
+  const left = Math.round(((window.innerWidth - width) / 2) + screenLeft);
+  const top = Math.round(((window.innerHeight - height) / 2) + screenTop);
+
+  return window.open(
+    url,
+    'ID.me',
+    `scrollbars=yes,width=${width},height=${height},top=${top},left=${left}`,
+  );
+}
+
+function watchIDMePopup(popupWindow) {
+  let intervalId;
+  let handleMessage;
+
+  function finish(coupon) {
+    window.clearInterval(intervalId);
+    window.removeEventListener('message', handleMessage);
+    if (coupon) applyIDMeCoupon(coupon);
+    popupWindow.close();
+  }
+
+  handleMessage = (event) => {
+    if (event.origin !== window.location.origin || event.source !== popupWindow) return;
+    if (event.data?.type !== 'idme:coupon') return;
+    finish(event.data.coupon);
+  };
+
+  window.addEventListener('message', handleMessage);
+  intervalId = window.setInterval(() => {
+    if (popupWindow.closed) {
+      window.clearInterval(intervalId);
+      window.removeEventListener('message', handleMessage);
+      return;
+    }
+
+    let popupUrl;
+    try {
+      popupUrl = new URL(popupWindow.location.href);
+    } catch {
+      // The popup is still on ID.me, so its location is cross-origin.
+      return;
+    }
+
+    if (popupUrl.origin !== window.location.origin) return;
+
+    const coupon = popupUrl.searchParams.get('idme_coupon');
+    const error = popupUrl.searchParams.get('idme_error');
+    if (!coupon && !error) return;
+
+    finish(coupon);
+  }, 100);
+}
+
 /**
  * Reads ?idme_coupon= from the current URL, stores it as an auto-applied
  * coupon, fires checkout:coupon-apply, and cleans the param from the address
@@ -37,9 +121,11 @@ export function handleIDMeReturn() {
   params.delete('idme_error');
   const qs = params.size ? `?${params}` : '';
   window.history.replaceState(null, '', window.location.pathname + qs);
-  sessionStorage.setItem('checkout_coupon_code', coupon);
-  sessionStorage.setItem('checkout_coupon_source', 'auto');
-  document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
+  if (notifyOpenerIDMeCoupon(coupon)) {
+    window.close();
+    return coupon;
+  }
+  applyIDMeCoupon(coupon);
   return coupon;
 }
 
@@ -53,6 +139,8 @@ export function handleIDMeReturn() {
  * @returns {string|null}
  */
 export function initIDMe(insertAfterEl) {
+  const returnedCoupon = handleIDMeReturn();
+
   // only allow overrides via localStorage on non-prod hosts
   let redirectOrigin = window.location.origin;
   if (!isProd) {
@@ -82,15 +170,25 @@ export function initIDMe(insertAfterEl) {
       </div>`;
 
     outer.querySelector('.idme-trigger-link').addEventListener('click', () => {
-      window.location.href = buildIDMeAuthUrl(callbackUrl);
+      const authUrl = buildIDMeAuthUrl(callbackUrl);
+      const popupWindow = openIDMePopup(authUrl);
+
+      if (!popupWindow || popupWindow.closed) {
+        window.location.href = authUrl;
+        return;
+      }
+
+      popupWindow.focus();
+      watchIDMePopup(popupWindow);
     });
 
-    const script = document.createElement('script');
-    script.src = 'https://s3.amazonaws.com/idme/developer/idme-buttons/assets/js/idme-wallet-button.js';
-    script.async = true;
-    outer.querySelector('.idme-wrapper').appendChild(script);
+    const style = document.createElement('link');
+    style.href = 'https://s3.amazonaws.com/idme/developer/idme-buttons/assets/css/unified/button.css';
+    style.rel = 'stylesheet';
+    outer.querySelector('.idme-wrapper').appendChild(style);
   }
 
   insertAfterEl.insertAdjacentElement('afterend', outer);
-  return handleIDMeReturn();
+  syncIDMeVisibility();
+  return returnedCoupon;
 }
