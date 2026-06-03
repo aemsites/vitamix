@@ -8,7 +8,7 @@ import applePay from '../../scripts/payments/apple-pay.js';
 import googlePay from '../../scripts/payments/google-pay.js';
 import paypal from '../../scripts/payments/paypal.js';
 import { getActiveProviders } from '../checkout/checkout-payment.js';
-import { initIDMe } from '../../scripts/commerce/idme.js';
+import { initIDMe, syncIDMeVisibility } from '../../scripts/commerce/idme.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 const ALL_PROVIDERS = [applePay, googlePay, paypal];
@@ -272,10 +272,15 @@ export default async function decorate(block) {
       updateTotals();
       couponErrorEl.textContent = getCouponErrorMessage(err?.errorHeader);
       couponErrorEl.hidden = false;
+      document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
     }
   };
 
   document.addEventListener('cart:change', updatePriceEstimate);
+  document.addEventListener('checkout:coupon-apply', () => {
+    syncIDMeVisibility();
+    updatePriceEstimate();
+  });
 
   block.querySelector('.discount-remove').addEventListener('click', () => {
     sessionStorage.removeItem('checkout_coupon_code');
@@ -284,6 +289,7 @@ export default async function decorate(block) {
     couponErrorEl.hidden = true;
     hideDiscountRow();
     updateTotals();
+    document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
   });
 
   const savedCoupon = sessionStorage.getItem('checkout_coupon_code') || '';
@@ -313,6 +319,7 @@ export default async function decorate(block) {
       const estimate = await estimatePrice(country, cart.getItemsForAPI(), code);
       sessionStorage.setItem('checkout_coupon_code', code);
       sessionStorage.removeItem('checkout_coupon_source');
+      syncIDMeVisibility();
       renderPriceEstimate(code, estimate);
     } catch (err) {
       if (existingCouponSource !== 'auto') {
@@ -356,6 +363,7 @@ export default async function decorate(block) {
           hideDiscountRow();
           couponErrorEl.textContent = getCouponErrorMessage(err.errorHeader);
           couponErrorEl.hidden = false;
+          document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
         }
         throw err;
       }
@@ -395,7 +403,7 @@ export default async function decorate(block) {
 
   if (getLocaleAndLanguage().locale === 'us') {
     const promoEl = block.querySelector('.cart-summary-promo');
-    const returnedCoupon = initIDMe(promoEl, discountInput);
+    const returnedCoupon = initIDMe(promoEl);
     if (returnedCoupon) {
       showDiscountRow(returnedCoupon);
       updatePriceEstimate();
