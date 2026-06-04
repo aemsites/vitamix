@@ -122,7 +122,7 @@ async function tryRedirectFromRecipeIndex(locale, language) {
   const there = target.replace(/\/$/, '') || '/';
   if (here === there) return false;
 
-  window.location.assign(target);
+  window.location.assign(`${target}${window.location.search}`);
   return true;
 }
 
