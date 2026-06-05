@@ -11,6 +11,7 @@
  */
 
 const ADMIN_URL = 'https://admin.da.live';
+const AEM_ADMIN_URL = 'https://admin.hlx.page';
 // const ADMIN_URL = 'https://stage-admin.da.live';
 // const ADMIN_URL = 'http://localhost:8787';
 
@@ -442,5 +443,5 @@ const translate = async (htmlInput, language, context, format, daFetch, skipPrep
 };
 
 export {
-  preprocess, translate, EDITOR_FORMAT, ADMIN_FORMAT, ADMIN_URL,
+  preprocess, translate, EDITOR_FORMAT, ADMIN_FORMAT, ADMIN_URL, AEM_ADMIN_URL,
 };
