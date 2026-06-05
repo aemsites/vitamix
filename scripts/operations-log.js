@@ -11,6 +11,13 @@
  * POSTs to the AEM network origin.
  */
 
+// V8 captures at most `stackTraceLimit` frames when an Error is constructed
+// (default 10). Raising it early — this module is imported during initial page
+// bootstrap — gives deeper stacks for async errors and unhandled rejections,
+// where the relevant app frame is often buried below framework/await frames.
+// No-op in engines that don't honour it (Firefox/Safari).
+try { Error.stackTraceLimit = 100; } catch { /* read-only in some engines */ }
+
 const OPERATIONS_LOG_PATH = '/us/en_us/products/operations-log';
 const CHECKOUT_ID_KEY = 'vmx_checkout_log_id';
 const AEM_NETWORK_ORIGIN = 'https://main--vitamix--aemsites.aem.network';
@@ -126,14 +133,22 @@ export function anonymize(body) {
   return out;
 }
 
+// Keep enough frames that the originating app frame (often buried below
+// framework/await frames in async stacks) survives, but cap total size so a
+// pathological stack can't bloat the payload.
+const STACK_MAX_LINES = 30;
+const STACK_MAX_CHARS = 4000;
+
 /**
- * Trims an error stack to its first few frames to keep payloads small.
+ * Trims an error stack: keeps the leading frames (where the originating call
+ * site lives) and caps total length to keep payloads bounded.
  * @param {string} [stack]
  * @returns {string|undefined}
  */
 function trimStack(stack) {
   if (!stack) return undefined;
-  return stack.split('\n').slice(0, 5).join('\n');
+  const trimmed = stack.split('\n').slice(0, STACK_MAX_LINES).join('\n');
+  return trimmed.length > STACK_MAX_CHARS ? `${trimmed.slice(0, STACK_MAX_CHARS)}…` : trimmed;
 }
 
 /**
@@ -145,6 +160,7 @@ function trimStack(stack) {
 export function logError(scope, error, extra = {}) {
   logOperation('error', {
     scope,
+    name: error?.name,
     message: error?.message || String(error),
     stack: trimStack(error?.stack),
     ...extra,
