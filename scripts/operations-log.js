@@ -6,13 +6,14 @@
  * throw or block page processing — logging failures are swallowed.
  *
  * The endpoint path is NOT localized: all countries/languages log to the
- * `us/en_us` endpoint. On `.vitamix.com` hosts we POST same-origin (relative);
- * everywhere else we POST to the AEM network origin.
+ * `us/en_us` endpoint. Only the production domain (www.vitamix.com) POSTs
+ * same-origin (relative); every other origin is treated as stage/preprod and
+ * POSTs to the AEM network origin.
  */
 
 const OPERATIONS_LOG_PATH = '/us/en_us/products/operations-log';
-const AEM_NETWORK_ORIGIN = 'https://main--vitamix--aemsites.aem.network';
 const CHECKOUT_ID_KEY = 'vmx_checkout_log_id';
+const AEM_NETWORK_ORIGIN = 'https://main--vitamix--aemsites.aem.network';
 
 /**
  * Valid `action` values. Mirrors the endpoint contract — the only required
@@ -29,7 +30,7 @@ const CHECKOUT_ID_KEY = 'vmx_checkout_log_id';
  */
 function logUrl() {
   const hostname = window?.location?.hostname || '';
-  const origin = hostname.includes('.vitamix.com') ? '' : AEM_NETWORK_ORIGIN;
+  const origin = hostname.includes('www.vitamix.com') ? '' : AEM_NETWORK_ORIGIN;
   return `${origin}${OPERATIONS_LOG_PATH}`;
 }
 
