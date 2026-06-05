@@ -10,20 +10,16 @@
  * everywhere else we POST to the AEM network origin.
  */
 
-const OPERATIONS_LOG_PATH = '/us/en_us/products/operations-log';
-<<<<<<< Updated upstream
-=======
-const CHECKOUT_ID_KEY = 'vmx_checkout_log_id';
-
 // V8 captures at most `stackTraceLimit` frames when an Error is constructed
 // (default 10). Raising it early — this module is imported during initial page
 // bootstrap — gives deeper stacks for async errors and unhandled rejections,
 // where the relevant app frame is often buried below framework/await frames.
 // No-op in engines that don't honour it (Firefox/Safari).
 try { Error.stackTraceLimit = 100; } catch { /* read-only in some engines */ }
->>>>>>> Stashed changes
-const AEM_NETWORK_ORIGIN = 'https://main--vitamix--aemsites.aem.network';
+
+const OPERATIONS_LOG_PATH = '/us/en_us/products/operations-log';
 const CHECKOUT_ID_KEY = 'vmx_checkout_log_id';
+const AEM_NETWORK_ORIGIN = 'https://main--vitamix--aemsites.aem.network';
 
 /**
  * Valid `action` values. Mirrors the endpoint contract — the only required
