@@ -37,18 +37,25 @@ beforeEach(() => {
 
 // --- origin selection -------------------------------------------------------
 
-test('logOperation: posts to AEM network origin off vitamix.com', () => {
+test('logOperation: posts to AEM network origin on aem.network hosts', () => {
   captureFetch();
   setHostname('main--vitamix--aemsites.aem.network');
   logOperation('cart-view');
   assert.equal(lastUrl, `https://main--vitamix--aemsites.aem.network${PATH}`);
 });
 
-test('logOperation: posts same-origin (relative) on .vitamix.com hosts', () => {
+test('logOperation: posts same-origin (relative) only on production www.vitamix.com', () => {
   captureFetch();
   setHostname('www.vitamix.com');
   logOperation('cart-view');
   assert.equal(lastUrl, PATH);
+});
+
+test('logOperation: non-production vitamix.com hosts use the AEM network origin', () => {
+  captureFetch();
+  setHostname('integration.vitamix.com');
+  logOperation('cart-view');
+  assert.equal(lastUrl, `https://main--vitamix--aemsites.aem.network${PATH}`);
 });
 
 // --- request shape ----------------------------------------------------------
