@@ -16,15 +16,28 @@ import { translate, ADMIN_URL, AEM_ADMIN_URL } from './shared.js';
 
 const LOCALES = [
   {
-    locale: 'us', language: 'en_us', translateCode: 'en', label: 'English',
+    locale: 'us', language: 'en_us', translateCode: 'en', country: 'United States', label: 'English',
   },
   {
-    locale: 'ca', language: 'fr_ca', translateCode: 'fr-CA', label: 'French',
+    locale: 'ca', language: 'en_us', translateCode: 'en', country: 'Canada', label: 'English',
   },
   {
-    locale: 'mx', language: 'es_mx', translateCode: 'es-MX', label: 'Spanish',
+    locale: 'ca', language: 'fr_ca', translateCode: 'fr-CA', country: 'Canada', label: 'French',
+  },
+  {
+    locale: 'mx', language: 'en_us', translateCode: 'en', country: 'Mexico', label: 'English',
+  },
+  {
+    locale: 'mx', language: 'es_mx', translateCode: 'es-MX', country: 'Mexico', label: 'Spanish',
+  },
+  {
+    locale: 'vr', language: 'en_us', translateCode: 'en', country: 'VR', label: 'English',
   },
 ];
+
+function localeKey(locale, language) {
+  return `${locale}-${language}`;
+}
 
 const EDIT_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
 
@@ -43,8 +56,8 @@ function parsePath(path) {
   };
 }
 
-function updateStatus(language, status, text) {
-  const labelEl = document.querySelector(`label[for="lang-${language}"]`);
+function updateStatus(locale, language, status, text) {
+  const labelEl = document.querySelector(`label[for="lang-${localeKey(locale, language)}"]`);
   if (!labelEl) return;
   let statusEl = labelEl.querySelector('.rollout-status');
   if (!statusEl) {
@@ -73,10 +86,13 @@ const errorMessage = document.querySelector('.rollout-error');
     return;
   }
 
-  LOCALES.forEach(({ locale, language, label }) => {
-    if (language.toLowerCase() === parsed.language.toLowerCase()) return;
+  LOCALES.forEach(({ locale, language, country, label }) => {
+    if (
+      locale === parsed.locale
+      && language.toLowerCase() === parsed.language.toLowerCase()
+    ) return;
 
-    const id = `lang-${language}`;
+    const id = `lang-${localeKey(locale, language)}`;
     const labelEl = document.createElement('label');
     labelEl.className = 'rollout-lang';
     labelEl.setAttribute('for', id);
@@ -89,7 +105,7 @@ const errorMessage = document.querySelector('.rollout-error');
     checkbox.checked = true;
 
     const span = document.createElement('span');
-    span.textContent = label;
+    span.textContent = `${country} — ${label}`;
 
     labelEl.appendChild(checkbox);
     labelEl.appendChild(span);
@@ -105,13 +121,13 @@ const errorMessage = document.querySelector('.rollout-error');
     errorMessage.style.display = 'none';
     document.querySelectorAll('.rollout-status').forEach((el) => el.remove());
 
-    const selectedLocales = LOCALES.filter(({ language }) => {
-      const checkbox = document.getElementById(`lang-${language}`);
+    const selectedLocales = LOCALES.filter(({ locale, language }) => {
+      const checkbox = document.getElementById(`lang-${localeKey(locale, language)}`);
       return checkbox?.checked;
     });
 
     if (selectedLocales.length === 0) {
-      errorMessage.textContent = 'Please select at least one language.';
+      errorMessage.textContent = 'Please select at least one target locale.';
       errorMessage.style.display = 'block';
       return;
     }
@@ -139,7 +155,7 @@ const errorMessage = document.querySelector('.rollout-error');
     for (const {
       locale, language, translateCode,
     } of selectedLocales) {
-      updateStatus(language, 'loading', 'Translating...');
+      updateStatus(locale, language, 'loading', 'Translating...');
 
       const targetPagePath = `/${locale}/${language}${parsed.pagePath}`;
 
@@ -156,7 +172,7 @@ const errorMessage = document.querySelector('.rollout-error');
           daFetch,
         );
 
-        updateStatus(language, 'saving', 'Saving...');
+        updateStatus(locale, language, 'saving', 'Saving...');
 
         const blob = new Blob([translatedHtml], { type: 'text/html' });
         const formData = new FormData();
@@ -168,21 +184,21 @@ const errorMessage = document.querySelector('.rollout-error');
         const saveResp = await daFetch(targetUrl, { method: 'PUT', body: formData });
         if (!saveResp.ok) throw new Error(`Save failed: ${saveResp.status}`);
 
-        updateStatus(language, 'previewing', 'Previewing...');
+        updateStatus(locale, language, 'previewing', 'Previewing...');
         const base = `${AEM_ADMIN_URL}/%s/${context.org}/${context.repo}/main${targetPagePath}`;
         // eslint-disable-next-line no-await-in-loop
         const previewResp = await daFetch(base.replace('%s', 'preview'), { method: 'POST' });
         if (!previewResp.ok) throw new Error(`Preview failed: ${previewResp.status}`);
 
-        updateStatus(language, 'publishing', 'Publishing...');
+        updateStatus(locale, language, 'publishing', 'Publishing...');
         // eslint-disable-next-line no-await-in-loop
         const publishResp = await daFetch(base.replace('%s', 'live'), { method: 'POST' });
         if (!publishResp.ok) throw new Error(`Publish failed: ${publishResp.status}`);
 
         const daHref = `https://da.live/edit#/${context.org}/${context.repo}${targetPagePath}`;
-        updateStatus(language, 'done', `Done! <a href="${daHref}" target="_blank">${EDIT_ICON_SVG}</a>`);
+        updateStatus(locale, language, 'done', `Done! <a href="${daHref}" target="_blank">${EDIT_ICON_SVG}</a>`);
       } catch (err) {
-        updateStatus(language, 'error', err.message || 'Translation failed.');
+        updateStatus(locale, language, 'error', err.message || 'Translation failed.');
       }
     }
 
