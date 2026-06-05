@@ -7,7 +7,7 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  logOperation, getCheckoutId, clearCheckoutId, anonymize, logApiError, logNetworkError,
+  logOperation, getCheckoutId, clearCheckoutId, anonymize, logApiError, logNetworkError, logError,
 } from '../../scripts/operations-log.js';
 
 const PATH = '/us/en_us/products/operations-log';
@@ -166,4 +166,32 @@ test('logNetworkError: logs error action with kind network and anonymized body',
   assert.equal(body.message, 'Failed to fetch');
   // undefined keys (country/zip) are dropped by JSON serialization.
   assert.deepEqual(body.requestBody, { country: 'us', shipping: { state: 'CA' } });
+});
+
+// --- logError ---------------------------------------------------------------
+
+test('logError: records the error name alongside message', () => {
+  captureFetch();
+  const err = new TypeError('cannot read property');
+  logError('checkout-order', err, { orderId: 'ord-1' });
+  const body = JSON.parse(lastInit.body);
+  assert.equal(body.action, 'error');
+  assert.equal(body.scope, 'checkout-order');
+  assert.equal(body.name, 'TypeError');
+  assert.equal(body.message, 'cannot read property');
+  assert.equal(body.orderId, 'ord-1');
+});
+
+test('logError: retains stack frames past the old 5-line cap', () => {
+  captureFetch();
+  const err = new Error('boom');
+  // Simulate a deep async stack where the originating app frame is line 8.
+  err.stack = ['Error: boom', ...Array.from(
+    { length: 15 },
+    (_, i) => `    at fn${i} (https://x/scripts/mod.js:${i + 1}:3)`,
+  )].join('\n');
+  logError('global', err);
+  const body = JSON.parse(lastInit.body);
+  assert.ok(body.stack.includes('fn8'), 'frame past line 5 should be retained');
+  assert.ok(body.stack.includes(':9:3'), 'line numbers should be preserved');
 });
