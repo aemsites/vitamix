@@ -4,6 +4,7 @@ import {
   getCurrentBranch,
   buildProductUrl,
   waitForElement,
+  setupTestMode,
 } from '../utils/test-helpers.js';
 
 /**
@@ -21,6 +22,10 @@ test.describe('Stale Session Cart ID', () => {
   test.beforeAll(async () => {
     currentBranch = await getCurrentBranch();
     console.log(`Running tests against branch: ${currentBranch}`);
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await setupTestMode(page);
   });
 
   test('should refresh side-by-side before add-to-cart and use the fresh cart_id', async ({ page }) => {

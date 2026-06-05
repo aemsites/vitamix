@@ -3,6 +3,7 @@ import { test, expect } from '@playwright/test';
 import {
   getCurrentBranch,
   getBaseUrl,
+  setupTestMode,
 } from '../utils/test-helpers.js';
 
 /**
@@ -22,6 +23,10 @@ test.describe('Cart Storage Tests', () => {
     baseUrl = getBaseUrl(currentBranch);
     console.log(`Running tests against branch: ${currentBranch}`);
     console.log(`Base URL: ${baseUrl}`);
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await setupTestMode(page);
   });
 
   test.describe('US Store (/us/en_us/)', () => {

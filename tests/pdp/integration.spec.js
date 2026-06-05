@@ -23,10 +23,21 @@ test.describe('PDP Integration Tests', () => {
     console.log(`Running tests against branch: ${currentBranch}`);
   });
 
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      window.IS_TEST_MODE = true;
+      localStorage.setItem('vitamix.priceRules.stub', JSON.stringify({ promotions: [] }));
+    });
+
+    // Protect runs against branch previews that do not yet include the
+    // operations-log test-mode guard.
+    await page.route('**/us/en_us/products/operations-log', (route) => route.fulfill({ status: 204, body: '' }));
+  });
+
   test.describe('Configurable Product Page', () => {
     const productPath = '/us/en_us/products/ascent-x2';
 
-    test('should load Ascent X2 product page with all required elements', async ({ page }) => {
+    test('should load Ascent X2 product page with all required elements @cross-browser', async ({ page }) => {
       const productUrl = buildProductUrl(productPath, currentBranch);
       console.log(`Testing URL: ${productUrl}`);
 

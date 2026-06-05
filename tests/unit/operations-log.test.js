@@ -31,6 +31,7 @@ beforeEach(() => {
   lastUrl = undefined;
   lastInit = undefined;
   globalThis.__resetTestState();
+  delete globalThis.window.IS_TEST_MODE;
   setHostname('main--vitamix--aemsites.aem.network');
 });
 
@@ -62,6 +63,16 @@ test('logOperation: includes action, timestamp, and extra data', () => {
   assert.equal(typeof body.ts, 'number');
   assert.equal(lastInit.method, 'POST');
   assert.equal(lastInit.keepalive, true);
+});
+
+// --- test mode --------------------------------------------------------------
+
+test('logOperation: skips network calls when window.IS_TEST_MODE is true', () => {
+  captureFetch();
+  globalThis.window.IS_TEST_MODE = true;
+  logOperation('checkout-start');
+  assert.equal(lastUrl, undefined);
+  assert.equal(lastInit, undefined);
 });
 
 // --- never throws -----------------------------------------------------------

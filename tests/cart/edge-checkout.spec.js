@@ -44,9 +44,20 @@ test.describe('Edge Checkout', () => {
     console.log(`Running tests against branch: ${currentBranch}`);
   });
 
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      window.IS_TEST_MODE = true;
+      localStorage.setItem('vitamix.priceRules.stub', JSON.stringify({ promotions: [] }));
+    });
+
+    // Protect runs against branch previews that do not yet include the
+    // operations-log test-mode guard.
+    await page.route('**/us/en_us/products/operations-log', (route) => route.fulfill({ status: 204, body: '' }));
+  });
+
   // ─── Configurable product ────────────────────────────────────────────────────
 
-  test.describe('Configurable Product - Ascent X2', () => {
+  test.describe('Configurable Product - Ascent X2 @desktop', () => {
     const productPath = '/us/en_us/products/ascent-x2';
 
     // openOrRedirect() returns early when window.innerWidth < 900 — force desktop
@@ -167,7 +178,7 @@ test.describe('Edge Checkout', () => {
 
   // ─── Simple product ──────────────────────────────────────────────────────────
 
-  test.describe('Simple Product - 20-ounce Travel Cup', () => {
+  test.describe('Simple Product - 20-ounce Travel Cup @desktop', () => {
     const productPath = '/us/en_us/products/20-ounce-travel-cup';
 
     test.use({ viewport: { width: 1280, height: 720 } });
@@ -196,7 +207,7 @@ test.describe('Edge Checkout', () => {
 
   // ─── Bundle product ──────────────────────────────────────────────────────────
 
-  test.describe('Bundle Product - 5200 Legacy Bundle', () => {
+  test.describe('Bundle Product - 5200 Legacy Bundle @desktop', () => {
     const productPath = '/us/en_us/products/5200-legacy-bundle';
 
     test.use({ viewport: { width: 1280, height: 720 } });
@@ -287,7 +298,7 @@ test.describe('Edge Checkout', () => {
 
   // ─── Warranty selection ──────────────────────────────────────────────────────
 
-  test.describe('Warranty Selection', () => {
+  test.describe('Warranty Selection @desktop', () => {
     const productPath = '/us/en_us/products/ascent-x2';
 
     test.use({ viewport: { width: 1280, height: 720 } });
@@ -412,7 +423,7 @@ test.describe('Edge Checkout', () => {
 
   // ─── Cart persistence ─────────────────────────────────────────────────────────
 
-  test.describe('Cart Persistence', () => {
+  test.describe('Cart Persistence @desktop', () => {
     const productPath = '/us/en_us/products/ascent-x2';
 
     test.use({ viewport: { width: 1280, height: 720 } });
@@ -665,7 +676,7 @@ test.describe('Edge Checkout', () => {
 
   // ─── Minicart interactions ────────────────────────────────────────────────────
 
-  test.describe('Minicart Interactions', () => {
+  test.describe('Minicart Interactions @desktop', () => {
     const productPath = '/us/en_us/products/ascent-x2';
 
     test.use({ viewport: { width: 1280, height: 720 } });
