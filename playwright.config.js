@@ -38,10 +38,18 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
+      // Desktop is a focused coverage leg: run tests that explicitly exercise
+      // desktop-only behavior plus a small cross-browser smoke set. The full
+      // suite runs on Mobile Chrome because mobile traffic is the higher-risk
+      // storefront path and duplicating every live-page test doubles origin load.
+      grep: /@desktop|@cross-browser/,
       use: { ...devices['Desktop Chrome'] },
     },
     {
       name: 'Mobile Chrome',
+      // Mobile is the primary integration leg. Exclude only tests that are
+      // explicitly desktop-only, such as minicart desktop popover behavior.
+      grepInvert: /@desktop/,
       use: { ...devices['Pixel 5'] },
     },
   ],

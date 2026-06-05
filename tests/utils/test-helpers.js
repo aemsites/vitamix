@@ -167,3 +167,20 @@ export async function waitForAddToCartButton(page) {
   ]);
   console.log('✓ Add-to-cart button ready');
 }
+
+/**
+ * Suppress side-effecting integrations for branch-preview test runs.
+ *
+ * The init script handles branches that include test-mode support, while the
+ * route guard protects tests that run against older branch-preview code before
+ * the guard is deployed.
+ * @param {import('@playwright/test').Page} page - Playwright page object
+ */
+export async function setupTestMode(page) {
+  await page.addInitScript(() => {
+    window.IS_TEST_MODE = true;
+    localStorage.setItem('vitamix.priceRules.stub', JSON.stringify({ promotions: [] }));
+  });
+
+  await page.route('**/us/en_us/products/operations-log', (route) => route.fulfill({ status: 204, body: '' }));
+}

@@ -34,6 +34,15 @@ function logUrl() {
 }
 
 /**
+ * Test harnesses can set this flag before page scripts run to suppress
+ * operations-log network calls while still exercising purchase-flow code paths.
+ * @returns {boolean}
+ */
+function isTestMode() {
+  return window?.IS_TEST_MODE === true;
+}
+
+/**
  * Posts a single operations-log event. Fire-and-forget: never throws, never
  * blocks. Uses `keepalive` so the beacon survives navigation/redirects.
  * @param {LogAction} action
@@ -41,6 +50,7 @@ function logUrl() {
  */
 export function logOperation(action, data = {}) {
   try {
+    if (isTestMode()) return;
     const body = JSON.stringify({ action, ts: Date.now(), ...data });
     fetch(logUrl(), {
       method: 'POST',
