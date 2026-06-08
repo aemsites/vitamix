@@ -28,21 +28,19 @@ function dedupeRecipeTitles(recipes, excludePath, excludeTitle) {
  * @returns {{ start: number, end: number, path: string }[]}
  */
 function findTitleMatches(text, titles) {
-  const lowerText = text.toLowerCase();
   const matches = [];
 
   titles.forEach(({ title, path }) => {
-    const lowerTitle = title.toLowerCase();
     let start = 0;
     while (start < text.length) {
-      const idx = lowerText.indexOf(lowerTitle, start);
+      const idx = text.indexOf(title, start);
       if (idx === -1) break;
       const end = idx + title.length;
       const overlaps = matches.some((match) => idx < match.end && end > match.start);
       if (!overlaps) {
         matches.push({ start: idx, end, path });
       }
-      start = idx + lowerTitle.length;
+      start = idx + title.length;
     }
   });
 
@@ -113,8 +111,8 @@ function collectTextNodes(section) {
  * @param {{ title: string, path: string }[]} titles
  */
 function linkRecipeTitlesInSection(section, titles) {
-  const haystack = section.textContent.toLowerCase();
-  const sectionTitles = titles.filter(({ title }) => haystack.includes(title.toLowerCase()));
+  const haystack = section.textContent;
+  const sectionTitles = titles.filter(({ title }) => haystack.includes(title));
   if (!sectionTitles.length) return;
 
   collectTextNodes(section).forEach((textNode) => {
@@ -152,8 +150,8 @@ export default async function linkRecipeMentions(block, locale, language, curren
     const titles = dedupeRecipeTitles(recipes, currentPath, currentTitle);
     if (!titles.length) return;
 
-    const haystack = sections.map((section) => section.textContent).join('\n').toLowerCase();
-    const matchingTitles = titles.filter(({ title }) => haystack.includes(title.toLowerCase()));
+    const haystack = sections.map((section) => section.textContent).join('\n');
+    const matchingTitles = titles.filter(({ title }) => haystack.includes(title));
     if (!matchingTitles.length) return;
 
     sections.forEach((section) => {
