@@ -102,37 +102,23 @@ main > .section:has(.checkout-wrapper) {
   max-width: 100%;
 }
 
-/* All buttons share one row at wide sizes — div covers SDK iframes, button covers stubs */
+/* PayPal and Pay Later share the second row as two equal columns. When only
+   one of them is present it expands to fill the full row. div covers SDK
+   iframes, button covers stubs. */
+.express-checkout-buttons > .paypal-paypal-wrapper,
+.express-checkout-buttons > .paypal-paylater-wrapper,
 .express-checkout-buttons > div,
 .express-checkout-buttons > button {
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
   display: flex;
   height: 55px;
 }
 
-/* Stub Pay Later button fills its wrapper in the default (wide) state */
+/* Stub PayPal / Pay Later buttons fill their wrapper. */
+.paypal-paypal-wrapper .paypal-express-btn,
 .paypal-paylater-wrapper .paypal-express-btn {
   height: 55px;
-}
-
-/* Pay Later drops to a full-width second row when space is tight */
-@container (max-width: 480px) {
-  .express-checkout-buttons > .paypal-paylater-wrapper {
-    flex: 0 0 100%;
-  }
-}
-
-@media (width >= 1118px) and (width <= 1250px) {
-  .express-checkout-buttons > .paypal-paylater-wrapper {
-    flex: 0 0 100%;
-  }
-}
-
-@media (width >= 610px) and (width <= 714px) {
-  .express-checkout-buttons > .paypal-paylater-wrapper {
-    flex: 0 0 100%;
-  }
 }
 
 .express-checkout-divider {
@@ -689,6 +675,10 @@ main > .section:has(.checkout-wrapper) {
 
 /* Apple Pay */
 apple-pay-button {
+  /* Inside the express-checkout flex row Apple Pay takes its own full-width
+     row on top, leaving PayPal + Pay Later to share the second row. */
+  flex: 0 0 100%;
+
   --apple-pay-button-width: 100%;
   --apple-pay-button-height: 55px;
   --apple-pay-button-border-radius: var(--commerce-button-radius);

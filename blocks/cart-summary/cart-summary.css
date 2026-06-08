@@ -126,10 +126,11 @@ div.section.cart-section:has(.cart-summary-wrapper) > .cart-wrapper {
 
 .cart-summary-express-buttons {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
+/* Apple Pay takes its own full-width row on top. */
 .cart-summary-express-buttons apple-pay-button {
   --apple-pay-button-width: 100%;
   --apple-pay-button-height: 55px;
@@ -137,6 +138,16 @@ div.section.cart-section:has(.cart-summary-wrapper) > .cart-wrapper {
   --apple-pay-button-padding: 0;
 
   display: block;
+  flex: 0 0 100%;
+}
+
+/* PayPal and Pay Later share the second row as two equal columns. When only
+   one of them is present it expands to fill the full row. */
+.cart-summary-express-buttons .paypal-paypal-wrapper,
+.cart-summary-express-buttons .paypal-paylater-wrapper {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 55px;
 }
 
 .cart-summary-express-divider {
