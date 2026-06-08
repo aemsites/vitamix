@@ -438,13 +438,54 @@ function parseVariants(sections) {
   });
 }
 
-// eslint-disable-next-line no-unused-vars
+/**
+ * Reads an authored PDP override flag from the page metadata.
+ *
+ * Authors set these via a metadata table in the document. The Edge Delivery
+ * pipeline normalizes metadata keys (lowercases them and converts any
+ * non-alphanumeric character to a hyphen), so a key authored as `In Stock`,
+ * `inStock`, or `in-stock` all surface as different meta names. To make the
+ * override resilient to authoring style, both the requested name and each
+ * meta tag name are normalized to lowercase alphanumerics before comparison.
+ *
+ * Recognized values are `Yes`/`No` (case-insensitive); any other value is
+ * returned verbatim. Missing overrides return an empty string so callers can
+ * fall back to the value coming from the product bus.
+ *
+ * @param {string} name The override name (e.g. 'inStock', 'addToCart')
+ * @returns {string} 'Yes', 'No', the raw value, or '' when not authored
+ */
+export function getPdpOverride(name) {
+  const normalize = (value) => (value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const target = normalize(name);
+  if (!target) return '';
+  const meta = [...document.head.querySelectorAll('meta[name]')]
+    .find((m) => normalize(m.getAttribute('name')) === target);
+  if (!meta) return '';
+  const value = (meta.content || '').trim();
+  if (/^yes$/i.test(value)) return 'Yes';
+  if (/^no$/i.test(value)) return 'No';
+  return value;
+}
+
 export function checkVariantOutOfStock(sku) {
+  // Authored `inStock` override wins over the product bus availability and
+  // applies to the whole product (every variant), per requirements.
+  const inStock = getPdpOverride('inStock');
+  if (inStock === 'Yes') return false;
+  if (inStock === 'No') return true;
+
   const { availability } = window.jsonLdData.offers.find((offer) => offer.sku === sku);
   return availability === 'https://schema.org/OutOfStock';
 }
 
 export function isProductOutOfStock() {
+  // Authored `inStock` override wins over the product bus availability and
+  // applies to the whole product, regardless of individual variants.
+  const inStock = getPdpOverride('inStock');
+  if (inStock === 'Yes') return false;
+  if (inStock === 'No') return true;
+
   // Check if all variants are out of stock, if any are in stock, return false
   const { offers, custom } = window.jsonLdData;
 
