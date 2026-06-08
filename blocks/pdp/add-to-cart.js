@@ -151,6 +151,17 @@ export default function renderAddToCart(ph, block, parent) {
     return renderFindDealer(ph, block);
   }
 
+  // When an authored `addToCart=No` override is set and no find-locally/dealer
+  // alternative applies, render nothing rather than falling through to the
+  // button. This is gated strictly on the authored override (a metadata-table
+  // value surfaced as a meta tag) and never on the product bus custom value,
+  // which only lives in JSON-LD and is left untouched. As the last branch, it
+  // also leaves every existing path (find locally/dealer, managed stock,
+  // availability) behaving exactly as before.
+  if (getPdpOverride('addToCart') === 'No') {
+    return '';
+  }
+
   // create main add to cart container
   const addToCartContainer = document.createElement('div');
   addToCartContainer.classList.add('add-to-cart');
