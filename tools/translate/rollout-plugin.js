@@ -86,7 +86,9 @@ const errorMessage = document.querySelector('.rollout-error');
     return;
   }
 
-  LOCALES.forEach(({ locale, language, country, label }) => {
+  LOCALES.forEach(({
+    locale, language, country, label,
+  }) => {
     if (
       locale === parsed.locale
       && language.toLowerCase() === parsed.language.toLowerCase()
@@ -134,6 +136,12 @@ const errorMessage = document.querySelector('.rollout-error');
 
     rolloutBtn.disabled = true;
 
+    const sourceLocale = LOCALES.find(
+      ({ locale, language }) => locale === parsed.locale
+        && language.toLowerCase() === parsed.language.toLowerCase(),
+    );
+    const sourceTranslateCode = sourceLocale?.translateCode;
+
     // Fetch the source page HTML (repoPath is already relative to org/repo)
     let sourcePath = parsed.repoPath;
     if (!sourcePath.endsWith('.html')) sourcePath += '.html';
@@ -164,7 +172,7 @@ const errorMessage = document.querySelector('.rollout-error');
         context.sourcePath = parsed.repoPath;
 
         // eslint-disable-next-line no-await-in-loop
-        const translatedHtml = await translate(
+        const translatedHtml = translateCode === sourceTranslateCode ? sourceHtml : await translate(
           sourceHtml,
           translateCode,
           context,

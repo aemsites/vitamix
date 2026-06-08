@@ -1,15 +1,17 @@
 @import url('./shared.css');
 
+body {
+  background: var(--card);
+  padding: 0;
+  align-items: start;
+}
+
 .rollout-container {
-  width: min(420px, 100%);
+  width: 100%;
 }
 
 .rollout-form {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 20px;
-  box-shadow: var(--shadow);
+  padding: 16px;
   display: grid;
   gap: 16px;
 }
@@ -33,6 +35,14 @@
   font-size: 14px;
   color: var(--text);
   user-select: none;
+}
+
+.rollout-lang > span:not(.rollout-status) {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .rollout-lang input[type="checkbox"] {
@@ -80,6 +90,7 @@ button:hover:not(:disabled) {
   display: inline-flex;
   align-items: center;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .rollout-status.loading,
