@@ -1,5 +1,5 @@
 import { getMetadata } from '../../scripts/aem.js';
-import { checkVariantOutOfStock, getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { checkVariantOutOfStock, getLocaleAndLanguage, getPdpOverride } from '../../scripts/scripts.js';
 
 /**
  * Renders "Find Locally" button container.
@@ -80,12 +80,11 @@ function toggleFixedAddToCart(container) {
  * @returns {boolean} True if the variant is available for sale, false otherwise
  */
 export function isVariantAvailableForSale(variant) {
-  if (getMetadata('addToCart') === 'No') {
-    return false;
-  }
+  const { managedStock, addToCart } = variant?.custom || {};
 
-  const { managedStock, addToCart } = variant.custom;
-  if (!variant || addToCart === 'No') {
+  // Authored `addToCart` override wins over the product bus custom.addToCart.
+  const effectiveAddToCart = getPdpOverride('addToCart') || addToCart;
+  if (!variant || effectiveAddToCart === 'No') {
     return false;
   }
 
@@ -114,8 +113,10 @@ export default function renderAddToCart(ph, block, parent) {
     selectedVariant = parent.offers.find((variant) => variant.sku === selectedSku);
   }
 
-  // Only look at findLocally and findDealer from parent product
-  const { findLocally, findDealer } = parent.custom;
+  // Only look at findLocally and findDealer from parent product.
+  // Authored overrides win over the product bus custom values.
+  const findLocally = getPdpOverride('findLocally') || parent.custom.findLocally;
+  const findDealer = getPdpOverride('findDealer') || parent.custom.findDealer;
   block.classList.remove('pdp-find-locally');
   block.classList.remove('pdp-find-dealer');
 
