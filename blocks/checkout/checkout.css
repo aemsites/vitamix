@@ -115,6 +115,18 @@ main > .section:has(.checkout-wrapper) {
   height: 55px;
 }
 
+/* Below ~420px there isn't room for two PayPal buttons side by side — their
+   SDK iframes have a minimum width and would overflow the gap. Stack all
+   buttons full-width vertically instead. */
+@container (max-width: 420px) {
+  .express-checkout-buttons > .paypal-paypal-wrapper,
+  .express-checkout-buttons > .paypal-paylater-wrapper,
+  .express-checkout-buttons > div,
+  .express-checkout-buttons > button {
+    flex: 0 0 100%;
+  }
+}
+
 /* Stub PayPal / Pay Later buttons fill their wrapper. */
 .paypal-paypal-wrapper .paypal-express-btn,
 .paypal-paylater-wrapper .paypal-express-btn {

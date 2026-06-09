@@ -125,6 +125,7 @@ div.section.cart-section:has(.cart-summary-wrapper) > .cart-wrapper {
 }
 
 .cart-summary-express-buttons {
+  container-type: inline-size;
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -148,6 +149,16 @@ div.section.cart-section:has(.cart-summary-wrapper) > .cart-wrapper {
   flex: 1 1 0;
   min-width: 0;
   height: 55px;
+}
+
+/* Below ~420px there isn't room for two PayPal buttons side by side — their
+   SDK iframes have a minimum width and would overflow the gap. Stack all
+   buttons full-width vertically instead. */
+@container (max-width: 420px) {
+  .cart-summary-express-buttons .paypal-paypal-wrapper,
+  .cart-summary-express-buttons .paypal-paylater-wrapper {
+    flex: 0 0 100%;
+  }
 }
 
 .cart-summary-express-divider {
