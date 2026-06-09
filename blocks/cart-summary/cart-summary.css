@@ -14,6 +14,14 @@
   padding-block-start: 10px;
 }
 
+/* The progress bar is hidden on mobile, so add back some breathing room
+   above the summary. */
+@media (width <= 600px) {
+  .section:has(.cart-summary-wrapper):has(.checkout-progress-wrapper) {
+    padding-block-start: 20px;
+  }
+}
+
 /* Heading authored alongside the cart sits above the two columns */
 div.section.cart-section:has(.cart-summary-wrapper) > .default-content-wrapper {
   flex-basis: 100%;
