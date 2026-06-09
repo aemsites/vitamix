@@ -133,6 +133,7 @@ div.section.cart-section:has(.cart-summary-wrapper) > .cart-wrapper {
 }
 
 .cart-summary-express-buttons {
+  container-type: inline-size;
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -157,12 +158,23 @@ div.section.cart-section:has(.cart-summary-wrapper) > .cart-wrapper {
   height: 55px;
 }
 
-/* Desktop only: the order-summary sidebar is a fixed ~420px column, so pair
-   PayPal + Pay Later as two columns below Apple Pay. On tablet/mobile (<=999px)
-   the sidebar goes full-width and the cart layout stacks, so the buttons stay
-   stacked vertically there. (A viewport query is used rather than a container
-   query because the full-width mobile sidebar is a similar width to the desktop
-   sidebar and can't be distinguished by container width alone.) */
+/* Pair PayPal + Pay Later as two columns below Apple Pay whenever there's room.
+   Two triggers are needed because the container can't tell two cases apart on
+   its own:
+   - Container >=420px: the full-width summary on tablet (and the wide checkout
+     surface) — pair them.
+   - Viewport >=1000px: the desktop cart sidebar is a fixed ~420px column whose
+     inner container (~360px) is too narrow for the container query but is wide
+     enough to pair — so pair them on desktop too.
+   The remaining case (narrow container AND narrow viewport = a phone) stays
+   stacked, which is what we want on mobile. */
+@container (min-width: 420px) {
+  .cart-summary-express-buttons .paypal-paypal-wrapper,
+  .cart-summary-express-buttons .paypal-paylater-wrapper {
+    flex: 1 1 0;
+  }
+}
+
 @media (width >= 1000px) {
   .cart-summary-express-buttons .paypal-paypal-wrapper,
   .cart-summary-express-buttons .paypal-paylater-wrapper {
