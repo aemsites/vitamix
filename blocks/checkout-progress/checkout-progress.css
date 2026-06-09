@@ -3,6 +3,14 @@
   width: 100%;
 }
 
+/* The step indicator doesn't lay out cleanly on small screens — hide it on
+   mobile and let the page lead with the cart/checkout content. */
+@media (width <= 600px) {
+  .checkout-progress-wrapper {
+    display: none;
+  }
+}
+
 .checkout-progress nav {
   padding: 16px 0;
 }
