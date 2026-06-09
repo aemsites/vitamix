@@ -29,6 +29,10 @@ export async function createSyncModal() {
     defaultStoreViewCode = 'en_ca';
   }
 
+  if (defaultStoreCode === 'mx' && defaultStoreViewCode === 'en_us') {
+    defaultStoreViewCode = 'en_mx';
+  }
+
   // pull the sku from the sku meta tag
   const skuMeta = document.querySelector('meta[name="sku"]');
   const defaultSku = skuMeta ? skuMeta.content : '';
