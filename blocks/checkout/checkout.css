@@ -102,28 +102,27 @@ main > .section:has(.checkout-wrapper) {
   max-width: 100%;
 }
 
-/* PayPal and Pay Later share the second row as two equal columns. When only
-   one of them is present it expands to fill the full row. div covers SDK
-   iframes, button covers stubs. */
+/* Base (narrow / mobile): every button stacked full-width. PayPal SDK iframes
+   have a minimum width, so two columns would overflow in a tight container.
+   div covers SDK iframes, button covers stubs. */
 .express-checkout-buttons > .paypal-paypal-wrapper,
 .express-checkout-buttons > .paypal-paylater-wrapper,
 .express-checkout-buttons > div,
 .express-checkout-buttons > button {
-  flex: 1 1 0;
+  flex: 0 0 100%;
   min-width: 0;
   display: flex;
   height: 55px;
 }
 
-/* Below ~420px there isn't room for two PayPal buttons side by side — their
-   SDK iframes have a minimum width and would overflow the gap. Stack all
-   buttons full-width vertically instead. */
-@container (max-width: 420px) {
+/* Tablet (>=420px): PayPal + Pay Later become two columns. Apple Pay stays on
+   its own full-width row above them (see apple-pay-button rule below). */
+@container (min-width: 420px) {
   .express-checkout-buttons > .paypal-paypal-wrapper,
   .express-checkout-buttons > .paypal-paylater-wrapper,
   .express-checkout-buttons > div,
   .express-checkout-buttons > button {
-    flex: 0 0 100%;
+    flex: 1 1 0;
   }
 }
 
@@ -687,8 +686,9 @@ main > .section:has(.checkout-wrapper) {
 
 /* Apple Pay */
 apple-pay-button {
-  /* Inside the express-checkout flex row Apple Pay takes its own full-width
-     row on top, leaving PayPal + Pay Later to share the second row. */
+  /* In the express-checkout row Apple Pay takes its own full-width row on top
+     at narrow/tablet widths, leaving PayPal + Pay Later to share the row below.
+     On desktop it joins the single row (see container query below). */
   flex: 0 0 100%;
 
   --apple-pay-button-width: 100%;
@@ -698,6 +698,15 @@ apple-pay-button {
 
   min-width: 0;
   display: block;
+}
+
+/* Desktop (>=620px): Apple Pay joins the row so all three express buttons sit
+   side by side. Keyed to the bare selector (placed after the base rule) to
+   avoid a descending-specificity conflict with it. */
+@container (min-width: 620px) {
+  apple-pay-button {
+    flex: 1 1 0;
+  }
 }
 
 

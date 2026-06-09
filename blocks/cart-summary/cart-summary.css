@@ -139,7 +139,8 @@ div.section.cart-section:has(.cart-summary-wrapper) > .cart-wrapper {
   gap: 10px;
 }
 
-/* Apple Pay takes its own full-width row on top. */
+/* Base (narrow / mobile): every button stacked full-width. PayPal SDK iframes
+   have a minimum width, so two columns would overflow in a tight container. */
 .cart-summary-express-buttons apple-pay-button {
   --apple-pay-button-width: 100%;
   --apple-pay-button-height: 55px;
@@ -150,22 +151,25 @@ div.section.cart-section:has(.cart-summary-wrapper) > .cart-wrapper {
   flex: 0 0 100%;
 }
 
-/* PayPal and Pay Later share the second row as two equal columns. When only
-   one of them is present it expands to fill the full row. */
 .cart-summary-express-buttons .paypal-paypal-wrapper,
 .cart-summary-express-buttons .paypal-paylater-wrapper {
-  flex: 1 1 0;
+  flex: 0 0 100%;
   min-width: 0;
   height: 55px;
 }
 
-/* Below ~420px there isn't room for two PayPal buttons side by side — their
-   SDK iframes have a minimum width and would overflow the gap. Stack all
-   buttons full-width vertically instead. */
-@container (max-width: 420px) {
+/* Tablet (>=420px): Apple Pay on its own row, PayPal + Pay Later as two columns. */
+@container (min-width: 420px) {
   .cart-summary-express-buttons .paypal-paypal-wrapper,
   .cart-summary-express-buttons .paypal-paylater-wrapper {
-    flex: 0 0 100%;
+    flex: 1 1 0;
+  }
+}
+
+/* Desktop (>=620px): all three buttons in a single row. */
+@container (min-width: 620px) {
+  .cart-summary-express-buttons apple-pay-button {
+    flex: 1 1 0;
   }
 }
 
