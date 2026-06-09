@@ -684,7 +684,6 @@ apple-pay-button {
   --apple-pay-button-border-radius: var(--commerce-button-radius);
   --apple-pay-button-padding: 0;
 
-  flex: 1;
   min-width: 0;
   display: block;
 }
