@@ -123,9 +123,12 @@ export default {
     if (!window.paypal) {
       // No SDK — stub buttons with localized Pay Later label
       const label = getPayLaterLabel(callbacks.getConfig().getLanguage());
+      const paypalWrapper = document.createElement('div');
+      paypalWrapper.className = 'paypal-paypal-wrapper';
       const paypalBtn = createButton(PAYPAL_WORDMARK, 'paypal-express-btn');
       paypalBtn.addEventListener('click', showNotConfiguredDialog);
-      container.appendChild(paypalBtn);
+      paypalWrapper.appendChild(paypalBtn);
+      container.appendChild(paypalWrapper);
 
       const payLaterWrapper = document.createElement('div');
       payLaterWrapper.className = 'paypal-paylater-wrapper';
@@ -149,7 +152,7 @@ export default {
 
     const buttonConfig = {
       style: {
-        layout: 'horizontal',
+        layout: 'vertical',
         color: 'gold',
         shape: 'rect',
         label: 'paypal',
@@ -313,7 +316,29 @@ export default {
       },
     };
 
-    window.paypal.Buttons(buttonConfig).render(container);
+    // Render PayPal and Pay Later as two separate funding-source buttons,
+    // each in its own wrapper, so layout is controlled by CSS. Rendering a
+    // single horizontal button and relying on enable-funding=paylater caused
+    // PayPal's SDK to silently drop the Pay Later button at narrow (mobile)
+    // widths. Two explicit funding sources always render when eligible.
+    const paypalWrapper = document.createElement('div');
+    paypalWrapper.className = 'paypal-paypal-wrapper';
+    container.appendChild(paypalWrapper);
+    window.paypal.Buttons({
+      ...buttonConfig,
+      fundingSource: window.paypal.FUNDING.PAYPAL,
+    }).render(paypalWrapper);
+
+    const payLaterButtons = window.paypal.Buttons({
+      ...buttonConfig,
+      fundingSource: window.paypal.FUNDING.PAYLATER,
+    });
+    if (payLaterButtons.isEligible()) {
+      const payLaterWrapper = document.createElement('div');
+      payLaterWrapper.className = 'paypal-paylater-wrapper';
+      container.appendChild(payLaterWrapper);
+      payLaterButtons.render(payLaterWrapper);
+    }
   },
 
   renderCheckoutButton(container, callbacks) {

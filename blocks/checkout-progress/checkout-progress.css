@@ -3,17 +3,26 @@
   width: 100%;
 }
 
+/* The step indicator doesn't lay out cleanly on small screens — hide it on
+   mobile and let the page lead with the cart/checkout content. */
+@media (width <= 600px) {
+  .checkout-progress-wrapper {
+    display: none;
+  }
+}
+
 .checkout-progress nav {
-  display: flex;
-  justify-content: center;
   padding: 16px 0;
 }
 
 .checkout-progress ol {
   display: flex;
   align-items: center;
+  width: 100%;
+  max-width: 560px;
   list-style: none;
-  margin: 0;
+  margin-inline: auto;
+  margin-block: 0;
   padding: 0;
   gap: 0;
   counter-reset: step-counter;
@@ -26,11 +35,12 @@
   color: var(--commerce-color-text-muted);
 }
 
-/* Connector line between steps */
+/* Connector line between steps — flexes to fill the space within its step */
 .checkout-progress .step + .step::before {
   content: '';
   display: block;
-  width: 48px;
+  flex: 1;
+  min-width: 24px;
   height: 2px;
   background: var(--commerce-step-color-inactive);
   margin: 0 12px;
@@ -100,4 +110,10 @@
 
 .checkout-progress .step-complete a:hover {
   text-decoration: underline;
+}
+
+/* Steps after the first grow so the connector line between them stretches,
+   giving an evenly-spaced bar instead of a small cluster lost in a wide row. */
+.checkout-progress .step + .step {
+  flex: 1;
 }

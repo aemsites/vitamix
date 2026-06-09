@@ -574,18 +574,65 @@ test.describe('SDK load parameters', () => {
 
 test.describe('button style config', () => {
   const BASE_STYLE = {
-    layout: 'horizontal', color: 'gold', shape: 'rect', label: 'paypal', disableMaxHeight: true,
+    layout: 'vertical', color: 'gold', shape: 'rect', label: 'paypal', tagline: false, height: 55,
   };
 
-  test('primary button has gold color, paypal label, and horizontal layout', () => {
+  test('primary button has gold color, paypal label, and vertical layout', () => {
     expect(BASE_STYLE.color).toBe('gold');
     expect(BASE_STYLE.label).toBe('paypal');
-    expect(BASE_STYLE.layout).toBe('horizontal');
+    expect(BASE_STYLE.layout).toBe('vertical');
   });
 });
 
-// Pay Later is included automatically by the horizontal layout when eligible
-// (via enable-funding=paylater in the SDK URL) — no separate button is rendered.
+// PayPal and Pay Later are rendered as two separate funding-source buttons
+// (FUNDING.PAYPAL and FUNDING.PAYLATER), each in its own wrapper. The Pay Later
+// button is only rendered when its Buttons instance reports isEligible(). This
+// guarantees Pay Later still appears at narrow (mobile) widths, where a single
+// horizontal button would otherwise drop it.
+
+test.describe('separate funding-source buttons', () => {
+  function renderSdkButtons(windowPaypal, container) {
+    const buttonConfig = { style: { layout: 'vertical' } };
+    const paypalWrapper = { className: 'paypal-paypal-wrapper' };
+    container.children.push(paypalWrapper);
+    windowPaypal.Buttons({ ...buttonConfig, fundingSource: 'paypal' }).render(paypalWrapper);
+
+    const payLater = windowPaypal.Buttons({ ...buttonConfig, fundingSource: 'paylater' });
+    if (payLater.isEligible()) {
+      const payLaterWrapper = { className: 'paypal-paylater-wrapper' };
+      container.children.push(payLaterWrapper);
+      payLater.render(payLaterWrapper);
+    }
+  }
+
+  test('renders Pay Later wrapper when the Pay Later button is eligible', () => {
+    const fundingSources = [];
+    const container = { children: [] };
+    const mockPaypal = {
+      FUNDING: { PAYPAL: 'paypal', PAYLATER: 'paylater' },
+      Buttons: (cfg) => {
+        fundingSources.push(cfg.fundingSource);
+        return { render: () => {}, isEligible: () => true };
+      },
+    };
+    renderSdkButtons(mockPaypal, container);
+    expect(fundingSources).toContain('paypal');
+    expect(fundingSources).toContain('paylater');
+    expect(container.children.map((c) => c.className)).toContain('paypal-paylater-wrapper');
+  });
+
+  test('skips Pay Later wrapper when the Pay Later button is not eligible', () => {
+    const container = { children: [] };
+    const mockPaypal = {
+      FUNDING: { PAYPAL: 'paypal', PAYLATER: 'paylater' },
+      Buttons: () => ({ render: () => {}, isEligible: () => false }),
+    };
+    renderSdkButtons(mockPaypal, container);
+    const classes = container.children.map((c) => c.className);
+    expect(classes).toContain('paypal-paypal-wrapper');
+    expect(classes).not.toContain('paypal-paylater-wrapper');
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Stub fallback (no window.paypal)

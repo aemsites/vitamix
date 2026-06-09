@@ -14,6 +14,14 @@
   padding-block-start: 10px;
 }
 
+/* The progress bar is hidden on mobile, so add back some breathing room
+   above the summary. */
+@media (width <= 600px) {
+  .section:has(.cart-summary-wrapper):has(.checkout-progress-wrapper) {
+    padding-block-start: 20px;
+  }
+}
+
 /* Heading authored alongside the cart sits above the two columns */
 div.section.cart-section:has(.cart-summary-wrapper) > .default-content-wrapper {
   flex-basis: 100%;
@@ -125,11 +133,14 @@ div.section.cart-section:has(.cart-summary-wrapper) > .cart-wrapper {
 }
 
 .cart-summary-express-buttons {
+  container-type: inline-size;
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
+/* Base (narrow / mobile): every button stacked full-width. PayPal SDK iframes
+   have a minimum width, so two columns would overflow in a tight container. */
 .cart-summary-express-buttons apple-pay-button {
   --apple-pay-button-width: 100%;
   --apple-pay-button-height: 55px;
@@ -137,6 +148,47 @@ div.section.cart-section:has(.cart-summary-wrapper) > .cart-wrapper {
   --apple-pay-button-padding: 0;
 
   display: block;
+  flex: 0 0 100%;
+}
+
+.cart-summary-express-buttons .paypal-paypal-wrapper,
+.cart-summary-express-buttons .paypal-paylater-wrapper {
+  flex: 0 0 100%;
+  min-width: 0;
+  height: 55px;
+}
+
+/* Pair PayPal + Pay Later as two columns below Apple Pay whenever there's room.
+   Two triggers are needed because the container can't tell two cases apart on
+   its own:
+   - Container >=420px: the full-width summary on tablet (and the wide checkout
+     surface) — pair them.
+   - Viewport >=1000px: the desktop cart sidebar is a fixed ~420px column whose
+     inner container (~360px) is too narrow for the container query but is wide
+     enough to pair — so pair them on desktop too.
+   The remaining case (narrow container AND narrow viewport = a phone) stays
+   stacked, which is what we want on mobile. */
+@container (min-width: 420px) {
+  .cart-summary-express-buttons .paypal-paypal-wrapper,
+  .cart-summary-express-buttons .paypal-paylater-wrapper {
+    flex: 1 1 0;
+  }
+}
+
+@media (width >= 1000px) {
+  .cart-summary-express-buttons .paypal-paypal-wrapper,
+  .cart-summary-express-buttons .paypal-paylater-wrapper {
+    flex: 1 1 0;
+  }
+}
+
+/* Tablet (768px up to the 1000px sidebar switch): the summary is full-width with
+   plenty of room, so put all three express buttons in a single row. Above 999px
+   the summary becomes a narrow ~420px sidebar where three across won't fit. */
+@media (width >= 768px) and (width <= 999px) {
+  .cart-summary-express-buttons apple-pay-button {
+    flex: 1 1 0;
+  }
 }
 
 .cart-summary-express-divider {
