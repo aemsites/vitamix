@@ -12,7 +12,9 @@
 
 // eslint-disable-next-line import/no-unresolved
 import DA_SDK from 'https://da.live/nx/utils/sdk.js';
-import { translate, ADMIN_URL, AEM_ADMIN_URL } from './shared.js';
+import {
+  translate, adjustURLs, ADMIN_URL, AEM_ADMIN_URL,
+} from './shared.js';
 
 const LOCALES = [
   {
@@ -169,16 +171,25 @@ const errorMessage = document.querySelector('.rollout-error');
 
       // eslint-disable-next-line no-await-in-loop
       try {
-        context.sourcePath = parsed.repoPath;
+        const targetContext = { ...context, sourcePath: targetPagePath };
 
-        // eslint-disable-next-line no-await-in-loop
-        const translatedHtml = translateCode === sourceTranslateCode ? sourceHtml : await translate(
-          sourceHtml,
-          translateCode,
-          context,
-          undefined, // format: handle both editor and admin format
-          daFetch,
-        );
+        let translatedHtml;
+        if (translateCode === sourceTranslateCode) {
+          const doc = new DOMParser().parseFromString(sourceHtml, 'text/html');
+          const adjusted = adjustURLs(doc, targetContext);
+          translatedHtml = adjusted.documentElement.outerHTML
+            .replace(/^<html><head><\/head><body>/, '')
+            .replace(/<\/body><\/html>$/, '');
+        } else {
+          // eslint-disable-next-line no-await-in-loop
+          translatedHtml = await translate(
+            sourceHtml,
+            translateCode,
+            targetContext,
+            undefined, // format: handle both editor and admin format
+            daFetch,
+          );
+        }
 
         updateStatus(locale, language, 'saving', 'Saving...');
 
