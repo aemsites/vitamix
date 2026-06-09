@@ -133,7 +133,6 @@ div.section.cart-section:has(.cart-summary-wrapper) > .cart-wrapper {
 }
 
 .cart-summary-express-buttons {
-  container-type: inline-size;
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -158,17 +157,15 @@ div.section.cart-section:has(.cart-summary-wrapper) > .cart-wrapper {
   height: 55px;
 }
 
-/* Tablet (>=420px): Apple Pay on its own row, PayPal + Pay Later as two columns. */
-@container (min-width: 420px) {
+/* Desktop only: the order-summary sidebar is a fixed ~420px column, so pair
+   PayPal + Pay Later as two columns below Apple Pay. On tablet/mobile (<=999px)
+   the sidebar goes full-width and the cart layout stacks, so the buttons stay
+   stacked vertically there. (A viewport query is used rather than a container
+   query because the full-width mobile sidebar is a similar width to the desktop
+   sidebar and can't be distinguished by container width alone.) */
+@media (width >= 1000px) {
   .cart-summary-express-buttons .paypal-paypal-wrapper,
   .cart-summary-express-buttons .paypal-paylater-wrapper {
-    flex: 1 1 0;
-  }
-}
-
-/* Desktop (>=620px): all three buttons in a single row. */
-@container (min-width: 620px) {
-  .cart-summary-express-buttons apple-pay-button {
     flex: 1 1 0;
   }
 }
