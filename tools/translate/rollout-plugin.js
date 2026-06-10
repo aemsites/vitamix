@@ -217,9 +217,10 @@ publishCheckbox.addEventListener('change', () => {
         if (!saveResp.ok) throw new Error(`Save failed: ${saveResp.status}`);
 
         const base = `${AEM_ADMIN_URL}/%s/${context.org}/${context.repo}/main${targetPagePath}`;
-        const versionUrl = `${ADMIN_URL}/versionsource/${context.org}/${context.repo}${targetPagePath}`;
+        const versionUrl = `${ADMIN_URL}/versionsource/${context.org}/${context.repo}${p}`;
         const versionOpts = (label) => ({
           method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ label }),
         });
 
