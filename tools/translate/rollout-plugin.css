@@ -1,0 +1,159 @@
+@import url('./shared.css');
+
+body {
+  background: var(--card);
+  padding: 0;
+  align-items: start;
+}
+
+.rollout-container {
+  width: 100%;
+}
+
+.rollout-form {
+  padding: 16px;
+  display: grid;
+  gap: 16px;
+}
+
+.rollout-page {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.rollout-languages {
+  display: grid;
+  gap: 10px;
+}
+
+.rollout-lang {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text);
+  user-select: none;
+}
+
+.rollout-lang > span:not(.rollout-status) {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rollout-lang input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.rollout-options:not([hidden]) {
+  display: flex;
+  gap: 16px;
+}
+
+.rollout-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.rollout-option input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.rollout-option input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.rollout-option:has(input:disabled) {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.rollout-error {
+  color: #c62828;
+  font-size: 13px;
+  min-height: 16px;
+  display: none;
+}
+
+button {
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.08s ease, box-shadow 0.2s ease, background 0.2s ease;
+  background: var(--primary);
+  color: #fff;
+  box-shadow: none;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button:hover:not(:disabled) {
+  background: var(--primary-dark);
+}
+
+.rollout-status {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.rollout-status.loading,
+.rollout-status.saving,
+.rollout-status.previewing,
+.rollout-status.publishing {
+  color: #0052cc;
+  background: #deebff;
+}
+
+.rollout-status.done,
+.rollout-status.saved {
+  color: #064;
+  background: #e3fcef;
+}
+
+.rollout-status.error {
+  color: #bf2600;
+  background: #ffebe6;
+}
+
+.rollout-status svg {
+  vertical-align: middle;
+  margin-left: 4px;
+  width: 14px;
+  height: 14px;
+}
+
+@media (width <= 500px) {
+  button {
+    width: 100%;
+  }
+}
