@@ -53,6 +53,39 @@ body {
   flex-shrink: 0;
 }
 
+.rollout-options:not([hidden]) {
+  display: flex;
+  gap: 16px;
+}
+
+.rollout-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.rollout-option input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.rollout-option input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.rollout-option:has(input:disabled) {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .rollout-error {
   color: #c62828;
   font-size: 13px;

@@ -73,7 +73,19 @@ function updateStatus(locale, language, status, text) {
 
 const languagesContainer = document.querySelector('.rollout-languages');
 const rolloutBtn = document.querySelector('button[name="rollout"]');
+const rolloutOptions = document.querySelector('.rollout-options');
+const previewCheckbox = document.querySelector('input[name="preview"]');
+const publishCheckbox = document.querySelector('input[name="publish"]');
 const errorMessage = document.querySelector('.rollout-error');
+
+publishCheckbox.addEventListener('change', () => {
+  if (publishCheckbox.checked) {
+    previewCheckbox.checked = true;
+    previewCheckbox.disabled = true;
+  } else {
+    previewCheckbox.disabled = false;
+  }
+});
 
 (async function init() {
   const { context, actions } = await DA_SDK;
@@ -116,6 +128,7 @@ const errorMessage = document.querySelector('.rollout-error');
     languagesContainer.appendChild(labelEl);
   });
 
+  rolloutOptions.hidden = false;
   rolloutBtn.hidden = false;
 
   rolloutBtn.addEventListener('click', async (e) => {
@@ -203,16 +216,20 @@ const errorMessage = document.querySelector('.rollout-error');
         const saveResp = await daFetch(targetUrl, { method: 'PUT', body: formData });
         if (!saveResp.ok) throw new Error(`Save failed: ${saveResp.status}`);
 
-        updateStatus(locale, language, 'previewing', 'Previewing...');
         const base = `${AEM_ADMIN_URL}/%s/${context.org}/${context.repo}/main${targetPagePath}`;
-        // eslint-disable-next-line no-await-in-loop
-        const previewResp = await daFetch(base.replace('%s', 'preview'), { method: 'POST' });
-        if (!previewResp.ok) throw new Error(`Preview failed: ${previewResp.status}`);
+        if (previewCheckbox.checked) {
+          updateStatus(locale, language, 'previewing', 'Previewing...');
+          // eslint-disable-next-line no-await-in-loop
+          const previewResp = await daFetch(base.replace('%s', 'preview'), { method: 'POST' });
+          if (!previewResp.ok) throw new Error(`Preview failed: ${previewResp.status}`);
+        }
 
-        updateStatus(locale, language, 'publishing', 'Publishing...');
-        // eslint-disable-next-line no-await-in-loop
-        const publishResp = await daFetch(base.replace('%s', 'live'), { method: 'POST' });
-        if (!publishResp.ok) throw new Error(`Publish failed: ${publishResp.status}`);
+        if (publishCheckbox.checked) {
+          updateStatus(locale, language, 'publishing', 'Publishing...');
+          // eslint-disable-next-line no-await-in-loop
+          const publishResp = await daFetch(base.replace('%s', 'live'), { method: 'POST' });
+          if (!publishResp.ok) throw new Error(`Publish failed: ${publishResp.status}`);
+        }
 
         const daHref = `https://da.live/edit#/${context.org}/${context.repo}${targetPagePath}`;
         updateStatus(locale, language, 'done', `Done! <a href="${daHref}" target="_blank">${EDIT_ICON_SVG}</a>`);

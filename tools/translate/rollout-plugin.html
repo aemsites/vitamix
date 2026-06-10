@@ -11,6 +11,16 @@
       <form class="rollout-form">
         <p class="rollout-page">Translate, preview and publish this page to the selected locales.</p>
         <div class="rollout-languages"></div>
+        <div class="rollout-options" hidden>
+          <label class="rollout-option">
+            <input type="checkbox" name="preview" checked>
+            <span>Preview</span>
+          </label>
+          <label class="rollout-option">
+            <input type="checkbox" name="publish" checked>
+            <span>Publish</span>
+          </label>
+        </div>
         <div class="rollout-error" aria-live="polite"></div>
         <button name="rollout" hidden>Rollout</button>
       </form>
