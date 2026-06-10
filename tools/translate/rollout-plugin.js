@@ -217,11 +217,18 @@ publishCheckbox.addEventListener('change', () => {
         if (!saveResp.ok) throw new Error(`Save failed: ${saveResp.status}`);
 
         const base = `${AEM_ADMIN_URL}/%s/${context.org}/${context.repo}/main${targetPagePath}`;
+        const versionUrl = `${ADMIN_URL}/versionsource/${context.org}/${context.repo}${targetPagePath}`;
+        const versionOpts = (label) => ({
+          method: 'POST',
+          body: JSON.stringify({ label }),
+        });
+
         if (previewCheckbox.checked) {
           updateStatus(locale, language, 'previewing', 'Previewing...');
           // eslint-disable-next-line no-await-in-loop
           const previewResp = await daFetch(base.replace('%s', 'preview'), { method: 'POST' });
           if (!previewResp.ok) throw new Error(`Preview failed: ${previewResp.status}`);
+          daFetch(versionUrl, versionOpts('Previewed'));
         }
 
         if (publishCheckbox.checked) {
@@ -229,6 +236,7 @@ publishCheckbox.addEventListener('change', () => {
           // eslint-disable-next-line no-await-in-loop
           const publishResp = await daFetch(base.replace('%s', 'live'), { method: 'POST' });
           if (!publishResp.ok) throw new Error(`Publish failed: ${publishResp.status}`);
+          daFetch(versionUrl, versionOpts('Published'));
         }
 
         const daHref = `https://da.live/edit#/${context.org}/${context.repo}${targetPagePath}`;
