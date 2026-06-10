@@ -229,7 +229,7 @@ publishCheckbox.addEventListener('change', () => {
           // eslint-disable-next-line no-await-in-loop
           const previewResp = await daFetch(base.replace('%s', 'preview'), { method: 'POST' });
           if (!previewResp.ok) throw new Error(`Preview failed: ${previewResp.status}`);
-          daFetch(versionUrl, versionOpts('Previewed'));
+          if (!publishCheckbox.checked) daFetch(versionUrl, versionOpts('Previewed'));
         }
 
         if (publishCheckbox.checked) {
