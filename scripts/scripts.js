@@ -1257,6 +1257,7 @@ export function findBestAlertBanner(banners, date = new Date()) {
 async function loadNavBanner(main) {
   const meta = getMetadata('nav-banners');
   if (!meta) return;
+  if (main.baseURI.includes('/commercial/')) return;
   try {
     const path = new URL(meta, window.location).pathname;
     // eslint-disable-next-line import/no-cycle
