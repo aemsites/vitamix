@@ -1,3 +1,4 @@
+import { logOperation } from '../../scripts/operations-log.js';
 import { validateField } from './checkout-validation.js';
 
 const US_STATES = [
@@ -218,6 +219,105 @@ export async function callValidateAddress(apiOrigin, payload, sessionToken) {
 
   if (!resp.ok) throw new Error(`address validation failed: ${resp.status}`);
   return resp.json();
+}
+
+function getComponentMap(result) {
+  const map = {};
+  result?.addressComponents?.forEach((component) => {
+    component.types?.forEach((type) => { map[type] = component; });
+  });
+  return map;
+}
+
+function normalizedComponentValue(map, type, field = 'longText') {
+  return (map[type]?.[field] || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function normalizedResultParts(result) {
+  const map = getComponentMap(result);
+  const street = [
+    normalizedComponentValue(map, 'street_number'),
+    normalizedComponentValue(map, 'route'),
+  ].filter(Boolean).join(' ');
+  const postalCode = normalizedComponentValue(map, 'postal_code');
+  const postalSuffix = normalizedComponentValue(map, 'postal_code_suffix');
+  return {
+    action: result?.action || '',
+    formattedAddress: (result?.formattedAddress || '').toString().trim().toLowerCase().replace(/\s+/g, ' '),
+    uspsDeliverable: result?.uspsDeliverable,
+    street,
+    unit: normalizedComponentValue(map, 'subpremise'),
+    city: normalizedComponentValue(map, 'locality')
+      || normalizedComponentValue(map, 'sublocality')
+      || normalizedComponentValue(map, 'postal_town'),
+    state: normalizedComponentValue(map, 'administrative_area_level_1', 'shortText'),
+    postalCode: postalSuffix ? `${postalCode}-${postalSuffix}` : postalCode,
+    country: normalizedComponentValue(map, 'country', 'shortText'),
+  };
+}
+
+export function compareAddressValidationResults(google, addressDoctor) {
+  const googleParts = normalizedResultParts(google);
+  const addressDoctorParts = normalizedResultParts(addressDoctor);
+  const fields = [
+    'action',
+    'formattedAddress',
+    'uspsDeliverable',
+    'street',
+    'unit',
+    'city',
+    'state',
+    'postalCode',
+    'country',
+  ];
+  const mismatchFields = fields.filter((field) => googleParts[field] !== addressDoctorParts[field]);
+  return {
+    mismatch: mismatchFields.length > 0,
+    mismatchFields,
+    googleAction: google?.action || null,
+    addressDoctorAction: addressDoctor?.action || null,
+  };
+}
+
+export function logAddressValidationMismatch(comparison, country) {
+  logOperation('error', {
+    kind: 'address-validation-mismatch',
+    providerPrimary: 'addressdoctor',
+    providerCompared: 'google',
+    mismatchFields: comparison.mismatchFields,
+    googleAction: comparison.googleAction,
+    addressDoctorAction: comparison.addressDoctorAction,
+    country,
+  });
+}
+
+function localAddressDoctorFix() {
+  return {
+    provider: 'addressdoctor',
+    action: 'FIX',
+    formattedAddress: null,
+    addressComponents: null,
+    uspsDeliverable: false,
+  };
+}
+
+export async function callDualValidateAddress(config, payload, sessionToken) {
+  const [googleResult, addressDoctorResult] = await Promise.allSettled([
+    callValidateAddress(config.apiOrigin, payload, sessionToken),
+    callValidateAddress(config.addressDoctorOrigin, payload, null),
+  ]);
+
+  const google = googleResult.status === 'fulfilled' ? googleResult.value : null;
+  const addressDoctor = addressDoctorResult.status === 'fulfilled' ? addressDoctorResult.value : null;
+
+  if (google && addressDoctor) {
+    const comparison = compareAddressValidationResults(google, addressDoctor);
+    if (comparison.mismatch) {
+      logAddressValidationMismatch(comparison, payload.address?.regionCode || null);
+    }
+  }
+
+  return addressDoctor || localAddressDoctorFix();
 }
 
 /**
@@ -746,7 +846,7 @@ export async function validateAndCollapseAddress(
     let result;
     try {
       // eslint-disable-next-line no-await-in-loop
-      result = await callValidateAddress(config.apiOrigin, payload, getToken?.() ?? null);
+      result = await callDualValidateAddress(config, payload, getToken?.() ?? null);
     } catch {
       showAddressError(
         section,

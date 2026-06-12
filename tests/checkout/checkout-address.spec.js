@@ -50,6 +50,108 @@ async function callValidateAddress(apiOrigin, payload, sessionToken, fetchFn = f
 }
 
 // ---------------------------------------------------------------------------
+// Inlined dual validation comparison helpers
+// ---------------------------------------------------------------------------
+
+function getComponentMap(result) {
+  const map = {};
+  result?.addressComponents?.forEach((component) => {
+    component.types?.forEach((type) => { map[type] = component; });
+  });
+  return map;
+}
+
+function normalizedComponentValue(map, type, field = 'longText') {
+  return (map[type]?.[field] || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function normalizedResultParts(result) {
+  const map = getComponentMap(result);
+  const street = [
+    normalizedComponentValue(map, 'street_number'),
+    normalizedComponentValue(map, 'route'),
+  ].filter(Boolean).join(' ');
+  const postalCode = normalizedComponentValue(map, 'postal_code');
+  const postalSuffix = normalizedComponentValue(map, 'postal_code_suffix');
+  return {
+    action: result?.action || '',
+    formattedAddress: (result?.formattedAddress || '').toString().trim().toLowerCase().replace(/\s+/g, ' '),
+    uspsDeliverable: result?.uspsDeliverable,
+    street,
+    unit: normalizedComponentValue(map, 'subpremise'),
+    city: normalizedComponentValue(map, 'locality')
+      || normalizedComponentValue(map, 'sublocality')
+      || normalizedComponentValue(map, 'postal_town'),
+    state: normalizedComponentValue(map, 'administrative_area_level_1', 'shortText'),
+    postalCode: postalSuffix ? `${postalCode}-${postalSuffix}` : postalCode,
+    country: normalizedComponentValue(map, 'country', 'shortText'),
+  };
+}
+
+function compareAddressValidationResults(google, addressDoctor) {
+  const googleParts = normalizedResultParts(google);
+  const addressDoctorParts = normalizedResultParts(addressDoctor);
+  const fields = [
+    'action',
+    'formattedAddress',
+    'uspsDeliverable',
+    'street',
+    'unit',
+    'city',
+    'state',
+    'postalCode',
+    'country',
+  ];
+  const mismatchFields = fields.filter((field) => googleParts[field] !== addressDoctorParts[field]);
+  return {
+    mismatch: mismatchFields.length > 0,
+    mismatchFields,
+    googleAction: google?.action || null,
+    addressDoctorAction: addressDoctor?.action || null,
+  };
+}
+
+function localAddressDoctorFix() {
+  return {
+    provider: 'addressdoctor',
+    action: 'FIX',
+    formattedAddress: null,
+    addressComponents: null,
+    uspsDeliverable: false,
+  };
+}
+
+async function callDualValidateAddress(cfg, body, token, fetchFn = fetch, logFn = () => {}) {
+  async function call(apiOrigin, sessionToken) {
+    return callValidateAddress(apiOrigin, body, sessionToken, fetchFn);
+  }
+  const [googleResult, addressDoctorResult] = await Promise.allSettled([
+    call(cfg.apiOrigin, token),
+    call(cfg.addressDoctorOrigin, null),
+  ]);
+
+  const google = googleResult.status === 'fulfilled' ? googleResult.value : null;
+  const addressDoctor = addressDoctorResult.status === 'fulfilled' ? addressDoctorResult.value : null;
+
+  if (google && addressDoctor) {
+    const comparison = compareAddressValidationResults(google, addressDoctor);
+    if (comparison.mismatch) {
+      logFn('error', {
+        kind: 'address-validation-mismatch',
+        providerPrimary: 'addressdoctor',
+        providerCompared: 'google',
+        mismatchFields: comparison.mismatchFields,
+        googleAction: comparison.googleAction,
+        addressDoctorAction: comparison.addressDoctorAction,
+        country: body.address?.regionCode || null,
+      });
+    }
+  }
+
+  return addressDoctor || localAddressDoctorFix();
+}
+
+// ---------------------------------------------------------------------------
 // buildAddressPayload tests
 // ---------------------------------------------------------------------------
 
@@ -135,10 +237,11 @@ test.describe('buildAddressPayload', () => {
 // callValidateAddress tests
 // ---------------------------------------------------------------------------
 
-test.describe('callValidateAddress', () => {
-  const apiOrigin = 'https://api.adobecommerce.live/org/sites/site';
-  const payload = { address: { regionCode: 'US', addressLines: ['123 Main St', 'Springfield, IL 62701'] } };
+const apiOrigin = 'https://api.adobecommerce.live/org/sites/site';
+const addressDoctorOrigin = 'https://vitamix-address-doctor-proxy-worker.adobeaem.workers.dev';
+const payload = { address: { regionCode: 'US', addressLines: ['123 Main St', 'Springfield, IL 62701'] } };
 
+test.describe('callValidateAddress', () => {
   test('POSTs to the correct URL', async () => {
     let capturedUrl;
     const fetchFn = async (url) => {
@@ -231,6 +334,167 @@ test.describe('callValidateAddress', () => {
 
     await expect(callValidateAddress(apiOrigin, payload, null, fetchFn))
       .rejects.toThrow('network error');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// dual validation tests
+// ---------------------------------------------------------------------------
+
+test.describe('callDualValidateAddress', () => {
+  const googleAccept = {
+    action: 'ACCEPT',
+    formattedAddress: '123 Main St, Springfield, IL 62701',
+    addressComponents: [
+      { longText: '123', shortText: '123', types: ['street_number'] },
+      { longText: 'Main St', shortText: 'Main St', types: ['route'] },
+      { longText: 'Springfield', shortText: 'Springfield', types: ['locality'] },
+      { longText: 'IL', shortText: 'IL', types: ['administrative_area_level_1'] },
+      { longText: '62701', shortText: '62701', types: ['postal_code'] },
+      { longText: 'US', shortText: 'US', types: ['country'] },
+    ],
+    uspsDeliverable: true,
+  };
+
+  const addressDoctorConfirm = {
+    provider: 'addressdoctor',
+    action: 'CONFIRM',
+    formattedAddress: '123 Main St, Springfield IL 62701-0001',
+    addressComponents: [
+      { longText: '123', shortText: '123', types: ['street_number'] },
+      { longText: 'Main St', shortText: 'Main St', types: ['route'] },
+      { longText: 'Springfield', shortText: 'Springfield', types: ['locality'] },
+      { longText: 'Illinois', shortText: 'IL', types: ['administrative_area_level_1'] },
+      { longText: '62701-0001', shortText: '62701-0001', types: ['postal_code'] },
+      { longText: 'US', shortText: 'US', types: ['country'] },
+    ],
+    uspsDeliverable: true,
+  };
+
+  test('uses AddressDoctor result when both providers succeed', async () => {
+    const urls = [];
+    const fetchFn = async (url) => {
+      urls.push(url);
+      return {
+        ok: true,
+        json: async () => {
+          if (url.startsWith(addressDoctorOrigin)) return addressDoctorConfirm;
+          return googleAccept;
+        },
+      };
+    };
+
+    const cfg = { apiOrigin, addressDoctorOrigin };
+    const result = await callDualValidateAddress(cfg, payload, 'tok-1', fetchFn);
+
+    expect(result).toEqual(addressDoctorConfirm);
+    expect(urls[0]).toContain(`${apiOrigin}/places/validate?sessiontoken=tok-1`);
+    expect(urls[1]).toBe(`${addressDoctorOrigin}/places/validate`);
+  });
+
+  test('logs non-PII mismatch metadata when providers differ', async () => {
+    const logs = [];
+    const fetchFn = async (url) => ({
+      ok: true,
+      json: async () => {
+        if (url.startsWith(addressDoctorOrigin)) return addressDoctorConfirm;
+        return googleAccept;
+      },
+    });
+
+    const cfg = { apiOrigin, addressDoctorOrigin };
+    const logFn = (...args) => logs.push(args);
+    await callDualValidateAddress(cfg, payload, null, fetchFn, logFn);
+
+    expect(logs).toHaveLength(1);
+    expect(logs[0][0]).toBe('error');
+    expect(logs[0][1]).toEqual(expect.objectContaining({
+      kind: 'address-validation-mismatch',
+      providerPrimary: 'addressdoctor',
+      providerCompared: 'google',
+      googleAction: 'ACCEPT',
+      addressDoctorAction: 'CONFIRM',
+      country: 'US',
+    }));
+    expect(logs[0][1].mismatchFields)
+      .toEqual(expect.arrayContaining(['action', 'formattedAddress', 'postalCode']));
+    expect(JSON.stringify(logs[0][1])).not.toContain('Springfield IL 62701-0001');
+  });
+
+  test('does not log when normalized provider results match', async () => {
+    const logs = [];
+    const fetchFn = async () => ({ ok: true, json: async () => googleAccept });
+    const cfg = { apiOrigin, addressDoctorOrigin };
+    const logFn = (...args) => logs.push(args);
+    const result = await callDualValidateAddress(cfg, payload, null, fetchFn, logFn);
+
+    expect(result).toEqual(googleAccept);
+    expect(logs).toHaveLength(0);
+  });
+
+  test('uses AddressDoctor when Google validation fails', async () => {
+    const fetchFn = async (url) => {
+      if (url.startsWith(apiOrigin)) throw new Error('google down');
+      return { ok: true, json: async () => addressDoctorConfirm };
+    };
+
+    const cfg = { apiOrigin, addressDoctorOrigin };
+    const result = await callDualValidateAddress(cfg, payload, null, fetchFn);
+
+    expect(result).toEqual(addressDoctorConfirm);
+  });
+
+  test('returns local FIX when AddressDoctor validation fails', async () => {
+    const fetchFn = async (url) => {
+      if (url.startsWith(addressDoctorOrigin)) throw new Error('addressdoctor down');
+      return { ok: true, json: async () => googleAccept };
+    };
+
+    const cfg = { apiOrigin, addressDoctorOrigin };
+    const result = await callDualValidateAddress(cfg, payload, null, fetchFn);
+
+    expect(result).toEqual({
+      provider: 'addressdoctor',
+      action: 'FIX',
+      formattedAddress: null,
+      addressComponents: null,
+      uspsDeliverable: false,
+    });
+  });
+});
+
+test.describe('compareAddressValidationResults', () => {
+  test('compares sublocality, postal suffix, unit, country, and missing actions', () => {
+    const google = {
+      addressComponents: [
+        { longText: '1', shortText: '1', types: ['street_number'] },
+        { longText: 'Main', shortText: 'Main', types: ['route'] },
+        { longText: 'Brooklyn', shortText: 'Brooklyn', types: ['sublocality'] },
+        { longText: 'NY', shortText: 'NY', types: ['administrative_area_level_1'] },
+        { longText: '11201', shortText: '11201', types: ['postal_code'] },
+        { longText: '1234', shortText: '1234', types: ['postal_code_suffix'] },
+        { longText: '4B', shortText: '4B', types: ['subpremise'] },
+        { longText: 'United States', shortText: 'US', types: ['country'] },
+      ],
+    };
+    const addressDoctor = {
+      action: 'CONFIRM',
+      addressComponents: [
+        { longText: '1', shortText: '1', types: ['street_number'] },
+        { longText: 'Main', shortText: 'Main', types: ['route'] },
+        { longText: 'Brooklyn', shortText: 'Brooklyn', types: ['postal_town'] },
+        { longText: 'NY', shortText: 'NY', types: ['administrative_area_level_1'] },
+        { longText: '11201-1234', shortText: '11201-1234', types: ['postal_code'] },
+        { longText: '5C', shortText: '5C', types: ['subpremise'] },
+        { longText: 'US', shortText: 'US', types: ['country'] },
+      ],
+    };
+
+    const result = compareAddressValidationResults(google, addressDoctor);
+    expect(result.mismatch).toBe(true);
+    expect(result.mismatchFields).toEqual(expect.arrayContaining(['action', 'unit']));
+    expect(result.googleAction).toBe(null);
+    expect(result.addressDoctorAction).toBe('CONFIRM');
   });
 });
 
