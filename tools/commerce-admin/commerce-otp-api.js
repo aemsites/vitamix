@@ -2,11 +2,17 @@
 /**
  * ProductBus / Adobe Commerce Live API client (from helix-tools-website
  * productbus-admin/api.js).
- * Auth is stored per environment (`pbus-auth-{org}-{site}-stage|prod`); switching hosts keeps both
- * sessions.
+ * Auth is stored in localStorage per environment (`pbus-auth-{org}-{site}-stage|prod`); switching
+ * hosts keeps both sessions. JWT `exp` is enforced client-side (~24h); expired sessions are cleared
+ * and the user is sent back to OTP sign-in.
  */
 
 import { showToast } from './commerce-otp-ui.js';
+
+/** Seconds before JWT `exp` to treat the token as expired (clock skew). */
+const AUTH_EXPIRY_SKEW_SEC = 30;
+
+let authExpiryTimerId = null;
 
 export const PRODUCTION_API_BASE = 'https://api.adobecommerce.live';
 export const STAGE_API_BASE = 'https://api-stage.adobecommerce.live';
@@ -47,13 +53,138 @@ export function setApiEnvironment(env) {
   }
 }
 
-/** SessionStorage key for ProductBus JWT + profile (separate per API host). */
+/** localStorage key for ProductBus JWT + profile (separate per API host). */
 function authStorageKey(org, site, env) {
   return `pbus-auth-${org}-${site}-${env}`;
 }
 
 function legacyAuthKey(org, site) {
   return `pbus-auth-${org}-${site}`;
+}
+
+function decodeJwtPayload(token) {
+  if (!token || typeof token !== 'string') return null;
+  const part = token.split('.')[1];
+  if (!part) return null;
+  try {
+    const b64 = part.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
+    return JSON.parse(atob(padded));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * JWT expiry (Unix seconds). Falls back to `iat + 24h` when `exp` is absent.
+ *
+ * @param {string} token
+ * @returns {number | null}
+ */
+export function getTokenExpirySec(token) {
+  const payload = decodeJwtPayload(token);
+  if (!payload) return null;
+  if (typeof payload.exp === 'number') return payload.exp;
+  if (typeof payload.iat === 'number') return payload.iat + 86400;
+  return null;
+}
+
+/**
+ * @param {string} token
+ * @param {number} [skewSec]
+ * @returns {boolean}
+ */
+export function isAuthTokenExpired(token, skewSec = AUTH_EXPIRY_SKEW_SEC) {
+  const exp = getTokenExpirySec(token);
+  if (!exp) return true;
+  return Date.now() / 1000 >= exp - skewSec;
+}
+
+function clearLegacyAuthKeys(org, site) {
+  sessionStorage.removeItem(legacyAuthKey(org, site));
+  localStorage.removeItem(legacyAuthKey(org, site));
+}
+
+function readAuthRaw(org, site, env) {
+  const key = authStorageKey(org, site, env);
+  try {
+    let raw = localStorage.getItem(key);
+    if (!raw) {
+      const fromSession = sessionStorage.getItem(key);
+      if (fromSession) {
+        localStorage.setItem(key, fromSession);
+        sessionStorage.removeItem(key);
+        raw = fromSession;
+      }
+    }
+    if (!raw) {
+      const legacy = localStorage.getItem(legacyAuthKey(org, site))
+        || sessionStorage.getItem(legacyAuthKey(org, site));
+      if (legacy) {
+        localStorage.setItem(key, legacy);
+        clearLegacyAuthKeys(org, site);
+        raw = legacy;
+      }
+    }
+    return raw;
+  } catch {
+    return null;
+  }
+}
+
+function clearAuthStateForEnv(org, site, env) {
+  const key = authStorageKey(org, site, env);
+  localStorage.removeItem(key);
+  sessionStorage.removeItem(key);
+  clearLegacyAuthKeys(org, site);
+}
+
+function parseAuthState(org, site, env) {
+  const raw = readAuthRaw(org, site, env);
+  if (!raw) return null;
+  try {
+    const state = JSON.parse(raw);
+    if (!state?.token) return null;
+    if (isAuthTokenExpired(state.token)) {
+      clearAuthStateForEnv(org, site, env);
+      return null;
+    }
+    return state;
+  } catch {
+    clearAuthStateForEnv(org, site, env);
+    return null;
+  }
+}
+
+/**
+ * Schedule a one-shot timer for JWT expiry; calls `onExpired` when the token lapses.
+ *
+ * @param {string} org
+ * @param {string} site
+ * @param {() => void} onExpired
+ */
+export function scheduleCommerceAuthExpiry(org, site, onExpired) {
+  if (authExpiryTimerId != null) {
+    clearTimeout(authExpiryTimerId);
+    authExpiryTimerId = null;
+  }
+  const env = getApiEnvironment();
+  const raw = readAuthRaw(org, site, env);
+  if (!raw) return;
+  let state;
+  try {
+    state = JSON.parse(raw);
+  } catch {
+    return;
+  }
+  const expSec = getTokenExpirySec(state?.token);
+  if (!expSec) return;
+  const delayMs = expSec * 1000 - Date.now() - AUTH_EXPIRY_SKEW_SEC * 1000;
+  if (delayMs <= 0) {
+    onExpired();
+    return;
+  }
+  authExpiryTimerId = setTimeout(onExpired, delayMs);
 }
 
 /**
@@ -66,46 +197,31 @@ function legacyAuthKey(org, site) {
  */
 export function getAuthStateForEnv(org, site, env) {
   const keyEnv = env === 'prod' ? 'prod' : 'stage';
-  const key = authStorageKey(org, site, keyEnv);
-  try {
-    const raw = sessionStorage.getItem(key);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
+  return parseAuthState(org, site, keyEnv);
 }
 
 export function getAuthState(org, site) {
   const env = getApiEnvironment();
-  const key = authStorageKey(org, site, env);
-  try {
-    let raw = sessionStorage.getItem(key);
-    if (!raw) {
-      const old = sessionStorage.getItem(legacyAuthKey(org, site));
-      if (old) {
-        sessionStorage.setItem(key, old);
-        sessionStorage.removeItem(legacyAuthKey(org, site));
-        raw = old;
-      }
-    }
-    return raw ? JSON.parse(raw) : null;
-  } catch (e) {
-    return null;
-  }
+  return parseAuthState(org, site, env);
 }
 
 export function setAuthState(org, site, state) {
   const env = getApiEnvironment();
-  sessionStorage.setItem(authStorageKey(org, site, env), JSON.stringify(state));
-  sessionStorage.removeItem(legacyAuthKey(org, site));
+  localStorage.setItem(authStorageKey(org, site, env), JSON.stringify(state));
+  clearLegacyAuthKeys(org, site);
+  sessionStorage.removeItem(authStorageKey(org, site, env));
   const roles = Array.isArray(state?.roles) ? state.roles.join(',') : String(state?.roles ?? '');
-  console.log(`[commerce-admin] setAuthState env=${env} storageKey=pbus-auth-${org}-${site}-${env} hasToken=${Boolean(state?.token)} roles=${roles}`);
+  const expSec = getTokenExpirySec(state?.token);
+  console.log(`[commerce-admin] setAuthState env=${env} storageKey=pbus-auth-${org}-${site}-${env} hasToken=${Boolean(state?.token)} roles=${roles} exp=${expSec ?? 'unknown'}`);
 }
 
 export function clearAuthState(org, site) {
   const env = getApiEnvironment();
-  sessionStorage.removeItem(authStorageKey(org, site, env));
-  sessionStorage.removeItem(legacyAuthKey(org, site));
+  clearAuthStateForEnv(org, site, env);
+  if (authExpiryTimerId != null) {
+    clearTimeout(authExpiryTimerId);
+    authExpiryTimerId = null;
+  }
 }
 
 /**
@@ -174,11 +290,34 @@ export async function logoutCommerceSession(org, site) {
   clearAuthState(org, site);
 }
 
+function notifySessionExpired(skipAuthRedirect, quiet) {
+  if (skipAuthRedirect || quiet) return;
+  showToast('Your sign-in expired. Please sign in again.', 'error');
+  window.dispatchEvent(new CustomEvent('commerce-admin:sign-out'));
+}
+
 export async function apiFetch(org, site, path, options = {}) {
   const { skipAuthRedirect, quiet, ...fetchOptions } = options;
   const base = getApiBase();
   const targetUrl = `${base}/${org}/sites/${site}/${path}`;
   const fetchUrl = `${CORS_PROXY}${encodeURIComponent(targetUrl)}${CORS_KEY}`;
+
+  const env = getApiEnvironment();
+  const raw = readAuthRaw(org, site, env);
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed?.token && isAuthTokenExpired(parsed.token)) {
+        clearAuthState(org, site);
+        notifySessionExpired(skipAuthRedirect, quiet);
+        throw new Error('Session expired');
+      }
+    } catch (err) {
+      if (err?.message === 'Session expired') throw err;
+      clearAuthState(org, site);
+    }
+  }
+
   const auth = getAuthState(org, site);
 
   const headers = {
@@ -203,6 +342,7 @@ export async function apiFetch(org, site, path, options = {}) {
 
   if (response.status === 401 && !skipAuthRedirect && !quiet) {
     clearAuthState(org, site);
+    notifySessionExpired(skipAuthRedirect, quiet);
     throw new Error('Unauthorized');
   }
 

@@ -7,7 +7,7 @@ const MAX_WAIT_MS = 5 * 60 * 1000;
 
 /**
  * Wait until a ProductBus JWT exists for this org/site (for the current API env in
- * sessionStorage). Prefer this over only checking `commerce-admin-auth-ok`: the HTML
+ * localStorage). Prefer this over only checking `commerce-admin-auth-ok`: the HTML
  * class can lag `setAuthState`, and a ~10s class-only wait used to fire API calls before
  * OTP completed (`hasBearer=false` then real login logs afterward).
  *
@@ -17,7 +17,7 @@ const MAX_WAIT_MS = 5 * 60 * 1000;
  */
 export default function waitForCommerceAuthReady(org, site) {
   if (getAuthState(org, site)?.token) {
-    console.log('[commerce-admin] wait-auth JWT already in sessionStorage');
+    console.log('[commerce-admin] wait-auth JWT already in localStorage');
     return Promise.resolve(true);
   }
   console.log('[commerce-admin] wait-auth polling until JWT exists (org/site + current API env)');

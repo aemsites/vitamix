@@ -8,6 +8,7 @@ import {
   getAuthState,
   verifyCommerceApiAccess,
   logoutCommerceSession,
+  scheduleCommerceAuthExpiry,
   PRODUCTBUS_STAGE_SESSION_KEY,
 } from './commerce-otp-api.js';
 import { mountCommerceOtpLogin } from './commerce-otp-login.js';
@@ -69,6 +70,10 @@ async function completeAuthIfAllowed(root, collapseAuthRoot) {
   applyProfileFromAuth();
   document.documentElement.classList.add('commerce-admin-auth-ok');
   collapseAuthRoot();
+  scheduleCommerceAuthExpiry(PB_ORG, PB_SITE, () => {
+    console.log('[commerce-admin] auth-page-boot JWT expired; signing out');
+    window.dispatchEvent(new CustomEvent('commerce-admin:sign-out'));
+  });
   return true;
 }
 
