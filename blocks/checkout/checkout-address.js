@@ -360,7 +360,7 @@ function addressPartsMatch(left, right) {
  */
 export function addressesMatchEntered(
   formData,
-  prefix = 'shipping-',
+  prefix,
   addressComponents,
   formattedAddress,
 ) {
