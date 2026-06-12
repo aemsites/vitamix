@@ -4,10 +4,17 @@
  * Org/site are fixed for this Vitamix project (matches Edge Delivery:
  * main--vitamix--aemsites).
  */
-import { getAuthState, clearAuthState, PRODUCTBUS_STAGE_SESSION_KEY } from './commerce-otp-api.js';
+import {
+  getAuthState,
+  verifyCommerceApiAccess,
+  logoutCommerceSession,
+  PRODUCTBUS_STAGE_SESSION_KEY,
+} from './commerce-otp-api.js';
 import { mountCommerceOtpLogin } from './commerce-otp-login.js';
 import { PB_ORG, PB_SITE } from './commerce-pbus-config.js';
 import { setStoredFirstName } from './user-identity.js';
+
+const ACCESS_DENIED_MS = 2200;
 
 function firstNameFromEmail(email) {
   if (!email || typeof email !== 'string') return null;
@@ -25,6 +32,67 @@ function applyProfileFromAuth() {
     const first = firstNameFromEmail(email);
     if (first) setStoredFirstName(first);
   }
+}
+
+function showAccessDenied(root) {
+  root.style.display = '';
+  root.removeAttribute('aria-hidden');
+  root.innerHTML = `
+    <div class="ca-login-wrap ca-login-denied">
+      <h1 class="ca-login-title">Not authorized.</h1>
+      <p class="ca-login-subtitle">This account does not have access to Commerce Admin for this site.</p>
+    </div>
+  `;
+}
+
+async function denyAccessAndSignOut(root) {
+  console.log('[commerce-admin] auth-page-boot access denied; signing out');
+  await logoutCommerceSession(PB_ORG, PB_SITE);
+  document.documentElement.classList.remove('commerce-admin-auth-ok');
+  showAccessDenied(root);
+  await new Promise((resolve) => {
+    setTimeout(resolve, ACCESS_DENIED_MS);
+  });
+}
+
+async function completeAuthIfAllowed(root, collapseAuthRoot) {
+  const access = await verifyCommerceApiAccess(PB_ORG, PB_SITE);
+  if (!access.ok) {
+    console.log(`[commerce-admin] auth-page-boot verifyCommerceApiAccess failed: ${access.message}`);
+    await denyAccessAndSignOut(root);
+    return false;
+  }
+
+  const auth = getAuthState(PB_ORG, PB_SITE);
+  const roles = Array.isArray(auth?.roles) ? auth.roles.join(',') : String(auth?.roles ?? '');
+  console.log(`[commerce-admin] auth-page-boot access ok; add commerce-admin-auth-ok roles=${roles}`);
+  applyProfileFromAuth();
+  document.documentElement.classList.add('commerce-admin-auth-ok');
+  collapseAuthRoot();
+  return true;
+}
+
+async function showLogin(root, collapseAuthRoot) {
+  root.style.display = '';
+  root.removeAttribute('aria-hidden');
+  root.innerHTML = '';
+  await new Promise((resolve) => {
+    mountCommerceOtpLogin(root, {
+      org: PB_ORG,
+      site: PB_SITE,
+      onAuthenticated: async (result) => {
+        const roles = Array.isArray(result?.roles) ? result.roles.join(',') : String(result?.roles ?? '');
+        console.log(`[commerce-admin] auth-page-boot onAuthenticated email=${String(result?.email ?? '')} roles=${roles}`);
+        const granted = await completeAuthIfAllowed(root, collapseAuthRoot);
+        if (granted) {
+          resolve(result);
+          return;
+        }
+        await showLogin(root, collapseAuthRoot);
+        resolve(null);
+      },
+    }).catch(() => {});
+  });
 }
 
 async function ensureCommerceAuth() {
@@ -49,29 +117,13 @@ async function ensureCommerceAuth() {
     const existing = getAuthState(PB_ORG, PB_SITE);
     if (existing?.token) {
       const roles = Array.isArray(existing?.roles) ? existing.roles.join(',') : String(existing?.roles ?? '');
-      console.log(`[commerce-admin] auth-page-boot existing session; add commerce-admin-auth-ok roles=${roles}`);
-      applyProfileFromAuth();
-      document.documentElement.classList.add('commerce-admin-auth-ok');
-      collapseAuthRoot();
+      console.log(`[commerce-admin] auth-page-boot existing session; verify access roles=${roles}`);
+      const granted = await completeAuthIfAllowed(root, collapseAuthRoot);
+      if (granted) return;
+      await showLogin(root, collapseAuthRoot);
       return;
     }
-    root.style.display = '';
-    root.removeAttribute('aria-hidden');
-    root.innerHTML = '';
-    await new Promise((resolve) => {
-      mountCommerceOtpLogin(root, {
-        org: PB_ORG,
-        site: PB_SITE,
-        onAuthenticated: (result) => {
-          const roles = Array.isArray(result?.roles) ? result.roles.join(',') : String(result?.roles ?? '');
-          console.log(`[commerce-admin] auth-page-boot onAuthenticated add commerce-admin-auth-ok email=${String(result?.email ?? '')} roles=${roles}`);
-          applyProfileFromAuth();
-          document.documentElement.classList.add('commerce-admin-auth-ok');
-          collapseAuthRoot();
-          resolve(result);
-        },
-      }).catch(() => {});
-    });
+    await showLogin(root, collapseAuthRoot);
   };
 
   const tryAuth = async () => {
@@ -88,9 +140,10 @@ async function ensureCommerceAuth() {
   }
 
   window.addEventListener('commerce-admin:sign-out', () => {
-    clearAuthState(PB_ORG, PB_SITE);
-    document.documentElement.classList.remove('commerce-admin-auth-ok');
-    tryAuth().catch(() => {});
+    logoutCommerceSession(PB_ORG, PB_SITE).then(() => {
+      document.documentElement.classList.remove('commerce-admin-auth-ok');
+      tryAuth().catch(() => {});
+    });
   });
 
   await tryAuth();

@@ -60,6 +60,14 @@ html:not(.commerce-admin-auth-ok) body > :not(#commerce-admin-auth-root) {
   line-height: 1.45;
 }
 
+.ca-login-denied .ca-login-title {
+  color: #8a2715;
+}
+
+.ca-login-denied .ca-login-subtitle {
+  margin-bottom: 0;
+}
+
 .ca-login-env {
   display: flex;
   align-items: center;

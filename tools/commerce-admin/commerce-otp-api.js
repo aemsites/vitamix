@@ -108,8 +108,74 @@ export function clearAuthState(org, site) {
   sessionStorage.removeItem(legacyAuthKey(org, site));
 }
 
+/**
+ * Commerce Admin requires `admin` or `superuser` (helix-commerce-api role → permission map).
+ *
+ * @param {unknown} roles
+ * @returns {boolean}
+ */
+export function hasCommerceAdminRole(roles) {
+  const list = Array.isArray(roles) ? roles : [];
+  return list.includes('admin') || list.includes('superuser');
+}
+
+/**
+ * Confirm the stored JWT can call admin-scoped ProductBus APIs for this org/site.
+ *
+ * @param {string} org
+ * @param {string} site
+ * @returns {Promise<{ ok: true } | { ok: false, status?: number, message: string }>}
+ */
+export async function verifyCommerceApiAccess(org, site) {
+  const auth = getAuthState(org, site);
+  if (!auth?.token) {
+    return { ok: false, message: 'missing token' };
+  }
+  if (!hasCommerceAdminRole(auth.roles)) {
+    return { ok: false, message: 'not authorized' };
+  }
+
+  try {
+    const resp = await apiFetch(org, site, 'customers', {
+      method: 'GET',
+      skipAuthRedirect: true,
+      quiet: true,
+    });
+    if (resp.ok) {
+      return { ok: true };
+    }
+    const message = resp.headers.get('x-error')
+      || (await resp.text().catch(() => '')).trim()
+      || `HTTP ${resp.status}`;
+    return { ok: false, status: resp.status, message };
+  } catch (err) {
+    return { ok: false, message: err?.message || 'access check failed' };
+  }
+}
+
+/**
+ * Revoke the JWT server-side when possible, then clear local session state.
+ *
+ * @param {string} org
+ * @param {string} site
+ */
+export async function logoutCommerceSession(org, site) {
+  if (getAuthState(org, site)?.token) {
+    try {
+      await apiFetch(org, site, 'auth/logout', {
+        method: 'POST',
+        skipAuthRedirect: true,
+        quiet: true,
+      });
+    } catch {
+      // best-effort revoke
+    }
+  }
+  clearAuthState(org, site);
+}
+
 export async function apiFetch(org, site, path, options = {}) {
-  const { skipAuthRedirect, ...fetchOptions } = options;
+  const { skipAuthRedirect, quiet, ...fetchOptions } = options;
   const base = getApiBase();
   const targetUrl = `${base}/${org}/sites/${site}/${path}`;
   const fetchUrl = `${CORS_PROXY}${encodeURIComponent(targetUrl)}${CORS_KEY}`;
@@ -135,12 +201,12 @@ export async function apiFetch(org, site, path, options = {}) {
     credentials: 'omit',
   });
 
-  if (response.status === 401 && !skipAuthRedirect) {
+  if (response.status === 401 && !skipAuthRedirect && !quiet) {
     clearAuthState(org, site);
     throw new Error('Unauthorized');
   }
 
-  if (response.status === 403) {
+  if (response.status === 403 && !quiet) {
     const errorMsg = response.headers.get('x-error') || 'Forbidden';
     console.log(`[commerce-admin] apiFetch 403 path=${path} x-error=${errorMsg} hasBearer=${Boolean(auth?.token)} htmlAuthOk=${htmlOk}`);
     showToast(`${errorMsg} (${response.status})`, 'error');
