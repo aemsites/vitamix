@@ -368,5 +368,7 @@ export default async function decorate(block) {
     }
   }
 
-  linkRecipeMentions(block, locale, language, recipeTitle);
+  setTimeout(() => {
+    linkRecipeMentions(block, locale, language, recipeTitle);
+  }, 2000);
 }
