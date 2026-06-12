@@ -781,44 +781,43 @@ export async function validateAndCollapseAddress(
         address2Input.dispatchEvent(new Event('input', { bubbles: true }));
         address2Input.dispatchEvent(new Event('change', { bubbles: true }));
       }
-      continue;
-    }
+    } else {
+      const hasSuggestion = !!(addressComponents?.length || formattedAddress);
+      const needsConfirmation = hasSuggestion
+        && !addressesMatchEntered(formData, prefix, addressComponents, formattedAddress);
 
-    const hasSuggestion = !!(addressComponents?.length || formattedAddress);
-    const needsConfirmation = hasSuggestion
-      && !addressesMatchEntered(formData, prefix, addressComponents, formattedAddress);
-
-    if (needsConfirmation) {
-      // eslint-disable-next-line no-await-in-loop
-      const { choice } = await showConfirmModal({
-        addressComponents, formattedAddress, formData, strings, prefix,
-      });
-      if (choice !== 'accept') return false;
-      if (!addressComponents) {
-        showAddressError(
-          section,
-          strings.addressInvalid || "We couldn't verify this address. Please check and try again.",
-        );
-        return false;
+      if (needsConfirmation) {
+        // eslint-disable-next-line no-await-in-loop
+        const { choice } = await showConfirmModal({
+          addressComponents, formattedAddress, formData, strings, prefix,
+        });
+        if (choice !== 'accept') return false;
+        if (!addressComponents) {
+          showAddressError(
+            section,
+            strings.addressInvalid || "We couldn't verify this address. Please check and try again.",
+          );
+          return false;
+        }
+        // Use [name$="street-0"] — the autocomplete attr is rewritten to "off"
+        // by initPlacesAutocomplete to suppress Chrome's autofill dropdown.
+        const addressInput = section.querySelector('[name$="street-0"]');
+        if (addressInput) fillAddressFields(section, addressInput, addressComponents);
+        collapse();
+        return true;
       }
-      // Use [name$="street-0"] — the autocomplete attr is rewritten to "off"
-      // by initPlacesAutocomplete to suppress Chrome's autofill dropdown.
-      const addressInput = section.querySelector('[name$="street-0"]');
-      if (addressInput) fillAddressFields(section, addressInput, addressComponents);
-      collapse();
-      return true;
-    }
 
-    if (!action || action === 'ACCEPT' || action === 'CONFIRM') {
-      collapse();
-      return true;
-    }
+      if (!action || action === 'ACCEPT' || action === 'CONFIRM') {
+        collapse();
+        return true;
+      }
 
-    showAddressError(
-      section,
-      strings.addressInvalid || "We couldn't verify this address. Please check and try again.",
-    );
-    return false;
+      showAddressError(
+        section,
+        strings.addressInvalid || "We couldn't verify this address. Please check and try again.",
+      );
+      return false;
+    }
   }
 
   showAddressError(
