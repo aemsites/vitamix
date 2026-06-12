@@ -458,3 +458,120 @@ test.describe('splitFormattedAddress', () => {
       .toEqual(['123 Main St', 'Springfield, IL']);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Inlined addressesMatchEntered
+// ---------------------------------------------------------------------------
+
+function normalizeAddressPart(value) {
+  return (value || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function getEnteredAddressParts(formData, prefix = 'shipping-') {
+  return {
+    street: normalizeAddressPart(formData.get(`${prefix}street-0`)),
+    unit: normalizeAddressPart(formData.get(`${prefix}street-1`)),
+    city: normalizeAddressPart(formData.get(`${prefix}city`)),
+    state: normalizeAddressPart(formData.get(`${prefix}state`)),
+    zip: normalizeAddressPart(formData.get(`${prefix}zip`)),
+  };
+}
+
+function getSuggestedAddressParts(addressComponents) {
+  const c = {};
+  addressComponents.forEach((comp) => {
+    comp.types.forEach((type) => { c[type] = comp; });
+  });
+  const street = [c.street_number?.longText, c.route?.longText].filter(Boolean).join(' ');
+  const zip = c.postal_code?.longText || '';
+  const zipSuffix = c.postal_code_suffix?.longText || '';
+  return {
+    street: normalizeAddressPart(street),
+    unit: normalizeAddressPart(c.subpremise?.longText || ''),
+    city: normalizeAddressPart((c.locality || c.sublocality || c.postal_town)?.longText || ''),
+    state: normalizeAddressPart(c.administrative_area_level_1?.shortText || ''),
+    zip: normalizeAddressPart(zipSuffix ? `${zip}-${zipSuffix}` : zip),
+  };
+}
+
+function addressPartsMatch(left, right) {
+  return left.street === right.street
+    && left.unit === right.unit
+    && left.city === right.city
+    && left.state === right.state
+    && left.zip === right.zip;
+}
+
+function addressesMatchEntered(formData, prefix, addressComponents, formattedAddress) {
+  if (addressComponents?.length) {
+    return addressPartsMatch(
+      getEnteredAddressParts(formData, prefix),
+      getSuggestedAddressParts(addressComponents),
+    );
+  }
+
+  if (formattedAddress) {
+    const entered = formatEnteredAddressLines(formData, prefix).map(normalizeAddressPart);
+    const suggested = splitFormattedAddress(formattedAddress)
+      .map((line) => normalizeAddressPart(line.replace(/,\s*(USA|Canada)$/i, '')));
+    if (entered.length !== suggested.length) return false;
+    return entered.every((line, i) => line === suggested[i]);
+  }
+
+  return true;
+}
+
+const BOLIVIA_COMPONENTS = [
+  { longText: '714', shortText: '714', types: ['street_number'] },
+  { longText: 'Lakeside Drive Southeast', shortText: 'Lakeside Drive Southeast', types: ['route'] },
+  { longText: 'Bolivia', shortText: 'Bolivia', types: ['locality'] },
+  { longText: 'NC', shortText: 'NC', types: ['administrative_area_level_1'] },
+  { longText: '28422', shortText: '28422', types: ['postal_code'] },
+  { longText: 'USA', shortText: 'USA', types: ['country'] },
+];
+
+test.describe('addressesMatchEntered', () => {
+  test('returns true when no suggestion data is returned', () => {
+    const fd = new FormData();
+    fd.set('shipping-street-0', '714 Lakeside Dr');
+    expect(addressesMatchEntered(fd, 'shipping-', null, null)).toBe(true);
+  });
+
+  test('returns false when the validated street differs from the entered street', () => {
+    const fd = new FormData();
+    fd.set('shipping-street-0', '714 Lakeside Dr');
+    fd.set('shipping-city', 'Bolivia');
+    fd.set('shipping-state', 'NC');
+    fd.set('shipping-zip', '28422');
+    expect(addressesMatchEntered(fd, 'shipping-', BOLIVIA_COMPONENTS, null)).toBe(false);
+  });
+
+  test('returns true when the validated address exactly matches the entered address', () => {
+    const fd = new FormData();
+    fd.set('shipping-street-0', '714 Lakeside Drive Southeast');
+    fd.set('shipping-city', 'Bolivia');
+    fd.set('shipping-state', 'NC');
+    fd.set('shipping-zip', '28422');
+    expect(addressesMatchEntered(fd, 'shipping-', BOLIVIA_COMPONENTS, null)).toBe(true);
+  });
+
+  test('compares formattedAddress lines when components are absent', () => {
+    const fd = new FormData();
+    fd.set('shipping-street-0', '124 Main Street');
+    fd.set('shipping-city', 'San Francisco');
+    fd.set('shipping-state', 'CA');
+    fd.set('shipping-zip', '94103');
+    expect(addressesMatchEntered(
+      fd,
+      'shipping-',
+      null,
+      '124 Main Street, San Francisco, CA 94103, USA',
+    )).toBe(true);
+    expect(addressesMatchEntered(
+      fd,
+      'shipping-',
+      null,
+      '124 Main St, San Francisco, CA 94103, USA',
+    )).toBe(false);
+  });
+});

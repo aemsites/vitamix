@@ -300,6 +300,88 @@ function formatSuggestedAddressLines(components) {
   return [street, unit, cityStateZip].filter(Boolean);
 }
 
+function normalizeAddressPart(value) {
+  return (value || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+/**
+ * @param {FormData} formData
+ * @param {string} prefix
+ * @returns {{ street: string, unit: string, city: string, state: string, zip: string }}
+ */
+function getEnteredAddressParts(formData, prefix = 'shipping-') {
+  return {
+    street: normalizeAddressPart(formData.get(`${prefix}street-0`)),
+    unit: normalizeAddressPart(formData.get(`${prefix}street-1`)),
+    city: normalizeAddressPart(formData.get(`${prefix}city`)),
+    state: normalizeAddressPart(formData.get(`${prefix}state`)),
+    zip: normalizeAddressPart(formData.get(`${prefix}zip`)),
+  };
+}
+
+/**
+ * @param {Array<{ longText: string, shortText: string, types: string[] }>} addressComponents
+ * @returns {{ street: string, unit: string, city: string, state: string, zip: string }}
+ */
+function getSuggestedAddressParts(addressComponents) {
+  const c = {};
+  addressComponents.forEach((comp) => {
+    comp.types.forEach((type) => { c[type] = comp; });
+  });
+  const street = [c.street_number?.longText, c.route?.longText].filter(Boolean).join(' ');
+  const zip = c.postal_code?.longText || '';
+  const zipSuffix = c.postal_code_suffix?.longText || '';
+  return {
+    street: normalizeAddressPart(street),
+    unit: normalizeAddressPart(c.subpremise?.longText || ''),
+    city: normalizeAddressPart((c.locality || c.sublocality || c.postal_town)?.longText || ''),
+    state: normalizeAddressPart(c.administrative_area_level_1?.shortText || ''),
+    zip: normalizeAddressPart(zipSuffix ? `${zip}-${zipSuffix}` : zip),
+  };
+}
+
+function addressPartsMatch(left, right) {
+  return left.street === right.street
+    && left.unit === right.unit
+    && left.city === right.city
+    && left.state === right.state
+    && left.zip === right.zip;
+}
+
+/**
+ * Returns true when the entered address exactly matches the validated response.
+ * When the API returns no comparable suggestion, the address is treated as matching.
+ *
+ * @param {FormData} formData
+ * @param {string} prefix
+ * @param {Array|null|undefined} addressComponents
+ * @param {string|null|undefined} formattedAddress
+ * @returns {boolean}
+ */
+export function addressesMatchEntered(
+  formData,
+  prefix,
+  addressComponents,
+  formattedAddress,
+) {
+  if (addressComponents?.length) {
+    return addressPartsMatch(
+      getEnteredAddressParts(formData, prefix),
+      getSuggestedAddressParts(addressComponents),
+    );
+  }
+
+  if (formattedAddress) {
+    const entered = formatEnteredAddressLines(formData, prefix).map(normalizeAddressPart);
+    const suggested = splitFormattedAddress(formattedAddress)
+      .map((line) => normalizeAddressPart(line.replace(/,\s*(USA|Canada)$/i, '')));
+    if (entered.length !== suggested.length) return false;
+    return entered.every((line, i) => line === suggested[i]);
+  }
+
+  return true;
+}
+
 /**
  * Builds the standard dialog shell: close button, icon badge, eyebrow, heading, subtitle.
  * @param {Object} opts
@@ -606,13 +688,14 @@ function showAddUnitModal({
  * 1. Clear any existing inline error.
  * 2. Ensure required address fields pass browser and custom field validation.
  * 3. Loop (up to MAX_ITERATIONS): build payload, call validate, handle the action.
- *    - ACCEPT → collapse and return true.
  *    - FIX → show inline error and return false (section stays expanded).
- *    - CONFIRM → side-by-side modal; 'accept' applies corrections and collapses;
- *      'edit' returns false so the customer can correct the address.
  *    - CONFIRM_ADD_SUBPREMISES → unit-input modal. If the user adds a unit,
  *      write it to street-2 and continue the loop to re-validate with the unit
  *      included. If the user chooses edit, return false.
+ *    - When the validated address does not exactly match the entered address,
+ *      show the side-by-side modal; 'accept' applies corrections and collapses;
+ *      'edit' returns false so the customer can correct the address.
+ *    - When the validated address matches the entered address, collapse and return true.
  *    - Unknown action / validation failure → show inline error and return false.
  *
  * @param {HTMLElement} section
@@ -674,38 +757,12 @@ export async function validateAndCollapseAddress(
 
     const { action, addressComponents, formattedAddress } = result;
 
-    if (!action || action === 'ACCEPT') {
-      collapse();
-      return true;
-    }
-
     if (action === 'FIX') {
       showAddressError(
         section,
         strings.addressInvalid || "We couldn't verify this address. Please check and try again.",
       );
       return false;
-    }
-
-    if (action === 'CONFIRM') {
-      // eslint-disable-next-line no-await-in-loop
-      const { choice } = await showConfirmModal({
-        addressComponents, formattedAddress, formData, strings, prefix,
-      });
-      if (choice !== 'accept') return false;
-      if (!addressComponents) {
-        showAddressError(
-          section,
-          strings.addressInvalid || "We couldn't verify this address. Please check and try again.",
-        );
-        return false;
-      }
-      // Use [name$="street-0"] — the autocomplete attr is rewritten to "off"
-      // by initPlacesAutocomplete to suppress Chrome's autofill dropdown.
-      const addressInput = section.querySelector('[name$="street-0"]');
-      if (addressInput) fillAddressFields(section, addressInput, addressComponents);
-      collapse();
-      return true;
     }
 
     if (action === 'CONFIRM_ADD_SUBPREMISES') {
@@ -725,6 +782,36 @@ export async function validateAndCollapseAddress(
         address2Input.dispatchEvent(new Event('change', { bubbles: true }));
       }
     } else {
+      const hasSuggestion = !!(addressComponents?.length || formattedAddress);
+      const needsConfirmation = hasSuggestion
+        && !addressesMatchEntered(formData, prefix, addressComponents, formattedAddress);
+
+      if (needsConfirmation) {
+        // eslint-disable-next-line no-await-in-loop
+        const { choice } = await showConfirmModal({
+          addressComponents, formattedAddress, formData, strings, prefix,
+        });
+        if (choice !== 'accept') return false;
+        if (!addressComponents) {
+          showAddressError(
+            section,
+            strings.addressInvalid || "We couldn't verify this address. Please check and try again.",
+          );
+          return false;
+        }
+        // Use [name$="street-0"] — the autocomplete attr is rewritten to "off"
+        // by initPlacesAutocomplete to suppress Chrome's autofill dropdown.
+        const addressInput = section.querySelector('[name$="street-0"]');
+        if (addressInput) fillAddressFields(section, addressInput, addressComponents);
+        collapse();
+        return true;
+      }
+
+      if (!action || action === 'ACCEPT' || action === 'CONFIRM') {
+        collapse();
+        return true;
+      }
+
       showAddressError(
         section,
         strings.addressInvalid || "We couldn't verify this address. Please check and try again.",
