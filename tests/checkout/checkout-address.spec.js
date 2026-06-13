@@ -66,7 +66,10 @@ function compareAddressValidationResults(google, addressDoctor) {
   const addressDoctorOutcome = validationOutcome(addressDoctor);
   const mismatchReasons = [];
 
-  if (googleOutcome !== addressDoctorOutcome) {
+  const expectedSubpremiseOverride = googleOutcome === 'needs-subpremise'
+    && addressDoctorOutcome === 'pass';
+
+  if (googleOutcome !== addressDoctorOutcome && !expectedSubpremiseOverride) {
     mismatchReasons.push('outcome');
   }
 
@@ -525,6 +528,22 @@ test.describe('compareAddressValidationResults', () => {
       addressDoctorAction: 'FIX',
       googleOutcome: 'needs-subpremise',
       addressDoctorOutcome: 'block',
+    });
+  });
+
+  test('does not report expected Google subpremise override as mismatch', () => {
+    const result = compareAddressValidationResults(
+      { action: 'CONFIRM_ADD_SUBPREMISES' },
+      { action: 'CONFIRM' },
+    );
+
+    expect(result).toEqual({
+      mismatch: false,
+      mismatchReasons: [],
+      googleAction: 'CONFIRM_ADD_SUBPREMISES',
+      addressDoctorAction: 'CONFIRM',
+      googleOutcome: 'needs-subpremise',
+      addressDoctorOutcome: 'pass',
     });
   });
 });

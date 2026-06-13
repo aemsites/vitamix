@@ -267,7 +267,10 @@ export function compareAddressValidationResults(google, addressDoctor) {
   const addressDoctorOutcome = validationOutcome(addressDoctor);
   const mismatchReasons = [];
 
-  if (googleOutcome !== addressDoctorOutcome) {
+  const expectedSubpremiseOverride = googleOutcome === 'needs-subpremise'
+    && addressDoctorOutcome === 'pass';
+
+  if (googleOutcome !== addressDoctorOutcome && !expectedSubpremiseOverride) {
     mismatchReasons.push('outcome');
   }
 
