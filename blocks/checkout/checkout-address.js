@@ -135,7 +135,8 @@ function wireBillingToggle(form) {
 export function setAddressFieldValue(input, value) {
   input.value = value;
   clearFieldError(input);
-  input.dispatchEvent(new Event('input', { bubbles: true }));
+  // Dispatch change, but not input: the Places autocomplete listener is bound
+  // to input and should only open for user typing, not programmatic corrections.
   input.dispatchEvent(new Event('change', { bubbles: true }));
 }
 

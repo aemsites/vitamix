@@ -74,7 +74,7 @@ test('buildPlacesAutocompleteInput omits empty locality fields', () => {
   );
 });
 
-test('setAddressFieldValue clears stale field errors and notifies listeners', () => {
+test('setAddressFieldValue clears stale field errors without reopening autocomplete', () => {
   const events = [];
   let removed = false;
   const wrapper = {
@@ -107,5 +107,5 @@ test('setAddressFieldValue clears stale field errors and notifies listeners', ()
   assert.equal(inputEl.value, '28422-7728');
   assert.deepEqual(wrapper.classList.removed, ['has-error']);
   assert.equal(removed, true);
-  assert.deepEqual(events, ['remove:aria-invalid', 'remove:aria-describedby', 'input', 'change']);
+  assert.deepEqual(events, ['remove:aria-invalid', 'remove:aria-describedby', 'change']);
 });
