@@ -66,7 +66,10 @@ function compareAddressValidationResults(google, addressDoctor) {
   const addressDoctorOutcome = validationOutcome(addressDoctor);
   const mismatchReasons = [];
 
-  if (googleOutcome !== addressDoctorOutcome) {
+  const expectedSubpremiseOverride = googleOutcome === 'needs-subpremise'
+    && addressDoctorOutcome === 'pass';
+
+  if (googleOutcome !== addressDoctorOutcome && !expectedSubpremiseOverride) {
     mismatchReasons.push('outcome');
   }
 
@@ -116,6 +119,10 @@ async function callDualValidateAddress(cfg, body, token, fetchFn = fetch, logFn 
         addressDoctorOutcome: comparison.addressDoctorOutcome,
         country: body.address?.regionCode || null,
       });
+    }
+
+    if (google.action === 'CONFIRM_ADD_SUBPREMISES' && addressDoctor.action !== 'FIX') {
+      return google;
     }
   }
 
@@ -410,6 +417,49 @@ test.describe('callDualValidateAddress', () => {
     expect(logs).toHaveLength(0);
   });
 
+  test('preserves Google add-subpremise action when AddressDoctor does not reject', async () => {
+    const googleSubpremise = {
+      ...googleAccept,
+      action: 'CONFIRM_ADD_SUBPREMISES',
+    };
+    const fetchFn = async (url) => ({
+      ok: true,
+      json: async () => {
+        if (url.startsWith(addressDoctorOrigin)) return addressDoctorConfirm;
+        return googleSubpremise;
+      },
+    });
+
+    const cfg = { apiOrigin, addressDoctorOrigin };
+    const result = await callDualValidateAddress(cfg, payload, null, fetchFn);
+
+    expect(result).toEqual(googleSubpremise);
+  });
+
+  test('keeps AddressDoctor FIX over Google add-subpremise action', async () => {
+    const googleSubpremise = {
+      ...googleAccept,
+      action: 'CONFIRM_ADD_SUBPREMISES',
+    };
+    const addressDoctorFix = {
+      ...addressDoctorConfirm,
+      action: 'FIX',
+      uspsDeliverable: false,
+    };
+    const fetchFn = async (url) => ({
+      ok: true,
+      json: async () => {
+        if (url.startsWith(addressDoctorOrigin)) return addressDoctorFix;
+        return googleSubpremise;
+      },
+    });
+
+    const cfg = { apiOrigin, addressDoctorOrigin };
+    const result = await callDualValidateAddress(cfg, payload, null, fetchFn);
+
+    expect(result).toEqual(addressDoctorFix);
+  });
+
   test('uses AddressDoctor when Google validation fails', async () => {
     const fetchFn = async (url) => {
       if (url.startsWith(apiOrigin)) throw new Error('google down');
@@ -478,6 +528,22 @@ test.describe('compareAddressValidationResults', () => {
       addressDoctorAction: 'FIX',
       googleOutcome: 'needs-subpremise',
       addressDoctorOutcome: 'block',
+    });
+  });
+
+  test('does not report expected Google subpremise override as mismatch', () => {
+    const result = compareAddressValidationResults(
+      { action: 'CONFIRM_ADD_SUBPREMISES' },
+      { action: 'CONFIRM' },
+    );
+
+    expect(result).toEqual({
+      mismatch: false,
+      mismatchReasons: [],
+      googleAction: 'CONFIRM_ADD_SUBPREMISES',
+      addressDoctorAction: 'CONFIRM',
+      googleOutcome: 'needs-subpremise',
+      addressDoctorOutcome: 'pass',
     });
   });
 });
