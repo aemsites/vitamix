@@ -1,3 +1,4 @@
+import { logOperation } from '../../scripts/operations-log.js';
 import { validateField } from './checkout-validation.js';
 
 const US_STATES = [
@@ -218,6 +219,76 @@ export async function callValidateAddress(apiOrigin, payload, sessionToken) {
 
   if (!resp.ok) throw new Error(`address validation failed: ${resp.status}`);
   return resp.json();
+}
+
+function validationOutcome(result) {
+  const action = result?.action || null;
+  if (action === 'FIX') return 'block';
+  if (action === 'CONFIRM_ADD_SUBPREMISES') return 'needs-subpremise';
+  if (action === 'ACCEPT' || action === 'CONFIRM') return 'pass';
+  return action ? 'review' : 'unknown';
+}
+
+export function compareAddressValidationResults(google, addressDoctor) {
+  const googleOutcome = validationOutcome(google);
+  const addressDoctorOutcome = validationOutcome(addressDoctor);
+  const mismatchReasons = [];
+
+  if (googleOutcome !== addressDoctorOutcome) {
+    mismatchReasons.push('outcome');
+  }
+
+  return {
+    mismatch: mismatchReasons.length > 0,
+    mismatchReasons,
+    googleAction: google?.action || null,
+    addressDoctorAction: addressDoctor?.action || null,
+    googleOutcome,
+    addressDoctorOutcome,
+  };
+}
+
+export function logAddressValidationMismatch(comparison, country) {
+  logOperation('error', {
+    kind: 'address-validation-mismatch',
+    providerPrimary: 'addressdoctor',
+    providerCompared: 'google',
+    mismatchReasons: comparison.mismatchReasons,
+    googleAction: comparison.googleAction,
+    addressDoctorAction: comparison.addressDoctorAction,
+    googleOutcome: comparison.googleOutcome,
+    addressDoctorOutcome: comparison.addressDoctorOutcome,
+    country,
+  });
+}
+
+function localAddressDoctorFix() {
+  return {
+    provider: 'addressdoctor',
+    action: 'FIX',
+    formattedAddress: null,
+    addressComponents: null,
+    uspsDeliverable: false,
+  };
+}
+
+export async function callDualValidateAddress(config, payload, sessionToken) {
+  const [googleResult, addressDoctorResult] = await Promise.allSettled([
+    callValidateAddress(config.apiOrigin, payload, sessionToken),
+    callValidateAddress(config.addressDoctorOrigin, payload, null),
+  ]);
+
+  const google = googleResult.status === 'fulfilled' ? googleResult.value : null;
+  const addressDoctor = addressDoctorResult.status === 'fulfilled' ? addressDoctorResult.value : null;
+
+  if (google && addressDoctor) {
+    const comparison = compareAddressValidationResults(google, addressDoctor);
+    if (comparison.mismatch) {
+      logAddressValidationMismatch(comparison, payload.address?.regionCode || null);
+    }
+  }
+
+  return addressDoctor || localAddressDoctorFix();
 }
 
 /**
@@ -746,7 +817,7 @@ export async function validateAndCollapseAddress(
     let result;
     try {
       // eslint-disable-next-line no-await-in-loop
-      result = await callValidateAddress(config.apiOrigin, payload, getToken?.() ?? null);
+      result = await callDualValidateAddress(config, payload, getToken?.() ?? null);
     } catch {
       showAddressError(
         section,

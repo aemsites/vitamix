@@ -27,6 +27,7 @@ const defaults = {
     return page ? `${base}/${page}` : base;
   },
   currency: (locale) => (locale === 'ca' ? 'CAD' : 'USD'),
+  addressDoctorOrigin: 'https://vitamix-address-doctor-proxy-worker.adobeaem.workers.dev',
   cardProvider: 'chase',
   maxCartQty: 3,
   affirmMinOrderTotal: 50,
