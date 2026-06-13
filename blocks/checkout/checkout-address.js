@@ -221,6 +221,31 @@ export async function callValidateAddress(apiOrigin, payload, sessionToken) {
   return resp.json();
 }
 
+/**
+ * Builds a Google Places autocomplete query from the street field plus any
+ * locality fields the shopper has already entered. Google receives a single
+ * input string, so adding city/state/ZIP here gives the street lookup enough
+ * context to rank the intended address.
+ *
+ * @param {HTMLElement} section
+ * @param {string} addressValue
+ * @param {string} prefix
+ * @returns {string}
+ */
+export function buildPlacesAutocompleteInput(section, addressValue, prefix = 'shipping-') {
+  const line1 = addressValue.trim();
+  const city = section.querySelector(`[name="${prefix}city"]`)?.value?.trim() || '';
+  const stateSelect = section.querySelector(`[name="${prefix}state"]`);
+  const state = stateSelect?.selectedOptions?.[0]?.textContent?.trim()
+    || stateSelect?.value?.trim()
+    || '';
+  const zip = section.querySelector(`[name="${prefix}zip"]`)?.value?.trim() || '';
+
+  const stateZip = [state, zip].filter(Boolean).join(' ');
+  const locality = [city, stateZip].filter(Boolean).join(', ');
+  return [line1, locality].filter(Boolean).join(', ');
+}
+
 function validationOutcome(result) {
   const action = result?.action || null;
   if (action === 'FIX') return 'block';
@@ -285,6 +310,13 @@ export async function callDualValidateAddress(config, payload, sessionToken) {
     const comparison = compareAddressValidationResults(google, addressDoctor);
     if (comparison.mismatch) {
       logAddressValidationMismatch(comparison, payload.address?.regionCode || null);
+    }
+
+    // Google has the explicit US-only signal for a missing apartment/suite.
+    // Keep AddressDoctor primary for normal correction decisions, but preserve
+    // this add-unit flow unless AddressDoctor says the address should be fixed.
+    if (google.action === 'CONFIRM_ADD_SUBPREMISES' && addressDoctor.action !== 'FIX') {
+      return google;
     }
   }
 
@@ -908,6 +940,7 @@ function initPlacesAutocomplete(section, config) {
   if (!addressInput) return null;
 
   const regionCode = config.getLocale() === 'ca' ? 'CA' : 'US';
+  const prefix = addressInput.name.replace(/street-0$/, '');
 
   const wrapper = document.createElement('div');
   wrapper.className = 'places-autocomplete-wrapper';
@@ -978,7 +1011,9 @@ function initPlacesAutocomplete(section, config) {
     debounceTimer = setTimeout(async () => {
       try {
         const params = new URLSearchParams({
-          input: value, sessiontoken: sessionToken, regioncode: regionCode,
+          input: buildPlacesAutocompleteInput(section, value, prefix),
+          sessiontoken: sessionToken,
+          regioncode: regionCode,
         });
         const resp = await fetch(`${config.apiOrigin}/places/autocomplete?${params}`);
         if (!resp.ok) return;

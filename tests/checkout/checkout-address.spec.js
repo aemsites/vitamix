@@ -117,6 +117,10 @@ async function callDualValidateAddress(cfg, body, token, fetchFn = fetch, logFn 
         country: body.address?.regionCode || null,
       });
     }
+
+    if (google.action === 'CONFIRM_ADD_SUBPREMISES' && addressDoctor.action !== 'FIX') {
+      return google;
+    }
   }
 
   return addressDoctor || localAddressDoctorFix();
@@ -408,6 +412,49 @@ test.describe('callDualValidateAddress', () => {
 
     expect(result).toEqual(googleAccept);
     expect(logs).toHaveLength(0);
+  });
+
+  test('preserves Google add-subpremise action when AddressDoctor does not reject', async () => {
+    const googleSubpremise = {
+      ...googleAccept,
+      action: 'CONFIRM_ADD_SUBPREMISES',
+    };
+    const fetchFn = async (url) => ({
+      ok: true,
+      json: async () => {
+        if (url.startsWith(addressDoctorOrigin)) return addressDoctorConfirm;
+        return googleSubpremise;
+      },
+    });
+
+    const cfg = { apiOrigin, addressDoctorOrigin };
+    const result = await callDualValidateAddress(cfg, payload, null, fetchFn);
+
+    expect(result).toEqual(googleSubpremise);
+  });
+
+  test('keeps AddressDoctor FIX over Google add-subpremise action', async () => {
+    const googleSubpremise = {
+      ...googleAccept,
+      action: 'CONFIRM_ADD_SUBPREMISES',
+    };
+    const addressDoctorFix = {
+      ...addressDoctorConfirm,
+      action: 'FIX',
+      uspsDeliverable: false,
+    };
+    const fetchFn = async (url) => ({
+      ok: true,
+      json: async () => {
+        if (url.startsWith(addressDoctorOrigin)) return addressDoctorFix;
+        return googleSubpremise;
+      },
+    });
+
+    const cfg = { apiOrigin, addressDoctorOrigin };
+    const result = await callDualValidateAddress(cfg, payload, null, fetchFn);
+
+    expect(result).toEqual(addressDoctorFix);
   });
 
   test('uses AddressDoctor when Google validation fails', async () => {
