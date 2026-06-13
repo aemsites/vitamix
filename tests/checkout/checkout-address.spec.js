@@ -69,11 +69,6 @@ function compareAddressValidationResults(google, addressDoctor) {
   if (googleOutcome !== addressDoctorOutcome) {
     mismatchReasons.push('outcome');
   }
-  if (typeof google?.uspsDeliverable === 'boolean'
-    && typeof addressDoctor?.uspsDeliverable === 'boolean'
-    && google.uspsDeliverable !== addressDoctor.uspsDeliverable) {
-    mismatchReasons.push('deliverability');
-  }
 
   return {
     mismatch: mismatchReasons.length > 0,
@@ -393,7 +388,7 @@ test.describe('callDualValidateAddress', () => {
       kind: 'address-validation-mismatch',
       providerPrimary: 'addressdoctor',
       providerCompared: 'google',
-      mismatchReasons: ['outcome', 'deliverability'],
+      mismatchReasons: ['outcome'],
       googleAction: 'ACCEPT',
       addressDoctorAction: 'FIX',
       googleOutcome: 'pass',
@@ -447,7 +442,7 @@ test.describe('callDualValidateAddress', () => {
 });
 
 test.describe('compareAddressValidationResults', () => {
-  test('compares checkout outcomes instead of formatting differences', () => {
+  test('compares checkout outcomes instead of formatting or deliverability differences', () => {
     const google = {
       action: 'ACCEPT',
       formattedAddress: '1 Main St, Brooklyn NY 11201',
@@ -456,7 +451,7 @@ test.describe('compareAddressValidationResults', () => {
     const addressDoctor = {
       action: 'CONFIRM',
       formattedAddress: '1 Main Street, Brooklyn NY 11201-1234',
-      uspsDeliverable: true,
+      uspsDeliverable: false,
     };
 
     const result = compareAddressValidationResults(google, addressDoctor);
@@ -470,7 +465,7 @@ test.describe('compareAddressValidationResults', () => {
     });
   });
 
-  test('reports outcome and deliverability mismatches', () => {
+  test('reports outcome mismatches', () => {
     const result = compareAddressValidationResults(
       { action: 'CONFIRM_ADD_SUBPREMISES', uspsDeliverable: true },
       { action: 'FIX', uspsDeliverable: false },
@@ -478,7 +473,7 @@ test.describe('compareAddressValidationResults', () => {
 
     expect(result).toEqual({
       mismatch: true,
-      mismatchReasons: ['outcome', 'deliverability'],
+      mismatchReasons: ['outcome'],
       googleAction: 'CONFIRM_ADD_SUBPREMISES',
       addressDoctorAction: 'FIX',
       googleOutcome: 'needs-subpremise',

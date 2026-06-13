@@ -237,11 +237,6 @@ export function compareAddressValidationResults(google, addressDoctor) {
   if (googleOutcome !== addressDoctorOutcome) {
     mismatchReasons.push('outcome');
   }
-  if (typeof google?.uspsDeliverable === 'boolean'
-    && typeof addressDoctor?.uspsDeliverable === 'boolean'
-    && google.uspsDeliverable !== addressDoctor.uspsDeliverable) {
-    mismatchReasons.push('deliverability');
-  }
 
   return {
     mismatch: mismatchReasons.length > 0,
