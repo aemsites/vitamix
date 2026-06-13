@@ -221,61 +221,35 @@ export async function callValidateAddress(apiOrigin, payload, sessionToken) {
   return resp.json();
 }
 
-function getComponentMap(result) {
-  const map = {};
-  result?.addressComponents?.forEach((component) => {
-    component.types?.forEach((type) => { map[type] = component; });
-  });
-  return map;
-}
-
-function normalizedComponentValue(map, type, field = 'longText') {
-  return (map[type]?.[field] || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
-}
-
-function normalizedResultParts(result) {
-  const map = getComponentMap(result);
-  const street = [
-    normalizedComponentValue(map, 'street_number'),
-    normalizedComponentValue(map, 'route'),
-  ].filter(Boolean).join(' ');
-  const postalCode = normalizedComponentValue(map, 'postal_code');
-  const postalSuffix = normalizedComponentValue(map, 'postal_code_suffix');
-  return {
-    action: result?.action || '',
-    formattedAddress: (result?.formattedAddress || '').toString().trim().toLowerCase().replace(/\s+/g, ' '),
-    uspsDeliverable: result?.uspsDeliverable,
-    street,
-    unit: normalizedComponentValue(map, 'subpremise'),
-    city: normalizedComponentValue(map, 'locality')
-      || normalizedComponentValue(map, 'sublocality')
-      || normalizedComponentValue(map, 'postal_town'),
-    state: normalizedComponentValue(map, 'administrative_area_level_1', 'shortText'),
-    postalCode: postalSuffix ? `${postalCode}-${postalSuffix}` : postalCode,
-    country: normalizedComponentValue(map, 'country', 'shortText'),
-  };
+function validationOutcome(result) {
+  const action = result?.action || null;
+  if (action === 'FIX') return 'block';
+  if (action === 'CONFIRM_ADD_SUBPREMISES') return 'needs-subpremise';
+  if (action === 'ACCEPT' || action === 'CONFIRM') return 'pass';
+  return action ? 'review' : 'unknown';
 }
 
 export function compareAddressValidationResults(google, addressDoctor) {
-  const googleParts = normalizedResultParts(google);
-  const addressDoctorParts = normalizedResultParts(addressDoctor);
-  const fields = [
-    'action',
-    'formattedAddress',
-    'uspsDeliverable',
-    'street',
-    'unit',
-    'city',
-    'state',
-    'postalCode',
-    'country',
-  ];
-  const mismatchFields = fields.filter((field) => googleParts[field] !== addressDoctorParts[field]);
+  const googleOutcome = validationOutcome(google);
+  const addressDoctorOutcome = validationOutcome(addressDoctor);
+  const mismatchReasons = [];
+
+  if (googleOutcome !== addressDoctorOutcome) {
+    mismatchReasons.push('outcome');
+  }
+  if (typeof google?.uspsDeliverable === 'boolean'
+    && typeof addressDoctor?.uspsDeliverable === 'boolean'
+    && google.uspsDeliverable !== addressDoctor.uspsDeliverable) {
+    mismatchReasons.push('deliverability');
+  }
+
   return {
-    mismatch: mismatchFields.length > 0,
-    mismatchFields,
+    mismatch: mismatchReasons.length > 0,
+    mismatchReasons,
     googleAction: google?.action || null,
     addressDoctorAction: addressDoctor?.action || null,
+    googleOutcome,
+    addressDoctorOutcome,
   };
 }
 
@@ -284,9 +258,11 @@ export function logAddressValidationMismatch(comparison, country) {
     kind: 'address-validation-mismatch',
     providerPrimary: 'addressdoctor',
     providerCompared: 'google',
-    mismatchFields: comparison.mismatchFields,
+    mismatchReasons: comparison.mismatchReasons,
     googleAction: comparison.googleAction,
     addressDoctorAction: comparison.addressDoctorAction,
+    googleOutcome: comparison.googleOutcome,
+    addressDoctorOutcome: comparison.addressDoctorOutcome,
     country,
   });
 }

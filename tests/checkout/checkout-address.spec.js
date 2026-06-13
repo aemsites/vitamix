@@ -53,61 +53,35 @@ async function callValidateAddress(apiOrigin, payload, sessionToken, fetchFn = f
 // Inlined dual validation comparison helpers
 // ---------------------------------------------------------------------------
 
-function getComponentMap(result) {
-  const map = {};
-  result?.addressComponents?.forEach((component) => {
-    component.types?.forEach((type) => { map[type] = component; });
-  });
-  return map;
-}
-
-function normalizedComponentValue(map, type, field = 'longText') {
-  return (map[type]?.[field] || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
-}
-
-function normalizedResultParts(result) {
-  const map = getComponentMap(result);
-  const street = [
-    normalizedComponentValue(map, 'street_number'),
-    normalizedComponentValue(map, 'route'),
-  ].filter(Boolean).join(' ');
-  const postalCode = normalizedComponentValue(map, 'postal_code');
-  const postalSuffix = normalizedComponentValue(map, 'postal_code_suffix');
-  return {
-    action: result?.action || '',
-    formattedAddress: (result?.formattedAddress || '').toString().trim().toLowerCase().replace(/\s+/g, ' '),
-    uspsDeliverable: result?.uspsDeliverable,
-    street,
-    unit: normalizedComponentValue(map, 'subpremise'),
-    city: normalizedComponentValue(map, 'locality')
-      || normalizedComponentValue(map, 'sublocality')
-      || normalizedComponentValue(map, 'postal_town'),
-    state: normalizedComponentValue(map, 'administrative_area_level_1', 'shortText'),
-    postalCode: postalSuffix ? `${postalCode}-${postalSuffix}` : postalCode,
-    country: normalizedComponentValue(map, 'country', 'shortText'),
-  };
+function validationOutcome(result) {
+  const action = result?.action || null;
+  if (action === 'FIX') return 'block';
+  if (action === 'CONFIRM_ADD_SUBPREMISES') return 'needs-subpremise';
+  if (action === 'ACCEPT' || action === 'CONFIRM') return 'pass';
+  return action ? 'review' : 'unknown';
 }
 
 function compareAddressValidationResults(google, addressDoctor) {
-  const googleParts = normalizedResultParts(google);
-  const addressDoctorParts = normalizedResultParts(addressDoctor);
-  const fields = [
-    'action',
-    'formattedAddress',
-    'uspsDeliverable',
-    'street',
-    'unit',
-    'city',
-    'state',
-    'postalCode',
-    'country',
-  ];
-  const mismatchFields = fields.filter((field) => googleParts[field] !== addressDoctorParts[field]);
+  const googleOutcome = validationOutcome(google);
+  const addressDoctorOutcome = validationOutcome(addressDoctor);
+  const mismatchReasons = [];
+
+  if (googleOutcome !== addressDoctorOutcome) {
+    mismatchReasons.push('outcome');
+  }
+  if (typeof google?.uspsDeliverable === 'boolean'
+    && typeof addressDoctor?.uspsDeliverable === 'boolean'
+    && google.uspsDeliverable !== addressDoctor.uspsDeliverable) {
+    mismatchReasons.push('deliverability');
+  }
+
   return {
-    mismatch: mismatchFields.length > 0,
-    mismatchFields,
+    mismatch: mismatchReasons.length > 0,
+    mismatchReasons,
     googleAction: google?.action || null,
     addressDoctorAction: addressDoctor?.action || null,
+    googleOutcome,
+    addressDoctorOutcome,
   };
 }
 
@@ -140,9 +114,11 @@ async function callDualValidateAddress(cfg, body, token, fetchFn = fetch, logFn 
         kind: 'address-validation-mismatch',
         providerPrimary: 'addressdoctor',
         providerCompared: 'google',
-        mismatchFields: comparison.mismatchFields,
+        mismatchReasons: comparison.mismatchReasons,
         googleAction: comparison.googleAction,
         addressDoctorAction: comparison.addressDoctorAction,
+        googleOutcome: comparison.googleOutcome,
+        addressDoctorOutcome: comparison.addressDoctorOutcome,
         country: body.address?.regionCode || null,
       });
     }
@@ -392,12 +368,17 @@ test.describe('callDualValidateAddress', () => {
     expect(urls[1]).toBe(`${addressDoctorOrigin}/places/validate`);
   });
 
-  test('logs non-PII mismatch metadata when providers differ', async () => {
+  test('logs concise non-PII mismatch metadata when provider outcomes differ', async () => {
     const logs = [];
+    const addressDoctorFix = {
+      ...addressDoctorConfirm,
+      action: 'FIX',
+      uspsDeliverable: false,
+    };
     const fetchFn = async (url) => ({
       ok: true,
       json: async () => {
-        if (url.startsWith(addressDoctorOrigin)) return addressDoctorConfirm;
+        if (url.startsWith(addressDoctorOrigin)) return addressDoctorFix;
         return googleAccept;
       },
     });
@@ -408,20 +389,22 @@ test.describe('callDualValidateAddress', () => {
 
     expect(logs).toHaveLength(1);
     expect(logs[0][0]).toBe('error');
-    expect(logs[0][1]).toEqual(expect.objectContaining({
+    expect(logs[0][1]).toEqual({
       kind: 'address-validation-mismatch',
       providerPrimary: 'addressdoctor',
       providerCompared: 'google',
+      mismatchReasons: ['outcome', 'deliverability'],
       googleAction: 'ACCEPT',
-      addressDoctorAction: 'CONFIRM',
+      addressDoctorAction: 'FIX',
+      googleOutcome: 'pass',
+      addressDoctorOutcome: 'block',
       country: 'US',
-    }));
-    expect(logs[0][1].mismatchFields)
-      .toEqual(expect.arrayContaining(['action', 'formattedAddress', 'postalCode']));
+    });
+    expect(logs[0][1]).not.toHaveProperty('mismatchFields');
     expect(JSON.stringify(logs[0][1])).not.toContain('Springfield IL 62701-0001');
   });
 
-  test('does not log when normalized provider results match', async () => {
+  test('does not log when provider outcomes match', async () => {
     const logs = [];
     const fetchFn = async () => ({ ok: true, json: async () => googleAccept });
     const cfg = { apiOrigin, addressDoctorOrigin };
@@ -464,37 +447,43 @@ test.describe('callDualValidateAddress', () => {
 });
 
 test.describe('compareAddressValidationResults', () => {
-  test('compares sublocality, postal suffix, unit, country, and missing actions', () => {
+  test('compares checkout outcomes instead of formatting differences', () => {
     const google = {
-      addressComponents: [
-        { longText: '1', shortText: '1', types: ['street_number'] },
-        { longText: 'Main', shortText: 'Main', types: ['route'] },
-        { longText: 'Brooklyn', shortText: 'Brooklyn', types: ['sublocality'] },
-        { longText: 'NY', shortText: 'NY', types: ['administrative_area_level_1'] },
-        { longText: '11201', shortText: '11201', types: ['postal_code'] },
-        { longText: '1234', shortText: '1234', types: ['postal_code_suffix'] },
-        { longText: '4B', shortText: '4B', types: ['subpremise'] },
-        { longText: 'United States', shortText: 'US', types: ['country'] },
-      ],
+      action: 'ACCEPT',
+      formattedAddress: '1 Main St, Brooklyn NY 11201',
+      uspsDeliverable: true,
     };
     const addressDoctor = {
       action: 'CONFIRM',
-      addressComponents: [
-        { longText: '1', shortText: '1', types: ['street_number'] },
-        { longText: 'Main', shortText: 'Main', types: ['route'] },
-        { longText: 'Brooklyn', shortText: 'Brooklyn', types: ['postal_town'] },
-        { longText: 'NY', shortText: 'NY', types: ['administrative_area_level_1'] },
-        { longText: '11201-1234', shortText: '11201-1234', types: ['postal_code'] },
-        { longText: '5C', shortText: '5C', types: ['subpremise'] },
-        { longText: 'US', shortText: 'US', types: ['country'] },
-      ],
+      formattedAddress: '1 Main Street, Brooklyn NY 11201-1234',
+      uspsDeliverable: true,
     };
 
     const result = compareAddressValidationResults(google, addressDoctor);
-    expect(result.mismatch).toBe(true);
-    expect(result.mismatchFields).toEqual(expect.arrayContaining(['action', 'unit']));
-    expect(result.googleAction).toBe(null);
-    expect(result.addressDoctorAction).toBe('CONFIRM');
+    expect(result).toEqual({
+      mismatch: false,
+      mismatchReasons: [],
+      googleAction: 'ACCEPT',
+      addressDoctorAction: 'CONFIRM',
+      googleOutcome: 'pass',
+      addressDoctorOutcome: 'pass',
+    });
+  });
+
+  test('reports outcome and deliverability mismatches', () => {
+    const result = compareAddressValidationResults(
+      { action: 'CONFIRM_ADD_SUBPREMISES', uspsDeliverable: true },
+      { action: 'FIX', uspsDeliverable: false },
+    );
+
+    expect(result).toEqual({
+      mismatch: true,
+      mismatchReasons: ['outcome', 'deliverability'],
+      googleAction: 'CONFIRM_ADD_SUBPREMISES',
+      addressDoctorAction: 'FIX',
+      googleOutcome: 'needs-subpremise',
+      addressDoctorOutcome: 'block',
+    });
   });
 });
 
