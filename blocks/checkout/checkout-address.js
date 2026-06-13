@@ -1,5 +1,5 @@
 import { logOperation } from '../../scripts/operations-log.js';
-import { validateField } from './checkout-validation.js';
+import { clearFieldError, validateField } from './checkout-validation.js';
 
 const US_STATES = [
   ['AL', 'Alabama'], ['AK', 'Alaska'], ['AS', 'American Samoa'], ['AZ', 'Arizona'],
@@ -132,6 +132,13 @@ function wireBillingToggle(form) {
   updateBillingVisibility();
 }
 
+export function setAddressFieldValue(input, value) {
+  input.value = value;
+  clearFieldError(input);
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
 function fillAddressFields(section, addressInput, addressComponents) {
   const c = {};
   addressComponents.forEach((comp) => {
@@ -142,24 +149,24 @@ function fillAddressFields(section, addressInput, addressComponents) {
   // Clearing an existing user-typed value can blank a required field and make the
   // section fail validation, which silently prevents collapse() from collapsing.
   const street = [c.street_number?.longText, c.route?.longText].filter(Boolean).join(' ');
-  if (street) addressInput.value = street;
+  if (street) setAddressFieldValue(addressInput, street);
 
   const address2Input = section.querySelector('[autocomplete="address-line2"]');
   if (address2Input && c.subpremise) {
-    address2Input.value = c.subpremise.longText;
+    setAddressFieldValue(address2Input, c.subpremise.longText);
   }
 
   const cityInput = section.querySelector('[autocomplete="address-level2"]');
   const cityValue = (c.locality || c.sublocality || c.postal_town)?.longText;
   if (cityInput && cityValue) {
-    cityInput.value = cityValue;
+    setAddressFieldValue(cityInput, cityValue);
   }
 
   const zipInput = section.querySelector('[autocomplete="postal-code"]');
   if (zipInput && c.postal_code?.longText) {
     const zip = c.postal_code.longText;
     const zipSuffix = c.postal_code_suffix?.longText || '';
-    zipInput.value = zipSuffix ? `${zip}-${zipSuffix}` : zip;
+    setAddressFieldValue(zipInput, zipSuffix ? `${zip}-${zipSuffix}` : zip);
   }
 
   // Set state last so FormData is complete when the change event triggers fetchAndPreview.

@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildPlacesAutocompleteInput } from '../../blocks/checkout/checkout-address.js';
+import {
+  buildPlacesAutocompleteInput,
+  setAddressFieldValue,
+} from '../../blocks/checkout/checkout-address.js';
 
 function sectionWithFields(fields) {
   return {
@@ -69,4 +72,40 @@ test('buildPlacesAutocompleteInput omits empty locality fields', () => {
     buildPlacesAutocompleteInput(section, '  714 Lakeside Drive  '),
     '714 Lakeside Drive',
   );
+});
+
+test('setAddressFieldValue clears stale field errors and notifies listeners', () => {
+  const events = [];
+  let removed = false;
+  const wrapper = {
+    classList: {
+      removed: [],
+      remove(name) { this.removed.push(name); },
+    },
+    querySelector(selector) {
+      assert.equal(selector, '.field-error');
+      return { remove: () => { removed = true; } };
+    },
+  };
+  const inputEl = {
+    value: '',
+    closest(selector) {
+      assert.equal(selector, '.form-field');
+      return wrapper;
+    },
+    removeAttribute(name) {
+      events.push(`remove:${name}`);
+    },
+    dispatchEvent(event) {
+      events.push(event.type);
+      return true;
+    },
+  };
+
+  setAddressFieldValue(inputEl, '28422-7728');
+
+  assert.equal(inputEl.value, '28422-7728');
+  assert.deepEqual(wrapper.classList.removed, ['has-error']);
+  assert.equal(removed, true);
+  assert.deepEqual(events, ['remove:aria-invalid', 'remove:aria-describedby', 'input', 'change']);
 });
