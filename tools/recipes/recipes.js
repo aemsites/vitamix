@@ -411,6 +411,7 @@ export function getQueryParams() {
     pw: params.get('pw') || '',
     date: params.get('date') || '',
     recipe: params.get('recipe') || '',
+    name: params.get('name') || '',
     status: params.get('status') || '',
     dateCreated: params.get('dateCreated') || '',
     dateUpdated: params.get('dateUpdated') || '',
@@ -886,6 +887,107 @@ export async function publishRecipe(root, kebabName) {
   return json.live.url;
 }
 
+function getRecipeResourcePath(root, kebabName) {
+  const cleanName = kebabName.endsWith('.html') ? kebabName.slice(0, -5) : kebabName;
+  return `${root}/recipes/${cleanName}`;
+}
+
+async function resolveRecipeFilename(recipeNumber, recipeName) {
+  const pathMap = await fetchRecipePathByNumber();
+  const indexPath = pathMap.get(recipeNumber.toUpperCase());
+
+  if (indexPath) {
+    const slug = indexPath.split('/').pop();
+    if (slug) return `${slug}.html`;
+  }
+
+  if (!recipeName) {
+    throw new Error(
+      `Cannot resolve filename for ${recipeNumber} — not in AEM index and no name provided`,
+    );
+  }
+
+  const kebabName = toKebabName(recipeName);
+  return `${kebabName}-${recipeNumber.toLowerCase()}.html`;
+}
+
+async function adminResourceDelete(resourceType, root, kebabName) {
+  const { token: daToken } = await loadDaSdk();
+  const path = getRecipeResourcePath(root, kebabName);
+  const url = `https://admin.hlx.page/${resourceType}/aemsites/vitamix/main/${path}`;
+
+  const resp = await fetch(url, {
+    headers: { Authorization: `Bearer ${daToken}` },
+    method: 'DELETE',
+  });
+
+  if (!resp.ok && resp.status !== 404) {
+    throw new Error(`${resourceType} delete failed: ${resp.status} ${resp.statusText}`);
+  }
+}
+
+// Unpublish recipe from live (DELETE admin.hlx.page/live/...)
+export async function unpublishRecipe(root, kebabName) {
+  await adminResourceDelete('live', root, kebabName);
+}
+
+// Remove recipe from preview (DELETE admin.hlx.page/preview/...)
+export async function unpreviewRecipe(root, kebabName) {
+  await adminResourceDelete('preview', root, kebabName);
+}
+
+// Remove recipe source from DA (DELETE admin.da.live/source/...)
+export async function deleteRecipeFromDA(root, filename) {
+  const { token: daToken } = await loadDaSdk();
+  const url = `https://admin.da.live/source/aemsites/vitamix/${root}/recipes/${filename}`;
+
+  const resp = await fetch(url, {
+    headers: { Authorization: `Bearer ${daToken}` },
+    method: 'DELETE',
+  });
+
+  if (!resp.ok && resp.status !== 404) {
+    throw new Error(`DA delete failed: ${resp.status} ${resp.statusText}`);
+  }
+}
+
+// Remove a deleted CalcMenu recipe from live, preview, and DA across all locales
+export async function removeDeletedRecipe(recipeNumber, recipeName, log = addLogEntry) {
+  const filename = await resolveRecipeFilename(recipeNumber, recipeName);
+  log(`  Resolved filename: ${filename}`, 'info');
+
+  for (let l = 0; l < LOCALES.length; l += 1) {
+    const { root } = LOCALES[l];
+    log(`  Removing from ${root}...`, 'info');
+
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      await unpublishRecipe(root, filename);
+      log('    ✓ Unpublished from live', 'success');
+    } catch (error) {
+      log(`    ⚠ Unpublish failed: ${error.message}`, 'warning');
+    }
+
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      await unpreviewRecipe(root, filename);
+      log('    ✓ Removed from preview', 'success');
+    } catch (error) {
+      log(`    ⚠ Unpreview failed: ${error.message}`, 'warning');
+    }
+
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      await deleteRecipeFromDA(root, filename);
+      log('    ✓ Removed from DA', 'success');
+    } catch (error) {
+      log(`    ⚠ DA delete failed: ${error.message}`, 'warning');
+    }
+  }
+
+  recipeIndexCache = null;
+}
+
 // Initialize session with CalcMenu to get session cookie
 export async function initCalcMenuSession() {
   const corsProxy = 'https://fcors.org/?url=';
@@ -983,97 +1085,112 @@ export async function bulkSyncWithDA() {
     addLogEntry(`\n[${i + 1}/${checkboxes.length}] Processing: ${recipeName}`, 'info');
 
     try {
+      const isDeleted = recipeStatus?.toLowerCase() === 'deleted';
+
+      if (isDeleted) {
+        addLogEntry('  Recipe marked as deleted — removing from live, preview, and DA', 'info');
+        // eslint-disable-next-line no-await-in-loop
+        await removeDeletedRecipe(recipeNumber, recipeName);
+        addLogEntry('  ✓ Deleted recipe removed from AEM', 'success');
+
+        // eslint-disable-next-line no-plusplus
+        successCount++;
+        consecutiveErrors = 0;
+        checkbox.checked = false;
+        saveCheckboxState(recipeNumber, false);
+      } else {
       // Fetch details and build HTML
       // eslint-disable-next-line no-await-in-loop
-      const { htmlContent, kebabName } = await fetchRecipeDetailsForSync(
-        recipeNumber,
-        recipeName,
-        params.user,
-        params.pw,
-        recipeStatus,
-        dateCreated,
-        dateUpdated,
-      );
+        const { htmlContent, kebabName } = await fetchRecipeDetailsForSync(
+          recipeNumber,
+          recipeName,
+          params.user,
+          params.pw,
+          recipeStatus,
+          dateCreated,
+          dateUpdated,
+        );
 
-      // Sync with DA
-      const lowercaseNumber = recipeNumber.toLowerCase();
-      const filename = `${kebabName}-${lowercaseNumber}.html`;
+        // Sync with DA
+        const lowercaseNumber = recipeNumber.toLowerCase();
+        const filename = `${kebabName}-${lowercaseNumber}.html`;
 
-      addLogEntry(`  Syncing to DA: ${filename}`, 'info');
+        addLogEntry(`  Syncing to DA: ${filename}`, 'info');
 
-      const processPage = async (root, translateLocale) => {
-        let html = htmlContent;
-        if (translateLocale) {
-          daContext.sourcePath = `/${root}/recipes/${filename}`;
-          // eslint-disable-next-line max-len
-          html = await translate(htmlContent, translateLocale, daContext, undefined, daFetch);
-        }
+        const processPage = async (root, translateLocale) => {
+          let html = htmlContent;
+          if (translateLocale) {
+            daContext.sourcePath = `/${root}/recipes/${filename}`;
+            // eslint-disable-next-line max-len
+            html = await translate(htmlContent, translateLocale, daContext, undefined, daFetch);
+          }
 
-        const blob = new Blob([html], { type: 'text/html' });
-        const body = new FormData();
-        body.append('data', blob);
+          const blob = new Blob([html], { type: 'text/html' });
+          const body = new FormData();
+          body.append('data', blob);
 
-        const opts = {
-          headers: { Authorization: `Bearer ${daToken}` },
-          method: 'POST',
-          body,
+          const opts = {
+            headers: { Authorization: `Bearer ${daToken}` },
+            method: 'POST',
+            body,
+          };
+
+          const daAdminPath = `https://admin.da.live/source/aemsites/vitamix/${root}/recipes/${filename}`;
+          const resp = await fetch(daAdminPath, opts);
+
+          if (!resp.ok) {
+            throw new Error(`${resp.status} ${resp.statusText}`);
+          }
+
+          const url = new URL(resp.url);
+          const segments = url.pathname.split('/');
+          const editUrl = `https://da.live/edit#/${segments.slice(2).join('/')}`;
+          const pathname = segments.slice(4).join('/');
+          if (translateLocale) {
+            addLogEntry(`  ✓ Successfully created and translated to ${translateLocale}: <a href="${editUrl}" target="_blank">${pathname}</a>`, 'success', true);
+          } else {
+            addLogEntry(`  ✓ Successfully created: <a href="${editUrl}" target="_blank">${pathname}</a>`, 'success', true);
+          }
+
+          // Preview and Publish if enabled
+          if (enablePublish) {
+            try {
+              addLogEntry('  Running preview...', 'info');
+              // eslint-disable-next-line no-await-in-loop
+              const previewUrl = await previewRecipe(root, filename);
+              addLogEntry(`  ✓ <a href="${previewUrl}" target="_blank">Preview complete</a>`, 'success', true);
+            } catch (previewError) {
+              addLogEntry(`  ⚠ Preview failed: ${previewError.message}`, 'warning');
+            }
+
+            try {
+              addLogEntry('  Publishing...', 'info');
+              // eslint-disable-next-line no-await-in-loop
+              const publishUrl = await publishRecipe(root, filename);
+              addLogEntry(`  ✓ <a href="${publishUrl}" target="_blank">Publish complete</a>`, 'success', true);
+              addLogEntry('  ✓ Publish complete', 'success');
+            } catch (publishError) {
+              addLogEntry(`  ⚠ Publish failed: ${publishError.message}`, 'warning');
+            }
+          }
         };
 
-        const daAdminPath = `https://admin.da.live/source/aemsites/vitamix/${root}/recipes/${filename}`;
-        const resp = await fetch(daAdminPath, opts);
-
-        if (!resp.ok) {
-          throw new Error(`${resp.status} ${resp.statusText}`);
+        for (let l = 0; l < LOCALES.length; l += 1) {
+          const locale = LOCALES[l];
+          // eslint-disable-next-line no-await-in-loop
+          await processPage(locale.root, locale.translateLocale);
         }
 
-        const url = new URL(resp.url);
-        const segments = url.pathname.split('/');
-        const editUrl = `https://da.live/edit#/${segments.slice(2).join('/')}`;
-        const pathname = segments.slice(4).join('/');
-        if (translateLocale) {
-          addLogEntry(`  ✓ Successfully created and translated to ${translateLocale}: <a href="${editUrl}" target="_blank">${pathname}</a>`, 'success', true);
-        } else {
-          addLogEntry(`  ✓ Successfully created: <a href="${editUrl}" target="_blank">${pathname}</a>`, 'success', true);
-        }
+        addLogEntry(`  ✓ Successfully synced to DA: ${filename}`, 'success');
 
-        // Preview and Publish if enabled
-        if (enablePublish) {
-          try {
-            addLogEntry('  Running preview...', 'info');
-            // eslint-disable-next-line no-await-in-loop
-            const previewUrl = await previewRecipe(root, filename);
-            addLogEntry(`  ✓ <a href="${previewUrl}" target="_blank">Preview complete</a>`, 'success', true);
-          } catch (previewError) {
-            addLogEntry(`  ⚠ Preview failed: ${previewError.message}`, 'warning');
-          }
+        // eslint-disable-next-line no-plusplus
+        successCount++;
+        consecutiveErrors = 0; // Reset consecutive error counter on success
 
-          try {
-            addLogEntry('  Publishing...', 'info');
-            // eslint-disable-next-line no-await-in-loop
-            const publishUrl = await publishRecipe(root, filename);
-            addLogEntry(`  ✓ <a href="${publishUrl}" target="_blank">Publish complete</a>`, 'success', true);
-            addLogEntry('  ✓ Publish complete', 'success');
-          } catch (publishError) {
-            addLogEntry(`  ⚠ Publish failed: ${publishError.message}`, 'warning');
-          }
-        }
-      };
-
-      for (let l = 0; l < LOCALES.length; l += 1) {
-        const locale = LOCALES[l];
-        // eslint-disable-next-line no-await-in-loop
-        await processPage(locale.root, locale.translateLocale);
+        // Uncheck the checkbox on success and remove from localStorage
+        checkbox.checked = false;
+        saveCheckboxState(recipeNumber, false);
       }
-
-      addLogEntry(`  ✓ Successfully synced to DA: ${filename}`, 'success');
-
-      // eslint-disable-next-line no-plusplus
-      successCount++;
-      consecutiveErrors = 0; // Reset consecutive error counter on success
-
-      // Uncheck the checkbox on success and remove from localStorage
-      checkbox.checked = false;
-      saveCheckboxState(recipeNumber, false);
     } catch (error) {
       addLogEntry(`  ✗ Failed: ${error.message}`, 'error');
       // eslint-disable-next-line no-plusplus
@@ -1199,6 +1316,61 @@ export async function displayRecipeDetails(recipeNumber) {
   detailView.style.display = 'block';
   detailLoading.classList.add('active');
   detailContent.innerHTML = '';
+
+  const isDeleted = params.status?.toLowerCase() === 'deleted';
+
+  if (isDeleted) {
+    detailLoading.classList.remove('active');
+    const pathMap = await fetchRecipePathByNumber();
+    const indexPath = pathMap.get(recipeNumber.toUpperCase());
+    const importedLabel = indexPath
+      ? `<p>Found in AEM at: <code>${indexPath}</code></p>`
+      : '<p>Not found in AEM recipe index — removal will use recipe name to resolve the filename.</p>';
+
+    detailContent.innerHTML = `
+      <div class="recipe deleted-recipe">
+        <h1 class="recipe-title">${params.name || 'Deleted Recipe'}</h1>
+        <p>This recipe has been marked as <strong>deleted</strong> in CalcMenu.</p>
+        <p><strong>Number:</strong> ${recipeNumber}</p>
+        ${importedLabel}
+      </div>
+    `;
+
+    const detailHeader = detailView.querySelector('.detail-header');
+    let removeBtn = detailHeader.querySelector('.btn-remove-from-aem');
+    if (!removeBtn) {
+      removeBtn = document.createElement('button');
+      removeBtn.className = 'btn-remove-from-aem btn-sync-with-da';
+      removeBtn.textContent = 'Remove from AEM';
+      detailHeader.appendChild(removeBtn);
+
+      removeBtn.addEventListener('click', async () => {
+        const originalText = removeBtn.textContent;
+        try {
+          removeBtn.disabled = true;
+          removeBtn.textContent = 'Removing...';
+          await removeDeletedRecipe(recipeNumber, params.name || recipeNumber);
+          removeBtn.textContent = '✓ Removed!';
+          removeBtn.style.backgroundColor = '#28a745';
+          setTimeout(() => {
+            removeBtn.textContent = originalText;
+            removeBtn.style.backgroundColor = '';
+            removeBtn.disabled = false;
+          }, 3000);
+        } catch (error) {
+          showError(`Failed to remove recipe: ${error.message}`);
+          removeBtn.textContent = '✗ Failed';
+          removeBtn.style.backgroundColor = '#dc3545';
+          setTimeout(() => {
+            removeBtn.textContent = originalText;
+            removeBtn.style.backgroundColor = '';
+            removeBtn.disabled = false;
+          }, 3000);
+        }
+      });
+    }
+    return;
+  }
 
   try {
     const xmlResponse = await fetchRecipeDetails(params.user, params.pw, recipeNumber);
@@ -1631,7 +1803,7 @@ export async function displayResults(data, rawXml) {
       // Make the content clickable (not the checkbox)
       const recipeContent = recipeItem.querySelector('.recipe-content');
       recipeContent.style.cursor = 'pointer';
-      const detailUrl = `?user=${encodeURIComponent(params.user)}&pw=${encodeURIComponent(params.pw)}&date=${encodeURIComponent(params.date)}&recipe=${encodeURIComponent(number)}&status=${encodeURIComponent(status)}&dateCreated=${encodeURIComponent(dateCreated)}&dateUpdated=${encodeURIComponent(dateUpdated)}`;
+      const detailUrl = `?user=${encodeURIComponent(params.user)}&pw=${encodeURIComponent(params.pw)}&date=${encodeURIComponent(params.date)}&recipe=${encodeURIComponent(number)}&name=${encodeURIComponent(name)}&status=${encodeURIComponent(status)}&dateCreated=${encodeURIComponent(dateCreated)}&dateUpdated=${encodeURIComponent(dateUpdated)}`;
       recipeContent.addEventListener('click', () => {
         window.location.href = detailUrl;
       });
