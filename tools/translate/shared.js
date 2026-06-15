@@ -11,6 +11,7 @@
  */
 
 const ADMIN_URL = 'https://admin.da.live';
+const AEM_ADMIN_URL = 'https://admin.hlx.page';
 // const ADMIN_URL = 'https://stage-admin.da.live';
 // const ADMIN_URL = 'http://localhost:8787';
 
@@ -368,16 +369,21 @@ const adjustURLs = (html, context) => {
   if (isLocalPath && basePrefix) {
     html.querySelectorAll('a[href]').forEach((element) => {
       if (!element.href) return;
-      const { pathname } = new URL(element.href);
+      const url = new URL(element.href);
+      const { pathname } = url;
 
       if (pathPrefixRegex.test(pathname)) {
-        // replace the first 2 segments of the pathname with the first 2 segments of the path
         const newPathname = pathname.replace(pathPrefixRegex, basePrefix);
-        const newHref = element.href.replace(pathname, newPathname);
-        if (element.textContent === element.href) {
-          element.textContent = newHref;
+        const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+        if (isLocalhost) {
+          element.setAttribute('href', newPathname);
+        } else {
+          const newHref = element.href.replace(pathname, newPathname);
+          if (element.textContent === element.href) {
+            element.textContent = newHref;
+          }
+          element.href = newHref;
         }
-        element.href = newHref;
       }
     });
   }
@@ -442,5 +448,5 @@ const translate = async (htmlInput, language, context, format, daFetch, skipPrep
 };
 
 export {
-  preprocess, translate, EDITOR_FORMAT, ADMIN_FORMAT, ADMIN_URL,
+  preprocess, translate, adjustURLs, EDITOR_FORMAT, ADMIN_FORMAT, ADMIN_URL, AEM_ADMIN_URL,
 };
