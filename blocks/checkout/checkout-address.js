@@ -683,6 +683,61 @@ function showConfirmModal({
  * @param {Object} opts
  * @returns {Promise<{ choice: 'add-unit', unit: string } | { choice: 'edit' }>}
  */
+function showUnvalidatedAddressModal({ formData, strings, prefix = 'shipping-' }) {
+  return new Promise((resolve) => {
+    let chosen = null;
+
+    const { dialog, body } = buildDialogShell({
+      iconSvg: ICON_INFO,
+      eyebrow: strings.addressEyebrow || 'Address verification',
+      heading: strings.addressUnvalidatedHeading || 'Address Verification',
+      subtitle: strings.addressUnvalidatedMessage
+        || 'We are unable to verify the address you entered. Please confirm that the address below is correct before proceeding to the next step.',
+      onClose: () => { chosen = { choice: 'change' }; dialog.close(); },
+      showClose: false,
+      preventDismiss: true,
+    });
+
+    body.append(buildAddressCard({
+      label: strings.addressWhatEntered || 'What you entered',
+      lines: formatEnteredAddressLines(formData, prefix),
+      variant: 'entered',
+    }));
+
+    const actions = document.createElement('div');
+    actions.className = 'address-validation-actions';
+
+    const changeAddress = document.createElement('button');
+    changeAddress.type = 'button';
+    changeAddress.className = 'button address-validation-secondary';
+    changeAddress.textContent = strings.addressChange || 'Change Address';
+    changeAddress.addEventListener('click', () => {
+      chosen = { choice: 'change' };
+      dialog.close();
+    });
+
+    const continueAddress = document.createElement('button');
+    continueAddress.type = 'button';
+    continueAddress.className = 'button emphasis address-validation-primary';
+    continueAddress.textContent = strings.addressContinueEntered || 'Continue with this address';
+    continueAddress.addEventListener('click', () => {
+      chosen = { choice: 'continue' };
+      dialog.close();
+    });
+
+    actions.append(changeAddress, continueAddress);
+    body.append(actions);
+
+    dialog.addEventListener('close', () => {
+      resolve(chosen ?? { choice: 'change' });
+      dialog.remove();
+    });
+    document.querySelectorAll('.address-validation-dialog').forEach((d) => d.remove());
+    document.body.append(dialog);
+    dialog.showModal();
+  });
+}
+
 function showAddUnitModal({
   addressComponents, formattedAddress, formData, strings, prefix = 'shipping-',
 }) {
@@ -826,6 +881,7 @@ export async function validateAndCollapseAddress(
   strings,
   getToken,
   prefix = 'shipping-',
+  setAddressIsValidated = () => {},
 ) {
   clearAddressError(section);
 
@@ -870,6 +926,15 @@ export async function validateAndCollapseAddress(
     }
 
     const { action, addressComponents, formattedAddress } = result;
+
+    if (action === 'CONFIRM_UNVALIDATED') {
+      // eslint-disable-next-line no-await-in-loop
+      const { choice } = await showUnvalidatedAddressModal({ formData, strings, prefix });
+      if (choice !== 'continue') return false;
+      setAddressIsValidated(false);
+      collapse();
+      return true;
+    }
 
     if (action === 'FIX') {
       showAddressError(
@@ -917,11 +982,13 @@ export async function validateAndCollapseAddress(
         // by initPlacesAutocomplete to suppress Chrome's autofill dropdown.
         const addressInput = section.querySelector('[name$="street-0"]');
         if (addressInput) fillAddressFields(section, addressInput, addressComponents);
+        setAddressIsValidated(true);
         collapse();
         return true;
       }
 
       if (!action || action === 'ACCEPT' || action === 'CONFIRM') {
+        setAddressIsValidated(true);
         collapse();
         return true;
       }
@@ -1070,24 +1137,29 @@ export function initAddress(form, state, config, strings) {
   if (shippingSection) {
     shippingSection.addEventListener('input', (e) => {
       state.shippingAddressValidated = false;
+      state.shippingAddressIsValidated = undefined;
       if (e.isTrusted) clearAddressError(shippingSection);
     });
     shippingSection.addEventListener('change', () => {
       state.shippingAddressValidated = false;
+      state.shippingAddressIsValidated = undefined;
     });
   }
   if (billingSection) {
     billingSection.addEventListener('input', (e) => {
       state.billingAddressValidated = false;
+      state.billingAddressIsValidated = undefined;
       if (e.isTrusted) clearAddressError(billingSection);
     });
     billingSection.addEventListener('change', () => {
       state.billingAddressValidated = false;
+      state.billingAddressIsValidated = undefined;
     });
   }
   form.querySelectorAll('[name="billing-choice"]').forEach((radio) => {
     radio.addEventListener('change', () => {
       state.billingAddressValidated = false;
+      state.billingAddressIsValidated = undefined;
     });
   });
 
@@ -1108,6 +1180,7 @@ export function initAddress(form, state, config, strings) {
         strings,
         shippingAutoComplete?.getSessionToken,
         'shipping-',
+        (value) => { state.shippingAddressIsValidated = value; },
       );
       state.shippingAddressValidated = isValid;
       return isValid;
@@ -1116,6 +1189,7 @@ export function initAddress(form, state, config, strings) {
       const isDifferent = form.querySelector('[name="billing-choice"]:checked')?.value === 'different';
       if (!isDifferent) {
         state.billingAddressValidated = true;
+        state.billingAddressIsValidated = state.shippingAddressIsValidated;
         return true;
       }
       const isValid = await validateAndCollapseAddress(
@@ -1125,6 +1199,7 @@ export function initAddress(form, state, config, strings) {
         strings,
         billingAutoComplete?.getSessionToken,
         'billing-',
+        (value) => { state.billingAddressIsValidated = value; },
       );
       state.billingAddressValidated = isValid;
       return isValid;
