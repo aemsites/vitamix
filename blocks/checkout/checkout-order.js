@@ -40,8 +40,13 @@ export function buildOrderJSON(formData, form, cart, state, config) {
   const country = locale;
 
   const shippingAddr = collectAddress(form, formData, 'shipping-', email, country);
+  shippingAddr.isValidated = state.shippingAddressIsValidated !== false;
+
   const sameAsBilling = form.querySelector('[name="billing-choice"]:checked')?.value !== 'different';
   const billingAddr = sameAsBilling ? null : collectAddress(form, formData, 'billing-', email, country);
+  if (billingAddr && state.billingAddressIsValidated !== undefined) {
+    billingAddr.isValidated = state.billingAddressIsValidated !== false;
+  }
 
   const cleanAddr = (addr) => Object.fromEntries(
     Object.entries(addr).filter(([, v]) => v !== ''),

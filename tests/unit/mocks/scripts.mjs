@@ -34,4 +34,6 @@ export async function loggedFetch(...args) {
   return fetch(...args);
 }
 
+export const FORMS_ENDPOINT = 'https://forms.example.test';
+
 export const isProdHost = false;
