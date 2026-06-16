@@ -42,6 +42,10 @@
   opacity: 0.8;
 }
 
+.hero.no-overlay::after {
+  content: none;
+}
+
 .hero:not(.split) {
   --image-color: var(--color-charcoal);
 }
@@ -80,10 +84,6 @@
 
 .hero .img-wrapper + h1 {
   margin-top: 0.6em;
-}
-
-.hero.no-overlay::after {
-  content: none;
 }
 
 @media (width >= 800px) {
