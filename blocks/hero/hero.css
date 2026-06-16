@@ -82,6 +82,10 @@
   margin-top: 0.6em;
 }
 
+.hero.no-overlay::after {
+  content: none;
+}
+
 @media (width >= 800px) {
   .hero h1 {
     font-size: var(--font-size-950);
