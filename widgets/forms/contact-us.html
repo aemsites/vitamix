@@ -34,12 +34,52 @@
   </div>
   <div class="contact-us-field">
     <label for="contact-us-reason">
-      <span class="label-text">Reason for communication</span><span class="required" aria-hidden="true">*</span>
+      <span class="label-text">Reason for Contact</span><span class="required" aria-hidden="true">*</span>
     </label>
     <select id="contact-us-reason" name="reasonForCommunication" required aria-required="true">
-      <option value="">Select</option>
+      <option value="">Please Select</option>
     </select>
   </div>
+  <div class="contact-us-field contact-us-conditional" data-field="orderNumber" aria-hidden="true">
+    <label for="contact-us-order-number">
+      <span class="label-text">Order Number</span><span class="required" aria-hidden="true">*</span>
+    </label>
+    <input id="contact-us-order-number" type="text" name="orderNumber" maxlength="50" placeholder="" autocomplete="off">
+  </div>
+  <div class="contact-us-field contact-us-conditional" data-field="phoneNumber" aria-hidden="true">
+    <label for="contact-us-phone-number">
+      <span class="label-text">Phone Number</span><span class="required" aria-hidden="true">*</span>
+    </label>
+    <input id="contact-us-phone-number" type="tel" name="phoneNumber" maxlength="10" placeholder="" autocomplete="tel">
+  </div>
+  <div class="contact-us-field contact-us-radio-group contact-us-conditional" data-field="contactPreference" aria-hidden="true">
+    <div class="contact-us-radio-group-label">
+      <span class="label-text radio-legend" id="contact-us-preference-legend"></span><span class="required" aria-hidden="true">*</span>
+    </div>
+    <div class="radio-options" role="radiogroup" aria-labelledby="contact-us-preference-legend">
+      <label class="radio-option">
+        <input type="radio" name="contactPreference" value="email">
+        <span class="radio-label"></span>
+      </label>
+      <label class="radio-option">
+        <input type="radio" name="contactPreference" value="telephone">
+        <span class="radio-label"></span>
+      </label>
+    </div>
+  </div>
+  <div class="contact-us-field contact-us-conditional" data-field="serialNumber" aria-hidden="true">
+    <label for="contact-us-serial-number">
+      <span class="label-text">Serial Number</span><span class="required" aria-hidden="true">*</span>
+    </label>
+    <input id="contact-us-serial-number" type="text" name="serialNumber" inputmode="numeric" pattern="[0-9]{18}" maxlength="18" placeholder="" autocomplete="off">
+  </div>
+  <div class="contact-us-field contact-us-conditional" data-field="additionalComments" aria-hidden="true">
+    <label for="contact-us-comments">
+      <span class="label-text">Comments (optional)</span>
+    </label>
+    <textarea id="contact-us-comments" name="additionalComments" rows="5" placeholder=""></textarea>
+  </div>
+  <div class="contact-us-discount-info" aria-hidden="true" hidden></div>
   <div class="contact-us-actions">
     <button type="submit" class="button emphasis">Submit</button>
   </div>

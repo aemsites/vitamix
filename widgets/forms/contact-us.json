@@ -1,39 +1,82 @@
 {
+  "fieldVisibility": {
+    "orders": {
+      "reasons": ["order-status", "shipment-date"],
+      "fields": ["orderNumber"]
+    },
+    "serials": {
+      "reasons": ["warranty-registration", "exchange-program"],
+      "fields": ["serialNumber", "phoneNumber", "contactPreference", "additionalComments"]
+    },
+    "general": {
+      "reasons": [
+        "where-to-buy",
+        "business-product-help",
+        "request-brochure",
+        "recipe-help",
+        "tracking-number",
+        "technical-question",
+        "find-store-demo",
+        "product-issue",
+        "compare-products",
+        "become-retailer",
+        "buy-direct",
+        "general-inquiry"
+      ],
+      "fields": ["phoneNumber", "contactPreference", "additionalComments"]
+    }
+  },
   "en": {
     "labels": {
-      "select": "Select",
+      "select": "Please Select",
       "firstName": "First Name",
       "lastName": "Last Name",
       "emailAddress": "Email Address",
       "typeOfRequest": "Type of request",
       "domestic": "Domestic",
       "commercial": "Commercial",
-      "reasonForCommunication": "Reason for communication",
+      "reasonForCommunication": "Reason for Contact",
+      "orderNumber": "Order Number",
+      "phoneNumber": "Phone Number",
+      "contactPreference": "Contact Preference",
+      "contactPreferenceEmail": "Email",
+      "contactPreferenceTelephone": "Telephone",
+      "serialNumber": "Serial Number",
+      "additionalComments": "Comments (optional)",
       "submit": "Submit",
       "sending": "Sending..."
     },
     "inputPlaceholders": {
       "firstName": "",
       "lastName": "",
-      "emailAddress": ""
+      "emailAddress": "",
+      "orderNumber": "",
+      "phoneNumber": "",
+      "serialNumber": "",
+      "additionalComments": ""
+    },
+    "discountProgram": {
+      "message": "Thank you for your interest in receiving a product discount from Vitamix. You can find all the information you need about the program criteria and process to request a discount in our Product Discount section.",
+      "buttonLabel": "Product Discount Program",
+      "path": "/customer-service/contact-us/product-donation-program"
     },
     "reasonOptions": [
       { "label": "Check the status of my order", "value": "order-status" },
-      { "label": "Where to get a Vitamix product", "value": "where-to-buy" },
-      { "label": "Get help with warranty registration", "value": "warranty-registration" },
-      { "label": "Get help choosing the Vitamix product that best suits my business", "value": "business-product-help" },
+      { "label": "Find out where to buy a Vitamix product", "value": "where-to-buy" },
+      { "label": "Help with registration for my warranty", "value": "warranty-registration" },
+      { "label": "Get help with choosing the right Vitamix product for my business", "value": "business-product-help" },
       { "label": "Request a brochure", "value": "request-brochure" },
-      { "label": "Get help with recipes", "value": "recipe-help" },
-      { "label": "Know when my order will be shipped", "value": "shipment-date" },
-      { "label": "Request my order tracking number", "value": "tracking-number" },
-      { "label": "Learn more about the exchange program", "value": "exchange-program" },
-      { "label": "Ask a technical question", "value": "technical-question" },
-      { "label": "Find a store or live demonstration", "value": "find-store-demo" },
-      { "label": "Resolve a product-related issue", "value": "product-issue" },
-      { "label": "Get help comparing Vitamix appliances and sets", "value": "compare-products" },
-      { "label": "Become a retailer", "value": "become-retailer" },
-      { "label": "Request help to buy directly from Vitamix", "value": "buy-direct" },
-      { "label": "Product discount program", "value": "discount-program" },
+      { "label": "Help with recipes", "value": "recipe-help" },
+      { "label": "Find out when my order is going to ship", "value": "shipment-date" },
+      { "label": "Request my shipping tracking number", "value": "tracking-number" },
+      { "label": "Learn more about the Trade-In Program", "value": "exchange-program" },
+      { "label": "Have a technical question", "value": "technical-question" },
+      { "label": "Find a store or live demo", "value": "find-store-demo" },
+      { "label": "Troubleshoot a product issue", "value": "product-issue" },
+      { "label": "Help with comparing Vitamix machines and packages", "value": "compare-products" },
+      { "label": "Looking to become a dealer", "value": "become-retailer" },
+      { "label": "Need help buying directly from Vitamix", "value": "buy-direct" },
+      { "label": "Product Discount Program", "value": "discount-program" },
       { "label": "General inquiry", "value": "general-inquiry" }
     ]
   },
@@ -47,13 +90,29 @@
       "domestic": "Domestique",
       "commercial": "Commercial",
       "reasonForCommunication": "Raison de la communication",
+      "orderNumber": "Numéro de commande",
+      "phoneNumber": "Numéro de téléphone",
+      "contactPreference": "Préférence de contact",
+      "contactPreferenceEmail": "Courriel",
+      "contactPreferenceTelephone": "Téléphone",
+      "serialNumber": "Numéro de série",
+      "additionalComments": "Commentaires (facultatif)",
       "submit": "Soumettre",
       "sending": "Envoi en cours..."
     },
     "inputPlaceholders": {
       "firstName": "",
       "lastName": "",
-      "emailAddress": ""
+      "emailAddress": "",
+      "orderNumber": "",
+      "phoneNumber": "",
+      "serialNumber": "",
+      "additionalComments": ""
+    },
+    "discountProgram": {
+      "message": "Merci de votre intérêt pour un rabais sur les produits Vitamix. Vous trouverez tous les renseignements sur les critères du programme et la procédure de demande dans notre section Programme de rabais.",
+      "buttonLabel": "Programme de rabais sur les produits",
+      "path": "/customer-service/contact-us/product-donation-program"
     },
     "reasonOptions": [
       { "label": "Vérifier le statut de ma commande", "value": "order-status" },
@@ -85,19 +144,35 @@
       "domestic": "Doméstico",
       "commercial": "Comercial",
       "reasonForCommunication": "Motivo de la comunicación",
+      "orderNumber": "Número de pedido",
+      "phoneNumber": "Número de teléfono",
+      "contactPreference": "Preferencia de contacto",
+      "contactPreferenceEmail": "Correo electrónico",
+      "contactPreferenceTelephone": "Teléfono",
+      "serialNumber": "Número de serie",
+      "additionalComments": "Comentarios (opcional)",
       "submit": "Enviar",
       "sending": "Enviando..."
     },
     "inputPlaceholders": {
       "firstName": "",
       "lastName": "",
-      "emailAddress": ""
+      "emailAddress": "",
+      "orderNumber": "",
+      "phoneNumber": "",
+      "serialNumber": "",
+      "additionalComments": ""
+    },
+    "discountProgram": {
+      "message": "Gracias por su interés en recibir un descuento en productos Vitamix. Puede encontrar toda la información sobre los criterios del programa y el proceso para solicitar un descuento en nuestra sección de Programa de descuento.",
+      "buttonLabel": "Programa de descuento en productos",
+      "path": "/customer-service/contact-us/product-donation-program"
     },
     "reasonOptions": [
-      { "label": "Consultar el estado de mi pedido", "value": "order-status" },
-      { "label": "Dónde comprar un producto Vitamix", "value": "where-to-buy" },
+      { "label": "Verificar el estado de mi orden", "value": "order-status" },
+      { "label": "Saber dónde comprar un producto Vitamix", "value": "where-to-buy" },
       { "label": "Ayuda con el registro de garantía", "value": "warranty-registration" },
-      { "label": "Elegir el producto Vitamix adecuado para mi negocio", "value": "business-product-help" },
+      { "label": "Ayuda para elegir el producto Vitamix indicado para mi negocio", "value": "business-product-help" },
       { "label": "Solicitar un folleto", "value": "request-brochure" },
       { "label": "Ayuda con recetas", "value": "recipe-help" },
       { "label": "Cuándo se enviará mi pedido", "value": "shipment-date" },
@@ -105,12 +180,12 @@
       { "label": "Más información sobre el programa de intercambio", "value": "exchange-program" },
       { "label": "Pregunta técnica", "value": "technical-question" },
       { "label": "Buscar una tienda o demostración", "value": "find-store-demo" },
-      { "label": "Resolver un problema con el producto", "value": "product-issue" },
-      { "label": "Comparar aparatos y conjuntos Vitamix", "value": "compare-products" },
+      { "label": "Identificar y resolver una falla de un producto", "value": "product-issue" },
+      { "label": "Ayuda para comparar máquinas y paquetes Vitamix", "value": "compare-products" },
       { "label": "Ser minorista", "value": "become-retailer" },
       { "label": "Comprar directamente a Vitamix", "value": "buy-direct" },
       { "label": "Programa de descuento en productos", "value": "discount-program" },
-      { "label": "Consulta general", "value": "general-inquiry" }
+      { "label": "Un consulta general", "value": "general-inquiry" }
     ]
   }
 }
