@@ -2,7 +2,7 @@
  * Unit tests for scripts/commerce-api.js — getOrder and estimateShipping functions.
  *
  * Run with `npm run test:unit`. The setup file installs the fetch mock and
- * browser globals (sessionStorage) that commerce-api.js depends on.
+ * browser globals (localStorage) that commerce-api.js depends on.
  */
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -76,14 +76,14 @@ test('getOrder: returns the full { order } payload on success', async () => {
 
 // --- Authentication ---------------------------------------------------------
 
-test('getOrder: attaches Bearer token from sessionStorage when present', async () => {
-  sessionStorage.setItem('auth_token', 'test-jwt');
+test('getOrder: attaches Bearer token from localStorage when present', async () => {
+  localStorage.setItem('auth_token', 'test-jwt');
   mockFetch(200, { order: {} });
   await getOrder('user@example.com', 'ord-4');
   assert.equal(lastInit.headers.Authorization, 'Bearer test-jwt');
 });
 
-test('getOrder: omits Authorization header when no token in sessionStorage', async () => {
+test('getOrder: omits Authorization header when no token in localStorage', async () => {
   mockFetch(200, { order: {} });
   await getOrder('user@example.com', 'ord-5');
   assert.equal(lastInit.headers.Authorization, undefined);
