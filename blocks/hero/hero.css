@@ -42,6 +42,10 @@
   opacity: 0.8;
 }
 
+.hero.no-overlay::after {
+  content: none;
+}
+
 .hero:not(.split) {
   --image-color: var(--color-charcoal);
 }

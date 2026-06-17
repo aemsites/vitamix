@@ -57,6 +57,31 @@ function slugFromRecipePath(path) {
 }
 
 /**
+ * Kebab-case slug from a recipe title: strip diacritics, `&` → `and`, drop punctuation.
+ * @param {string} title
+ * @returns {string}
+ */
+function slugFromRecipeTitle(title) {
+  let text = String(title || '').trim();
+  if (!text) return '';
+  try {
+    text = decodeURIComponent(text);
+  } catch {
+    // keep original
+  }
+  return text
+    .replace(/&/g, ' and ')
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/\u0131/g, 'i')
+    .replace(/\u0130/g, 'i')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+/**
  * Best recipe index row for a target slug, or null when none match.
  * @param {Object[]} recipes - Filtered query-index rows
  * @param {string} targetSlug - Normalized last path segment to match
@@ -70,6 +95,28 @@ function findBestRecipeMatch(recipes, targetSlug) {
     if (slug === targetSlug) return [{ path, slug, score: 3 }];
     const slugBase = stripTrailingRecipeId(slug);
     if (slugBase === targetSlug) return [{ path, slug, score: 2 }];
+    if (targetSlug.length >= 3 && slug.startsWith(targetSlug)) return [{ path, slug, score: 1 }];
+    return [];
+  });
+
+  if (matches.length === 0) return null;
+
+  matches.sort((a, b) => b.score - a.score || a.slug.length - b.slug.length);
+  return matches[0];
+}
+
+/**
+ * Best recipe index row for a target slug matched against title-derived slugs.
+ * @param {Object[]} recipes - Filtered query-index rows
+ * @param {string} targetSlug - Normalized slug to match
+ * @returns {{ path: string, slug: string, score: number } | null}
+ */
+function findBestRecipeMatchByTitle(recipes, targetSlug) {
+  const matches = recipes.flatMap((r) => {
+    const path = (r.path || '').trim();
+    const slug = slugFromRecipeTitle(r.title);
+    if (!slug) return [];
+    if (slug === targetSlug) return [{ path, slug, score: 3 }];
     if (targetSlug.length >= 3 && slug.startsWith(targetSlug)) return [{ path, slug, score: 1 }];
     return [];
   });
@@ -108,6 +155,18 @@ export function resolveRecipeRedirect(pathname, recipes) {
     const simplifiedSlug = stripEquipmentSuffixFromSlug(targetSlug);
     if (simplifiedSlug && simplifiedSlug !== targetSlug) {
       best = findBestRecipeMatch(recipes, simplifiedSlug);
+    }
+  }
+  if (!best) {
+    const titleTargetSlug = slugFromRecipeTitle(lastPathSegment(pathname));
+    if (titleTargetSlug) {
+      best = findBestRecipeMatchByTitle(recipes, titleTargetSlug);
+      if (!best) {
+        const simplifiedTitleSlug = stripEquipmentSuffixFromSlug(titleTargetSlug);
+        if (simplifiedTitleSlug && simplifiedTitleSlug !== titleTargetSlug) {
+          best = findBestRecipeMatchByTitle(recipes, simplifiedTitleSlug);
+        }
+      }
     }
   }
   if (!best) return null;
