@@ -1,5 +1,5 @@
 import { getConfig } from './commerce-config.js';
-import { AUTH_TOKEN_KEY } from './auth-api.js';
+import { getToken } from './auth-api.js';
 import { mintRecaptchaToken, RECAPTCHA_ACTIONS, RECAPTCHA_HEADER } from './recaptcha.js';
 import { getLocaleAndLanguage, loggedFetch } from './scripts.js';
 import { logApiError, logNetworkError } from './operations-log.js';
@@ -20,7 +20,7 @@ class CommerceApiError extends Error {
 
 /**
  * Makes an authenticated POST request to the Commerce API.
- * Attaches a Bearer token from sessionStorage if one is present, so orders
+ * Attaches a Bearer token from localStorage if one is present, so orders
  * created while a user is logged in are associated with their account.
  * When `recaptchaAction` is provided AND no Bearer token is available,
  * mints a reCAPTCHA Enterprise token and attaches it as `X-Recaptcha-Token`.
@@ -34,7 +34,7 @@ class CommerceApiError extends Error {
  */
 async function post(path, body, recaptchaAction) {
   const headers = { 'Content-Type': 'application/json' };
-  const token = sessionStorage.getItem(AUTH_TOKEN_KEY);
+  const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
 
   if (recaptchaAction && !token) {
@@ -187,7 +187,7 @@ export async function initiatePayment(orderId, idempotencyKey, fraudToken, provi
 
 /**
  * Makes an authenticated HTTP request to the Commerce API.
- * Attaches a Bearer token from sessionStorage when present.
+ * Attaches a Bearer token from localStorage when present.
  * No reCAPTCHA support — PayPal session endpoints are Cloudflare-rate-limited.
  *
  * @param {string} path - API path relative to config.apiOrigin
@@ -199,7 +199,7 @@ export async function initiatePayment(orderId, idempotencyKey, fraudToken, provi
 async function request(path, body, method) {
   const headers = {};
   if (body !== null) headers['Content-Type'] = 'application/json';
-  const token = sessionStorage.getItem(AUTH_TOKEN_KEY);
+  const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
 
   let resp;

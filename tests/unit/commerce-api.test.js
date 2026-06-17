@@ -2,13 +2,20 @@
  * Unit tests for scripts/commerce-api.js — getOrder and estimateShipping functions.
  *
  * Run with `npm run test:unit`. The setup file installs the fetch mock and
- * browser globals (sessionStorage) that commerce-api.js depends on.
+ * browser globals (localStorage) that commerce-api.js depends on.
  */
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { getOrder, estimateShipping, estimatePrice } from '../../scripts/commerce-api.js';
 
 const API_ORIGIN = 'https://api.test.com/test-org/sites/test-site';
+
+/** Build a JWT-shaped token whose payload carries the given `exp` (Unix secs). */
+function makeJwt(expSec) {
+  const payload = Buffer.from(JSON.stringify({ exp: expSec })).toString('base64url');
+  return `eyJhbGciOiJIUzI1NiJ9.${payload}.sig`;
+}
+const FUTURE_JWT = makeJwt(Math.floor(Date.now() / 1000) + 3600);
 
 /** Captured details from the most recent fetch() call. */
 let lastUrl;
@@ -76,14 +83,21 @@ test('getOrder: returns the full { order } payload on success', async () => {
 
 // --- Authentication ---------------------------------------------------------
 
-test('getOrder: attaches Bearer token from sessionStorage when present', async () => {
-  sessionStorage.setItem('auth_token', 'test-jwt');
+test('getOrder: attaches Bearer token from localStorage when present', async () => {
+  localStorage.setItem('auth_token', FUTURE_JWT);
   mockFetch(200, { order: {} });
   await getOrder('user@example.com', 'ord-4');
-  assert.equal(lastInit.headers.Authorization, 'Bearer test-jwt');
+  assert.equal(lastInit.headers.Authorization, `Bearer ${FUTURE_JWT}`);
 });
 
-test('getOrder: omits Authorization header when no token in sessionStorage', async () => {
+test('getOrder: omits Authorization header when the stored token is expired', async () => {
+  localStorage.setItem('auth_token', makeJwt(Math.floor(Date.now() / 1000) - 3600));
+  mockFetch(200, { order: {} });
+  await getOrder('user@example.com', 'ord-4b');
+  assert.equal(lastInit.headers.Authorization, undefined);
+});
+
+test('getOrder: omits Authorization header when no token in localStorage', async () => {
   mockFetch(200, { order: {} });
   await getOrder('user@example.com', 'ord-5');
   assert.equal(lastInit.headers.Authorization, undefined);
