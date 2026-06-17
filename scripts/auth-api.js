@@ -10,30 +10,106 @@ export const AUTH_USER_KEY = 'auth_user';
 /** CustomEvent name dispatched on document when auth state changes */
 export const AUTH_EVENT = 'commerce:auth-state-changed';
 
+/** Seconds before JWT `exp` to treat the token as expired (clock skew). */
+const AUTH_EXPIRY_SKEW_SEC = 30;
+
+/** id of the one-shot expiry timer, so it can be rescheduled or cleared. */
+let authExpiryTimerId = null;
+
+/**
+ * Decodes the payload segment of a JWT without verifying its signature.
+ * Verification happens server-side; this is only used to read `exp`/`iat`
+ * so the client can stop presenting a token it knows the server will reject.
+ *
+ * @param {string} token
+ * @returns {Record<string, unknown>|null}
+ */
+function decodeJwtPayload(token) {
+  if (!token || typeof token !== 'string') return null;
+  const part = token.split('.')[1];
+  if (!part) return null;
+  try {
+    const b64 = part.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
+    return JSON.parse(atob(padded));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * JWT expiry in Unix seconds. Falls back to `iat + 24h` when `exp` is absent,
+ * matching the 24h lifetime the API issues.
+ *
+ * @param {string} token
+ * @returns {number|null}
+ */
+export function getTokenExpirySec(token) {
+  const payload = decodeJwtPayload(token);
+  if (!payload) return null;
+  if (typeof payload.exp === 'number') return payload.exp;
+  if (typeof payload.iat === 'number') return payload.iat + 86400;
+  return null;
+}
+
+/**
+ * Whether the token is expired (or undecodable). A token whose expiry can't be
+ * read is treated as expired so a malformed/garbage value never counts as a
+ * live session.
+ *
+ * @param {string} token
+ * @param {number} [skewSec]
+ * @returns {boolean}
+ */
+export function isAuthTokenExpired(token, skewSec = AUTH_EXPIRY_SKEW_SEC) {
+  const exp = getTokenExpirySec(token);
+  if (!exp) return true;
+  return Date.now() / 1000 >= exp - skewSec;
+}
+
 /**
  * Reads the current JWT, or null when not signed in.
  * Backed by localStorage so the session is shared across all tabs of the
- * origin (sessionStorage would isolate the token to a single tab).
+ * origin (sessionStorage would isolate the token to a single tab). An expired
+ * token is cleared on read and reported as absent, so the UI never trusts a
+ * token the server would reject.
  *
  * @returns {string|null}
  */
 export function getToken() {
-  try { return localStorage.getItem(AUTH_TOKEN_KEY); } catch { return null; }
+  let token;
+  try { token = localStorage.getItem(AUTH_TOKEN_KEY); } catch { return null; }
+  if (!token) return null;
+  if (isAuthTokenExpired(token)) {
+    // eslint-disable-next-line no-use-before-define
+    clearToken();
+    try { localStorage.removeItem(AUTH_USER_KEY); } catch { /* storage disabled */ }
+    return null;
+  }
+  return token;
 }
 
 /**
- * Persists the JWT so every tab on this origin sees the session.
+ * Persists the JWT so every tab on this origin sees the session, and schedules
+ * the auto-expiry timer for one day of acquisition (the token's `exp`).
  * @param {string} token
  */
 export function setToken(token) {
   try { localStorage.setItem(AUTH_TOKEN_KEY, token); } catch { /* storage disabled */ }
+  // eslint-disable-next-line no-use-before-define
+  scheduleAuthExpiry();
 }
 
 /**
- * Removes the JWT (logout / 401). Does not touch the cached user object.
+ * Removes the JWT (logout / 401 / expiry). Does not touch the cached user
+ * object. Cancels any pending expiry timer.
  */
 export function clearToken() {
   try { localStorage.removeItem(AUTH_TOKEN_KEY); } catch { /* storage disabled */ }
+  if (authExpiryTimerId != null) {
+    clearTimeout(authExpiryTimerId);
+    authExpiryTimerId = null;
+  }
 }
 
 /**
@@ -43,6 +119,38 @@ export function clearToken() {
  */
 function dispatchAuthEvent(loggedIn, email) {
   document.dispatchEvent(new CustomEvent(AUTH_EVENT, { detail: { loggedIn, email } }));
+}
+
+/**
+ * Schedules a one-shot timer that logs the user out when the current token's
+ * `exp` lapses, so the UI flips to signed-out without waiting for the next API
+ * call. Reschedules on each call and fires immediately if already expired.
+ * No-op when there is no (live) token.
+ */
+export function scheduleAuthExpiry() {
+  if (authExpiryTimerId != null) {
+    clearTimeout(authExpiryTimerId);
+    authExpiryTimerId = null;
+  }
+  let token;
+  try { token = localStorage.getItem(AUTH_TOKEN_KEY); } catch { return; }
+  if (!token) return;
+  const expSec = getTokenExpirySec(token);
+  if (!expSec) return;
+  const fire = () => {
+    clearToken();
+    try { localStorage.removeItem(AUTH_USER_KEY); } catch { /* storage disabled */ }
+    dispatchAuthEvent(false, null);
+  };
+  const delayMs = expSec * 1000 - Date.now() - AUTH_EXPIRY_SKEW_SEC * 1000;
+  if (delayMs <= 0) {
+    fire();
+    return;
+  }
+  authExpiryTimerId = setTimeout(fire, delayMs);
+  // In Node (tests) a pending timer keeps the event loop alive; unref so the
+  // process can exit. No-op in browsers, where setTimeout returns a number.
+  if (typeof authExpiryTimerId?.unref === 'function') authExpiryTimerId.unref();
 }
 
 /**
@@ -193,13 +301,20 @@ export async function authFetch(url, options = {}) {
 /**
  * Keeps tabs in sync. The browser fires a `storage` event on *other* tabs of
  * the same origin whenever localStorage changes, so when one tab logs in or
- * out we re-dispatch the local auth state event in the others. A null `key`
- * means storage was cleared wholesale; treat that as an auth change too.
+ * out we re-dispatch the local auth state event in the others and (re)arm this
+ * tab's own expiry timer. A null `key` means storage was cleared wholesale;
+ * treat that as an auth change too.
+ *
+ * On load we also schedule the expiry timer for any session restored from a
+ * prior visit, so a token that lapsed while the tab was closed is cleaned up
+ * (and an active session still flips to signed-out the moment it expires).
  */
 if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
   window.addEventListener('storage', (e) => {
     if (e.key !== AUTH_TOKEN_KEY && e.key !== AUTH_USER_KEY && e.key !== null) return;
+    scheduleAuthExpiry();
     const loggedIn = isLoggedIn();
     dispatchAuthEvent(loggedIn, loggedIn ? getUser()?.email ?? null : null);
   });
+  scheduleAuthExpiry();
 }
