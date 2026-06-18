@@ -1,5 +1,6 @@
 import {
   createPayPalSession,
+  getCustomerTimezone,
   patchPayPalSession,
   getPayPalSession,
 } from '../commerce-api.js';
@@ -259,6 +260,7 @@ export default {
             config.getLocale(),
             getLocaleAndLanguage(false, true).language,
           );
+          const customerTimezone = getCustomerTimezone();
           const orderBody = {
             customer: {
               firstName: session.payer.firstName,
@@ -281,6 +283,7 @@ export default {
             estimateToken: state.currentEstimateToken,
             country: session.shippingAddress.country,
             locale: getLocaleAndLanguage(false, true).language,
+            ...(customerTimezone ? { customerTimezone } : {}),
           };
           const createdOrder = await callbacks.createOrder(orderBody);
           const fraudToken = (() => {

@@ -1,4 +1,8 @@
-import { validateApplePayMerchant, estimateExpressCheckout } from '../commerce-api.js';
+import {
+  estimateExpressCheckout,
+  getCustomerTimezone,
+  validateApplePayMerchant,
+} from '../commerce-api.js';
 import { getUser, isLoggedIn } from '../auth-api.js';
 import { logOperation, getCheckoutId } from '../operations-log.js';
 
@@ -163,6 +167,7 @@ function startExpressSession(btn, config, callbacks) {
         // to the right account. The Apple Pay contact email may differ from the
         // commerce account email, which causes assertEmail to reject the request.
         const customerEmail = (isLoggedIn() && getUser()?.email) || contact.emailAddress || '';
+        const customerTimezone = getCustomerTimezone();
         const orderBody = {
           customer: {
             firstName: contact.givenName || '',
@@ -177,6 +182,7 @@ function startExpressSession(btn, config, callbacks) {
           estimateToken: callbacks.getState().currentEstimateToken,
           country: locale,
           locale: bcp47,
+          ...(customerTimezone ? { customerTimezone } : {}),
         };
 
         const createdOrder = await callbacks.createOrder(orderBody);

@@ -1,4 +1,9 @@
-import { createOrder, initiatePayment, previewOrder } from '../../scripts/commerce-api.js';
+import {
+  createOrder,
+  getCustomerTimezone,
+  initiatePayment,
+  previewOrder,
+} from '../../scripts/commerce-api.js';
 import { collectAddress } from './checkout-address.js';
 import { updatePreview } from './checkout-shipping.js';
 import { FORMS_ENDPOINT, getLocaleAndLanguage } from '../../scripts/scripts.js';
@@ -84,6 +89,9 @@ export function buildOrderJSON(formData, form, cart, state, config) {
 
   const paymentMethod = formData.get('paymentMethod');
   if (paymentMethod) order.paymentMethod = paymentMethod;
+
+  const customerTimezone = getCustomerTimezone();
+  if (customerTimezone) order.customerTimezone = customerTimezone;
 
   return order;
 }
