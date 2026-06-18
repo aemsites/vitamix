@@ -861,6 +861,23 @@ button.checkout-submit-btn {
     padding-bottom: 8px;
   }
 
+  /* Single-column layout: the breakdown rows are shown, so stack the total
+     above a full-width button (matches the mobile experience). */
+  .order-total-section {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  button.checkout-submit-btn {
+    justify-content: center;
+    width: 100%;
+  }
+}
+
+/* Two-column layout (viewport >= 1000px) where the checkout column itself is
+   narrow (e.g. tablet landscape): stack so the long submit button doesn't
+   overlap the total. */
+@container checkout-col (width < 600px) {
   .order-total-section {
     flex-direction: column;
     align-items: stretch;
