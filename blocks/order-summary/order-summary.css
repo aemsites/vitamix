@@ -47,6 +47,10 @@
   min-width: 0;
 }
 
+.checkout-wrapper {
+  container: checkout-col / inline-size;
+}
+
 .order-summary-header-total {
   display: none;
   font-size: var(--commerce-font-size-base);
@@ -122,6 +126,13 @@
     width: 100%;
     position: static;
     order: -1;
+  }
+
+  /* The section uses align-items: flex-start, so flex items shrink-wrap on the
+     cross axis. Force full width here; otherwise inline-size containment on
+     .checkout-wrapper would collapse it to its min-content width. */
+  .checkout-wrapper {
+    width: 100%;
   }
 
   .order-summary-toggle {
