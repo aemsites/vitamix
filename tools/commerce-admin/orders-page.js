@@ -558,12 +558,13 @@ function appendDl(sectionEl, rows) {
 const STAGING_STOREFRONT_HOST = 'uat.vitamix.com';
 
 /**
- * Rewrite an order line item's URL host to the staging storefront when the
- * admin is signed into the staging environment. Production is left untouched
- * (its canonical host is already correct). Relative paths and non-http values
- * pass through unchanged.
+ * Resolve an order line item's link to the current admin environment. In
+ * staging the canonical (production) host is rewritten to the staging
+ * storefront; in production the URL is returned unchanged (its canonical host
+ * is already correct). Relative paths and non-http values pass through
+ * unchanged.
  */
-function stagingItemUrl(url) {
+function itemUrlForEnv(url) {
   if (!url || typeof url !== 'string' || getApiEnvironment() !== 'stage') return url;
   try {
     const u = new URL(url, window.location.origin);
@@ -664,7 +665,7 @@ function buildOrderHumanView(payload) {
       const priceTd = document.createElement('td');
       priceTd.textContent = formatItemPrice(item) || '—';
       const linkTd = document.createElement('td');
-      const url = stagingItemUrl(item.productUrl || item.path);
+      const url = itemUrlForEnv(item.productUrl || item.path);
       if (url) {
         const display = typeof url === 'string' && url.length > 40 ? `${url.slice(0, 37)}…` : String(url);
         linkTd.appendChild(linkCell(url, display));
