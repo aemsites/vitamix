@@ -459,6 +459,20 @@
   color: #202223;
 }
 
+.orders-detail-discounts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.orders-detail-discounts li {
+  margin: 0 0 4px;
+}
+
+.orders-detail-discounts li:last-child {
+  margin-bottom: 0;
+}
+
 .orders-detail-history {
   margin: 0;
   padding: 0;

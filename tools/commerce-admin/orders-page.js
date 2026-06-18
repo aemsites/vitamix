@@ -522,6 +522,78 @@ function formatItemPrice(item) {
   return cur ? `${final} ${cur}` : String(final);
 }
 
+/** Best-effort order currency: payment currency, else first line item's. */
+function orderCurrency(o) {
+  const pay = o?.payment;
+  if (pay && typeof pay === 'object' && pay.currency != null && String(pay.currency).trim()) {
+    return String(pay.currency).trim();
+  }
+  const items = Array.isArray(o?.items) ? o.items : [];
+  const cur = items[0]?.price?.currency;
+  return cur != null && String(cur).trim() ? String(cur).trim() : '';
+}
+
+const DISCOUNT_SOURCE_LABELS = {
+  coupon: 'Coupon',
+  pricing_rule: 'Price rule',
+  promotion: 'Promotion',
+};
+
+const DISCOUNT_TYPE_LABELS = {
+  percentage: 'Percentage',
+  fixed: 'Fixed amount',
+  free_shipping: 'Free shipping',
+  product_price_override: 'Sale price',
+};
+
+/** Human-readable name for a single applied discount (name › id › fallback). */
+function discountLabel(d) {
+  if (d == null || typeof d !== 'object') return 'Discount';
+  if (typeof d.name === 'string' && d.name.trim()) return d.name.trim();
+  if (typeof d.id === 'string' && d.id.trim()) return d.id.trim();
+  return 'Discount';
+}
+
+/**
+ * Render a single applied discount as readable text, e.g.
+ * `-15.00 USD (Coupon · Percentage)`. Returns '' when there is nothing to show.
+ */
+function discountValueText(d, currency) {
+  if (d == null || typeof d !== 'object') return '';
+  const parts = [];
+  const amt = Number(d.amount);
+  // Free-shipping discounts carry amount 0 (the value lives in shipping, not a
+  // cash discount), so skip the redundant `-0.00` and let the tag describe it.
+  if (d.amount != null && String(d.amount).trim() !== '' && !Number.isNaN(amt) && amt !== 0) {
+    parts.push(`-${amt.toFixed(2)}${currency ? ` ${currency}` : ''}`);
+  }
+  const tags = [];
+  const src = DISCOUNT_SOURCE_LABELS[d.source];
+  if (src) tags.push(src);
+  if (d.freeShipping) tags.push('Free shipping');
+  else {
+    const typ = DISCOUNT_TYPE_LABELS[d.type];
+    if (typ) tags.push(typ);
+  }
+  if (tags.length) parts.push(`(${tags.join(' · ')})`);
+  return parts.join(' ');
+}
+
+/** Build the `Discounts` row value: a readable list, or the string 'None'. */
+function discountsValueNode(disc, currency) {
+  if (!Array.isArray(disc) || !disc.length) return 'None';
+  const ul = document.createElement('ul');
+  ul.className = 'orders-detail-discounts';
+  disc.forEach((d) => {
+    const li = document.createElement('li');
+    const label = discountLabel(d);
+    const text = discountValueText(d, currency);
+    li.textContent = text ? `${label} — ${text}` : label;
+    ul.appendChild(li);
+  });
+  return ul;
+}
+
 function section(title) {
   const sec = document.createElement('section');
   sec.className = 'orders-detail-section';
@@ -696,7 +768,7 @@ function buildOrderHumanView(payload) {
     }
     const disc = est.discounts;
     if (Array.isArray(disc)) {
-      appendDl(sec, [['Discounts', disc.length ? disc.map((d) => JSON.stringify(d)).join('; ') : 'None']]);
+      appendDl(sec, [['Discounts', discountsValueNode(disc, orderCurrency(o))]]);
     }
     if (sec.querySelector('dl')?.children?.length) root.appendChild(sec);
   }
