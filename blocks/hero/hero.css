@@ -46,6 +46,16 @@
   content: none;
 }
 
+.hero.split.no-overlay::after {
+  content: none;
+}
+
+@media (width >= 800px) {
+  .hero.split.no-overlay::after {
+    content: none;
+  }
+}
+
 .hero:not(.split) {
   --image-color: var(--color-charcoal);
 }
