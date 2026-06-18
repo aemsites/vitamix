@@ -562,7 +562,9 @@ function discountValueText(d, currency) {
   if (d == null || typeof d !== 'object') return '';
   const parts = [];
   const amt = Number(d.amount);
-  if (d.amount != null && String(d.amount).trim() !== '' && !Number.isNaN(amt)) {
+  // Free-shipping discounts carry amount 0 (the value lives in shipping, not a
+  // cash discount), so skip the redundant `-0.00` and let the tag describe it.
+  if (d.amount != null && String(d.amount).trim() !== '' && !Number.isNaN(amt) && amt !== 0) {
     parts.push(`-${amt.toFixed(2)}${currency ? ` ${currency}` : ''}`);
   }
   const tags = [];
