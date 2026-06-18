@@ -7,6 +7,51 @@ export function normalizeTotalsDiscounts(discounts = []) {
   return discounts.filter((discount) => Math.abs(parseFloat(discount?.amount)) > 0);
 }
 
+/**
+ * Parses a JSON string, returning null on absent or malformed input.
+ */
+export function parseJson(raw) {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Returns true when cached confirmation data belongs to the order currently
+ * being displayed. Cached display data (cart items, preview totals) is scoped
+ * to the matching order so a stale cache from a previous order in the same tab
+ * is never rendered against a different orderId.
+ */
+export function cachedOrderMatches(cachedOrder, orderId) {
+  return !!cachedOrder && !!orderId && cachedOrder.id === orderId;
+}
+
+/**
+ * Decides which order to render on the confirmation page, gating the success
+ * UI on a successful API lookup:
+ *
+ *  - API order present                  → render it (authoritative).
+ *  - API 404 / 403 (not found / not yours) → redirect; never fall back.
+ *  - API transient error / not called   → fall back to the cached order, but
+ *    only when it matches the orderId in the URL.
+ *  - Otherwise                          → redirect.
+ *
+ * @returns {{ order: Object|null, redirect: boolean }}
+ */
+export function resolveConfirmationOrder({
+  apiOrder, apiError, cachedOrder, cacheMatches,
+} = {}) {
+  if (apiOrder) return { order: apiOrder, redirect: false };
+  if (apiError && (apiError.status === 404 || apiError.status === 403)) {
+    return { order: null, redirect: true };
+  }
+  if (cacheMatches && cachedOrder) return { order: cachedOrder, redirect: false };
+  return { order: null, redirect: true };
+}
+
 export function calculateConfirmationTotal({
   subtotal = 0,
   tax = 0,
@@ -30,10 +75,13 @@ export function calculateConfirmationTotal({
  * Cancel:  Chase / PayPal → API → redirect here with ?orderId=...&reason=...
  *   reason values: customer_cancelled | payment_failed | declined
  *
- * Order display data is fetched from the API using the orderId and email from
- * the URL / sessionStorage. sessionStorage is used as a fallback when the API
- * call fails, and for totals (preview) and enriched item display data (cartItems)
- * which are not stored on the order.
+ * Order display data is fetched from the API using the orderId (URL) and the
+ * email proof held in sessionStorage. A successful lookup gates the success UI:
+ * a not-found / forbidden response redirects rather than rendering a forged
+ * confirmation. The tab-scoped sessionStorage cache survives a refresh and is
+ * used for first paint and as a transient fallback — but only when it belongs
+ * to the orderId being displayed (totals/preview and enriched cartItems are not
+ * stored on the order itself).
  */
 export default async function decorate(block) {
   const config = getConfig();
@@ -84,38 +132,32 @@ export default async function decorate(block) {
     return;
   }
 
-  // success flow — read from sessionStorage
+  // success flow
   const orderId = params.orderId || params.id;
   const email = params.email || sessionStorage.getItem('checkout_email');
-  const orderData = sessionStorage.getItem('checkout_order');
-  const previewData = sessionStorage.getItem('checkout_preview');
-  const cartItemsData = sessionStorage.getItem('checkout_cart_items');
 
   if (!orderId) {
     window.location.href = storeRootPath;
     return;
   }
 
-  let order;
-  let preview;
-  let cartItems;
-  try {
-    order = orderData ? JSON.parse(orderData) : null;
-    preview = previewData ? JSON.parse(previewData) : null;
-    cartItems = cartItemsData ? JSON.parse(cartItemsData) : null;
-  } catch {
-    order = null;
+  // First-paint cache written before the payment redirect. It is tab-scoped:
+  // it survives a refresh, is overwritten by the next order, and is cleared
+  // when the tab closes — so it is intentionally not removed here.
+  const cachedOrder = parseJson(sessionStorage.getItem('checkout_order'));
+  let preview = parseJson(sessionStorage.getItem('checkout_preview'));
+  let cartItems = parseJson(sessionStorage.getItem('checkout_cart_items'));
+
+  // Only trust cached display data when it belongs to the order in the URL,
+  // so a stale cache from a previous order in the same tab is never rendered
+  // against a different orderId.
+  const cacheMatches = cachedOrderMatches(cachedOrder, orderId);
+  if (!cacheMatches) {
     preview = null;
     cartItems = null;
   }
 
-  // clear checkout session data
-  sessionStorage.removeItem('checkout_email');
-  sessionStorage.removeItem('checkout_order');
-  sessionStorage.removeItem('checkout_preview');
-  sessionStorage.removeItem('checkout_cart_items');
-
-  // clear the cart
+  // clear the cart (the shopping cart, not the confirmation cache)
   try {
     const { default: cart } = await import('../../scripts/cart.js');
     cart.clear();
@@ -123,14 +165,28 @@ export default async function decorate(block) {
     // cart may not be available
   }
 
-  // fetch authoritative order data from the API; fall back to sessionStorage on failure
-  if (orderId && email) {
+  // The API is the source of truth and the validation gate. Fetch the order
+  // using the email proof held in sessionStorage. A definitive not-found /
+  // forbidden response means the orderId is bogus or not ours — redirect
+  // rather than render a forged confirmation. A transient failure (or no
+  // email available) falls back to the cached order only when it matches.
+  let apiOrder = null;
+  let apiError = null;
+  if (email) {
     try {
       const result = await getOrder(email, orderId);
-      order = result.order;
-    } catch {
-      // use sessionStorage order as fallback
+      apiOrder = result.order;
+    } catch (err) {
+      apiError = err;
     }
+  }
+
+  const { order, redirect } = resolveConfirmationOrder({
+    apiOrder, apiError, cachedOrder, cacheMatches,
+  });
+  if (redirect || !order) {
+    window.location.href = storeRootPath;
+    return;
   }
 
   // build confirmation page
@@ -179,7 +235,7 @@ export default async function decorate(block) {
   leftCol.className = 'order-details-left';
 
   // items
-  const displayItems = cartItems || order?.items;
+  const displayItems = cartItems?.length ? cartItems : order?.items;
   if (displayItems?.length) {
     const itemsSection = document.createElement('div');
     itemsSection.className = 'order-items';

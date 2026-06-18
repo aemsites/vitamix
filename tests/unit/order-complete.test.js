@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {
   calculateConfirmationTotal,
   normalizeTotalsDiscounts,
+  cachedOrderMatches,
+  resolveConfirmationOrder,
 } from '../../blocks/order-complete/order-complete.js';
 
 beforeEach(() => {
@@ -26,6 +28,106 @@ describe('calculateConfirmationTotal', () => {
       shippingRate: 10,
       discounts: [{ name: 'SAVE20', amount: 20 }],
     }), 98);
+  });
+});
+
+describe('cachedOrderMatches', () => {
+  test('matches when cached order id equals the URL orderId', () => {
+    assert.equal(cachedOrderMatches({ id: 'order-1' }, 'order-1'), true);
+  });
+
+  test('does not match a different orderId', () => {
+    assert.equal(cachedOrderMatches({ id: 'order-1' }, 'order-2'), false);
+  });
+
+  test('does not match when cached order or id is missing', () => {
+    assert.equal(cachedOrderMatches(null, 'order-1'), false);
+    assert.equal(cachedOrderMatches({ id: 'order-1' }, undefined), false);
+    assert.equal(cachedOrderMatches({}, 'order-1'), false);
+  });
+});
+
+describe('resolveConfirmationOrder', () => {
+  test('renders the API order when present (authoritative)', () => {
+    const apiOrder = { id: 'order-1' };
+    assert.deepEqual(
+      resolveConfirmationOrder({ apiOrder, cachedOrder: { id: 'order-1' }, cacheMatches: true }),
+      { order: apiOrder, redirect: false },
+    );
+  });
+
+  test('redirects on a 404 without falling back to cache', () => {
+    assert.deepEqual(
+      resolveConfirmationOrder({
+        apiOrder: null,
+        apiError: { status: 404 },
+        cachedOrder: { id: 'order-1' },
+        cacheMatches: true,
+      }),
+      { order: null, redirect: true },
+    );
+  });
+
+  test('redirects on a 403 (not ours) without falling back to cache', () => {
+    assert.deepEqual(
+      resolveConfirmationOrder({
+        apiOrder: null,
+        apiError: { status: 403 },
+        cachedOrder: { id: 'order-1' },
+        cacheMatches: true,
+      }),
+      { order: null, redirect: true },
+    );
+  });
+
+  test('falls back to a matching cached order on a transient error', () => {
+    const cachedOrder = { id: 'order-1' };
+    assert.deepEqual(
+      resolveConfirmationOrder({
+        apiOrder: null,
+        apiError: { status: 503 },
+        cachedOrder,
+        cacheMatches: true,
+      }),
+      { order: cachedOrder, redirect: false },
+    );
+  });
+
+  test('falls back to the cached order when the API was not called (no email)', () => {
+    const cachedOrder = { id: 'order-1' };
+    assert.deepEqual(
+      resolveConfirmationOrder({
+        apiOrder: null,
+        apiError: null,
+        cachedOrder,
+        cacheMatches: true,
+      }),
+      { order: cachedOrder, redirect: false },
+    );
+  });
+
+  test('redirects on a transient error when the cache does not match', () => {
+    assert.deepEqual(
+      resolveConfirmationOrder({
+        apiOrder: null,
+        apiError: { status: 503 },
+        cachedOrder: { id: 'other-order' },
+        cacheMatches: false,
+      }),
+      { order: null, redirect: true },
+    );
+  });
+
+  test('redirects when there is no API order and no usable cache', () => {
+    assert.deepEqual(
+      resolveConfirmationOrder({
+        apiOrder: null,
+        apiError: null,
+        cachedOrder: null,
+        cacheMatches: false,
+      }),
+      { order: null, redirect: true },
+    );
   });
 });
 
