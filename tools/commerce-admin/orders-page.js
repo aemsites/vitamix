@@ -2,7 +2,7 @@
  * Orders list — ProductBus API (helix productbus-admin/orders.js pattern).
  * Row opens a detail dialog (human-readable order + journal); Edit saves via PUT / PATCH.
  */
-import { apiFetch } from './commerce-otp-api.js';
+import { apiFetch, getApiEnvironment } from './commerce-otp-api.js';
 import waitForCommerceAuthReady from './commerce-wait-auth-ready.js';
 import { putOrPatchResource } from './commerce-resource-save.js';
 import { openOrderContactEditDialog } from './order-contact-edit-dialog.js';
@@ -548,6 +548,33 @@ function appendDl(sectionEl, rows) {
   if (dl.children.length) sectionEl.appendChild(dl);
 }
 
+/**
+ * Storefront host used for line-item links when the admin is in the staging
+ * environment. Order line items persist an absolute `productUrl` whose host is
+ * the product's canonical (production) URL, regardless of where the order was
+ * placed. When viewing staging orders we rewrite the host to the staging
+ * storefront so the link opens the matching environment. See issue #610.
+ */
+const STAGING_STOREFRONT_HOST = 'uat.vitamix.com';
+
+/**
+ * Rewrite an order line item's URL host to the staging storefront when the
+ * admin is signed into the staging environment. Production is left untouched
+ * (its canonical host is already correct). Relative paths and non-http values
+ * pass through unchanged.
+ */
+function stagingItemUrl(url) {
+  if (!url || typeof url !== 'string' || getApiEnvironment() !== 'stage') return url;
+  try {
+    const u = new URL(url, window.location.origin);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return url;
+    u.host = STAGING_STOREFRONT_HOST;
+    return u.href;
+  } catch {
+    return url;
+  }
+}
+
 function linkCell(href, text) {
   const hrefOk = safeHttpUrl(href);
   if (!hrefOk) {
@@ -637,7 +664,7 @@ function buildOrderHumanView(payload) {
       const priceTd = document.createElement('td');
       priceTd.textContent = formatItemPrice(item) || '—';
       const linkTd = document.createElement('td');
-      const url = item.productUrl || item.path;
+      const url = stagingItemUrl(item.productUrl || item.path);
       if (url) {
         const display = typeof url === 'string' && url.length > 40 ? `${url.slice(0, 37)}…` : String(url);
         linkTd.appendChild(linkCell(url, display));
