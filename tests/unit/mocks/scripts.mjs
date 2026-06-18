@@ -26,8 +26,22 @@ export function checkVariantOutOfStock(sku) {
   return outOfStockSkus.has(sku);
 }
 
-export function getLocaleAndLanguage() {
-  return locale;
+/**
+ * Mirrors the real getLocaleAndLanguage(forceEnCA, bcp47) shape so callers that
+ * request the BCP-47 form (e.g. 'fr-CA') get the same conversion they would in
+ * production. The backing value set via __setLocale uses the URL/underscore form
+ * (e.g. { locale: 'ca', language: 'fr_ca' }).
+ */
+export function getLocaleAndLanguage(forceEnCA = false, bcp47 = false) {
+  const { locale: loc } = locale;
+  let { language } = locale;
+  if (forceEnCA && loc === 'ca' && language === 'en_us') {
+    language = 'en_ca';
+  }
+  if (bcp47) {
+    language = language.replace('_', '-').replace(/-([a-z]{2})$/, (_, r) => `-${r.toUpperCase()}`);
+  }
+  return { locale: loc, language };
 }
 
 export async function loggedFetch(...args) {
