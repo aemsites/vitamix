@@ -1,9 +1,3 @@
-const debug = (
-  window.location.hostname === 'localhost')
-  || (window.location.search.includes('instrumentation=debug')
-  );
+import { initInstrumentation } from './instrumentation-lib.js';
 
-if (debug) {
-  /* eslint-disable-next-line no-console */
-  console.log('Adobe Analytics instrumentation loaded');
-}
+initInstrumentation();

@@ -1469,6 +1469,9 @@ async function loadDelayed() {
   // eslint-disable-next-line import/no-cycle
   const params = new URLSearchParams(window.location.search);
   if (params.get('martech') !== 'off') {
+    import('./consented/instrumentation-lib.js').then(
+      ({ installAnalyticsTrackingServers }) => installAnalyticsTrackingServers(),
+    );
     await loadScript('https://consent.cookiebot.com/uc.js', {
       'data-cbid': '1d1d4c74-9c10-49e5-9577-f8eb4ba520fb',
       'data-blockingmode': 'auto',
