@@ -6,7 +6,10 @@
  */
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { getOrder, estimateShipping, estimatePrice } from '../../scripts/commerce-api.js';
+import {
+  getOrder, estimateShipping, estimatePrice, estimateExpressCheckout,
+} from '../../scripts/commerce-api.js';
+import { __setLocale, __resetScripts } from './mocks/scripts.mjs';
 
 const API_ORIGIN = 'https://api.test.com/test-org/sites/test-site';
 
@@ -42,6 +45,7 @@ beforeEach(() => {
   lastUrl = undefined;
   lastInit = undefined;
   globalThis.__resetTestState();
+  __resetScripts();
 });
 
 // --- URL construction -------------------------------------------------------
@@ -180,6 +184,34 @@ test('estimateShipping: returns rates array from response', async () => {
   mockFetch(200, { rates });
   const result = await estimateShipping('us', 'NY', []);
   assert.deepEqual(result.rates, rates);
+});
+
+test('estimateShipping: sends BCP-47 locale from the store view', async () => {
+  __setLocale({ locale: 'ca', language: 'fr_ca' });
+  mockFetch(200, { rates: [] });
+  await estimateShipping('ca', 'QC', []);
+  const body = JSON.parse(lastInit.body);
+  assert.equal(body.locale, 'fr-CA');
+});
+
+test('estimateShipping: defaults locale to en-US', async () => {
+  mockFetch(200, { rates: [] });
+  await estimateShipping('us', 'CA', []);
+  const body = JSON.parse(lastInit.body);
+  assert.equal(body.locale, 'en-US');
+});
+
+test('estimateExpressCheckout: sends locale and order shape', async () => {
+  __setLocale({ locale: 'ca', language: 'fr_ca' });
+  const items = [{ sku: 'abc', quantity: 1, price: { final: '50.00' } }];
+  mockFetch(200, { subtotal: '50.00', shippingMethods: [] });
+  await estimateExpressCheckout('ca', 'QC', 'H2X 1Y4', items);
+  assert.equal(lastUrl, `${API_ORIGIN}/estimate/order`);
+  const body = JSON.parse(lastInit.body);
+  assert.equal(body.locale, 'fr-CA');
+  assert.equal(body.country, 'ca');
+  assert.deepEqual(body.shipping, { country: 'ca', state: 'QC', zip: 'H2X 1Y4' });
+  assert.deepEqual(body.items, items);
 });
 
 test('estimatePrice: includes couponSource when provided with couponCode', async () => {

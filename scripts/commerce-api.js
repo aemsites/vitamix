@@ -81,8 +81,11 @@ async function post(path, body, recaptchaAction) {
  * @throws {CommerceApiError}
  */
 export async function estimateShipping(country, state, items, couponCode, couponSource) {
+  // BCP-47 store-view locale (e.g. 'fr-CA') so the API can localize method labels.
+  const { language: locale } = getLocaleAndLanguage(false, true);
   return post('/estimate/shipping', {
     country,
+    locale,
     shipping: { country, state },
     items,
     ...(couponCode ? { couponCode } : {}),
@@ -124,8 +127,11 @@ export async function estimatePrice(country, items, couponCode, couponSource) {
  * @throws {CommerceApiError}
  */
 export async function estimateExpressCheckout(country, state, zip, items) {
+  // BCP-47 store-view locale (e.g. 'fr-CA') so the API can localize method labels.
+  const { language: locale } = getLocaleAndLanguage(false, true);
   return post('/estimate/order', {
     country,
+    locale,
     shipping: { country, state, zip },
     items,
   });
