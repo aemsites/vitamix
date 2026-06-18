@@ -19,6 +19,19 @@ class CommerceApiError extends Error {
 }
 
 /**
+ * Read the shopper browser timezone for Commerce API order payloads, when available.
+ *
+ * @returns {string|undefined}
+ */
+export function getCustomerTimezone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Makes an authenticated POST request to the Commerce API.
  * Attaches a Bearer token from localStorage if one is present, so orders
  * created while a user is logged in are associated with their account.
