@@ -671,16 +671,13 @@ pre {
 
 body.last-week-view .form-section,
 body.last-week-view .credentials-notice,
+body.last-week-view .last-week-hidden,
 body.last-week-view .filter-container,
 body.last-week-view .bulk-actions .select-all-container,
 body.last-week-view .bulk-actions .btn-select-unimported,
 body.last-week-view .bulk-actions .btn-bulk-select,
 body.last-week-view .bulk-actions .sync-options {
   display: none;
-}
-
-body.last-week-view .subtitle {
-  margin-bottom: 20px;
 }
 
 body.last-week-view .bulk-actions {

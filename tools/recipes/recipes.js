@@ -502,15 +502,8 @@ function applyLastWeekViewUI() {
   if (!isLastWeekView()) return;
 
   document.body.classList.add('last-week-view');
-
-  const heading = document.querySelector('h1');
-  if (heading) heading.textContent = 'Recipes Modified in the Last Week';
-
-  const subtitle = document.querySelector('.subtitle');
-  if (subtitle) {
-    const sinceDate = getDateSevenDaysAgoISO();
-    subtitle.textContent = `CalcMenu updates since ${sinceDate}. Recipes newer than the AEM index are auto-selected for sync.`;
-  }
+  document.querySelector('.container > h1')?.classList.add('last-week-hidden');
+  document.querySelector('.subtitle')?.classList.add('last-week-hidden');
 
   const resultsHeading = document.querySelector('#results h2');
   if (resultsHeading) resultsHeading.textContent = 'Last Week Modifications';
