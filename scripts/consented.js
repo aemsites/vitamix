@@ -1,6 +1,8 @@
 import { loadScript } from './aem.js';
 import './consented/newsletter.js';
 
+document.body.classList.add('consented');
+
 // add delayed functionality here
 window.config = {
   POOLID: 'us-east-1:d54ecd7d-db6e-456d-bf35-d26346122a63',

@@ -660,12 +660,6 @@ legend {
   font-size: var(--body-size-xs);
 }
 
-input:hover,
-textarea:hover,
-select:hover {
-  /* border-color: var(--color-gray-400); */
-}
-
 input:focus,
 textarea:focus,
 select:focus,
@@ -902,4 +896,22 @@ body.corp main .default-content-wrapper h2 {
 body.corp-no-toc main .default-content-wrapper {
   max-width: 800px;
   margin: 0 auto;
+}
+
+.consented .target-delay {
+  animation: fadein 3.5s ease-in-out 0s 1 normal forwards;
+}
+
+@keyframes fadein {
+  0% {
+    opacity: 0;
+  }
+
+  90% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
 }
