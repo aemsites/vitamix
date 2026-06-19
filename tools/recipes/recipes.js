@@ -229,6 +229,37 @@ function extractKebabSlugFromPath(path) {
   return match ? match[1] : null;
 }
 
+function formatShortDate(dateValue) {
+  if (!dateValue) return '—';
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return '—';
+
+  const now = new Date();
+  const options = {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  };
+  if (date.getFullYear() !== now.getFullYear()) {
+    options.year = 'numeric';
+  }
+  return date.toLocaleString(undefined, options);
+}
+
+function buildRecipeTitleHtml(name, number, highlightTerm = '') {
+  const nameHtml = highlightTerm ? highlightText(name, highlightTerm) : name;
+  return `${nameHtml} <span class="recipe-number">(${number})</span>`;
+}
+
+function buildRecipeThumbnailHtml(imageUrl, name) {
+  if (!imageUrl) {
+    return '<div class="recipe-thumb recipe-thumb-placeholder" aria-hidden="true"></div>';
+  }
+  const alt = name ? `${name} thumbnail` : '';
+  return `<img class="recipe-thumb" src="${imageUrl}" alt="${alt.replace(/"/g, '&quot;')}" loading="lazy" />`;
+}
+
 function isValidRecipeImage(imageUrl) {
   if (!imageUrl || typeof imageUrl !== 'string') return false;
   return !imageUrl.includes('default-meta-image');
@@ -410,12 +441,81 @@ export function getQueryParams() {
     user: params.get('user') || '',
     pw: params.get('pw') || '',
     date: params.get('date') || '',
+    view: params.get('view') || '',
     recipe: params.get('recipe') || '',
     name: params.get('name') || '',
     status: params.get('status') || '',
     dateCreated: params.get('dateCreated') || '',
     dateUpdated: params.get('dateUpdated') || '',
   };
+}
+
+export function isLastWeekView() {
+  return getQueryParams().view === 'last-week';
+}
+
+function getDateSevenDaysAgoISO() {
+  const date = new Date();
+  date.setDate(date.getDate() - 7);
+  return date.toISOString().split('T')[0];
+}
+
+function getLastWeekCutoffTimestamp() {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 7);
+  cutoff.setHours(0, 0, 0, 0);
+  return cutoff.getTime();
+}
+
+function parseComparableDate(value) {
+  if (!value) return null;
+  const timestamp = new Date(value).getTime();
+  return Number.isNaN(timestamp) ? null : timestamp;
+}
+
+function isWithinLastWeek(dateValue) {
+  const timestamp = parseComparableDate(dateValue);
+  if (timestamp === null) return false;
+  return timestamp >= getLastWeekCutoffTimestamp();
+}
+
+function calcMenuIsNewerThanIndex(calcDateUpdated, indexDateUpdated) {
+  const calcTimestamp = parseComparableDate(calcDateUpdated);
+  const indexTimestamp = parseComparableDate(indexDateUpdated);
+  if (calcTimestamp === null) return false;
+  if (indexTimestamp === null) return true;
+  return calcTimestamp > indexTimestamp;
+}
+
+function buildListUrlParams(overrides = {}) {
+  const params = { ...getQueryParams(), ...overrides };
+  const searchParams = new URLSearchParams();
+  if (params.user) searchParams.set('user', params.user);
+  if (params.pw) searchParams.set('pw', params.pw);
+  if (params.view) searchParams.set('view', params.view);
+  if (params.date && !isLastWeekView()) searchParams.set('date', params.date);
+  const query = searchParams.toString();
+  return query ? `?${query}` : '';
+}
+
+function applyLastWeekViewUI() {
+  if (!isLastWeekView()) return;
+
+  document.body.classList.add('last-week-view');
+
+  const heading = document.querySelector('h1');
+  if (heading) heading.textContent = 'Recipes Modified in the Last Week';
+
+  const subtitle = document.querySelector('.subtitle');
+  if (subtitle) {
+    const sinceDate = getDateSevenDaysAgoISO();
+    subtitle.textContent = `CalcMenu updates since ${sinceDate}. Recipes newer than the AEM index are auto-selected for sync.`;
+  }
+
+  const resultsHeading = document.querySelector('#results h2');
+  if (resultsHeading) resultsHeading.textContent = 'Last Week Modifications';
+
+  updateBulkSyncButton();
 }
 
 // Format date for API request (mm/dd/yyyy)
@@ -546,6 +646,8 @@ export function initializeForm() {
 
   if (params.date) {
     dateUpdatedInput.value = params.date;
+  } else if (isLastWeekView()) {
+    dateUpdatedInput.value = getDateSevenDaysAgoISO();
   }
 
   if (params.user && params.pw) {
@@ -608,10 +710,12 @@ export function clearCheckboxState() {
 export function updateBulkSyncButton() {
   const checkboxes = document.querySelectorAll('.recipe-checkbox:checked');
   const bulkSyncBtn = document.getElementById('bulkSyncBtn');
+  const lastWeekView = isLastWeekView();
+  const defaultLabel = lastWeekView ? 'Sync and Publish Selected' : 'Sync Selected with DA';
   bulkSyncBtn.disabled = checkboxes.length === 0;
   bulkSyncBtn.textContent = checkboxes.length > 0
-    ? `Sync Selected (${checkboxes.length})`
-    : 'Sync Selected with DA';
+    ? `${defaultLabel} (${checkboxes.length})`
+    : defaultLabel;
 }
 
 // Fetch recipe details and build HTML for sync
@@ -1042,8 +1146,8 @@ export async function bulkSyncWithDA() {
     return;
   }
 
-  // Check if publish option is enabled
-  const enablePublish = document.getElementById('enablePublish')?.checked || false;
+  // Publish is always enabled in last-week view; otherwise use the checkbox
+  const enablePublish = isLastWeekView() || document.getElementById('enablePublish')?.checked || false;
 
   const syncProgress = document.getElementById('syncProgress');
   const syncLog = document.getElementById('syncLog');
@@ -1722,34 +1826,55 @@ export async function displayResults(data, rawXml) {
   const recipeCount = document.getElementById('recipeCount');
   const recipeList = document.getElementById('recipeList');
   const params = getQueryParams();
+  const lastWeekView = isLastWeekView();
 
-  // Fetch imported recipes
+  // Fetch imported recipes and index data for thumbnails and date comparison
   const importedRecipes = await fetchImportedRecipes();
-  importedRecipesSet = importedRecipes; // Store globally for selection filtering
+  importedRecipesSet = importedRecipes;
+  const { byNumber: indexEntriesByNumber } = await getRecipeIndexCache();
 
   // Parse XML and display recipes
   try {
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(rawXml, 'text/xml');
-    const recipes = xmlDoc.querySelectorAll('Recipes');
+    const allRecipes = Array.from(xmlDoc.querySelectorAll('Recipes'));
+    const recipes = lastWeekView
+      ? allRecipes.filter((recipe) => isWithinLastWeek(recipe.getAttribute('DateUpdated')))
+      : allRecipes;
+
+    recipes.sort((a, b) => {
+      const aTimestamp = parseComparableDate(a.getAttribute('DateUpdated')) ?? 0;
+      const bTimestamp = parseComparableDate(b.getAttribute('DateUpdated')) ?? 0;
+      return bTimestamp - aTimestamp;
+    });
 
     // Count imported recipes
     let importedCount = 0;
+    let needsSyncCount = 0;
     recipes.forEach((recipe) => {
       const number = recipe.getAttribute('Number');
       if (importedRecipes.has(number.toUpperCase())) {
         importedCount += 1;
       }
+      if (lastWeekView) {
+        const indexDate = indexEntriesByNumber.get(number.toUpperCase())?.['date-updated'] || '';
+        if (calcMenuIsNewerThanIndex(recipe.getAttribute('DateUpdated'), indexDate)) {
+          needsSyncCount += 1;
+        }
+      }
     });
 
-    recipeCount.textContent = `Recipes found: ${recipes.length} (${importedCount} already imported)`;
+    if (lastWeekView) {
+      recipeCount.textContent = `Recipes modified in the last week: ${recipes.length} (${needsSyncCount} need sync, ${importedCount} in AEM index)`;
+    } else {
+      recipeCount.textContent = `Recipes found: ${recipes.length} (${importedCount} already imported)`;
+    }
 
     // Clear previous results
     recipeList.innerHTML = '';
 
     // Create list items for each recipe
     recipes.forEach((recipe) => {
-      const code = recipe.getAttribute('Code');
       const number = recipe.getAttribute('Number');
       const name = recipe.getAttribute('Name');
       const status = recipe.getAttribute('Status');
@@ -1766,24 +1891,29 @@ export async function displayResults(data, rawXml) {
       // Status class
       const statusClass = status.toLowerCase();
 
-      // Check if recipe is already imported
-      const isImported = importedRecipes.has(number.toUpperCase());
+      const indexEntry = indexEntriesByNumber.get(number.toUpperCase());
+      const indexDateUpdated = indexEntry?.['date-updated'] || '';
+      const needsSync = lastWeekView
+        ? calcMenuIsNewerThanIndex(dateUpdated, indexDateUpdated)
+        : false;
+      const imageUrl = indexEntry?.image ? resolveRecipeImageUrl(indexEntry.image) : '';
 
       recipeItem.innerHTML = `
         <input type="checkbox" class="recipe-checkbox" data-recipe-number="${number}" data-recipe-name="${name.replace(/"/g, '&quot;')}" data-recipe-status="${status}" data-date-created="${dateCreated}" data-date-updated="${dateUpdated}" />
+        <div class="recipe-thumb-wrap">
+          ${buildRecipeThumbnailHtml(imageUrl, name)}
+        </div>
         <div class="recipe-content">
           <div class="recipe-header">
-            <h3 class="recipe-title">${name}</h3>
+            <h3 class="recipe-title">${buildRecipeTitleHtml(name, number)}</h3>
             <div class="recipe-badges">
               <span class="recipe-status ${statusClass}">${status}</span>
-              ${isImported ? '<span class="recipe-status imported">Imported</span>' : ''}
+              ${lastWeekView ? `<span class="recipe-status ${needsSync ? 'needs-sync' : 'up-to-date'}">${needsSync ? 'Needs sync' : 'Up to date'}</span>` : ''}
             </div>
           </div>
           <div class="recipe-meta">
-            <span><strong>Code:</strong> ${code}</span>
-            <span><strong>Number:</strong> ${number}</span>
-            <span><strong>Created:</strong> ${new Date(dateCreated).toISOString()}</span>
-            <span><strong>Updated:</strong> ${new Date(dateUpdated).toISOString()}</span>
+            <span class="recipe-date"><strong>CalcMenu</strong> ${formatShortDate(dateUpdated)}</span>
+            ${lastWeekView ? `<span class="recipe-date"><strong>Website</strong> ${formatShortDate(indexDateUpdated)}</span>` : ''}
           </div>
           ${brands.length > 0 ? `
             <div class="recipe-brands">
@@ -1803,7 +1933,17 @@ export async function displayResults(data, rawXml) {
       // Make the content clickable (not the checkbox)
       const recipeContent = recipeItem.querySelector('.recipe-content');
       recipeContent.style.cursor = 'pointer';
-      const detailUrl = `?user=${encodeURIComponent(params.user)}&pw=${encodeURIComponent(params.pw)}&date=${encodeURIComponent(params.date)}&recipe=${encodeURIComponent(number)}&name=${encodeURIComponent(name)}&status=${encodeURIComponent(status)}&dateCreated=${encodeURIComponent(dateCreated)}&dateUpdated=${encodeURIComponent(dateUpdated)}`;
+      const detailParams = new URLSearchParams();
+      detailParams.set('user', params.user);
+      detailParams.set('pw', params.pw);
+      if (params.view) detailParams.set('view', params.view);
+      if (params.date && !lastWeekView) detailParams.set('date', params.date);
+      detailParams.set('recipe', number);
+      detailParams.set('name', name);
+      detailParams.set('status', status);
+      detailParams.set('dateCreated', dateCreated);
+      detailParams.set('dateUpdated', dateUpdated);
+      const detailUrl = `?${detailParams.toString()}`;
       recipeContent.addEventListener('click', () => {
         window.location.href = detailUrl;
       });
@@ -1815,10 +1955,15 @@ export async function displayResults(data, rawXml) {
         updateBulkSyncButton();
       });
 
-      // Restore checkbox state from localStorage
-      const savedState = loadCheckboxState();
-      if (savedState[number]) {
-        checkbox.checked = true;
+      if (lastWeekView) {
+        checkbox.checked = needsSync;
+        saveCheckboxState(number, needsSync);
+      } else {
+        // Restore checkbox state from localStorage
+        const savedState = loadCheckboxState();
+        if (savedState[number]) {
+          checkbox.checked = true;
+        }
       }
 
       recipeList.appendChild(recipeItem);
@@ -1965,14 +2110,15 @@ function filterRecipes(searchTerm) {
 
     // Get original text (store it on first run)
     if (!checkbox.dataset.originalName) {
-      checkbox.dataset.originalName = titleEl.textContent;
+      checkbox.dataset.originalName = checkbox.dataset.recipeName || titleEl.textContent;
     }
-    const { originalName } = checkbox.dataset;
+    const name = checkbox.dataset.recipeName || checkbox.dataset.originalName;
+    const number = checkbox.dataset.recipeNumber || '';
 
     // Collect all searchable text
     const metaText = metaEl ? metaEl.textContent : '';
     const brandText = Array.from(brandEls).map((b) => b.textContent).join(' ');
-    const searchableText = `${originalName} ${metaText} ${brandText}`.toLowerCase();
+    const searchableText = `${name} ${number} ${metaText} ${brandText}`.toLowerCase();
 
     if (!term || searchableText.includes(term)) {
       item.classList.remove('hidden');
@@ -1980,14 +2126,14 @@ function filterRecipes(searchTerm) {
 
       // Apply highlighting if there's a search term
       if (term) {
-        titleEl.innerHTML = highlightText(originalName, term);
+        titleEl.innerHTML = buildRecipeTitleHtml(name, number, term);
       } else {
-        titleEl.textContent = originalName;
+        titleEl.innerHTML = buildRecipeTitleHtml(name, number);
       }
     } else {
       item.classList.add('hidden');
       // Reset highlighting when hidden
-      titleEl.textContent = originalName;
+      titleEl.innerHTML = buildRecipeTitleHtml(name, number);
     }
   });
 
@@ -2021,7 +2167,8 @@ export async function makeApiCallFromParams() {
   submitBtn.disabled = true;
 
   try {
-    const xmlResponse = await fetchRecipes(params.user, params.pw, params.date);
+    const dateToUse = params.date || (isLastWeekView() ? getDateSevenDaysAgoISO() : '');
+    const xmlResponse = await fetchRecipes(params.user, params.pw, dateToUse);
     await displayResults(null, xmlResponse);
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -2135,12 +2282,11 @@ export async function init() {
   const backBtn = document.getElementById('backToList');
   if (backBtn) {
     backBtn.addEventListener('click', () => {
-      const url = `?user=${encodeURIComponent(params.user)}&pw=${encodeURIComponent(params.pw)}`;
-      const dateParam = params.date ? `&date=${encodeURIComponent(params.date)}` : '';
-      window.location.href = url + dateParam;
+      window.location.href = buildListUrlParams();
     });
   }
 
+  applyLastWeekViewUI();
   initializeForm();
 
   // Check if we should display recipe details or list
