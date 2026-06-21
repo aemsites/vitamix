@@ -1301,7 +1301,18 @@ async function simulatePDPPreview() {
     const corsProxy = 'https://fcors.org/?url=';
     const corsKey = '&key=Mg23N96GgR8O3NjU';
     const fullUrl = `https://main--vitamix--aemsites.aem.network${url}`;
-    return fetch(`${corsProxy}${encodeURIComponent(fullUrl)}${corsKey}`);
+    const { origin } = window.location;
+    const staging = (
+      origin.endsWith('.aem.page')
+      || origin === 'http://localhost:3000'
+      || window.location.search.includes('stage=true')
+    ) && !window.location.search.includes('stage=false');
+
+    return fetch(`${corsProxy}${encodeURIComponent(fullUrl)}${corsKey}`, {
+      headers: {
+        ...(staging ? { 'x-env': 'stage' } : {}),
+      },
+    });
   };
   const { pathname } = new URL(window.location.href);
   const resp = await corsProxyFetch(pathname);
