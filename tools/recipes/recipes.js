@@ -343,6 +343,21 @@ function normalizeImporterAssetName(name) {
     .toLowerCase();
 }
 
+function getImporterListItemFilename(item) {
+  if (item.path) {
+    return item.path.split('/').pop() || '';
+  }
+
+  const name = item.name?.replace(/^.*\//, '') || '';
+  if (!name) return '';
+
+  if (item.ext && !name.includes('.')) {
+    return `${name}.${item.ext}`;
+  }
+
+  return name;
+}
+
 async function loadImporterAssetIndex(daFetch, context) {
   if (importerAssetIndexCache) return importerAssetIndexCache;
 
@@ -360,11 +375,11 @@ async function loadImporterAssetIndex(daFetch, context) {
     const items = await resp.json();
     const index = new Map();
     (Array.isArray(items) ? items : []).forEach((item) => {
-      const rawName = item.name || item.path?.split('/').pop() || '';
-      if (!rawName) return;
-      const lookupKey = normalizeImporterAssetName(rawName);
+      const filename = getImporterListItemFilename(item);
+      if (!filename) return;
+      const lookupKey = normalizeImporterAssetName(filename);
       if (lookupKey) {
-        index.set(lookupKey, rawName.replace(/^.*\//, ''));
+        index.set(lookupKey, filename);
       }
     });
 
