@@ -195,3 +195,28 @@
   font-size: 13px;
   word-break: break-all;
 }
+
+.customers-order-open-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: #2c6ecb;
+  cursor: pointer;
+  text-align: left;
+}
+
+.customers-order-open-btn:hover .customers-order-number-code,
+.customers-order-open-btn:focus-visible .customers-order-number-code {
+  text-decoration: underline;
+}
+
+.customers-order-open-btn .customers-order-number-code {
+  color: inherit;
+}
+
+.customers-order-open-btn:focus-visible {
+  outline: 2px solid #2c6ecb;
+  outline-offset: 2px;
+  border-radius: 3px;
+}

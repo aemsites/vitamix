@@ -12,6 +12,7 @@ import { openJsonEditDialog } from './commerce-json-edit-dialog.js';
 import { PB_ORG, PB_SITE } from './commerce-pbus-config.js';
 import { escapeHtml, showToast } from './commerce-otp-ui.js';
 import { highlightMatch } from './search-highlight.js';
+import { openOrderById } from './orders-page.js';
 
 function getUrlParam(key) {
   return new URLSearchParams(window.location.search).get(key) || '';
@@ -78,38 +79,30 @@ function formatOrderNumberLabel(orderOrRawId) {
   return short ? formatOrderIdChunks(short) : formatOrderIdChunks(raw);
 }
 
-function orderEmailNorm(o) {
-  const e = o?.customer?.email
-    || o?.customMetadata?.customerEmail
-    || o?.email;
-  return e != null ? String(e).trim().toLowerCase() : '';
-}
-
 /**
- * Order numbers for a customer email from `GET orders` (same list payload as the Orders admin).
+ * Order entries (clickable: `{ id, label }`) from `GET customers/{email}/orders`.
+ * The endpoint already scopes to the customer, so no email matching is needed;
+ * each summary carries the full `id` used to open the order detail dialog.
  * @param {object[]} orders
- * @param {string} email
+ * @returns {{ id: string, label: string }[]}
  */
-function orderDisplayNumbersFromOrdersList(orders, email) {
-  const want = String(email || '').trim().toLowerCase();
-  if (!want || !Array.isArray(orders)) return [];
-  const matches = orders.filter((o) => {
-    const e = orderEmailNorm(o);
-    return e && e === want;
-  });
-  matches.sort((a, b) => {
+function orderEntriesFromCustomerOrders(orders) {
+  if (!Array.isArray(orders)) return [];
+  const sorted = [...orders].sort((a, b) => {
     const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
     const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
     return tb - ta;
   });
-  const labels = matches.map((o) => formatOrderNumberLabel(o)).filter(Boolean);
   const seen = new Set();
   const out = [];
-  labels.forEach((lbl) => {
-    const k = normalizeOrderIdKey(lbl);
-    if (!k || seen.has(k)) return;
+  sorted.forEach((o) => {
+    const id = o && o.id != null ? String(o.id).trim() : '';
+    const label = formatOrderNumberLabel(o);
+    if (!label || label === '—') return;
+    const k = id ? `id:${id}` : `lbl:${normalizeOrderIdKey(label)}`;
+    if (seen.has(k)) return;
     seen.add(k);
-    out.push(lbl);
+    out.push({ id, label });
   });
   return out;
 }
@@ -148,14 +141,23 @@ function embeddedOrderDisplayNumbers(data) {
   return out;
 }
 
-function mergeOrderNumberLists(primary, secondary) {
+/** Embedded labels (non-clickable: no order id) from the customer JSON record. */
+function embeddedOrderEntries(data) {
+  return embeddedOrderDisplayNumbers(data).map((label) => ({ id: '', label }));
+}
+
+/** Merge clickable + embedded entries, deduped by id and by normalized label. */
+function mergeOrderEntries(primary, secondary) {
   const seen = new Set();
   const out = [];
-  [...primary, ...secondary].forEach((lbl) => {
-    const k = normalizeOrderIdKey(lbl);
-    if (!k || seen.has(k)) return;
-    seen.add(k);
-    out.push(lbl);
+  [...primary, ...secondary].forEach((e) => {
+    if (!e || !e.label) return;
+    const lblKey = `lbl:${normalizeOrderIdKey(e.label)}`;
+    const idKey = e.id ? `id:${e.id}` : lblKey;
+    if (seen.has(idKey) || seen.has(lblKey)) return;
+    seen.add(idKey);
+    seen.add(lblKey);
+    out.push(e);
   });
   return out;
 }
@@ -433,7 +435,7 @@ function buildCustomerRichHeader(data) {
   return wrap;
 }
 
-function buildCustomerDetailHumanView(data, orderDisplayNumbers) {
+function buildCustomerDetailHumanView(data, orderEntries, onOpenOrder) {
   const root = document.createElement('div');
   root.className = 'customers-detail-human';
   root.appendChild(buildCustomerRichHeader(data));
@@ -468,22 +470,34 @@ function buildCustomerDetailHumanView(data, orderDisplayNumbers) {
     root.appendChild(sec);
   }
 
-  const orderNums = Array.isArray(orderDisplayNumbers) ? orderDisplayNumbers : [];
+  const orders = Array.isArray(orderEntries) ? orderEntries : [];
   const ordSec = detailSection('Orders');
-  if (!orderNums.length) {
+  if (!orders.length) {
     const p = document.createElement('p');
     p.className = 'orders-detail-empty';
-    p.textContent = 'No orders found for this email in the loaded orders list, and none on the customer record.';
+    p.textContent = 'No orders found for this customer.';
     ordSec.appendChild(p);
   } else {
     const ul = document.createElement('ul');
     ul.className = 'customers-order-number-list';
-    orderNums.forEach((label) => {
+    orders.forEach((entry) => {
       const li = document.createElement('li');
       const code = document.createElement('code');
       code.className = 'customers-order-number-code';
-      code.textContent = label;
-      li.appendChild(code);
+      code.textContent = entry.label;
+      if (entry.id && typeof onOpenOrder === 'function') {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'customers-order-open-btn';
+        btn.setAttribute('aria-label', `Open order ${entry.label}`);
+        btn.appendChild(code);
+        btn.addEventListener('click', () => {
+          onOpenOrder(entry.id);
+        });
+        li.appendChild(btn);
+      } else {
+        li.appendChild(code);
+      }
       ul.appendChild(li);
     });
     ordSec.appendChild(ul);
@@ -495,10 +509,17 @@ function buildCustomerDetailHumanView(data, orderDisplayNumbers) {
 
 function openCustomerDetailModal(
   customerData,
-  { email, onRefresh, orderDisplayNumbers = [] } = {},
+  { email, onRefresh, orderEntries = [] } = {},
 ) {
   const dialog = document.createElement('dialog');
   dialog.className = 'customers-detail-dialog coupons-detail-dialog';
+
+  const openOrder = (orderId) => {
+    if (!orderId) return;
+    openOrderById(orderId, { onEditSaved: onRefresh }).catch((err) => {
+      showToast(err.message || 'Failed to load order', 'error');
+    });
+  };
 
   const toolbar = document.createElement('div');
   toolbar.className = 'commerce-detail-modal-toolbar';
@@ -524,7 +545,7 @@ function openCustomerDetailModal(
 
   const header = createDetailModalHeaderCloseAndJson({
     bodyHost,
-    getHumanNode: () => buildCustomerDetailHumanView(customerData, orderDisplayNumbers),
+    getHumanNode: () => buildCustomerDetailHumanView(customerData, orderEntries, openOrder),
     getJsonValue: () => customerData,
     onClose: shut,
   });
@@ -568,11 +589,11 @@ function openCustomerDetailModal(
 
 async function viewCustomer(email, rowFallback, onRefresh) {
   let data = rowFallback;
-  let ordersList = [];
+  let customerOrders = [];
   try {
     const [custResp, ordResp] = await Promise.all([
       apiFetch(PB_ORG, PB_SITE, `customers/${encodeURIComponent(email)}`, { method: 'GET' }),
-      apiFetch(PB_ORG, PB_SITE, 'orders', { method: 'GET' }),
+      apiFetch(PB_ORG, PB_SITE, `customers/${encodeURIComponent(email)}/orders`, { method: 'GET' }),
     ]);
     if (custResp.ok) {
       const raw = await custResp.json();
@@ -581,17 +602,17 @@ async function viewCustomer(email, rowFallback, onRefresh) {
     if (ordResp.ok) {
       const ordJson = await ordResp.json();
       const list = ordJson.orders || ordJson || [];
-      if (Array.isArray(list)) ordersList = list;
+      if (Array.isArray(list)) customerOrders = list;
     }
   } catch {
     /* use fallback */
   }
 
-  const fromOrders = orderDisplayNumbersFromOrdersList(ordersList, email);
-  const embedded = embeddedOrderDisplayNumbers(data);
-  const merged = mergeOrderNumberLists(fromOrders, embedded);
+  const fromOrders = orderEntriesFromCustomerOrders(customerOrders);
+  const embedded = embeddedOrderEntries(data);
+  const merged = mergeOrderEntries(fromOrders, embedded);
 
-  openCustomerDetailModal(data, { email, onRefresh, orderDisplayNumbers: merged });
+  openCustomerDetailModal(data, { email, onRefresh, orderEntries: merged });
 }
 
 function renderTable(wrap, displayed, query, onEditSaved) {

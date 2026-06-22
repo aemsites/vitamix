@@ -962,7 +962,7 @@ function buildJournalHumanView(data) {
   return root;
 }
 
-function showOrderDialog(order, { onEditSaved } = {}) {
+export function showOrderDialog(order, { onEditSaved } = {}) {
   let orderPayload = order;
   const orderId = resolveOrderId(orderPayload);
   let isJournalView = false;
@@ -1095,6 +1095,20 @@ function showOrderDialog(order, { onEditSaved } = {}) {
   dialog.showModal();
 }
 
+/**
+ * Fetch a full order by id and open the shared order detail dialog. Reused by
+ * the customers admin so a customer's order opens the same pop-up as the
+ * orders list.
+ * @param {string} orderId
+ * @param {{ onEditSaved?: () => (void | Promise<void>) }} [opts]
+ */
+export async function openOrderById(orderId, { onEditSaved } = {}) {
+  const resp = await apiFetch(PB_ORG, PB_SITE, `orders/${encodeURIComponent(orderId)}`, { method: 'GET' });
+  if (!resp.ok) throw new Error(await readRespError(resp));
+  const orderData = await resp.json();
+  showOrderDialog(orderData, { onEditSaved });
+}
+
 function fillStateSelect(select, states, current) {
   select.innerHTML = '';
   const all = document.createElement('option');
@@ -1190,10 +1204,7 @@ function renderTable(wrap, orders, query, onEditSaved) {
       const id = row.getAttribute('data-id');
       if (!id) return;
       try {
-        const resp = await apiFetch(PB_ORG, PB_SITE, `orders/${encodeURIComponent(id)}`, { method: 'GET' });
-        if (!resp.ok) throw new Error(await readRespError(resp));
-        const orderData = await resp.json();
-        showOrderDialog(orderData, { onEditSaved });
+        await openOrderById(id, { onEditSaved });
       } catch (err) {
         showToast(`Failed to load order: ${err.message}`, 'error');
       }
