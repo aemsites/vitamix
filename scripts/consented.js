@@ -6,6 +6,8 @@ import {
   installAnalyticsTrackingServers,
 } from './consented/instrumentation-lib.js';
 
+document.body.classList.add('consented');
+
 // add delayed functionality here
 window.config = {
   POOLID: 'us-east-1:d54ecd7d-db6e-456d-bf35-d26346122a63',
