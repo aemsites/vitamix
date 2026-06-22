@@ -97,10 +97,12 @@
   height: 100%;
   background: -webkit-gradient(linear, left top, right bottom, 
     color-stop(0%, #fff0), 
-    color-stop(48%, #fff0), 
-    color-stop(48%, #ff5216), 
-    color-stop(52%, #ff5216), 
-    color-stop(52%, #fff0), 
+    color-stop(47%, #fff0), 
+    color-stop(48%, #fff), 
+    color-stop(49.5%, #ff5216), 
+    color-stop(50.5%, #ff5216), 
+    color-stop(52%, #fff), 
+    color-stop(53%, #fff0), 
     color-stop(100%, #fff0)
   );
 }
