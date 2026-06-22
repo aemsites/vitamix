@@ -415,6 +415,14 @@ async function loadImporterAssetIndex(daFetch, context) {
   }
 }
 
+function resolveAbsoluteUrl(base, location) {
+  try {
+    return new URL(location, base).href;
+  } catch {
+    return location;
+  }
+}
+
 async function resolveRedirectLocation(url) {
   if (!url) return '';
 
@@ -423,12 +431,15 @@ async function resolveRedirectLocation(url) {
       const resp = await fetchViaFcors(url, { revealHeaders: true });
       if (resp.ok) {
         const data = await resp.json();
-        const status = data.status || data.statusCode;
+        const status = Number(data.status ?? data.statusCode ?? 0);
         const locationHeader = data.headers?.find((h) => h.name.toLowerCase() === 'location');
-        if (locationHeader?.value && status >= 300 && status < 400) {
-          return locationHeader.value;
+        if (locationHeader?.value) {
+          const resolved = resolveAbsoluteUrl(url, locationHeader.value);
+          if (!status || (status >= 300 && status < 400)) {
+            return resolved;
+          }
         }
-        if (data.url) return data.url;
+        if (data.url) return resolveAbsoluteUrl(url, data.url);
       }
     } catch {
       // fall through to direct fetch
@@ -439,13 +450,56 @@ async function resolveRedirectLocation(url) {
     const resp = await fetch(url, { redirect: 'manual' });
     if (resp.status === 301 || resp.status === 302 || resp.status === 307 || resp.status === 308) {
       const location = resp.headers.get('Location');
-      if (location) return location;
+      if (location) return resolveAbsoluteUrl(url, location);
     }
     if (resp.ok) return url;
   } catch {
     // CORS may prevent reading redirect headers in the browser
   }
   return url;
+}
+
+async function lookupImporterImageUrl(recipeNumber, recipeName, daToken, daFetch, context) {
+  if (!daToken || !daFetch) return '';
+
+  const importerIndex = await loadImporterAssetIndex(daFetch, context);
+  if (!importerIndex?.size) return '';
+
+  const { byNumber } = await getRecipeIndexCache();
+  const entry = byNumber.get(recipeNumber.toUpperCase());
+  const slug = getRecipeSlugFromEntry(entry, recipeName, recipeNumber);
+  const assetName = importerIndex.get(getImporterAssetLookupKey(slug));
+  if (!assetName) return '';
+
+  return resolveImporterPreviewImageUrl(assetName, daToken);
+}
+
+async function fetchRecipeImageWithFallback(recipeNumber, kebabName, recipeName, options = {}) {
+  const { onLog, daToken, daFetch, daContext } = options;
+
+  const indexImage = await fetchRecipeImageFromIndex(recipeNumber, kebabName, recipeName, onLog);
+  if (indexImage) return indexImage;
+
+  if (!daToken || !daFetch) return '';
+
+  onLog?.('  Checking DA importer folder for image...', 'info');
+  try {
+    const importerImage = await lookupImporterImageUrl(
+      recipeNumber,
+      recipeName,
+      daToken,
+      daFetch,
+      daContext,
+    );
+    if (importerImage) {
+      onLog?.('  ✓ Image found in DA importer folder', 'success');
+      return importerImage;
+    }
+    onLog?.('  ⚠ No matching image in DA importer folder', 'warning');
+  } catch (error) {
+    onLog?.(`  ⚠ DA importer image lookup failed: ${error.message}`, 'warning');
+  }
+  return '';
 }
 
 async function resolveImporterPreviewImageUrl(assetName, daToken) {
@@ -498,19 +552,11 @@ async function resolveImporterThumbnails(recipes, indexEntriesByNumber) {
   const sdk = await loadDaSdkOptional();
   if (!sdk?.token || !sdk.actions?.daFetch) return thumbnails;
 
-  const importerIndex = await loadImporterAssetIndex(sdk.actions.daFetch, sdk.context);
-  if (!importerIndex?.size) return thumbnails;
-
   await Promise.all(unresolved.map(async (recipe) => {
     const number = recipe.getAttribute('Number');
     const name = recipe.getAttribute('Name');
-    const entry = indexEntriesByNumber.get(number.toUpperCase());
-    const slug = getRecipeSlugFromEntry(entry, name, number);
-    const assetKey = getImporterAssetLookupKey(slug);
-    const assetName = importerIndex.get(assetKey);
-    if (!assetName) return;
 
-    const url = await resolveImporterPreviewImageUrl(assetName, sdk.token);
+    const url = await lookupImporterImageUrl(number, name, sdk.token, sdk.actions.daFetch, sdk.context);
     if (url) {
       thumbnails.set(number, { url, isImporter: true });
     }
@@ -950,6 +996,7 @@ export async function fetchRecipeDetailsForSync(
   recipeStatus,
   dateCreated,
   dateUpdated,
+  daOptions = {},
 ) {
   addLogEntry(`Fetching details for "${recipeName}" (${recipeNumber})...`, 'info');
 
@@ -1001,7 +1048,12 @@ export async function fetchRecipeDetailsForSync(
 
   const kebabName = toKebabName(xmlRecipeName);
 
-  const recipeImageSrc = await fetchRecipeImageFromIndex(recipeNumber, kebabName, xmlRecipeName, addLogEntry);
+  const recipeImageSrc = await fetchRecipeImageWithFallback(
+    recipeNumber,
+    kebabName,
+    xmlRecipeName,
+    { onLog: addLogEntry, ...daOptions },
+  );
 
   // Extract metadata
   let totalTime = '';
@@ -1434,6 +1486,7 @@ export async function bulkSyncWithDA() {
           recipeStatus,
           dateCreated,
           dateUpdated,
+          { daToken, daFetch, daContext },
         );
 
         // Sync with DA
