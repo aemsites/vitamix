@@ -20,6 +20,12 @@ const LOCALES = [{
 }];
 
 let daSdkPromise = null;
+const DA_SDK_TIMEOUT_MS = 2000;
+
+function isStandaloneDevHost() {
+  const { hostname } = window.location;
+  return hostname === 'localhost' || hostname === '127.0.0.1';
+}
 
 /** DA SDK blocks on postMessage when not embedded in DA; load lazily for sync only. */
 async function loadDaSdk() {
@@ -31,6 +37,22 @@ async function loadDaSdk() {
     });
   }
   return daSdkPromise;
+}
+
+/** Returns null instead of blocking forever when DA is unavailable. */
+async function loadDaSdkOptional(timeoutMs = DA_SDK_TIMEOUT_MS) {
+  if (isStandaloneDevHost()) return null;
+
+  try {
+    return await Promise.race([
+      loadDaSdk(),
+      new Promise((resolve) => {
+        setTimeout(() => resolve(null), timeoutMs);
+      }),
+    ]);
+  } catch {
+    return null;
+  }
 }
 
 const AEM_ORIGIN = 'https://main--vitamix--aemsites.aem.page';
@@ -252,12 +274,13 @@ function buildRecipeTitleHtml(name, number, highlightTerm = '') {
   return `${nameHtml} <span class="recipe-number">(${number})</span>`;
 }
 
-function buildRecipeThumbnailHtml(imageUrl, name) {
+function buildRecipeThumbnailHtml(imageUrl, name, isImporterImage = false) {
   if (!imageUrl) {
     return '<div class="recipe-thumb recipe-thumb-placeholder" aria-hidden="true"></div>';
   }
   const alt = name ? `${name} thumbnail` : '';
-  return `<img class="recipe-thumb" src="${imageUrl}" alt="${alt.replace(/"/g, '&quot;')}" loading="lazy" />`;
+  const importerClass = isImporterImage ? ' recipe-thumb-importer' : '';
+  return `<img class="recipe-thumb${importerClass}" src="${imageUrl}" alt="${alt.replace(/"/g, '&quot;')}" loading="lazy" />`;
 }
 
 function isValidRecipeImage(imageUrl) {
@@ -294,6 +317,164 @@ function resolveRecipeImageUrl(imageUrl) {
 }
 
 const LOCAL_QUERY_INDEX_URL = '/us/en_us/recipes/query-index.json?limit=10000';
+const DA_ADMIN_URL = 'https://admin.da.live';
+const DA_IMPORTER_PATH = '/assets/recipes/importer';
+const IMPORTER_IMAGE_SIZE = '-470x449';
+
+let importerAssetIndexCache = null;
+
+function getRecipeSlugFromEntry(indexEntry, name, recipeNumber) {
+  if (indexEntry?.path) {
+    const slug = indexEntry.path.split('/').pop();
+    if (slug) return slug;
+  }
+  return `${toKebabName(name)}-${recipeNumber.toLowerCase()}`;
+}
+
+function getImporterAssetLookupKey(slug) {
+  return slug.replace(/-r\d+$/i, '').replace(/-/g, '').toLowerCase();
+}
+
+function normalizeImporterAssetName(name) {
+  return name
+    .replace(/\.[^./]+$/, '')
+    .replace(new RegExp(`${IMPORTER_IMAGE_SIZE}$`, 'i'), '')
+    .replace(/-/g, '')
+    .toLowerCase();
+}
+
+async function loadImporterAssetIndex(daFetch, context) {
+  if (importerAssetIndexCache) return importerAssetIndexCache;
+
+  const org = context?.org || 'aemsites';
+  const repo = context?.repo || 'vitamix';
+  const listUrl = `${DA_ADMIN_URL}/list/${org}/${repo}${DA_IMPORTER_PATH}`;
+
+  try {
+    const resp = await daFetch(listUrl);
+    if (!resp.ok) {
+      importerAssetIndexCache = new Map();
+      return importerAssetIndexCache;
+    }
+
+    const items = await resp.json();
+    const index = new Map();
+    (Array.isArray(items) ? items : []).forEach((item) => {
+      const rawName = item.name || item.path?.split('/').pop() || '';
+      if (!rawName) return;
+      const lookupKey = normalizeImporterAssetName(rawName);
+      if (lookupKey) {
+        index.set(lookupKey, rawName.replace(/^.*\//, ''));
+      }
+    });
+
+    importerAssetIndexCache = index;
+    return index;
+  } catch {
+    importerAssetIndexCache = new Map();
+    return importerAssetIndexCache;
+  }
+}
+
+async function resolveRedirectLocation(url) {
+  try {
+    const resp = await fetch(url, { redirect: 'manual' });
+    if (resp.status === 301 || resp.status === 302 || resp.status === 307 || resp.status === 308) {
+      const location = resp.headers.get('Location');
+      if (location) return location;
+    }
+    if (resp.ok) return url;
+  } catch {
+    // CORS may prevent reading redirect headers in the browser
+  }
+  return url;
+}
+
+async function resolveImporterPreviewImageUrl(assetName, daToken) {
+  const assetPath = `${DA_IMPORTER_PATH}/${assetName}`;
+  const previewEndpoint = `https://admin.hlx.page/preview/aemsites/vitamix/main${assetPath}`;
+
+  const previewResp = await fetch(previewEndpoint, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${daToken}` },
+  });
+
+  if (!previewResp.ok) return '';
+
+  try {
+    const json = await previewResp.json();
+    const previewUrl = json?.preview?.url;
+    if (!previewUrl) return '';
+    return resolveRedirectLocation(previewUrl);
+  } catch {
+    return '';
+  }
+}
+
+function resolveIndexThumbnails(recipes, indexEntriesByNumber) {
+  const thumbnails = new Map();
+
+  recipes.forEach((recipe) => {
+    const number = recipe.getAttribute('Number');
+    const entry = indexEntriesByNumber.get(number.toUpperCase());
+    const indexUrl = entry?.image ? resolveRecipeImageUrl(entry.image) : '';
+    if (indexUrl) {
+      thumbnails.set(number, { url: indexUrl, isImporter: false });
+    }
+  });
+
+  return thumbnails;
+}
+
+async function resolveImporterThumbnails(recipes, indexEntriesByNumber) {
+  const thumbnails = new Map();
+  const unresolved = recipes.filter((recipe) => {
+    const number = recipe.getAttribute('Number');
+    const entry = indexEntriesByNumber.get(number.toUpperCase());
+    const indexUrl = entry?.image ? resolveRecipeImageUrl(entry.image) : '';
+    return !indexUrl;
+  });
+
+  if (unresolved.length === 0) return thumbnails;
+
+  const sdk = await loadDaSdkOptional();
+  if (!sdk?.token || !sdk.actions?.daFetch) return thumbnails;
+
+  const importerIndex = await loadImporterAssetIndex(sdk.actions.daFetch, sdk.context);
+  if (!importerIndex?.size) return thumbnails;
+
+  await Promise.all(unresolved.map(async (recipe) => {
+    const number = recipe.getAttribute('Number');
+    const name = recipe.getAttribute('Name');
+    const entry = indexEntriesByNumber.get(number.toUpperCase());
+    const slug = getRecipeSlugFromEntry(entry, name, number);
+    const assetKey = getImporterAssetLookupKey(slug);
+    const assetName = importerIndex.get(assetKey);
+    if (!assetName) return;
+
+    const url = await resolveImporterPreviewImageUrl(assetName, sdk.token);
+    if (url) {
+      thumbnails.set(number, { url, isImporter: true });
+    }
+  }));
+
+  return thumbnails;
+}
+
+function applyImporterThumbnails(recipeList, thumbnails) {
+  thumbnails.forEach((thumbnail, number) => {
+    const recipeItem = recipeList.querySelector(`.recipe-item[data-recipe-number="${number}"]`);
+    if (!recipeItem) return;
+
+    const checkbox = recipeItem.querySelector('.recipe-checkbox');
+    const name = checkbox?.dataset.recipeName || '';
+    const thumbWrap = recipeItem.querySelector('.recipe-thumb-wrap');
+    if (!thumbWrap) return;
+
+    thumbWrap.classList.toggle('recipe-thumb-wrap-importer', thumbnail.isImporter);
+    thumbWrap.innerHTML = buildRecipeThumbnailHtml(thumbnail.url, name, thumbnail.isImporter);
+  });
+}
 
 async function fetchRecipeIndexEntries() {
   const corsProxy = 'https://fcors.org/?url=';
@@ -1866,6 +2047,8 @@ export async function displayResults(data, rawXml) {
     // Clear previous results
     recipeList.innerHTML = '';
 
+    const recipeThumbnails = resolveIndexThumbnails(recipes, indexEntriesByNumber);
+
     // Create list items for each recipe
     recipes.forEach((recipe) => {
       const number = recipe.getAttribute('Number');
@@ -1880,6 +2063,7 @@ export async function displayResults(data, rawXml) {
       // Create recipe item
       const recipeItem = document.createElement('div');
       recipeItem.className = 'recipe-item';
+      recipeItem.dataset.recipeNumber = number;
 
       // Status class
       const statusClass = status.toLowerCase();
@@ -1889,12 +2073,14 @@ export async function displayResults(data, rawXml) {
       const needsSync = lastWeekView
         ? calcMenuIsNewerThanIndex(dateUpdated, indexDateUpdated)
         : false;
-      const imageUrl = indexEntry?.image ? resolveRecipeImageUrl(indexEntry.image) : '';
+      const thumbnail = recipeThumbnails.get(number);
+      const imageUrl = thumbnail?.url || '';
+      const isImporterImage = thumbnail?.isImporter || false;
 
       recipeItem.innerHTML = `
         <input type="checkbox" class="recipe-checkbox" data-recipe-number="${number}" data-recipe-name="${name.replace(/"/g, '&quot;')}" data-recipe-status="${status}" data-date-created="${dateCreated}" data-date-updated="${dateUpdated}" />
-        <div class="recipe-thumb-wrap">
-          ${buildRecipeThumbnailHtml(imageUrl, name)}
+        <div class="recipe-thumb-wrap${isImporterImage ? ' recipe-thumb-wrap-importer' : ''}">
+          ${buildRecipeThumbnailHtml(imageUrl, name, isImporterImage)}
         </div>
         <div class="recipe-content">
           <div class="recipe-header">
@@ -1966,6 +2152,15 @@ export async function displayResults(data, rawXml) {
 
     // Update bulk sync button to reflect restored state
     updateBulkSyncButton();
+
+    if (lastWeekView) {
+      resolveImporterThumbnails(recipes, indexEntriesByNumber)
+        .then((importerThumbnails) => applyImporterThumbnails(recipeList, importerThumbnails))
+        .catch((error) => {
+          // eslint-disable-next-line no-console
+          console.warn('Importer thumbnail lookup failed:', error);
+        });
+    }
   } catch (e) {
     // eslint-disable-next-line no-console
     console.error('Error parsing recipes:', e);

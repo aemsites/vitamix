@@ -592,6 +592,12 @@ pre {
   background: linear-gradient(135deg, #ececec 0%, #d8d8d8 100%);
 }
 
+.recipe-thumb-wrap-importer .recipe-thumb,
+.recipe-thumb.recipe-thumb-importer {
+  border: 3px solid #28a745;
+  box-sizing: border-box;
+}
+
 .recipe-content {
   flex: 1;
   min-width: 0;
