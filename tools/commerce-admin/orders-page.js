@@ -306,6 +306,13 @@ function paymentSummaryLine(payment) {
   return bits.length ? bits.join(' · ') : '—';
 }
 
+function customerTypeLabel(customerType) {
+  const type = customerType != null ? String(customerType).trim().toLowerCase() : '';
+  if (type === 'registered') return 'Registered User';
+  if (type === 'guest') return 'Guest';
+  return '';
+}
+
 function formatAddressLines(addr) {
   if (!addr || typeof addr !== 'object') return '';
   const lines = [];
@@ -484,6 +491,8 @@ function buildOrderRichHeader(o) {
     summarizeOrderMonetaryTotal(o),
   ));
   stats.appendChild(statBlock('Payment', paymentSummaryLine(o.payment)));
+  const customerType = customerTypeLabel(o.customerType);
+  if (customerType) stats.appendChild(statBlock('Customer type', customerType));
   wrap.appendChild(stats);
 
   const pills = document.createElement('div');
