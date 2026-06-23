@@ -924,8 +924,8 @@ export default async function decorate(widget) {
   const productTypeSelect = widget.querySelector('#productType');
   if (productTypeSelect) {
     const opts = productTypeSelect.querySelectorAll('option');
-    if (opts[0]) opts[0].textContent = labels.householdProducts ?? 'Commercial Products';
-    if (opts[1]) opts[1].textContent = labels.commercialProducts ?? 'Household Products';
+    if (opts[0]) opts[0].textContent = labels.commercialProducts ?? 'Commercial Products';
+    if (opts[1]) opts[1].textContent = labels.householdProducts ?? 'Household Products';
     if (opts[2]) opts[2].textContent = labels.demonstrations ?? 'Demonstrations';
   }
   const submitBtn = widget.querySelector('form button[type="submit"]');
