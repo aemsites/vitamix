@@ -1242,7 +1242,7 @@ async function init() {
   }
 
   const initialQ = getUrlParam('q');
-  const initialState = getUrlParam('state') || 'payment_completed';
+  const initialState = getUrlParam('state') || '';
   const initialSort = getUrlParam('sort') === 'oldest' ? 'oldest' : 'newest';
 
   search.value = initialQ;
