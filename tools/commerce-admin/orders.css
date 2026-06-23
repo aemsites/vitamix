@@ -126,6 +126,44 @@
   background: #fafafa;
 }
 
+.orders-detail-totals {
+  margin-left: auto;
+  margin-top: 12px;
+  width: 100%;
+  max-width: 340px;
+  font-size: 13px;
+  color: #202223;
+}
+
+.orders-detail-totals-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 4px 0;
+  text-align: right;
+}
+
+.orders-detail-totals-row > span:first-child,
+.orders-detail-totals-row > strong:first-child {
+  color: #6d7175;
+}
+
+.orders-detail-totals-discount > span:last-child {
+  color: #007a5c;
+}
+
+.orders-detail-totals-final {
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px solid #e1e3e5;
+  font-size: 15px;
+}
+
+.orders-detail-totals-final > strong:first-child {
+  color: #202223;
+}
+
 .orders-data-table th:first-child,
 .orders-data-table td:first-child {
   min-width: 9rem;
