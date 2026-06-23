@@ -189,6 +189,16 @@
   color: #202223;
 }
 
+.orders-email {
+  display: inline-block;
+  max-width: 16rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+  color: #202223;
+}
+
 .orders-detail-rich .coupons-modal-idline code.orders-detail-id-code {
   font-size: 1.05rem;
   font-weight: 600;

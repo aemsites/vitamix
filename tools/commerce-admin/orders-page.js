@@ -116,6 +116,7 @@ function filterByQuery(orders, q) {
     if (nNeedle && normalizeOrderIdKey(o.id).includes(nNeedle)) return true;
     if (nNeedle && normalizeOrderIdKey(String(o.friendlyId || '')).includes(nNeedle)) return true;
     if (nNeedle && normalizeOrderIdKey(orderIdForDisplay(o)).includes(nNeedle)) return true;
+    if ((o.email || '').toLowerCase().includes(needle)) return true;
     if ((o.customer?.email || '').toLowerCase().includes(needle)) return true;
     if ((o.customMetadata?.customerEmail || '').toLowerCase().includes(needle)) return true;
     if ((o.state || '').toLowerCase().includes(needle)) return true;
@@ -1269,6 +1270,7 @@ function renderTable(wrap, orders, query, onEditSaved) {
       <thead>
         <tr>
           <th>Order ID</th>
+          <th>Email</th>
           <th>State</th>
           <th>Items</th>
           <th>Subtotal</th>
@@ -1307,9 +1309,15 @@ function renderTable(wrap, orders, query, onEditSaved) {
       ? String(o.paymentMethod).trim()
       : '—';
     const marketHtml = o.country ? commerceMarketEmojiHtml(o.country) : '—';
+    const emailRaw = o.email || o.customer?.email || '';
+    const emailStr = String(emailRaw).trim();
+    const emailHtml = emailStr
+      ? `<span class="orders-email">${highlightMatch(emailStr, query)}</span>`
+      : '—';
     return `
           <tr class="orders-row-open" data-id="${escapeHtml(id)}" tabindex="0" role="button" aria-label="Open order ${escapeHtml(formattedId)}">
             <td><code class="orders-id"${titleAttr}>${highlightOrderIdCell(formattedId, compactId, query)}</code></td>
+            <td>${emailHtml}</td>
             <td><span class="orders-badge ${orderStateBadgeClass(o.state)}">${highlightMatch(String(o.state || 'pending'), query)}</span></td>
             <td>${highlightMatch(itemCount, query)}</td>
             <td>${highlightMatch(subtotalStr, query)}</td>
