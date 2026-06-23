@@ -127,10 +127,8 @@
 }
 
 .orders-detail-totals {
-  margin-left: auto;
   margin-top: 12px;
   width: 100%;
-  max-width: 340px;
   font-size: 13px;
   color: #202223;
 }
@@ -141,7 +139,6 @@
   align-items: baseline;
   gap: 16px;
   padding: 4px 0;
-  text-align: right;
 }
 
 .orders-detail-totals-row > span:first-child,
