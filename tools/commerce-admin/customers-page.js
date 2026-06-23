@@ -10,9 +10,9 @@ import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
 import { createDetailModalHeaderCloseAndJson } from './commerce-detail-modal-json.js';
 import { openJsonEditDialog } from './commerce-json-edit-dialog.js';
 import { PB_ORG, PB_SITE } from './commerce-pbus-config.js';
-import { escapeHtml, showToast } from './commerce-otp-ui.js';
+import { escapeHtml, showToast, commerceMarketEmojiHtml } from './commerce-otp-ui.js';
 import { highlightMatch } from './search-highlight.js';
-import { openOrderById } from './orders-page.js';
+import { openOrderById, orderStateBadgeClass } from './orders-page.js';
 
 function getUrlParam(key) {
   return new URLSearchParams(window.location.search).get(key) || '';
@@ -80,13 +80,14 @@ function formatOrderNumberLabel(orderOrRawId) {
 }
 
 /**
- * Order entries (clickable: `{ id, label }`) from `GET customers/{email}/orders`.
- * The endpoint already scopes to the customer, so no email matching is needed;
- * each summary carries the full `id` used to open the order detail dialog.
+ * Order summaries from `GET customers/{email}/orders`, sorted newest-first and
+ * deduped by id. The endpoint already scopes to the customer, so no email
+ * matching is needed; each summary carries the full `id` used to open the order
+ * detail dialog plus list metadata (state, itemCount, total, country, createdAt).
  * @param {object[]} orders
- * @returns {{ id: string, label: string }[]}
+ * @returns {object[]}
  */
-function orderEntriesFromCustomerOrders(orders) {
+function orderSummariesFromCustomerOrders(orders) {
   if (!Array.isArray(orders)) return [];
   const sorted = [...orders].sort((a, b) => {
     const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -96,13 +97,12 @@ function orderEntriesFromCustomerOrders(orders) {
   const seen = new Set();
   const out = [];
   sorted.forEach((o) => {
-    const id = o && o.id != null ? String(o.id).trim() : '';
-    const label = formatOrderNumberLabel(o);
-    if (!label || label === '—') return;
-    const k = id ? `id:${id}` : `lbl:${normalizeOrderIdKey(label)}`;
-    if (seen.has(k)) return;
-    seen.add(k);
-    out.push({ id, label });
+    if (!o || typeof o !== 'object') return;
+    const id = o.id != null ? String(o.id).trim() : '';
+    if (!id) return;
+    if (seen.has(id)) return;
+    seen.add(id);
+    out.push(o);
   });
   return out;
 }
@@ -137,27 +137,6 @@ function embeddedOrderDisplayNumbers(data) {
     if (!k || seen.has(k)) return;
     seen.add(k);
     out.push(lbl);
-  });
-  return out;
-}
-
-/** Embedded labels (non-clickable: no order id) from the customer JSON record. */
-function embeddedOrderEntries(data) {
-  return embeddedOrderDisplayNumbers(data).map((label) => ({ id: '', label }));
-}
-
-/** Merge clickable + embedded entries, deduped by id and by normalized label. */
-function mergeOrderEntries(primary, secondary) {
-  const seen = new Set();
-  const out = [];
-  [...primary, ...secondary].forEach((e) => {
-    if (!e || !e.label) return;
-    const lblKey = `lbl:${normalizeOrderIdKey(e.label)}`;
-    const idKey = e.id ? `id:${e.id}` : lblKey;
-    if (seen.has(idKey) || seen.has(lblKey)) return;
-    seen.add(idKey);
-    seen.add(lblKey);
-    out.push(e);
   });
   return out;
 }
@@ -435,7 +414,87 @@ function buildCustomerRichHeader(data) {
   return wrap;
 }
 
-function buildCustomerDetailHumanView(data, orderEntries, onOpenOrder) {
+/** Money cell like the orders admin: `$<value>` or em dash. */
+function formatMoneyCell(value) {
+  if (value == null || String(value).trim() === '') return '—';
+  return `$${String(value).trim()}`;
+}
+
+/** Localized created date for an order summary. */
+function orderCreatedCell(o) {
+  if (!o || o.createdAt == null || o.createdAt === '') return '—';
+  const d = new Date(o.createdAt);
+  return Number.isNaN(d.getTime()) ? String(o.createdAt) : d.toLocaleString();
+}
+
+/**
+ * Orders table for the customer modal, mirroring the Orders admin look (badge,
+ * market flag) but trimmed to a single-customer context. Rows open the shared
+ * order detail dialog.
+ * @param {object[]} orders
+ * @param {(id: string) => void} onOpenOrder
+ */
+function buildCustomerOrdersTable(orders, onOpenOrder) {
+  const table = document.createElement('table');
+  table.className = 'customers-orders-table orders-data-table';
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th>Order</th>
+        <th>State</th>
+        <th>Items</th>
+        <th>Total</th>
+        <th>Market</th>
+        <th>Created</th>
+      </tr>
+    </thead>`;
+  const tbody = document.createElement('tbody');
+
+  orders.forEach((o) => {
+    const id = o.id != null ? String(o.id).trim() : '';
+    const shortId = orderIdForDisplay(o) || id;
+    const formattedId = formatOrderIdChunks(shortId);
+    const state = String(o.state || 'pending');
+    let itemCount = '—';
+    if (o.itemCount != null && String(o.itemCount).trim() !== '') itemCount = String(o.itemCount);
+    const total = formatMoneyCell(o.total != null && String(o.total).trim() !== '' ? o.total : o.subtotal);
+    const marketHtml = o.country ? commerceMarketEmojiHtml(o.country) : '—';
+
+    const tr = document.createElement('tr');
+    const clickable = Boolean(id) && typeof onOpenOrder === 'function';
+    if (clickable) {
+      tr.className = 'customers-orders-row-open';
+      tr.setAttribute('role', 'button');
+      tr.setAttribute('tabindex', '0');
+      tr.setAttribute('aria-label', `Open order ${formattedId}`);
+    }
+    const titleAttr = id && normalizeOrderIdKey(shortId) !== normalizeOrderIdKey(id)
+      ? ` title="${escapeHtml(id)}"`
+      : '';
+    tr.innerHTML = `
+      <td><code class="orders-id"${titleAttr}>${escapeHtml(formattedId)}</code></td>
+      <td><span class="orders-badge ${orderStateBadgeClass(state)}">${escapeHtml(state)}</span></td>
+      <td>${escapeHtml(itemCount)}</td>
+      <td>${escapeHtml(total)}</td>
+      <td>${marketHtml}</td>
+      <td>${escapeHtml(orderCreatedCell(o))}</td>`;
+    if (clickable) {
+      tr.addEventListener('click', () => onOpenOrder(id));
+      tr.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onOpenOrder(id);
+        }
+      });
+    }
+    tbody.appendChild(tr);
+  });
+
+  table.appendChild(tbody);
+  return table;
+}
+
+function buildCustomerDetailHumanView(data, orderData, onOpenOrder) {
   const root = document.createElement('div');
   root.className = 'customers-detail-human';
   root.appendChild(buildCustomerRichHeader(data));
@@ -470,37 +529,38 @@ function buildCustomerDetailHumanView(data, orderEntries, onOpenOrder) {
     root.appendChild(sec);
   }
 
-  const orders = Array.isArray(orderEntries) ? orderEntries : [];
+  const orders = orderData && Array.isArray(orderData.orders) ? orderData.orders : [];
+  const embeddedLabels = orderData && Array.isArray(orderData.embeddedLabels)
+    ? orderData.embeddedLabels : [];
   const ordSec = detailSection('Orders');
-  if (!orders.length) {
+  if (orders.length) {
+    const count = document.createElement('p');
+    count.className = 'customers-orders-count';
+    count.textContent = `${orders.length} order${orders.length === 1 ? '' : 's'}`;
+    ordSec.appendChild(count);
+    const wrapEl = document.createElement('div');
+    wrapEl.className = 'customers-orders-table-wrap';
+    wrapEl.appendChild(buildCustomerOrdersTable(orders, onOpenOrder));
+    ordSec.appendChild(wrapEl);
+  } else if (embeddedLabels.length) {
+    /* Fallback: order numbers present on the customer record but not returned by
+       the customer orders endpoint (no metadata for a full table row). */
+    const ul = document.createElement('ul');
+    ul.className = 'customers-order-number-list';
+    embeddedLabels.forEach((label) => {
+      const li = document.createElement('li');
+      const code = document.createElement('code');
+      code.className = 'customers-order-number-code';
+      code.textContent = label;
+      li.appendChild(code);
+      ul.appendChild(li);
+    });
+    ordSec.appendChild(ul);
+  } else {
     const p = document.createElement('p');
     p.className = 'orders-detail-empty';
     p.textContent = 'No orders found for this customer.';
     ordSec.appendChild(p);
-  } else {
-    const ul = document.createElement('ul');
-    ul.className = 'customers-order-number-list';
-    orders.forEach((entry) => {
-      const li = document.createElement('li');
-      const code = document.createElement('code');
-      code.className = 'customers-order-number-code';
-      code.textContent = entry.label;
-      if (entry.id && typeof onOpenOrder === 'function') {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'customers-order-open-btn';
-        btn.setAttribute('aria-label', `Open order ${entry.label}`);
-        btn.appendChild(code);
-        btn.addEventListener('click', () => {
-          onOpenOrder(entry.id);
-        });
-        li.appendChild(btn);
-      } else {
-        li.appendChild(code);
-      }
-      ul.appendChild(li);
-    });
-    ordSec.appendChild(ul);
   }
   root.appendChild(ordSec);
 
@@ -509,7 +569,9 @@ function buildCustomerDetailHumanView(data, orderEntries, onOpenOrder) {
 
 function openCustomerDetailModal(
   customerData,
-  { email, onRefresh, orderEntries = [] } = {},
+  {
+    email, onRefresh, orders = [], embeddedLabels = [],
+  } = {},
 ) {
   const dialog = document.createElement('dialog');
   dialog.className = 'customers-detail-dialog coupons-detail-dialog';
@@ -545,7 +607,11 @@ function openCustomerDetailModal(
 
   const header = createDetailModalHeaderCloseAndJson({
     bodyHost,
-    getHumanNode: () => buildCustomerDetailHumanView(customerData, orderEntries, openOrder),
+    getHumanNode: () => buildCustomerDetailHumanView(
+      customerData,
+      { orders, embeddedLabels },
+      openOrder,
+    ),
     getJsonValue: () => customerData,
     onClose: shut,
   });
@@ -608,11 +674,13 @@ async function viewCustomer(email, rowFallback, onRefresh) {
     /* use fallback */
   }
 
-  const fromOrders = orderEntriesFromCustomerOrders(customerOrders);
-  const embedded = embeddedOrderEntries(data);
-  const merged = mergeOrderEntries(fromOrders, embedded);
+  const orders = orderSummariesFromCustomerOrders(customerOrders);
+  /* Only used when the endpoint returns nothing — order numbers on the record. */
+  const embeddedLabels = orders.length ? [] : embeddedOrderDisplayNumbers(data);
 
-  openCustomerDetailModal(data, { email, onRefresh, orderEntries: merged });
+  openCustomerDetailModal(data, {
+    email, onRefresh, orders, embeddedLabels,
+  });
 }
 
 function renderTable(wrap, displayed, query, onEditSaved) {

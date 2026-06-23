@@ -201,7 +201,7 @@ function formatDateTime(iso) {
 }
 
 /** Distinct badge colors for list + detail (not only success vs default). */
-function orderStateBadgeClass(state) {
+export function orderStateBadgeClass(state) {
   const s = String(state || 'pending').toLowerCase().replace(/\s+/g, '_');
   if (s === 'completed' || s === 'payment_completed' || s === 'fulfilled') return 'orders-badge-success';
   if (s === 'payment_cancelled' || s === 'cancelled' || s === 'canceled' || s === 'abandoned') return 'orders-badge-danger';
