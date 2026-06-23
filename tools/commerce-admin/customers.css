@@ -138,6 +138,11 @@
   font-size: 14px;
 }
 
+/* Wider than the shared coupons dialog to give the orders table room to breathe. */
+.customers-detail-dialog.coupons-detail-dialog {
+  max-width: min(96vw, 940px);
+}
+
 .customers-detail-scroll {
   padding-top: 12px;
 }
