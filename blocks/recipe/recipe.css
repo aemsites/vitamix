@@ -315,7 +315,8 @@ main > .recipe-container.section > .recipe-wrapper {
   background-color: var(--color-charcoal);
 }
 
-.recipe .recipe-toolbar button {
+.recipe .recipe-toolbar button,
+.recipe .recipe-toolbar a.recipe-save {
   display: flex;
   align-items: center;
   gap: var(--spacing-40);
@@ -323,9 +324,11 @@ main > .recipe-container.section > .recipe-wrapper {
   color: var(--color-white);
   font: inherit;
   cursor: pointer;
+  text-decoration: none;
 }
 
-.recipe .recipe-toolbar button img {
+.recipe .recipe-toolbar button img,
+.recipe .recipe-toolbar a.recipe-save img {
   margin-right: 0.5ch;
   width: 30px;
   height: 30px;
@@ -336,12 +339,13 @@ main > .recipe-container.section > .recipe-wrapper {
     padding: var(--spacing-400);
   }
 
-  .recipe .recipe-toolbar button {
+  .recipe .recipe-toolbar button,
+  .recipe .recipe-toolbar a.recipe-save {
     position: relative;
     padding: var(--spacing-60) var(--spacing-80);
   }
 
-  .recipe .recipe-toolbar > button + button::before,
+  .recipe .recipe-toolbar > a.recipe-save + button::before,
   .recipe .recipe-toolbar > button + .recipe-share-wrapper::before {
     content: '';
     position: absolute;
