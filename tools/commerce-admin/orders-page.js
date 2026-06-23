@@ -594,6 +594,120 @@ function discountsValueNode(disc, currency) {
   return ul;
 }
 
+/** Format a numeric money value as `12.34 USD` (currency optional). */
+function formatMoney(n, currency) {
+  if (n == null || Number.isNaN(Number(n))) return '';
+  const amt = Number(n).toFixed(2);
+  return currency ? `${amt} ${currency}` : amt;
+}
+
+/**
+ * Compute the order's monetary breakdown for display, mirroring the canonical
+ * server-side `computeTotal` in helix-commerce-api/src/utils/payment.js — the
+ * same math used for the actual charge and the order confirmation email.
+ *
+ * - `subtotal` is the sum of line `price.final × quantity`.
+ * - `taxAmount` prefers the persisted `estimates.tax.amount`, falling back to
+ *   `subtotal × rate/100` for older orders that only stored a rate.
+ * - A `free_shipping` discount zeroes the shipping line rather than adding a
+ *   cash discount; such rows are excluded from `discountTotal`.
+ * - `total = subtotal − discountTotal + taxAmount + shippingCost`.
+ *
+ * Returns null when there are no line items to summarize.
+ */
+function computeDetailTotals(o) {
+  const items = Array.isArray(o?.items) ? o.items : [];
+  if (!items.length) return null;
+  const currency = orderCurrency(o);
+  const subtotal = items.reduce(
+    (sum, item) => sum + (Number(item?.price?.final) || 0) * (item?.quantity ?? 1),
+    0,
+  );
+
+  const est = o?.estimates;
+  if (!est || typeof est !== 'object') {
+    return {
+      currency,
+      subtotal,
+      taxAmount: 0,
+      shippingCost: 0,
+      discountTotal: 0,
+      freeShipping: false,
+      total: subtotal,
+    };
+  }
+
+  let taxAmount = 0;
+  if (est.tax && typeof est.tax === 'object') {
+    if (est.tax.amount != null && String(est.tax.amount).trim() !== '') {
+      taxAmount = Number(est.tax.amount) || 0;
+    } else if (est.tax.rate != null) {
+      taxAmount = subtotal * (Number(est.tax.rate) / 100);
+    }
+  }
+
+  const discountsList = Array.isArray(est.discounts) ? est.discounts : [];
+  const freeShipping = discountsList.some((d) => d?.freeShipping);
+  const shippingCost = freeShipping ? 0 : (Number(est.shippingMethod?.rate) || 0);
+  const discountTotal = Math.round(
+    discountsList.reduce(
+      (sum, d) => sum + (d?.type === 'free_shipping' ? 0 : (Number(d?.amount) || 0)),
+      0,
+    ) * 100,
+  ) / 100;
+
+  const total = subtotal - discountTotal + taxAmount + shippingCost;
+  return {
+    currency, subtotal, taxAmount, shippingCost, discountTotal, freeShipping, total,
+  };
+}
+
+/**
+ * Build the right-aligned order totals summary (Subtotal, cash discounts,
+ * Shipping, Estimated taxes, Total) shown directly below the line-items table.
+ * Mirrors the storefront order-summary block. Returns null when there are no
+ * items to summarize.
+ */
+function buildOrderTotalsSummary(o) {
+  const t = computeDetailTotals(o);
+  if (!t) return null;
+  const { currency } = t;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'orders-detail-totals';
+
+  const addRow = (label, value, opts = {}) => {
+    const row = document.createElement('div');
+    row.className = 'orders-detail-totals-row';
+    if (opts.final) row.classList.add('orders-detail-totals-final');
+    if (opts.discount) row.classList.add('orders-detail-totals-discount');
+    const l = document.createElement(opts.final ? 'strong' : 'span');
+    l.textContent = label;
+    const v = document.createElement(opts.final ? 'strong' : 'span');
+    v.textContent = value;
+    row.append(l, v);
+    wrap.appendChild(row);
+  };
+
+  addRow('Subtotal', formatMoney(t.subtotal, currency));
+
+  // Per-coupon/cash discount lines (free-shipping-only rows are reflected in the
+  // shipping line instead, so skip them here).
+  const disc = Array.isArray(o?.estimates?.discounts) ? o.estimates.discounts : [];
+  disc.forEach((d) => {
+    if (!d || d.type === 'free_shipping') return;
+    const amt = Number(d.amount);
+    if (Number.isNaN(amt) || amt === 0) return;
+    addRow(discountLabel(d), `-${formatMoney(amt, currency)}`, { discount: true });
+  });
+
+  addRow('Shipping', t.freeShipping || t.shippingCost === 0 ? 'Free' : formatMoney(t.shippingCost, currency));
+  addRow('Estimated taxes', formatMoney(t.taxAmount, currency));
+  addRow('Total', formatMoney(t.total, currency), { final: true });
+
+  return wrap;
+}
+
 function section(title) {
   const sec = document.createElement('section');
   sec.className = 'orders-detail-section';
@@ -747,6 +861,8 @@ function buildOrderHumanView(payload) {
     });
     table.appendChild(tbody);
     sec.appendChild(table);
+    const totals = buildOrderTotalsSummary(o);
+    if (totals) sec.appendChild(totals);
     root.appendChild(sec);
   }
 
