@@ -92,9 +92,46 @@ export function toKebabName(name) {
     .trim();
 }
 
+const UNICODE_FRACTIONS = new Map([
+  ['½', 0.5],
+  ['¼', 0.25],
+  ['¾', 0.75],
+  ['⅓', 1 / 3],
+  ['⅔', 2 / 3],
+  ['⅛', 0.125],
+  ['⅜', 0.375],
+  ['⅝', 0.625],
+  ['⅞', 0.875],
+]);
+
 function parsePositiveQuantity(qty) {
   if (!qty) return null;
-  const num = parseFloat(qty);
+  const trimmed = qty.trim();
+  if (!trimmed) return null;
+
+  const unicodeFraction = UNICODE_FRACTIONS.get(trimmed);
+  if (unicodeFraction !== undefined) return unicodeFraction;
+
+  const mixedUnicode = trimmed.match(/^(\d+)([½¼¾⅓⅔⅛⅜⅝⅞])$/);
+  if (mixedUnicode) {
+    const fraction = UNICODE_FRACTIONS.get(mixedUnicode[2]);
+    if (fraction !== undefined) {
+      return parseInt(mixedUnicode[1], 10) + fraction;
+    }
+  }
+
+  const slashFraction = trimmed.match(/^(\d+)?\s*(\d+)\/(\d+)$/);
+  if (slashFraction) {
+    const whole = slashFraction[1] ? parseInt(slashFraction[1], 10) : 0;
+    const numerator = parseInt(slashFraction[2], 10);
+    const denominator = parseInt(slashFraction[3], 10);
+    if (denominator > 0) {
+      const value = whole + numerator / denominator;
+      return value > 0 ? value : null;
+    }
+  }
+
+  const num = parseFloat(trimmed);
   if (Number.isNaN(num) || num <= 0) return null;
   return num;
 }
@@ -105,6 +142,7 @@ function formatQuantityDisplay(qty, num) {
 
 function formatIngredientLine(ingredient) {
   const quantityImperial = ingredient.querySelector('Quantity_Imperial')?.textContent.trim() || '';
+  const quantityImperialGross = ingredient.querySelector('Quantity_Imperial_Gross')?.textContent.trim() || '';
   const unitImperial = ingredient.querySelector('Unit_Imperial')?.textContent.trim() || '';
   const quantityMetric = ingredient.querySelector('Quantity_Metric')?.textContent.trim() || '';
   const unitMetric = ingredient.querySelector('Unit_Metric')?.textContent.trim() || '';
@@ -112,13 +150,18 @@ function formatIngredientLine(ingredient) {
   const preparation = ingredient.querySelector('Preparation')?.textContent.trim() || '';
   const alternativeIngredient = ingredient.querySelector('AlternativeIngredient')?.textContent.trim() || '';
 
-  const imperialNum = parsePositiveQuantity(quantityImperial);
+  let imperialNum = parsePositiveQuantity(quantityImperial);
+  let imperialDisplay = quantityImperial;
+  if (imperialNum === null && quantityImperialGross) {
+    imperialNum = parsePositiveQuantity(quantityImperialGross);
+    imperialDisplay = quantityImperialGross;
+  }
   const metricNum = parsePositiveQuantity(quantityMetric);
 
   let ingredientStr = '';
 
   if (imperialNum !== null) {
-    ingredientStr += formatQuantityDisplay(quantityImperial, imperialNum);
+    ingredientStr += formatQuantityDisplay(imperialDisplay, imperialNum);
     if (unitImperial) {
       ingredientStr += ` ${unitImperial}`;
     }
