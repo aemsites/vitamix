@@ -83,6 +83,7 @@
       "addressBadge": "Address"
     },
     "ordersEmpty": "No orders yet.",
+    "ordersLoading": "Loading orders…",
     "logout": "Log out",
     "sectionSelectAria": "Account menu",
     "orderMock": {
@@ -200,6 +201,7 @@
       "addressBadge": "Adresse"
     },
     "ordersEmpty": "Aucune commande pour le moment.",
+    "ordersLoading": "Chargement des commandes…",
     "logout": "Se déconnecter",
     "sectionSelectAria": "Menu du compte",
     "orderMock": {
@@ -317,6 +319,7 @@
       "addressBadge": "Dirección"
     },
     "ordersEmpty": "Aún no hay pedidos.",
+    "ordersLoading": "Cargando pedidos…",
     "logout": "Cerrar sesión",
     "sectionSelectAria": "Menú de la cuenta",
     "orderMock": {

@@ -2,7 +2,9 @@ import { loadCSS } from '../../scripts/aem.js';
 import {
   fetchFormsProfile,
   getCustomerAddresses,
+  getCustomerOrders,
   renderAccountAddressList,
+  renderAccountOrderList,
   unwrapPayload,
 } from './account-api.js';
 import { getFormSubmissionUrl, getLocaleAndLanguage } from '../../scripts/scripts.js';
@@ -337,15 +339,45 @@ export default async function decorate(widget) {
   }
 
   const orders = widget.querySelector('.account-panel[data-section="orders"]');
+  const ordersLoadingEl = widget.querySelector('.account-orders-loading');
+  const ordersEmptyEl = widget.querySelector('.account-orders-empty');
+  const ordersListEl = widget.querySelector('.account-order-mock-list');
+  let ordersLoaded = false;
+  let ordersPromise = null;
+  const setOrdersLoading = (loading) => {
+    if (ordersLoadingEl) ordersLoadingEl.hidden = !loading;
+    if (ordersListEl) ordersListEl.hidden = loading;
+    if (ordersEmptyEl && loading) ordersEmptyEl.hidden = true;
+  };
+  const loadAccountOrders = async () => {
+    if (!email || ordersLoaded) return;
+    if (ordersPromise) {
+      await ordersPromise;
+      return;
+    }
+    setOrdersLoading(true);
+    ordersPromise = (async () => {
+      try {
+        const payload = await getCustomerOrders(email);
+        await renderAccountOrderList(widget, unwrapPayload(payload) ?? payload, copy);
+        ordersLoaded = true;
+      } catch {
+        if (ordersEmptyEl) {
+          ordersEmptyEl.hidden = false;
+          ordersEmptyEl.textContent = String(copy.ordersLoadError || copy.ordersEmpty || 'Could not load orders. Please try again.');
+        }
+      } finally {
+        setOrdersLoading(false);
+        ordersPromise = null;
+      }
+    })();
+    await ordersPromise;
+  };
   if (orders) {
     const p = panels.orders || {};
     const t = orders.querySelector('.account-panel-title');
-    const emptyEl = orders.querySelector('.account-orders-empty');
     if (t) t.textContent = p.title || '';
-    if (emptyEl) {
-      emptyEl.hidden = false;
-      emptyEl.textContent = String(copy.ordersEmpty || '');
-    }
+    if (ordersLoadingEl) ordersLoadingEl.textContent = String(copy.ordersLoading || 'Loading orders…');
   }
 
   const mq = window.matchMedia('(min-width: 768px)');
@@ -396,6 +428,9 @@ export default async function decorate(widget) {
     syncMobileNavMode();
     if (section === 'address') {
       loadAccountAddresses();
+    }
+    if (section === 'orders') {
+      loadAccountOrders();
     }
   };
 

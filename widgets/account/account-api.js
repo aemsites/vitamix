@@ -201,14 +201,11 @@ export async function getCustomerOrderById(customerEmail, orderId) {
  * when the customer opens the Addresses tab.
  *
  * @param {string} customerEmail
- * @returns {Promise<{ customer: unknown, orders: unknown }>}
+ * @returns {Promise<{ customer: unknown }>}
  */
 export async function fetchAccountBundle(customerEmail) {
-  const [customer, orders] = await Promise.all([
-    getLoggedInCustomer(customerEmail),
-    getCustomerOrders(customerEmail),
-  ]);
-  return { customer, orders };
+  const customer = await getLoggedInCustomer(customerEmail);
+  return { customer };
 }
 
 /** @param {unknown} iso */
@@ -301,14 +298,13 @@ function normalizeOrderArray(payload) {
  */
 function mapAddressToDisplay(addr, addressBookCopy = {}) {
   const defBadge = addressBookCopy.defaultBadge || 'Default';
-  const addrBadge = addressBookCopy.addressBadge || 'Address';
   const id = addr.id != null ? String(addr.id) : '';
   const hasStreet = typeof addr.address1 === 'string' && addr.address1.length > 0;
 
   /* List endpoint: { id, email, isDefault } only — hydrate before display when possible */
   if (!hasStreet && id) {
     const isDef = addr.isDefault === true;
-    const badge = isDef ? defBadge : addrBadge;
+    const badge = isDef ? defBadge : '';
     const emailLine = typeof addr.email === 'string' ? addr.email : '';
     const lines = [emailLine].filter((x) => String(x).length);
     return {
@@ -319,7 +315,7 @@ function mapAddressToDisplay(addr, addressBookCopy = {}) {
 
   const badgeParts = [];
   if (addr.isDefault === true) badgeParts.push(defBadge);
-  const badge = badgeParts.join(' · ') || addrBadge;
+  const badge = badgeParts.join(' · ');
   const name = typeof addr.name === 'string' ? addr.name : '';
   const line1 = typeof addr.address1 === 'string' ? addr.address1 : '';
   const line2 = [addr.city, addr.state, addr.zip].filter((x) => x != null && String(x).length).join(', ');
@@ -383,6 +379,10 @@ function pickOrderTotal(order) {
   if (order.total != null) return String(order.total);
   if (order.grandTotal != null) return String(order.grandTotal);
   if (order.totalDue != null) return String(order.totalDue);
+  const payment = order.payment && typeof order.payment === 'object'
+    ? /** @type {Record<string, unknown>} */ (order.payment)
+    : null;
+  if (payment?.amount != null) return String(payment.amount);
   return '—';
 }
 
@@ -421,8 +421,8 @@ export function formatOrderNumberForDisplay(raw) {
  * @param {{ placed?: string, total?: string, state?: string }} orderLabels
  */
 function mapOrderToDisplay(order, orderLabels) {
-  const fetchId = order.friendlyId || order.orderId || order.id || order.number || '—';
-  const displaySource = order.id || order.friendlyId || order.orderId || order.number || fetchId;
+  const fetchId = order.friendlyId || order.id || order.orderId || order.number || '—';
+  const displaySource = order.friendlyId || order.id || order.orderId || order.number || fetchId;
   const dateRaw = order.createdAt || order.created_at || order.date || order.placedAt;
   const dateDisplay = formatIsoForUi(dateRaw);
   const total = pickOrderTotal(order);
@@ -508,7 +508,7 @@ function applyCustomerToWidget(widget, customer, email, copy) {
  * @param {{ placed?: string, total?: string, state?: string }} orderMockLabels
  * @param {Record<string, unknown>} copy
  */
-function applyOrdersToWidget(widget, ordersPayload, orderMockLabels, copy = {}) {
+export function applyOrdersToWidget(widget, ordersPayload, orderMockLabels, copy = {}) {
   const list = widget.querySelector('.account-order-mock-list');
   const emptyEl = widget.querySelector('.account-orders-empty');
   if (!list) return;
@@ -555,6 +555,73 @@ export function unwrapPayload(payload) {
     return /** @type {Record<string, unknown>} */ (payload).data;
   }
   return payload;
+}
+
+/**
+ * Single-order GET may return `{ "order": { ... } }` or a bare object.
+ *
+ * @param {unknown} payload
+ * @returns {unknown}
+ */
+function unwrapOrderDetail(payload) {
+  const afterData = unwrapPayload(payload);
+  if (afterData && typeof afterData === 'object' && 'order' in afterData
+    && /** @type {Record<string, unknown>} */ (afterData).order != null) {
+    return /** @type {Record<string, unknown>} */ (afterData).order;
+  }
+  return afterData;
+}
+
+/**
+ * @param {Record<string, unknown>} order
+ * @returns {string}
+ */
+function getOrderDetailLookupId(order) {
+  return String(order.friendlyId || order.id || order.orderId || order.number || '');
+}
+
+/**
+ * Fetch full order records for list rows so the account panel can display friendlyId, totals,
+ * and createdAt from the authoritative order payload instead of only link metadata.
+ *
+ * @param {unknown[]} items
+ * @param {string} customerEmail
+ * @returns {Promise<unknown[]>}
+ */
+async function hydrateAccountOrderListItems(items, customerEmail) {
+  if (!customerEmail || !Array.isArray(items)) return items;
+  return Promise.all(items.map(async (item) => {
+    if (!item || typeof item !== 'object') return item;
+    const stub = /** @type {Record<string, unknown>} */ (item);
+    const lookupId = getOrderDetailLookupId(stub);
+    if (!lookupId) return stub;
+    try {
+      const payload = await getCustomerOrderById(customerEmail, lookupId);
+      const detail = unwrapOrderDetail(payload);
+      if (detail && typeof detail === 'object') {
+        return { ...stub, .../** @type {Record<string, unknown>} */(detail) };
+      }
+    } catch {
+      /* keep the list metadata if a detail request fails */
+    }
+    return stub;
+  }));
+}
+
+/**
+ * @param {HTMLElement} widget
+ * @param {unknown} ordersPayload
+ * @param {Record<string, unknown>} [copy]
+ * @returns {Promise<void>}
+ */
+export async function renderAccountOrderList(widget, ordersPayload, copy = {}) {
+  const emailEl = widget.querySelector('.account-email-muted');
+  const customerEmail = (emailEl?.textContent || '').trim();
+  let raw = normalizeOrderArray(ordersPayload);
+  if (customerEmail && raw.length) {
+    raw = await hydrateAccountOrderListItems(raw, customerEmail);
+  }
+  applyOrdersToWidget(widget, raw, copy.orderMock || {}, copy);
 }
 
 /**
@@ -655,6 +722,7 @@ export async function renderAccountAddressList(widget, addressesPayload, copy = 
       const badge = document.createElement('div');
       badge.className = 'account-address-badge';
       badge.textContent = mapped.badge;
+      if (!mapped.badge) badge.hidden = true;
       const actions = document.createElement('div');
       actions.className = 'account-address-actions';
       const editBtn = document.createElement('button');
@@ -664,7 +732,9 @@ export async function renderAccountAddressList(widget, addressesPayload, copy = 
       const delBtn = document.createElement('button');
       delBtn.type = 'button';
       delBtn.className = 'button link-style account-address-delete';
-      delBtn.textContent = ab.remove || 'Remove';
+      delBtn.textContent = '×';
+      delBtn.setAttribute('aria-label', ab.remove || 'Remove');
+      delBtn.title = ab.remove || 'Remove';
       actions.append(editBtn, delBtn);
       head.append(badge, actions);
 
@@ -683,21 +753,6 @@ export async function renderAccountAddressList(widget, addressesPayload, copy = 
  */
 async function applyAddressesToWidget(widget, addressesPayload, copy = {}) {
   await renderAccountAddressList(widget, addressesPayload, copy);
-}
-
-/**
- * Single-order GET may return `{ "order": { ... } }` or a bare object.
- *
- * @param {unknown} payload
- * @returns {unknown}
- */
-function unwrapOrderDetail(payload) {
-  const afterData = unwrapPayload(payload);
-  if (afterData && typeof afterData === 'object' && 'order' in afterData
-    && /** @type {Record<string, unknown>} */ (afterData).order != null) {
-    return /** @type {Record<string, unknown>} */ (afterData).order;
-  }
-  return afterData;
 }
 
 /**
@@ -1127,7 +1182,7 @@ export function wireOrderDetailInteractions(widget, copySlice = {}) {
  * After fetchAccountBundle, maps API payloads onto the account widget DOM.
  *
  * @param {HTMLElement} widget
- * @param {{ customer: unknown, addresses?: unknown, orders: unknown }} data
+ * @param {{ customer: unknown, addresses?: unknown, orders?: unknown }} data
  * @param {{
  *   orderMock?: { placed?: string, total?: string, state?: string },
  *   orderDetail?: Record<string, string>,
@@ -1143,7 +1198,8 @@ export async function applyAccountDataToWidget(widget, data, copySlice = {}) {
 
   const hasAddresses = Object.prototype.hasOwnProperty.call(data, 'addresses');
   const addresses = hasAddresses ? unwrapPayload(data.addresses) : undefined;
-  const orders = unwrapPayload(data.orders);
+  const hasOrders = Object.prototype.hasOwnProperty.call(data, 'orders');
+  const orders = hasOrders ? unwrapPayload(data.orders) : undefined;
 
   if (customer && typeof customer === 'object') {
     applyOverviewPanel(widget, customer, email, copySlice);
@@ -1154,9 +1210,7 @@ export async function applyAccountDataToWidget(widget, data, copySlice = {}) {
   if (hasAddresses && addresses != null) {
     await applyAddressesToWidget(widget, addresses, copySlice);
   }
-  if (orders != null) {
+  if (hasOrders && orders != null) {
     applyOrdersToWidget(widget, orders, copySlice.orderMock || {}, copySlice);
-  } else {
-    applyOrdersToWidget(widget, [], copySlice.orderMock || {}, copySlice);
   }
 }
