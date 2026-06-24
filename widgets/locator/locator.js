@@ -315,31 +315,41 @@ function findCommResults(
     allowedTypes,
   });
 
-  const distributors = cleaned
+  let distributors = cleaned
     .filter((i) => i.TYPE === 'DEALER/DISTRIBUTOR'
       && haversineDistance(location.lat, location.lng, i.lat, i.lng) <= MAX_DISTANCE_COMM)
     .sort((a, b) => haversineDistance(location.lat, location.lng, a.lat, a.lng)
       - haversineDistance(location.lat, location.lng, b.lat, b.lng));
+  if (!distributors.length) {
+    distributors = cleaned
+      .filter((i) => i.TYPE === 'DEALER/DISTRIBUTOR')
+      .sort((a, b) => normLower(a.CITY).localeCompare(normLower(b.CITY)));
+  }
 
   const hasState = !!(stateShort || stateLong);
 
-  const localRep = cleaned
+  let localRep = cleaned
     .filter((i) => i.TYPE === 'LOCAL REP')
     .filter((i) => {
-    // If we have state info, filter by state
       if (hasState) {
         return (
           norm(i.STATE_PROVINCE) === norm(stateShort)
-        || norm(i.STATE_NAME) === norm(stateLong)
+          || norm(i.STATE_NAME) === norm(stateLong)
+          || norm(i.CITY) === norm(stateShort)
+          || norm(i.CITY) === norm(stateLong)
         );
       }
 
-      // If no state info, fallback to country match (or return all LOCAL REP for that country)
       return (
-        norm(i.COUNTRY_CODE) === norm(countryShort)
-      || norm(i.COUNTRY_NAME) === norm(countryLong)
+        norm(i.COUNTRY) === norm(countryShort)
+        || norm(i.COUNTRY) === norm(countryLong)
+        || norm(i.COUNTRY_CODE) === norm(countryShort)
+        || norm(i.COUNTRY_NAME) === norm(countryLong)
       );
     });
+  if (!localRep.length) {
+    localRep = cleaned.filter((i) => i.TYPE === 'LOCAL REP');
+  }
 
   return { distributors, localRep };
 }
