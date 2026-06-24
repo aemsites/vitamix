@@ -315,7 +315,7 @@ function findCommResults(
     allowedTypes,
   });
 
-  const distributors = cleaned
+  let distributors = cleaned
     .filter((i) => i.TYPE === 'DEALER/DISTRIBUTOR'
       && haversineDistance(location.lat, location.lng, i.lat, i.lng) <= MAX_DISTANCE_COMM)
     .sort((a, b) => haversineDistance(location.lat, location.lng, a.lat, a.lng)
