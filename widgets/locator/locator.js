@@ -320,7 +320,6 @@ function findCommResults(
       && haversineDistance(location.lat, location.lng, i.lat, i.lng) <= MAX_DISTANCE_COMM)
     .sort((a, b) => haversineDistance(location.lat, location.lng, a.lat, a.lng)
       - haversineDistance(location.lat, location.lng, b.lat, b.lng));
-  
   if (!distributors.length) {
     distributors = cleaned
       .filter((i) => i.TYPE === 'DEALER/DISTRIBUTOR')
@@ -348,7 +347,6 @@ function findCommResults(
         || norm(i.COUNTRY_NAME) === norm(countryLong)
       );
     });
-  
   if (!localRep.length) {
     localRep = cleaned.filter((i) => i.TYPE === 'LOCAL REP');
   }
