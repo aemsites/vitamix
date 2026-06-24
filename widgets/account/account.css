@@ -451,6 +451,31 @@
   font-size: var(--commerce-font-size-lg);
 }
 
+.account-address-dialog-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 320px;
+  margin: 0;
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-text-muted);
+}
+
+.account-address-dialog-loading[hidden] {
+  display: none;
+}
+
+.account-address-dialog-loading::before {
+  content: '';
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--commerce-color-border);
+  border-top-color: var(--commerce-color-primary);
+  border-radius: 50%;
+  animation: account-address-spin 0.8s linear infinite;
+}
+
 .account-address-form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

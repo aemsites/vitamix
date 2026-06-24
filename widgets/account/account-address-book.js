@@ -122,6 +122,7 @@ export function wireAccountAddressBook(widget, customerEmail, lang, marketLocale
   const errEl = widget.querySelector('.account-address-form-error');
   const saveBtn = widget.querySelector('.account-address-save');
   const cancelBtn = widget.querySelector('.account-address-cancel');
+  const dialogLoadingEl = widget.querySelector('.account-address-dialog-loading');
   const addressLoadingEl = widget.querySelector('.account-address-loading');
   const addressEmptyEl = widget.querySelector('.account-address-empty');
   const addressListEl = widget.querySelector('.account-address-list');
@@ -191,13 +192,23 @@ export function wireAccountAddressBook(widget, customerEmail, lang, marketLocale
     fillRegionSelect(stateSelect, opts, ab.regionPlaceholder || 'Select…');
   };
 
+  const setDialogSubmitting = (submitting, label = '') => {
+    form.hidden = submitting;
+    if (dialogLoadingEl) {
+      dialogLoadingEl.hidden = !submitting;
+      dialogLoadingEl.textContent = label;
+    }
+  };
+
   const closeDialog = () => {
     dialog.close();
     editingId = null;
+    setDialogSubmitting(false);
   };
 
   const showAddDialog = () => {
     editingId = null;
+    setDialogSubmitting(false);
     if (errEl) {
       errEl.hidden = true;
       errEl.textContent = '';
@@ -211,6 +222,7 @@ export function wireAccountAddressBook(widget, customerEmail, lang, marketLocale
   };
 
   const showEditDialog = (raw) => {
+    setDialogSubmitting(false);
     if (errEl) {
       errEl.hidden = true;
       errEl.textContent = '';
@@ -259,6 +271,9 @@ export function wireAccountAddressBook(widget, customerEmail, lang, marketLocale
       return;
     }
     if (saveBtn) saveBtn.disabled = true;
+    setDialogSubmitting(true, editingId
+      ? (ab.updating || 'Updating address…')
+      : (ab.saving || 'Saving address…'));
     try {
       if (editingId) {
         await updateCustomerAddress(customerEmail, editingId, body);
@@ -268,6 +283,7 @@ export function wireAccountAddressBook(widget, customerEmail, lang, marketLocale
       closeDialog();
       await reloadList();
     } catch (err) {
+      setDialogSubmitting(false);
       if (errEl) {
         errEl.hidden = false;
         errEl.textContent = ab.saveError || (err instanceof Error ? err.message : String(err));
