@@ -122,6 +122,9 @@ export function wireAccountAddressBook(widget, customerEmail, lang, marketLocale
   const errEl = widget.querySelector('.account-address-form-error');
   const saveBtn = widget.querySelector('.account-address-save');
   const cancelBtn = widget.querySelector('.account-address-cancel');
+  const addressLoadingEl = widget.querySelector('.account-address-loading');
+  const addressEmptyEl = widget.querySelector('.account-address-empty');
+  const addressListEl = widget.querySelector('.account-address-list');
   const countrySelect = form?.querySelector('[name="country"]');
   const stateSelect = form?.querySelector('[name="state"]');
   const zipLabel = form?.querySelector('[for="account-addr-zip"] .label-text');
@@ -229,6 +232,12 @@ export function wireAccountAddressBook(widget, customerEmail, lang, marketLocale
 
   cancelBtn?.addEventListener('click', () => closeDialog());
 
+  const setAddressLoading = (loading) => {
+    if (addressLoadingEl) addressLoadingEl.hidden = !loading;
+    if (addressListEl) addressListEl.hidden = loading;
+    if (addressEmptyEl && loading) addressEmptyEl.hidden = true;
+  };
+
   const reloadList = async () => {
     const payload = await getCustomerAddresses(customerEmail);
     const list = unwrapPayload(payload);
@@ -299,11 +308,14 @@ export function wireAccountAddressBook(widget, customerEmail, lang, marketLocale
     if (delBtn) {
       const ok = window.confirm(ab.deleteConfirm || 'Remove this address?');
       if (!ok) return;
+      setAddressLoading(true);
       try {
         await deleteCustomerAddress(customerEmail, id);
         await reloadList();
       } catch (err) {
         window.alert(ab.deleteError || (err instanceof Error ? err.message : String(err)));
+      } finally {
+        setAddressLoading(false);
       }
     }
   });

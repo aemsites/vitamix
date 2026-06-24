@@ -533,7 +533,9 @@
 .account-address-loading {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
+  min-height: 160px;
   margin: 0 0 12px;
   font-size: var(--commerce-font-size-sm);
   color: var(--commerce-color-text-muted);
