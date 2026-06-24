@@ -37,7 +37,7 @@ async function pickFromSchedule(path) {
 
   const resp = await fetch(path);
   const schedule = await resp.json();
-  const now = window.simulateDate ? new Date(window.simulateDate) : new Date();
+  const now = window.simulateDate || new Date();
   let pickedItem = null;
   schedule.data.forEach((item) => {
     const startDate = parseDateSafe(item.Start);

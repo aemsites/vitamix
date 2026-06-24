@@ -1322,6 +1322,76 @@ async function simulatePDPPreview() {
 }
 
 /**
+ * Returns the locale prefix used for schedule and promotion fetches.
+ * @returns {string} Locale path prefix (e.g. /us/en_us)
+ */
+function getScheduleLocalePrefix() {
+  if (window.location.pathname.startsWith('/drafts/')) {
+    return '/us/en_us';
+  }
+  const { locale, language } = getLocaleAndLanguage();
+  return `/${locale}/${language}`;
+}
+
+/**
+ * Checks schedule metadata and swaps main content when a promotion is active.
+ */
+async function checkSchedule() {
+  try {
+    const scheduleName = getMetadata('schedule');
+    if (!scheduleName) return;
+
+    const localePrefix = getScheduleLocalePrefix();
+    const resp = await fetch(`${localePrefix}/promotions/${scheduleName}.json`);
+    if (!resp.ok) return;
+
+    const schedule = await resp.json();
+    if (!schedule?.data?.length) return;
+
+    const parseDateSafe = (dateStr) => {
+      if (!dateStr) return null;
+      try {
+        return parseEasternDateTime(dateStr);
+      } catch {
+        const fallback = new Date(dateStr);
+        return Number.isNaN(fallback.getTime()) ? null : fallback;
+      }
+    };
+
+    const now = window.simulateDate || new Date();
+    let activePromotion = null;
+    schedule.data.forEach((item) => {
+      const startDate = parseDateSafe(item.Start);
+      const endDate = parseDateSafe(item.End);
+      if ((now >= startDate || !startDate) && (now <= endDate || !endDate)) {
+        activePromotion = item.Promotion;
+      }
+    });
+
+    if (!activePromotion) return;
+
+    const pagePath = window.location.pathname.split('/').filter(Boolean).slice(2).join('/');
+    const promotionBase = `${localePrefix}/promotions/${activePromotion}`;
+    const promotionPath = pagePath ? `${promotionBase}/${pagePath}` : `${promotionBase}/`;
+
+    const promoResp = await fetch(promotionPath);
+    if (!promoResp.ok) return;
+
+    const html = await promoResp.text();
+    const dom = new DOMParser().parseFromString(html, 'text/html');
+    const promoMain = dom.querySelector('main');
+    if (!promoMain) return;
+
+    const main = document.querySelector('main');
+    if (!main) return;
+
+    main.innerHTML = promoMain.innerHTML;
+  } catch {
+    // leave page unchanged on any error
+  }
+}
+
+/**
  * Loads everything needed to get to LCP.
  * @param {Element} doc The container element
  */
@@ -1332,9 +1402,22 @@ async function loadEager(doc) {
 
   /* simulation date */
   const params = new URLSearchParams(window.location.search);
-  if (params.get('simulateDate')) {
-    window.simulateDate = params.get('simulateDate');
+  const simulateDateParam = params.get('simulateDate');
+  if (simulateDateParam) {
+    try {
+      window.simulateDate = parseEasternDateTime(simulateDateParam);
+    } catch {
+      const date = new Date(simulateDateParam);
+      if (!Number.isNaN(date.getTime())) {
+        window.simulateDate = date;
+      } else {
+        // eslint-disable-next-line no-console
+        console.warn(`Invalid simulateDate: ${simulateDateParam}`);
+      }
+    }
   }
+
+  await checkSchedule();
 
   /* query param based redirects: comma-separated pairs of
    * <queryparam>=<value>:<redirectPathname> (e.g. "product=123:/us/en_us/products/123")
