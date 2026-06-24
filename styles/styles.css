@@ -573,6 +573,11 @@ button.button.link {
   text-transform: none;
 }
 
+.default-content-wrapper .button.link {
+  text-align: left;
+  line-height: var(--line-height-m);
+}
+
 a.button.link:hover,
 button.button.link:hover,
 button.button.link:focus {
