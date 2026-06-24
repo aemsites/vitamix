@@ -575,7 +575,7 @@ button.button.link {
 
 .default-content-wrapper .button.link {
   text-align: left;
-  line-height: var(--line-height-m);
+  line-height: var(--line-height-xl);
 }
 
 a.button.link:hover,
