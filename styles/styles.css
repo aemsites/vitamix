@@ -573,11 +573,6 @@ button.button.link {
   text-transform: none;
 }
 
-.default-content-wrapper .button.link {
-  text-align: left;
-  line-height: var(--line-height-xl);
-}
-
 a.button.link:hover,
 button.button.link:hover,
 button.button.link:focus {
@@ -613,6 +608,11 @@ button.button.close {
 button.button.close:hover,
 button.button.close:focus {
   background-color: var(--color-shadow);
+}
+
+.default-content-wrapper .button.link {
+  text-align: left;
+  line-height: var(--line-height-xl);
 }
 
 @media (width >= 800px) {
