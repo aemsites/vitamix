@@ -195,18 +195,20 @@ export async function getCustomerOrderById(customerEmail, orderId) {
 }
 
 /**
- * Fetches customer, addresses, and orders in parallel for the account drawer.
+ * Fetches customer and orders for the account drawer.
+ *
+ * Addresses are intentionally excluded so the drawer can open quickly; they are loaded lazily
+ * when the customer opens the Addresses tab.
  *
  * @param {string} customerEmail
- * @returns {Promise<{ customer: unknown, addresses: unknown, orders: unknown }>}
+ * @returns {Promise<{ customer: unknown, orders: unknown }>}
  */
 export async function fetchAccountBundle(customerEmail) {
-  const [customer, addresses, orders] = await Promise.all([
+  const [customer, orders] = await Promise.all([
     getLoggedInCustomer(customerEmail),
-    getCustomerAddresses(customerEmail),
     getCustomerOrders(customerEmail),
   ]);
-  return { customer, addresses, orders };
+  return { customer, orders };
 }
 
 /** @param {unknown} iso */
@@ -305,7 +307,7 @@ function mapAddressToDisplay(addr, addressBookCopy = {}) {
 
   /* List endpoint: { id, email, isDefault } only — hydrate before display when possible */
   if (!hasStreet && id) {
-    const isDef = addr.default === true || addr.isDefault === true;
+    const isDef = addr.isDefault === true;
     const badge = isDef ? defBadge : addrBadge;
     const emailLine = typeof addr.email === 'string' ? addr.email : '';
     const lines = [emailLine].filter((x) => String(x).length);
@@ -316,7 +318,7 @@ function mapAddressToDisplay(addr, addressBookCopy = {}) {
   }
 
   const badgeParts = [];
-  if (addr.default === true || addr.isDefault === true) badgeParts.push(defBadge);
+  if (addr.isDefault === true) badgeParts.push(defBadge);
   const badge = badgeParts.join(' · ') || addrBadge;
   const name = typeof addr.name === 'string' ? addr.name : '';
   const line1 = typeof addr.address1 === 'string' ? addr.address1 : '';
@@ -1125,7 +1127,7 @@ export function wireOrderDetailInteractions(widget, copySlice = {}) {
  * After fetchAccountBundle, maps API payloads onto the account widget DOM.
  *
  * @param {HTMLElement} widget
- * @param {{ customer: unknown, addresses: unknown, orders: unknown }} data
+ * @param {{ customer: unknown, addresses?: unknown, orders: unknown }} data
  * @param {{
  *   orderMock?: { placed?: string, total?: string, state?: string },
  *   orderDetail?: Record<string, string>,
@@ -1139,7 +1141,8 @@ export async function applyAccountDataToWidget(widget, data, copySlice = {}) {
     [customer] = customer;
   }
 
-  const addresses = unwrapPayload(data.addresses);
+  const hasAddresses = Object.prototype.hasOwnProperty.call(data, 'addresses');
+  const addresses = hasAddresses ? unwrapPayload(data.addresses) : undefined;
   const orders = unwrapPayload(data.orders);
 
   if (customer && typeof customer === 'object') {
@@ -1148,10 +1151,8 @@ export async function applyAccountDataToWidget(widget, data, copySlice = {}) {
   } else {
     applyOverviewPanel(widget, null, email, copySlice);
   }
-  if (addresses != null) {
+  if (hasAddresses && addresses != null) {
     await applyAddressesToWidget(widget, addresses, copySlice);
-  } else {
-    await renderAccountAddressList(widget, [], copySlice);
   }
   if (orders != null) {
     applyOrdersToWidget(widget, orders, copySlice.orderMock || {}, copySlice);

@@ -1,5 +1,10 @@
 import { loadCSS } from '../../scripts/aem.js';
-import { fetchFormsProfile, renderAccountAddressList } from './account-api.js';
+import {
+  fetchFormsProfile,
+  getCustomerAddresses,
+  renderAccountAddressList,
+  unwrapPayload,
+} from './account-api.js';
 import { getFormSubmissionUrl, getLocaleAndLanguage } from '../../scripts/scripts.js';
 import { getUser, logout } from '../../scripts/auth-api.js';
 
@@ -282,18 +287,53 @@ export default async function decorate(widget) {
   }
 
   const address = widget.querySelector('.account-panel[data-section="address"]');
+  const addressLoadingEl = widget.querySelector('.account-address-loading');
+  const addressEmptyEl = widget.querySelector('.account-address-empty');
+  const addressListEl = widget.querySelector('.account-address-list');
+  let addressListLoaded = false;
+  let addressListPromise = null;
+  const setAddressLoading = (loading) => {
+    if (addressLoadingEl) addressLoadingEl.hidden = !loading;
+    if (addressListEl) addressListEl.hidden = loading;
+    if (addressEmptyEl && loading) addressEmptyEl.hidden = true;
+  };
+  const loadAccountAddresses = async () => {
+    if (!email || addressListLoaded) return;
+    if (addressListPromise) {
+      await addressListPromise;
+      return;
+    }
+    setAddressLoading(true);
+    addressListPromise = (async () => {
+      try {
+        const payload = await getCustomerAddresses(email);
+        await renderAccountAddressList(widget, unwrapPayload(payload) ?? payload, copy);
+        addressListLoaded = true;
+      } catch {
+        if (addressEmptyEl) {
+          const ab = /** @type {Record<string, string>} */ (copy.addressBook || {});
+          addressEmptyEl.hidden = false;
+          addressEmptyEl.textContent = ab.loadListError || 'Could not load addresses. Please try again.';
+        }
+      } finally {
+        setAddressLoading(false);
+        addressListPromise = null;
+      }
+    })();
+    await addressListPromise;
+  };
   if (address) {
     const p = panels.address || {};
     const t = address.querySelector('.account-panel-title');
     const addBtn = address.querySelector('.account-address-add');
     if (t) t.textContent = p.title || '';
     const ab = /** @type {Record<string, string>} */ (copy.addressBook || {});
+    if (addressLoadingEl) addressLoadingEl.textContent = ab.loading || 'Loading addresses…';
     if (addBtn) {
       addBtn.textContent = ab.add || 'Add address';
       addBtn.hidden = !email;
       addBtn.disabled = !email;
     }
-    await renderAccountAddressList(widget, [], copy);
   }
 
   const orders = widget.querySelector('.account-panel[data-section="orders"]');
@@ -354,6 +394,9 @@ export default async function decorate(widget) {
       panel.hidden = !show;
     });
     syncMobileNavMode();
+    if (section === 'address') {
+      loadAccountAddresses();
+    }
   };
 
   navButtons.forEach((btn) => {

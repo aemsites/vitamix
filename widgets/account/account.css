@@ -523,10 +523,40 @@
   margin-top: 20px;
 }
 
-.account-orders-empty {
+.account-orders-empty,
+.account-address-empty {
   margin: 0 0 12px;
   font-size: var(--commerce-font-size-sm);
   color: var(--commerce-color-text-muted);
+}
+
+.account-address-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-text-muted);
+}
+
+.account-address-loading[hidden] {
+  display: none;
+}
+
+.account-address-loading::before {
+  content: '';
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--commerce-color-border);
+  border-top-color: var(--commerce-color-primary);
+  border-radius: 50%;
+  animation: account-address-spin 0.8s linear infinite;
+}
+
+@keyframes account-address-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .account-address-item {

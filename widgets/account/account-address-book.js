@@ -66,7 +66,6 @@ function readAddressForm(form, accountEmail) {
     phone,
     email: String(fd.get('email') || '').trim() || accountEmail,
     isDefault: fd.get('isDefault') === 'on',
-    default: fd.get('isDefault') === 'on',
   };
   return body;
 }
@@ -96,7 +95,7 @@ function fillAddressForm(form, addr, accountEmail) {
   (form.querySelector('[name="email"]')).value = String(addr.email ?? accountEmail ?? '');
   /** @type {HTMLInputElement | null} */
   const defCb = form.querySelector('input[name="isDefault"]');
-  if (defCb) defCb.checked = addr.isDefault === true || addr.default === true;
+  if (defCb) defCb.checked = addr.isDefault === true;
   const countrySel = form.querySelector('[name="country"]');
   if (countrySel) {
     const c = String(addr.country || 'us').toLowerCase();
