@@ -5,23 +5,57 @@ import {
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+function getEasternParts(date) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: false,
+  }).formatToParts(date);
+  const get = (type) => parseInt(parts.find((p) => p.type === type)?.value || '0', 10);
+  return {
+    year: get('year'),
+    month: get('month'),
+    day: get('day'),
+    hour: get('hour'),
+    minute: get('minute'),
+  };
+}
+
+function daysInMonth(year, month) {
+  return new Date(year, month, 0).getDate();
+}
+
+function addMonths(year, month, delta) {
+  let m = month + delta;
+  let y = year;
+  while (m < 1) {
+    m += 12;
+    y -= 1;
+  }
+  while (m > 12) {
+    m -= 12;
+    y += 1;
+  }
+  return { year: y, month: m };
+}
+
+function formatEasternDateTime(date) {
+  const { year, month, day, hour, minute } = getEasternParts(date);
+  const hour24 = hour === 24 ? 0 : hour;
+  const h12 = hour24 % 12 || 12;
+  const ampm = hour24 < 12 ? 'am' : 'pm';
+  const minStr = minute ? `:${String(minute).padStart(2, '0')}` : '';
+  return `${month}/${day}/${year} ${h12}${minStr}${ampm}`;
+}
+
 function formatShortDateTime(date) {
   if (date === null) return 'Open';
   if (!date || !(date instanceof Date) || Number.isNaN(date.getTime())) return 'Invalid Date';
-
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-  let hours = date.getHours();
-  const minutes = date.getMinutes();
-  const ampm = hours >= 12 ? 'pm' : 'am';
-  hours %= 12;
-  if (hours === 0) hours = 12;
-
-  let timeStr = `${hours}${ampm}`;
-  if (minutes !== 0) {
-    timeStr = `${hours}:${minutes.toString().padStart(2, '0')}${ampm}`;
-  }
-  return `${month}/${day} ${timeStr}`;
+  return formatEasternDateTime(date);
 }
 
 function parseDateOrNull(dateStr) {
@@ -65,7 +99,8 @@ function findBestPromotion(items, date = new Date()) {
 }
 
 function formatMarkerLabel(date, activeItem) {
-  const dateStr = `${date.getMonth() + 1}/${date.getDate()}`;
+  const { month, day } = getEasternParts(date);
+  const dateStr = `${month}/${day}`;
   if (activeItem?.promotion) return `${dateStr} ${activeItem.promotion}`;
   return dateStr;
 }
@@ -74,36 +109,21 @@ function createTimeline(items, bestItem = null, date = new Date(), onDateChange 
   const container = document.createElement('div');
   container.classList.add('alert-banners-timeline');
 
-  const currentMonth = date.getMonth();
-  const currentYear = date.getFullYear();
-
-  let startMonth = currentMonth - 3;
-  let startYear = currentYear;
-  if (startMonth < 0) {
-    startMonth += 12;
-    startYear -= 1;
-  }
-  const rangeStart = new Date(startYear, startMonth, 1);
-
-  let endMonth = currentMonth + 3;
-  let endYear = currentYear;
-  if (endMonth > 11) {
-    endMonth -= 12;
-    endYear += 1;
-  }
-  const rangeEnd = new Date(endYear, endMonth + 1, 0, 23, 59, 59);
+  const { year: currentYear, month: currentMonth } = getEasternParts(date);
+  const rangeStartInfo = addMonths(currentYear, currentMonth, -3);
+  const rangeEndInfo = addMonths(currentYear, currentMonth, 3);
+  const rangeStart = parseEasternDateTime(`${rangeStartInfo.month}/1/${rangeStartInfo.year} 12am`);
+  const rangeEnd = parseEasternDateTime(
+    `${rangeEndInfo.month}/${daysInMonth(rangeEndInfo.year, rangeEndInfo.month)}/${rangeEndInfo.year} 11:59pm`,
+  );
   const rangeDuration = rangeEnd.getTime() - rangeStart.getTime();
 
   const displayMonths = [];
-  let m = startMonth;
-  let y = startYear;
+  let m = rangeStartInfo.month;
+  let y = rangeStartInfo.year;
   for (let i = 0; i < 7; i += 1) {
-    displayMonths.push({ month: m, year: y, name: MONTH_NAMES[m] });
-    m += 1;
-    if (m > 11) {
-      m = 0;
-      y += 1;
-    }
+    displayMonths.push({ month: m, year: y, name: MONTH_NAMES[m - 1] });
+    ({ year: y, month: m } = addMonths(y, m, 1));
   }
 
   const header = document.createElement('div');
@@ -111,7 +131,9 @@ function createTimeline(items, bestItem = null, date = new Date(), onDateChange 
 
   const yearLabel = document.createElement('div');
   yearLabel.classList.add('timeline-year');
-  yearLabel.textContent = startYear === endYear ? String(startYear) : `${startYear}–${endYear}`;
+  yearLabel.textContent = rangeStartInfo.year === rangeEndInfo.year
+    ? String(rangeStartInfo.year)
+    : `${rangeStartInfo.year}–${rangeEndInfo.year}`;
   header.appendChild(yearLabel);
 
   const monthsRow = document.createElement('div');
@@ -326,7 +348,7 @@ function createTimeline(items, bestItem = null, date = new Date(), onDateChange 
 
 function buildPageUrl(pagePath, date) {
   const url = new URL(pagePath, window.location.origin);
-  url.searchParams.set('simulateDate', date.toISOString().slice(0, 16));
+  url.searchParams.set('simulateDate', formatEasternDateTime(date));
   return url.href;
 }
 
@@ -370,7 +392,7 @@ async function init() {
 
   let currentPromotion;
   const updateIframeIfPromotionChanged = (date, activeItem) => {
-    const promotion = activeItem?.promotion || null;
+    const promotion = activeItem?.promotion ?? null;
     if (promotion === currentPromotion) return;
     currentPromotion = promotion;
     frame.src = buildPageUrl(pagePath, date);
