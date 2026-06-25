@@ -72,16 +72,11 @@ body {
   background: #f5f5f5;
 }
 
-.error {
-  margin: 1rem;
+.timeline-error {
   padding: 0.75rem 1rem;
   background: #ffeaea;
   color: #c62828;
   border-radius: 6px;
-}
-
-.error[hidden] {
-  display: none;
 }
 
 #page-frame {

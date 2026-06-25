@@ -356,15 +356,42 @@ const LOCALE_FLAGS = {
   mx: '🇲🇽',
 };
 
-function parseScheduleMeta(schedulePath) {
-  const segments = schedulePath.split('/').filter(Boolean);
-  const locale = segments[0]?.toLowerCase() || '';
-  const filename = segments[segments.length - 1] || '';
-  const name = filename.replace(/\.json$/i, '');
+function parseScheduleDisplay(pagePath, scheduleName = '') {
+  const segments = pagePath.split('/').filter(Boolean);
+  const locale = pagePath.startsWith('/drafts/') ? 'us' : (segments[0]?.toLowerCase() || '');
   return {
-    name,
+    name: scheduleName,
     flag: LOCALE_FLAGS[locale] || '',
   };
+}
+
+function getLocalePrefixFromPath(pathname) {
+  if (pathname.startsWith('/drafts/')) {
+    return '/us/en_us';
+  }
+  const segments = pathname.split('/').filter(Boolean);
+  if (segments.length >= 2) {
+    return `/${segments[0]}/${segments[1]}`;
+  }
+  return '/us/en_us';
+}
+
+function getScheduleNameFromPage(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const meta = doc.querySelector('meta[name="schedule"]');
+  return meta?.content?.trim() || '';
+}
+
+async function resolveScheduleFromPage(pagePath) {
+  const resp = await fetch(pagePath);
+  if (!resp.ok) throw new Error(`Failed to load page (${resp.status})`);
+  const scheduleName = getScheduleNameFromPage(await resp.text());
+  if (!scheduleName) {
+    throw new Error("this page doesn't have a schedule");
+  }
+  const { pathname } = new URL(pagePath, window.location.origin);
+  const schedulePath = `${getLocalePrefixFromPath(pathname)}/promotions/${scheduleName}.json`;
+  return { scheduleName, schedulePath };
 }
 
 function isPreviewEnv() {
@@ -418,35 +445,51 @@ function buildPageUrl(pagePath, date) {
   return url.href;
 }
 
-function showError(message) {
-  const errorEl = document.getElementById('error');
-  errorEl.textContent = message;
-  errorEl.hidden = !message;
+function showTimelineError(timeline, message) {
+  timeline.textContent = '';
+  timeline.classList.add('timeline-error');
+  timeline.textContent = message;
+}
+
+function clearTimelineError(timeline) {
+  timeline.classList.remove('timeline-error');
+  timeline.textContent = '';
 }
 
 async function init() {
   const params = new URLSearchParams(window.location.search);
-  const schedulePath = params.get('schedule') || '';
   const pagePath = params.get('page') || '';
-
-  if (!schedulePath || !pagePath) {
-    showError('Missing schedule or page query parameter');
-    return;
-  }
 
   const panel = document.getElementById('simulator-panel');
   const timeline = document.getElementById('timeline');
   const frame = document.getElementById('page-frame');
-  const { name: scheduleName, flag: scheduleFlag } = parseScheduleMeta(schedulePath);
 
-  document.getElementById('schedule-name').textContent = scheduleName;
+  if (!pagePath) {
+    panel.hidden = false;
+    showTimelineError(timeline, 'Missing page query parameter');
+    return;
+  }
+
+  const { name: displayName, flag: scheduleFlag } = parseScheduleDisplay(pagePath);
+  document.getElementById('schedule-name').textContent = displayName;
   document.getElementById('schedule-flag').textContent = scheduleFlag;
 
   panel.hidden = false;
   frame.hidden = false;
-  showError('');
-
   setupEnvToggle();
+  frame.src = buildPageUrl(pagePath, new Date());
+
+  let schedulePath;
+  let scheduleName;
+  try {
+    ({ scheduleName, schedulePath } = await resolveScheduleFromPage(pagePath));
+  } catch (e) {
+    showTimelineError(timeline, e.message || 'Failed to load page');
+    return;
+  }
+
+  document.getElementById('schedule-name').textContent = scheduleName;
+  clearTimelineError(timeline);
 
   let currentPromotion;
   let items = [];
@@ -457,9 +500,7 @@ async function init() {
     if (!schedule?.data?.length) throw new Error('Schedule has no rows');
     items = parseScheduleItems(schedule.data);
   } catch (e) {
-    showError(e.message || 'Failed to load schedule');
-    panel.hidden = true;
-    frame.hidden = true;
+    showTimelineError(timeline, e.message || 'Failed to load schedule');
     return;
   }
 
