@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Date Simulator</title>
+  <link rel="stylesheet" href="./date-simulator.css">
+</head>
+<body>
+  <div class="date-simulator">
+    <div id="error" class="error" hidden></div>
+    <div class="simulator-panel" id="simulator-panel" hidden>
+      <div class="simulator-toolbar">
+        <div class="schedule-title">
+          <span id="schedule-name"></span>
+          <span class="schedule-flag" id="schedule-flag"></span>
+        </div>
+        <div class="env-toggle" role="group" aria-label="Schedule environment">
+          <a id="env-preview" class="env-toggle-option" href="#">Preview Schedule</a>
+          <a id="env-live" class="env-toggle-option" href="#">Live Schedule</a>
+        </div>
+      </div>
+      <div id="timeline" class="alert-banners-timeline-container"></div>
+    </div>
+    <iframe id="page-frame" title="Page preview" hidden></iframe>
+  </div>
+  <script type="module" src="./date-simulator.js"></script>
+</body>
+</html>
