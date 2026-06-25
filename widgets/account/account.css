@@ -419,6 +419,7 @@
   top: 0;
   right: 0;
   margin: 0;
+  padding-right: 10px;
 }
 
 .account-address-add.button.emphasis {
@@ -975,10 +976,6 @@
   .account-sidebar {
     position: sticky;
     top: 0;
-  }
-
-  .account-panel-body {
-    padding-right: clamp(8px, 2vw, 32px);
   }
 
   .account-widget-mobile-nav-select .account-nav-mobile {
