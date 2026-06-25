@@ -767,6 +767,11 @@ export async function renderAccountAddressList(widget, addressesPayload, copy = 
 
   raw
     .filter((x) => x && typeof x === 'object')
+    .sort((a, b) => {
+      const ad = /** @type {Record<string, unknown>} */ (a).isDefault === true ? 1 : 0;
+      const bd = /** @type {Record<string, unknown>} */ (b).isDefault === true ? 1 : 0;
+      return bd - ad;
+    })
     .forEach((item) => {
       const addr = /** @type {Record<string, unknown>} */ (item);
       const mapped = mapAddressToDisplay(addr, ab);
