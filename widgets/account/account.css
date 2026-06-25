@@ -411,8 +411,50 @@
   max-width: 42rem;
 }
 
+.account-panel[data-section='address'] .account-panel-body {
+  position: relative;
+}
+
 .account-address-toolbar {
-  margin: 0 0 16px;
+  position: absolute;
+  top: 0;
+  right: 0;
+  margin: 0;
+}
+
+.account-address-add.button.emphasis {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-blue, #1b64b4);
+  font-size: var(--commerce-font-size-sm);
+  font-weight: var(--commerce-font-weight-bold);
+  text-decoration: none;
+}
+
+.account-address-add.button.emphasis::before {
+  content: '+';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid currentcolor;
+  border-radius: 50%;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.account-address-add.button.emphasis:hover,
+.account-address-add.button.emphasis:focus {
+  background: transparent;
+  color: var(--color-blue, #1b64b4);
+  text-decoration: underline;
 }
 
 .account-address-item-head {
@@ -703,18 +745,38 @@
   border-bottom: none;
 }
 
+.account-order-mock-summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
 .account-order-mock-id {
   font-weight: var(--commerce-font-weight-bold);
   font-size: var(--commerce-font-size-sm);
   color: var(--commerce-color-text);
 }
 
+.account-order-mock-total {
+  flex-shrink: 0;
+  font-weight: var(--commerce-font-weight-bold);
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-text);
+  text-align: right;
+}
+
 .account-order-mock-meta {
   display: flex;
-  flex-wrap: wrap;
+  justify-content: space-between;
   gap: 12px 24px;
   font-size: var(--commerce-font-size-xs);
   color: var(--commerce-color-text-muted);
+}
+
+.account-order-mock-status {
+  margin-left: auto;
+  text-align: right;
 }
 
 .account-order-detail-back {

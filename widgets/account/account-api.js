@@ -376,14 +376,37 @@ function applyOverviewPanel(widget, customer, email, copy) {
 }
 
 function pickOrderTotal(order) {
-  if (order.total != null) return String(order.total);
-  if (order.grandTotal != null) return String(order.grandTotal);
-  if (order.totalDue != null) return String(order.totalDue);
+  if (order.total != null) return order.total;
+  if (order.grandTotal != null) return order.grandTotal;
+  if (order.totalDue != null) return order.totalDue;
   const payment = order.payment && typeof order.payment === 'object'
     ? /** @type {Record<string, unknown>} */ (order.payment)
     : null;
-  if (payment?.amount != null) return String(payment.amount);
-  return '—';
+  if (payment?.amount != null) return payment.amount;
+  return null;
+}
+
+/**
+ * @param {Record<string, unknown>} order
+ * @returns {string}
+ */
+function getOrderCurrency(order) {
+  const payment = order.payment && typeof order.payment === 'object'
+    ? /** @type {Record<string, unknown>} */ (order.payment)
+    : null;
+  return String(order.currency || order.currencyCode || payment?.currency || 'USD');
+}
+
+/**
+ * @param {Record<string, unknown>} order
+ * @returns {string}
+ */
+function formatOrderTotalDisplay(order) {
+  const total = pickOrderTotal(order);
+  if (total == null || total === '') return '—';
+  const amount = typeof total === 'number' ? total : Number(total);
+  if (Number.isFinite(amount)) return formatPrice(amount, getOrderCurrency(order));
+  return String(total);
 }
 
 /**
@@ -421,23 +444,22 @@ export function formatOrderNumberForDisplay(raw) {
  * @param {{ placed?: string, total?: string, state?: string }} orderLabels
  */
 function mapOrderToDisplay(order, orderLabels) {
-  const fetchId = order.friendlyId || order.id || order.orderId || order.number || '—';
-  const displaySource = order.friendlyId || order.id || order.orderId || order.number || fetchId;
+  const fetchId = order.id || order.friendlyId || order.orderId || order.number || '—';
+  const displaySource = order.orderId || order.number || order.orderNumber
+    || order.friendlyId || order.id || fetchId;
   const dateRaw = order.createdAt || order.created_at || order.date || order.placedAt;
   const dateDisplay = formatIsoForUi(dateRaw);
-  const total = pickOrderTotal(order);
   const state = order.state != null ? String(order.state) : '';
-  const totalLabel = orderLabels.total || 'Total';
-  const stateLabel = orderLabels.state || 'Status';
-  const metaSecond = total !== '—'
-    ? `${totalLabel}: ${total}`
-    : `${stateLabel}: ${state || '—'}`;
   const orderId = String(fetchId);
+  const displayOrderNumber = order.orderId || order.number || order.orderNumber || order.friendlyId
+    ? String(displaySource)
+    : formatOrderNumberForDisplay(String(displaySource));
   return {
     orderId,
-    displayOrderNumber: formatOrderNumberForDisplay(String(displaySource)),
+    displayOrderNumber,
     metaFirst: `${orderLabels.placed || 'Placed'}: ${dateDisplay}`,
-    metaSecond,
+    status: `${orderLabels.state || 'Status'}: ${state || '—'}`,
+    total: formatOrderTotalDisplay(order),
   };
 }
 
@@ -531,18 +553,25 @@ export function applyOrdersToWidget(widget, ordersPayload, orderMockLabels, copy
     btn.type = 'button';
     btn.className = 'account-order-mock-item';
     btn.dataset.orderId = o.orderId;
+    const summary = document.createElement('div');
+    summary.className = 'account-order-mock-summary';
     const idEl = document.createElement('span');
     idEl.className = 'account-order-mock-id';
     idEl.textContent = o.displayOrderNumber;
     idEl.title = o.orderId;
+    const totalEl = document.createElement('span');
+    totalEl.className = 'account-order-mock-total';
+    totalEl.textContent = o.total;
+    summary.append(idEl, totalEl);
     const meta = document.createElement('div');
     meta.className = 'account-order-mock-meta';
     const s1 = document.createElement('span');
     s1.textContent = o.metaFirst;
     const s2 = document.createElement('span');
-    s2.textContent = o.metaSecond;
+    s2.className = 'account-order-mock-status';
+    s2.textContent = o.status;
     meta.append(s1, s2);
-    btn.append(idEl, meta);
+    btn.append(summary, meta);
     li.append(btn);
     list.append(li);
   });
