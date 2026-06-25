@@ -38,7 +38,7 @@ const defaults = {
     'en-us': {
       stepCart: 'Cart',
       stepCheckout: 'Checkout',
-      stepConfirmation: 'Confirmation',
+      stepConfirmation: 'Done',
       checkoutStepsLabel: 'Checkout steps',
       remove: 'Remove',
       removeItem: 'Remove item',
@@ -81,7 +81,7 @@ const defaults = {
     'fr-ca': {
       stepCart: 'Panier',
       stepCheckout: 'Caisse',
-      stepConfirmation: 'Confirmation',
+      stepConfirmation: 'Terminé',
       checkoutStepsLabel: 'Étapes de la caisse',
       remove: 'Retirer',
       removeItem: "Retirer l'article",
