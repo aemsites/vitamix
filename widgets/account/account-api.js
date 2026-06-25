@@ -1206,7 +1206,6 @@ function renderOrderDetailReadout(container, order, copySlice = {}) {
   const payLine = buildOrderPaymentLine(o, od);
 
   container.append(meta, summaryRoot);
-  renderOrderStatusAction(container, o, od);
   if (addrWrap.childElementCount) {
     container.append(addrWrap);
   }
@@ -1225,6 +1224,9 @@ function renderOrderDetailReadout(container, order, copySlice = {}) {
     foot.append(wrap);
     container.append(foot);
   }
+
+  // Status check lives at the very bottom, after order summary, addresses, and payment.
+  renderOrderStatusAction(container, o, od);
 }
 
 /**

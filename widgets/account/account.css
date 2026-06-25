@@ -134,7 +134,7 @@
 .account-nav-item.is-active {
   background: var(--commerce-color-surface);
   font-weight: var(--commerce-font-weight-bold);
-  border-left: 3px solid var(--commerce-color-primary);
+  border-left: 3px solid var(--color-blue, #1b64b4);
   padding-left: calc(24px - 3px);
 }
 
@@ -408,7 +408,6 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  max-width: 42rem;
 }
 
 .account-panel[data-section='address'] .account-panel-body {
@@ -703,7 +702,6 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  max-width: 42rem;
 }
 
 .account-order-mock-list {
@@ -909,18 +907,28 @@
   margin-top: 16px;
 }
 
-.account-order-status-result-list,
-.account-order-status-definitions-list {
+.account-order-status-result .order-status-result-list,
+.account-order-status-definitions .order-status-definitions-list {
   margin: 0;
+  padding: 0;
 }
 
-.account-order-status-definitions-row dt {
+.account-order-status-definitions .order-status-definitions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.account-order-status-definitions .order-status-definitions-row dt {
   margin: 0;
+  font-size: var(--commerce-font-size-sm);
   font-weight: var(--commerce-font-weight-bold);
+  color: var(--commerce-color-text);
 }
 
-.account-order-status-definitions-row dd {
-  margin: 2px 0 0;
+.account-order-status-definitions .order-status-definitions-row dd {
+  margin: 4px 0 0;
+  font-size: var(--commerce-font-size-sm);
   color: var(--commerce-color-text-muted);
 }
 
@@ -949,18 +957,11 @@
   border-top: 1px solid var(--commerce-color-border);
 }
 
-.account-order-status-definitions-title {
-  margin: 0 0 8px;
-  font-size: var(--commerce-font-size-xs);
+.account-order-status-definitions .order-status-definitions-title {
+  margin: 0 0 12px;
+  font-size: var(--commerce-font-size-base);
   font-weight: var(--commerce-font-weight-bold);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--commerce-color-text-muted);
-}
-
-.account-order-status-definitions-row {
-  padding: 6px 0;
-  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-text);
 }
 
 @media (width >= 768px) {
