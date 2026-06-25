@@ -44,7 +44,9 @@ function addMonths(year, month, delta) {
 }
 
 function formatEasternDateTime(date) {
-  const { year, month, day, hour, minute } = getEasternParts(date);
+  const {
+    year, month, day, hour, minute,
+  } = getEasternParts(date);
   const hour24 = hour === 24 ? 0 : hour;
   const h12 = hour24 % 12 || 12;
   const ampm = hour24 < 12 ? 'am' : 'pm';
