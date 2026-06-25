@@ -185,6 +185,87 @@ html:not(.commerce-admin-auth-ok) body > :not(#commerce-admin-auth-root) {
   background: #f6f6f7;
 }
 
+.ca-login-form .auth-code-boxes {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin: 8px 0;
+}
+
+.ca-login-form .auth-code-box {
+  width: 48px;
+  height: 56px;
+  border: 1px solid #8c9196;
+  border-radius: 4px;
+  text-align: center;
+  font-size: 1.25rem;
+  font-weight: 600;
+  font-family: inherit;
+  color: #202223;
+  background: #fff;
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  padding: 0;
+}
+
+.ca-login-form .auth-code-box:focus {
+  outline: none;
+  border-color: #2c2c2e;
+  box-shadow: 0 0 0 3px rgb(0 0 0 / 10%);
+}
+
+.ca-login-form .auth-code-box.input-error,
+.ca-login-form .auth-code-box.input-error:focus {
+  border-color: #c5280c;
+  box-shadow: 0 0 0 3px rgb(197 40 12 / 12%);
+}
+
+.ca-login-form .auth-submit {
+  width: 100%;
+  padding: 0.75rem;
+  margin-top: 16px;
+  background: #2c2c2e;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.ca-login-form .auth-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ca-login-form .auth-submit:hover:not(:disabled) {
+  background: #1a1a1c;
+}
+
+.ca-login-form .auth-error {
+  color: #c5280c;
+  font-size: 0.8125rem;
+  min-height: 1.2em;
+  margin: 0;
+}
+
+.ca-login-form .auth-back {
+  border: none;
+  background: none;
+  color: #2c6ecb;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  padding: 0;
+  margin-top: 20px;
+  text-align: left;
+}
+
+.ca-login-form .auth-back:hover {
+  text-decoration: underline;
+}
+
 .commerce-admin-toast {
   position: fixed;
   bottom: 24px;
