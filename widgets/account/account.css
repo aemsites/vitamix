@@ -145,19 +145,19 @@
   padding: 10px 16px;
   font-size: var(--commerce-font-size-sm);
   font-weight: var(--commerce-font-weight-bold);
-  color: var(--commerce-color-error);
-  background: transparent;
-  border: 1px solid var(--commerce-color-border);
+  color: var(--commerce-color-primary-text, #fff);
+  background: var(--color-blue, #1b64b4);
+  border: 1px solid var(--color-blue, #1b64b4);
   border-radius: var(--commerce-button-radius);
   cursor: pointer;
   font-family: inherit;
-  text-align: left;
+  text-align: center;
   transition: background 0.15s, border-color 0.15s;
 }
 
 .account-logout:hover {
-  background: var(--commerce-color-error-bg);
-  border-color: var(--commerce-color-error-border);
+  background: color-mix(in srgb, var(--color-blue, #1b64b4) 88%, black);
+  border-color: color-mix(in srgb, var(--color-blue, #1b64b4) 88%, black);
 }
 
 .account-logout:disabled {
