@@ -66,7 +66,6 @@ function readAddressForm(form, accountEmail) {
     phone,
     email: String(fd.get('email') || '').trim() || accountEmail,
     isDefault: fd.get('isDefault') === 'on',
-    default: fd.get('isDefault') === 'on',
   };
   return body;
 }
@@ -96,7 +95,7 @@ function fillAddressForm(form, addr, accountEmail) {
   (form.querySelector('[name="email"]')).value = String(addr.email ?? accountEmail ?? '');
   /** @type {HTMLInputElement | null} */
   const defCb = form.querySelector('input[name="isDefault"]');
-  if (defCb) defCb.checked = addr.isDefault === true || addr.default === true;
+  if (defCb) defCb.checked = addr.isDefault === true;
   const countrySel = form.querySelector('[name="country"]');
   if (countrySel) {
     const c = String(addr.country || 'us').toLowerCase();
@@ -123,6 +122,10 @@ export function wireAccountAddressBook(widget, customerEmail, lang, marketLocale
   const errEl = widget.querySelector('.account-address-form-error');
   const saveBtn = widget.querySelector('.account-address-save');
   const cancelBtn = widget.querySelector('.account-address-cancel');
+  const dialogLoadingEl = widget.querySelector('.account-address-dialog-loading');
+  const addressLoadingEl = widget.querySelector('.account-address-loading');
+  const addressEmptyEl = widget.querySelector('.account-address-empty');
+  const addressListEl = widget.querySelector('.account-address-list');
   const countrySelect = form?.querySelector('[name="country"]');
   const stateSelect = form?.querySelector('[name="state"]');
   const zipLabel = form?.querySelector('[for="account-addr-zip"] .label-text');
@@ -189,13 +192,23 @@ export function wireAccountAddressBook(widget, customerEmail, lang, marketLocale
     fillRegionSelect(stateSelect, opts, ab.regionPlaceholder || 'Select…');
   };
 
+  const setDialogSubmitting = (submitting, label = '') => {
+    form.hidden = submitting;
+    if (dialogLoadingEl) {
+      dialogLoadingEl.hidden = !submitting;
+      dialogLoadingEl.textContent = label;
+    }
+  };
+
   const closeDialog = () => {
     dialog.close();
     editingId = null;
+    setDialogSubmitting(false);
   };
 
   const showAddDialog = () => {
     editingId = null;
+    setDialogSubmitting(false);
     if (errEl) {
       errEl.hidden = true;
       errEl.textContent = '';
@@ -209,6 +222,7 @@ export function wireAccountAddressBook(widget, customerEmail, lang, marketLocale
   };
 
   const showEditDialog = (raw) => {
+    setDialogSubmitting(false);
     if (errEl) {
       errEl.hidden = true;
       errEl.textContent = '';
@@ -229,6 +243,12 @@ export function wireAccountAddressBook(widget, customerEmail, lang, marketLocale
   });
 
   cancelBtn?.addEventListener('click', () => closeDialog());
+
+  const setAddressLoading = (loading) => {
+    if (addressLoadingEl) addressLoadingEl.hidden = !loading;
+    if (addressListEl) addressListEl.hidden = loading;
+    if (addressEmptyEl && loading) addressEmptyEl.hidden = true;
+  };
 
   const reloadList = async () => {
     const payload = await getCustomerAddresses(customerEmail);
@@ -251,6 +271,9 @@ export function wireAccountAddressBook(widget, customerEmail, lang, marketLocale
       return;
     }
     if (saveBtn) saveBtn.disabled = true;
+    setDialogSubmitting(true, editingId
+      ? (ab.updating || 'Updating address…')
+      : (ab.saving || 'Saving address…'));
     try {
       if (editingId) {
         await updateCustomerAddress(customerEmail, editingId, body);
@@ -260,6 +283,7 @@ export function wireAccountAddressBook(widget, customerEmail, lang, marketLocale
       closeDialog();
       await reloadList();
     } catch (err) {
+      setDialogSubmitting(false);
       if (errEl) {
         errEl.hidden = false;
         errEl.textContent = ab.saveError || (err instanceof Error ? err.message : String(err));
@@ -300,11 +324,14 @@ export function wireAccountAddressBook(widget, customerEmail, lang, marketLocale
     if (delBtn) {
       const ok = window.confirm(ab.deleteConfirm || 'Remove this address?');
       if (!ok) return;
+      setAddressLoading(true);
       try {
         await deleteCustomerAddress(customerEmail, id);
         await reloadList();
       } catch (err) {
         window.alert(ab.deleteError || (err instanceof Error ? err.message : String(err)));
+      } finally {
+        setAddressLoading(false);
       }
     }
   });
