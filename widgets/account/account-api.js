@@ -2,6 +2,7 @@ import { createOptimizedPicture } from '../../scripts/aem.js';
 import { authFetch } from '../../scripts/auth-api.js';
 import { formatPrice, getConfig } from '../../scripts/commerce-config.js';
 import { FORMS_ENDPOINT, getLocaleAndLanguage } from '../../scripts/scripts.js';
+import sortAccountOrdersNewestFirst from './order-sort.js';
 
 /**
  * GET URL for the signed-in user's forms profile (customer + newsletter opt-in status).
@@ -556,7 +557,7 @@ export function applyOrdersToWidget(widget, ordersPayload, orderMockLabels, copy
   const emptyEl = widget.querySelector('.account-orders-empty');
   if (!list) return;
   list.innerHTML = '';
-  const raw = normalizeOrderArray(ordersPayload);
+  const raw = sortAccountOrdersNewestFirst(normalizeOrderArray(ordersPayload));
   if (!raw.length) {
     if (emptyEl) {
       emptyEl.hidden = false;
@@ -565,37 +566,38 @@ export function applyOrdersToWidget(widget, ordersPayload, orderMockLabels, copy
     return;
   }
   if (emptyEl) emptyEl.hidden = true;
-  raw.forEach((item) => {
-    if (!item || typeof item !== 'object') return;
-    const o = mapOrderToDisplay(/** @type {Record<string, unknown>} */ (item), orderMockLabels);
-    const li = document.createElement('li');
-    li.className = 'account-order-mock-row';
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'account-order-mock-item';
-    btn.dataset.orderId = o.orderId;
-    const summary = document.createElement('div');
-    summary.className = 'account-order-mock-summary';
-    const idEl = document.createElement('span');
-    idEl.className = 'account-order-mock-id';
-    idEl.textContent = o.displayOrderNumber;
-    idEl.title = o.orderId;
-    const totalEl = document.createElement('span');
-    totalEl.className = 'account-order-mock-total';
-    totalEl.textContent = o.total;
-    summary.append(idEl, totalEl);
-    const meta = document.createElement('div');
-    meta.className = 'account-order-mock-meta';
-    const s1 = document.createElement('span');
-    s1.textContent = o.metaFirst;
-    const s2 = document.createElement('span');
-    s2.className = 'account-order-mock-status';
-    s2.textContent = o.status;
-    meta.append(s1, s2);
-    btn.append(summary, meta);
-    li.append(btn);
-    list.append(li);
-  });
+  raw
+    .filter((item) => item && typeof item === 'object')
+    .forEach((item) => {
+      const o = mapOrderToDisplay(/** @type {Record<string, unknown>} */ (item), orderMockLabels);
+      const li = document.createElement('li');
+      li.className = 'account-order-mock-row';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'account-order-mock-item';
+      btn.dataset.orderId = o.orderId;
+      const summary = document.createElement('div');
+      summary.className = 'account-order-mock-summary';
+      const idEl = document.createElement('span');
+      idEl.className = 'account-order-mock-id';
+      idEl.textContent = o.displayOrderNumber;
+      idEl.title = o.orderId;
+      const totalEl = document.createElement('span');
+      totalEl.className = 'account-order-mock-total';
+      totalEl.textContent = o.total;
+      summary.append(idEl, totalEl);
+      const meta = document.createElement('div');
+      meta.className = 'account-order-mock-meta';
+      const s1 = document.createElement('span');
+      s1.textContent = o.metaFirst;
+      const s2 = document.createElement('span');
+      s2.className = 'account-order-mock-status';
+      s2.textContent = o.status;
+      meta.append(s1, s2);
+      btn.append(summary, meta);
+      li.append(btn);
+      list.append(li);
+    });
 }
 
 /** If API wraps payload in `{ data: ... }`, unwrap one level. */
@@ -671,7 +673,7 @@ export async function renderAccountOrderList(widget, ordersPayload, copy = {}) {
   if (customerEmail && raw.length) {
     raw = await hydrateAccountOrderListItems(raw, customerEmail);
   }
-  applyOrdersToWidget(widget, raw, copy.orderMock || {}, copy);
+  applyOrdersToWidget(widget, sortAccountOrdersNewestFirst(raw), copy.orderMock || {}, copy);
 }
 
 /**
