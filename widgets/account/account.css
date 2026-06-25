@@ -809,9 +809,24 @@
 }
 
 .account-order-detail-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 320px;
   margin: 0;
   font-size: var(--commerce-font-size-sm);
   color: var(--commerce-color-text-muted);
+}
+
+.account-order-detail-loading::before {
+  content: '';
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--commerce-color-border);
+  border-top-color: var(--color-blue, #1b64b4);
+  border-radius: 50%;
+  animation: account-address-spin 0.8s linear infinite;
 }
 
 .account-order-detail-addresses {

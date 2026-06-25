@@ -440,25 +440,46 @@ export function formatOrderNumberForDisplay(raw) {
 }
 
 /**
+ * @param {unknown} raw
+ * @param {Record<string, string>} statusLabels
+ * @returns {string}
+ */
+function formatOrderStatus(raw, statusLabels = {}) {
+  if (raw == null || raw === '') return '—';
+  const key = String(raw).trim();
+  if (!key) return '—';
+  if (statusLabels[key]) return statusLabels[key];
+  return key
+    .replaceAll('_', ' ')
+    .replaceAll('-', ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/**
  * @param {Record<string, unknown>} order
- * @param {{ placed?: string, total?: string, state?: string }} orderLabels
+ * @param {{
+ *   placed?: string,
+ *   total?: string,
+ *   state?: string,
+ *   statuses?: Record<string, string>,
+ * }} orderLabels
  */
 function mapOrderToDisplay(order, orderLabels) {
   const fetchId = order.id || order.friendlyId || order.orderId || order.number || '—';
-  const displaySource = order.orderId || order.number || order.orderNumber
-    || order.friendlyId || order.id || fetchId;
+  const displaySource = order.friendlyId || order.orderId || order.number || order.orderNumber
+    || order.id || fetchId;
   const dateRaw = order.createdAt || order.created_at || order.date || order.placedAt;
   const dateDisplay = formatIsoForUi(dateRaw);
-  const state = order.state != null ? String(order.state) : '';
+  const state = formatOrderStatus(order.state, orderLabels.statuses || {});
   const orderId = String(fetchId);
-  const displayOrderNumber = order.orderId || order.number || order.orderNumber || order.friendlyId
+  const displayOrderNumber = order.friendlyId || order.orderId || order.number || order.orderNumber
     ? String(displaySource)
     : formatOrderNumberForDisplay(String(displaySource));
   return {
     orderId,
     displayOrderNumber,
     metaFirst: `${orderLabels.placed || 'Placed'}: ${dateDisplay}`,
-    status: `${orderLabels.state || 'Status'}: ${state || '—'}`,
+    status: `${orderLabels.state || 'Status'}: ${state}`,
     total: formatOrderTotalDisplay(order),
   };
 }
@@ -915,7 +936,8 @@ function renderOrderDetailReadout(container, order, copySlice = {}) {
 
   const o = /** @type {Record<string, unknown>} */ (order);
   const od = /** @type {Record<string, string>} */ (copySlice.orderDetail || {});
-  const om = /** @type {{ placed?: string, state?: string }} */ (copySlice.orderMock || {});
+  /** @type {{ placed?: string, state?: string, statuses?: Record<string, string> }} */
+  const om = copySlice.orderMock || {};
   const s = getConfig().getStrings();
 
   const meta = document.createElement('div');
@@ -940,8 +962,7 @@ function renderOrderDetailReadout(container, order, copySlice = {}) {
     pushMetaRow(om.placed || od.placedOn || 'Placed', formatIsoForUi(placedRaw));
   }
   if (o.state != null) {
-    const stateStr = String(o.state).replaceAll('_', ' ');
-    pushMetaRow(om.state || od.status || 'Status', stateStr);
+    pushMetaRow(om.state || od.status || 'Status', formatOrderStatus(o.state, om.statuses || {}));
   }
 
   const items = Array.isArray(o.items) ? o.items.filter((x) => x && typeof x === 'object') : [];

@@ -89,7 +89,22 @@
     "orderMock": {
       "placed": "Placed",
       "total": "Total",
-      "state": "Status"
+      "state": "Status",
+      "statuses": {
+        "pending": "Pending",
+        "processing": "Processing",
+        "payment_pending": "Payment pending",
+        "payment_authorized": "Payment authorized",
+        "payment_cancelled": "Payment cancelled",
+        "paid": "Paid",
+        "shipped": "Shipped",
+        "complete": "Complete",
+        "completed": "Completed",
+        "cancelled": "Cancelled",
+        "canceled": "Canceled",
+        "refunded": "Refunded",
+        "failed": "Failed"
+      }
     },
     "communications": {
       "title": "Communications",
@@ -207,7 +222,22 @@
     "orderMock": {
       "placed": "Passée le",
       "total": "Total",
-      "state": "Statut"
+      "state": "Statut",
+      "statuses": {
+        "pending": "En attente",
+        "processing": "En traitement",
+        "payment_pending": "Paiement en attente",
+        "payment_authorized": "Paiement autorisé",
+        "payment_cancelled": "Paiement annulé",
+        "paid": "Payée",
+        "shipped": "Expédiée",
+        "complete": "Terminée",
+        "completed": "Terminée",
+        "cancelled": "Annulée",
+        "canceled": "Annulée",
+        "refunded": "Remboursée",
+        "failed": "Échec"
+      }
     },
     "communications": {
       "title": "Communications",
@@ -325,7 +355,22 @@
     "orderMock": {
       "placed": "Realizado",
       "total": "Total",
-      "state": "Estado"
+      "state": "Estado",
+      "statuses": {
+        "pending": "Pendiente",
+        "processing": "En proceso",
+        "payment_pending": "Pago pendiente",
+        "payment_authorized": "Pago autorizado",
+        "payment_cancelled": "Pago cancelado",
+        "paid": "Pagado",
+        "shipped": "Enviado",
+        "complete": "Completado",
+        "completed": "Completado",
+        "cancelled": "Cancelado",
+        "canceled": "Cancelado",
+        "refunded": "Reembolsado",
+        "failed": "Error"
+      }
     },
     "communications": {
       "title": "Comunicaciones",
