@@ -582,6 +582,7 @@ export function applyOrdersToWidget(widget, ordersPayload, orderMockLabels, copy
       btn.type = 'button';
       btn.className = 'account-order-mock-item';
       btn.dataset.orderId = o.orderId;
+      btn.dataset.orderNumber = o.displayOrderNumber;
       const summary = document.createElement('div');
       summary.className = 'account-order-mock-summary';
       const idEl = document.createElement('span');
@@ -1278,14 +1279,15 @@ export function wireOrderDetailInteractions(widget, copySlice = {}) {
   list?.addEventListener('click', async (e) => {
     const btn = e.target.closest('button.account-order-mock-item');
     if (!btn) return;
-    const { orderId } = btn.dataset;
+    const { orderId, orderNumber } = btn.dataset;
     const emailEl = widget.querySelector('.account-email-muted');
     const customerEmail = (emailEl?.textContent || '').trim();
     if (!orderId || !customerEmail) return;
 
     showDetail();
     if (heading) {
-      heading.textContent = formatOrderNumberForDisplay(orderId);
+      // Show the merchant order number verbatim; only fall back to the formatted id.
+      heading.textContent = orderNumber || formatOrderNumberForDisplay(orderId);
       heading.title = orderId;
     }
     if (readout) {
