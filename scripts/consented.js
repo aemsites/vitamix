@@ -1,10 +1,11 @@
 import { loadScript } from './aem.js';
 import './consented/newsletter.js';
 import {
-  ensureAnalyticsTrackingPatched,
+  configureAnalyticsTrackingServers,
+  ensureAnalyticsTrackingConfigured,
   getDeploymentEnv,
-  installAnalyticsTrackingServers,
-} from './consented/instrumentation-lib.js';
+  initInstrumentation,
+} from './consented/instrumentation.js';
 
 document.body.classList.add('consented');
 
@@ -24,7 +25,7 @@ currentEnvironment.dataset.deploymentEnv = getDeploymentEnv();
 currentEnvironment.dataset.templatePath = '/conf/vitamix/settings/wcm/templates/default-page';
 document.body.appendChild(currentEnvironment);
 
-installAnalyticsTrackingServers();
+configureAnalyticsTrackingServers();
 
 const chatbot = document.createElement('div');
 chatbot.id = 'chatbot-container';
@@ -35,7 +36,7 @@ loadScript('https://www.vitamix.com/etc.clientlibs/core/wcm/components/commons/s
 
 await loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-library.lc-259cf15444c5fe1f89e5c54df7b6e1e9-lc.min.js');
 await loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-analytics.lc-26814920488a848ff91c1f425646d010-lc.min.js');
-installAnalyticsTrackingServers();
+configureAnalyticsTrackingServers();
 loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-base.lc-daf5b8dac79e9cf7cb1c0b30d8372e7a-lc.min.js');
 
 if (currentEnvironment.dataset.deploymentEnv === 'prod') {
@@ -46,9 +47,11 @@ if (currentEnvironment.dataset.deploymentEnv === 'prod') {
   await loadScript('https://assets.adobedtm.com/8639b8ee2552/0f7a35c4f04b/launch-EN10955306e5aa4722aaabcdd1910448ad-development.min.js');
 }
 
-// Fire prodView before page-view beacon; Launch prodView rule only setVariables.
-import('./consented/instrumentation.js');
-ensureAnalyticsTrackingPatched();
+configureAnalyticsTrackingServers();
+
+// PDP prodView via Launch direct call; Launch rule maps digitalData and sends the beacon.
+initInstrumentation();
+ensureAnalyticsTrackingConfigured();
 
 const { pathname } = window.location;
 
