@@ -66,6 +66,30 @@ test('validateField: empty non-required zip returns null', () => {
 });
 
 // ---------------------------------------------------------------------------
+// validateField — telephone
+// ---------------------------------------------------------------------------
+
+test('validateField: valid 10-digit telephone returns null', () => {
+  const input = makeInput('shipping-telephone', '(555) 123-4567', { required: true });
+  assert.equal(validateField(input), null);
+});
+
+test('validateField: +1 prefixed telephone returns null', () => {
+  const input = makeInput('telephone', '1 (555) 123-4567', { required: true });
+  assert.equal(validateField(input), null);
+});
+
+test('validateField: short telephone returns phone error', () => {
+  const input = makeInput('telephone', '(555) 123', { required: true });
+  assert.notEqual(validateField(input), null);
+});
+
+test('validateField: empty required telephone returns required error', () => {
+  const input = makeInput('telephone', '', { required: true });
+  assert.notEqual(validateField(input), null);
+});
+
+// ---------------------------------------------------------------------------
 // validateForm — collapsed section expansion
 // ---------------------------------------------------------------------------
 
