@@ -348,6 +348,70 @@ function createTimeline(items, bestItem = null, date = new Date(), onDateChange 
   return container;
 }
 
+const AEM_LIVE_HOST = 'main--vitamix--aemsites.aem.live';
+
+const LOCALE_FLAGS = {
+  us: '🇺🇸',
+  ca: '🇨🇦',
+  mx: '🇲🇽',
+};
+
+function parseScheduleMeta(schedulePath) {
+  const segments = schedulePath.split('/').filter(Boolean);
+  const locale = segments[0]?.toLowerCase() || '';
+  const filename = segments[segments.length - 1] || '';
+  const name = filename.replace(/\.json$/i, '');
+  return {
+    name,
+    flag: LOCALE_FLAGS[locale] || '',
+  };
+}
+
+function isPreviewEnv() {
+  const { hostname } = window.location;
+  return hostname.endsWith('.aem.page')
+    || hostname === 'localhost'
+    || hostname === '127.0.0.1';
+}
+
+function getPreviewEnvUrl() {
+  const url = new URL(window.location.href);
+  const { hostname } = window.location;
+  if (hostname.endsWith('.aem.live')) {
+    url.hostname = hostname.replace('.aem.live', '.aem.page');
+  }
+  return url.href;
+}
+
+function getLiveEnvUrl() {
+  const url = new URL(window.location.href);
+  const { hostname } = window.location;
+  if (hostname.endsWith('.aem.page')) {
+    url.hostname = hostname.replace('.aem.page', '.aem.live');
+    return url.href;
+  }
+  if (hostname.endsWith('.aem.live')) {
+    return url.href;
+  }
+  url.protocol = 'https:';
+  url.port = '';
+  url.hostname = AEM_LIVE_HOST;
+  return url.href;
+}
+
+function setupEnvToggle() {
+  const previewLink = document.getElementById('env-preview');
+  const liveLink = document.getElementById('env-live');
+  const isPreview = isPreviewEnv();
+
+  previewLink.href = getPreviewEnvUrl();
+  liveLink.href = getLiveEnvUrl();
+  previewLink.classList.toggle('is-active', isPreview);
+  liveLink.classList.toggle('is-active', !isPreview);
+  previewLink.setAttribute('aria-current', isPreview ? 'true' : 'false');
+  liveLink.setAttribute('aria-current', !isPreview ? 'true' : 'false');
+}
+
 function buildPageUrl(pagePath, date) {
   const url = new URL(pagePath, window.location.origin);
   url.searchParams.set('simulateDate', formatEasternDateTime(date));
@@ -373,11 +437,18 @@ async function init() {
   const panel = document.getElementById('simulator-panel');
   const timeline = document.getElementById('timeline');
   const frame = document.getElementById('page-frame');
+  const { name: scheduleName, flag: scheduleFlag } = parseScheduleMeta(schedulePath);
+
+  document.getElementById('schedule-name').textContent = scheduleName;
+  document.getElementById('schedule-flag').textContent = scheduleFlag;
 
   panel.hidden = false;
   frame.hidden = false;
   showError('');
 
+  setupEnvToggle();
+
+  let currentPromotion;
   let items = [];
   try {
     const resp = await fetch(schedulePath);
@@ -392,7 +463,6 @@ async function init() {
     return;
   }
 
-  let currentPromotion;
   const updateIframeIfPromotionChanged = (date, activeItem) => {
     const promotion = activeItem?.promotion ?? null;
     if (promotion === currentPromotion) return;

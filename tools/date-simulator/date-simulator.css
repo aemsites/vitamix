@@ -20,6 +20,58 @@ body {
   border-bottom: 1px solid #e0e0e0;
 }
 
+.simulator-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.schedule-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.schedule-flag {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.env-toggle {
+  display: inline-flex;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.env-toggle-option {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  background: #fff;
+  color: #333;
+  text-decoration: none;
+}
+
+.env-toggle-option + .env-toggle-option {
+  border-left: 1px solid #ccc;
+}
+
+.env-toggle-option.is-active {
+  background: #333;
+  color: #fff;
+  cursor: default;
+  pointer-events: none;
+}
+
+.env-toggle-option:not(.is-active):hover {
+  background: #f5f5f5;
+}
+
 .error {
   margin: 1rem;
   padding: 0.75rem 1rem;
