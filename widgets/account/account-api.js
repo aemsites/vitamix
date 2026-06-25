@@ -3,6 +3,12 @@ import { authFetch } from '../../scripts/auth-api.js';
 import { formatPrice, getConfig } from '../../scripts/commerce-config.js';
 import { FORMS_ENDPOINT, getLocaleAndLanguage } from '../../scripts/scripts.js';
 import sortAccountOrdersNewestFirst from './order-sort.js';
+import {
+  loadOrderStatusCopy,
+  performOrderStatusLookup,
+  renderOrderStatusResult,
+  renderOrderStatusDefinitions,
+} from '../forms/order-status-lookup.js';
 
 /**
  * GET URL for the signed-in user's forms profile (customer + newsletter opt-in status).
@@ -923,6 +929,86 @@ function buildReadOnlyOrderLineItem(item, currencyCode, qtyLabel) {
 }
 
 /**
+ * Best merchant order number to use for an order-status lookup.
+ *
+ * @param {Record<string, unknown>} order
+ * @returns {string}
+ */
+function getOrderStatusLookupNumber(order) {
+  return String(
+    order.friendlyId || order.number || order.orderNumber || order.orderId || order.id || '',
+  );
+}
+
+/**
+ * Appends an on-demand "Check status" control to the order detail readout. The status result and
+ * status definitions are only rendered after the customer clicks, since the lookup can be slow.
+ *
+ * @param {HTMLElement} container
+ * @param {Record<string, unknown>} order
+ * @param {Record<string, string>} od - orderDetail copy slice
+ */
+function renderOrderStatusAction(container, order, od) {
+  const lookupNumber = getOrderStatusLookupNumber(order);
+  if (!lookupNumber) return;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'account-order-status';
+
+  const actionRow = document.createElement('div');
+  actionRow.className = 'account-order-status-action';
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'button emphasis account-order-status-check';
+  btn.textContent = od.checkStatus || 'Check status';
+  const loading = document.createElement('span');
+  loading.className = 'account-order-status-loading';
+  loading.hidden = true;
+  loading.setAttribute('role', 'status');
+  loading.setAttribute('aria-live', 'polite');
+  loading.textContent = od.checkingStatus || 'Checking order…';
+  actionRow.append(btn, loading);
+
+  const resultEl = document.createElement('div');
+  resultEl.className = 'account-order-status-result';
+  resultEl.hidden = true;
+  const definitionsEl = document.createElement('div');
+  definitionsEl.className = 'account-order-status-definitions';
+  definitionsEl.hidden = true;
+  const errEl = document.createElement('p');
+  errEl.className = 'account-order-status-error';
+  errEl.hidden = true;
+
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    loading.hidden = false;
+    errEl.hidden = true;
+    errEl.textContent = '';
+    resultEl.hidden = true;
+    definitionsEl.hidden = true;
+    try {
+      const { language } = getLocaleAndLanguage();
+      const lang = (language || 'en_us').split('_')[0];
+      const copy = await loadOrderStatusCopy(lang);
+      const result = await performOrderStatusLookup(lookupNumber);
+      renderOrderStatusResult(result, copy, resultEl);
+      renderOrderStatusDefinitions(copy, definitionsEl);
+      resultEl.hidden = false;
+      definitionsEl.hidden = false;
+    } catch {
+      errEl.hidden = false;
+      errEl.textContent = od.statusError || 'Could not check the order status. Please try again.';
+    } finally {
+      loading.hidden = true;
+      btn.disabled = false;
+    }
+  });
+
+  wrap.append(actionRow, errEl, resultEl, definitionsEl);
+  container.append(wrap);
+}
+
+/**
  * Renders checkout-style order summary (shared `order-summary` + `cart-item` classes).
  *
  * @param {HTMLElement} container
@@ -1120,6 +1206,7 @@ function renderOrderDetailReadout(container, order, copySlice = {}) {
   const payLine = buildOrderPaymentLine(o, od);
 
   container.append(meta, summaryRoot);
+  renderOrderStatusAction(container, o, od);
   if (addrWrap.childElementCount) {
     container.append(addrWrap);
   }

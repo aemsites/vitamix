@@ -862,6 +862,107 @@
   color: var(--commerce-color-error-text, #b00020);
 }
 
+.account-order-status {
+  margin-top: 24px;
+  max-width: 42rem;
+}
+
+.account-order-status-action {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.account-order-status-check.button.emphasis {
+  min-width: 0;
+}
+
+.account-order-status-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-text-muted);
+}
+
+.account-order-status-loading[hidden] {
+  display: none;
+}
+
+.account-order-status-loading::before {
+  content: '';
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--commerce-color-border);
+  border-top-color: var(--color-blue, #1b64b4);
+  border-radius: 50%;
+  animation: account-address-spin 0.8s linear infinite;
+}
+
+.account-order-status-error {
+  margin: 12px 0 0;
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-error-text, #b00020);
+}
+
+.account-order-status-result {
+  margin-top: 16px;
+}
+
+.account-order-status-result-list,
+.account-order-status-definitions-list {
+  margin: 0;
+}
+
+.account-order-status-definitions-row dt {
+  margin: 0;
+  font-weight: var(--commerce-font-weight-bold);
+}
+
+.account-order-status-definitions-row dd {
+  margin: 2px 0 0;
+  color: var(--commerce-color-text-muted);
+}
+
+.account-order-status-result .order-status-result-row dt {
+  margin: 0;
+  color: var(--commerce-color-text-muted);
+}
+
+.account-order-status-result .order-status-result-row dd {
+  margin: 0;
+  font-weight: var(--commerce-font-weight-bold);
+}
+
+.account-order-status-result .order-status-result-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--commerce-color-border);
+  font-size: var(--commerce-font-size-sm);
+}
+
+.account-order-status-definitions {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--commerce-color-border);
+}
+
+.account-order-status-definitions-title {
+  margin: 0 0 8px;
+  font-size: var(--commerce-font-size-xs);
+  font-weight: var(--commerce-font-weight-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--commerce-color-text-muted);
+}
+
+.account-order-status-definitions-row {
+  padding: 6px 0;
+  font-size: var(--commerce-font-size-sm);
+}
+
 @media (width >= 768px) {
   .account-layout {
     display: grid;

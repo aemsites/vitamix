@@ -129,7 +129,10 @@
       "shippingAddress": "Shipping address",
       "billingAddress": "Billing address",
       "payment": "Payment",
-      "paymentCard": "Card ending {{lastFour}}"
+      "paymentCard": "Card ending {{lastFour}}",
+      "checkStatus": "Check status",
+      "checkingStatus": "Checking order…",
+      "statusError": "Could not check the order status. Please try again."
     }
   },
   "fr": {
@@ -262,7 +265,10 @@
       "shippingAddress": "Adresse de livraison",
       "billingAddress": "Adresse de facturation",
       "payment": "Paiement",
-      "paymentCard": "Carte se terminant par {{lastFour}}"
+      "paymentCard": "Carte se terminant par {{lastFour}}",
+      "checkStatus": "Vérifier le statut",
+      "checkingStatus": "Vérification de la commande…",
+      "statusError": "Impossible de vérifier le statut de la commande. Veuillez réessayer."
     }
   },
   "es": {
@@ -395,7 +401,10 @@
       "shippingAddress": "Dirección de envío",
       "billingAddress": "Dirección de facturación",
       "payment": "Pago",
-      "paymentCard": "Tarjeta terminada en {{lastFour}}"
+      "paymentCard": "Tarjeta terminada en {{lastFour}}",
+      "checkStatus": "Consultar estado",
+      "checkingStatus": "Consultando pedido…",
+      "statusError": "No se pudo consultar el estado del pedido. Inténtelo de nuevo."
     }
   }
 }
