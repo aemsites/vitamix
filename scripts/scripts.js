@@ -805,8 +805,9 @@ function decorateButtons(main) {
       a.className = 'button';
       const strong = a.closest('strong');
       const em = a.closest('em');
-      const sup = a.closest('sup');
-      const sub = a.closest('sub');
+      // da.live places sup/sub inside the <a>, so check children not ancestors
+      const hasSup = a.querySelector('sup') !== null;
+      const hasSub = a.querySelector('sub') !== null;
       if (strong && em) {
         a.classList.add('accent');
         const outer = strong.contains(em) ? strong : em;
@@ -817,14 +818,14 @@ function decorateButtons(main) {
       } else if (em) {
         a.classList.add('link');
         em.replaceWith(a);
-      } else if (sup) {
-        // superscript → white outline button (for dark/image backgrounds)
+      } else if (hasSup) {
+        // superscript inside link → white outline button (for dark/image backgrounds)
         a.classList.add('outline-white');
-        sup.replaceWith(a);
-      } else if (sub) {
-        // subscript → charcoal outline button (for light backgrounds)
+        a.querySelector('sup').replaceWith(...a.querySelector('sup').childNodes);
+      } else if (hasSub) {
+        // subscript inside link → charcoal outline button (for light backgrounds)
         a.classList.add('outline-charcoal');
-        sub.replaceWith(a);
+        a.querySelector('sub').replaceWith(...a.querySelector('sub').childNodes);
       }
       p.className = 'button-wrapper';
     }
