@@ -35,7 +35,7 @@ function getAddressFields(strings, isCanada) {
       name: 'zip', type: 'text', label: isCanada ? strings.postalCode : strings.zip, required: true, autocomplete: 'postal-code', width: 'third', inputmode: isCanada ? undefined : 'numeric',
     },
     {
-      name: 'telephone', type: 'tel', label: strings.phone, autocomplete: 'tel', format: 'phone',
+      name: 'telephone', type: 'tel', label: strings.phone, required: true, autocomplete: 'tel', format: 'phone',
     },
   ];
 }
