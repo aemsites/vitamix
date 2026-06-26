@@ -1040,7 +1040,7 @@ function buildJournalHumanView(data) {
   if (entries.length === 0) {
     const p = document.createElement('p');
     p.className = 'orders-detail-empty';
-    p.textContent = 'No journal entries for this order.';
+    p.textContent = 'Journal entries are still being ingested. They can take up to five minutes after order creation to appear.';
     root.appendChild(p);
     return root;
   }
