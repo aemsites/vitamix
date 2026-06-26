@@ -5,6 +5,7 @@ import {
   getPayPalSession,
 } from '../commerce-api.js';
 import { getLocaleAndLanguage } from '../scripts.js';
+import { getUser, isLoggedIn } from '../auth-api.js';
 import { logOperation, getCheckoutId } from '../operations-log.js';
 
 let sdkLoadPromise = null;
@@ -261,11 +262,15 @@ export default {
             getLocaleAndLanguage(false, true).language,
           );
           const customerTimezone = getCustomerTimezone();
+          // When signed in, the order owner is the commerce account. PayPal may
+          // return a different payer email, which remains on billing/shipping.
+          const accountEmail = isLoggedIn() ? getUser()?.email : '';
+          const customerEmail = accountEmail || session.payer.email || '';
           const orderBody = {
             customer: {
               firstName: session.payer.firstName,
               lastName: session.payer.lastName,
-              email: session.payer.email,
+              email: customerEmail,
               phone: '',
             },
             shipping: {

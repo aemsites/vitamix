@@ -92,18 +92,23 @@ async function handleShippingOptionsChange(data, actions, closureState, callback
   return undefined;
 }
 
-/** @param {object} callbacks @param {{ getPayPalSessionFn: Function }} deps */
+/**
+ * @param {object} callbacks
+ * @param {{ getPayPalSessionFn: Function, isLoggedInFn?: Function, getUserFn?: Function }} deps
+ */
 async function handleApprove(callbacks, deps) {
   try {
     const state = callbacks.getState();
     const session = await deps.getPayPalSessionFn(state.paypalSessionId);
     const cart = callbacks.getCart();
     const config = callbacks.getConfig();
+    const accountEmail = deps.isLoggedInFn?.() ? deps.getUserFn?.()?.email : '';
+    const customerEmail = accountEmail || session.payer.email || '';
     const orderBody = {
       customer: {
         firstName: session.payer.firstName,
         lastName: session.payer.lastName,
-        email: session.payer.email,
+        email: customerEmail,
         phone: '',
       },
       shipping: {
@@ -461,6 +466,23 @@ test.describe('onApprove callback', () => {
     expect(orderBody.shippingMethod.id).toBe('std');
     expect(orderBody.estimateToken).toBe('est-tok');
     expect(orderBody.country).toBe('us');
+  });
+
+  test('uses authenticated account email for order customer when signed in', async () => {
+    const state = makeState({ paypalSessionId: 'PP-TEST-001', currentEstimateToken: 'est-tok' });
+    let orderBody;
+    const callbacks = makeCallbacks(state, {
+      createOrder: async (body) => { orderBody = body; return { order: { id: 'ORD-001' } }; },
+    });
+    const deps = {
+      getPayPalSessionFn: async () => SESSION,
+      isLoggedInFn: () => true,
+      getUserFn: () => ({ email: 'account@example.com' }),
+    };
+    await handleApprove(callbacks, deps);
+    expect(orderBody.customer.email).toBe('account@example.com');
+    expect(orderBody.shipping.email).toBe('john@example.com');
+    expect(orderBody.billing.email).toBe('john@example.com');
   });
 
   test('calls initiatePayment with provider=paypal-express, paymentMethod=paypal, paypalOrderId', async () => {
