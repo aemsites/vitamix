@@ -1,4 +1,4 @@
-import { formatPrice, getOfferPricing } from '../../scripts/scripts.js';
+import { formatPrice, getOfferPricing, getPdpOverride } from '../../scripts/scripts.js';
 
 /**
  * Renders the pricing section of the PDP block.
@@ -9,8 +9,10 @@ export default function renderPricing(ph, block, variant) {
   const pricingContainer = document.createElement('div');
   pricingContainer.classList.add('pricing');
 
-  // Don't render pricing if addToCart is set to No
-  if (window.jsonLdData?.custom?.addToCart === 'No') {
+  // Don't render pricing if addToCart is set to No.
+  // Authored `addToCart` override wins over the product bus custom.addToCart.
+  const effectiveAddToCart = getPdpOverride('addToCart') || window.jsonLdData?.custom?.addToCart;
+  if (effectiveAddToCart === 'No') {
     return pricingContainer;
   }
 

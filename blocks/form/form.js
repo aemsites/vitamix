@@ -485,6 +485,7 @@ function enableFooterSignUp(form) {
     const entries = Object.fromEntries(data.entries());
     const { email, mobile, optIn } = entries;
     const country = window.location.pathname.split('/')[1];
+    const { locale, language } = getLocaleAndLanguage();
     let leadSource = `sub-em-footer-${country}`;
     if (form.closest('dialog')) {
       leadSource = `sub-em-modal-${country}`;
@@ -493,15 +494,14 @@ function enableFooterSignUp(form) {
       leadSource = `sub-em-${window.leadSourceOverride}-${country}`;
     }
 
-    const { locale, language } = getLocaleAndLanguage();
     const payload = {
       formId: `${locale}/${language}/newsletter`,
-      pageUrl: window.location.href,
       email,
       mobile,
-      smsOptIn: optIn,
-      emailOptIn: true,
-      leadSource,
+      sms_optin: optIn ? '1' : '0',
+      lead_source: leadSource,
+      pageUrl: window.location.href,
+      actionUrl: `/${locale}/${language}/rest/V1/vitamix-api/newslettersubscribe`,
     };
     try {
       const url = getFormSubmissionUrl();

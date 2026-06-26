@@ -4,6 +4,35 @@
   animation: linkchecker-pulse 1.5s ease-in-out infinite;
 }
 
+.linkchecker-schedule-badge {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 9999;
+}
+
+.linkchecker-schedule-link {
+  display: inline-block;
+  padding: 0.6rem 1rem;
+  border-radius: 999px;
+  background: #d32f2f;
+  color: #fff;
+  font-family: system-ui, sans-serif;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  text-transform: uppercase;
+  box-shadow: 0 4px 14px rgb(211 47 47 / 45%);
+  animation: linkchecker-schedule-pulse 2s ease-in-out infinite;
+}
+
+.linkchecker-schedule-link:any-link {
+  background: #b71c1c;
+  color: #fff;
+  text-decoration: none;
+}
+
 @keyframes linkchecker-pulse {
   0%, 100% {
     outline-color: #f00;
@@ -13,5 +42,17 @@
   50% {
     outline-color: #f60;
     outline-offset: 6px;
+  }
+}
+
+@keyframes linkchecker-schedule-pulse {
+  0%, 100% {
+    box-shadow: 0 4px 14px rgb(211 47 47 / 45%);
+    transform: scale(1);
+  }
+
+  50% {
+    box-shadow: 0 6px 22px rgb(211 47 47 / 60%);
+    transform: scale(1.03);
   }
 }

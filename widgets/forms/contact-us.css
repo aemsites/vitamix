@@ -72,3 +72,33 @@
   background-color: var(--color-gray-900);
   border-color: var(--color-gray-900);
 }
+
+.forms-contact-us .contact-us-conditional[aria-hidden="true"],
+.forms-contact-us .contact-us-discount-info[aria-hidden="true"],
+.forms-contact-us .contact-us-actions[aria-hidden="true"] {
+  display: none;
+}
+
+.forms-contact-us .contact-us-form textarea {
+  resize: vertical;
+  min-height: 5em;
+}
+
+.forms-contact-us .contact-us-discount-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-100);
+}
+
+.forms-contact-us .contact-us-discount-info .button {
+  align-self: flex-start;
+  background-color: var(--color-charcoal);
+  border-color: var(--color-charcoal);
+  color: var(--color-white);
+}
+
+.forms-contact-us .contact-us-discount-info .button:hover,
+.forms-contact-us .contact-us-discount-info .button:focus {
+  background-color: var(--color-gray-900);
+  border-color: var(--color-gray-900);
+}

@@ -1,6 +1,7 @@
 import { getMetadata, toClassName, fetchPlaceholders } from '../../scripts/aem.js';
 import { formatTime, formatServings, getLocaleAndLanguage } from '../../scripts/scripts.js';
 import { getHiddenContainers, isHiddenContainer } from './recipe-containers.js';
+import linkRecipeMentions from './recipe-links.js';
 
 function wrapInDiv(element, className) {
   if (!element) return;
@@ -366,4 +367,8 @@ export default async function decorate(block) {
       console.error('Error loading recipe containers:', error);
     }
   }
+
+  setTimeout(() => {
+    linkRecipeMentions(block, locale, language, recipeTitle);
+  }, 2000);
 }
