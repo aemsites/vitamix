@@ -1,4 +1,4 @@
-import { loadCSS } from '../../scripts/aem.js';
+import { loadCSS, getMetadata } from '../../scripts/aem.js';
 
 loadCSS('/tools/linkchecker/linkchecker.css');
 
@@ -20,4 +20,23 @@ function checkLinks() {
   });
 }
 
+function addScheduleLink() {
+  const schedule = getMetadata('schedule');
+  const badge = document.createElement('div');
+  badge.className = 'linkchecker-schedule-badge';
+
+  const link = document.createElement('a');
+  link.href = `/tools/date-simulator/index.html?page=${encodeURIComponent(window.location.pathname)}`;
+  link.textContent = `Schedule: ${schedule}`;
+  link.target = '_blank';
+  link.classList.add('linkchecker-schedule-link');
+
+  badge.append(link);
+  document.body.append(badge);
+}
+
 setTimeout(checkLinks, 2000);
+
+if (getMetadata('schedule')) {
+  setTimeout(addScheduleLink, 2000);
+}

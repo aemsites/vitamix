@@ -151,7 +151,7 @@ main > .navigation-container.section ~ .section h6 {
   gap: 1ch;
 }
 
-.navigation:not([data-nav*="post"]) .menu nav ul {
+.navigation:not(.jump, [data-nav*="post"]) .menu nav ul {
   justify-content: space-between;
 }
 

@@ -77,6 +77,17 @@ function useFcors() {
 }
 
 /**
+ * Same-origin base path for owner's manuals assets (JSON + PDFs under /assets/manuals/{locale}/).
+ * @param {string} locale - Region (us, ca, mx, vr)
+ * @returns {string}
+ */
+function manualsAssetBase(locale) {
+  const loc = ['us', 'ca', 'mx', 'vr'].includes(locale) ? locale : 'us';
+  const path = `/assets/manuals/${loc}`;
+  return `${window.hlx?.codeBasePath || ''}${path}`;
+}
+
+/**
  * Fetch URL via fcors proxy for non-prod origins.
  * @param {string} url - Path (e.g. /us/en_us/products/index.json)
  * @returns {Promise<Response>}
@@ -114,7 +125,37 @@ function normalizeProduct(row, locale, language) {
 }
 
 /**
- * Fetch and merge all search indices (articles, recipes, locale query-index, products).
+ * Owner's manuals sheet (same shape as AEM asset JSON).
+ * @param {Object} row
+ * @param {string} locale
+ */
+function normalizeManual(row, locale) {
+  const filename = (row.filename || '').trim();
+  const base = manualsAssetBase(locale);
+  const path = filename ? `${base}/${encodeURIComponent(filename)}` : '';
+  return {
+    type: 'manual',
+    path,
+    title: (row.title || '').trim(),
+    description: (row.summary || '').trim(),
+    image: '',
+  };
+}
+
+/**
+ * @param {string} locale
+ * @returns {Promise<Array<Object>>}
+ */
+async function fetchManualRows(locale) {
+  const url = `${manualsAssetBase(locale)}/manuals.json`;
+  const res = await fetch(url);
+  if (!res.ok) return [];
+  const json = await res.json();
+  return Array.isArray(json.data) ? json.data : [];
+}
+
+/**
+ * Fetch and merge all search indices (articles, recipes, locale query-index, products, manuals).
  * Uses fcors for products on localhost, .aem.page, .aem.live.
  * @returns {Promise<Array<Object>>} Combined normalized items
  */
@@ -135,11 +176,12 @@ async function loadSearchIndex() {
     ? () => corsProxyFetch(productsUrl).then((r) => (r.ok ? r.json() : { data: [] }))
     : () => fetchJson(productsUrl);
 
-  const [articlesRes, recipesRes, queryRes, productsRes] = await Promise.allSettled([
+  const [articlesRes, recipesRes, queryRes, productsRes, manualRowsRes] = await Promise.allSettled([
     fetchJson(articlesUrl),
     fetchJson(recipesUrl),
     fetchJson(queryUrl),
     productsFetch(),
+    fetchManualRows(locale),
   ]);
 
   const combined = [];
@@ -169,6 +211,10 @@ async function loadSearchIndex() {
   if (productsRes.status === 'fulfilled' && Array.isArray(productsRes.value?.data)) {
     const parents = productsRes.value.data.filter((row) => !(row.parentSku || '').trim());
     parents.forEach((row) => combined.push(normalizeProduct(row, locale, language)));
+  }
+
+  if (manualRowsRes.status === 'fulfilled' && Array.isArray(manualRowsRes.value)) {
+    manualRowsRes.value.forEach((row) => combined.push(normalizeManual(row, locale)));
   }
 
   window.searchResultsIndex = combined;
@@ -217,12 +263,13 @@ function filterBySearch(index, searchTerm) {
   }).map((item) => ({ ...item, searchTerm: term }));
 }
 
-/** Type order for tie-break: product > recipe > article > query (lower = higher priority). */
+/** Type order for tie-break: product > manual > recipe > article > query (lower = higher priority). */
 const TYPE_ORDER = {
   product: 0,
-  recipe: 1,
-  article: 2,
-  query: 3,
+  manual: 1,
+  recipe: 2,
+  article: 3,
+  query: 4,
 };
 
 /**
@@ -233,7 +280,7 @@ const TYPE_ORDER = {
  */
 function sortByRelevance(results, searchTerm) {
   if (!searchTerm || !searchTerm.trim()) {
-    results.sort((a, b) => (TYPE_ORDER[a.type] ?? 4) - (TYPE_ORDER[b.type] ?? 4));
+    results.sort((a, b) => (TYPE_ORDER[a.type] ?? 5) - (TYPE_ORDER[b.type] ?? 5));
     return;
   }
 
@@ -249,7 +296,7 @@ function sortByRelevance(results, searchTerm) {
     const inDesc = descIdx !== -1;
 
     // Rank 0 = title match (earlier offset = better), 1 = description only, 2 = other (author/tags)
-    const typeOrder = TYPE_ORDER[item.type] ?? 4;
+    const typeOrder = TYPE_ORDER[item.type] ?? 5;
     if (inTitle) return [0, titleIdx, typeOrder];
     if (inDesc) return [1, descIdx, typeOrder];
     return [2, Number.MAX_SAFE_INTEGER, typeOrder];
@@ -378,6 +425,10 @@ function createResultCard(item, copy = {}) {
 
   const link = document.createElement('a');
   link.href = item.path || '#';
+  if (item.type === 'manual') {
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+  }
 
   let imageEl;
   const imageSrc = getResultImageSrc(item);
@@ -400,6 +451,7 @@ function createResultCard(item, copy = {}) {
     recipe: copy.typeRecipe || copy.recipe || 'Recipe',
     query: copy.typeQuery || copy.page || 'Page',
     product: copy.typeProduct || copy.product || 'Product',
+    manual: copy.typeManual || 'Manual',
   };
   const typeBadge = document.createElement('span');
   typeBadge.className = 'type-badge';
@@ -457,6 +509,9 @@ const FILTER_TYPES = [
   },
   {
     value: 'product', labelKey: 'typeProduct', fallbackKey: 'product', defaultLabel: 'Product',
+  },
+  {
+    value: 'manual', labelKey: 'typeManual', fallbackKey: null, defaultLabel: 'Manual',
   },
   {
     value: 'recipe', labelKey: 'typeRecipe', fallbackKey: 'recipe', defaultLabel: 'Recipe',
