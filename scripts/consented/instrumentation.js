@@ -3,6 +3,15 @@ export function isDebugMode() {
     || window.location.search.includes('instrumentation=debug');
 }
 
+export function debugLog(...args) {
+  // eslint-disable-next-line no-console
+  if (isDebugMode()) console.log(...args);
+}
+export function debugWarn(...args) {
+  // eslint-disable-next-line no-console
+  if (isDebugMode()) console.warn(...args);
+}
+
 /**
  * Whether marketing/analytics scripts may run (Cookiebot consent or martech=on).
  * Mirrors scripts/scripts.js loadDelayed consent gating for consented.js.
@@ -207,7 +216,7 @@ function patchAppMeasurementFactory() {
 /**
  * Launch keeps its tracker in AppMeasurement's s_c_il registry, not always window.s.
  */
-export function configureAllAppMeasurementTrackers() {
+export function configureAnalyticsTrackingServers() {
   patchAppMeasurementFactory();
   configureAnalyticsTracker(window.s);
   if (!Array.isArray(window.s_c_il)) {
@@ -218,13 +227,6 @@ export function configureAllAppMeasurementTrackers() {
       configureAnalyticsTracker(instance);
     }
   });
-}
-
-/**
- * Register doPlugins on known AppMeasurement tracker instances (window.s, s_c_il).
- */
-export function configureAnalyticsTrackingServers() {
-  configureAllAppMeasurementTrackers();
 }
 
 /**
@@ -274,9 +276,8 @@ export function whenSatelliteReady(
     attempts += 1;
     if (attempts < maxAttempts) {
       setTimeout(check, intervalMs);
-    } else if (isDebugMode()) {
-      /* eslint-disable-next-line no-console */
-      console.warn(`Adobe Analytics ${eventLabel} skipped: Adobe Launch (_satellite) not available`);
+    } else {
+      debugWarn(`Adobe Analytics ${eventLabel} skipped: Adobe Launch (_satellite) not available`);
     }
   };
   check();
@@ -309,11 +310,7 @@ async function pushProductEvent(eventName, productID, { waitForBeacon = false } 
   if (beaconComplete) {
     await beaconComplete;
   }
-
-  if (isDebugMode()) {
-    /* eslint-disable-next-line no-console */
-    console.log(`Adobe Analytics ${eventName} fired`, window.digitalData.product);
-  }
+  debugLog(`Adobe Analytics ${eventName} fired`, window.digitalData.product);
   return true;
 }
 
@@ -324,16 +321,12 @@ async function pushProductEvent(eventName, productID, { waitForBeacon = false } 
 export async function fireProdView() {
   const productName = `${getProductName()}`;
   if (!productName) {
-    if (isDebugMode()) {
-      /* eslint-disable-next-line no-console */
-      console.warn('Adobe Analytics prodView skipped: product name not found on PDP');
-    }
+    debugWarn('Adobe Analytics prodView skipped: product name not found on PDP');
     return;
   }
 
-  if (!(await pushProductEvent('prodView', buildProductId(productName))) && isDebugMode()) {
-    /* eslint-disable-next-line no-console */
-    console.warn('Adobe Analytics prodView skipped: Adobe Launch (_satellite) not available');
+  if (!(await pushProductEvent('prodView', buildProductId(productName)))) {
+    debugWarn('Adobe Analytics prodView skipped: Adobe Launch (_satellite) not available');
   }
 }
 
@@ -365,17 +358,12 @@ export async function fireScAdd(productName = getProductName(), quantity = 1) {
 
   const name = `${productName || ''}`.trim();
   if (!name) {
-    if (isDebugMode()) {
-      /* eslint-disable-next-line no-console */
-      console.warn('Adobe Analytics scAdd skipped: product name not found');
-    }
+    debugWarn('Adobe Analytics scAdd skipped: product name not found');
     return;
   }
 
-  if (!(await pushProductEvent('scAdd', buildCartProductId(name, quantity), { waitForBeacon: true }))
-    && isDebugMode()) {
-    /* eslint-disable-next-line no-console */
-    console.warn('Adobe Analytics scAdd skipped: Adobe Launch (_satellite) not available');
+  if (!(await pushProductEvent('scAdd', buildCartProductId(name, quantity), { waitForBeacon: true }))) {
+    debugWarn('Adobe Analytics scAdd skipped: Adobe Launch (_satellite) not available');
   }
 }
 
@@ -410,16 +398,8 @@ export function trackScAdd(productName = getProductName(), quantity = 1) {
  * @returns {void}
  */
 export function initInstrumentation() {
-  const debug = isDebugMode();
-  if (debug) {
-    /* eslint-disable-next-line no-console */
-    console.log('Adobe Analytics instrumentation loaded');
-  }
-
+  debugLog('Adobe Analytics instrumentation loaded');
   if (isPdpPage()) {
     trackProdView();
-  } else if (debug) {
-    /* eslint-disable-next-line no-console */
-    console.log('Adobe Analytics prodView skipped (not a PDP)');
   }
 }

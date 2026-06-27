@@ -25,8 +25,6 @@ currentEnvironment.dataset.deploymentEnv = getDeploymentEnv();
 currentEnvironment.dataset.templatePath = '/conf/vitamix/settings/wcm/templates/default-page';
 document.body.appendChild(currentEnvironment);
 
-configureAnalyticsTrackingServers();
-
 const chatbot = document.createElement('div');
 chatbot.id = 'chatbot-container';
 document.body.appendChild(chatbot);
