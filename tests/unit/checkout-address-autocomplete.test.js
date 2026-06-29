@@ -3,7 +3,35 @@ import assert from 'node:assert/strict';
 import {
   buildPlacesAutocompleteInput,
   setAddressFieldValue,
+  fillAddressFields,
 } from '../../blocks/checkout/checkout-address.js';
+
+// Minimal field mock compatible with setAddressFieldValue/clearFieldError:
+// closest() returns null so clearFieldError early-returns, and dispatchEvent
+// is a no-op recorder.
+function fieldMock(value = '') {
+  return {
+    value,
+    closest() { return null; },
+    removeAttribute() {},
+    dispatchEvent() { return true; },
+    classList: { toggle() {} },
+  };
+}
+
+// Section mock for fillAddressFields, which queries by [autocomplete="..."]
+// for line2/city/zip and select[name$="-state"] for the state dropdown.
+function sectionForFill(fields) {
+  return {
+    querySelector(selector) {
+      return fields[selector] || null;
+    },
+  };
+}
+
+function component(types, longText, shortText = longText) {
+  return { types, longText, shortText };
+}
 
 function sectionWithFields(fields) {
   return {
@@ -108,4 +136,42 @@ test('setAddressFieldValue clears stale field errors without reopening autocompl
   assert.deepEqual(wrapper.classList.removed, ['has-error']);
   assert.equal(removed, true);
   assert.deepEqual(events, ['remove:aria-invalid', 'remove:aria-describedby', 'change']);
+});
+
+test('fillAddressFields keeps the house number when Place Details omits street_number', () => {
+  // Regression: Google occasionally returns a `route` with no `street_number`.
+  // Rebuilding from components alone dropped the number the user already had,
+  // turning "32501 Dufferin Street" into "Dufferin Street".
+  const addressInput = fieldMock('32501 Dufferin Street');
+  const section = sectionForFill({});
+
+  fillAddressFields(section, addressInput, [
+    component(['route'], 'Dufferin Street'),
+    component(['locality'], 'Toronto'),
+  ]);
+
+  assert.equal(addressInput.value, '32501 Dufferin Street');
+});
+
+test('fillAddressFields rebuilds street from components when street_number is present', () => {
+  const addressInput = fieldMock('32501 Dufferin');
+  const section = sectionForFill({});
+
+  fillAddressFields(section, addressInput, [
+    component(['street_number'], '32501'),
+    component(['route'], 'Dufferin Street'),
+  ]);
+
+  assert.equal(addressInput.value, '32501 Dufferin Street');
+});
+
+test('fillAddressFields populates an empty street from a route-only result', () => {
+  const addressInput = fieldMock('');
+  const section = sectionForFill({});
+
+  fillAddressFields(section, addressInput, [
+    component(['route'], 'Dufferin Street'),
+  ]);
+
+  assert.equal(addressInput.value, 'Dufferin Street');
 });
