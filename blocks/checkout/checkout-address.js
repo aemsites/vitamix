@@ -140,7 +140,7 @@ export function setAddressFieldValue(input, value) {
   input.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
-function fillAddressFields(section, addressInput, addressComponents) {
+export function fillAddressFields(section, addressInput, addressComponents) {
   const c = {};
   addressComponents.forEach((comp) => {
     comp.types.forEach((type) => { c[type] = comp; });
@@ -149,8 +149,17 @@ function fillAddressFields(section, addressInput, addressComponents) {
   // Only overwrite a field when Google actually returned the corresponding component.
   // Clearing an existing user-typed value can blank a required field and make the
   // section fail validation, which silently prevents collapse() from collapsing.
+  //
+  // Place Details responses occasionally come back with a `route` but no
+  // `street_number` (Google resolved the place to a route/geocode rather than a
+  // precise premise). Rebuilding the street from components alone would then drop
+  // the house number the user already entered (e.g. "32501 Dufferin Street" ->
+  // "Dufferin Street"). Only overwrite when we have a street_number, or when the
+  // field is currently empty (nothing to lose).
   const street = [c.street_number?.longText, c.route?.longText].filter(Boolean).join(' ');
-  if (street) setAddressFieldValue(addressInput, street);
+  if (street && (c.street_number?.longText || !addressInput.value.trim())) {
+    setAddressFieldValue(addressInput, street);
+  }
 
   const address2Input = section.querySelector('[autocomplete="address-line2"]');
   if (address2Input && c.subpremise) {
