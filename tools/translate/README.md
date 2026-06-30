@@ -47,16 +47,25 @@ DA Live editor panel plugin. Rolls out the current page to all configured locale
    - If different language: page is translated then URLs are adjusted.
    - Page is saved to DA, then optionally previewed and published via AEM Admin.
 
-**Configured locales** (hardcoded in `rollout-plugin.js`):
+**Configured locales** (defined in `config.js`):
 
-| Locale | Language | Translate Code | Country |
-|--------|----------|----------------|---------|
-| `us`   | `en_us`  | `en`           | United States |
-| `ca`   | `en_us`  | `en`           | Canada |
-| `ca`   | `fr_ca`  | `fr-CA`        | Canada |
-| `mx`   | `en_us`  | `en`           | Mexico |
-| `mx`   | `es_mx`  | `es-MX`        | Mexico |
-| `vr`   | `en_us`  | `en`           | VR |
+| Prefix | Translate Code | Country |
+|--------|----------------|---------|
+| `/us/en_us` | `en`    | United States |
+| `/ca/en_us` | `en`    | Canada |
+| `/ca/fr_ca` | `fr-CA` | Canada |
+| `/mx/en_us` | `en`    | Mexico |
+| `/mx/es_mx` | `es-MX` | Mexico |
+| `/vr/en_us` | `en`    | VR |
+
+For a simpler path structure (e.g. `/en/page`, `/fr/page`), set `LOCALES` in `config.js` to:
+
+```js
+export const LOCALES = [
+  { prefix: '/en', translateCode: 'en', label: 'English' },
+  { prefix: '/fr', translateCode: 'fr-CA', label: 'French' },
+];
+```
 
 ---
 
@@ -74,7 +83,7 @@ All project-specific settings live in `config.js`. Edit this file when copying t
 | `CONFIG_PATH` | Path to the optional config spreadsheet within the repo. |
 | `METADATA_FIELDS_TO_TRANSLATE` | Metadata fields translated by default (`title`, `description`). |
 | `LANGUAGES` | Language options shown in the plugin/app dropdowns. First entry is the default selection. |
-| `LOCALES` | Locale matrix for the rollout plugin. Each entry maps `locale + language` to a translate code. |
+| `LOCALES` | Locale list for the rollout plugin. Each entry has a `prefix` (e.g. `/en` or `/us/en_us`) and a `translateCode`. Works with any path depth. |
 
 ### `/.da/translate.json` spreadsheet
 

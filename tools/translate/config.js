@@ -37,25 +37,28 @@ export const LANGUAGES = [
 ];
 
 // Locales for the rollout plugin.
-// Each entry maps a locale+language combination to a Google Translate language code.
-// The page path structure expected: /<locale>/<language>/...
+// Each entry maps a path prefix to a Google Translate language code.
+// `prefix` is the path segment(s) before the page path, e.g. '/us/en_us' or '/en'.
+// `translateCode` is the language code sent to the translation service.
+// `country` is optional and used for display only.
+// The first matching prefix for the current page is treated as the source locale.
 export const LOCALES = [
   {
-    locale: 'us', language: 'en_us', translateCode: 'en', country: 'United States', label: 'English',
+    prefix: '/us/en_us', translateCode: 'en', country: 'United States', label: 'English',
   },
   {
-    locale: 'ca', language: 'en_us', translateCode: 'en', country: 'Canada', label: 'English',
+    prefix: '/ca/en_us', translateCode: 'en', country: 'Canada', label: 'English',
   },
   {
-    locale: 'ca', language: 'fr_ca', translateCode: 'fr-CA', country: 'Canada', label: 'French',
+    prefix: '/ca/fr_ca', translateCode: 'fr-CA', country: 'Canada', label: 'French',
   },
   {
-    locale: 'mx', language: 'en_us', translateCode: 'en', country: 'Mexico', label: 'English',
+    prefix: '/mx/en_us', translateCode: 'en', country: 'Mexico', label: 'English',
   },
   {
-    locale: 'mx', language: 'es_mx', translateCode: 'es-MX', country: 'Mexico', label: 'Spanish',
+    prefix: '/mx/es_mx', translateCode: 'es-MX', country: 'Mexico', label: 'Spanish',
   },
   {
-    locale: 'vr', language: 'en_us', translateCode: 'en', country: 'VR', label: 'English',
+    prefix: '/vr/en_us', translateCode: 'en', country: 'VR', label: 'English',
   },
 ];

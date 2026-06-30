@@ -15,29 +15,23 @@ import DA_SDK from 'https://da.live/nx/utils/sdk.js';
 import { translate, adjustURLs } from './shared.js';
 import { ADMIN_URL, AEM_ADMIN_URL, LOCALES } from './config.js';
 
-function localeKey(locale, language) {
-  return `${locale}-${language}`;
+function localeKey(prefix) {
+  return prefix.replace(/^\//, '').replace(/\//g, '-');
 }
 
 const EDIT_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
 
 function parsePath(path) {
-  // path = /<locale>/<language>/... (org/repo already stripped)
-  const parts = path.replace(/^\/+/, '').split('/');
-  if (parts.length < 2) return null;
-  const [locale, language] = parts;
-  if (!/^[a-z]{2}$/i.test(locale) || !/^[a-z]{2}[_-][a-z]{2}$/i.test(language)) return null;
-  const pagePath = parts.length > 2 ? `/${parts.slice(2).join('/')}` : '';
-  return {
-    locale,
-    language,
-    pagePath,
-    repoPath: `/${locale}/${language}${pagePath}`,
-  };
+  const normalized = path.startsWith('/') ? path : `/${path}`;
+  const matched = LOCALES.find(({ prefix }) => normalized === prefix || normalized.startsWith(`${prefix}/`));
+  if (!matched) return null;
+  const { prefix } = matched;
+  const pagePath = normalized.slice(prefix.length) || '';
+  return { prefix, pagePath, repoPath: `${prefix}${pagePath}` };
 }
 
-function updateStatus(locale, language, status, text) {
-  const labelEl = document.querySelector(`label[for="lang-${localeKey(locale, language)}"]`);
+function updateStatus(prefix, status, text) {
+  const labelEl = document.querySelector(`label[for="lang-${localeKey(prefix)}"]`);
   if (!labelEl) return;
   let statusEl = labelEl.querySelector('.rollout-status');
   if (!statusEl) {
@@ -73,20 +67,15 @@ publishCheckbox.addEventListener('change', () => {
   const parsed = parsePath(currentPath);
 
   if (!parsed) {
-    errorMessage.textContent = 'This page is not under a locale path (e.g. /us/en_us/…). Rollout is not available here.';
+    errorMessage.textContent = 'This page is not under a configured locale path. Rollout is not available here.';
     errorMessage.style.display = 'block';
     return;
   }
 
-  LOCALES.forEach(({
-    locale, language, country, label,
-  }) => {
-    if (
-      locale === parsed.locale
-      && language.toLowerCase() === parsed.language.toLowerCase()
-    ) return;
+  LOCALES.forEach(({ prefix, country, label }) => {
+    if (prefix === parsed.prefix) return;
 
-    const id = `lang-${localeKey(locale, language)}`;
+    const id = `lang-${localeKey(prefix)}`;
     const labelEl = document.createElement('label');
     labelEl.className = 'rollout-lang';
     labelEl.setAttribute('for', id);
@@ -94,12 +83,11 @@ publishCheckbox.addEventListener('change', () => {
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.id = id;
-    checkbox.dataset.locale = locale;
-    checkbox.dataset.language = language;
+    checkbox.dataset.prefix = prefix;
     checkbox.checked = true;
 
     const span = document.createElement('span');
-    span.textContent = `${country} — ${label}`;
+    span.textContent = [country, label].filter(Boolean).join(' — ');
 
     labelEl.appendChild(checkbox);
     labelEl.appendChild(span);
@@ -116,8 +104,8 @@ publishCheckbox.addEventListener('change', () => {
     errorMessage.style.display = 'none';
     document.querySelectorAll('.rollout-status').forEach((el) => el.remove());
 
-    const selectedLocales = LOCALES.filter(({ locale, language }) => {
-      const checkbox = document.getElementById(`lang-${localeKey(locale, language)}`);
+    const selectedLocales = LOCALES.filter(({ prefix }) => {
+      const checkbox = document.getElementById(`lang-${localeKey(prefix)}`);
       return checkbox?.checked;
     });
 
@@ -129,10 +117,7 @@ publishCheckbox.addEventListener('change', () => {
 
     rolloutBtn.disabled = true;
 
-    const sourceLocale = LOCALES.find(
-      ({ locale, language }) => locale === parsed.locale
-        && language.toLowerCase() === parsed.language.toLowerCase(),
-    );
+    const sourceLocale = LOCALES.find(({ prefix }) => prefix === parsed.prefix);
     const sourceTranslateCode = sourceLocale?.translateCode;
 
     // Fetch the source page HTML (repoPath is already relative to org/repo)
@@ -153,12 +138,10 @@ publishCheckbox.addEventListener('change', () => {
     }
 
     // eslint-disable-next-line no-restricted-syntax
-    for (const {
-      locale, language, translateCode,
-    } of selectedLocales) {
-      updateStatus(locale, language, 'loading', 'Translating...');
+    for (const { prefix, translateCode } of selectedLocales) {
+      updateStatus(prefix, 'loading', 'Translating...');
 
-      const targetPagePath = `/${locale}/${language}${parsed.pagePath}`;
+      const targetPagePath = `${prefix}${parsed.pagePath}`;
 
       // eslint-disable-next-line no-await-in-loop
       try {
@@ -182,7 +165,7 @@ publishCheckbox.addEventListener('change', () => {
           );
         }
 
-        updateStatus(locale, language, 'saving', 'Saving...');
+        updateStatus(prefix, 'saving', 'Saving...');
 
         const blob = new Blob([translatedHtml], { type: 'text/html' });
         const formData = new FormData();
@@ -196,14 +179,14 @@ publishCheckbox.addEventListener('change', () => {
 
         const base = `${AEM_ADMIN_URL}/%s/${context.org}/${context.repo}/main${targetPagePath}`;
         const versionUrl = `${ADMIN_URL}/versionsource/${context.org}/${context.repo}${p}`;
-        const versionOpts = (label) => ({
+        const versionOpts = (versionLabel) => ({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ label }),
+          body: JSON.stringify({ label: versionLabel }),
         });
 
         if (previewCheckbox.checked) {
-          updateStatus(locale, language, 'previewing', 'Previewing...');
+          updateStatus(prefix, 'previewing', 'Previewing...');
           // eslint-disable-next-line no-await-in-loop
           const previewResp = await daFetch(base.replace('%s', 'preview'), { method: 'POST' });
           if (!previewResp.ok) throw new Error(`Preview failed: ${previewResp.status}`);
@@ -211,7 +194,7 @@ publishCheckbox.addEventListener('change', () => {
         }
 
         if (publishCheckbox.checked) {
-          updateStatus(locale, language, 'publishing', 'Publishing...');
+          updateStatus(prefix, 'publishing', 'Publishing...');
           // eslint-disable-next-line no-await-in-loop
           const publishResp = await daFetch(base.replace('%s', 'live'), { method: 'POST' });
           if (!publishResp.ok) throw new Error(`Publish failed: ${publishResp.status}`);
@@ -219,9 +202,9 @@ publishCheckbox.addEventListener('change', () => {
         }
 
         const daHref = `https://da.live/edit#/${context.org}/${context.repo}${targetPagePath}`;
-        updateStatus(locale, language, 'done', `Done! <a href="${daHref}" target="_blank">${EDIT_ICON_SVG}</a>`);
+        updateStatus(prefix, 'done', `Done! <a href="${daHref}" target="_blank">${EDIT_ICON_SVG}</a>`);
       } catch (err) {
-        updateStatus(locale, language, 'error', err.message || 'Translation failed.');
+        updateStatus(prefix, 'error', err.message || 'Translation failed.');
       }
     }
 
