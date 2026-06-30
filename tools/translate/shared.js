@@ -10,17 +10,12 @@
  * governing permissions and limitations under the License.
  */
 
-const ADMIN_URL = 'https://admin.da.live';
-const AEM_ADMIN_URL = 'https://admin.hlx.page';
-// const ADMIN_URL = 'https://stage-admin.da.live';
-// const ADMIN_URL = 'http://localhost:8787';
+import {
+  ADMIN_URL, TRANSLATION_SERVICE_URL, CONFIG_PATH, METADATA_FIELDS_TO_TRANSLATE,
+} from './config.js';
 
-const TRANSLATION_SERVICE_URL = 'https://translate.da.live/google';
-
-const CONFIG_PATH = '/.da/translate.json';
 const CONFIG_CONTENT_DNT_SHEET = 'dnt-content-rules';
 const CONFIG_METADATA_FIELDS_SHEET = 'dt-metadata-fields';
-const METADATA_FIELDS_TO_TRANSLATE = ['title', 'description'];
 
 const EDITOR_FORMAT = 'table';
 const ADMIN_FORMAT = 'div';
@@ -448,5 +443,5 @@ const translate = async (htmlInput, language, context, format, daFetch, skipPrep
 };
 
 export {
-  preprocess, translate, adjustURLs, EDITOR_FORMAT, ADMIN_FORMAT, ADMIN_URL, AEM_ADMIN_URL,
+  preprocess, translate, adjustURLs, EDITOR_FORMAT, ADMIN_FORMAT,
 };

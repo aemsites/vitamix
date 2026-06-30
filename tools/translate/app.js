@@ -14,16 +14,24 @@
 
 // eslint-disable-next-line import/no-unresolved
 import DA_SDK from 'https://da.live/nx/utils/sdk.js';
-import { translate, ADMIN_URL } from './shared.js';
+import { translate } from './shared.js';
+import { ADMIN_URL, LANGUAGES } from './config.js';
 
 const EDIT_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-edit"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
 
 (async function init() {
+  const languageSelect = document.querySelector('select[name="language"]');
+  LANGUAGES.forEach(({ code, label }) => {
+    const option = document.createElement('option');
+    option.value = code;
+    option.textContent = label;
+    languageSelect.appendChild(option);
+  });
+
   const { context, actions } = await DA_SDK;
   const { daFetch } = actions;
 
   const urlsTextarea = document.querySelector('textarea[name="urls"]');
-  const languageSelect = document.querySelector('select[name="language"]');
   const translateButton = document.querySelector('button[name="translate"]');
   const outputList = document.querySelector('.app-output-list');
   const errorMessage = document.querySelector('.app-error');

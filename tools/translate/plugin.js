@@ -13,8 +13,17 @@
 // eslint-disable-next-line import/no-unresolved
 import DA_SDK from 'https://da.live/nx/utils/sdk.js';
 import { preprocess, translate, EDITOR_FORMAT } from './shared.js';
+import { LANGUAGES } from './config.js';
 
 (async function init() {
+  const languageSelector = document.querySelector('select[name="language"]');
+  LANGUAGES.forEach(({ code, label }) => {
+    const option = document.createElement('option');
+    option.value = code;
+    option.textContent = label;
+    languageSelector.appendChild(option);
+  });
+
   // eslint-disable-next-line no-unused-vars
   const { context, token, actions } = await DA_SDK;
 
@@ -33,8 +42,6 @@ import { preprocess, translate, EDITOR_FORMAT } from './shared.js';
 
   const outputTextarea = document.querySelector('textarea[name="output"]');
   outputTextarea.value = '';
-
-  const languageSelector = document.querySelector('select[name="language"]');
 
   const translateBtn = document.querySelector('button[name="translate"]');
   const errorMessage = document.querySelector('.translate-error');

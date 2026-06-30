@@ -12,30 +12,8 @@
 
 // eslint-disable-next-line import/no-unresolved
 import DA_SDK from 'https://da.live/nx/utils/sdk.js';
-import {
-  translate, adjustURLs, ADMIN_URL, AEM_ADMIN_URL,
-} from './shared.js';
-
-const LOCALES = [
-  {
-    locale: 'us', language: 'en_us', translateCode: 'en', country: 'United States', label: 'English',
-  },
-  {
-    locale: 'ca', language: 'en_us', translateCode: 'en', country: 'Canada', label: 'English',
-  },
-  {
-    locale: 'ca', language: 'fr_ca', translateCode: 'fr-CA', country: 'Canada', label: 'French',
-  },
-  {
-    locale: 'mx', language: 'en_us', translateCode: 'en', country: 'Mexico', label: 'English',
-  },
-  {
-    locale: 'mx', language: 'es_mx', translateCode: 'es-MX', country: 'Mexico', label: 'Spanish',
-  },
-  {
-    locale: 'vr', language: 'en_us', translateCode: 'en', country: 'VR', label: 'English',
-  },
-];
+import { translate, adjustURLs } from './shared.js';
+import { ADMIN_URL, AEM_ADMIN_URL, LOCALES } from './config.js';
 
 function localeKey(locale, language) {
   return `${locale}-${language}`;
