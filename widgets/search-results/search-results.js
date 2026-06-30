@@ -268,7 +268,8 @@ function filterBySearch(index, searchTerm) {
   }).map((item) => ({ ...item, searchTerm: term }));
 }
 
-/** Type order for tie-break: product > manual > recipe > article > query (lower = higher priority). */
+/** Type order for tie-break: product > manual > recipe > article > query
+ * (lower = higher priority). */
 const TYPE_ORDER = {
   product: 0,
   manual: 1,
