@@ -1,6 +1,8 @@
 import { getMetadata, toClassName, fetchPlaceholders } from '../../scripts/aem.js';
 import { resolveRecipeId } from './recipe-slug.js';
-import { formatTime, formatServings, getLocaleAndLanguage } from '../../scripts/scripts.js';
+import {
+  formatTime, formatServings, getLocaleAndLanguage, getCookies,
+} from '../../scripts/scripts.js';
 import { getHiddenContainers, isHiddenContainer } from './recipe-containers.js';
 import linkRecipeMentions from './recipe-links.js';
 
@@ -18,8 +20,10 @@ async function loadRecipeIds() {
 
 function buildSaveHref(recipeId) {
   const { locale, language } = getLocaleAndLanguage();
-  const returnUrl = `https://www.vitamix.com/${locale}/${language}/recipebook?recipe_id=${recipeId}`;
-  const encodedReturn = btoa(returnUrl);
+  const recipebookUrl = `https://www.vitamix.com/${locale}/${language}/recipebook?recipe_id=${recipeId}`;
+  const { vitamix_customer: customer } = getCookies();
+  if (customer) return recipebookUrl;
+  const encodedReturn = btoa(recipebookUrl);
   return `https://www.vitamix.com/${locale}/${language}/customer/account/login/referer/${encodeURIComponent(encodedReturn)}/`;
 }
 
