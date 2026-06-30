@@ -1,7 +1,27 @@
 import { getMetadata, toClassName, fetchPlaceholders } from '../../scripts/aem.js';
+import { resolveRecipeId } from './recipe-slug.js';
 import { formatTime, formatServings, getLocaleAndLanguage } from '../../scripts/scripts.js';
 import { getHiddenContainers, isHiddenContainer } from './recipe-containers.js';
 import linkRecipeMentions from './recipe-links.js';
+
+const RECIPE_IDS_URL = '/assets/recipes/recipe-ids.json';
+let recipeIdsPromise;
+
+async function loadRecipeIds() {
+  if (!recipeIdsPromise) {
+    recipeIdsPromise = fetch(RECIPE_IDS_URL)
+      .then((resp) => (resp.ok ? resp.json() : null))
+      .catch(() => null);
+  }
+  return recipeIdsPromise;
+}
+
+function buildSaveHref(recipeId) {
+  const { locale, language } = getLocaleAndLanguage();
+  const returnUrl = `https://www.vitamix.com/${locale}/${language}/recipebook?recipe_id=${recipeId}`;
+  const encodedReturn = btoa(returnUrl);
+  return `https://www.vitamix.com/${locale}/${language}/customer/account/login/referer/${encodeURIComponent(encodedReturn)}/`;
+}
 
 function wrapInDiv(element, className) {
   if (!element) return;
@@ -32,7 +52,7 @@ function buildToolbar(placeholders = {}) {
   const shareEmailLabel = placeholders.shareViaEmail || 'Share via Email';
 
   toolbar.innerHTML = `
-    <button type="button" class="recipe-save"><img src="/blocks/recipe/save.svg" alt=""> ${saveLabel}</button>
+    <a class="recipe-save"><img src="/blocks/recipe/save.svg" alt=""> ${saveLabel}</a>
     <button type="button" class="recipe-print"><img src="/blocks/recipe/print.svg" alt=""> ${printLabel}</button>
     <div class="recipe-share-wrapper">
       <button type="button" class="recipe-share"><img src="/blocks/recipe/share.svg" alt=""> ${shareLabel}</button>
@@ -53,16 +73,17 @@ function buildToolbar(placeholders = {}) {
     </div>
   `;
 
-  // Save button
-  const saveButton = toolbar.querySelector('.recipe-save');
-  saveButton.addEventListener('click', () => {
-    const { locale, language } = getLocaleAndLanguage();
-    const title = document.querySelector('h1').textContent.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-    const recipeId = `rcp${title}recipe`;
-    const returnUrl = `https://www.vitamix.com/${locale}/${language}/recipebook?recipe_id=${recipeId}`;
-    const encodedReturn = btoa(returnUrl);
-    window.location.href = `https://www.vitamix.com/${locale}/${language}/customer/account/login/referer/${encodeURIComponent(encodedReturn)}/`;
-  });
+  const saveLink = toolbar.querySelector('.recipe-save');
+  setTimeout(async () => {
+    const payload = await loadRecipeIds();
+    const rows = Array.isArray(payload?.data) ? payload.data : [];
+    const recipeId = resolveRecipeId(window.location.pathname, rows);
+    if (!recipeId) {
+      saveLink.remove();
+      return;
+    }
+    saveLink.href = buildSaveHref(recipeId);
+  }, 500);
 
   // Print button
   const printButton = toolbar.querySelector('.recipe-print');
