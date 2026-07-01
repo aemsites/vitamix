@@ -239,9 +239,6 @@ export default function renderAddToCart(ph, block, parent) {
       // add product to cart with selected options and quantity
       await cartApi.addToCart(sku, selectedOptions, quantity);
 
-      const { trackScAdd } = await import('../../scripts/consented/instrumentation.js');
-      await trackScAdd(parent.name, quantity);
-
       // redirect to cart page after successful addition
       const { locale, language } = getLocaleAndLanguage();
       window.location.href = `/${locale}/${language}/checkout/cart/`;

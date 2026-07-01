@@ -77,17 +77,6 @@ export function buildProductId(productName) {
   return `;${productName};;;;`;
 }
 
-/**
- * Adobe Analytics products string for scAdd (includes quantity).
- * @param {string} productName
- * @param {number|string} [quantity]
- * @returns {string}
- */
-export function buildCartProductId(productName, quantity = 1) {
-  const qty = Number(quantity) || 1;
-  return `;${productName};${qty};;;`;
-}
-
 export function getSatellite() {
   // eslint-disable-next-line no-underscore-dangle
   return window._satellite;
@@ -286,7 +275,7 @@ export function whenSatelliteReady(
 /**
  * Push product context to digitalData and trigger a Launch direct-call rule.
  * Launch owns variable mapping and beacon send (Adobe-recommended pattern).
- * @param {string} eventName Launch direct-call identifier (e.g. prodView, scAdd)
+ * @param {string} eventName Launch direct-call identifier (e.g. prodView)
  * @param {string} productID Adobe Analytics products string
  * @param {{ waitForBeacon?: boolean }} [options]
  * @returns {Promise<boolean>} Whether the Launch rule was triggered
@@ -343,54 +332,6 @@ export function trackProdView(attempt = 0) {
     }
     fireProdView();
   }, 'prodView');
-}
-
-/**
- * Fire the scAdd event after a successful add to cart.
- * @param {string} [productName]
- * @param {number|string} [quantity]
- * @returns {Promise<void>}
- */
-export async function fireScAdd(productName = getProductName(), quantity = 1) {
-  if (!hasMarketingConsent()) {
-    return;
-  }
-
-  const name = `${productName || ''}`.trim();
-  if (!name) {
-    debugWarn('Adobe Analytics scAdd skipped: product name not found');
-    return;
-  }
-
-  if (!(await pushProductEvent('scAdd', buildCartProductId(name, quantity), { waitForBeacon: true }))) {
-    debugWarn('Adobe Analytics scAdd skipped: Adobe Launch (_satellite) not available');
-  }
-}
-
-/**
- * Wait for Launch, then fire scAdd (used before cart redirect).
- * @param {string} [productName]
- * @param {number|string} [quantity]
- * @returns {Promise<void>}
- */
-export function trackScAdd(productName = getProductName(), quantity = 1) {
-  return new Promise((resolve) => {
-    let settled = false;
-    const finish = () => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      resolve();
-    };
-
-    whenSatelliteReady(() => {
-      fireScAdd(productName, quantity).then(finish);
-    }, 'scAdd');
-
-    // Do not block cart redirect if Launch never becomes available.
-    setTimeout(finish, 2000);
-  });
 }
 
 /**
