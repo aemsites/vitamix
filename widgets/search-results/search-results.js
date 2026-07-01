@@ -87,6 +87,11 @@ function manualsAssetBase(locale) {
   return `${window.hlx?.codeBasePath || ''}${path}`;
 }
 
+/** @returns {string} */
+function getManualIconPath() {
+  return `${window.hlx?.codeBasePath || ''}/icons/manual-icon.svg`;
+}
+
 /**
  * Fetch URL via fcors proxy for non-prod origins.
  * @param {string} url - Path (e.g. /us/en_us/products/index.json)
@@ -138,7 +143,7 @@ function normalizeManual(row, locale) {
     path,
     title: (row.title || '').trim(),
     description: (row.summary || '').trim(),
-    image: '',
+    image: getManualIconPath(),
   };
 }
 
@@ -263,7 +268,8 @@ function filterBySearch(index, searchTerm) {
   }).map((item) => ({ ...item, searchTerm: term }));
 }
 
-/** Type order for tie-break: product > manual > recipe > article > query (lower = higher priority). */
+/** Type order for tie-break: product > manual > recipe > article > query
+ * (lower = higher priority). */
 const TYPE_ORDER = {
   product: 0,
   manual: 1,
@@ -365,6 +371,7 @@ function isUsableImageUrl(url) {
  * @returns {string}
  */
 function getResultImageSrc(item) {
+  if (item.type === 'manual') return getManualIconPath();
   if (!item?.image || !isUsableImageUrl(item.image)) return '';
   if (item.type === 'query' && !item.image.trim().startsWith('https://')) return '';
   if (item.type === 'product' && useFcors()) {
@@ -437,6 +444,7 @@ function createResultCard(item, copy = {}) {
     imageEl.src = imageSrc;
     imageEl.alt = '';
     imageEl.loading = 'lazy';
+    if (item.type === 'manual') imageEl.classList.add('manual-icon');
   } else {
     imageEl = document.createElement('div');
     imageEl.className = 'img placeholder';

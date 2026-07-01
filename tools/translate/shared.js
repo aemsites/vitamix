@@ -10,17 +10,12 @@
  * governing permissions and limitations under the License.
  */
 
-const ADMIN_URL = 'https://admin.da.live';
-const AEM_ADMIN_URL = 'https://admin.hlx.page';
-// const ADMIN_URL = 'https://stage-admin.da.live';
-// const ADMIN_URL = 'http://localhost:8787';
+import {
+  ADMIN_URL, TRANSLATION_SERVICE_URL, CONFIG_PATH, METADATA_FIELDS_TO_TRANSLATE, LOCALES,
+} from './config.js';
 
-const TRANSLATION_SERVICE_URL = 'https://translate.da.live/google';
-
-const CONFIG_PATH = '/.da/translate.json';
 const CONFIG_CONTENT_DNT_SHEET = 'dnt-content-rules';
 const CONFIG_METADATA_FIELDS_SHEET = 'dt-metadata-fields';
-const METADATA_FIELDS_TO_TRANSLATE = ['title', 'description'];
 
 const EDITOR_FORMAT = 'table';
 const ADMIN_FORMAT = 'div';
@@ -361,32 +356,33 @@ const removeDnt = (html) => {
 
 const adjustURLs = (html, context) => {
   const { sourcePath } = context;
-  // test if path starts with /<lang>/<locale>.
-  const pathPrefixRegex = /^\/?[a-z]{2}\/[a-z]{2}[-_][a-z]{2}(?=\/|$)/;
-  const isLocalPath = pathPrefixRegex.test(sourcePath);
-  const pathSegments = sourcePath.replace(/^\/+/, '').split('/');
-  const basePrefix = pathSegments.length >= 2 ? `/${pathSegments[0]}/${pathSegments[1]}` : '';
-  if (isLocalPath && basePrefix) {
-    html.querySelectorAll('a[href]').forEach((element) => {
-      if (!element.href) return;
-      const url = new URL(element.href);
-      const { pathname } = url;
+  const prefixes = LOCALES.map(({ prefix }) => prefix);
+  const matchPrefix = (path) => prefixes.find((p) => path === p || path.startsWith(`${p}/`));
 
-      if (pathPrefixRegex.test(pathname)) {
-        const newPathname = pathname.replace(pathPrefixRegex, basePrefix);
-        const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
-        if (isLocalhost) {
-          element.setAttribute('href', newPathname);
-        } else {
-          const newHref = element.href.replace(pathname, newPathname);
-          if (element.textContent === element.href) {
-            element.textContent = newHref;
-          }
-          element.href = newHref;
-        }
+  const targetPrefix = matchPrefix(sourcePath);
+  if (!targetPrefix) return html;
+
+  html.querySelectorAll('a[href]').forEach((element) => {
+    if (!element.href) return;
+    const url = new URL(element.href);
+    const { pathname } = url;
+
+    const linkedPrefix = matchPrefix(pathname);
+    if (!linkedPrefix || linkedPrefix === targetPrefix) return;
+
+    const newPathname = targetPrefix + pathname.slice(linkedPrefix.length);
+    const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+    if (isLocalhost) {
+      element.setAttribute('href', newPathname);
+    } else {
+      const newHref = element.href.replace(pathname, newPathname);
+      if (element.textContent === element.href) {
+        element.textContent = newHref;
       }
-    });
-  }
+      element.href = newHref;
+    }
+  });
+
   return html;
 };
 
@@ -448,5 +444,5 @@ const translate = async (htmlInput, language, context, format, daFetch, skipPrep
 };
 
 export {
-  preprocess, translate, adjustURLs, EDITOR_FORMAT, ADMIN_FORMAT, ADMIN_URL, AEM_ADMIN_URL,
+  preprocess, translate, adjustURLs, EDITOR_FORMAT, ADMIN_FORMAT,
 };

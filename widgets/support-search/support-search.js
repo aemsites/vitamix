@@ -39,6 +39,11 @@ function manualsAssetBase(locale) {
   return `${window.hlx?.codeBasePath || ''}${path}`;
 }
 
+/** @returns {string} */
+function getManualIconPath() {
+  return `${window.hlx?.codeBasePath || ''}/icons/manual-icon.svg`;
+}
+
 /**
  * @param {Object} row
  * @param {string} locale
@@ -76,7 +81,7 @@ function normalizeManual(row, locale) {
     path,
     title: (row.title || '').trim(),
     description: (row.summary || '').trim(),
-    image: '',
+    image: getManualIconPath(),
   };
 }
 
@@ -279,6 +284,7 @@ function isUsableImageUrl(url) {
 }
 
 function getResultImageSrc(item) {
+  if (item.type === 'manual') return getManualIconPath();
   if (!item?.image || !isUsableImageUrl(item.image)) return '';
   if (item.type === 'product' && useFcors()) {
     const path = item.image.startsWith('http')
@@ -349,13 +355,14 @@ function createResultCard(item, copy = {}) {
 
   content.append(typeBadge, title, description);
 
-  if (item.type === 'product') {
+  if (item.type === 'product' || item.type === 'manual') {
     const imageSrc = getResultImageSrc(item);
     if (imageSrc && !imageSrc.includes('default-meta-image')) {
       const imageEl = document.createElement('img');
       imageEl.src = imageSrc;
       imageEl.alt = '';
       imageEl.loading = 'lazy';
+      if (item.type === 'manual') imageEl.classList.add('manual-icon');
       link.append(imageEl, content);
     } else {
       const placeholder = document.createElement('div');
