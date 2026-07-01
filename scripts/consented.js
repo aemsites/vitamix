@@ -1,5 +1,11 @@
 import { loadScript } from './aem.js';
 import './consented/newsletter.js';
+import {
+  configureAnalyticsTrackingServers,
+  ensureAnalyticsTrackingConfigured,
+  getDeploymentEnv,
+  initInstrumentation,
+} from './consented/instrumentation.js';
 
 document.body.classList.add('consented');
 
@@ -15,7 +21,7 @@ window.adobeDataLayer = window.adobeDataLayer || [];
 
 const currentEnvironment = document.createElement('div');
 currentEnvironment.classList.add('currentEnvironment');
-currentEnvironment.dataset.deploymentEnv = 'prod';
+currentEnvironment.dataset.deploymentEnv = getDeploymentEnv();
 currentEnvironment.dataset.templatePath = '/conf/vitamix/settings/wcm/templates/default-page';
 document.body.appendChild(currentEnvironment);
 
@@ -28,9 +34,22 @@ loadScript('https://www.vitamix.com/etc.clientlibs/core/wcm/components/commons/s
 
 await loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-library.lc-259cf15444c5fe1f89e5c54df7b6e1e9-lc.min.js');
 await loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-analytics.lc-26814920488a848ff91c1f425646d010-lc.min.js');
+configureAnalyticsTrackingServers();
 loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-base.lc-daf5b8dac79e9cf7cb1c0b30d8372e7a-lc.min.js');
 
-await loadScript('https://assets.adobedtm.com/launch-EN40f2d69539754c3ea73511e70c65c801.min.js');
+if (currentEnvironment.dataset.deploymentEnv === 'prod') {
+  // for production, use the production launch script
+  await loadScript('https://assets.adobedtm.com/launch-EN40f2d69539754c3ea73511e70c65c801.min.js');
+} else {
+  // for development, use the development launch script
+  await loadScript('https://assets.adobedtm.com/8639b8ee2552/0f7a35c4f04b/launch-EN10955306e5aa4722aaabcdd1910448ad-development.min.js');
+}
+
+configureAnalyticsTrackingServers();
+
+// PDP prodView via Launch direct call; Launch rule maps digitalData and sends the beacon.
+initInstrumentation();
+ensureAnalyticsTrackingConfigured();
 
 const { pathname } = window.location;
 
