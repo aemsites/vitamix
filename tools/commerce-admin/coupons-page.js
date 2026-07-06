@@ -408,7 +408,7 @@ function couponYearSelectOptionsHtml() {
 function newCouponCountryCheckboxesHtml() {
   const tabs = COUPON_MARKETS.filter((m) => m.key !== 'all')
     .map(({ key, label }) => `
-      <label class="coupons-market-tab coupons-market-tab--toggle">
+      <label class="coupons-market-tab coupons-market-tab-toggle">
         <input type="checkbox" class="cp-new-country-cb" value="${escapeHtml(key)}" />
         <span class="coupons-market-tab-label">${escapeHtml(label)}</span>
       </label>`)
@@ -416,7 +416,7 @@ function newCouponCountryCheckboxesHtml() {
   return `
       <div class="coupons-field coupons-field-full" data-cp-new-countries>
         <span class="coupons-country-field-label" id="cp-new-country-legend">Countries</span>
-        <div class="coupons-market-tabs coupons-market-tabs--form" role="group" aria-labelledby="cp-new-country-legend" aria-describedby="cp-new-country-hint">
+        <div class="coupons-market-tabs coupons-market-tabs-form" role="group" aria-labelledby="cp-new-country-legend" aria-describedby="cp-new-country-hint">
           ${tabs}
         </div>
         <p id="cp-new-country-hint" class="coupons-field-hint">Select at least one. One market saves as <code>country</code>; several save as <code>countries</code> (not both). The coupon id uses the <strong>first</strong> in US → Canada → Mexico order.</p>
@@ -427,7 +427,7 @@ function newCouponCountryCheckboxesHtml() {
 function editCouponCountryFieldsHtml() {
   const tabs = COUPON_MARKETS.filter((m) => m.key !== 'all')
     .map(({ key, label }) => `
-      <label class="coupons-market-tab coupons-market-tab--toggle">
+      <label class="coupons-market-tab coupons-market-tab-toggle">
         <input type="checkbox" class="cp-edit-country-cb" value="${escapeHtml(key)}" />
         <span class="coupons-market-tab-label">${escapeHtml(label)}</span>
       </label>`)
@@ -435,7 +435,7 @@ function editCouponCountryFieldsHtml() {
   return `
       <div class="coupons-field coupons-field-full" data-cp-edit-countries>
         <span class="coupons-country-field-label" id="cp-edit-country-legend">Countries</span>
-        <div class="coupons-market-tabs coupons-market-tabs--form" role="group" aria-labelledby="cp-edit-country-legend">
+        <div class="coupons-market-tabs coupons-market-tabs-form" role="group" aria-labelledby="cp-edit-country-legend">
           ${tabs}
         </div>
         <p class="coupons-field-hint">Select at least one. One market saves as <code>country</code>; several save as <code>countries</code> (not both).</p>
@@ -471,6 +471,40 @@ function marketTagHtml(market) {
 function pillHtml(label, on) {
   const cl = on ? 'coupons-pill coupons-pill-on' : 'coupons-pill coupons-pill-off';
   return `<span class="${cl}">${escapeHtml(label)}</span>`;
+}
+
+/** Single state badge (not an on/off pair). */
+function statePillHtml(label) {
+  return `<span class="coupons-pill coupons-pill-state">${escapeHtml(label)}</span>`;
+}
+
+/** @param {string} couponId */
+function couponDiscountBasisStatePill(couponId) {
+  return statePillHtml(
+    couponDiscountAppliesToSalePrice(couponId) ? 'Sale price' : 'Regular price',
+  );
+}
+
+/** @param {Record<string, unknown>} d */
+function couponOnSaleEligibilityStatePill(d) {
+  return statePillHtml(
+    couponExcludesOnSaleProducts(d)
+      ? 'Excludes products on sale'
+      : 'Includes products on sale',
+  );
+}
+
+/** @param {Record<string, unknown>} d coupon detail/list row */
+function couponExcludesOnSaleProducts(d) {
+  return !!(d.excludeDiscountedProducts ?? d.exclude_discounted_products);
+}
+
+/** @param {string} label @param {string} pillsHtml */
+function couponDetailPillGroupHtml(label, pillsHtml) {
+  return `<div class="coupons-modal-pill-group">
+    <span class="coupons-modal-pill-group-label">${escapeHtml(label)}</span>
+    <div class="coupons-modal-pills">${pillsHtml}</div>
+  </div>`;
 }
 
 function couponDetailModalInnerHtml(d) {
@@ -530,12 +564,18 @@ function couponDetailModalInnerHtml(d) {
       <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Total cap per code</span><span class="coupons-modal-stat-value">${escapeHtml(d.defaultUsageLimit != null ? String(d.defaultUsageLimit) : '—')}</span></div>
       <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Cap per customer</span><span class="coupons-modal-stat-value">${escapeHtml(d.defaultUsesPerCode != null ? String(d.defaultUsesPerCode) : '—')}</span></div>
     </div>
-    <div class="coupons-modal-pills" aria-label="Program flags">
-      ${pillHtml('Shipping benefit', couponShippingModeFromRow(d) !== 'none')}
-      ${pillHtml('Stacks with rules', d.stackable !== false)}
-      ${pillHtml('Exclude sale prices', !!(d.excludeDiscountedProducts ?? d.exclude_discounted_products))}
-      ${pillHtml('Auto-apply', !!d.autoApply)}
-      ${pillHtml('Manual entry', d.allowManualEntry !== false)}
+    <div class="coupons-modal-pill-groups" aria-label="Coupon behavior">
+      ${couponDetailPillGroupHtml('Discount calculation', couponDiscountBasisStatePill(id))}
+      ${couponDetailPillGroupHtml('On-sale products', couponOnSaleEligibilityStatePill(d))}
+      ${couponDetailPillGroupHtml(
+    'Program',
+    [
+      pillHtml('Shipping benefit', couponShippingModeFromRow(d) !== 'none'),
+      pillHtml('Stacks with rules', d.stackable !== false),
+      pillHtml('Auto-apply', !!d.autoApply),
+      pillHtml('Manual entry', d.allowManualEntry !== false),
+    ].join(''),
+  )}
     </div>
     <section class="coupons-modal-section">
       <h3 class="coupons-modal-section-title">Included products</h3>
@@ -599,6 +639,7 @@ function wireCouponDetailModal(dialog) {
         { method: 'DELETE' },
       );
       showToast('Coupon deleted', 'success');
+      setCouponDiscountApplyToSalePrice(state.selectedCouponId, false);
       state.selectedCouponId = '';
       state.couponDetail = null;
       state.codes = [];
@@ -777,7 +818,22 @@ const state = {
   /** Overview grid sort (default: title A–Z). */
   overviewSortKey: /** @type {'title'|'id'|'discount'|'min'|'cap'|'freeship'|'stack'|'year'|'market'} */ ('title'),
   overviewSortDir: /** @type {'asc'|'desc'} */ ('asc'),
+  /** Mock-only: coupon id → apply discount to sale price (default regular price). */
+  couponDiscountApplyToSale: /** @type {Record<string, boolean>} */ ({}),
 };
+
+/** @param {string} couponId */
+function couponDiscountAppliesToSalePrice(couponId) {
+  return Boolean(state.couponDiscountApplyToSale[String(couponId || '').trim()]);
+}
+
+/** @param {string} couponId @param {boolean} appliesToSale */
+function setCouponDiscountApplyToSalePrice(couponId, appliesToSale) {
+  const id = String(couponId || '').trim();
+  if (!id) return;
+  if (appliesToSale) state.couponDiscountApplyToSale[id] = true;
+  else delete state.couponDiscountApplyToSale[id];
+}
 
 /** @param {'error'|'info'} tone */
 function setError(msg, tone = 'error') {
@@ -1157,6 +1213,76 @@ async function openDialog(title, innerHtml, onSubmit, afterMount, dialogClass, s
   dialog.showModal();
 }
 
+function couponFormOptionRow(id, label, detail) {
+  return `<div class="cp-form-option">
+    <label class="cp-form-checkbox" for="${escapeHtml(id)}">
+      <input type="checkbox" id="${escapeHtml(id)}" />
+      <span class="cp-form-checkbox-label">${escapeHtml(label)}</span>
+    </label>
+    <p class="coupons-field-hint cp-form-option-detail">${detail}</p>
+  </div>`;
+}
+
+/** @param {string} title @param {string} rowsHtml */
+function couponFormOptionsSubgroupHtml(title, rowsHtml) {
+  return `<div class="cp-form-options-subgroup">
+    <h4 class="cp-form-options-subtitle">${escapeHtml(title)}</h4>
+    <div class="cp-form-options-list">${rowsHtml}</div>
+  </div>`;
+}
+
+/** @param {{ editMode?: boolean }} [opts] */
+function couponFormOptionsSectionHtml(opts = {}) {
+  const editMode = Boolean(opts.editMode);
+  const subgroups = [];
+
+  if (editMode) {
+    subgroups.push(couponFormOptionsSubgroupHtml(
+      'Discount calculation',
+      couponFormOptionRow(
+        'cp-form-apply-to-sale',
+        'Calculate discount from sale price',
+        'Which price the discount amount is based on. Unchecked uses regular price (default); checked uses the current sale price. UX mock only — not persisted yet.',
+      ),
+    ));
+  }
+
+  subgroups.push(couponFormOptionsSubgroupHtml(
+    'On-sale products',
+    couponFormOptionRow(
+      'cp-form-exclude-discounted',
+      'Block coupon on products that are on sale',
+      'Whether this coupon can be used at all on items that already have a catalog sale price. Separate from the discount calculation base above.',
+    ),
+  ));
+
+  subgroups.push(couponFormOptionsSubgroupHtml(
+    'Checkout & stacking',
+    [
+      couponFormOptionRow(
+        'cp-form-stackable',
+        'Allow stacking with automatic pricing rules',
+        'When enabled, this coupon can combine with catalog promotions and cart rules instead of being blocked.',
+      ),
+      couponFormOptionRow(
+        'cp-form-auto',
+        'Auto-apply hint',
+        'Marks the coupon for automatic application when supported (for example via an affiliate URL parameter).',
+      ),
+      couponFormOptionRow(
+        'cp-form-manual',
+        'Allow manual code entry',
+        'When enabled, customers can enter a coupon code at checkout. Turn off for auto-apply-only programs.',
+      ),
+    ].join(''),
+  ));
+
+  return `<div class="coupons-field coupons-field-full cp-form-options-group">
+    <h3 class="cp-form-options-title">Behavior &amp; eligibility</h3>
+    ${subgroups.join('')}
+  </div>`;
+}
+
 function couponFormHtml({ idReadonly }) {
   const idBlock = idReadonly
     ? `<div class="coupons-field coupons-field-full">
@@ -1214,18 +1340,7 @@ function couponFormHtml({ idReadonly }) {
         </select>
         <p class="coupons-field-hint">Same options as cart rules: standard only, or standard and priority.</p>
       </div>
-      <div class="coupons-field coupons-field-full">
-        <label class="coupons-checkbox-row"><input type="checkbox" id="cp-form-stackable" checked /> Allow stacking with automatic pricing rules</label>
-      </div>
-      <div class="coupons-field coupons-field-full">
-        <label class="coupons-checkbox-row"><input type="checkbox" id="cp-form-exclude-discounted" /> Do not apply to products already discounted by catalog price rules</label>
-      </div>
-      <div class="coupons-field coupons-field-full">
-        <label class="coupons-checkbox-row"><input type="checkbox" id="cp-form-auto" /> Auto-apply hint (e.g. affiliate URL)</label>
-      </div>
-      <div class="coupons-field coupons-field-full">
-        <label class="coupons-checkbox-row"><input type="checkbox" id="cp-form-manual" checked /> Customers may enter a code manually at checkout</label>
-      </div>
+      ${couponFormOptionsSectionHtml({ editMode: idReadonly })}
       <div class="coupons-field">
         <label for="cp-form-def-limit">Total cap per code (default)</label>
         <input type="number" id="cp-form-def-limit" min="0" step="1" placeholder="empty = unlimited" />
@@ -1430,6 +1545,10 @@ function fillCouponForm(dlg, d) {
   dlg.querySelector('#cp-form-def-limit').value = d.defaultUsageLimit != null ? String(d.defaultUsageLimit) : '';
   dlg.querySelector('#cp-form-def-per-code').value = d.defaultUsesPerCode != null ? String(d.defaultUsesPerCode) : '';
   dlg.querySelector('#cp-form-notes').value = d.notes ?? '';
+  const applySaleEl = dlg.querySelector('#cp-form-apply-to-sale');
+  if (applySaleEl instanceof HTMLInputElement) {
+    applySaleEl.checked = couponDiscountAppliesToSalePrice(String(d.id ?? state.selectedCouponId ?? ''));
+  }
   applyCouponCountryCheckboxesFromDetail(dlg, d);
 }
 
@@ -1687,11 +1806,18 @@ function openEditCouponDialog() {
     couponFormHtml({ idReadonly: true }),
     async (dlg) => {
       const body = readCouponBodyFromForm(dlg, { requireId: false });
+      const applyToSale = !!dlg.querySelector('#cp-form-apply-to-sale')?.checked;
       await couponsApiFetch(
         `coupons/types/${encodeURIComponent(state.selectedCouponId)}`,
         { method: 'PUT', body: JSON.stringify(body) },
       );
-      showToast('Coupon updated', 'success');
+      setCouponDiscountApplyToSalePrice(state.selectedCouponId, applyToSale);
+      showToast(
+        applyToSale
+          ? 'Coupon updated. Discount basis (sale price) is a UX mock and was not saved yet.'
+          : 'Coupon updated',
+        'success',
+      );
       await refreshSelection();
       afterCodesRefresh();
     },

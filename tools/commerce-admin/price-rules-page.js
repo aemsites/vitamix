@@ -4,6 +4,7 @@
  * Data comes only from ProductBus; failed loads show errors and empty lists.
  */
 import waitForCommerceAuthReady from './commerce-wait-auth-ready.js';
+import { apiFetch } from './commerce-otp-api.js';
 import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
 import { createDetailModalHeaderCloseAndJson } from './commerce-detail-modal-json.js';
 import { mountPromoteProductionInToolbar } from './commerce-promote-production.js';
@@ -125,6 +126,9 @@ const AREAS = /** @type {const} */ (['rules', 'promotions']);
  *   promoListGroupFilter: string,
  *   cartRuleSearch: string,
  *   catalogPromotions: import('./price-rules-api.js').CatalogPromotion[],
+ *   promotionCouponTypes: Record<string, unknown>[],
+ *   promotionCouponLoadError: string,
+ *   promotionCouponGateSelections: Record<string, string>,
  *   catalogDataSource: 'api'|'unavailable',
  *   catalogLoadError: string,
  *   cartRulesList: import('./price-rules-api.js').HelixCartPriceRule[]|null,
@@ -149,6 +153,11 @@ const state = {
   cartRuleSortDir: /** @type {'asc'|'desc'} */ ('asc'),
   /** @type {import('./price-rules-api.js').CatalogPromotion[]} */
   catalogPromotions: [],
+  /** @type {Record<string, unknown>[]} */
+  promotionCouponTypes: [],
+  promotionCouponLoadError: '',
+  /** Mock-only, session-local until the promotion access API exists. */
+  promotionCouponGateSelections: /** @type {Record<string, string>} */ ({}),
   /** @type {'api'|'unavailable'} */
   catalogDataSource: 'unavailable',
   catalogLoadError: '',
@@ -342,6 +351,103 @@ function rulesForCountry(ck) {
 
 function promotionsListSource() {
   return state.catalogPromotions;
+}
+
+async function readProductBusResponseError(resp) {
+  return resp.headers.get('x-error')
+    || (await resp.text().catch(() => '')).trim()
+    || `HTTP ${resp.status}`;
+}
+
+/**
+ * @param {unknown} data
+ * @returns {Record<string, unknown>[]}
+ */
+function couponTypeRowsFromResponse(data) {
+  if (Array.isArray(data)) return /** @type {Record<string, unknown>[]} */ (data);
+  if (!data || typeof data !== 'object') return [];
+  const obj = /** @type {Record<string, unknown>} */ (data);
+  const key = ['types', 'items', 'data', 'results', 'coupons'].find((k) => Array.isArray(obj[k]));
+  return key ? /** @type {Record<string, unknown>[]} */ (obj[key]) : [];
+}
+
+/**
+ * @param {Record<string, unknown>} row
+ * @returns {string}
+ */
+function couponTypeIdFromRow(row) {
+  return String(row?.id ?? row?.typeId ?? '').trim();
+}
+
+/**
+ * @param {Record<string, unknown>} row
+ * @returns {string}
+ */
+function couponTypeLabelFromRow(row) {
+  const id = couponTypeIdFromRow(row);
+  const name = String(row?.name ?? '').trim();
+  if (name && id) return `${name} (${id})`;
+  return name || id || 'Untitled coupon';
+}
+
+function sortedPromotionCouponTypes() {
+  return state.promotionCouponTypes
+    .filter((row) => couponTypeIdFromRow(row))
+    .slice()
+    .sort((a, b) => couponTypeLabelFromRow(a).localeCompare(
+      couponTypeLabelFromRow(b),
+      undefined,
+      { sensitivity: 'base', numeric: true },
+    ));
+}
+
+function promotionCouponLabelById(couponId) {
+  const id = String(couponId || '').trim();
+  if (!id) return '';
+  const row = state.promotionCouponTypes.find((r) => couponTypeIdFromRow(r) === id);
+  return row ? couponTypeLabelFromRow(row) : id;
+}
+
+function promotionCouponGateOptionsHtml(selected = '') {
+  const rows = sortedPromotionCouponTypes();
+  const selectedId = String(selected || '').trim();
+  if (!rows.length) {
+    const label = state.promotionCouponLoadError
+      ? 'Coupon list unavailable'
+      : 'No coupons available';
+    return `<option value="">${escapeHtml(label)}</option>`;
+  }
+  const opts = rows.map((row) => {
+    const id = couponTypeIdFromRow(row);
+    const sel = id === selectedId ? ' selected' : '';
+    return `<option value="${escapeHtml(id)}"${sel}>${escapeHtml(couponTypeLabelFromRow(row))}</option>`;
+  });
+  return `<option value="">Select a coupon…</option>${opts.join('')}`;
+}
+
+function promotionCouponGateSelection(promoId) {
+  return String(state.promotionCouponGateSelections[String(promoId || '').trim()] || '').trim();
+}
+
+function setPromotionCouponGateSelection(promoId, couponId) {
+  const id = String(promoId || '').trim();
+  if (!id) return;
+  const coupon = String(couponId || '').trim();
+  if (coupon) state.promotionCouponGateSelections[id] = coupon;
+  else delete state.promotionCouponGateSelections[id];
+}
+
+async function loadPromotionCouponTypesFromApi() {
+  try {
+    const resp = await apiFetch(PB_ORG, PB_SITE, 'coupons/types', { method: 'GET' });
+    if (!resp.ok) throw new Error(await readProductBusResponseError(resp));
+    const data = await resp.json();
+    state.promotionCouponTypes = couponTypeRowsFromResponse(data);
+    state.promotionCouponLoadError = '';
+  } catch (err) {
+    state.promotionCouponTypes = [];
+    state.promotionCouponLoadError = err?.message || String(err);
+  }
 }
 
 async function loadCatalogFromApi() {
@@ -777,12 +883,33 @@ function wirePromotionMinCartConditionFields(dlg) {
   sync();
 }
 
+/** @param {ParentNode} root */
+function wirePromotionCouponGateFields(root) {
+  const cb = root.querySelector('[data-pr-promo-coupon-gate-enabled]');
+  const sel = root.querySelector('[data-pr-promo-coupon-gate-select]');
+  if (!(cb instanceof HTMLInputElement) || !(sel instanceof HTMLSelectElement)) return;
+  const sync = () => {
+    sel.disabled = !cb.checked || !sortedPromotionCouponTypes().length;
+  };
+  cb.addEventListener('change', sync);
+  sync();
+}
+
 /** @param {HTMLDialogElement} dlg */
 function readPromotionMinCartCondition(dlg) {
   const cb = dlg.querySelector('#pr-promo-min-cart-enabled');
   const enabled = cb instanceof HTMLInputElement && cb.checked;
   const raw = String(dlg.querySelector('#pr-promo-min-cart-amount')?.value ?? '').trim();
   return { enabled, amountRaw: raw };
+}
+
+/** @param {HTMLDialogElement} dlg */
+function readPromotionCouponGateMock(dlg) {
+  const cb = dlg.querySelector('[data-pr-promo-coupon-gate-enabled]');
+  const sel = dlg.querySelector('[data-pr-promo-coupon-gate-select]');
+  const enabled = cb instanceof HTMLInputElement && cb.checked;
+  const couponId = sel instanceof HTMLSelectElement ? String(sel.value || '').trim() : '';
+  return { enabled, couponId };
 }
 
 /**
@@ -1330,11 +1457,12 @@ function promotionSaleLinesTableWrapHtml(linesHtml) {
 /**
  * @param {(typeof COUNTRIES)[number]} initialMarket
  * @param {PromotionRow[]} lines
- * @param {{ edit?: boolean, promoId?: string }} [opts]
+ * @param {{ edit?: boolean, promoId?: string, selectedCouponId?: string }} [opts]
  */
 function promotionEditFormInnerHtml(initialMarket, lines, opts = {}) {
   const edit = Boolean(opts.edit);
   const promoId = opts.promoId ? String(opts.promoId) : '';
+  const selectedCouponId = opts.selectedCouponId ? String(opts.selectedCouponId) : '';
   const optsHtml = COUNTRIES.map((key) => {
     const label = marketLabel(key).trim() || key.toUpperCase();
     const sel = key === initialMarket ? ' selected' : '';
@@ -1357,6 +1485,22 @@ function promotionEditFormInnerHtml(initialMarket, lines, opts = {}) {
       end: '',
     }];
   const linesHtml = seed.map((r, i) => promotionFormTableRowHtml(r, i)).join('');
+  const couponGateBlock = edit ? `
+      <div class="coupons-field coupons-field-full pr-promo-form-option pr-promo-coupon-gate">
+        <label class="pr-promo-form-checkbox">
+          <input type="checkbox" data-pr-promo-coupon-gate-enabled />
+          <span class="pr-promo-form-checkbox-label">Gate promotion access by coupon</span>
+        </label>
+        <div class="pr-promo-form-option-body">
+          <select data-pr-promo-coupon-gate-select disabled aria-label="Coupon required for promotion access">
+            ${promotionCouponGateOptionsHtml(selectedCouponId)}
+          </select>
+          <p class="coupons-field-hint">UX mock only. The selected coupon is not included in <code>PUT …/price-rules/catalog</code> until the promotion access API is available.</p>
+        ${state.promotionCouponLoadError
+    ? `<p class="coupons-field-hint pr-promo-coupon-gate-error">${escapeHtml(state.promotionCouponLoadError)}</p>`
+    : ''}
+        </div>
+      </div>` : '';
   return `
     <p class="coupons-page-lead" style="margin:0 0 12px;font-size:14px;color:#6d7175">
     ${edit
@@ -1380,14 +1524,17 @@ function promotionEditFormInnerHtml(initialMarket, lines, opts = {}) {
         <label for="pr-promo-form-group">Group <span class="coupons-field-hint">(e.g. calendar year)</span></label>
         <input type="text" id="pr-promo-form-group" inputmode="text" placeholder="2026" />
       </div>
-      <div class="coupons-field coupons-field-full">
-        <label class="pr-promo-min-cart-check">
+      <div class="coupons-field coupons-field-full pr-promo-form-option">
+        <label class="pr-promo-form-checkbox" for="pr-promo-min-cart-enabled">
           <input type="checkbox" id="pr-promo-min-cart-enabled" />
-          Require minimum cart subtotal
+          <span class="pr-promo-form-checkbox-label">Require minimum cart subtotal</span>
         </label>
-        <input type="text" id="pr-promo-min-cart-amount" class="pr-promo-min-cart-amount-input" inputmode="decimal" placeholder="e.g. 100" disabled aria-label="Minimum cart subtotal (dollars)" />
-        <p class="coupons-field-hint">Optional. When enabled, saved as <code>conditions.minimumSubtotal</code> on the promotion (storefront applies the threshold when supported). Turn off to clear this condition.</p>
+        <div class="pr-promo-form-option-body">
+          <input type="text" id="pr-promo-min-cart-amount" class="pr-promo-min-cart-amount-input" inputmode="decimal" placeholder="e.g. 100" disabled aria-label="Minimum cart subtotal (dollars)" />
+          <p class="coupons-field-hint">Optional. When enabled, saved as <code>conditions.minimumSubtotal</code> on the promotion (storefront applies the threshold when supported). Turn off to clear this condition.</p>
+        </div>
       </div>
+      ${couponGateBlock}
     </div>
     <div class="pr-promo-form-lines-header">
       <h3 class="pr-promo-form-lines-title">Sale lines</h3>
@@ -1580,6 +1727,7 @@ async function deletePromotionById(promoId) {
   }
   try {
     await putCatalogPromotionsDocument(next);
+    setPromotionCouponGateSelection(promoId, '');
     showToast('Promotion deleted', 'success');
     return true;
   } catch (err) {
@@ -1626,6 +1774,7 @@ async function openPromotionAddDialog() {
   wirePromotionFormDynamicLines(dialog);
   wirePromotionTsvImport(dialog);
   wirePromotionMinCartConditionFields(dialog);
+  wirePromotionCouponGateFields(dialog);
   wirePromotionSaleLineTableCells(dialog);
   refreshPromotionLineIndices(dialog);
   refreshPromotionSaleLinesVisuals(dialog);
@@ -1647,6 +1796,10 @@ async function openPromotionAddDialog() {
       const group = String(dialog.querySelector('#pr-promo-form-group')?.value ?? '').trim()
         || String(new Date().getFullYear());
       const minCart = readPromotionMinCartCondition(dialog);
+      const couponGate = readPromotionCouponGateMock(dialog);
+      if (couponGate.enabled && sortedPromotionCouponTypes().length && !couponGate.couponId) {
+        throw new Error('Select a coupon for the mock access gate, or turn off coupon gating.');
+      }
       if (minCart.enabled) {
         const d = catalogPriceStringForApi(minCart.amountRaw);
         const n = parseFloat(d);
@@ -1674,7 +1827,13 @@ async function openPromotionAddDialog() {
         rules: rulesNew,
       }, minCart)];
       await putCatalogPromotionsDocument(next);
-      showToast('Promotion added', 'success');
+      setPromotionCouponGateSelection(id, couponGate.enabled ? couponGate.couponId : '');
+      showToast(
+        couponGate.enabled
+          ? 'Promotion added. Coupon gate selection is a UX mock and was not saved yet.'
+          : 'Promotion added',
+        'success',
+      );
       close();
       render();
     } catch (err) {
@@ -1709,6 +1868,7 @@ async function openPromotionEditDialog(countryKey, promoId) {
   );
   const rows = rulesCo.map(catalogRuleToPromotionRow);
   const groupGuess = promotionCatalogGroup(promo, ck);
+  const selectedCouponId = promotionCouponGateSelection(promoId);
 
   const dialog = document.createElement('dialog');
   dialog.className = 'coupons-dialog coupons-dialog-wide pr-promo-form-dialog';
@@ -1716,7 +1876,7 @@ async function openPromotionEditDialog(countryKey, promoId) {
     <div class="coupons-dialog-inner">
       <div class="coupons-dialog-scroll" tabindex="-1">
         <h2 class="coupons-dialog-title">Edit promotion</h2>
-        ${promotionEditFormInnerHtml(ck, rows, { edit: true, promoId })}
+        ${promotionEditFormInnerHtml(ck, rows, { edit: true, promoId, selectedCouponId })}
       </div>
       <div class="coupons-dialog-actions pr-cart-rule-edit-dialog-actions">
         <button type="button" class="coupons-btn coupons-btn-danger" data-pr-promo-form-delete>Delete promotion…</button>
@@ -1741,10 +1901,15 @@ async function openPromotionEditDialog(countryKey, promoId) {
       minAmt.disabled = false;
     }
   }
+  const couponCb = dialog.querySelector('[data-pr-promo-coupon-gate-enabled]');
+  if (couponCb instanceof HTMLInputElement && selectedCouponId) {
+    couponCb.checked = true;
+  }
 
   wirePromotionFormDynamicLines(dialog);
   wirePromotionTsvImport(dialog);
   wirePromotionMinCartConditionFields(dialog);
+  wirePromotionCouponGateFields(dialog);
   wirePromotionSaleLineTableCells(dialog);
   refreshPromotionLineIndices(dialog);
   refreshPromotionSaleLinesVisuals(dialog);
@@ -1777,6 +1942,10 @@ async function openPromotionEditDialog(countryKey, promoId) {
       const group = String(dialog.querySelector('#pr-promo-form-group')?.value ?? '').trim()
         || String(new Date().getFullYear());
       const minCart = readPromotionMinCartCondition(dialog);
+      const couponGate = readPromotionCouponGateMock(dialog);
+      if (couponGate.enabled && sortedPromotionCouponTypes().length && !couponGate.couponId) {
+        throw new Error('Select a coupon for the mock access gate, or turn off coupon gating.');
+      }
       if (minCart.enabled) {
         const d = catalogPriceStringForApi(minCart.amountRaw);
         const n = parseFloat(d);
@@ -1817,7 +1986,13 @@ async function openPromotionEditDialog(countryKey, promoId) {
         rules: merged,
       }, minCart, prev);
       await putCatalogPromotionsDocument(next);
-      showToast('Promotion updated', 'success');
+      setPromotionCouponGateSelection(promoId, couponGate.enabled ? couponGate.couponId : '');
+      showToast(
+        couponGate.enabled
+          ? 'Promotion updated. Coupon gate selection is a UX mock and was not saved yet.'
+          : 'Promotion updated',
+        'success',
+      );
       close();
       render();
     } catch (err) {
@@ -2248,9 +2423,9 @@ async function initPricingSources() {
     return;
   }
   const tasks = [];
-  if (PR_APP_MODE === 'promotions') tasks.push(loadCatalogFromApi());
+  if (PR_APP_MODE === 'promotions') tasks.push(loadCatalogFromApi(), loadPromotionCouponTypesFromApi());
   else if (PR_APP_MODE === 'cart-rules') tasks.push(loadCartFromApi());
-  else tasks.push(loadCatalogFromApi(), loadCartFromApi());
+  else tasks.push(loadCatalogFromApi(), loadCartFromApi(), loadPromotionCouponTypesFromApi());
   await Promise.all(tasks);
 }
 
@@ -2482,6 +2657,14 @@ function promoMarketTagHtml(countryKey) {
 function promoPillHtml(label, on) {
   const cl = on ? 'coupons-pill coupons-pill-on' : 'coupons-pill coupons-pill-off';
   return `<span class="${cl}">${escapeHtml(label)}</span>`;
+}
+
+function promotionCouponGateBadgeHtml(promoId) {
+  const couponId = promotionCouponGateSelection(promoId);
+  if (!couponId) {
+    return '<span class="coupons-tag coupons-tag-muted pr-promo-coupon-code-badge">No coupon required</span>';
+  }
+  return `<span class="coupons-tag coupons-tag-slug pr-promo-coupon-code-badge">${escapeHtml(promotionCouponLabelById(couponId))}</span>`;
 }
 
 /** @param {string} digits normalized plain number string */
@@ -3127,6 +3310,7 @@ function promotionDetailModalInnerHtml(
         ${promoMarketTagHtml(countryKey)}
         ${commerceGroupBadgeHtml(groupLabel)}
         <span class="coupons-tag coupons-tag-slug">${escapeHtml(id)}</span>
+        ${promotionCouponGateBadgeHtml(id)}
       </div>
       <h2 class="coupons-modal-title">${escapeHtml(set.title)}</h2>
       <p class="coupons-modal-idline"><code>${escapeHtml(fullPath)}</code></p>

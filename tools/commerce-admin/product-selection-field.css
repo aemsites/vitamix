@@ -41,6 +41,11 @@
   outline: none;
 }
 
+.psf-pills {
+  gap: 9px;
+  min-height: 0;
+}
+
 .psf-display-empty .psf-pills {
   display: none;
 }
@@ -57,11 +62,6 @@
 
 .psf-display:not(.psf-display-empty) .psf-empty {
   display: none;
-}
-
-.psf-pills {
-  gap: 9px;
-  min-height: 0;
 }
 
 .psf-display .ps-pill {
@@ -92,11 +92,11 @@
   padding: 0;
   border: none;
   border-radius: 12px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 18%);
 }
 
 .ps-modal-dialog::backdrop {
-  background: rgba(0, 0, 0, 0.45);
+  background: rgb(0 0 0 / 45%);
 }
 
 .ps-modal-inner {

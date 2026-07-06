@@ -517,10 +517,6 @@
   margin: 0 0 4px;
 }
 
-.orders-detail-discounts li:last-child {
-  margin-bottom: 0;
-}
-
 .orders-detail-history {
   margin: 0;
   padding: 0;
@@ -548,6 +544,10 @@
 .orders-detail-history .orders-history-event {
   font-size: 13px;
   color: #202223;
+}
+
+.orders-detail-discounts li:last-child {
+  margin-bottom: 0;
 }
 
 .orders-detail-empty {

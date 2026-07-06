@@ -412,7 +412,9 @@
 }
 
 /* -------------------------------------------------------------------------- */
+
 /* Mobile / narrow viewports — horizontal scroll for overview tables + shell  */
+
 /* -------------------------------------------------------------------------- */
 
 .commerce-admin-body .pim-main,
@@ -424,13 +426,12 @@
 /* Catalog + any list using .pim-list-wrapper: pim.css uses overflow:hidden which clips wide tables. */
 .commerce-admin-body .pim-list-wrapper {
   max-width: 100%;
-  overflow-x: auto;
-  overflow-y: auto;
+  overflow: auto;
   -webkit-overflow-scrolling: touch;
 }
 
 /* Wide data tables: keep column readability; parent .pim-list-wrapper scrolls horizontally. */
-@media (max-width: 900px) {
+@media (width <= 900px) {
   .commerce-admin-body .pim-list {
     min-width: 720px;
   }
@@ -458,13 +459,10 @@
   }
 }
 
-@media (max-width: 720px) {
+@media (width <= 720px) {
   .commerce-admin-body .pim-main,
   .commerce-admin-body .commerce-admin-hub-main {
-    padding-left: max(12px, env(safe-area-inset-left, 0px));
-    padding-right: max(12px, env(safe-area-inset-right, 0px));
-    padding-top: 16px;
-    padding-bottom: 28px;
+    padding: 16px max(12px, env(safe-area-inset-right, 0px)) 28px max(12px, env(safe-area-inset-left, 0px));
   }
 
   .commerce-admin-header-inner {
@@ -506,7 +504,7 @@
   }
 }
 
-@media (max-width: 520px) {
+@media (width <= 520px) {
   .commerce-admin-header-inner {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-rows: auto auto;

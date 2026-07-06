@@ -84,12 +84,12 @@
   color: #202223;
 }
 
-.coupons-market-tabs--form {
+.coupons-market-tabs-form {
   margin-bottom: 4px;
 }
 
 /* Country multi-select in coupon dialogs — same look as toolbar market tabs */
-.coupons-market-tab--toggle {
+.coupons-market-tab-toggle {
   display: inline-flex;
   align-items: center;
   cursor: pointer;
@@ -98,7 +98,7 @@
   font-weight: 500;
 }
 
-.coupons-market-tab--toggle input {
+.coupons-market-tab-toggle input {
   position: absolute;
   opacity: 0;
   width: 0;
@@ -106,16 +106,16 @@
   pointer-events: none;
 }
 
-.coupons-market-tab--toggle:has(input:checked) {
+.coupons-market-tab-toggle:has(:focus-visible) {
+  outline: 2px solid #1a56b0;
+  outline-offset: 2px;
+}
+
+.coupons-market-tab-toggle:has(input:checked) {
   border-color: #2c2c2e;
   background: #202223;
   color: #fff;
   font-weight: 600;
-}
-
-.coupons-market-tab--toggle:has(:focus-visible) {
-  outline: 2px solid #1a56b0;
-  outline-offset: 2px;
 }
 
 .coupons-market-hint {
@@ -551,6 +551,12 @@
   border-color: #e1e3e5;
 }
 
+.coupons-pill-state {
+  background: #eef3fb;
+  color: #1a3a6e;
+  border-color: #c5d4ed;
+}
+
 .coupons-muted {
   color: #8c9196;
   font-size: 13px;
@@ -743,7 +749,25 @@
 .coupons-modal-pills {
   display: flex;
   flex-wrap: wrap;
+  margin-bottom: 0;
+}
+
+.coupons-modal-pill-groups {
   margin-bottom: 18px;
+}
+
+.coupons-modal-pill-group + .coupons-modal-pill-group {
+  margin-top: 12px;
+}
+
+.coupons-modal-pill-group-label {
+  display: block;
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6d7175;
 }
 
 .coupons-modal-section {
@@ -898,6 +922,103 @@
 .coupons-checkbox-row input {
   width: auto;
   min-width: 0;
+}
+
+/* Coupon edit form: modern checkbox option (discount basis mock) */
+.cp-form-options-group {
+  margin-top: 4px;
+}
+
+.cp-form-options-title {
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #202223;
+}
+
+.cp-form-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cp-form-options-subgroup + .cp-form-options-subgroup {
+  margin-top: 16px;
+}
+
+.cp-form-options-subtitle {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #202223;
+  letter-spacing: 0.01em;
+}
+
+.cp-form-option {
+  padding: 12px 14px;
+  border: 1px solid #e1e3e5;
+  border-radius: 10px;
+  background: #fafbfb;
+}
+
+.cp-form-option-detail {
+  margin: 8px 0 0;
+  padding-left: 28px;
+}
+
+.cp-form-checkbox {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 10px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.cp-form-checkbox-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #202223;
+  line-height: 1.35;
+}
+
+.coupons-field .cp-form-checkbox input[type='checkbox'] {
+  appearance: none;
+  box-sizing: border-box;
+  flex: 0 0 18px;
+  flex-shrink: 0;
+  width: 18px;
+  min-width: 18px;
+  max-width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  border: 1.5px solid #c9cccf;
+  border-radius: 5px;
+  background: #fff;
+  cursor: pointer;
+  transition: background-color 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
+}
+
+.coupons-field .cp-form-checkbox input[type='checkbox']:hover {
+  border-color: #8c9196;
+}
+
+.coupons-field .cp-form-checkbox input[type='checkbox']:checked {
+  border-color: #202223;
+  background-color: #202223;
+  background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2.5 6L5 8.5L9.5 4' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 12px 12px;
+}
+
+.coupons-field .cp-form-checkbox input[type='checkbox']:focus-visible {
+  outline: 2px solid #2c6ecb;
+  outline-offset: 2px;
 }
 
 .coupons-advanced {
