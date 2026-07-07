@@ -213,20 +213,3 @@ loadScript('https://cdn.datasteam.io/js/D26F66D1AD707A.js');
 })
 (window,document,"script","//bat.bing.com/bat.js","uetq");
 
-(function(w, d){
-  var id='spdt-capture', n='script';
-  if (!d.getElementById(id)) {
-    w.spdt =
-      w.spdt ||
-      function() {
-        (w.spdt.q = w.spdt.q || []).push(arguments);
-      };
-    var e = d.createElement(n); e.id = id; e.async=1;
-    e.src = 'https://pixel.byspotify.com/ping.min.js';
-    var s = d.getElementsByTagName(n)[0];
-    s.parentNode.insertBefore(e, s);
-  }
-  w.spdt('conf', { key: '18858202ee0c4082a0f7e6d3d8b53c94' });
-  w.spdt('view');
-})(window, document);
-
