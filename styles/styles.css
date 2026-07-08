@@ -610,6 +610,36 @@ button.button.close:focus {
   background-color: var(--color-shadow);
 }
 
+a.button.outline-white,
+button.button.outline-white {
+  border-color: var(--color-white);
+  background-color: transparent;
+  color: var(--color-white);
+}
+
+a.button.outline-white:hover,
+button.button.outline-white:hover,
+button.button.outline-white:focus {
+  border-color: var(--color-white);
+  background-color: rgb(255 255 255 / 15%);
+  color: var(--color-white);
+}
+
+a.button.outline-charcoal,
+button.button.outline-charcoal {
+  border-color: var(--color-charcoal);
+  background-color: transparent;
+  color: var(--color-charcoal);
+}
+
+a.button.outline-charcoal:hover,
+button.button.outline-charcoal:hover,
+button.button.outline-charcoal:focus {
+  border-color: var(--color-charcoal);
+  background-color: rgb(0 0 0 / 8%);
+  color: var(--color-charcoal);
+}
+
 .default-content-wrapper .button.link {
   text-align: left;
   line-height: var(--line-height-xl);
