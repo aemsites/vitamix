@@ -818,11 +818,11 @@ function decorateButtons(main) {
         a.classList.add('link');
         em.replaceWith(a);
       } else if (hasSup) {
-        // superscript inside link, white outline button 
+        // superscript inside link, white outline button
         a.classList.add('outline-white');
         a.querySelector('sup').replaceWith(...a.querySelector('sup').childNodes);
       } else if (hasSub) {
-        // subscript inside link, charcoal outline button 
+        // subscript inside link, charcoal outline button
         a.classList.add('outline-charcoal');
         a.querySelector('sub').replaceWith(...a.querySelector('sub').childNodes);
       }
