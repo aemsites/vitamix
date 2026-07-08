@@ -1400,8 +1400,18 @@ async function loadEager(doc) {
   const language = locale ? locale.split('_')[0] : 'en';
   document.documentElement.lang = language;
 
-  /* simulation date */
   const params = new URLSearchParams(window.location.search);
+
+  /* Adobe Target fast path: start Target immediately for already-consented
+     US visitors instead of waiting for the delayed/consented phase.
+     The later import in consented.js resolves to the same module (cached). */
+  if (params.get('martech') !== 'off'
+    && window.location.pathname.startsWith('/us/en_us/')
+    && /(?:^|;\s*)CookieConsent=[^;]*marketing(?::|%3A)true/.test(document.cookie)) {
+    import('./consented/adobe-target.js');
+  }
+
+  /* simulation date */
   const simulateDateParam = params.get('simulateDate');
   if (simulateDateParam) {
     try {
