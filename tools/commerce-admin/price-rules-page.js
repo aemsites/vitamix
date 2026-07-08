@@ -800,6 +800,62 @@ function parseSaleLinesTsv(text) {
   return rows;
 }
 
+const PROMO_TSV_HEADER = 'Start\tEnd\tProduct\tRegular Price\tSale Price';
+
+/** @param {string} value */
+function promotionSaleLineTsvCell(value) {
+  return String(value ?? '').replace(/\t/g, ' ').replace(/\r?\n/g, ' ').trim();
+}
+
+/** @param {string|null} paste @param {string} view @param {string} iso */
+function promotionSaleLineDateTsvCell(paste, view, iso) {
+  if (paste) return paste;
+  if (view && view !== '—') return view;
+  if (iso) return formatIsoForSaleLineView(iso);
+  return '';
+}
+
+/** @param {HTMLTableRowElement} tr */
+function promotionSaleLineRowTsvFromDom(tr) {
+  const startPaste = tr.getAttribute('data-pr-start-paste');
+  const endPaste = tr.getAttribute('data-pr-end-paste');
+  const startIso = String(tr.querySelector('.pr-promo-h-start')?.value ?? '').trim();
+  const endIso = String(tr.querySelector('.pr-promo-h-end')?.value ?? '').trim();
+  const startView = String(
+    tr.querySelector('.pr-promo-cell[data-field="start"] .pr-promo-cell-view')?.textContent ?? '',
+  ).trim();
+  const endView = String(
+    tr.querySelector('.pr-promo-cell[data-field="end"] .pr-promo-cell-view')?.textContent ?? '',
+  ).trim();
+  const start = promotionSaleLineDateTsvCell(startPaste, startView, startIso);
+  const end = promotionSaleLineDateTsvCell(endPaste, endView, endIso);
+  const product = String(tr.querySelector('.pr-promo-h-product')?.value ?? '').trim()
+    || String(tr.querySelector('.pr-promo-path-text')?.textContent ?? '').trim();
+  const regularRaw = String(tr.querySelector('.pr-promo-h-regular')?.value ?? '').trim();
+  const regular = regularRaw && regularRaw !== '—' ? regularRaw : '';
+  const sale = String(tr.querySelector('.pr-promo-h-sale')?.value ?? '').trim();
+  if (!product && !sale && !regular && !start && !end) return '';
+  return [
+    promotionSaleLineTsvCell(start),
+    promotionSaleLineTsvCell(end),
+    promotionSaleLineTsvCell(product),
+    promotionSaleLineTsvCell(regular),
+    promotionSaleLineTsvCell(sale),
+  ].join('\t');
+}
+
+/** @param {HTMLDialogElement} dlg */
+function syncPromotionTsvPasteFromDom(dlg) {
+  const ta = dlg.querySelector('#pr-promo-tsv-paste');
+  if (!(ta instanceof HTMLTextAreaElement)) return;
+  const rowLines = [...dlg.querySelectorAll('[data-pr-promo-line]')]
+    .map((line) => (line instanceof HTMLTableRowElement ? promotionSaleLineRowTsvFromDom(line) : ''))
+    .filter(Boolean);
+  ta.value = rowLines.length
+    ? `${PROMO_TSV_HEADER}\n${rowLines.join('\n')}`
+    : PROMO_TSV_HEADER;
+}
+
 /**
  * String-key map from rule `custom` (helix).
  *
@@ -1602,8 +1658,14 @@ function wirePromotionFormDynamicLines(dlg) {
  */
 function wirePromotionTsvImport(dlg) {
   const ta = /** @type {HTMLTextAreaElement | null} */ (dlg.querySelector('#pr-promo-tsv-paste'));
+  const details = dlg.querySelector('.pr-promo-tsv-import');
+  details?.addEventListener('toggle', () => {
+    if (details instanceof HTMLDetailsElement && details.open) {
+      syncPromotionTsvPasteFromDom(dlg);
+    }
+  });
   dlg.querySelector('[data-pr-promo-tsv-clear]')?.addEventListener('click', () => {
-    if (ta) ta.value = '';
+    if (ta) ta.value = PROMO_TSV_HEADER;
   });
   const applyParsed = (parsed, mode) => {
     const tbody = dlg.querySelector('#pr-promo-form-lines-tbody');
@@ -1621,6 +1683,7 @@ function wirePromotionTsvImport(dlg) {
     }
     refreshPromotionLineIndices(dlg);
     refreshPromotionSaleLinesVisuals(dlg);
+    syncPromotionTsvPasteFromDom(dlg);
     showToast(`${mode === 'replace' ? 'Replaced with' : 'Appended'} ${parsed.length} row(s)`, 'success');
   };
   dlg.querySelector('[data-pr-promo-tsv-replace]')?.addEventListener('click', () => {
