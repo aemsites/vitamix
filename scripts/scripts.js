@@ -817,7 +817,7 @@ function decorateButtons(main) {
       } else if (em) {
         a.classList.add('link');
         em.replaceWith(a);
-        } else if (hasSup) {
+      } else if (hasSup) {
         // superscript inside link, white outline button
         a.classList.add('outline-white');
         a.querySelector('sup').replaceWith(...a.querySelector('sup').childNodes);
