@@ -49,7 +49,9 @@ function removePrehidingStyle() {
 
 async function getAndApplyOffers() {
   try {
-    const response = await window.adobe.target.getOffers({ request: { execute: { pageLoad: {} } } });
+    const response = await window.adobe.target.getOffers({
+      request: { execute: { pageLoad: {} } },
+    });
     const { options = [], metrics = [] } = response.execute.pageLoad;
     onDecoratedElement(() => {
       try {
