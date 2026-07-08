@@ -3,7 +3,7 @@
     try {
       if (new URLSearchParams(location.search).get('martech') === 'off') return;
       if (!location.pathname.startsWith('/us/en_us/')) return;
-      if (!/(?:^|;\s*)CookieConsent=[^;]*marketing%3Atrue/.test(document.cookie)) return;
+      if (!/(?:^|;\s*)CookieConsent=[^;]*marketing(?::|%3A)true/.test(document.cookie)) return;
       var s = document.createElement('style');
       s.id = 'at-body-style';
       s.innerHTML = 'body { opacity: 0 !important }';
