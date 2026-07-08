@@ -123,6 +123,13 @@
   flex-shrink: 0;
 }
 
+.support-search .support-search-results .card img.manual-icon {
+  object-fit: contain;
+  padding: var(--spacing-150);
+  box-sizing: border-box;
+  background: var(--color-gray-200);
+}
+
 .support-search .support-search-results .card .img.placeholder {
   width: 120px;
   height: 120px;
