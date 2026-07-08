@@ -1,3 +1,21 @@
+<script>
+  (function () {
+    try {
+      if (new URLSearchParams(location.search).get('martech') === 'off') return;
+      if (!location.pathname.startsWith('/us/en_us/')) return;
+      if (!/(?:^|;\s*)CookieConsent=[^;]*marketing%3Atrue/.test(document.cookie)) return;
+      var s = document.createElement('style');
+      s.id = 'at-body-style';
+      s.innerHTML = 'body { opacity: 0 !important }';
+      document.head.appendChild(s);
+      setTimeout(function () {
+        var el = document.getElementById('at-body-style');
+        if (el) el.remove();
+      }, 1800);
+    } catch (e) { /* fail open */ }
+  })();
+</script>
+
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <script src="/scripts/aem.js" type="module"></script>
 <script src="/scripts/scripts.js" type="module"></script>
