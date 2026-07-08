@@ -614,6 +614,11 @@ button.button.close:focus {
   background-color: var(--color-shadow);
 }
 
+.default-content-wrapper .button.link {
+  text-align: left;
+  line-height: var(--line-height-xl);
+}
+
 @media (width >= 800px) {
   a.button,
   button.button {
