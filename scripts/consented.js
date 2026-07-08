@@ -59,11 +59,8 @@ if (pathname.startsWith('/us/en_us/')) {
 
 /* eslint-disable */
 
-loadScript('https://www.googletagmanager.com/gtag/js?id=AW-1070742187', { 'data-cookieconsent': 'marketing' });
 window.dataLayer = window.dataLayer || [];
 function gtag() { dataLayer.push(arguments); }
-gtag('js', new Date());
-gtag('config', 'AW-1070742187');
 
 loadScript('https://www.googletagmanager.com/gtag/js?id=G-XJB3SPQE38');
 gtag('js', new Date());
