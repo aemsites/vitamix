@@ -37,6 +37,12 @@ import {
   hydrateProductScopePills,
   mountProductSelectionField,
 } from './product-selection-field.js';
+import {
+  couponProductListSectionHtml,
+  fillCouponProductList,
+  readCouponDiscountedProductsFromDom,
+  wireCouponProductListRows,
+} from './coupons-product-list.js';
 
 /**
  * ProductBus coupon type (`…/coupons/types`). Shapes match **helix-commerce-api**.
@@ -507,6 +513,28 @@ function couponDetailPillGroupHtml(label, pillsHtml) {
   </div>`;
 }
 
+/**
+ * Read-only table of a product-list coupon's discounted products for the detail
+ * modal (replaces the included/excluded scope sections, which don't apply).
+ * @param {Array<{ path?: string, sku?: string, price?: string|number }>} entries
+ */
+function couponDiscountedProductsSectionHtml(entries) {
+  const rows = entries.map((e) => {
+    const path = escapeHtml(String(e?.path ?? ''));
+    const sku = e?.sku ? escapeHtml(String(e.sku)) : '—';
+    const price = escapeHtml(String(e?.price ?? ''));
+    return `<tr><td><code>${path}</code></td><td>${sku}</td><td>$${price}</td></tr>`;
+  }).join('');
+  return `<section class="coupons-modal-section">
+    <h3 class="coupons-modal-section-title">Discounted products</h3>
+    <p class="coupons-field-hint" style="margin:0 0 8px">Each product path (and optional variant SKU) is discounted to this absolute per-unit price when the coupon code is applied.</p>
+    <table class="cp-plc-detail-grid">
+      <thead><tr><th scope="col">Product path</th><th scope="col">SKU</th><th scope="col">Price</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </section>`;
+}
+
 function couponDetailModalInnerHtml(d) {
   const id = String(d.id ?? state.selectedCouponId ?? '');
   const name = d.name != null ? String(d.name) : '';
@@ -515,9 +543,17 @@ function couponDetailModalInnerHtml(d) {
   const year = pathSeg ? pathSeg.year : '';
   const slugName = pathSeg ? pathSeg.name : '';
 
+  const discountedProducts = Array.isArray(d.discountedProducts ?? d.discounted_products)
+    ? (d.discountedProducts ?? d.discounted_products)
+    : [];
+  const isProductList = discountedProducts.length > 0;
+
   let heroMain = '—';
   let heroSub = '';
-  if (d.discountType === 'fixed' && d.discountValue != null) {
+  if (isProductList) {
+    heroMain = 'Product list';
+    heroSub = `${discountedProducts.length} product${discountedProducts.length === 1 ? '' : 's'}`;
+  } else if (d.discountType === 'fixed' && d.discountValue != null) {
     heroMain = `$${d.discountValue}`;
     heroSub = 'off order subtotal';
   } else if (d.discountType === 'percentage' && d.discountValue != null) {
@@ -565,8 +601,8 @@ function couponDetailModalInnerHtml(d) {
       <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Cap per customer</span><span class="coupons-modal-stat-value">${escapeHtml(d.defaultUsesPerCode != null ? String(d.defaultUsesPerCode) : '—')}</span></div>
     </div>
     <div class="coupons-modal-pill-groups" aria-label="Coupon behavior">
-      ${couponDetailPillGroupHtml('Discount calculation', couponDiscountBasisStatePill(id))}
-      ${couponDetailPillGroupHtml('On-sale products', couponOnSaleEligibilityStatePill(d))}
+      ${isProductList ? '' : couponDetailPillGroupHtml('Discount calculation', couponDiscountBasisStatePill(id))}
+      ${isProductList ? '' : couponDetailPillGroupHtml('On-sale products', couponOnSaleEligibilityStatePill(d))}
       ${couponDetailPillGroupHtml(
     'Program',
     [
@@ -577,7 +613,7 @@ function couponDetailModalInnerHtml(d) {
     ].join(''),
   )}
     </div>
-    <section class="coupons-modal-section">
+    ${isProductList ? couponDiscountedProductsSectionHtml(discountedProducts) : `<section class="coupons-modal-section">
       <h3 class="coupons-modal-section-title">Included products</h3>
       <p class="coupons-field-hint" style="margin:0 0 8px">Products and categories the coupon applies to. Leave empty to allow any product unless excluded below.</p>
       <div class="coupons-modal-tags ps-pills" data-cp-scope-pills="included" data-cp-scope-empty="None (any product unless excluded below)"></div>
@@ -586,7 +622,7 @@ function couponDetailModalInnerHtml(d) {
       <h3 class="coupons-modal-section-title">Excluded products</h3>
       <p class="coupons-field-hint" style="margin:0 0 8px">Products and categories that disqualify the coupon when present in the cart.</p>
       <div class="coupons-modal-tags ps-pills" data-cp-scope-pills="excluded" data-cp-scope-empty="None"></div>
-    </section>
+    </section>`}
     ${d.notes && String(d.notes).trim()
     ? `<section class="coupons-modal-section"><h3 class="coupons-modal-section-title">Notes</h3><div class="coupons-modal-notes">${escapeHtml(String(d.notes).trim())}</div></section>`
     : ''}
@@ -858,6 +894,10 @@ function yn(v) {
 /** Single-line discount summary for overview grid (list row). */
 function overviewDiscountText(row) {
   if (!row || typeof row !== 'object') return '—';
+  const discountedProducts = row.discountedProducts ?? row.discounted_products;
+  if (Array.isArray(discountedProducts) && discountedProducts.length) {
+    return `Product list (${discountedProducts.length})`;
+  }
   if (row.discountType === 'fixed' && row.discountValue != null) {
     return `$${row.discountValue}`;
   }
@@ -1223,9 +1263,9 @@ function couponFormOptionRow(id, label, detail) {
   </div>`;
 }
 
-/** @param {string} title @param {string} rowsHtml */
-function couponFormOptionsSubgroupHtml(title, rowsHtml) {
-  return `<div class="cp-form-options-subgroup">
+/** @param {string} title @param {string} rowsHtml @param {string} [attrs] */
+function couponFormOptionsSubgroupHtml(title, rowsHtml, attrs = '') {
+  return `<div class="cp-form-options-subgroup"${attrs ? ` ${attrs}` : ''}>
     <h4 class="cp-form-options-subtitle">${escapeHtml(title)}</h4>
     <div class="cp-form-options-list">${rowsHtml}</div>
   </div>`;
@@ -1244,6 +1284,7 @@ function couponFormOptionsSectionHtml(opts = {}) {
         'Calculate discount from sale price',
         'Which price the discount amount is based on. Unchecked uses regular price (default); checked uses the current sale price. UX mock only — not persisted yet.',
       ),
+      'data-cp-discount-only',
     ));
   }
 
@@ -1254,6 +1295,7 @@ function couponFormOptionsSectionHtml(opts = {}) {
       'Block coupon on products that are on sale',
       'Whether this coupon can be used at all on items that already have a catalog sale price. Separate from the discount calculation base above.',
     ),
+    'data-cp-discount-only',
   ));
 
   subgroups.push(couponFormOptionsSubgroupHtml(
@@ -1294,22 +1336,26 @@ function couponFormHtml({ idReadonly }) {
 
   return `
     <p class="coupons-page-lead" style="margin-bottom:12px">Describe how this coupon behaves. Amounts are in storefront currency unless noted otherwise.</p>
+    <div class="cp-form-tabs" role="tablist" aria-label="Coupon type">
+      <button type="button" class="cp-form-tab" role="tab" data-cp-coupon-tab="discount" aria-selected="true">Discount</button>
+      <button type="button" class="cp-form-tab" role="tab" data-cp-coupon-tab="productlist" aria-selected="false" tabindex="-1">Product list</button>
+    </div>
     <div class="coupons-form-grid">
       ${idBlock}
       <div class="coupons-field coupons-field-full">
         <label for="cp-form-name">Display name</label>
         <input type="text" id="cp-form-name" autocomplete="off" required />
       </div>
-      <div class="coupons-field">
+      <div class="coupons-field" data-cp-discount-only>
         <label for="cp-form-discount-type">Discount style</label>
         <select id="cp-form-discount-type">
           <option value="percentage">Percentage off order</option>
           <option value="fixed">Fixed dollars off order</option>
         </select>
       </div>
-      <div class="coupons-field">
+      <div class="coupons-field" data-cp-discount-only>
         <label for="cp-form-discount-value">Discount value</label>
-        <input type="number" id="cp-form-discount-value" min="0" step="any" placeholder="25 = 25% or $25" required />
+        <input type="number" id="cp-form-discount-value" min="0" step="any" placeholder="25 = 25% or $25" />
       </div>
       <div class="coupons-field">
         <label for="cp-form-min">Minimum order subtotal ($)</label>
@@ -1319,14 +1365,15 @@ function couponFormHtml({ idReadonly }) {
         <label for="cp-form-max-cap">Max discount cap ($)</label>
         <input type="number" id="cp-form-max-cap" min="0" step="any" placeholder="empty = no cap" />
       </div>
-      <div class="coupons-field coupons-field-full">
+      ${couponProductListSectionHtml()}
+      <div class="coupons-field coupons-field-full" data-cp-discount-only>
         <label>Included products</label>
         <p class="coupons-field-hint">Products and categories the coupon applies to. Leave empty for no include filter. Uses the product index for the primary selected country (see Countries above).</p>
         <div data-cp-psf-mount="included"></div>
         <input type="text" id="cp-form-included" autocomplete="off" />
         <input type="text" id="cp-form-included-products" autocomplete="off" />
       </div>
-      <div class="coupons-field coupons-field-full">
+      <div class="coupons-field coupons-field-full" data-cp-discount-only>
         <label>Excluded products</label>
         <p class="coupons-field-hint">Products and categories that disqualify the coupon. Cannot be set together with included product paths.</p>
         <div data-cp-psf-mount="excluded"></div>
@@ -1354,6 +1401,79 @@ function couponFormHtml({ idReadonly }) {
         <textarea id="cp-form-notes" rows="2" placeholder="Shown only in admin"></textarea>
       </div>
     </div>`;
+}
+
+const COUPON_MODE_SWITCH_EDIT_WARNING = 'Switching coupon type will clear the current settings and overwrite this coupon\'s saved definition when you save. Continue?';
+
+/**
+ * Show the fields for one coupon mode and hide the other's. Purely visual —
+ * clearing the outgoing mode's values is the caller's job (wireCouponFormTabs),
+ * so this is safe to call on initial mount without wiping loaded data.
+ * @param {HTMLElement} dlg
+ * @param {'discount'|'productlist'} mode
+ */
+function setCouponFormMode(dlg, mode) {
+  const next = mode === 'productlist' ? 'productlist' : 'discount';
+  dlg.dataset.cpCouponMode = next;
+  dlg.querySelectorAll('[data-cp-coupon-tab]').forEach((tab) => {
+    const active = tab.getAttribute('data-cp-coupon-tab') === next;
+    tab.setAttribute('aria-selected', active ? 'true' : 'false');
+    if (tab instanceof HTMLElement) tab.tabIndex = active ? 0 : -1;
+  });
+  dlg.querySelectorAll('[data-cp-discount-only]').forEach((el) => {
+    if (el instanceof HTMLElement) el.hidden = next !== 'discount';
+  });
+  dlg.querySelectorAll('[data-cp-plc-only]').forEach((el) => {
+    if (el instanceof HTMLElement) el.hidden = next !== 'productlist';
+  });
+}
+
+/** Reset the flat-discount / scoping fields (the fields a product-list coupon rejects). */
+function clearCouponDiscountModeFields(dlg) {
+  const type = dlg.querySelector('#cp-form-discount-type');
+  if (type instanceof HTMLSelectElement) type.value = 'percentage';
+  ['#cp-form-discount-value', '#cp-form-included', '#cp-form-included-products',
+    '#cp-form-excluded', '#cp-form-excluded-products'].forEach((sel) => {
+    const el = dlg.querySelector(sel);
+    if (el instanceof HTMLInputElement) el.value = '';
+  });
+  ['#cp-form-exclude-discounted', '#cp-form-apply-to-sale'].forEach((sel) => {
+    const el = dlg.querySelector(sel);
+    if (el instanceof HTMLInputElement) el.checked = false;
+  });
+  // Re-render the product-selection pills now that their backing inputs are empty.
+  couponProductSelectionFields.forEach((f) => { f.refresh().catch(() => {}); });
+}
+
+/** Reset the discounted-products grid to a single empty row. */
+function clearCouponProductListFields(dlg) {
+  fillCouponProductList(dlg, []);
+}
+
+/**
+ * @param {HTMLElement} dlg
+ * @param {{ isEdit?: boolean }} [opts]
+ */
+function wireCouponFormTabs(dlg, { isEdit = false } = {}) {
+  dlg.querySelectorAll('[data-cp-coupon-tab]').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      const target = tab.getAttribute('data-cp-coupon-tab') === 'productlist' ? 'productlist' : 'discount';
+      const current = dlg.dataset.cpCouponMode === 'productlist' ? 'productlist' : 'discount';
+      if (target === current) return;
+      // Editing an existing coupon: switching type discards its current
+      // definition and overwrites it on save, so confirm first.
+      /* eslint-disable-next-line no-alert -- destructive: overwrites the saved coupon definition */
+      if (isEdit && !window.confirm(COUPON_MODE_SWITCH_EDIT_WARNING)) return;
+      // Drop the mode we're leaving so its (now conflicting) fields can't be sent.
+      if (current === 'discount') clearCouponDiscountModeFields(dlg);
+      else clearCouponProductListFields(dlg);
+      setCouponFormMode(dlg, target);
+    });
+  });
+  setCouponFormMode(
+    dlg,
+    dlg.dataset.cpCouponMode === 'productlist' ? 'productlist' : 'discount',
+  );
 }
 
 function readOptionalInt(raw) {
@@ -1384,30 +1504,19 @@ function readCouponBodyFromForm(dlg, { requireId }) {
   if (requireId && !id) throw new Error('Coupon ID is required');
   if (requireId) assertCouponIdMarketPath(id);
   if (!name) throw new Error('Display name is required');
-  const discountType = dlg.querySelector('#cp-form-discount-type')?.value || 'percentage';
-  const discountValRaw = dlg.querySelector('#cp-form-discount-value')?.value;
-  const discountValue = Number(discountValRaw);
-  if (!Number.isFinite(discountValue) || discountValue < 0) throw new Error('Discount value must be a valid number');
+
+  // The active tab decides which discount shape is persisted. The other tab's
+  // fields are intentionally omitted from the body — a product-list coupon and
+  // the flat discount/scoping fields are mutually exclusive and the API rejects
+  // them together, so switching tabs and saving drops the now-irrelevant fields.
+  const mode = dlg.dataset.cpCouponMode === 'productlist' ? 'productlist' : 'discount';
+
   const minRaw = dlg.querySelector('#cp-form-min')?.value;
   const minimumOrderAmount = minRaw != null && String(minRaw).trim() !== '' ? Number(minRaw) : 0;
   const maxCap = readOptionalInt(dlg.querySelector('#cp-form-max-cap')?.value);
-  const includedRaw = dlg.querySelector('#cp-form-included')?.value || '';
-  const includedCategories = includedRaw.split(',').map((s) => s.trim()).filter(Boolean);
-  const excludedRaw = dlg.querySelector('#cp-form-excluded')?.value || '';
-  const excludedCategories = excludedRaw.split(',').map((s) => s.trim()).filter(Boolean);
-  const includedProducts = parseProductConditionsInput(
-    dlg.querySelector('#cp-form-included-products')?.value || '',
-  );
-  const excludedProducts = parseProductConditionsInput(
-    dlg.querySelector('#cp-form-excluded-products')?.value || '',
-  );
-  if (includedProducts.length && excludedProducts.length) {
-    throw new Error('Included and excluded product paths cannot both be set on the same coupon.');
-  }
   const shippingMode = normalizeShippingBenefitMode(dlg.querySelector('#cp-form-shipping')?.value);
   const shipFields = shippingBenefitFieldsFromMode(shippingMode);
   const stackable = !!dlg.querySelector('#cp-form-stackable')?.checked;
-  const excludeDiscountedProducts = !!dlg.querySelector('#cp-form-exclude-discounted')?.checked;
   const autoApply = !!dlg.querySelector('#cp-form-auto')?.checked;
   const allowManualEntry = !!dlg.querySelector('#cp-form-manual')?.checked;
   const defaultUsageLimit = readOptionalInt(dlg.querySelector('#cp-form-def-limit')?.value);
@@ -1417,23 +1526,45 @@ function readCouponBodyFromForm(dlg, { requireId }) {
   const body = {
     id: id || state.selectedCouponId,
     name,
-    discountType,
-    discountValue,
     minimumOrderAmount: Number.isFinite(minimumOrderAmount) ? minimumOrderAmount : 0,
     maximumDiscountAmount: maxCap,
     ...shipFields,
-    includedCategories,
-    excludedCategories,
-    includedProducts,
-    excludedProducts,
     stackable,
-    excludeDiscountedProducts,
     autoApply,
     allowManualEntry,
     defaultUsageLimit,
     defaultUsesPerCode,
     notes,
   };
+
+  if (mode === 'productlist') {
+    body.discountedProducts = readCouponDiscountedProductsFromDom(dlg);
+  } else {
+    const discountType = dlg.querySelector('#cp-form-discount-type')?.value || 'percentage';
+    const discountValRaw = dlg.querySelector('#cp-form-discount-value')?.value;
+    const discountValue = Number(discountValRaw);
+    if (!Number.isFinite(discountValue) || discountValue < 0) throw new Error('Discount value must be a valid number');
+    const includedRaw = dlg.querySelector('#cp-form-included')?.value || '';
+    const includedCategories = includedRaw.split(',').map((s) => s.trim()).filter(Boolean);
+    const excludedRaw = dlg.querySelector('#cp-form-excluded')?.value || '';
+    const excludedCategories = excludedRaw.split(',').map((s) => s.trim()).filter(Boolean);
+    const includedProducts = parseProductConditionsInput(
+      dlg.querySelector('#cp-form-included-products')?.value || '',
+    );
+    const excludedProducts = parseProductConditionsInput(
+      dlg.querySelector('#cp-form-excluded-products')?.value || '',
+    );
+    if (includedProducts.length && excludedProducts.length) {
+      throw new Error('Included and excluded product paths cannot both be set on the same coupon.');
+    }
+    body.discountType = discountType;
+    body.discountValue = discountValue;
+    body.includedCategories = includedCategories;
+    body.excludedCategories = excludedCategories;
+    body.includedProducts = includedProducts;
+    body.excludedProducts = excludedProducts;
+    body.excludeDiscountedProducts = !!dlg.querySelector('#cp-form-exclude-discounted')?.checked;
+  }
   const seg = parseCouponTypePath(String(body.id || ''));
   const countries = readCouponCountriesFromForm(dlg);
   const hasCountryFields = dlg.querySelector('input.cp-new-country-cb')
@@ -1550,6 +1681,17 @@ function fillCouponForm(dlg, d) {
     applySaleEl.checked = couponDiscountAppliesToSalePrice(String(d.id ?? state.selectedCouponId ?? ''));
   }
   applyCouponCountryCheckboxesFromDetail(dlg, d);
+
+  // A non-empty discountedProducts array marks a product-list coupon: select
+  // that tab and populate the grid. wireCouponFormTabs (called after this in the
+  // afterMount hook) reads dlg.dataset.cpCouponMode to apply field visibility.
+  const discountedProducts = d.discountedProducts ?? d.discounted_products;
+  if (Array.isArray(discountedProducts) && discountedProducts.length) {
+    dlg.dataset.cpCouponMode = 'productlist';
+    fillCouponProductList(dlg, discountedProducts);
+  } else {
+    dlg.dataset.cpCouponMode = 'discount';
+  }
 }
 
 function renderCodesSection() {
@@ -1563,12 +1705,18 @@ function renderCodesSection() {
       const code = escapeHtml(codeStr || '—');
       const active = c.active !== false && c.active !== 'false';
       const { used, limit } = pickCouponUsageParts(raw);
+      const usedCount = Number(used);
+      const isUsed = Number.isFinite(usedCount) && usedCount > 0;
       const usage = `${used ?? '—'} / ${limit ?? '∞'}`;
       const expRaw = pickCouponExpires(raw);
       const exp = expRaw ? escapeHtml(expRaw) : '—';
-      return `<tr><td><code>${code}</code></td><td>${active ? 'Yes' : 'No'}</td><td>${escapeHtml(String(usage))}</td><td>${exp}</td></tr>`;
+      const cbDisabled = codeStr ? '' : ' disabled';
+      return `<tr>
+        <td class="coupons-code-select-cell"><input type="checkbox" class="cp-code-cb" value="${escapeHtml(codeStr)}" data-cp-code-used="${isUsed ? '1' : '0'}" aria-label="Select code ${code}"${cbDisabled} /></td>
+        <td><code>${code}</code></td><td>${active ? 'Yes' : 'No'}</td><td>${escapeHtml(String(usage))}</td><td>${exp}</td>
+      </tr>`;
     }).join('')
-    : '<tr><td colspan="4" class="coupons-empty" style="padding:16px">No codes for this coupon yet.</td></tr>';
+    : '<tr><td colspan="5" class="coupons-empty" style="padding:16px">No codes for this coupon yet.</td></tr>';
 
   return `
     <h3 class="coupons-section-title">Codes for this coupon</h3>
@@ -1576,14 +1724,122 @@ function renderCodesSection() {
       <button type="button" class="coupons-btn" data-cp-refresh-codes>Refresh</button>
       <button type="button" class="coupons-btn" data-cp-add-codes>Add new codes...</button>
       <button type="button" class="coupons-btn" data-cp-batch>Generate batch</button>
+      <button type="button" class="coupons-btn coupons-btn-danger" data-cp-delete-codes disabled>Delete selected</button>
       ${state.codesNextCursor ? '<button type="button" class="coupons-btn" data-cp-next-codes>Next page</button>' : ''}
     </div>
     <div class="coupons-table-wrap">
       <table class="coupons-data-table">
-        <thead><tr><th>Code</th><th>Active</th><th>Usage</th><th>Expires</th></tr></thead>
+        <thead><tr>
+          <th class="coupons-code-select-cell"><input type="checkbox" class="cp-code-cb-all" aria-label="Select all loaded codes"${state.codes.length ? '' : ' disabled'} /></th>
+          <th>Code</th><th>Active</th><th>Usage</th><th>Expires</th>
+        </tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>`;
+}
+
+/** Max simultaneous DELETE requests — the API has no bulk delete, so we fan out. */
+const COUPON_CODE_DELETE_CONCURRENCY = 5;
+
+/**
+ * Sync the codes-list selection affordances to the current checkbox state:
+ * the "Delete selected" button label/enabled state and the select-all
+ * checked/indeterminate state.
+ * @param {ParentNode} mount
+ */
+function syncCouponCodeSelectionUi(mount) {
+  const boxes = Array.from(mount.querySelectorAll('.cp-code-cb'));
+  const selectable = boxes.filter((b) => b instanceof HTMLInputElement && !b.disabled);
+  const checked = selectable.filter((b) => b.checked);
+  const btn = mount.querySelector('[data-cp-delete-codes]');
+  if (btn instanceof HTMLButtonElement) {
+    btn.disabled = checked.length === 0;
+    btn.textContent = checked.length ? `Delete selected (${checked.length})` : 'Delete selected';
+  }
+  const all = mount.querySelector('.cp-code-cb-all');
+  if (all instanceof HTMLInputElement) {
+    all.checked = selectable.length > 0 && checked.length === selectable.length;
+    all.indeterminate = checked.length > 0 && checked.length < selectable.length;
+  }
+}
+
+/**
+ * Delete the given codes with bounded concurrency, reporting progress. Each code
+ * is an independent DELETE; failures are collected rather than aborting the rest.
+ * @param {string[]} codes
+ * @param {(done: number) => void} [onProgress]
+ * @returns {Promise<{ ok: string[]; failed: string[] }>}
+ */
+async function deleteCouponCodes(codes, onProgress) {
+  const ok = [];
+  const failed = [];
+  let index = 0;
+  let done = 0;
+  const worker = async () => {
+    while (index < codes.length) {
+      const code = codes[index];
+      index += 1;
+      try {
+        // eslint-disable-next-line no-await-in-loop -- bounded worker-pool fan-out
+        await couponsApiFetch(`coupons/${encodeURIComponent(code)}`, { method: 'DELETE' });
+        ok.push(code);
+      } catch (err) {
+        console.warn('[commerce-admin/coupons] delete code failed', { code, message: err?.message });
+        failed.push(code);
+      } finally {
+        done += 1;
+        onProgress?.(done);
+      }
+    }
+  };
+  const poolSize = Math.min(COUPON_CODE_DELETE_CONCURRENCY, codes.length);
+  await Promise.all(Array.from({ length: poolSize }, () => worker()));
+  return { ok, failed };
+}
+
+async function handleDeleteSelectedCodes(mount) {
+  const boxes = Array.from(mount.querySelectorAll('.cp-code-cb:checked'));
+  const codes = boxes.map((b) => (b instanceof HTMLInputElement ? b.value : '')).filter(Boolean);
+  if (!codes.length) return;
+  const usedCount = boxes.filter((b) => b.getAttribute('data-cp-code-used') === '1').length;
+  const label = codes.length === 1 ? `code "${codes[0]}"` : `${codes.length} codes`;
+  const usedNote = usedCount
+    ? `\n\n${usedCount} of the selected ${usedCount === 1 ? 'code has' : 'codes have'} already been redeemed — deleting also removes ${usedCount === 1 ? 'its' : 'their'} usage history.`
+    : '';
+  /* eslint-disable-next-line no-alert -- destructive bulk action needs explicit confirmation */
+  if (!window.confirm(`Delete ${label}? This cannot be undone.${usedNote}`)) return;
+
+  const btn = mount.querySelector('[data-cp-delete-codes]');
+  if (btn instanceof HTMLButtonElement) {
+    btn.disabled = true;
+    btn.textContent = `Deleting… (0/${codes.length})`;
+  }
+  const { ok, failed } = await deleteCouponCodes(codes, (n) => {
+    if (btn instanceof HTMLButtonElement) btn.textContent = `Deleting… (${n}/${codes.length})`;
+  });
+  if (failed.length) {
+    showToast(`Deleted ${ok.length} of ${codes.length} — ${failed.length} failed. Retry the still-selected codes.`, 'error');
+  } else {
+    showToast(`Deleted ${ok.length} ${ok.length === 1 ? 'code' : 'codes'}`, 'success');
+  }
+
+  try {
+    await fetchCodesForCoupon();
+  } catch (err) {
+    console.warn('[commerce-admin/coupons] reload after delete failed', { message: err?.message });
+  }
+  afterCodesRefresh();
+
+  // Re-check any codes that failed to delete (in the freshly rendered list) so
+  // the user can retry without hunting for them.
+  if (failed.length) {
+    const dlg = document.querySelector('dialog.coupons-detail-dialog') ?? mount;
+    const failedSet = new Set(failed);
+    dlg.querySelectorAll('.cp-code-cb').forEach((cb) => {
+      if (cb instanceof HTMLInputElement && failedSet.has(cb.value)) cb.checked = true;
+    });
+    syncCouponCodeSelectionUi(dlg);
+  }
 }
 
 function bindCodesEvents(mount) {
@@ -1616,6 +1872,25 @@ function bindCodesEvents(mount) {
   });
   mount.querySelector('[data-cp-add-codes]')?.addEventListener('click', () => openAddCodesDialog());
   mount.querySelector('[data-cp-batch]')?.addEventListener('click', () => openBatchDialog());
+
+  const selectAll = mount.querySelector('.cp-code-cb-all');
+  selectAll?.addEventListener('change', () => {
+    const on = selectAll instanceof HTMLInputElement && selectAll.checked;
+    mount.querySelectorAll('.cp-code-cb').forEach((cb) => {
+      if (cb instanceof HTMLInputElement && !cb.disabled) cb.checked = on;
+    });
+    syncCouponCodeSelectionUi(mount);
+  });
+  mount.querySelectorAll('.cp-code-cb').forEach((cb) => {
+    cb.addEventListener('change', () => syncCouponCodeSelectionUi(mount));
+  });
+  mount.querySelector('[data-cp-delete-codes]')?.addEventListener('click', () => {
+    handleDeleteSelectedCodes(mount).catch((err) => {
+      console.warn('[commerce-admin/coupons] bulk delete failed', { message: err?.message });
+      showToast(err?.message || 'Delete failed', 'error');
+    });
+  });
+  syncCouponCodeSelectionUi(mount);
 }
 
 function render() {
@@ -1789,6 +2064,8 @@ function openNewCouponDialog() {
       });
       syncPreview();
       wireCouponProductSelectionFields(dlg);
+      wireCouponProductListRows(dlg);
+      wireCouponFormTabs(dlg);
     },
     'coupons-dialog-wide',
   );
@@ -1825,6 +2102,8 @@ function openEditCouponDialog() {
       fillCouponForm(dlg, snap);
       wireCouponCountryCheckboxGuards(dlg);
       wireCouponProductSelectionFields(dlg);
+      wireCouponProductListRows(dlg);
+      wireCouponFormTabs(dlg, { isEdit: true });
     },
     'coupons-dialog-wide',
   );
