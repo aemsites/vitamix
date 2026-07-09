@@ -2,9 +2,9 @@
  * Coupons — ProductBus: types at …/coupons/types; codes at …/coupons;
  * batch at …/coupons/batch. UI: “coupon” / “code”; nav on selected coupon.
  * Coupon type bodies use camelCase fields such as `excludedCategories`, `includedCategories`,
- * `includedProducts`, `excludedProducts`, and `excludeDiscountedProducts`; the API may also
- * return snake_case — the form normalizes on read. Included/excluded product lists are mutually
- * exclusive.
+ * `includedProducts`, `excludedProducts`, `excludeDiscountedProducts`, and `applyToSalePrice`;
+ * the API may also return snake_case — the form normalizes on read. Included/excluded product
+ * lists are mutually exclusive.
  */
 /* eslint-disable no-use-before-define, no-console */
 // render, bindCodesEvents, and open* dialogs reference each other.
@@ -38,8 +38,12 @@ import {
   mountProductSelectionField,
 } from './product-selection-field.js';
 import {
+  buildThumbUrlMapForCouponEntries,
+  couponDiscountedProductsDetailSectionHtml,
+  couponOverviewProductListDiscountHtml,
   couponProductListSectionHtml,
   fillCouponProductList,
+  hydrateCouponOverviewProductListThumbs,
   readCouponDiscountedProductsFromDom,
   wireCouponProductListRows,
 } from './coupons-product-list.js';
@@ -67,6 +71,8 @@ import {
  * @property {boolean} [allowManualEntry]
  * @property {boolean} [excludeDiscountedProducts] When true, blocks coupon on
  *   catalog price-rule discounted products
+ * @property {boolean} [applyToSalePrice] When true, discount is computed from
+ *   the sale price; default false uses regular price with whichever-cheaper wins
  * @property {number|null} [defaultUsageLimit]
  * @property {number|null} [defaultUsesPerCode]
  * @property {string} [notes]
@@ -484,10 +490,15 @@ function statePillHtml(label) {
   return `<span class="coupons-pill coupons-pill-state">${escapeHtml(label)}</span>`;
 }
 
-/** @param {string} couponId */
-function couponDiscountBasisStatePill(couponId) {
+/** @param {Record<string, unknown>} d */
+function couponApplyToSalePrice(d) {
+  return !!(d?.applyToSalePrice ?? d?.apply_to_sale_price);
+}
+
+/** @param {Record<string, unknown>} d */
+function couponDiscountBasisStatePill(d) {
   return statePillHtml(
-    couponDiscountAppliesToSalePrice(couponId) ? 'Sale price' : 'Regular price',
+    couponApplyToSalePrice(d) ? 'Sale price' : 'Regular price',
   );
 }
 
@@ -517,25 +528,20 @@ function couponDetailPillGroupHtml(label, pillsHtml) {
  * Read-only table of a product-list coupon's discounted products for the detail
  * modal (replaces the included/excluded scope sections, which don't apply).
  * @param {Array<{ path?: string, sku?: string, price?: string|number }>} entries
+ * @param {Map<string, string>} [thumbByPath]
  */
-function couponDiscountedProductsSectionHtml(entries) {
-  const rows = entries.map((e) => {
-    const path = escapeHtml(String(e?.path ?? ''));
-    const sku = e?.sku ? escapeHtml(String(e.sku)) : '—';
-    const price = escapeHtml(String(e?.price ?? ''));
-    return `<tr><td><code>${path}</code></td><td>${sku}</td><td>$${price}</td></tr>`;
-  }).join('');
-  return `<section class="coupons-modal-section">
-    <h3 class="coupons-modal-section-title">Discounted products</h3>
-    <p class="coupons-field-hint" style="margin:0 0 8px">Each product path (and optional variant SKU) is discounted to this absolute per-unit price when the coupon code is applied.</p>
-    <table class="cp-plc-detail-grid">
-      <thead><tr><th scope="col">Product path</th><th scope="col">SKU</th><th scope="col">Price</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-  </section>`;
+function couponDiscountedProductsSectionHtml(entries, thumbByPath) {
+  return couponDiscountedProductsDetailSectionHtml(entries, thumbByPath);
 }
 
-function couponDetailModalInnerHtml(d) {
+/** @param {Record<string, unknown>} row */
+function couponCountryKeyForThumbLookup(row) {
+  const countries = normalizeCouponCountries(row);
+  if (countries.length) return countries[0];
+  return couponMarketPrefixFromId(couponIdFromRow(row));
+}
+
+function couponDetailModalInnerHtml(d, thumbByPath) {
   const id = String(d.id ?? state.selectedCouponId ?? '');
   const name = d.name != null ? String(d.name) : '';
   const pathSeg = parseCouponTypePath(id);
@@ -601,7 +607,7 @@ function couponDetailModalInnerHtml(d) {
       <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Cap per customer</span><span class="coupons-modal-stat-value">${escapeHtml(d.defaultUsesPerCode != null ? String(d.defaultUsesPerCode) : '—')}</span></div>
     </div>
     <div class="coupons-modal-pill-groups" aria-label="Coupon behavior">
-      ${isProductList ? '' : couponDetailPillGroupHtml('Discount calculation', couponDiscountBasisStatePill(id))}
+      ${isProductList ? '' : couponDetailPillGroupHtml('Discount calculation', couponDiscountBasisStatePill(d))}
       ${isProductList ? '' : couponDetailPillGroupHtml('On-sale products', couponOnSaleEligibilityStatePill(d))}
       ${couponDetailPillGroupHtml(
     'Program',
@@ -613,7 +619,7 @@ function couponDetailModalInnerHtml(d) {
     ].join(''),
   )}
     </div>
-    ${isProductList ? couponDiscountedProductsSectionHtml(discountedProducts) : `<section class="coupons-modal-section">
+    ${isProductList ? couponDiscountedProductsSectionHtml(discountedProducts, thumbByPath) : `<section class="coupons-modal-section">
       <h3 class="coupons-modal-section-title">Included products</h3>
       <p class="coupons-field-hint" style="margin:0 0 8px">Products and categories the coupon applies to. Leave empty to allow any product unless excluded below.</p>
       <div class="coupons-modal-tags ps-pills" data-cp-scope-pills="included" data-cp-scope-empty="None (any product unless excluded below)"></div>
@@ -675,7 +681,6 @@ function wireCouponDetailModal(dialog) {
         { method: 'DELETE' },
       );
       showToast('Coupon deleted', 'success');
-      setCouponDiscountApplyToSalePrice(state.selectedCouponId, false);
       state.selectedCouponId = '';
       state.couponDetail = null;
       state.codes = [];
@@ -739,7 +744,13 @@ async function openCouponDetailModal() {
 
   const humanWrap = document.createElement('div');
   humanWrap.setAttribute('data-cp-human', '');
-  humanWrap.innerHTML = couponDetailModalInnerHtml(d);
+  const discountedProducts = Array.isArray(d.discountedProducts ?? d.discounted_products)
+    ? (d.discountedProducts ?? d.discounted_products)
+    : [];
+  const thumbByPath = discountedProducts.length
+    ? await buildThumbUrlMapForCouponEntries(discountedProducts, couponCountryKeyForThumbLookup(d))
+    : undefined;
+  humanWrap.innerHTML = couponDetailModalInnerHtml(d, thumbByPath);
   hydrateCouponDetailScopePills(humanWrap, d);
 
   const jsonPre = document.createElement('pre');
@@ -854,22 +865,7 @@ const state = {
   /** Overview grid sort (default: title A–Z). */
   overviewSortKey: /** @type {'title'|'id'|'discount'|'min'|'cap'|'freeship'|'stack'|'year'|'market'} */ ('title'),
   overviewSortDir: /** @type {'asc'|'desc'} */ ('asc'),
-  /** Mock-only: coupon id → apply discount to sale price (default regular price). */
-  couponDiscountApplyToSale: /** @type {Record<string, boolean>} */ ({}),
 };
-
-/** @param {string} couponId */
-function couponDiscountAppliesToSalePrice(couponId) {
-  return Boolean(state.couponDiscountApplyToSale[String(couponId || '').trim()]);
-}
-
-/** @param {string} couponId @param {boolean} appliesToSale */
-function setCouponDiscountApplyToSalePrice(couponId, appliesToSale) {
-  const id = String(couponId || '').trim();
-  if (!id) return;
-  if (appliesToSale) state.couponDiscountApplyToSale[id] = true;
-  else delete state.couponDiscountApplyToSale[id];
-}
 
 /** @param {'error'|'info'} tone */
 function setError(msg, tone = 'error') {
@@ -896,15 +892,15 @@ function overviewDiscountText(row) {
   if (!row || typeof row !== 'object') return '—';
   const discountedProducts = row.discountedProducts ?? row.discounted_products;
   if (Array.isArray(discountedProducts) && discountedProducts.length) {
-    return `Product list (${discountedProducts.length})`;
+    return couponOverviewProductListDiscountHtml(discountedProducts, couponIdFromRow(row));
   }
   if (row.discountType === 'fixed' && row.discountValue != null) {
-    return `$${row.discountValue}`;
+    return escapeHtml(`$${row.discountValue}`);
   }
   if (row.discountType === 'percentage' && row.discountValue != null) {
-    return `${row.discountValue}%`;
+    return escapeHtml(`${row.discountValue}%`);
   }
-  if (row.discountType) return `${row.discountType}: ${row.discountValue ?? '—'}`;
+  if (row.discountType) return escapeHtml(`${row.discountType}: ${row.discountValue ?? '—'}`);
   return '—';
 }
 
@@ -1012,7 +1008,7 @@ function renderCouponsOverviewBody(filtered) {
     return `<tr class="coupons-grid-row coupons-row-open" data-cp-coupon-id="${escapeHtml(id)}" tabindex="0" role="button" aria-label="${escapeHtml(label)}">
       <td class="coupons-grid-lead coupons-grid-name">${escapeHtml(String(name))}</td>
       <td><code class="coupons-grid-id">${escapeHtml(id || '—')}</code></td>
-      <td>${escapeHtml(disc)}</td>
+      <td>${disc}</td>
       <td>${escapeHtml(min)}</td>
       <td>${escapeHtml(cap)}</td>
       <td>${escapeHtml(ship)}</td>
@@ -1271,22 +1267,18 @@ function couponFormOptionsSubgroupHtml(title, rowsHtml, attrs = '') {
   </div>`;
 }
 
-/** @param {{ editMode?: boolean }} [opts] */
-function couponFormOptionsSectionHtml(opts = {}) {
-  const editMode = Boolean(opts.editMode);
+function couponFormOptionsSectionHtml() {
   const subgroups = [];
 
-  if (editMode) {
-    subgroups.push(couponFormOptionsSubgroupHtml(
-      'Discount calculation',
-      couponFormOptionRow(
-        'cp-form-apply-to-sale',
-        'Calculate discount from sale price',
-        'Which price the discount amount is based on. Unchecked uses regular price (default); checked uses the current sale price. UX mock only — not persisted yet.',
-      ),
-      'data-cp-discount-only',
-    ));
-  }
+  subgroups.push(couponFormOptionsSubgroupHtml(
+    'Discount calculation',
+    couponFormOptionRow(
+      'cp-form-apply-to-sale',
+      'Calculate discount from sale price',
+      'Which price the discount amount is based on. Unchecked uses regular price (default) and the cheaper of sale vs coupon wins per line; checked stacks the discount on the current sale price.',
+    ),
+    'data-cp-discount-only',
+  ));
 
   subgroups.push(couponFormOptionsSubgroupHtml(
     'On-sale products',
@@ -1387,7 +1379,7 @@ function couponFormHtml({ idReadonly }) {
         </select>
         <p class="coupons-field-hint">Same options as cart rules: standard only, or standard and priority.</p>
       </div>
-      ${couponFormOptionsSectionHtml({ editMode: idReadonly })}
+      ${couponFormOptionsSectionHtml()}
       <div class="coupons-field">
         <label for="cp-form-def-limit">Total cap per code (default)</label>
         <input type="number" id="cp-form-def-limit" min="0" step="1" placeholder="empty = unlimited" />
@@ -1564,6 +1556,7 @@ function readCouponBodyFromForm(dlg, { requireId }) {
     body.includedProducts = includedProducts;
     body.excludedProducts = excludedProducts;
     body.excludeDiscountedProducts = !!dlg.querySelector('#cp-form-exclude-discounted')?.checked;
+    body.applyToSalePrice = !!dlg.querySelector('#cp-form-apply-to-sale')?.checked;
   }
   const seg = parseCouponTypePath(String(body.id || ''));
   const countries = readCouponCountriesFromForm(dlg);
@@ -1678,7 +1671,7 @@ function fillCouponForm(dlg, d) {
   dlg.querySelector('#cp-form-notes').value = d.notes ?? '';
   const applySaleEl = dlg.querySelector('#cp-form-apply-to-sale');
   if (applySaleEl instanceof HTMLInputElement) {
-    applySaleEl.checked = couponDiscountAppliesToSalePrice(String(d.id ?? state.selectedCouponId ?? ''));
+    applySaleEl.checked = couponApplyToSalePrice(d);
   }
   applyCouponCountryCheckboxesFromDetail(dlg, d);
 
@@ -2003,6 +1996,11 @@ function render() {
       }
     });
   });
+
+  hydrateCouponOverviewProductListThumbs(mount, (couponId) => {
+    const row = sorted.find((r) => couponIdFromRow(r) === couponId);
+    return row ? couponCountryKeyForThumbLookup(row) : 'us';
+  }).catch(() => {});
 }
 
 function openNewCouponDialog() {
@@ -2083,18 +2081,11 @@ function openEditCouponDialog() {
     couponFormHtml({ idReadonly: true }),
     async (dlg) => {
       const body = readCouponBodyFromForm(dlg, { requireId: false });
-      const applyToSale = !!dlg.querySelector('#cp-form-apply-to-sale')?.checked;
       await couponsApiFetch(
         `coupons/types/${encodeURIComponent(state.selectedCouponId)}`,
         { method: 'PUT', body: JSON.stringify(body) },
       );
-      setCouponDiscountApplyToSalePrice(state.selectedCouponId, applyToSale);
-      showToast(
-        applyToSale
-          ? 'Coupon updated. Discount basis (sale price) is a UX mock and was not saved yet.'
-          : 'Coupon updated',
-        'success',
-      );
+      showToast('Coupon updated', 'success');
       await refreshSelection();
       afterCodesRefresh();
     },

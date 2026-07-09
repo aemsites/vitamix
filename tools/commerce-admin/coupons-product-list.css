@@ -71,6 +71,55 @@
   border-bottom: 1px solid #f1f2f3;
 }
 
+.cp-plc-detail-thumb .pim-thumb-img,
+.cp-plc-detail-thumb .pim-thumb-placeholder {
+  display: block;
+  border-radius: 4px;
+}
+
+/* Product-list discount cell in the coupon programs overview grid. */
+.cp-plc-overview-discount {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.cp-plc-overview-thumb-strip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.cp-plc-overview-thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+
+.cp-plc-overview-thumb .pim-thumb-img {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  display: block;
+}
+
+.cp-plc-overview-thumb .pim-thumb-placeholder {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+}
+
+.cp-plc-overview-thumb-overflow {
+  font-size: 12px;
+  color: #6d7175;
+  white-space: nowrap;
+}
+
 /* Discounted-products grid. */
 .cp-plc-header {
   display: flex;
@@ -127,6 +176,67 @@
   padding: 6px 10px;
   border: 1px solid #e1e3e5;
   border-radius: 6px;
+}
+
+.cp-plc-cell-view {
+  cursor: pointer;
+  min-height: 36px;
+  padding: 8px 6px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+}
+
+.cp-plc-cell-view:hover {
+  border-color: #c9cccf;
+  background: #fff;
+}
+
+.cp-plc-cell-view:focus-visible {
+  outline: 2px solid #2c6ecb;
+  outline-offset: 1px;
+}
+
+.cp-plc-cell-view-active {
+  border-color: #2c6ecb;
+  background: #f4f9ff;
+}
+
+.cp-plc-cell-edit input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  font-size: 13px;
+}
+
+.cp-plc-product-view {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cp-plc-thumb-cell {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cp-plc-thumb-cell .pim-thumb-img {
+  display: block;
+  border-radius: 4px;
+}
+
+.cp-plc-path-text {
+  font-size: 12px;
+  word-break: break-all;
+  white-space: normal;
+}
+
+.cp-plc-cell-wide {
+  min-width: 260px;
 }
 
 .cp-plc-col-price {
