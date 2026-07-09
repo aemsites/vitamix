@@ -795,17 +795,18 @@
 /* Videos variant */
 
 .carousel-wrapper:has(.carousel.videos.block) {
-  margin-right: calc(-1 * var(--horizontal-spacing));
-}
-
-@media (width >= 600px) {
-  .carousel-wrapper:has(.carousel.videos.block) {
-    margin-right: 0;
-  }
+  overflow-x: hidden;
 }
 
 .carousel.videos.block {
   overflow: visible;
+  margin-right: calc(-1 * var(--horizontal-spacing));
+}
+
+@media (width >= 600px) {
+  .carousel.videos.block {
+    margin-right: 0;
+  }
 }
 
 /* Track */
