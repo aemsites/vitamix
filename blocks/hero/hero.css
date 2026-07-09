@@ -298,3 +298,33 @@
     max-width: 400px;
   }
 }
+
+
+.hero a.button {
+  border-color: currentcolor;
+  background-color: transparent;
+}
+
+.hero.image-dark a.button,
+.hero.image-darkest a.button,
+.hero.image-dark a.button:hover,
+.hero.image-darkest a.button:hover {
+  border-color: var(--color-white);
+  color: var(--color-white);
+}
+
+.hero a.button.emphasis,
+.hero a.button.emphasis:hover {
+  border-color: var(--color-charcoal);
+  background-color: var(--color-charcoal);
+  color: var(--color-white);  
+}
+
+.hero.image-dark a.button.emphasis,
+.hero.image-darkest a.button.emphasis,
+.hero.image-dark a.button.emphasis:hover,
+.hero.image-darkest a.button.emphasis:hover {
+  border-color: var(--color-white);
+  background-color: var(--color-white);
+  color: var(--color-charcoal);
+}
