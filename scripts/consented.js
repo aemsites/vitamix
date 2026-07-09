@@ -5,9 +5,12 @@ import {
   ensureAnalyticsTrackingConfigured,
   getDeploymentEnv,
   initInstrumentation,
+  trackCartChange,
 } from './consented/instrumentation.js';
 
 document.body.classList.add('consented');
+// Register cart listeners before Launch scripts finish loading.
+trackCartChange();
 
 // add delayed functionality here
 window.config = {
