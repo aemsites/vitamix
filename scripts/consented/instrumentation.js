@@ -58,16 +58,37 @@ export function isCartPage() {
 }
 
 /**
+ * Whether a cart line should be included in scAdd/scRemove/scView analytics.
+ * Matches the cart block's visible-line filter.
+ * @param {{ name?: string, local?: object, custom?: object }} item
+ * @returns {boolean}
+ */
+export function shouldTrackCartLine(item) {
+  if (!item?.name) {
+    return false;
+  }
+  if (item.local?.showInCart === false) {
+    return false;
+  }
+  if (item.custom?.giftWithPurchase) {
+    return false;
+  }
+  return true;
+}
+
+/** @deprecated Use shouldTrackCartLine */
+export const shouldTrackScRemoveItem = shouldTrackCartLine;
+
+/**
  * Read the current cart lines for scView from the shared cart singleton.
  * Uses the already-instantiated window.cart when present, otherwise imports
- * the cart module (its constructor restores items from localStorage). Mirrors
- * the cart block's visible-line filter (excludes local.showInCart === false).
+ * the cart module (its constructor restores items from localStorage).
  * @returns {Promise<Array<{name: string, quantity?: number|string}>>}
  */
 export async function getCartViewItems() {
   const cart = window.cart?.items ? window.cart : (await import('../cart.js')).default;
   return (cart?.items || [])
-    .filter((item) => item.local?.showInCart !== false)
+    .filter(shouldTrackCartLine)
     .map((item) => ({ name: item.name, quantity: item.quantity }));
 }
 
@@ -343,51 +364,41 @@ export function resetTrackerForScAdd(tracker) {
 }
 
 /**
- * Send scRemove via AppMeasurement link tracking (s.tl b/ss beacon).
- * The Launch dev container has scView/scAdd rules but no scRemove direct-call
- * rule for EDS; Commerce sends this beacon from PHP inline script. EDS sends
- * it directly so removal is tracked without a Launch rule dependency.
- * @param {string} productID Comma-joined Adobe Analytics products string
+ * Send a cart event via AppMeasurement link tracking (s.tl b/ss beacon).
+ * Synchronous — survives PDP redirects. Used for Magento scAdd and all scRemove.
+ * @param {string} eventName Adobe Analytics event (e.g. scAdd, scRemove)
+ * @param {string} productID Adobe Analytics products string
  */
-function sendScRemoveLinkBeacon(productID) {
-  if (!productID) {
+function sendCartLinkBeacon(eventName, productID) {
+  if (!productID || !eventName) {
     return;
   }
 
+  const seen = new Set();
   getAnalyticsTrackers().forEach((tracker) => {
-    if (typeof tracker.tl !== 'function') {
+    if (!tracker || seen.has(tracker) || typeof tracker.tl !== 'function') {
       return;
     }
+    seen.add(tracker);
     resetTrackerForScAdd(tracker);
     tracker.linkTrackVars = 'events,products';
-    tracker.linkTrackEvents = 'scRemove';
-    tracker.events = 'scRemove';
+    tracker.linkTrackEvents = eventName;
+    tracker.events = eventName;
     tracker.products = productID;
-    tracker.tl(true, 'o', 'scRemove');
+    tracker.tl(true, 'o', eventName);
   });
 }
 
 /**
- * Send scAdd via AppMeasurement link tracking (s.tl b/ss beacon).
- * Synchronous — survives the Magento PDP redirect to the cart page.
- * @param {string} productID Adobe Analytics products string
+ * Assign Commerce-shaped cart data to digitalData and clear prodView carry-over.
+ * @param {object} cartData digitalData.cart payload
  */
-function sendScAddLinkBeacon(productID) {
-  if (!productID) {
-    return;
-  }
-
-  getAnalyticsTrackers().forEach((tracker) => {
-    if (typeof tracker.tl !== 'function') {
-      return;
-    }
-    resetTrackerForScAdd(tracker);
-    tracker.linkTrackVars = 'events,products';
-    tracker.linkTrackEvents = 'scAdd';
-    tracker.events = 'scAdd';
-    tracker.products = productID;
-    tracker.tl(true, 'o', 'scAdd');
-  });
+function setDigitalDataCart(cartData) {
+  window.digitalData = window.digitalData || {};
+  window.digitalData.cart = {};
+  window.digitalData.cart = cartData;
+  delete window.digitalData.product;
+  getAnalyticsTrackers().forEach(resetTrackerForScAdd);
 }
 
 /**
@@ -501,38 +512,21 @@ async function pushProductEvent(eventName, productID, { waitForBeacon = false } 
  * @returns {Promise<boolean>} Whether the Launch rule was triggered
  */
 async function pushScAddEvent(productID, { isFirstCart = false, waitForBeacon = false } = {}) {
-  window.digitalData = window.digitalData || {};
-  // Mirror Commerce: reset cart scope before assigning scAdd payload.
-  window.digitalData.cart = {};
-  window.digitalData.cart = buildScAddCartData(productID, isFirstCart);
-  delete window.digitalData.product;
-
-  getAnalyticsTrackers().forEach(resetTrackerForScAdd);
-
+  setDigitalDataCart(buildScAddCartData(productID, isFirstCart));
   return triggerLaunchEvent('scAdd', window.digitalData.cart, { waitForBeacon });
 }
 
 /**
  * Push scAdd context and send a synchronous link beacon (Magento redirect path).
+ * Uses s.tl only — Launch scAdd rules would double-count if _satellite.track ran too.
  * @param {string} productID Adobe Analytics products string
  * @param {{ isFirstCart?: boolean }} [options]
  * @returns {boolean} Whether a beacon was sent
  */
 function pushScAddLinkEvent(productID, { isFirstCart = false } = {}) {
-  window.digitalData = window.digitalData || {};
-  window.digitalData.cart = {};
-  window.digitalData.cart = buildScAddCartData(productID, isFirstCart);
-  delete window.digitalData.product;
-
-  getAnalyticsTrackers().forEach(resetTrackerForScAdd);
+  setDigitalDataCart(buildScAddCartData(productID, isFirstCart));
   configureAnalyticsTrackingServers();
-
-  const satellite = getSatellite();
-  if (satellite?.track) {
-    satellite.track('scAdd');
-  }
-
-  sendScAddLinkBeacon(productID);
+  sendCartLinkBeacon('scAdd', productID);
   debugLog('Adobe Analytics scAdd fired (link beacon)', window.digitalData.cart);
   return Boolean(productID);
 }
@@ -546,51 +540,38 @@ function pushScAddLinkEvent(productID, { isFirstCart = false } = {}) {
  * @returns {Promise<boolean>} Whether the Launch rule was triggered
  */
 async function pushScViewEvent(items, { waitForBeacon = false } = {}) {
-  window.digitalData = window.digitalData || {};
-  window.digitalData.cart = {};
-  window.digitalData.cart = buildScViewCartData(items, items.length === 1);
-  delete window.digitalData.product;
-  getAnalyticsTrackers().forEach(resetTrackerForScAdd);
+  setDigitalDataCart(buildScViewCartData(items, items.length === 1));
   return triggerLaunchEvent('scView', window.digitalData.cart, { waitForBeacon });
 }
 
 /**
- * Push removed-item context to digitalData and trigger the scRemove Launch rule.
- * Mirrors Commerce: single item[] entry with comma-joined productID and
- * _satellite.track('scRemove').
+ * Push removed-item context to digitalData and send scRemove via s.tl.
+ * Uses link beacon only — Launch scRemove rules would double-count if
+ * _satellite.track ran too (same fix as Magento scAdd).
  * @param {Array<{name: string, quantity?: number|string}>} items Removed cart lines
  * @param {{ waitForBeacon?: boolean }} [options]
- * @returns {Promise<boolean>} Whether the Launch rule was triggered
+ * @returns {Promise<boolean>} Whether the scRemove beacon was sent
  */
 async function pushScRemoveEvent(items, { waitForBeacon = false } = {}) {
   const cartData = buildScRemoveCartData(items);
   const productID = cartData.item[0]?.productInfo?.productID || '';
 
-  window.digitalData = window.digitalData || {};
-  // Mirror Commerce: reset cart scope before assigning the scRemove payload.
-  window.digitalData.cart = {};
-  window.digitalData.cart = cartData;
-  delete window.digitalData.product;
-  // eslint-disable-next-line no-console
-
-  getAnalyticsTrackers().forEach(resetTrackerForScAdd);
-
-  // Keep Launch direct-call for parity with Commerce (peripheral tags, if any).
-  const satellite = getSatellite();
-  const beaconComplete = waitForBeacon ? waitForBeaconComplete() : null;
-  if (satellite?.track) {
-    configureAnalyticsTrackingServers();
-    satellite.track('scRemove');
+  if (!productID) {
+    return false;
   }
 
-  // Launch container lacks an scRemove rule for EDS — send the b/ss beacon directly.
-  sendScRemoveLinkBeacon(productID);
+  setDigitalDataCart(cartData);
+  debugLog('Adobe Analytics scRemove payload', window.digitalData.cart.item);
+
+  configureAnalyticsTrackingServers();
+  const beaconComplete = waitForBeacon ? waitForBeaconComplete() : null;
+  sendCartLinkBeacon('scRemove', productID);
 
   if (beaconComplete) {
     await beaconComplete;
   }
   debugLog('Adobe Analytics scRemove fired', window.digitalData.cart);
-  return Boolean(satellite?.track || productID);
+  return true;
 }
 
 /**
@@ -598,6 +579,10 @@ async function pushScRemoveEvent(items, { waitForBeacon = false } = {}) {
  * @returns {Promise<void>}
  */
 export async function fireProdView() {
+  if (!hasMarketingConsent()) {
+    return;
+  }
+
   const productName = `${getProductName()}`;
   if (!productName) {
     debugWarn('Adobe Analytics prodView skipped: product name not found on PDP');
@@ -655,7 +640,7 @@ export async function fireScAdd(
 }
 
 /**
- * Wait for Launch, then fire scAdd (used before cart redirect).
+ * Wait for Launch, then fire scAdd via direct-call (edge cart:change path).
  * @param {string} [productName]
  * @param {number|string} [quantity]
  * @param {{ isFirstCart?: boolean }} [options]
@@ -738,7 +723,7 @@ export async function fireScRemove(items = [], { waitForBeacon = false } = {}) {
   }
 
   if (!(await pushScRemoveEvent(validItems, { waitForBeacon }))) {
-    debugWarn('Adobe Analytics scRemove skipped: Adobe Launch (_satellite) not available');
+    debugWarn('Adobe Analytics scRemove skipped: AppMeasurement tracker not available');
   }
 }
 
@@ -746,28 +731,6 @@ export async function fireScRemove(items = [], { waitForBeacon = false } = {}) {
 let pendingScRemoveLines = [];
 let scRemoveFlushQueued = false;
 let cartChangeTrackingInstalled = false;
-
-/**
- * Whether a cart line should be included in scAdd/scRemove analytics.
- * Matches the cart block's visible-line filter.
- * @param {{ name?: string, local?: object, custom?: object }} item
- * @returns {boolean}
- */
-export function shouldTrackCartLine(item) {
-  if (!item?.name) {
-    return false;
-  }
-  if (item.local?.showInCart === false) {
-    return false;
-  }
-  if (item.custom?.giftWithPurchase) {
-    return false;
-  }
-  return true;
-}
-
-/** @deprecated Use shouldTrackCartLine */
-export const shouldTrackScRemoveItem = shouldTrackCartLine;
 
 async function runScRemoveAndScView(removedLines) {
   await fireScRemove(removedLines, { waitForBeacon: true });
@@ -806,7 +769,7 @@ function queueScRemoveFlush() {
 
 /**
  * Handle a cart:change detail for scAdd tracking (edge add-to-cart path).
- * @param {{ action?: string, item?: object, cart?: { itemCount?: number } }} detail
+ * @param {{ action?: string, item?: object, cart?: { visibleItemCount?: number } }} detail
  * @returns {void}
  */
 export function handleCartAddChange(detail) {
@@ -816,7 +779,7 @@ export function handleCartAddChange(detail) {
   }
 
   const quantity = item.quantity ?? 1;
-  const isFirstCart = cart?.itemCount === Number(quantity);
+  const isFirstCart = cart?.visibleItemCount === Number(quantity);
   trackScAdd(`${item.name}`.trim(), quantity, { isFirstCart });
 }
 
@@ -892,7 +855,8 @@ export function trackCartChange() {
 export const trackScRemove = trackCartChange;
 
 /**
- * Initialize Adobe Analytics instrumentation (prodView on PDP, scView on cart).
+ * Initialize page-level Adobe Analytics (prodView on PDP, scView on cart).
+ * Cart mutation listeners are registered early via trackCartChange() in consented.js.
  * @returns {void}
  */
 export function initInstrumentation() {
@@ -903,5 +867,4 @@ export function initInstrumentation() {
   if (isCartPage()) {
     trackScView();
   }
-  trackCartChange();
 }
