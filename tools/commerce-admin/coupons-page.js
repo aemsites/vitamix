@@ -37,6 +37,12 @@ import {
   hydrateProductScopePills,
   mountProductSelectionField,
 } from './product-selection-field.js';
+import {
+  couponProductListSectionHtml,
+  fillCouponProductList,
+  readCouponDiscountedProductsFromDom,
+  wireCouponProductListRows,
+} from './coupons-product-list.js';
 
 /**
  * ProductBus coupon type (`…/coupons/types`). Shapes match **helix-commerce-api**.
@@ -507,6 +513,28 @@ function couponDetailPillGroupHtml(label, pillsHtml) {
   </div>`;
 }
 
+/**
+ * Read-only table of a product-list coupon's discounted products for the detail
+ * modal (replaces the included/excluded scope sections, which don't apply).
+ * @param {Array<{ path?: string, sku?: string, price?: string|number }>} entries
+ */
+function couponDiscountedProductsSectionHtml(entries) {
+  const rows = entries.map((e) => {
+    const path = escapeHtml(String(e?.path ?? ''));
+    const sku = e?.sku ? escapeHtml(String(e.sku)) : '—';
+    const price = escapeHtml(String(e?.price ?? ''));
+    return `<tr><td><code>${path}</code></td><td>${sku}</td><td>$${price}</td></tr>`;
+  }).join('');
+  return `<section class="coupons-modal-section">
+    <h3 class="coupons-modal-section-title">Discounted products</h3>
+    <p class="coupons-field-hint" style="margin:0 0 8px">Each product path (and optional variant SKU) is discounted to this absolute per-unit price when the coupon code is applied.</p>
+    <table class="cp-plc-detail-grid">
+      <thead><tr><th scope="col">Product path</th><th scope="col">SKU</th><th scope="col">Price</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </section>`;
+}
+
 function couponDetailModalInnerHtml(d) {
   const id = String(d.id ?? state.selectedCouponId ?? '');
   const name = d.name != null ? String(d.name) : '';
@@ -515,9 +543,17 @@ function couponDetailModalInnerHtml(d) {
   const year = pathSeg ? pathSeg.year : '';
   const slugName = pathSeg ? pathSeg.name : '';
 
+  const discountedProducts = Array.isArray(d.discountedProducts ?? d.discounted_products)
+    ? (d.discountedProducts ?? d.discounted_products)
+    : [];
+  const isProductList = discountedProducts.length > 0;
+
   let heroMain = '—';
   let heroSub = '';
-  if (d.discountType === 'fixed' && d.discountValue != null) {
+  if (isProductList) {
+    heroMain = 'Product list';
+    heroSub = `${discountedProducts.length} product${discountedProducts.length === 1 ? '' : 's'}`;
+  } else if (d.discountType === 'fixed' && d.discountValue != null) {
     heroMain = `$${d.discountValue}`;
     heroSub = 'off order subtotal';
   } else if (d.discountType === 'percentage' && d.discountValue != null) {
@@ -565,8 +601,8 @@ function couponDetailModalInnerHtml(d) {
       <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Cap per customer</span><span class="coupons-modal-stat-value">${escapeHtml(d.defaultUsesPerCode != null ? String(d.defaultUsesPerCode) : '—')}</span></div>
     </div>
     <div class="coupons-modal-pill-groups" aria-label="Coupon behavior">
-      ${couponDetailPillGroupHtml('Discount calculation', couponDiscountBasisStatePill(id))}
-      ${couponDetailPillGroupHtml('On-sale products', couponOnSaleEligibilityStatePill(d))}
+      ${isProductList ? '' : couponDetailPillGroupHtml('Discount calculation', couponDiscountBasisStatePill(id))}
+      ${isProductList ? '' : couponDetailPillGroupHtml('On-sale products', couponOnSaleEligibilityStatePill(d))}
       ${couponDetailPillGroupHtml(
     'Program',
     [
@@ -577,7 +613,7 @@ function couponDetailModalInnerHtml(d) {
     ].join(''),
   )}
     </div>
-    <section class="coupons-modal-section">
+    ${isProductList ? couponDiscountedProductsSectionHtml(discountedProducts) : `<section class="coupons-modal-section">
       <h3 class="coupons-modal-section-title">Included products</h3>
       <p class="coupons-field-hint" style="margin:0 0 8px">Products and categories the coupon applies to. Leave empty to allow any product unless excluded below.</p>
       <div class="coupons-modal-tags ps-pills" data-cp-scope-pills="included" data-cp-scope-empty="None (any product unless excluded below)"></div>
@@ -586,7 +622,7 @@ function couponDetailModalInnerHtml(d) {
       <h3 class="coupons-modal-section-title">Excluded products</h3>
       <p class="coupons-field-hint" style="margin:0 0 8px">Products and categories that disqualify the coupon when present in the cart.</p>
       <div class="coupons-modal-tags ps-pills" data-cp-scope-pills="excluded" data-cp-scope-empty="None"></div>
-    </section>
+    </section>`}
     ${d.notes && String(d.notes).trim()
     ? `<section class="coupons-modal-section"><h3 class="coupons-modal-section-title">Notes</h3><div class="coupons-modal-notes">${escapeHtml(String(d.notes).trim())}</div></section>`
     : ''}
@@ -858,6 +894,10 @@ function yn(v) {
 /** Single-line discount summary for overview grid (list row). */
 function overviewDiscountText(row) {
   if (!row || typeof row !== 'object') return '—';
+  const discountedProducts = row.discountedProducts ?? row.discounted_products;
+  if (Array.isArray(discountedProducts) && discountedProducts.length) {
+    return `Product list (${discountedProducts.length})`;
+  }
   if (row.discountType === 'fixed' && row.discountValue != null) {
     return `$${row.discountValue}`;
   }
@@ -1223,9 +1263,9 @@ function couponFormOptionRow(id, label, detail) {
   </div>`;
 }
 
-/** @param {string} title @param {string} rowsHtml */
-function couponFormOptionsSubgroupHtml(title, rowsHtml) {
-  return `<div class="cp-form-options-subgroup">
+/** @param {string} title @param {string} rowsHtml @param {string} [attrs] */
+function couponFormOptionsSubgroupHtml(title, rowsHtml, attrs = '') {
+  return `<div class="cp-form-options-subgroup"${attrs ? ` ${attrs}` : ''}>
     <h4 class="cp-form-options-subtitle">${escapeHtml(title)}</h4>
     <div class="cp-form-options-list">${rowsHtml}</div>
   </div>`;
@@ -1244,6 +1284,7 @@ function couponFormOptionsSectionHtml(opts = {}) {
         'Calculate discount from sale price',
         'Which price the discount amount is based on. Unchecked uses regular price (default); checked uses the current sale price. UX mock only — not persisted yet.',
       ),
+      'data-cp-discount-only',
     ));
   }
 
@@ -1254,6 +1295,7 @@ function couponFormOptionsSectionHtml(opts = {}) {
       'Block coupon on products that are on sale',
       'Whether this coupon can be used at all on items that already have a catalog sale price. Separate from the discount calculation base above.',
     ),
+    'data-cp-discount-only',
   ));
 
   subgroups.push(couponFormOptionsSubgroupHtml(
@@ -1294,22 +1336,26 @@ function couponFormHtml({ idReadonly }) {
 
   return `
     <p class="coupons-page-lead" style="margin-bottom:12px">Describe how this coupon behaves. Amounts are in storefront currency unless noted otherwise.</p>
+    <div class="cp-form-tabs" role="tablist" aria-label="Coupon type">
+      <button type="button" class="cp-form-tab" role="tab" data-cp-coupon-tab="discount" aria-selected="true">Discount</button>
+      <button type="button" class="cp-form-tab" role="tab" data-cp-coupon-tab="productlist" aria-selected="false" tabindex="-1">Product list</button>
+    </div>
     <div class="coupons-form-grid">
       ${idBlock}
       <div class="coupons-field coupons-field-full">
         <label for="cp-form-name">Display name</label>
         <input type="text" id="cp-form-name" autocomplete="off" required />
       </div>
-      <div class="coupons-field">
+      <div class="coupons-field" data-cp-discount-only>
         <label for="cp-form-discount-type">Discount style</label>
         <select id="cp-form-discount-type">
           <option value="percentage">Percentage off order</option>
           <option value="fixed">Fixed dollars off order</option>
         </select>
       </div>
-      <div class="coupons-field">
+      <div class="coupons-field" data-cp-discount-only>
         <label for="cp-form-discount-value">Discount value</label>
-        <input type="number" id="cp-form-discount-value" min="0" step="any" placeholder="25 = 25% or $25" required />
+        <input type="number" id="cp-form-discount-value" min="0" step="any" placeholder="25 = 25% or $25" />
       </div>
       <div class="coupons-field">
         <label for="cp-form-min">Minimum order subtotal ($)</label>
@@ -1319,14 +1365,15 @@ function couponFormHtml({ idReadonly }) {
         <label for="cp-form-max-cap">Max discount cap ($)</label>
         <input type="number" id="cp-form-max-cap" min="0" step="any" placeholder="empty = no cap" />
       </div>
-      <div class="coupons-field coupons-field-full">
+      ${couponProductListSectionHtml()}
+      <div class="coupons-field coupons-field-full" data-cp-discount-only>
         <label>Included products</label>
         <p class="coupons-field-hint">Products and categories the coupon applies to. Leave empty for no include filter. Uses the product index for the primary selected country (see Countries above).</p>
         <div data-cp-psf-mount="included"></div>
         <input type="text" id="cp-form-included" autocomplete="off" />
         <input type="text" id="cp-form-included-products" autocomplete="off" />
       </div>
-      <div class="coupons-field coupons-field-full">
+      <div class="coupons-field coupons-field-full" data-cp-discount-only>
         <label>Excluded products</label>
         <p class="coupons-field-hint">Products and categories that disqualify the coupon. Cannot be set together with included product paths.</p>
         <div data-cp-psf-mount="excluded"></div>
@@ -1354,6 +1401,43 @@ function couponFormHtml({ idReadonly }) {
         <textarea id="cp-form-notes" rows="2" placeholder="Shown only in admin"></textarea>
       </div>
     </div>`;
+}
+
+/**
+ * Show the fields for one coupon mode and hide the other's. Field *values* are
+ * left untouched so the user keeps both definitions until they save; the save
+ * collector (readCouponBodyFromForm) is what drops the inactive mode's fields.
+ * @param {HTMLElement} dlg
+ * @param {'discount'|'productlist'} mode
+ */
+function setCouponFormMode(dlg, mode) {
+  const next = mode === 'productlist' ? 'productlist' : 'discount';
+  dlg.dataset.cpCouponMode = next;
+  dlg.querySelectorAll('[data-cp-coupon-tab]').forEach((tab) => {
+    const active = tab.getAttribute('data-cp-coupon-tab') === next;
+    tab.setAttribute('aria-selected', active ? 'true' : 'false');
+    if (tab instanceof HTMLElement) tab.tabIndex = active ? 0 : -1;
+  });
+  dlg.querySelectorAll('[data-cp-discount-only]').forEach((el) => {
+    if (el instanceof HTMLElement) el.hidden = next !== 'discount';
+  });
+  dlg.querySelectorAll('[data-cp-plc-only]').forEach((el) => {
+    if (el instanceof HTMLElement) el.hidden = next !== 'productlist';
+  });
+}
+
+/** @param {HTMLElement} dlg */
+function wireCouponFormTabs(dlg) {
+  dlg.querySelectorAll('[data-cp-coupon-tab]').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      const mode = tab.getAttribute('data-cp-coupon-tab') === 'productlist' ? 'productlist' : 'discount';
+      setCouponFormMode(dlg, mode);
+    });
+  });
+  setCouponFormMode(
+    dlg,
+    dlg.dataset.cpCouponMode === 'productlist' ? 'productlist' : 'discount',
+  );
 }
 
 function readOptionalInt(raw) {
@@ -1384,30 +1468,19 @@ function readCouponBodyFromForm(dlg, { requireId }) {
   if (requireId && !id) throw new Error('Coupon ID is required');
   if (requireId) assertCouponIdMarketPath(id);
   if (!name) throw new Error('Display name is required');
-  const discountType = dlg.querySelector('#cp-form-discount-type')?.value || 'percentage';
-  const discountValRaw = dlg.querySelector('#cp-form-discount-value')?.value;
-  const discountValue = Number(discountValRaw);
-  if (!Number.isFinite(discountValue) || discountValue < 0) throw new Error('Discount value must be a valid number');
+
+  // The active tab decides which discount shape is persisted. The other tab's
+  // fields are intentionally omitted from the body — a product-list coupon and
+  // the flat discount/scoping fields are mutually exclusive and the API rejects
+  // them together, so switching tabs and saving drops the now-irrelevant fields.
+  const mode = dlg.dataset.cpCouponMode === 'productlist' ? 'productlist' : 'discount';
+
   const minRaw = dlg.querySelector('#cp-form-min')?.value;
   const minimumOrderAmount = minRaw != null && String(minRaw).trim() !== '' ? Number(minRaw) : 0;
   const maxCap = readOptionalInt(dlg.querySelector('#cp-form-max-cap')?.value);
-  const includedRaw = dlg.querySelector('#cp-form-included')?.value || '';
-  const includedCategories = includedRaw.split(',').map((s) => s.trim()).filter(Boolean);
-  const excludedRaw = dlg.querySelector('#cp-form-excluded')?.value || '';
-  const excludedCategories = excludedRaw.split(',').map((s) => s.trim()).filter(Boolean);
-  const includedProducts = parseProductConditionsInput(
-    dlg.querySelector('#cp-form-included-products')?.value || '',
-  );
-  const excludedProducts = parseProductConditionsInput(
-    dlg.querySelector('#cp-form-excluded-products')?.value || '',
-  );
-  if (includedProducts.length && excludedProducts.length) {
-    throw new Error('Included and excluded product paths cannot both be set on the same coupon.');
-  }
   const shippingMode = normalizeShippingBenefitMode(dlg.querySelector('#cp-form-shipping')?.value);
   const shipFields = shippingBenefitFieldsFromMode(shippingMode);
   const stackable = !!dlg.querySelector('#cp-form-stackable')?.checked;
-  const excludeDiscountedProducts = !!dlg.querySelector('#cp-form-exclude-discounted')?.checked;
   const autoApply = !!dlg.querySelector('#cp-form-auto')?.checked;
   const allowManualEntry = !!dlg.querySelector('#cp-form-manual')?.checked;
   const defaultUsageLimit = readOptionalInt(dlg.querySelector('#cp-form-def-limit')?.value);
@@ -1417,23 +1490,45 @@ function readCouponBodyFromForm(dlg, { requireId }) {
   const body = {
     id: id || state.selectedCouponId,
     name,
-    discountType,
-    discountValue,
     minimumOrderAmount: Number.isFinite(minimumOrderAmount) ? minimumOrderAmount : 0,
     maximumDiscountAmount: maxCap,
     ...shipFields,
-    includedCategories,
-    excludedCategories,
-    includedProducts,
-    excludedProducts,
     stackable,
-    excludeDiscountedProducts,
     autoApply,
     allowManualEntry,
     defaultUsageLimit,
     defaultUsesPerCode,
     notes,
   };
+
+  if (mode === 'productlist') {
+    body.discountedProducts = readCouponDiscountedProductsFromDom(dlg);
+  } else {
+    const discountType = dlg.querySelector('#cp-form-discount-type')?.value || 'percentage';
+    const discountValRaw = dlg.querySelector('#cp-form-discount-value')?.value;
+    const discountValue = Number(discountValRaw);
+    if (!Number.isFinite(discountValue) || discountValue < 0) throw new Error('Discount value must be a valid number');
+    const includedRaw = dlg.querySelector('#cp-form-included')?.value || '';
+    const includedCategories = includedRaw.split(',').map((s) => s.trim()).filter(Boolean);
+    const excludedRaw = dlg.querySelector('#cp-form-excluded')?.value || '';
+    const excludedCategories = excludedRaw.split(',').map((s) => s.trim()).filter(Boolean);
+    const includedProducts = parseProductConditionsInput(
+      dlg.querySelector('#cp-form-included-products')?.value || '',
+    );
+    const excludedProducts = parseProductConditionsInput(
+      dlg.querySelector('#cp-form-excluded-products')?.value || '',
+    );
+    if (includedProducts.length && excludedProducts.length) {
+      throw new Error('Included and excluded product paths cannot both be set on the same coupon.');
+    }
+    body.discountType = discountType;
+    body.discountValue = discountValue;
+    body.includedCategories = includedCategories;
+    body.excludedCategories = excludedCategories;
+    body.includedProducts = includedProducts;
+    body.excludedProducts = excludedProducts;
+    body.excludeDiscountedProducts = !!dlg.querySelector('#cp-form-exclude-discounted')?.checked;
+  }
   const seg = parseCouponTypePath(String(body.id || ''));
   const countries = readCouponCountriesFromForm(dlg);
   const hasCountryFields = dlg.querySelector('input.cp-new-country-cb')
@@ -1550,6 +1645,17 @@ function fillCouponForm(dlg, d) {
     applySaleEl.checked = couponDiscountAppliesToSalePrice(String(d.id ?? state.selectedCouponId ?? ''));
   }
   applyCouponCountryCheckboxesFromDetail(dlg, d);
+
+  // A non-empty discountedProducts array marks a product-list coupon: select
+  // that tab and populate the grid. wireCouponFormTabs (called after this in the
+  // afterMount hook) reads dlg.dataset.cpCouponMode to apply field visibility.
+  const discountedProducts = d.discountedProducts ?? d.discounted_products;
+  if (Array.isArray(discountedProducts) && discountedProducts.length) {
+    dlg.dataset.cpCouponMode = 'productlist';
+    fillCouponProductList(dlg, discountedProducts);
+  } else {
+    dlg.dataset.cpCouponMode = 'discount';
+  }
 }
 
 function renderCodesSection() {
@@ -1789,6 +1895,8 @@ function openNewCouponDialog() {
       });
       syncPreview();
       wireCouponProductSelectionFields(dlg);
+      wireCouponProductListRows(dlg);
+      wireCouponFormTabs(dlg);
     },
     'coupons-dialog-wide',
   );
@@ -1825,6 +1933,8 @@ function openEditCouponDialog() {
       fillCouponForm(dlg, snap);
       wireCouponCountryCheckboxGuards(dlg);
       wireCouponProductSelectionFields(dlg);
+      wireCouponProductListRows(dlg);
+      wireCouponFormTabs(dlg);
     },
     'coupons-dialog-wide',
   );
