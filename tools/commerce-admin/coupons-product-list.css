@@ -5,6 +5,16 @@
  * promotions sale-lines grid.
  */
 
+/**
+ * Mode-specific fields are toggled via the `hidden` attribute, but the coupon
+ * form's `.coupons-field { display: flex }` (and `.coupons-field-full`) would
+ * otherwise override `[hidden]`'s default `display: none`. Force them hidden.
+ */
+[data-cp-discount-only][hidden],
+[data-cp-plc-only][hidden] {
+  display: none !important;
+}
+
 /* Tabs at the top of the coupon create/update form. */
 .cp-form-tabs {
   display: flex;
