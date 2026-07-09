@@ -1403,10 +1403,12 @@ function couponFormHtml({ idReadonly }) {
     </div>`;
 }
 
+const COUPON_MODE_SWITCH_EDIT_WARNING = 'Switching coupon type will clear the current settings and overwrite this coupon\'s saved definition when you save. Continue?';
+
 /**
- * Show the fields for one coupon mode and hide the other's. Field *values* are
- * left untouched so the user keeps both definitions until they save; the save
- * collector (readCouponBodyFromForm) is what drops the inactive mode's fields.
+ * Show the fields for one coupon mode and hide the other's. Purely visual —
+ * clearing the outgoing mode's values is the caller's job (wireCouponFormTabs),
+ * so this is safe to call on initial mount without wiping loaded data.
  * @param {HTMLElement} dlg
  * @param {'discount'|'productlist'} mode
  */
@@ -1426,12 +1428,46 @@ function setCouponFormMode(dlg, mode) {
   });
 }
 
-/** @param {HTMLElement} dlg */
-function wireCouponFormTabs(dlg) {
+/** Reset the flat-discount / scoping fields (the fields a product-list coupon rejects). */
+function clearCouponDiscountModeFields(dlg) {
+  const type = dlg.querySelector('#cp-form-discount-type');
+  if (type instanceof HTMLSelectElement) type.value = 'percentage';
+  ['#cp-form-discount-value', '#cp-form-included', '#cp-form-included-products',
+    '#cp-form-excluded', '#cp-form-excluded-products'].forEach((sel) => {
+    const el = dlg.querySelector(sel);
+    if (el instanceof HTMLInputElement) el.value = '';
+  });
+  ['#cp-form-exclude-discounted', '#cp-form-apply-to-sale'].forEach((sel) => {
+    const el = dlg.querySelector(sel);
+    if (el instanceof HTMLInputElement) el.checked = false;
+  });
+  // Re-render the product-selection pills now that their backing inputs are empty.
+  couponProductSelectionFields.forEach((f) => { f.refresh().catch(() => {}); });
+}
+
+/** Reset the discounted-products grid to a single empty row. */
+function clearCouponProductListFields(dlg) {
+  fillCouponProductList(dlg, []);
+}
+
+/**
+ * @param {HTMLElement} dlg
+ * @param {{ isEdit?: boolean }} [opts]
+ */
+function wireCouponFormTabs(dlg, { isEdit = false } = {}) {
   dlg.querySelectorAll('[data-cp-coupon-tab]').forEach((tab) => {
     tab.addEventListener('click', () => {
-      const mode = tab.getAttribute('data-cp-coupon-tab') === 'productlist' ? 'productlist' : 'discount';
-      setCouponFormMode(dlg, mode);
+      const target = tab.getAttribute('data-cp-coupon-tab') === 'productlist' ? 'productlist' : 'discount';
+      const current = dlg.dataset.cpCouponMode === 'productlist' ? 'productlist' : 'discount';
+      if (target === current) return;
+      // Editing an existing coupon: switching type discards its current
+      // definition and overwrites it on save, so confirm first.
+      /* eslint-disable-next-line no-alert -- destructive: overwrites the saved coupon definition */
+      if (isEdit && !window.confirm(COUPON_MODE_SWITCH_EDIT_WARNING)) return;
+      // Drop the mode we're leaving so its (now conflicting) fields can't be sent.
+      if (current === 'discount') clearCouponDiscountModeFields(dlg);
+      else clearCouponProductListFields(dlg);
+      setCouponFormMode(dlg, target);
     });
   });
   setCouponFormMode(
@@ -1934,7 +1970,7 @@ function openEditCouponDialog() {
       wireCouponCountryCheckboxGuards(dlg);
       wireCouponProductSelectionFields(dlg);
       wireCouponProductListRows(dlg);
-      wireCouponFormTabs(dlg);
+      wireCouponFormTabs(dlg, { isEdit: true });
     },
     'coupons-dialog-wide',
   );
