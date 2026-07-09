@@ -315,7 +315,12 @@
   cursor: pointer;
 }
 
-.coupons-btn:hover {
+.coupons-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.coupons-btn:hover:not(:disabled) {
   background: #f6f6f7;
 }
 
@@ -325,7 +330,7 @@
   color: #fff;
 }
 
-.coupons-btn-primary:hover {
+.coupons-btn-primary:hover:not(:disabled) {
   background: #1a1a1c;
 }
 
@@ -413,6 +418,17 @@
   text-transform: uppercase;
   letter-spacing: 0.03em;
   color: #6d7175;
+}
+
+.coupons-code-select-cell {
+  width: 1%;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.coupons-code-select-cell input {
+  cursor: pointer;
+  margin: 0;
 }
 
 .coupons-grid-table th .pim-th-sort-btn {
@@ -577,7 +593,7 @@
   background: #fff;
 }
 
-.coupons-btn-danger:hover {
+.coupons-btn-danger:hover:not(:disabled) {
   background: #fdecea;
 }
 

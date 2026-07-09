@@ -1705,12 +1705,18 @@ function renderCodesSection() {
       const code = escapeHtml(codeStr || '—');
       const active = c.active !== false && c.active !== 'false';
       const { used, limit } = pickCouponUsageParts(raw);
+      const usedCount = Number(used);
+      const isUsed = Number.isFinite(usedCount) && usedCount > 0;
       const usage = `${used ?? '—'} / ${limit ?? '∞'}`;
       const expRaw = pickCouponExpires(raw);
       const exp = expRaw ? escapeHtml(expRaw) : '—';
-      return `<tr><td><code>${code}</code></td><td>${active ? 'Yes' : 'No'}</td><td>${escapeHtml(String(usage))}</td><td>${exp}</td></tr>`;
+      const cbDisabled = codeStr ? '' : ' disabled';
+      return `<tr>
+        <td class="coupons-code-select-cell"><input type="checkbox" class="cp-code-cb" value="${escapeHtml(codeStr)}" data-cp-code-used="${isUsed ? '1' : '0'}" aria-label="Select code ${code}"${cbDisabled} /></td>
+        <td><code>${code}</code></td><td>${active ? 'Yes' : 'No'}</td><td>${escapeHtml(String(usage))}</td><td>${exp}</td>
+      </tr>`;
     }).join('')
-    : '<tr><td colspan="4" class="coupons-empty" style="padding:16px">No codes for this coupon yet.</td></tr>';
+    : '<tr><td colspan="5" class="coupons-empty" style="padding:16px">No codes for this coupon yet.</td></tr>';
 
   return `
     <h3 class="coupons-section-title">Codes for this coupon</h3>
@@ -1718,14 +1724,122 @@ function renderCodesSection() {
       <button type="button" class="coupons-btn" data-cp-refresh-codes>Refresh</button>
       <button type="button" class="coupons-btn" data-cp-add-codes>Add new codes...</button>
       <button type="button" class="coupons-btn" data-cp-batch>Generate batch</button>
+      <button type="button" class="coupons-btn coupons-btn-danger" data-cp-delete-codes disabled>Delete selected</button>
       ${state.codesNextCursor ? '<button type="button" class="coupons-btn" data-cp-next-codes>Next page</button>' : ''}
     </div>
     <div class="coupons-table-wrap">
       <table class="coupons-data-table">
-        <thead><tr><th>Code</th><th>Active</th><th>Usage</th><th>Expires</th></tr></thead>
+        <thead><tr>
+          <th class="coupons-code-select-cell"><input type="checkbox" class="cp-code-cb-all" aria-label="Select all loaded codes"${state.codes.length ? '' : ' disabled'} /></th>
+          <th>Code</th><th>Active</th><th>Usage</th><th>Expires</th>
+        </tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>`;
+}
+
+/** Max simultaneous DELETE requests — the API has no bulk delete, so we fan out. */
+const COUPON_CODE_DELETE_CONCURRENCY = 5;
+
+/**
+ * Sync the codes-list selection affordances to the current checkbox state:
+ * the "Delete selected" button label/enabled state and the select-all
+ * checked/indeterminate state.
+ * @param {ParentNode} mount
+ */
+function syncCouponCodeSelectionUi(mount) {
+  const boxes = Array.from(mount.querySelectorAll('.cp-code-cb'));
+  const selectable = boxes.filter((b) => b instanceof HTMLInputElement && !b.disabled);
+  const checked = selectable.filter((b) => b.checked);
+  const btn = mount.querySelector('[data-cp-delete-codes]');
+  if (btn instanceof HTMLButtonElement) {
+    btn.disabled = checked.length === 0;
+    btn.textContent = checked.length ? `Delete selected (${checked.length})` : 'Delete selected';
+  }
+  const all = mount.querySelector('.cp-code-cb-all');
+  if (all instanceof HTMLInputElement) {
+    all.checked = selectable.length > 0 && checked.length === selectable.length;
+    all.indeterminate = checked.length > 0 && checked.length < selectable.length;
+  }
+}
+
+/**
+ * Delete the given codes with bounded concurrency, reporting progress. Each code
+ * is an independent DELETE; failures are collected rather than aborting the rest.
+ * @param {string[]} codes
+ * @param {(done: number) => void} [onProgress]
+ * @returns {Promise<{ ok: string[]; failed: string[] }>}
+ */
+async function deleteCouponCodes(codes, onProgress) {
+  const ok = [];
+  const failed = [];
+  let index = 0;
+  let done = 0;
+  const worker = async () => {
+    while (index < codes.length) {
+      const code = codes[index];
+      index += 1;
+      try {
+        // eslint-disable-next-line no-await-in-loop -- bounded worker-pool fan-out
+        await couponsApiFetch(`coupons/${encodeURIComponent(code)}`, { method: 'DELETE' });
+        ok.push(code);
+      } catch (err) {
+        console.warn('[commerce-admin/coupons] delete code failed', { code, message: err?.message });
+        failed.push(code);
+      } finally {
+        done += 1;
+        onProgress?.(done);
+      }
+    }
+  };
+  const poolSize = Math.min(COUPON_CODE_DELETE_CONCURRENCY, codes.length);
+  await Promise.all(Array.from({ length: poolSize }, () => worker()));
+  return { ok, failed };
+}
+
+async function handleDeleteSelectedCodes(mount) {
+  const boxes = Array.from(mount.querySelectorAll('.cp-code-cb:checked'));
+  const codes = boxes.map((b) => (b instanceof HTMLInputElement ? b.value : '')).filter(Boolean);
+  if (!codes.length) return;
+  const usedCount = boxes.filter((b) => b.getAttribute('data-cp-code-used') === '1').length;
+  const label = codes.length === 1 ? `code "${codes[0]}"` : `${codes.length} codes`;
+  const usedNote = usedCount
+    ? `\n\n${usedCount} of the selected ${usedCount === 1 ? 'code has' : 'codes have'} already been redeemed — deleting also removes ${usedCount === 1 ? 'its' : 'their'} usage history.`
+    : '';
+  /* eslint-disable-next-line no-alert -- destructive bulk action needs explicit confirmation */
+  if (!window.confirm(`Delete ${label}? This cannot be undone.${usedNote}`)) return;
+
+  const btn = mount.querySelector('[data-cp-delete-codes]');
+  if (btn instanceof HTMLButtonElement) {
+    btn.disabled = true;
+    btn.textContent = `Deleting… (0/${codes.length})`;
+  }
+  const { ok, failed } = await deleteCouponCodes(codes, (n) => {
+    if (btn instanceof HTMLButtonElement) btn.textContent = `Deleting… (${n}/${codes.length})`;
+  });
+  if (failed.length) {
+    showToast(`Deleted ${ok.length} of ${codes.length} — ${failed.length} failed. Retry the still-selected codes.`, 'error');
+  } else {
+    showToast(`Deleted ${ok.length} ${ok.length === 1 ? 'code' : 'codes'}`, 'success');
+  }
+
+  try {
+    await fetchCodesForCoupon();
+  } catch (err) {
+    console.warn('[commerce-admin/coupons] reload after delete failed', { message: err?.message });
+  }
+  afterCodesRefresh();
+
+  // Re-check any codes that failed to delete (in the freshly rendered list) so
+  // the user can retry without hunting for them.
+  if (failed.length) {
+    const dlg = document.querySelector('dialog.coupons-detail-dialog') ?? mount;
+    const failedSet = new Set(failed);
+    dlg.querySelectorAll('.cp-code-cb').forEach((cb) => {
+      if (cb instanceof HTMLInputElement && failedSet.has(cb.value)) cb.checked = true;
+    });
+    syncCouponCodeSelectionUi(dlg);
+  }
 }
 
 function bindCodesEvents(mount) {
@@ -1758,6 +1872,25 @@ function bindCodesEvents(mount) {
   });
   mount.querySelector('[data-cp-add-codes]')?.addEventListener('click', () => openAddCodesDialog());
   mount.querySelector('[data-cp-batch]')?.addEventListener('click', () => openBatchDialog());
+
+  const selectAll = mount.querySelector('.cp-code-cb-all');
+  selectAll?.addEventListener('change', () => {
+    const on = selectAll instanceof HTMLInputElement && selectAll.checked;
+    mount.querySelectorAll('.cp-code-cb').forEach((cb) => {
+      if (cb instanceof HTMLInputElement && !cb.disabled) cb.checked = on;
+    });
+    syncCouponCodeSelectionUi(mount);
+  });
+  mount.querySelectorAll('.cp-code-cb').forEach((cb) => {
+    cb.addEventListener('change', () => syncCouponCodeSelectionUi(mount));
+  });
+  mount.querySelector('[data-cp-delete-codes]')?.addEventListener('click', () => {
+    handleDeleteSelectedCodes(mount).catch((err) => {
+      console.warn('[commerce-admin/coupons] bulk delete failed', { message: err?.message });
+      showToast(err?.message || 'Delete failed', 'error');
+    });
+  });
+  syncCouponCodeSelectionUi(mount);
 }
 
 function render() {
