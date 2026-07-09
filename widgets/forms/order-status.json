@@ -7,6 +7,29 @@
     },
     "inputPlaceholders": {
       "orderNumber": ""
+    },
+    "result": {
+      "labels": {
+        "orderNumber": "Order Number",
+        "orderStatus": "Order Status"
+      },
+      "statuses": {
+        "received": "Order Received",
+        "processed": "Order Processed",
+        "partiallyShipped": "Partially Shipped",
+        "shipped": "Order Shipped",
+        "cancelled": "Order Cancelled",
+        "unavailable": "Status Unavailable"
+      },
+      "definitionsTitle": "What these statuses mean",
+      "descriptions": {
+        "received": "We've received your order and it's awaiting processing.",
+        "processed": "Your order has been processed and is being prepared for shipment.",
+        "partiallyShipped": "Some items have shipped; the rest are on the way.",
+        "shipped": "All items in your order have shipped.",
+        "cancelled": "This order has been cancelled.",
+        "unavailable": "We couldn't determine the status for this order right now."
+      }
     }
   },
   "fr": {
@@ -17,6 +40,29 @@
     },
     "inputPlaceholders": {
       "orderNumber": ""
+    },
+    "result": {
+      "labels": {
+        "orderNumber": "Numéro de commande",
+        "orderStatus": "État de la commande"
+      },
+      "statuses": {
+        "received": "Commande reçue",
+        "processed": "Commande traitée",
+        "partiallyShipped": "Partiellement expédiée",
+        "shipped": "Commande expédiée",
+        "cancelled": "Commande annulée",
+        "unavailable": "État indisponible"
+      },
+      "definitionsTitle": "Signification de ces états",
+      "descriptions": {
+        "received": "Nous avons reçu votre commande et elle est en attente de traitement.",
+        "processed": "Votre commande a été traitée et est en cours de préparation pour l'expédition.",
+        "partiallyShipped": "Certains articles ont été expédiés; les autres sont en route.",
+        "shipped": "Tous les articles de votre commande ont été expédiés.",
+        "cancelled": "Cette commande a été annulée.",
+        "unavailable": "Nous n'avons pas pu déterminer l'état de cette commande pour le moment."
+      }
     }
   },
   "es": {
@@ -27,6 +73,29 @@
     },
     "inputPlaceholders": {
       "orderNumber": ""
+    },
+    "result": {
+      "labels": {
+        "orderNumber": "Número de pedido",
+        "orderStatus": "Estado del pedido"
+      },
+      "statuses": {
+        "received": "Pedido recibido",
+        "processed": "Pedido procesado",
+        "partiallyShipped": "Parcialmente enviado",
+        "shipped": "Pedido enviado",
+        "cancelled": "Pedido cancelado",
+        "unavailable": "Estado no disponible"
+      },
+      "definitionsTitle": "Qué significan estos estados",
+      "descriptions": {
+        "received": "Hemos recibido su pedido y está pendiente de procesamiento.",
+        "processed": "Su pedido ha sido procesado y se está preparando para el envío.",
+        "partiallyShipped": "Algunos artículos se han enviado; el resto está en camino.",
+        "shipped": "Todos los artículos de su pedido han sido enviados.",
+        "cancelled": "Este pedido ha sido cancelado.",
+        "unavailable": "No pudimos determinar el estado de este pedido en este momento."
+      }
     }
   }
 }

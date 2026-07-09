@@ -1,0 +1,9 @@
+.cart-item-compatibility-warning {
+  grid-column: 1 / -1;
+  margin: 4px 0 0;
+  padding: 8px 10px;
+  background: #f2e6e3;
+  color: #b00020;
+  font-size: var(--commerce-font-size-xs);
+  line-height: 1.4;
+}

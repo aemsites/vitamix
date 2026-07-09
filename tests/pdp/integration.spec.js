@@ -23,10 +23,21 @@ test.describe('PDP Integration Tests', () => {
     console.log(`Running tests against branch: ${currentBranch}`);
   });
 
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      window.IS_TEST_MODE = true;
+      localStorage.setItem('vitamix.priceRules.stub', JSON.stringify({ promotions: [] }));
+    });
+
+    // Protect runs against branch previews that do not yet include the
+    // operations-log test-mode guard.
+    await page.route('**/us/en_us/products/operations-log', (route) => route.fulfill({ status: 204, body: '' }));
+  });
+
   test.describe('Configurable Product Page', () => {
     const productPath = '/us/en_us/products/ascent-x2';
 
-    test('should load Ascent X2 product page with all required elements', async ({ page }) => {
+    test('should load Ascent X2 product page with all required elements @cross-browser', async ({ page }) => {
       const productUrl = buildProductUrl(productPath, currentBranch);
       console.log(`Testing URL: ${productUrl}`);
 
@@ -63,9 +74,22 @@ test.describe('PDP Integration Tests', () => {
     });
 
     test('add to cart button should work', async ({ page }) => {
+      await page.route('**/customer/section/load/**', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            cart: { items: [], summary_count: 0, data_id: 12345 },
+            customer: { data_id: 12345 },
+            'side-by-side': { cart_id: 'test-cart-id', data_id: 12345 },
+          }),
+        });
+      });
+
       await page.route('**/graphql', async (route) => {
         const requestBody = route.request().postDataJSON();
         expect(requestBody.variables).toEqual({
+          cartId: 'test-cart-id',
           cartItems: [
             {
               sku: 'Ascent X2',
@@ -99,7 +123,7 @@ test.describe('PDP Integration Tests', () => {
         });
       });
 
-      const productUrl = buildProductUrl(productPath, currentBranch);
+      const productUrl = buildProductUrl(productPath, currentBranch, { cart: 'magento' });
       await page.goto(productUrl);
 
       // Wait for add to cart button
@@ -121,9 +145,22 @@ test.describe('PDP Integration Tests', () => {
     });
 
     test('dialog should be shown if add to cart fails', async ({ page }) => {
+      await page.route('**/customer/section/load/**', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            cart: { items: [], summary_count: 0, data_id: 12345 },
+            customer: { data_id: 12345 },
+            'side-by-side': { cart_id: 'test-cart-id', data_id: 12345 },
+          }),
+        });
+      });
+
       await page.route('**/graphql', async (route) => {
         const requestBody = route.request().postDataJSON();
         expect(requestBody.variables).toEqual({
+          cartId: 'test-cart-id',
           cartItems: [
             {
               sku: 'Ascent X2',
@@ -166,7 +203,7 @@ test.describe('PDP Integration Tests', () => {
         });
       });
 
-      const productUrl = buildProductUrl(productPath, currentBranch);
+      const productUrl = buildProductUrl(productPath, currentBranch, { cart: 'magento' });
       await page.goto(productUrl);
 
       // Wait for add to cart button
@@ -225,7 +262,7 @@ test.describe('PDP Integration Tests', () => {
         });
       });
 
-      const productUrl = buildProductUrl(productPath, currentBranch, { COUPON: 'test' });
+      const productUrl = buildProductUrl(productPath, currentBranch, { cart: 'magento', COUPON: 'test' });
       console.log('productUrl: ', productUrl);
       await page.goto(productUrl);
 
@@ -309,9 +346,22 @@ test.describe('PDP Integration Tests', () => {
     });
 
     test('add to cart button should work', async ({ page }) => {
+      await page.route('**/customer/section/load/**', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            cart: { items: [], summary_count: 0, data_id: 12345 },
+            customer: { data_id: 12345 },
+            'side-by-side': { cart_id: 'test-cart-id', data_id: 12345 },
+          }),
+        });
+      });
+
       await page.route('**/graphql', async (route) => {
         const requestBody = route.request().postDataJSON();
         expect(requestBody.variables).toEqual({
+          cartId: 'test-cart-id',
           cartItems: [
             {
               sku: 'VBND5200LB',
@@ -348,11 +398,12 @@ test.describe('PDP Integration Tests', () => {
         });
       });
 
-      const productUrl = buildProductUrl(productPath, currentBranch);
+      const productUrl = buildProductUrl(productPath, currentBranch, { cart: 'magento' });
       await page.goto(productUrl);
 
-      // Wait for add to cart button
-      await waitForElement(page, '.quantity-container button');
+      // Wait for add to cart button. Bundle PDP data can take longer to hydrate
+      // on branch previews, especially while AEM cache is warming.
+      await waitForElement(page, '.quantity-container button', 30000);
 
       const addToCartButton = page.locator('.quantity-container button');
       await expect(addToCartButton).toContainText(/add to cart/i);
@@ -410,7 +461,7 @@ test.describe('PDP Integration Tests', () => {
         });
       });
 
-      const productUrl = buildProductUrl(productPath, currentBranch);
+      const productUrl = buildProductUrl(productPath, currentBranch, { cart: 'magento' });
       await page.goto(productUrl);
 
       // Wait for add to cart button
@@ -488,7 +539,7 @@ test.describe('PDP Integration Tests', () => {
         await route.fulfill({ status: 200 });
       });
 
-      const productUrl = buildProductUrl(productPath, currentBranch);
+      const productUrl = buildProductUrl(productPath, currentBranch, { cart: 'magento' });
       await page.goto(productUrl);
       await waitForElement(page, '.quantity-container button');
 
@@ -534,9 +585,22 @@ test.describe('PDP Integration Tests', () => {
     });
 
     test('add to cart button should work', async ({ page }) => {
+      await page.route('**/customer/section/load/**', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            cart: { items: [], summary_count: 0, data_id: 12345 },
+            customer: { data_id: 12345 },
+            'side-by-side': { cart_id: 'test-cart-id', data_id: 12345 },
+          }),
+        });
+      });
+
       await page.route('**/graphql', async (route) => {
         const requestBody = route.request().postDataJSON();
         expect(requestBody.variables).toEqual({
+          cartId: 'test-cart-id',
           cartItems: [
             {
               sku: '056264',
@@ -568,7 +632,7 @@ test.describe('PDP Integration Tests', () => {
         });
       });
 
-      const productUrl = buildProductUrl(productPath, currentBranch);
+      const productUrl = buildProductUrl(productPath, currentBranch, { cart: 'magento' });
       await page.goto(productUrl);
 
       // Wait for add to cart button
@@ -626,17 +690,21 @@ test.describe('PDP Integration Tests', () => {
         pageUrl,
       } = config;
 
-      await page.route('**/bin/vitamix/newslettersubscription**', async (route) => {
-        const url = route.request().url();
-        const urlObj = new URL(url);
+      await page.route('**/us/en_us/forms**', async (route) => {
+        expect(route.request().method()).toBe('POST');
+        const body = route.request().postDataJSON();
 
-        // Check the query parameters
-        expect(urlObj.searchParams.get('email')).toBe('test@test.com');
-        expect(urlObj.searchParams.get('mobile')).toBe('1234567890');
-        expect(urlObj.searchParams.get('sms_optin')).toBe(smsOptin ? '1' : '0');
-        expect(urlObj.searchParams.get('lead_source')).toBe(leadSource);
-        expect(urlObj.searchParams.get('pageUrl')).toContain(pageUrl);
-        expect(urlObj.searchParams.get('actionUrl')).toBe('/us/en_us/rest/V1/vitamix-api/newslettersubscribe');
+        expect(body.formId).toBe('us/en_us/newsletter');
+        expect(body.email).toBe('test@test.com');
+        expect(body.mobile).toBe('1234567890');
+        expect(body.emailOptIn).toBe(true);
+        expect(body.leadSource).toBe(leadSource);
+        expect(body.pageUrl).toContain(pageUrl);
+        if (smsOptin) {
+          expect(body.smsOptIn).toBeTruthy();
+        } else {
+          expect(body.smsOptIn).toBeFalsy();
+        }
 
         console.log('✓ Newsletter subscription request intercepted with correct parameters');
         await route.fulfill({

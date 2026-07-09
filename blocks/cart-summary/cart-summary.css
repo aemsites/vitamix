@@ -1,0 +1,512 @@
+/* Two-column layout: section containing cart-summary becomes a flex row.
+   Pull horizontal spacing onto the section and strip it from inner wrappers,
+   which global styles would otherwise pad with --horizontal-spacing each side. */
+.section:has(.cart-summary-wrapper) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 24px 48px;
+  padding-block: 40px;
+  padding-inline: var(--horizontal-spacing);
+}
+
+.section:has(.cart-summary-wrapper):has(.checkout-progress-wrapper) {
+  padding-block-start: 10px;
+}
+
+/* The progress bar is hidden on mobile, so add back some breathing room
+   above the summary. */
+@media (width <= 600px) {
+  .section:has(.cart-summary-wrapper):has(.checkout-progress-wrapper) {
+    padding-block-start: 20px;
+  }
+}
+
+/* Heading authored alongside the cart sits above the two columns */
+div.section.cart-section:has(.cart-summary-wrapper) > .default-content-wrapper {
+  flex-basis: 100%;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+div.section.cart-section:has(.cart-summary-wrapper) > .default-content-wrapper h1 {
+  margin-top: 0;
+  padding-top: 0;
+}
+
+.cart-continue-shopping {
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-text-muted);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.cart-continue-shopping:hover {
+  color: var(--color-text);
+  text-decoration: underline;
+}
+
+/* Hide the cart block's own checkout button — cart-summary provides it */
+.section:has(.cart-summary-wrapper) .cart-controls {
+  display: none;
+}
+
+.cart-summary-wrapper {
+  width: var(--commerce-summary-width);
+  flex-shrink: 0;
+}
+
+.section:has(.cart-summary-wrapper) > .cart-wrapper {
+  flex: 1;
+  min-width: 0;
+}
+
+.section:has(.cart-summary-wrapper) > .cart-wrapper,
+.section:has(.cart-summary-wrapper) > .cart-summary-wrapper {
+  padding: 0;
+  margin: 0;
+}
+
+/* Remove margin-top that cart.css adds to .cart-wrapper so it top-aligns with the summary */
+div.section.cart-section:has(.cart-summary-wrapper) > .cart-wrapper {
+  margin-top: 0;
+}
+
+/* Hide order summary when cart is empty */
+.section:has(.cart-is-empty) .cart-summary-wrapper {
+  display: none;
+}
+
+@media (width <= 999px) {
+  .section:has(.cart-summary-wrapper) {
+    flex-direction: column;
+    padding-inline: var(--horizontal-spacing);
+    padding-block-start: 20px;
+  }
+
+  .section:has(.cart-summary-wrapper) > .cart-wrapper {
+    width: 100%;
+    flex: none;
+  }
+
+  .cart-summary-wrapper {
+    width: 100%;
+    position: static;
+  }
+
+  div.section.cart-section:has(.cart-summary-wrapper) > .default-content-wrapper {
+    width: 100%;
+  }
+}
+
+/* Card */
+.cart-summary {
+  background-color: var(--commerce-color-background);
+  border: 1px solid var(--commerce-color-border);
+  border-radius: var(--commerce-radius-card);
+  overflow: hidden;
+}
+
+/* Header */
+.cart-summary-header {
+  padding: 20px 24px 12px;
+  border-bottom: 1px solid var(--commerce-color-border);
+}
+
+.cart-summary-header h3 {
+  margin: 0;
+  font-size: var(--heading-size-l);
+}
+
+/* Content panel — always visible */
+.cart-summary-content {
+  display: block;
+  padding: var(--commerce-card-padding);
+}
+
+/* Express checkout buttons */
+.cart-summary-express-section {
+  margin-bottom: 20px;
+}
+
+.cart-summary-express-buttons {
+  container-type: inline-size;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* Base (narrow / mobile): every button stacked full-width. PayPal SDK iframes
+   have a minimum width, so two columns would overflow in a tight container. */
+.cart-summary-express-buttons apple-pay-button {
+  --apple-pay-button-width: 100%;
+  --apple-pay-button-height: 55px;
+  --apple-pay-button-border-radius: var(--commerce-button-radius);
+  --apple-pay-button-padding: 0;
+
+  display: block;
+  flex: 0 0 100%;
+}
+
+.cart-summary-express-buttons .paypal-paypal-wrapper,
+.cart-summary-express-buttons .paypal-paylater-wrapper {
+  flex: 0 0 100%;
+  min-width: 0;
+  height: 55px;
+}
+
+/* Pair PayPal + Pay Later as two columns below Apple Pay whenever there's room.
+   Two triggers are needed because the container can't tell two cases apart on
+   its own:
+   - Container >=420px: the full-width summary on tablet (and the wide checkout
+     surface) — pair them.
+   - Viewport >=1000px: the desktop cart sidebar is a fixed ~420px column whose
+     inner container (~360px) is too narrow for the container query but is wide
+     enough to pair — so pair them on desktop too.
+   The remaining case (narrow container AND narrow viewport = a phone) stays
+   stacked, which is what we want on mobile. */
+@container (min-width: 420px) {
+  .cart-summary-express-buttons .paypal-paypal-wrapper,
+  .cart-summary-express-buttons .paypal-paylater-wrapper {
+    flex: 1 1 0;
+  }
+}
+
+@media (width >= 1000px) {
+  .cart-summary-express-buttons .paypal-paypal-wrapper,
+  .cart-summary-express-buttons .paypal-paylater-wrapper {
+    flex: 1 1 0;
+  }
+}
+
+/* Tablet (768px up to the 1000px sidebar switch): the summary is full-width with
+   plenty of room, so put all three express buttons in a single row. Above 999px
+   the summary becomes a narrow ~420px sidebar where three across won't fit. */
+@media (width >= 768px) and (width <= 999px) {
+  .cart-summary-express-buttons apple-pay-button {
+    flex: 1 1 0;
+  }
+}
+
+.cart-summary-express-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  color: var(--commerce-color-text-muted);
+  font-size: var(--commerce-font-size-sm);
+}
+
+.cart-summary-express-divider::before,
+.cart-summary-express-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--commerce-color-border);
+}
+
+/* PayPal stub buttons */
+.cart-summary-express-buttons .paypal-express-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 55px;
+  background: #ffc439;
+  border: none;
+  border-radius: var(--commerce-button-radius);
+  cursor: pointer;
+  transition: background 0.15s;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.cart-summary-express-buttons .pp-wordmark {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 20px;
+  font-weight: bold;
+  line-height: 1;
+}
+
+.cart-summary-express-buttons .pp-pay { color: #003087; }
+
+.cart-summary-express-buttons .pp-pal { color: #009cde; }
+
+.cart-summary-express-buttons .pp-later {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 13px;
+  font-weight: bold;
+  color: #003087;
+  margin-left: 6px;
+}
+
+.cart-summary-express-buttons .paypal-express-btn:hover {
+  background: #f0b929;
+}
+
+.cart-summary-express-buttons .paypal-express-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  font-size: var(--commerce-font-size-sm);
+  color: #003087;
+}
+
+.cart-summary-express-buttons .paylater-express-btn {
+  background: #e8f4fb;
+  border: 1px solid #b0d8f0;
+}
+
+.cart-summary-express-buttons .paylater-express-btn:hover {
+  background: #d0eaf7;
+}
+
+/* Modal dialog for not-configured Apple Pay / PayPal (appended to body) */
+dialog.paypal-not-configured-dialog {
+  border: 1px solid var(--commerce-color-border);
+  border-radius: var(--commerce-radius-card);
+  padding: var(--commerce-card-padding);
+  min-width: 280px;
+  text-align: center;
+}
+
+dialog.paypal-not-configured-dialog p {
+  margin: 0 0 16px;
+  font-size: var(--commerce-font-size-sm);
+}
+
+dialog.paypal-not-configured-dialog::backdrop {
+  background: rgb(0 0 0 / 40%);
+}
+
+.cart-summary-express-buttons .paypal-not-configured-dialog {
+  border: 1px solid var(--commerce-color-border);
+  border-radius: var(--commerce-radius-card);
+  padding: var(--commerce-card-padding);
+  width: 100%;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.cart-summary-express-buttons .paypal-not-configured-dialog p {
+  margin: 0 0 16px;
+  font-size: var(--commerce-font-size-sm);
+}
+
+/* Promo code disclosure */
+.cart-summary-promo {
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--commerce-color-border);
+}
+
+.cart-summary-promo-toggle {
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-text);
+}
+
+.cart-summary-discount {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--commerce-gap-sm);
+  margin-top: 12px;
+}
+
+.cart-summary .discount-input {
+  flex: 1;
+  padding: 12px 16px;
+  border: 1px solid var(--commerce-input-border);
+  border-radius: var(--commerce-input-radius);
+  font-size: var(--commerce-font-size-sm);
+  background: var(--commerce-input-background);
+}
+
+.cart-summary .discount-input:focus {
+  outline: none;
+  border-color: var(--commerce-input-border-focus);
+}
+
+.cart-summary .discount-apply {
+  padding: 12px 24px;
+  background: var(--commerce-color-text-muted);
+  color: #fff;
+  border: none;
+  border-radius: var(--commerce-button-radius);
+  font-size: var(--commerce-font-size-sm);
+  font-weight: var(--commerce-font-weight-bold);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.cart-summary .discount-apply:hover {
+  background: var(--commerce-color-text);
+}
+
+/* ID.me verification */
+.cart-summary .idme-verify {
+  margin-bottom: var(--commerce-card-padding);
+  padding-bottom: var(--commerce-card-padding);
+  border-bottom: 1px solid var(--commerce-color-border);
+  text-align: left;
+}
+
+.cart-summary .idme-verify .idme-trigger-link {
+  width: fit-content;
+}
+
+/* Remove bottom border from promo section when ID.me follows it */
+.cart-summary-promo:has(+ .idme-verify) {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: var(--commerce-card-padding);
+}
+
+/* Totals */
+.cart-summary-totals {
+  display: flex;
+  flex-direction: column;
+  gap: var(--commerce-gap-sm);
+}
+
+.cart-summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--commerce-font-size-sm);
+}
+
+.cart-summary-shipping {
+  color: var(--commerce-color-text-muted);
+  font-style: italic;
+}
+
+.cart-summary-row.cart-summary-final {
+  margin-top: var(--commerce-gap-sm);
+  padding-top: 16px;
+  border-top: 1px solid var(--commerce-color-border);
+  font-size: var(--commerce-font-size-base);
+}
+
+.cart-summary-final-amount {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cart-summary-discount-pending {
+  color: var(--commerce-color-text-muted);
+  font-style: italic;
+}
+
+.cart-summary-final-amount .currency {
+  font-size: var(--commerce-font-size-xs);
+  font-weight: 400;
+  color: var(--commerce-color-text-muted);
+}
+
+.cart-summary-final-amount strong {
+  font-size: var(--commerce-font-size-total);
+}
+
+/* Error */
+.cart-summary-error {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--commerce-color-error-bg);
+  border: 1px solid var(--commerce-color-error-border);
+  border-radius: var(--commerce-radius-badge);
+  color: var(--commerce-color-error);
+  font-size: var(--commerce-font-size-sm);
+}
+
+/* Coupon remove button */
+.cart-summary-discount-row .discount-remove {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  line-height: 1;
+  font-size: 16px;
+  color: var(--commerce-color-text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.cart-summary-discount-row:hover .discount-remove {
+  opacity: 1;
+}
+
+.cart-summary-discount-row .discount-remove:hover {
+  color: var(--commerce-color-error);
+}
+
+@media (width <= 999px) {
+  .cart-summary-discount-row .discount-remove {
+    opacity: 1;
+  }
+}
+
+/* Coupon error — lives inside .cart-summary-discount, wraps to its own row */
+.cart-summary-coupon-error {
+  flex-basis: 100%;
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--commerce-color-error-bg);
+  border: 1px solid var(--commerce-color-error-border);
+  border-radius: var(--commerce-radius-badge);
+  color: var(--commerce-color-error);
+  font-size: var(--commerce-font-size-sm);
+}
+
+/* Checkout CTA */
+.cart-summary-checkout-btn {
+  display: block;
+  width: 100%;
+  margin-top: 20px;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+/* Terms link below checkout button */
+.cart-summary-terms {
+  margin-top: 12px;
+  margin-bottom: 0;
+  text-align: center;
+  font-size: var(--commerce-font-size-sm);
+}
+
+.cart-summary-terms a {
+  color: var(--commerce-color-text-muted);
+  text-decoration: underline;
+}
+
+.cart-summary-terms a:hover {
+  color: var(--commerce-color-text);
+}
+
+/* Loading state */
+.cart-summary-content.loading {
+  position: relative;
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.cart-summary-content.loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 32px;
+  height: 32px;
+  margin: -16px 0 0 -16px;
+  border: 3px solid var(--commerce-color-border);
+  border-top-color: var(--commerce-color-text);
+  border-radius: 50%;
+  animation: cart-summary-spin 0.7s linear infinite;
+}
+
+@keyframes cart-summary-spin {
+  to { transform: rotate(360deg); }
+}

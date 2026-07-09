@@ -71,6 +71,10 @@ body.pdp-template {
   --site-width: 1440px;
 }
 
+body.cart-template {
+  --site-width: 1440px;
+}
+
 @media (width >= 900px) {
   :host,
   :root {
@@ -896,6 +900,28 @@ body.corp main .default-content-wrapper h1 {
 
 body.corp main .default-content-wrapper h2 {
   font-size: var(--font-size-500);
+}
+
+/*
+ * reCAPTCHA Enterprise badge — hidden globally. Google's Terms of Service
+ * permit hiding the badge as long as attribution text is shown near every
+ * form that uses reCAPTCHA. The required `.recaptcha-notice` block is
+ * rendered inside the auth panel and the checkout form for that purpose.
+ */
+.grecaptcha-badge {
+  visibility: hidden !important;
+}
+
+.recaptcha-notice {
+  font-size: var(--font-size-100);
+  color: #666;
+  margin-top: 12px;
+  line-height: 1.4;
+}
+
+.recaptcha-notice a {
+  color: inherit;
+  text-decoration: underline;
 }
 
 body.corp-no-toc main .default-content-wrapper {

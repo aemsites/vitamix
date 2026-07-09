@@ -3,6 +3,7 @@ import { test, expect } from '@playwright/test';
 import {
   getCurrentBranch,
   getBaseUrl,
+  setupTestMode,
 } from '../utils/test-helpers.js';
 
 /**
@@ -24,11 +25,15 @@ test.describe('Cart Storage Tests', () => {
     console.log(`Base URL: ${baseUrl}`);
   });
 
+  test.beforeEach(async ({ page }) => {
+    await setupTestMode(page);
+  });
+
   test.describe('US Store (/us/en_us/)', () => {
     const storePath = '/us/en_us';
 
     test('should use original mage-cache-storage key', async ({ page }) => {
-      await page.goto(`${baseUrl}${storePath}/products/ascent-x2?martech=off`);
+      await page.goto(`${baseUrl}${storePath}/products/ascent-x2?martech=off&cart=magento`);
       await page.waitForLoadState('networkidle');
 
       // Trigger a cart interaction to populate localStorage
@@ -96,7 +101,7 @@ test.describe('Cart Storage Tests', () => {
         });
       });
 
-      await page.goto(`${baseUrl}${storePath}/products/ascent-x2?martech=off`);
+      await page.goto(`${baseUrl}${storePath}/products/ascent-x2?martech=off&cart=magento`);
       await page.waitForLoadState('networkidle');
 
       // Wait for add to cart button
@@ -119,7 +124,7 @@ test.describe('Cart Storage Tests', () => {
         expect(cartData['side-by-side'].cart_id).toBe('us-cart-abc123');
         console.log('✓ US cart stored in mage-cache-storage with correct cart_id');
       } else {
-        expect.fail('US cart not stored in mage-cache-storage');
+        throw new Error('US cart not stored in mage-cache-storage');
       }
     });
   });
@@ -162,7 +167,7 @@ test.describe('Cart Storage Tests', () => {
         });
       });
 
-      await page.goto(`${baseUrl}${storePath}/products/ascent-x2?martech=off`);
+      await page.goto(`${baseUrl}${storePath}/products/ascent-x2?martech=off&cart=magento`);
       await page.waitForLoadState('networkidle');
 
       // Wait for add to cart button
@@ -215,7 +220,7 @@ test.describe('Cart Storage Tests', () => {
         });
       });
 
-      await page.goto(`${baseUrl}${storePath}/products/ascent-x2?martech=off`);
+      await page.goto(`${baseUrl}${storePath}/products/ascent-x2?martech=off&cart=magento`);
       await page.waitForLoadState('networkidle');
 
       const addToCartButton = page.locator('.quantity-container button');
@@ -234,7 +239,7 @@ test.describe('Cart Storage Tests', () => {
         expect(cartData['side-by-side'].cart_id).toBe('fr-cart-isolated');
         console.log('✓ FR-CA cart stored in mage-cache-storage-ca-fr_ca with correct cart_id');
       } else {
-        expect.fail('FR-CA cart not stored in mage-cache-storage-ca-fr_ca');
+        throw new Error('FR-CA cart not stored in mage-cache-storage-ca-fr_ca');
       }
     });
   });
@@ -276,7 +281,7 @@ test.describe('Cart Storage Tests', () => {
       });
 
       // Step 1: Add to cart on US store
-      await page.goto(`${baseUrl}/us/en_us/products/ascent-x2?martech=off`);
+      await page.goto(`${baseUrl}/us/en_us/products/ascent-x2?martech=off&cart=magento`);
       await page.waitForLoadState('networkidle');
 
       let addToCartButton = page.locator('.quantity-container button');
@@ -294,7 +299,7 @@ test.describe('Cart Storage Tests', () => {
       console.log('✓ US cart stored correctly');
 
       // Step 2: Navigate to FR-CA store and add to cart
-      await page.goto(`${baseUrl}/ca/fr_ca/products/ascent-x2?martech=off`);
+      await page.goto(`${baseUrl}/ca/fr_ca/products/ascent-x2?martech=off&cart=magento`);
       await page.waitForLoadState('networkidle');
 
       addToCartButton = page.locator('.quantity-container button');
@@ -321,7 +326,7 @@ test.describe('Cart Storage Tests', () => {
       console.log('✓ US cart still intact after FR-CA interaction');
 
       // Step 4: Navigate back to US and verify cart is preserved
-      await page.goto(`${baseUrl}/us/en_us/products/ascent-x2?martech=off`);
+      await page.goto(`${baseUrl}/us/en_us/products/ascent-x2?martech=off&cart=magento`);
       await page.waitForLoadState('networkidle');
 
       const usCartFinal = await page.evaluate(() => {
@@ -368,7 +373,7 @@ test.describe('Cart Storage Tests', () => {
         });
       });
 
-      await page.goto(`${baseUrl}/us/en_us/products/ascent-x2?martech=off`);
+      await page.goto(`${baseUrl}/us/en_us/products/ascent-x2?martech=off&cart=magento`);
       await page.waitForLoadState('networkidle');
 
       const addToCartButton = page.locator('.quantity-container button');
@@ -412,7 +417,7 @@ test.describe('Cart Storage Tests', () => {
         });
       });
 
-      await page.goto(`${baseUrl}/ca/fr_ca/products/ascent-x2?martech=off`);
+      await page.goto(`${baseUrl}/ca/fr_ca/products/ascent-x2?martech=off&cart=magento`);
       await page.waitForLoadState('networkidle');
 
       const addToCartButton = page.locator('.quantity-container button');

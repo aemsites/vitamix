@@ -17,11 +17,73 @@ import {
   loadScript,
   getMetadata,
 } from './aem.js';
+import { logError } from './operations-log.js';
 
-const isProdHost = window.location.hostname.includes('vitamix.com');
+const { hostname } = window.location;
+
+// Files considered "AEM scope" for error logging — only errors originating from
+// our own JS are logged, not third-party/payment-SDK noise.
+const AEM_SCOPE = /\/(scripts|blocks|tools|widgets)\//;
+const isInAemScope = (str) => typeof str === 'string' && AEM_SCOPE.test(str);
+
+/**
+ * Registers global listeners that log uncaught errors and unhandled promise
+ * rejections originating from AEM-scope JS to the operations-log endpoint.
+ * Independent of aem.js's RUM error handler. Idempotent.
+ */
+let errorLoggingRegistered = false;
+function registerErrorLogging() {
+  if (errorLoggingRegistered) return;
+  errorLoggingRegistered = true;
+  window.addEventListener('error', (event) => {
+    const stack = event.error?.stack || '';
+    if (!isInAemScope(event.filename) && !isInAemScope(stack)) return;
+    logError('window.error', event.error || { message: event.message }, {
+      filename: event.filename,
+      lineno: event.lineno,
+      colno: event.colno,
+    });
+  });
+  window.addEventListener('unhandledrejection', (event) => {
+    const { reason } = event;
+    if (!isInAemScope(reason?.stack || '')) return;
+    logError('unhandledrejection', reason instanceof Error ? reason : { message: String(reason) });
+  });
+}
+
+// Locale+language pairs enabled for edge checkout on production.
+// Format: '<locale>/<language>' (e.g., 'ca/fr_ca'). Add pairs as each region goes live.
+const EDGE_CHECKOUT_LOCALES = ['ca/fr_ca', 'ca/en_us', 'us/en_us'];
+
+export const isEdgeHost = hostname.includes('localhost') || hostname.includes('edge-accounts') || hostname.includes('edge-orders') || hostname.includes('integration.vitamix.com') || hostname.includes('uat.vitamix.com');
+export const isProdHost = hostname.includes('vitamix.com');
+
+// Affirm public API key — safe to expose client-side (used for PDP promo widgets).
+// Checkout gets its key from the server's checkout object so it always matches the
+// environment of the merchant config.
+export const AFFIRM_PUBLIC_KEY = isProdHost ? 'LIVE_PUBLIC_KEY' : 'GH4VQBRG3LHDS5CM';
 export const FORMS_ENDPOINT = isProdHost
   ? ''
   : 'https://main--vitamix--aemsites.aem.network';
+
+const PAYPAL_CLIENT_IDS = {
+  us: 'AaBQdCVqIp15uFQaHrJmTUDBZ-xJrOYPs99NtZ-iLN5oij-ustZq304ikTHJKwqqSL4yN0v9GLireQLN',
+  ca: 'AVlGkhsI0_EFNFx8jnRsv0dSROcLzzLYtTdMoNieyjZeAWlIXdFpocB6eyhHvuDOZ3F2YFmQDkLE03Rp',
+};
+const siteLocale = window.location.pathname.split('/').filter(Boolean)[0] || 'us';
+
+window.CommerceConfig = {
+  org: 'aemsites',
+  site: 'vitamix',
+  cartItemExtensionModules: [
+    '/blocks/cart/warranty-selector-extension.js',
+    '/scripts/cart-compatibility.js',
+  ],
+  paypal: {
+    clientId: PAYPAL_CLIENT_IDS[siteLocale] ?? PAYPAL_CLIENT_IDS.us,
+    intent: 'authorize',
+  },
+};
 
 /**
  * Load fonts.css and set a session storage flag.
@@ -121,20 +183,48 @@ export function formatServings(servingsString) {
 
 /**
  * Gets the locale and language from the window.location.pathname.
+ * @param {boolean} [forceEnCA] - Remap en_us → en_ca for Canadian English paths.
+ * @param {boolean} [bcp47] - Return language as a BCP-47 tag (e.g. 'en-US') instead of
+ *   the underscore form used in URL paths (e.g. 'en_us').
  * @returns {Object} Object with locale and language.
  */
-export function getLocaleAndLanguage(forceEnCA = false) {
+export function getLocaleAndLanguage(forceEnCA = false, bcp47 = false) {
   const pathSegments = window.location.pathname.split('/').filter(Boolean);
   const locale = pathSegments[0] || 'us'; // fallback to 'us' if not found
-  const language = pathSegments[1] || 'en_us'; // fallback to 'en_us' if not found
+  let language = pathSegments[1] || 'en_us'; // fallback to 'en_us' if not found
 
   // Commerce backend uses the language code en_ca for the Canada english store view.
   // On the frontend they are incorrectly using the en_us language code.
   if (forceEnCA && locale === 'ca' && language === 'en_us') {
-    return { locale, language: 'en_ca' };
+    language = 'en_ca';
+  }
+
+  if (bcp47) {
+    language = language.replace('_', '-').replace(/-([a-z]{2})$/, (_, r) => `-${r.toUpperCase()}`);
   }
 
   return { locale, language };
+}
+
+/**
+ * Returns the path for an order-flow page (cart, checkout, complete, cancel)
+ * scoped to the current locale and language.
+ * @param {'cart'|'checkout'|'complete'|'cancel'} page
+ * @returns {string}
+ */
+export function getOrderPath(page) {
+  const { locale, language } = getLocaleAndLanguage();
+  return `/${locale}/${language}/order/${page}`;
+}
+
+/**
+ * Returns the path for an account page scoped to the current locale and language.
+ * @param {string} [page] - Optional sub-page (e.g., 'orders', 'order-detail')
+ * @returns {string}
+ */
+export function getAccountPath(page) {
+  const { locale, language } = getLocaleAndLanguage();
+  return page ? `/${locale}/${language}/account/${page}` : `/${locale}/${language}/account`;
 }
 
 /**
@@ -164,15 +254,24 @@ function setAffiliateCoupon() {
   const urlParams = new URLSearchParams(window.location.search);
   const { cjdata, cjevent, COUPON } = Object.fromEntries(urlParams);
 
-  if (!cjdata || !cjevent || !COUPON) return;
+  if (cjevent) {
+    localStorage.setItem('cjevent', JSON.stringify({ value: cjevent, ts: Date.now() }));
+  }
 
-  const { locale, language } = getLocaleAndLanguage();
-  const loginUrl = new URL(`https://www.vitamix.com/${locale}/${language}/checkout/cart`);
-  Object.entries({ cjdata, cjevent, COUPON }).forEach(([key, value]) => {
-    loginUrl.searchParams.set(key, value);
-  });
+  if (COUPON) {
+    sessionStorage.setItem('checkout_coupon_code', COUPON);
+    sessionStorage.removeItem('checkout_coupon_source');
 
-  fetch(loginUrl.toString());
+    // TODO: remove once all locales migrate off Magento — applies the coupon to the PHP cart
+    const { locale, language } = getLocaleAndLanguage();
+    if (!EDGE_CHECKOUT_LOCALES.includes(`${locale}/${language}`)) {
+      const cartUrl = new URL(`https://www.vitamix.com/${locale}/${language}/checkout/cart`);
+      if (cjdata) cartUrl.searchParams.set('cjdata', cjdata);
+      if (cjevent) cartUrl.searchParams.set('cjevent', cjevent);
+      cartUrl.searchParams.set('COUPON', COUPON);
+      fetch(cartUrl.toString());
+    }
+  }
 }
 
 /**
@@ -1053,6 +1152,51 @@ export function applyImgColor(block) {
 }
 
 /**
+ * Logs error to the console
+ * @param {RequestInfo|URL} input
+ * @param {RequestInit} [init]
+ * @returns {Promise<Response>}
+ */
+export async function loggedFetch(input, init) {
+  if (hostname.includes('www.vitamix.com')) return fetch(input, init);
+  const response = await fetch(input, init);
+  if (!response.ok) {
+    const xError = response.headers.get('x-error');
+    const xErrorCode = response.headers.get('x-error-code');
+    try {
+      response.clone().text().then((text) => {
+        let data = text;
+        try {
+          data = JSON.parse(text);
+        } catch { /* noop */ }
+        let requestBody = init?.body;
+        try {
+          requestBody = JSON.parse(requestBody);
+        } catch { /* noop */ }
+
+        /* eslint-disable no-console */
+        console.group(`Error response from: ${input.toString()}`);
+        console.error(JSON.stringify({
+          status: response.status,
+          method: init?.method ?? 'GET',
+          requestHeaders: init?.headers,
+          requestBody,
+          responseBody: data,
+          xError,
+          xErrorCode,
+        }, null, 2));
+        console.groupEnd();
+      });
+    } catch (e) {
+      console.error('Error logging response for:', input.toString(), e, xError, xErrorCode);
+      console.warn(response);
+      /* eslint-enable no-console */
+    }
+  }
+  return response;
+}
+
+/**
  * Determines if a given date falls within US Eastern Daylight Saving Time.
  * DST starts: 2nd Sunday of March at 2:00 AM
  * DST ends: 1st Sunday of November at 2:00 AM
@@ -1396,9 +1540,21 @@ async function checkSchedule() {
  * @param {Element} doc The container element
  */
 async function loadEager(doc) {
-  const locale = window.location.pathname.split('/')[2];
-  const language = locale ? locale.split('_')[0] : 'en';
-  document.documentElement.lang = language;
+  registerErrorLogging();
+  const { locale, language } = getLocaleAndLanguage();
+  document.documentElement.lang = language ? language.split('_')[0] : 'en';
+
+  // Dev/staging hosts: edge checkout enabled for all locales.
+  // Production: edge checkout enabled only for locale+language pairs in EDGE_CHECKOUT_LOCALES.
+  window.useEdgeCheckout = isEdgeHost || EDGE_CHECKOUT_LOCALES.includes(`${locale}/${language}`);
+  if (localStorage.getItem('useEdgeCheckout') !== null) {
+    window.useEdgeCheckout = localStorage.getItem('useEdgeCheckout') === 'true';
+  }
+  // ?cart=magento or ?cart=edge overrides all other settings (useful for testing)
+  const cartModeParam = new URLSearchParams(window.location.search).get('cart');
+  if (cartModeParam !== null) {
+    window.useEdgeCheckout = cartModeParam !== 'magento';
+  }
 
   /* simulation date */
   const params = new URLSearchParams(window.location.search);
@@ -1450,11 +1606,12 @@ async function loadEager(doc) {
   const main = doc.querySelector('main');
   if (main) {
     decorateMain(main);
-    /* adjust shop images to locale root path, util all of shop is mapped */
-    if (window.location.pathname.includes('/shop/')
-      || window.location.pathname.includes('/foundation/')
-      || window.location.pathname.includes('/commercial/')
-      || window.location.pathname.includes('/catalog/product_compare/')) {
+    /* adjust images to locale root path, can be removed once migration is complete */
+    const innerPath = window.location.pathname.substring(9);
+    if (innerPath.startsWith('/shop/')
+      || innerPath.startsWith('/foundation/')
+      || innerPath.startsWith('/commercial/')
+      || innerPath.startsWith('/catalog/product_compare/')) {
       const images = doc.querySelectorAll('img[src*="/media_"]');
       images.forEach((img) => {
         img.setAttribute('src', `/us/en_us/media_${img.getAttribute('src').split('/media_').pop()}`);
@@ -1493,6 +1650,11 @@ async function loadLazy(doc) {
   const main = doc.querySelector('main');
   loadHeader(doc.querySelector('header'));
   await loadSections(main);
+
+  // Gift-with-purchase: kick off once the cart (initialised in eager phase)
+  // is known. The module wires its own cart:change listener and handles
+  // the pageload-cart-has-items case internally.
+  import('./gift-with-purchase.js').then(({ initGWP }) => initGWP());
 
   const { hash } = window.location;
   const element = hash ? doc.getElementById(hash.substring(1)) : false;
@@ -1534,11 +1696,18 @@ async function loadLazy(doc) {
   }
 }
 
+function decorateInternalLinks() {
+  const internalLinks = document.querySelectorAll('a[href^="https://www.vitamix.com/"]');
+  internalLinks.forEach((link) => {
+    link.href = link.href.replace('https://www.vitamix.com', window.location.origin);
+  });
+}
+
 function decorateExternalLinks() {
   const externalLinks = document.querySelectorAll('a[href^="https://"]');
   externalLinks.forEach((link) => {
-    const { hostname } = new URL(link.href);
-    if (!link.href.includes('vitamix') || hostname === 'localhost') {
+    const { hostname: linkHostname } = new URL(link.href);
+    if (!link.href.includes('vitamix') || linkHostname === 'localhost') {
       link.setAttribute('target', '_blank');
       link.setAttribute('rel', 'noopener');
     }
@@ -1587,6 +1756,16 @@ async function loadDelayed() {
     console.error('Error loading link checker', e);
   }
 
+  const { default: injectForterSnippet } = await import('./forter-snippet.js');
+  injectForterSnippet();
+
+  document.addEventListener('ftr:tokenReady', (evt) => {
+    const token = evt.detail;
+    try {
+      sessionStorage.setItem('forter_token', token);
+    } catch { /* ignore */ }
+  });
+
   const initContentScore = async () => {
     const CONTENT_SCORE = 'https://tools.aem.live/tools/content-score/src/scripts.js';
     const { init } = await import(CONTENT_SCORE);
@@ -1598,6 +1777,13 @@ async function loadDelayed() {
   if (sk) initContentScore();
   else {
     document.addEventListener('sidekick-ready', initContentScore, { once: true });
+  }
+
+  if (
+    window.location.hostname === 'localhost'
+    || (window.location.hostname.endsWith('.vitamix.com') && window.location.hostname !== 'www.vitamix.com')
+  ) {
+    setTimeout(decorateInternalLinks, 1000);
   }
 
   setTimeout(decorateExternalLinks, 1000);

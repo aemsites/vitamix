@@ -151,3 +151,36 @@ export async function waitForElement(page, selector, timeout = 10000) {
   await page.waitForSelector(selector, { timeout });
   console.log(`✓ Element found: ${selector}`);
 }
+
+/**
+ * Wait for the add-to-cart button AND for the header to finish async decoration
+ * (nav-fragment fetch). Uses Promise.all so both waits run concurrently — no
+ * extra delay when the CDN is warm. Without this, clicking ATC before the
+ * header finishes decorating means pdp:add-to-cart and cart:change events fire
+ * before their listeners are registered.
+ * @param {import('@playwright/test').Page} page - Playwright page object
+ */
+export async function waitForAddToCartButton(page) {
+  await Promise.all([
+    page.waitForSelector('.quantity-container button', { timeout: 30000 }),
+    page.waitForSelector('header a[href*="/order/cart"]', { timeout: 30000 }),
+  ]);
+  console.log('✓ Add-to-cart button ready');
+}
+
+/**
+ * Suppress side-effecting integrations for branch-preview test runs.
+ *
+ * The init script handles branches that include test-mode support, while the
+ * route guard protects tests that run against older branch-preview code before
+ * the guard is deployed.
+ * @param {import('@playwright/test').Page} page - Playwright page object
+ */
+export async function setupTestMode(page) {
+  await page.addInitScript(() => {
+    window.IS_TEST_MODE = true;
+    localStorage.setItem('vitamix.priceRules.stub', JSON.stringify({ promotions: [] }));
+  });
+
+  await page.route('**/us/en_us/products/operations-log', (route) => route.fulfill({ status: 204, body: '' }));
+}

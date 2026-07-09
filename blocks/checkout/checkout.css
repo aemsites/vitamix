@@ -1,0 +1,1383 @@
+/* Constrain the combined form + order summary to the commerce max-width */
+main > .section:has(.checkout-wrapper) {
+  max-width: var(--commerce-max-width);
+  margin-right: auto;
+  margin-left: auto;
+  gap: 24px;
+  isolation: isolate;
+}
+
+/* Stack section cards with spacing */
+.checkout-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Sign-in prompt — not a card, just a small text link above */
+.checkout-signin-prompt {
+  padding: 0 0 4px;
+  font-size: var(--commerce-font-size-sm);
+}
+
+.checkout-signin-link {
+  color: var(--commerce-color-text);
+  text-decoration: underline;
+}
+
+/* ── Section cards — each section is a white bordered card ──────── */
+.checkout-form .form-section {
+  background: var(--commerce-color-background);
+  border: 1px solid var(--commerce-color-border);
+  border-radius: var(--commerce-radius-card);
+  padding: 20px 24px;
+}
+
+/* Fieldset sections inherit card styling */
+.checkout-form fieldset.form-section {
+  margin: 0;
+}
+
+.checkout-form .form-section h3 {
+  margin: 0 0 16px;
+  font-size: var(--commerce-font-size-base);
+  font-weight: var(--commerce-font-weight-bold);
+}
+
+.checkout-form fieldset.form-section legend {
+  float: left;
+  grid-column: 1 / -1;
+  width: 100%;
+  padding: 0;
+  margin-bottom: 16px;
+  font-size: var(--commerce-font-size-base);
+  font-weight: var(--commerce-font-weight-bold);
+}
+
+/* Clearfix for fieldset legend float */
+.checkout-form fieldset.form-section::after {
+  content: '';
+  display: block;
+  clear: both;
+}
+
+/* Express checkout — card panel */
+.checkout-form .express-checkout-section {
+  background: var(--commerce-color-surface);
+}
+
+.checkout-form .express-checkout-section[hidden] {
+  display: none;
+}
+
+/* Billing section — card with radio options */
+
+/* ── Express checkout ─────────────────────────────────────────────── */
+.express-checkout-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.express-checkout-label {
+  margin: 0;
+  font-size: var(--commerce-font-size-base);
+  font-weight: var(--commerce-font-weight-bold);
+}
+
+.express-checkout-tagline {
+  margin: 0;
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-text-muted);
+}
+
+.express-checkout-buttons {
+  container-type: inline-size;
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: 12px;
+  overflow: hidden;
+  max-width: 100%;
+}
+
+/* Base (narrow / mobile): every button stacked full-width. PayPal SDK iframes
+   have a minimum width, so two columns would overflow in a tight container.
+   div covers SDK iframes, button covers stubs. */
+.express-checkout-buttons > .paypal-paypal-wrapper,
+.express-checkout-buttons > .paypal-paylater-wrapper,
+.express-checkout-buttons > div,
+.express-checkout-buttons > button {
+  flex: 0 0 100%;
+  min-width: 0;
+  display: flex;
+  height: 55px;
+}
+
+/* Tablet (>=420px): PayPal + Pay Later become two columns. Apple Pay stays on
+   its own full-width row above them (see apple-pay-button rule below). */
+@container (min-width: 420px) {
+  .express-checkout-buttons > .paypal-paypal-wrapper,
+  .express-checkout-buttons > .paypal-paylater-wrapper,
+  .express-checkout-buttons > div,
+  .express-checkout-buttons > button {
+    flex: 1 1 0;
+  }
+}
+
+/* Stub PayPal / Pay Later buttons fill their wrapper. */
+.paypal-paypal-wrapper .paypal-express-btn,
+.paypal-paylater-wrapper .paypal-express-btn {
+  height: 55px;
+}
+
+.express-checkout-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0 0;
+  padding-top: 14px;
+  font-size: 11px;
+  font-weight: var(--commerce-font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--commerce-color-text-muted);
+  white-space: nowrap;
+}
+
+.express-checkout-divider::before,
+.express-checkout-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--commerce-color-border);
+}
+
+/* ── Field grid ───────────────────────────────────────────────────── */
+.form-fields {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+}
+
+.form-field {
+  grid-column: 1 / -1;
+}
+
+.form-field.field-half {
+  grid-column: span 3;
+}
+
+.form-field.field-third {
+  grid-column: span 2;
+}
+
+/* ── Floating labels — checkbox first (lower specificity than :has() below) ── */
+.form-field-checkbox label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: var(--commerce-font-size-sm);
+}
+
+.form-field-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.floating-label-field {
+  position: relative;
+}
+
+.floating-label-field input,
+.floating-label-field select,
+.floating-label-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 20px 14px 4px;
+  height: var(--commerce-input-height);
+  border: 1px solid var(--commerce-input-border);
+  border-radius: var(--commerce-input-radius);
+  background: var(--commerce-input-background);
+  font-size: var(--commerce-font-size-sm);
+  font-weight: 400;
+  font-family: inherit;
+  color: var(--commerce-color-text);
+  outline: none;
+  appearance: none;
+}
+
+.floating-label-field textarea {
+  height: auto;
+  padding-top: 24px;
+  resize: vertical;
+}
+
+.floating-label-field select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23666' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 36px;
+  cursor: pointer;
+}
+
+.floating-label-field input:focus,
+.floating-label-field select:focus,
+.floating-label-field textarea:focus {
+  border-color: var(--commerce-input-border-focus);
+}
+
+/* Suppress browser default red glow on empty required fields before validation */
+.floating-label-field input:invalid,
+.floating-label-field select:invalid,
+.floating-label-field textarea:invalid {
+  box-shadow: none;
+}
+
+.floating-label-field.has-error input,
+.floating-label-field.has-error select,
+.floating-label-field.has-error textarea {
+  border-color: var(--commerce-color-error, #c00);
+}
+
+.field-error {
+  display: block;
+  color: var(--commerce-color-error, #c00);
+  font-size: 0.7rem;
+  margin-top: 4px;
+}
+
+.floating-label-field input:-webkit-autofill,
+.floating-label-field input:-webkit-autofill:hover,
+.floating-label-field input:-webkit-autofill:focus {
+  box-shadow: 0 0 0 1000px var(--commerce-input-background) inset;
+  -webkit-text-fill-color: var(--commerce-color-text);
+}
+
+.floating-label-field select:-webkit-autofill,
+.floating-label-field select:-webkit-autofill:hover,
+.floating-label-field select:-webkit-autofill:focus {
+  background-color: var(--commerce-input-background);
+  color: var(--commerce-color-text);
+}
+
+.floating-label-field input[required] + label::after,
+.floating-label-field select[required] + label::after {
+  content: ' *';
+  color: var(--commerce-color-error, #c00);
+}
+
+.floating-label-field label {
+  position: absolute;
+  left: 14px;
+  top: 16px;
+  margin: 0;
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-text-muted);
+  pointer-events: none;
+  transition: top 0.15s ease, font-size 0.15s ease;
+}
+
+.floating-label-field:has(input:focus) label,
+.floating-label-field:has(input:not(:placeholder-shown)) label,
+.floating-label-field:has(select:focus) label,
+.floating-label-field:has(select.has-value) label,
+.floating-label-field:has(textarea:focus) label,
+.floating-label-field:has(textarea:not(:placeholder-shown)) label {
+  top: 8px;
+  font-size: 0.7rem;
+}
+
+/* ── Gift message panel ──────────────────────────────────────────── */
+.gift-message-wrapper {
+  margin-top: 12px;
+}
+
+/* Gift message char count */
+.char-count {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--commerce-color-text-muted);
+  text-align: right;
+  margin-top: 4px;
+}
+
+/* ── Shipping methods — horizontal card layout ───────────────────── */
+.shipping-methods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.checkout-form .shipping-methods:has(.shipping-methods-placeholder) {
+  padding-bottom: 20px;
+}
+
+.checkout-form .shipping-methods:has(.shipping-methods-placeholder) legend {
+  margin-bottom: 8px;
+}
+
+.shipping-methods.loading {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.shipping-method-option {
+  flex: 1 1 auto;
+  min-width: 150px;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--commerce-color-border);
+  border-radius: var(--commerce-radius-badge);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.shipping-method-option:hover {
+  border-color: var(--commerce-color-text);
+}
+
+.shipping-method-option:has(input:checked) {
+  border-color: var(--commerce-color-text);
+  background: var(--commerce-color-surface);
+}
+
+.shipping-method-option input[type="radio"] {
+  flex-shrink: 0;
+  margin: 2px 0 0;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--commerce-color-text);
+}
+
+.shipping-method-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.shipping-method-label {
+  font-size: var(--commerce-font-size-sm);
+  font-weight: var(--commerce-font-weight-bold);
+}
+
+.shipping-method-eta {
+  font-size: 12px;
+  color: var(--commerce-color-text-muted);
+}
+
+.shipping-method-price {
+  font-size: var(--commerce-font-size-sm);
+  font-weight: var(--commerce-font-weight-bold);
+}
+
+.shipping-method-price-free {
+  color: #2a7c43;
+}
+
+.shipping-methods-empty,
+.shipping-methods-placeholder {
+  color: var(--commerce-color-text-muted);
+  font-size: var(--commerce-font-size-sm);
+  font-style: italic;
+  margin-top: 4px;
+}
+
+/* ── Billing address ─────────────────────────────────────────────── */
+.billing-subtitle {
+  margin: 0 0 16px;
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-text-muted);
+}
+
+.billing-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.billing-option-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--commerce-color-border);
+  border-radius: var(--commerce-radius-card);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.billing-option-card:has(input:checked) {
+  border-color: var(--commerce-color-text);
+}
+
+.billing-option-card input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  flex-shrink: 0;
+  cursor: pointer;
+  accent-color: var(--commerce-color-text);
+}
+
+.billing-option-content {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.billing-option-label {
+  font-size: var(--commerce-font-size-sm);
+  font-weight: var(--commerce-font-weight-bold);
+}
+
+.billing-option-detail {
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-text-muted);
+}
+
+.billing-fields-wrapper {
+  margin-top: 20px;
+}
+
+/* ── Payment method ──────────────────────────────────────────────── */
+.payment-security-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  background: var(--commerce-color-surface);
+  border: 1px solid var(--commerce-color-border);
+  border-radius: var(--commerce-radius-card);
+}
+
+.payment-security-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  background: #e8e8e8;
+  border-radius: 8px;
+  color: var(--commerce-color-text-muted);
+}
+
+.payment-security-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--commerce-font-size-sm);
+}
+
+.payment-security-text strong {
+  color: var(--commerce-color-text);
+  font-weight: var(--commerce-font-weight-bold);
+}
+
+.payment-security-text span {
+  color: var(--commerce-color-text-muted);
+}
+
+.payment-how-label {
+  margin: 0 0 12px;
+  font-size: 11px;
+  font-weight: var(--commerce-font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--commerce-color-text-muted);
+}
+
+.payment-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.payment-option-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--commerce-color-border);
+  border-radius: var(--commerce-radius-card);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.payment-option-card:hover {
+  border-color: var(--commerce-color-text-muted);
+}
+
+.payment-option-card.payment-option-active {
+  border-color: var(--commerce-color-text);
+}
+
+.payment-option-card input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  flex-shrink: 0;
+  cursor: pointer;
+  accent-color: var(--commerce-color-text);
+}
+
+/* Restore focus ring on radio buttons — global outline:0 on input:focus suppresses it */
+.shipping-method-option input[type="radio"]:focus-visible,
+.billing-option-card input[type="radio"]:focus-visible,
+.payment-option-card input[type="radio"]:focus-visible {
+  outline: 2px solid var(--commerce-color-text);
+  outline-offset: 2px;
+}
+
+.payment-option-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  color: var(--commerce-color-text-muted);
+}
+
+.payment-icon-pp {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 14px;
+  font-weight: bold;
+  line-height: 1;
+}
+
+.payment-icon-text {
+  font-size: 12px;
+  font-weight: var(--commerce-font-weight-bold);
+  color: var(--commerce-color-text-muted);
+}
+
+.payment-option-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.payment-option-label {
+  font-size: var(--commerce-font-size-sm);
+  font-weight: var(--commerce-font-weight-bold);
+  color: var(--commerce-color-text);
+}
+
+.payment-option-sublabel {
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-text-muted);
+}
+
+.payment-option-badges {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.card-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 5px;
+  border: 1px solid var(--commerce-color-border);
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: var(--commerce-font-weight-bold);
+  color: var(--commerce-color-text-muted);
+  letter-spacing: 0.02em;
+}
+
+.payment-button-container {
+  display: none;
+}
+
+/* PayPal stub buttons */
+.paypal-btn,
+.paypal-express-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  height: 55px;
+  overflow: hidden;
+  background: #ffc439;
+  border: none;
+  border-radius: var(--commerce-button-radius);
+  cursor: pointer;
+  transition: background 0.15s;
+  box-sizing: border-box;
+}
+
+.pp-wordmark {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 20px;
+  font-weight: bold;
+  line-height: 1;
+}
+
+.pp-pay { color: #003087; }
+
+.pp-pal { color: #009cde; }
+
+.pp-later {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 13px;
+  font-weight: bold;
+  color: #003087;
+  margin-left: 6px;
+}
+
+.paypal-btn:hover,
+.paypal-express-btn:hover {
+  background: #f0b929;
+}
+
+.paypal-btn:disabled,
+.paypal-express-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  font-size: var(--commerce-font-size-sm);
+  color: #003087;
+}
+
+.paylater-btn,
+.paylater-express-btn {
+  background: #e8f4fb;
+  border: 1px solid #b0d8f0;
+}
+
+.paylater-btn:hover,
+.paylater-express-btn:hover {
+  background: #d0eaf7;
+}
+
+/* Not-configured dialog */
+.paypal-not-configured-dialog {
+  border: 1px solid var(--commerce-color-border);
+  border-radius: var(--commerce-radius-card);
+  padding: var(--commerce-card-padding);
+  min-width: 280px;
+  text-align: center;
+}
+
+.paypal-not-configured-dialog p {
+  margin: 0 0 16px;
+  font-size: var(--commerce-font-size-sm);
+}
+
+.paypal-not-configured-dialog::backdrop {
+  background: rgb(0 0 0 / 40%);
+}
+
+/* Apple Pay */
+apple-pay-button {
+  /* In the express-checkout row Apple Pay takes its own full-width row on top
+     at narrow/tablet widths, leaving PayPal + Pay Later to share the row below.
+     On desktop it joins the single row (see container query below). */
+  flex: 0 0 100%;
+
+  --apple-pay-button-width: 100%;
+  --apple-pay-button-height: 55px;
+  --apple-pay-button-border-radius: var(--commerce-button-radius);
+  --apple-pay-button-padding: 0;
+
+  min-width: 0;
+  display: block;
+}
+
+/* Desktop (>=620px): Apple Pay joins the row so all three express buttons sit
+   side by side. Keyed to the bare selector (placed after the base rule) to
+   avoid a descending-specificity conflict with it. */
+@container (min-width: 620px) {
+  apple-pay-button {
+    flex: 1 1 0;
+  }
+}
+
+
+/* ── Order total breakdown (mobile only) ─────────────────────────── */
+.order-total-breakdown {
+  display: none;
+}
+
+.order-breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-text-muted);
+}
+
+/* ── Order total + submit ─────────────────────────────────────────── */
+.order-total-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.order-total-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.order-total-label {
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-text-muted);
+}
+
+.order-total-amount {
+  font-size: 28px;
+  font-weight: var(--commerce-font-weight-bold);
+  color: var(--commerce-color-text);
+  line-height: 1.1;
+}
+
+.order-total-tnc {
+  margin: 0;
+  font-size: 11px;
+  color: var(--commerce-color-text-muted);
+}
+
+button.checkout-submit-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  padding: 14px 24px;
+  font-size: var(--commerce-font-size-base);
+}
+
+.submit-lock-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.checkout-submit-btn:disabled {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.checkout-submit-btn.is-loading .submit-lock-icon svg {
+  display: none;
+}
+
+.checkout-submit-btn.is-loading .submit-lock-icon::after {
+  content: '';
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgb(255 255 255 / 40%);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: submit-btn-spin 0.7s linear infinite;
+}
+
+@keyframes submit-btn-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (width < 1000px) {
+  .payment-option-card {
+    display: grid;
+    grid-template-columns: 18px 40px 1fr;
+    align-items: center;
+    gap: 6px 12px;
+  }
+
+  .payment-option-card input[type="radio"] {
+    grid-column: 1;
+  }
+
+  .payment-option-icon {
+    grid-column: 2;
+  }
+
+  .payment-option-content {
+    grid-column: 3;
+  }
+
+  .payment-option-badges {
+    grid-column: 3;
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .order-total-breakdown {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 12px 0;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--commerce-color-border);
+    position: relative;
+  }
+
+  .order-total-breakdown.loading {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+
+  .order-total-breakdown.loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid var(--commerce-color-border);
+    border-top-color: var(--commerce-color-text);
+    border-radius: 50%;
+    animation: order-breakdown-spin 0.7s linear infinite;
+  }
+
+  @keyframes order-breakdown-spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .order-total-amount {
+    text-align: right;
+    padding-bottom: 8px;
+  }
+
+  /* Single-column layout: the breakdown rows are shown, so stack the total
+     above a full-width button (matches the mobile experience). */
+  .order-total-section {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  button.checkout-submit-btn {
+    justify-content: center;
+    width: 100%;
+  }
+}
+
+/* Two-column layout (viewport >= 1000px) where the checkout column itself is
+   narrow (e.g. tablet landscape): stack so the long submit button doesn't
+   overlap the total. */
+@container checkout-col (width < 600px) {
+  .order-total-section {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  button.checkout-submit-btn {
+    justify-content: center;
+    width: 100%;
+  }
+}
+
+/* ── Error ───────────────────────────────────────────────────────── */
+.checkout-error {
+  background: var(--commerce-color-error-bg);
+  border: 1px solid var(--commerce-color-error-border);
+  border-radius: var(--commerce-radius-badge);
+  color: var(--commerce-color-error);
+  font-size: var(--commerce-font-size-sm);
+  margin-top: 4px;
+  padding: 12px 16px;
+}
+
+.checkout-error[hidden] {
+  display: none;
+}
+
+/* ── Empty cart ──────────────────────────────────────────────────── */
+.checkout-empty {
+  text-align: center;
+  padding: 80px 24px;
+}
+
+.checkout-empty h2 {
+  margin: 0 0 8px;
+}
+
+.checkout-empty p {
+  margin: 0 0 24px;
+  color: var(--commerce-color-text-muted);
+}
+
+/* ── Section collapse ────────────────────────────────────────────── */
+.form-section.is-collapsed > :not(.section-collapsed-bar) {
+  display: none;
+}
+
+.section-collapsed-bar:not([hidden]) {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.section-check {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.section-summary-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.section-summary-title {
+  font-size: var(--commerce-font-size-base);
+  font-weight: var(--commerce-font-weight-bold);
+  color: var(--commerce-color-text);
+}
+
+.section-summary-detail {
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.section-edit-btn {
+  background: none;
+  border: none;
+  padding: 4px 0;
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-text-muted);
+  cursor: pointer;
+  text-decoration: underline;
+  flex-shrink: 0;
+}
+
+.section-edit-btn:hover {
+  color: var(--commerce-color-text);
+}
+
+/* ── Places autocomplete ─────────────────────────────────────────── */
+.places-autocomplete-wrapper {
+  position: relative;
+}
+
+/* Suppress search-input browser chrome added when we set type="search" */
+.places-autocomplete-wrapper input[type="search"]::-webkit-search-decoration,
+.places-autocomplete-wrapper input[type="search"]::-webkit-search-cancel-button,
+.places-autocomplete-wrapper input[type="search"]::-webkit-search-results-button,
+.places-autocomplete-wrapper input[type="search"]::-webkit-search-results-decoration {
+  display: none;
+}
+
+.places-autocomplete-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 100;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  background: var(--commerce-color-background);
+  border: 1px solid var(--commerce-color-border);
+  border-radius: var(--commerce-radius-card);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 10%);
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.places-autocomplete-dropdown li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: var(--commerce-font-size-sm);
+}
+
+.places-autocomplete-dropdown li:hover {
+  background: var(--commerce-color-surface-alt, #f5f5f5);
+}
+
+.places-main {
+  color: var(--commerce-color-text);
+  font-weight: var(--commerce-font-weight-medium, 500);
+}
+
+.places-secondary {
+  color: var(--commerce-color-text-muted);
+  font-size: 0.75rem;
+}
+
+/* stylelint-disable no-descending-specificity */
+
+/* ── Address validation dialog ──────────────────────────────────── */
+.address-validation-dialog {
+  --dialog-accent: var(--color-link, var(--commerce-color-primary));
+  --dialog-accent-hover: var(--color-link-hover, var(--commerce-color-primary-hover));
+
+  border: none;
+  border-radius: 16px;
+  padding: 28px;
+  max-width: 560px;
+  width: calc(100% - 32px);
+  box-shadow: 0 24px 64px rgb(0 0 0 / 18%);
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0;
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+}
+
+.address-validation-dialog::backdrop {
+  background: rgb(0 0 0 / 45%);
+}
+
+.address-validation-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 28px;
+  height: 28px;
+  padding: 4px;
+  background: none;
+  border: none;
+  border-radius: 50%;
+  color: var(--commerce-color-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.address-validation-close:hover {
+  background: var(--commerce-color-surface);
+  color: var(--commerce-color-text);
+}
+
+.address-validation-close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.address-validation-header {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  margin-bottom: 18px;
+  padding-right: 32px;
+}
+
+.address-validation-icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--dialog-accent) 15%, white);
+  color: var(--dialog-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.address-validation-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.address-validation-title-group {
+  flex: 1;
+  min-width: 0;
+}
+
+.address-validation-eyebrow {
+  font-size: 11px;
+  font-weight: var(--commerce-font-weight-bold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--commerce-color-text-muted);
+  margin-bottom: 4px;
+}
+
+.address-validation-heading {
+  font-size: 22px;
+  font-weight: var(--commerce-font-weight-bold);
+  line-height: 1.25;
+  margin: 0 0 6px;
+  color: var(--commerce-color-text);
+}
+
+.address-validation-subtitle {
+  font-size: var(--commerce-font-size-sm);
+  line-height: 1.45;
+  color: var(--commerce-color-text-muted);
+  margin: 0;
+}
+
+.address-validation-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* Address comparison cards (CONFIRM) */
+.address-validation-comparison {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.address-card {
+  background: var(--commerce-color-surface);
+  border: 1px solid var(--commerce-color-border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  position: relative;
+}
+
+.address-card-entered {
+  background: var(--commerce-color-surface);
+}
+
+.address-card-suggested {
+  background: color-mix(in srgb, var(--dialog-accent) 8%, white);
+  border-color: color-mix(in srgb, var(--dialog-accent) 30%, white);
+}
+
+.address-card-badge {
+  position: absolute;
+  top: -10px;
+  left: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--dialog-accent);
+  color: var(--commerce-color-primary-text);
+  font-size: 10px;
+  font-weight: var(--commerce-font-weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: 999px;
+}
+
+.address-card-badge-icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.address-card-badge-icon svg {
+  width: 10px;
+  height: 10px;
+}
+
+.address-card-label {
+  font-size: 10px;
+  font-weight: var(--commerce-font-weight-bold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--commerce-color-text-muted);
+  margin-bottom: 6px;
+}
+
+.address-card-suggested .address-card-label {
+  color: color-mix(in srgb, var(--dialog-accent) 80%, black);
+  margin-top: 6px;
+}
+
+.address-card-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.address-line {
+  font-size: var(--commerce-font-size-sm);
+  line-height: 1.45;
+  color: var(--commerce-color-text);
+}
+
+.address-line-changed {
+  background: color-mix(in srgb, var(--dialog-accent) 22%, white);
+  border-radius: 3px;
+  padding: 0 4px;
+  margin: 0 -4px;
+  align-self: flex-start;
+  font-weight: var(--commerce-font-weight-bold);
+}
+
+/* Display-only address card (unit dialog) */
+.address-card-display {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.address-card-pin {
+  flex-shrink: 0;
+  color: var(--commerce-color-text-muted);
+  display: inline-flex;
+}
+
+.address-card-pin svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Unit input (CONFIRM_ADD_SUBPREMISES) */
+.address-unit-input {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.address-unit-label {
+  font-size: var(--commerce-font-size-sm);
+  font-weight: var(--commerce-font-weight-bold);
+  color: var(--commerce-color-text);
+}
+
+.address-unit-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.address-unit-input-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--commerce-color-text-muted);
+  display: inline-flex;
+  pointer-events: none;
+}
+
+.address-unit-input-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.address-unit-input-field {
+  width: 100%;
+  padding: 10px 12px 10px 36px;
+  font-size: var(--commerce-font-size-sm);
+  background: var(--commerce-color-background);
+  border: 1px solid var(--commerce-color-border);
+  border-radius: 10px;
+  color: var(--commerce-color-text);
+  font-family: inherit;
+}
+
+.address-unit-input-field:focus {
+  outline: none;
+  border-color: var(--dialog-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dialog-accent) 18%, transparent);
+}
+
+/* Action buttons — use Vitamix's .button + .emphasis with dialog-specific overrides */
+.address-validation-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.address-validation-actions button.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 18px;
+  font-size: var(--commerce-font-size-sm);
+  font-weight: var(--commerce-font-weight-bold);
+  text-transform: none;
+  border-radius: 10px;
+}
+
+/* Primary filled button — uses Vitamix's brand link color */
+.address-validation-actions button.button.emphasis {
+  background-color: var(--dialog-accent);
+  border-color: var(--dialog-accent);
+  color: var(--commerce-color-primary-text);
+}
+
+.address-validation-actions button.button.emphasis:hover:not(:disabled),
+.address-validation-actions button.button.emphasis:focus:not(:disabled) {
+  background-color: var(--dialog-accent-hover);
+  border-color: var(--dialog-accent-hover);
+}
+
+.address-validation-actions button.button.emphasis:disabled,
+.address-validation-actions button.button.emphasis:disabled:hover {
+  background-color: color-mix(in srgb, var(--dialog-accent) 35%, white);
+  border-color: color-mix(in srgb, var(--dialog-accent) 35%, white);
+  color: #fff;
+  cursor: not-allowed;
+}
+
+.address-validation-btn-icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.address-validation-btn-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Side-by-side layout on wider screens */
+@media (width >= 480px) {
+  .address-validation-comparison {
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+
+  .address-validation-actions {
+    flex-direction: row;
+    gap: 12px;
+  }
+
+  .address-validation-actions .button {
+    flex: 1;
+  }
+}
+
+.address-validation-error {
+  margin-top: 8px;
+}
+
+/* ── Mobile ──────────────────────────────────────────────────────── */
+@media (width < 480px) {
+  .form-field.field-half,
+  .form-field.field-third {
+    grid-column: 1 / -1;
+  }
+
+  .shipping-methods {
+    grid-template-columns: 1fr;
+  }
+
+  .checkout-form .form-section {
+    padding: 16px;
+  }
+
+}

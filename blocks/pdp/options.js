@@ -134,10 +134,15 @@ export function onOptionChange(ph, block, variants, color, isParentOutOfStock = 
 
   window.selectedVariant = variant;
 
-  // update add to cart
+  // update add to cart, preserving the user's current quantity selection
+  const currentQty = block.querySelector('.quantity-container select')?.value;
   const addToCartContainer = renderAddToCart(ph, block, window.jsonLdData);
   if (addToCartContainer) {
     block.querySelector('.add-to-cart').replaceWith(addToCartContainer);
+    if (currentQty) {
+      const newQtySelect = addToCartContainer.querySelector('.quantity-container select');
+      if (newQtySelect) newQtySelect.value = currentQty;
+    }
   }
 }
 

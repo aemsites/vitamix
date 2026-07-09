@@ -1,6 +1,22 @@
 import { getMetadata, toClassName } from '../../scripts/aem.js';
-import { swapIcons, getCookies } from '../../scripts/scripts.js';
+import { swapIcons, getCookies, getOrderPath } from '../../scripts/scripts.js';
 import { loadFragment } from '../fragment/fragment.js';
+import { AUTH_EVENT, getUser, isLoggedIn } from '../../scripts/auth-api.js';
+import {
+  addMagentoCacheListener, getLoggedInFromLocalStorage, getMagentoCache,
+} from '../../scripts/storage/util.js';
+import { lockBodyScroll, unlockBodyScroll } from '../../scripts/body-scroll-lock.js';
+
+/** True when OTP JWT or legacy Magento customer cache indicates signed in. */
+function isHeaderAuthSessionActive() {
+  try {
+    return isLoggedIn() || getLoggedInFromLocalStorage();
+  } catch {
+    return false;
+  }
+}
+
+const EDGE_CART_PATH = () => getOrderPath('cart');
 
 // media query match that indicates desktop width
 const isDesktop = window.matchMedia('(width >= 1000px)');
@@ -464,16 +480,313 @@ export default async function decorate(block) {
     }
   }
 
-  const customer = cookies.vitamix_customer;
-  if (customer) {
-    const account = block.querySelector('.icon-account').parentElement;
-    account.lastChild.textContent = `${customer}'s Account`;
+  const accountLink = block.querySelector('.icon-account').parentElement;
+  const defaultAccountLabel = (accountLink?.lastChild?.textContent ?? '').trim();
+
+  /**
+   * Account link label: fragment default when signed out; cookie name, OTP email local-part,
+   * or Magento customer firstname when signed in (same "'s Account" pattern as legacy cookie).
+   */
+  const resolveAccountLinkLabel = (signedIn) => {
+    const cookieName = getCookies().vitamix_customer;
+    if (!signedIn) {
+      if (cookieName) return `${cookieName}'s Account`;
+      return defaultAccountLabel;
+    }
+    if (cookieName) return `${cookieName}'s Account`;
+    if (isLoggedIn()) {
+      const email = getUser()?.email;
+      if (email) {
+        const local = email.split('@')[0];
+        return `${local}'s Account`;
+      }
+    }
+    if (getLoggedInFromLocalStorage()) {
+      const first = getMagentoCache().customer?.firstname;
+      if (first) return `${first}'s Account`;
+    }
+    return defaultAccountLabel;
+  };
+
+  // --- Auth state display (all pages): OTP session and/or legacy Magento customer cache ---
+
+  const syncHeaderAuthDisplay = () => {
+    const combined = isHeaderAuthSessionActive();
+    accountLink.classList.toggle('is-logged-in', combined);
+    if (accountLink.lastChild) {
+      accountLink.lastChild.textContent = resolveAccountLinkLabel(combined);
+    }
+  };
+
+  document.addEventListener(AUTH_EVENT, syncHeaderAuthDisplay);
+  addMagentoCacheListener(syncHeaderAuthDisplay);
+  syncHeaderAuthDisplay();
+
+  // --- Auth panel + OTP account drawer (edge checkout mode only) ---
+  if (window.useEdgeCheckout) {
+    let authPanel = null;
+    const ensureAuthPanel = async () => {
+      if (authPanel) return authPanel;
+      const { default: createAuthPanel } = await import('./auth-panel.js');
+      authPanel = createAuthPanel();
+      block.append(authPanel.dialog);
+      return authPanel;
+    };
+
+    /** @type {HTMLDialogElement | null} */
+    let accountMgmtDialog = null;
+    const ensureAccountManagementModal = async () => {
+      if (accountMgmtDialog) return accountMgmtDialog;
+      const base = window.hlx?.codeBasePath || '';
+      const htmlResp = await fetch(`${base}/widgets/account/account.html`);
+      const html = await htmlResp.text();
+
+      accountMgmtDialog = document.createElement('dialog');
+      accountMgmtDialog.id = 'account-management';
+      accountMgmtDialog.className = 'minicart account-management';
+      accountMgmtDialog.setAttribute('aria-expanded', 'false');
+      block.append(accountMgmtDialog);
+
+      const headerRow = document.createElement('div');
+      headerRow.className = 'slide-panel-header';
+      const accountTitle = document.createElement('h2');
+      accountTitle.textContent = 'Account';
+      const accountClose = document.createElement('button');
+      accountClose.className = 'slide-panel-close';
+      accountClose.textContent = '\u00D7';
+      accountClose.setAttribute('aria-label', 'Close');
+      headerRow.append(accountTitle, accountClose);
+
+      const bodyHost = document.createElement('div');
+      bodyHost.innerHTML = html.trim();
+      const widgetRoot = bodyHost.firstElementChild;
+      if (!widgetRoot) {
+        accountMgmtDialog.remove();
+        accountMgmtDialog = null;
+        throw new Error('account widget HTML missing root');
+      }
+      accountMgmtDialog.append(headerRow, widgetRoot);
+
+      accountClose.addEventListener('click', () => {
+        accountMgmtDialog.closeModal();
+      });
+
+      accountMgmtDialog.addEventListener('click', (event) => {
+        const rect = accountMgmtDialog.getBoundingClientRect();
+        const inside = rect.top <= event.clientY
+          && event.clientY <= rect.top + rect.height
+          && rect.left <= event.clientX
+          && event.clientX <= rect.left + rect.width;
+        if (!inside) accountMgmtDialog.closeModal();
+      });
+
+      accountMgmtDialog.addEventListener('close', () => {
+        unlockBodyScroll();
+      });
+
+      const open = () => {
+        lockBodyScroll();
+        accountMgmtDialog.showModal();
+        accountMgmtDialog.setAttribute('aria-expanded', 'true');
+      };
+      accountMgmtDialog.openModal = open;
+
+      const close = () => {
+        accountMgmtDialog.setAttribute('aria-expanded', 'false');
+        setTimeout(() => {
+          accountMgmtDialog.close();
+        }, 300);
+      };
+      accountMgmtDialog.closeModal = close;
+
+      const { default: decorateAccount } = await import(`${base}/widgets/account/account.js`);
+      await decorateAccount(widgetRoot);
+
+      return accountMgmtDialog;
+    };
+
+    accountLink.addEventListener('click', async (e) => {
+      if (!isHeaderAuthSessionActive()) {
+        e.preventDefault();
+        const panel = await ensureAuthPanel();
+        panel.showEmailStep();
+        panel.open();
+        return;
+      }
+      if (isLoggedIn()) {
+        e.preventDefault();
+        try {
+          const dlg = await ensureAccountManagementModal();
+          dlg.openModal();
+        } catch {
+          /* fall through to default navigation */
+        }
+      }
+      /* Legacy Magento session only: follow account href */
+    });
   }
 
-  const cartItems = cookies.cart_items_count;
-  if (cartItems && +cartItems > 0) {
-    const cart = block.querySelector('.icon-cart').parentElement;
-    cart.dataset.cartItems = cartItems;
-    cart.lastChild.textContent = `Cart (${cartItems})`;
+  const cartLink = block.querySelector('.icon-cart').parentElement;
+
+  // Read item count from locale-specific localStorage key (same logic as Cart.STORAGE_KEY)
+  // to avoid stale domain-wide cookie when switching between locales (e.g. CA → US).
+  // Mirrors `cart.visibleItemCount`: skips entries flagged invisible via `local.showInCart`
+  // so hidden add-ons (e.g. paired warranties) don't inflate the header badge.
+  const getStoredCartCount = () => {
+    try {
+      const locale = window.location.pathname.split('/')[1] || 'default';
+      const key = `cart:${locale === 'drafts' ? 'ca' : locale}`;
+      const stored = localStorage.getItem(key);
+      if (!stored) return 0;
+      const parsed = JSON.parse(stored);
+      return (parsed.items || []).reduce(
+        (acc, item) => (item.local?.showInCart === false ? acc : acc + item.quantity),
+        0,
+      );
+    } catch {
+      return 0;
+    }
+  };
+
+  const initialCount = getStoredCartCount();
+  if (initialCount > 0) {
+    cartLink.dataset.cartItems = initialCount;
+    cartLink.lastChild.textContent = `Cart (${initialCount})`;
   }
+
+  // update cart qty bubble on change
+  document.addEventListener('cart:change', (e) => {
+    const count = e.detail.cart.visibleItemCount;
+    if (count > 0) {
+      cartLink.dataset.cartItems = count;
+      cartLink.lastChild.textContent = `Cart (${count})`;
+    } else {
+      delete cartLink.dataset.cartItems;
+      cartLink.lastChild.textContent = 'Cart';
+    }
+  });
+
+  // change to edge cart link
+  if (window.useEdgeCheckout) {
+    cartLink.href = EDGE_CART_PATH();
+  }
+
+  const openOrRedirect = async (e) => {
+    // if already on cart page, do nothing
+    if (window.location.pathname.includes(EDGE_CART_PATH())) {
+      return;
+    }
+
+    // if on mobile or not using edge checkout, redirect to cart page
+    if (!window.useEdgeCheckout || window.innerWidth < 900) {
+      return;
+    }
+
+    // on desktop, open minicart popover
+    if (e) {
+      e.preventDefault();
+    }
+    /** @type {HTMLDialogElement} */
+    let minicart = document.querySelector('#minicart');
+
+    const scrollToItem = () => {
+      if (!e.detail?.item?.sku) return;
+      setTimeout(() => {
+        minicart.querySelector(`.cart-item-${e.detail.item.sku}`)?.scrollIntoView({ behavior: 'smooth' });
+      }, 300);
+    };
+
+    if (minicart) {
+      minicart.openModal();
+      scrollToItem();
+      return;
+    }
+
+    try {
+      const { default: decorateCart } = await import('../cart/cart.js');
+      minicart = document.createElement('dialog');
+      minicart.id = 'minicart';
+      minicart.className = 'minicart';
+      minicart.setAttribute('aria-expanded', false);
+      block.append(minicart);
+
+      const headerRow = document.createElement('div');
+      headerRow.className = 'slide-panel-header';
+
+      const cartTitle = document.createElement('h2');
+      cartTitle.textContent = 'Cart';
+      headerRow.append(cartTitle);
+
+      const cartClose = document.createElement('button');
+      cartClose.className = 'slide-panel-close';
+      cartClose.textContent = '\u00D7';
+      cartClose.setAttribute('aria-label', 'Close');
+      cartClose.addEventListener('click', () => {
+        minicart.closeModal();
+      });
+      headerRow.append(cartClose);
+      minicart.append(headerRow);
+
+      const cartBlock = document.createElement('div');
+      minicart.append(cartBlock);
+      decorateCart(cartBlock, cartLink);
+
+      minicart.addEventListener('click', (event) => {
+        const rect = minicart.getBoundingClientRect();
+        const isInDialog = (rect.top <= event.clientY
+          && event.clientY <= rect.top + rect.height
+          && rect.left <= event.clientX
+          && event.clientX <= rect.left + rect.width);
+        if (!isInDialog) {
+          minicart.closeModal();
+        }
+      });
+
+      minicart.addEventListener('close', () => {
+        unlockBodyScroll();
+      });
+
+      const closeOnEmpty = (ev) => {
+        if (ev.detail.action === 'empty') {
+          minicart.closeModal();
+        }
+      };
+
+      // open/close methods to account for transitions
+      const open = () => {
+        lockBodyScroll();
+        minicart.showModal();
+        minicart.setAttribute('aria-expanded', true);
+        document.addEventListener('cart:change', closeOnEmpty);
+      };
+      minicart.openModal = open;
+
+      const close = () => {
+        minicart.setAttribute('aria-expanded', false);
+        document.removeEventListener('cart:change', closeOnEmpty);
+        setTimeout(() => {
+          minicart.close();
+        }, 300);
+      };
+      minicart.closeModal = close;
+
+      minicart.openModal();
+
+      // scroll item into view
+      scrollToItem();
+    } catch (error) {
+      setTimeout(() => {
+        // redirect to cart page
+        window.location.href = EDGE_CART_PATH();
+      }, 1000);
+    }
+  };
+
+  // handle cart click
+  cartLink.addEventListener('click', openOrRedirect);
+
+  // and when adding to cart from PDP
+  document.addEventListener('pdp:add-to-cart', (ev) => {
+    openOrRedirect(ev);
+  });
 }

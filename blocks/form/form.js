@@ -1,5 +1,5 @@
 import { toCamelCase, toClassName } from '../../scripts/aem.js';
-import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { getFormSubmissionUrl, getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 /**
  * Creates an HTML element with an optional class name
@@ -52,6 +52,25 @@ function buildLabel(text, type = 'label', id = null) {
 }
 
 /**
+ * @param {Object} field
+ * @returns {HTMLDivElement} Section element
+ */
+function buildSection(field) {
+  const {
+    label, field: fieldName, autocomplete,
+  } = field;
+  const section = createElement('fieldset', `form-section section-${fieldName}`);
+  // section.append(buildLabel(label, 'legend'));
+  if (label) {
+    const h3 = createElement('h3');
+    h3.textContent = label;
+    section.append(h3);
+  }
+  if (autocomplete) section.autocomplete = `section-${autocomplete}`;
+  return section;
+}
+
+/**
  * Creates an input element with specified attributes
  * @param {Object} field - Field configuration object
  * @returns {HTMLInputElement} Input element
@@ -64,6 +83,7 @@ function buildInput(field) {
     default: defaultValue,
     placeholder,
     pattern,
+    autocomplete,
   } = field;
 
   const input = createElement('input');
@@ -74,6 +94,7 @@ function buildInput(field) {
 
   if (defaultValue) input.value = defaultValue;
   if (placeholder) input.placeholder = placeholder;
+  if (autocomplete) input.autocomplete = autocomplete;
   if (pattern) input.pattern = pattern;
 
   if (fieldName === 'mobile') {
@@ -104,7 +125,7 @@ function buildInput(field) {
  */
 function buildTextArea(field) {
   const {
-    field: fieldName, required, default: defaultValue, placeholder,
+    field: fieldName, required, default: defaultValue, placeholder, autocomplete,
   } = field;
 
   const textarea = createElement('textarea');
@@ -114,7 +135,40 @@ function buildTextArea(field) {
   textarea.rows = 5;
   if (defaultValue) textarea.value = defaultValue;
   if (placeholder) textarea.placeholder = placeholder;
+  if (autocomplete) textarea.autocomplete = autocomplete;
   return textarea;
+}
+
+async function appendSelectOptions(select, url) {
+  try {
+    // fetch options as JSON sheet
+    const { pathname } = new URL(url);
+    const resp = await fetch(pathname);
+    if (!resp.ok) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to fetch select options', resp.status);
+      return select;
+    }
+    const { data } = await resp.json();
+    if (!data || !Array.isArray(data)) {
+      // eslint-disable-next-line no-console
+      console.error('Invalid select options JSON', data);
+      return select;
+    }
+
+    if (select.dataset.optionsOverridden) return select;
+    data.forEach((option) => {
+      const optionEl = createElement('option');
+      optionEl.value = option.Value || option.value;
+      optionEl.textContent = option.Label || option.label;
+      select.append(optionEl);
+    });
+    return select;
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Failed to parse select options', error);
+    return select;
+  }
 }
 
 /**
@@ -133,7 +187,7 @@ function decodeOption(option) {
  */
 function buildSelect(field) {
   const {
-    field: fieldName, required, default: defaultValue, options,
+    field: fieldName, required, default: defaultValue, placeholder, options,
   } = field;
 
   const select = createElement('select');
@@ -141,7 +195,20 @@ function buildSelect(field) {
   select.name = select.id;
   select.required = required === 'true';
 
-  if (options) {
+  if (options && /^https?:\/\//.test(options)) {
+    // URL-based options: fetch from JSON sheet
+    if (placeholder) {
+      const optionEl = createElement('option');
+      if (defaultValue != null) {
+        optionEl.value = defaultValue;
+      }
+      optionEl.textContent = placeholder;
+      optionEl.setAttribute('disabled', 'true');
+      select.append(optionEl);
+    }
+    appendSelectOptions(select, options);
+  } else if (options) {
+    // Inline comma-separated options
     options.split(',').forEach((o) => {
       const [text, value] = decodeOption(o);
       const option = createElement('option');
@@ -428,6 +495,7 @@ function enableFooterSignUp(form) {
     }
 
     const payload = {
+      formId: `${locale}/${language}/newsletter`,
       email,
       mobile,
       sms_optin: optIn ? '1' : '0',
@@ -435,9 +503,15 @@ function enableFooterSignUp(form) {
       pageUrl: window.location.href,
       actionUrl: `/${locale}/${language}/rest/V1/vitamix-api/newslettersubscribe`,
     };
-    const params = new URLSearchParams(payload);
     try {
-      const resp = await fetch(`https://www.vitamix.com/bin/vitamix/newslettersubscription?${params.toString()}`);
+      const url = getFormSubmissionUrl();
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
       if (!resp.ok) {
         // eslint-disable-next-line no-console
         console.error('Failed to submit newsletter subscription', resp);
@@ -551,11 +625,15 @@ function buildForm(fields, path) {
   // group buttons at the end
   const buttons = [];
 
+  let section = form;
   fields.forEach((field) => {
     if (field.type === 'submit' || field.type === 'reset') {
       buttons.push(field);
+    } else if (field.type === 'section') {
+      section = buildSection(field, form);
+      form.append(section);
     } else {
-      form.append(buildField(field));
+      section.append(buildField(field));
     }
   });
 

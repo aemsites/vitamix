@@ -1,0 +1,119 @@
+.section > .checkout-progress-wrapper {
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* The step indicator doesn't lay out cleanly on small screens — hide it on
+   mobile and let the page lead with the cart/checkout content. */
+@media (width <= 600px) {
+  .checkout-progress-wrapper {
+    display: none;
+  }
+}
+
+.checkout-progress nav {
+  padding: 16px 0;
+}
+
+.checkout-progress ol {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 560px;
+  list-style: none;
+  margin-inline: auto;
+  margin-block: 0;
+  padding: 0;
+  gap: 0;
+  counter-reset: step-counter;
+}
+
+.checkout-progress .step {
+  display: flex;
+  align-items: center;
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-text-muted);
+}
+
+/* Connector line between steps — flexes to fill the space within its step */
+.checkout-progress .step + .step::before {
+  content: '';
+  display: block;
+  flex: 1;
+  min-width: 24px;
+  height: 2px;
+  background: var(--commerce-step-color-inactive);
+  margin: 0 12px;
+}
+
+.checkout-progress .step-complete + .step::before {
+  background: var(--commerce-color-text);
+}
+
+.checkout-progress .step a,
+.checkout-progress .step span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: inherit;
+  white-space: nowrap;
+}
+
+/* Circle — inactive (future) steps: white fill, border only, no number */
+.checkout-progress .step a::before,
+.checkout-progress .step span::before {
+  content: '';
+  counter-increment: step-counter;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: var(--commerce-font-weight-bold);
+  line-height: 1;
+  flex-shrink: 0;
+  background: #fff;
+  border: 2px solid var(--commerce-color-border);
+  color: #fff;
+  box-sizing: border-box;
+}
+
+/* Complete steps: dark fill with checkmark */
+.checkout-progress .step-complete a::before,
+.checkout-progress .step-complete span::before {
+  content: '✓';
+  background: var(--commerce-color-text);
+  border-color: var(--commerce-color-text);
+  color: #fff;
+}
+
+/* Active step: brand fill with step number */
+.checkout-progress .step-active span::before {
+  content: counter(step-counter);
+  background: var(--commerce-step-color-active);
+  border-color: var(--commerce-step-color-active);
+  color: #fff;
+}
+
+.checkout-progress .step-complete a,
+.checkout-progress .step-complete span {
+  color: var(--commerce-color-text);
+}
+
+.checkout-progress .step-active span {
+  color: var(--commerce-color-text);
+  font-weight: var(--commerce-font-weight-bold);
+}
+
+.checkout-progress .step-complete a:hover {
+  text-decoration: underline;
+}
+
+/* Steps after the first grow so the connector line between them stretches,
+   giving an evenly-spaced bar instead of a small cluster lost in a wide row. */
+.checkout-progress .step + .step {
+  flex: 1;
+}
