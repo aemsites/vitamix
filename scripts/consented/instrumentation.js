@@ -50,11 +50,33 @@ export function isPdpPage() {
 }
 
 /**
+ * EDS checkout page detection (`/order/checkout`).
+ * @returns {boolean}
+ */
+export function isCheckoutPage() {
+  return /\/order\/checkout\/?$/.test(window.location.pathname);
+}
+
+/**
  * Shopping cart page detection via URL path.
  * @returns {boolean}
  */
 export function isCartPage() {
   return /\/(?:order|checkout)\/cart\/?$/.test(window.location.pathname);
+}
+
+/**
+ * EDS order success page detection (`/order/complete`).
+ * Skips cancelled/failed payment returns that carry a `reason` query param.
+ * @returns {boolean}
+ */
+export function isOrderSuccessPage() {
+  const { pathname, search } = window.location;
+  const params = new URLSearchParams(search);
+  if (params.get('reason')) return false;
+  const orderId = params.get('orderId') || params.get('id');
+  if (!orderId) return false;
+  return /\/order\/complete\/?$/.test(pathname);
 }
 
 /**
@@ -75,6 +97,18 @@ export function shouldTrackCartLine(item) {
   }
   return true;
 }
+
+/**
+ * Adobe Analytics page name for checkout success.
+ * @param {string} [localeKey]
+ * @returns {string}
+ */
+export function buildOrderSuccessPageName(localeKey = getStoreLocaleKey()) {
+  return `vitamix:${localeKey}:hh:checkout|onepage|success|`;
+}
+
+/** Adobe Target conversion mbox for order confirmation (Magento parity). */
+const TARGET_ORDER_CONFIRM_MBOX = 'orderConfirmPage';
 
 /** @deprecated Use shouldTrackCartLine */
 export const shouldTrackScRemoveItem = shouldTrackCartLine;
@@ -119,6 +153,256 @@ export function getProductName() {
  */
 export function buildProductId(productName) {
   return `;${productName};;;;`;
+}
+
+/**
+ * @param {number|string} value
+ * @returns {string}
+ */
+function formatAnalyticsQuantity(value) {
+  const num = Number(value);
+  if (Number.isNaN(num)) return '0';
+  return Math.round(num).toString();
+}
+
+/**
+ * @param {number|string} value
+ * @returns {string}
+ */
+function formatAnalyticsMoney(value) {
+  const num = Number(value);
+  if (Number.isNaN(num)) return '0.00';
+  return num.toFixed(2);
+}
+
+/**
+ * @param {string} sku
+ * @returns {boolean}
+ */
+function isWarrantySku(sku) {
+  return sku.toLowerCase().includes('warranty');
+}
+
+/**
+ * Adobe Analytics checkout products string segment: ;{name};{qty};{lineTotal};;
+ * @param {string} name
+ * @param {number|string} qty
+ * @param {number|string} unitPrice
+ * @returns {string}
+ */
+function buildCheckoutProductLine(name, qty, unitPrice) {
+  const quantity = formatAnalyticsQuantity(qty);
+  const lineTotal = formatAnalyticsMoney(Number(qty) * Number(unitPrice));
+  return `;${name};${quantity};${lineTotal};;`;
+}
+
+/**
+ * @param {string[]} lines
+ * @returns {string}
+ */
+function buildCheckoutProductId(lines) {
+  return lines.join(',');
+}
+
+/**
+ * Mirrors order-complete confirmation total math for analytics parity.
+ * @param {{ subtotal?: number, tax?: number, shippingRate?: number, discounts?: object[] }} params
+ * @returns {number}
+ */
+function calculateOrderSuccessTotal({
+  subtotal = 0,
+  tax = 0,
+  shippingRate = 0,
+  discounts = [],
+} = {}) {
+  const hasFreeShipping = discounts.some((discount) => discount?.freeShipping);
+  const shippingAmount = hasFreeShipping ? 0 : (parseFloat(shippingRate) || 0);
+  const discountAmount = discounts
+    .filter((discount) => Math.abs(parseFloat(discount?.amount)) > 0)
+    .reduce((sum, discount) => sum + (Math.abs(parseFloat(discount.amount)) || 0), 0);
+
+  return Math.round(Math.max(0, subtotal - discountAmount + shippingAmount + tax) * 100) / 100;
+}
+
+/**
+ * @returns {string}
+ */
+function getStoreLocaleKey() {
+  return window.location.pathname.split('/').filter(Boolean)[0] || 'us';
+}
+
+/**
+ * @param {object} item scripts/cart.js line item
+ * @returns {boolean}
+ */
+function shouldSkipCartItem(item) {
+  if (item.local?.showInCart === false) return true;
+  if (item.custom?.giftWithPurchase) return true;
+  const sku = item.sku || '';
+  if (isWarrantySku(sku)) return true;
+  return false;
+}
+
+/**
+ * @param {object} item
+ * @returns {{ name: string, qty: number, unitPrice: number }|null}
+ */
+function normalizeCartItem(item) {
+  const name = item.name || '';
+  const qty = Number(item.quantity ?? 0);
+  const unitPrice = Number(item.price?.final ?? item.price ?? 0);
+  if (!name || qty <= 0) return null;
+  return { name, qty, unitPrice };
+}
+
+/**
+ * Build checkout analytics payload from normalized cart line items.
+ * @param {Array<{ name: string, qty: number, unitPrice: number }>} items
+ * @param {number|string|undefined} cartTotal
+ * @returns {{ productID: string, cartTotal: string }|null}
+ */
+function buildCheckoutCartPayload(items, cartTotal) {
+  if (!items.length) return null;
+
+  const lines = items.map((item) => buildCheckoutProductLine(item.name, item.qty, item.unitPrice));
+  const computedTotal = items.reduce((sum, item) => sum + (item.qty * item.unitPrice), 0);
+  const resolvedTotal = cartTotal ?? computedTotal;
+
+  return {
+    productID: buildCheckoutProductId(lines),
+    cartTotal: formatAnalyticsMoney(resolvedTotal),
+  };
+}
+
+/**
+ * Checkout cart from edge localStorage (`cart:{locale}`).
+ * @returns {{ productID: string, cartTotal: string }|null}
+ */
+export function getCheckoutCartData() {
+  const raw = localStorage.getItem(`cart:${getStoreLocaleKey()}`);
+  if (!raw) return null;
+
+  try {
+    const cart = JSON.parse(raw);
+    const items = (cart.items || [])
+      .filter((item) => !shouldSkipCartItem(item))
+      .map(normalizeCartItem)
+      .filter(Boolean);
+
+    const cartTotal = cart.totals?.grandTotal ?? cart.totals?.subtotal;
+
+    return buildCheckoutCartPayload(items, cartTotal);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @param {string|null} raw
+ * @returns {object|null}
+ */
+export function parseStorageJson(raw) {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Reads checkout confirmation data written before the payment redirect.
+ * @returns {object|null}
+ */
+export function readOrderSuccessContext() {
+  const params = new URLSearchParams(window.location.search);
+  const orderId = params.get('orderId') || params.get('id');
+  if (!orderId || params.get('reason')) return null;
+
+  const order = parseStorageJson(sessionStorage.getItem('checkout_order'));
+  const cacheMatches = !!order?.id && order.id === orderId;
+
+  return {
+    orderId,
+    order: cacheMatches ? order : null,
+    preview: cacheMatches ? parseStorageJson(sessionStorage.getItem('checkout_preview')) : null,
+    cartItems: cacheMatches ? parseStorageJson(sessionStorage.getItem('checkout_cart_items')) : null,
+    couponCode: sessionStorage.getItem('checkout_coupon_code') || '',
+  };
+}
+
+/**
+ * Comma-separated SKUs for Adobe Target order confirmation.
+ * Mirrors Magento `getAllVisibleItems()` + `getPurchasedProductIdsString()`.
+ * @param {object[]} items Order or cart line items with `sku`
+ * @returns {string}
+ */
+export function buildPurchasedProductIdsString(items = []) {
+  return items
+    .map((item) => String(item.sku || '').trim())
+    .filter(Boolean)
+    .join(',');
+}
+
+/**
+ * Order total and line items from the checkout session snapshot.
+ * @param {ReturnType<typeof readOrderSuccessContext>} context
+ * @returns {{ displayItems: object[], orderTotal: number }|null}
+ */
+function getOrderSuccessOrderSummary(context) {
+  if (!context?.orderId) return null;
+
+  const {
+    orderId, order, preview, cartItems,
+  } = context;
+  const displayItems = cartItems?.length ? cartItems : order?.items;
+  if (!displayItems?.length) return null;
+
+  const est = order?.estimates;
+  const discounts = est ? (est.discounts || []) : (preview?.discounts || []);
+  const shippingMethod = est ? (est.shippingMethod || {}) : (preview?.shippingMethod || {});
+  const tax = parseFloat(est ? (est.tax?.amount || 0) : (preview?.taxAmount || 0));
+  const subtotal = est
+    ? order.items?.reduce(
+      (acc, item) => acc + (parseFloat(item.price?.final || item.price || 0) * item.quantity),
+      0,
+    ) ?? 0
+    : parseFloat(preview?.subtotal || 0);
+  const shippingRate = parseFloat(shippingMethod.rate || 0);
+  const orderTotal = calculateOrderSuccessTotal({
+    subtotal,
+    tax,
+    shippingRate,
+    discounts,
+  });
+
+  return {
+    displayItems,
+    orderId: String(order?.friendlyId || order?.number || order?.orderNumber || orderId),
+    orderTotal,
+  };
+}
+
+/**
+ * Adobe Target order-confirmation params from sessionStorage checkout snapshot.
+ * @param {ReturnType<typeof readOrderSuccessContext>} [context]
+ * @returns {{ orderId: string, orderTotal: string, productPurchasedId: string }|null}
+ */
+export function getOrderConfirmTargetParams(context = readOrderSuccessContext()) {
+  const summary = getOrderSuccessOrderSummary(context);
+  if (!summary) return null;
+
+  const purchasedItems = context.order?.items?.length
+    ? context.order.items
+    : summary.displayItems;
+  const productPurchasedId = buildPurchasedProductIdsString(purchasedItems);
+  if (!productPurchasedId) return null;
+
+  return {
+    orderId: summary.orderId,
+    orderTotal: formatAnalyticsMoney(summary.orderTotal),
+    productPurchasedId,
+  };
 }
 
 /**
@@ -207,6 +491,10 @@ export function buildScRemoveCartData(items = []) {
 export function getSatellite() {
   // eslint-disable-next-line no-underscore-dangle
   return window._satellite;
+}
+
+export function getAdobeTarget() {
+  return window.adobe?.target;
 }
 
 const ANALYTICS_TRACKING_SERVER = 'metrics.vitamix.com';
@@ -464,6 +752,39 @@ export function whenSatelliteReady(
 }
 
 /**
+ * @param {() => void} callback
+ * @param {string} [eventLabel]
+ * @param {number} [maxAttempts]
+ * @param {number} [intervalMs]
+ */
+export function whenTargetReady(
+  callback,
+  eventLabel = 'Target event',
+  maxAttempts = 100,
+  intervalMs = 100,
+) {
+  let attempts = 0;
+  let done = false;
+  const run = () => {
+    if (done) return;
+    const target = getAdobeTarget();
+    if (target && typeof target.trackEvent === 'function') {
+      done = true;
+      callback();
+      return;
+    }
+    attempts += 1;
+    if (attempts < maxAttempts) {
+      setTimeout(run, intervalMs);
+    } else {
+      debugWarn(`Adobe Target ${eventLabel} skipped: adobe.target.trackEvent not available`);
+    }
+  };
+  document.addEventListener('at-library-loaded', run, { once: true });
+  run();
+}
+
+/**
  * @param {string} eventName
  * @param {object} payload Logged debug payload
  * @param {{ waitForBeacon?: boolean }} [options]
@@ -571,6 +892,63 @@ async function pushScRemoveEvent(items, { waitForBeacon = false } = {}) {
     await beaconComplete;
   }
   debugLog('Adobe Analytics scRemove fired', window.digitalData.cart);
+  return true;
+}
+
+/**
+ * Push checkout cart context to digitalData and trigger a Launch direct-call rule.
+ * @param {string} eventName Launch direct-call identifier (e.g. scCheckout)
+ * @param {string} productID Adobe Analytics products string
+ * @param {string} cartTotal Cart grand total
+ * @param {{ waitForBeacon?: boolean }} [options]
+ * @returns {Promise<boolean>} Whether the Launch rule was triggered
+ */
+async function pushCartCheckoutEvent(
+  eventName,
+  productID,
+  cartTotal,
+  { waitForBeacon = false } = {},
+) {
+  window.digitalData = window.digitalData || {};
+  window.digitalData.cart = {
+    item: [{
+      productInfo: { productID },
+      cartInfo: { cartTotal },
+    }],
+  };
+
+  const satellite = getSatellite();
+  if (!satellite?.track) {
+    return false;
+  }
+
+  configureAnalyticsTrackingServers();
+  const beaconComplete = waitForBeacon ? waitForBeaconComplete() : null;
+  satellite.track(eventName);
+
+  if (beaconComplete) {
+    await beaconComplete;
+  }
+  debugLog(`Adobe Analytics ${eventName} fired`, window.digitalData.cart);
+  return true;
+}
+
+/**
+ * Fire Adobe Target order-confirmation conversion (Magento parity).
+ * @param {{ orderId: string, orderTotal: string, productPurchasedId: string }} params
+ * @returns {boolean} Whether trackEvent was invoked
+ */
+function trackOrderConfirmPage(params) {
+  const target = getAdobeTarget();
+  if (!target?.trackEvent) {
+    return false;
+  }
+
+  target.trackEvent({
+    mbox: TARGET_ORDER_CONFIRM_MBOX,
+    params,
+  });
+  debugLog(`Adobe Target ${TARGET_ORDER_CONFIRM_MBOX} fired`, params);
   return true;
 }
 
@@ -851,11 +1229,88 @@ export function trackCartChange() {
   });
 }
 
+let scCheckoutFired = false;
+
+/**
+ * Fire the scCheckout event when checkout cart data is available.
+ * @param {{ productID: string, cartTotal: string }} [cartData]
+ * @returns {Promise<void>}
+ */
+export async function fireScCheckout(cartData = getCheckoutCartData()) {
+  if (scCheckoutFired) return;
+
+  if (!cartData?.productID) {
+    debugWarn('Adobe Analytics scCheckout skipped: cart data not available');
+    return;
+  }
+
+  if (!(await pushCartCheckoutEvent('scCheckout', cartData.productID, cartData.cartTotal))) {
+    debugWarn('Adobe Analytics scCheckout skipped: Adobe Launch (_satellite) not available');
+    return;
+  }
+
+  scCheckoutFired = true;
+}
+
+/**
+ * Retry briefly so cart localStorage is populated after consent scripts load.
+ * @param {number} [attempt]
+ */
+export function trackScCheckout(attempt = 0) {
+  whenSatelliteReady(() => {
+    const cartData = getCheckoutCartData();
+    if (!cartData?.productID && attempt < 20) {
+      setTimeout(() => trackScCheckout(attempt + 1), 250);
+      return;
+    }
+    fireScCheckout(cartData);
+  }, 'scCheckout');
+}
+
+let orderSuccessPageFired = false;
+
+/**
+ * Fire Adobe Target orderConfirmPage when confirmation params are available.
+ * @param {ReturnType<typeof getOrderConfirmTargetParams>} [params]
+ * @returns {void}
+ */
+export function fireOrderSuccessPage(params = getOrderConfirmTargetParams()) {
+  if (orderSuccessPageFired) return;
+
+  if (!params?.productPurchasedId) {
+    debugWarn(`Adobe Target ${TARGET_ORDER_CONFIRM_MBOX} skipped: order data not available`);
+    return;
+  }
+
+  if (!trackOrderConfirmPage(params)) {
+    debugWarn(`Adobe Target ${TARGET_ORDER_CONFIRM_MBOX} skipped: adobe.target.trackEvent not available`);
+    return;
+  }
+
+  orderSuccessPageFired = true;
+}
+
+/**
+ * Retry briefly so checkout sessionStorage and at.js are available after consent scripts load.
+ * @param {number} [attempt]
+ */
+export function trackOrderSuccessPage(attempt = 0) {
+  whenTargetReady(() => {
+    const params = getOrderConfirmTargetParams();
+    if (!params?.productPurchasedId && attempt < 20) {
+      setTimeout(() => trackOrderSuccessPage(attempt + 1), 250);
+      return;
+    }
+    fireOrderSuccessPage(params);
+  }, TARGET_ORDER_CONFIRM_MBOX);
+}
+
 /** @deprecated Use trackCartChange */
 export const trackScRemove = trackCartChange;
 
 /**
- * Initialize page-level Adobe Analytics (prodView on PDP, scView on cart).
+ * Initialize page-level Adobe Analytics (prodView on PDP, scView on cart, scCheckout)
+ * and Adobe Target orderConfirmPage on order success.
  * Cart mutation listeners are registered early via trackCartChange() in consented.js.
  * @returns {void}
  */
@@ -866,5 +1321,11 @@ export function initInstrumentation() {
   }
   if (isCartPage()) {
     trackScView();
+  }
+  if (isCheckoutPage()) {
+    trackScCheckout();
+  }
+  if (isOrderSuccessPage()) {
+    trackOrderSuccessPage();
   }
 }
