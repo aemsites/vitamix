@@ -80,12 +80,21 @@ export function isOrderSuccessPage() {
 }
 
 /**
- * Whether a cart line should be included in scAdd/scRemove/scView analytics.
- * Matches the cart block's visible-line filter.
- * @param {{ name?: string, local?: object, custom?: object }} item
+ * @param {string} sku
  * @returns {boolean}
  */
-export function shouldTrackCartLine(item) {
+function isWarrantySku(sku) {
+  return sku.toLowerCase().includes('warranty');
+}
+
+/**
+ * Whether a cart line should be included in analytics events.
+ * Matches the cart block's visible-line filter; checkout can exclude warranties.
+ * @param {{ name?: string, sku?: string, local?: object, custom?: object }} item
+ * @param {{ excludeWarranty?: boolean }} [options]
+ * @returns {boolean}
+ */
+export function shouldTrackCartLine(item, { excludeWarranty = false } = {}) {
   if (!item?.name) {
     return false;
   }
@@ -95,23 +104,14 @@ export function shouldTrackCartLine(item) {
   if (item.custom?.giftWithPurchase) {
     return false;
   }
+  if (excludeWarranty && isWarrantySku(item.sku || '')) {
+    return false;
+  }
   return true;
-}
-
-/**
- * Adobe Analytics page name for checkout success.
- * @param {string} [localeKey]
- * @returns {string}
- */
-export function buildOrderSuccessPageName(localeKey = getStoreLocaleKey()) {
-  return `vitamix:${localeKey}:hh:checkout|onepage|success|`;
 }
 
 /** Adobe Target conversion mbox for order confirmation (Magento parity). */
 const TARGET_ORDER_CONFIRM_MBOX = 'orderConfirmPage';
-
-/** @deprecated Use shouldTrackCartLine */
-export const shouldTrackScRemoveItem = shouldTrackCartLine;
 
 /**
  * Read the current cart lines for scView from the shared cart singleton.
@@ -176,14 +176,6 @@ function formatAnalyticsMoney(value) {
 }
 
 /**
- * @param {string} sku
- * @returns {boolean}
- */
-function isWarrantySku(sku) {
-  return sku.toLowerCase().includes('warranty');
-}
-
-/**
  * Adobe Analytics checkout products string segment: ;{name};{qty};{lineTotal};;
  * @param {string} name
  * @param {number|string} qty
@@ -205,7 +197,7 @@ function buildCheckoutProductId(lines) {
 }
 
 /**
- * Mirrors order-complete confirmation total math for analytics parity.
+ * Order confirmation total for Target params (mirrors order-complete.js).
  * @param {{ subtotal?: number, tax?: number, shippingRate?: number, discounts?: object[] }} params
  * @returns {number}
  */
@@ -229,18 +221,6 @@ function calculateOrderSuccessTotal({
  */
 function getStoreLocaleKey() {
   return window.location.pathname.split('/').filter(Boolean)[0] || 'us';
-}
-
-/**
- * @param {object} item scripts/cart.js line item
- * @returns {boolean}
- */
-function shouldSkipCartItem(item) {
-  if (item.local?.showInCart === false) return true;
-  if (item.custom?.giftWithPurchase) return true;
-  const sku = item.sku || '';
-  if (isWarrantySku(sku)) return true;
-  return false;
 }
 
 /**
@@ -285,7 +265,7 @@ export function getCheckoutCartData() {
   try {
     const cart = JSON.parse(raw);
     const items = (cart.items || [])
-      .filter((item) => !shouldSkipCartItem(item))
+      .filter((item) => shouldTrackCartLine(item, { excludeWarranty: true }))
       .map(normalizeCartItem)
       .filter(Boolean);
 
@@ -618,18 +598,42 @@ function patchAppMeasurementFactory() {
 }
 
 /**
+ * Launch-owned AppMeasurement instance (prefer s_c_il over window.s stub).
+ * @returns {object|null}
+ */
+export function getPrimaryAnalyticsTracker() {
+  if (Array.isArray(window.s_c_il)) {
+    for (let i = window.s_c_il.length - 1; i >= 0; i -= 1) {
+      const instance = window.s_c_il[i];
+      if (instance?.account && typeof instance.t === 'function') {
+        return instance;
+      }
+    }
+  }
+  if (window.s && typeof window.s === 'object' && typeof window.s.t === 'function') {
+    return window.s;
+  }
+  return null;
+}
+
+/**
  * AppMeasurement tracker instances (window.s and Launch registry in s_c_il).
  * @returns {object[]}
  */
 export function getAnalyticsTrackers() {
   const trackers = [];
-  if (window.s && typeof window.s === 'object') {
-    trackers.push(window.s);
-  }
+  const seen = new Set();
+  const add = (tracker) => {
+    if (tracker && typeof tracker === 'object' && !seen.has(tracker)) {
+      seen.add(tracker);
+      trackers.push(tracker);
+    }
+  };
+  add(window.s);
   if (Array.isArray(window.s_c_il)) {
     window.s_c_il.forEach((instance) => {
       if (instance && (instance.account || typeof instance.t === 'function')) {
-        trackers.push(instance);
+        add(instance);
       }
     });
   }
@@ -637,8 +641,7 @@ export function getAnalyticsTrackers() {
 }
 
 /**
- * Clear prior direct-call carry-over (e.g. prodView) so the next Launch rule
- * (scAdd, scView) sets its own events/products on a clean tracker.
+ * Clear prior Launch/AppMeasurement carry-over so each direct-call rule starts clean.
  * @param {object} tracker AppMeasurement tracker instance
  */
 export function resetTrackerForScAdd(tracker) {
@@ -651,9 +654,18 @@ export function resetTrackerForScAdd(tracker) {
   tracker.linkTrackEvents = '';
 }
 
+/** Reset Launch primary tracker before cart/checkout direct calls (not prodView). */
+function flushLaunchTrackers() {
+  const tracker = getPrimaryAnalyticsTracker();
+  if (tracker) {
+    resetTrackerForScAdd(tracker);
+  }
+}
+
 /**
  * Send a cart event via AppMeasurement link tracking (s.tl b/ss beacon).
- * Synchronous — survives PDP redirects. Used for Magento scAdd and all scRemove.
+ * Uses the Launch primary tracker only — avoids duplicate hits when window.s
+ * and s_c_il both exist.
  * @param {string} eventName Adobe Analytics event (e.g. scAdd, scRemove)
  * @param {string} productID Adobe Analytics products string
  */
@@ -662,31 +674,37 @@ function sendCartLinkBeacon(eventName, productID) {
     return;
   }
 
-  const seen = new Set();
-  getAnalyticsTrackers().forEach((tracker) => {
-    if (!tracker || seen.has(tracker) || typeof tracker.tl !== 'function') {
-      return;
-    }
-    seen.add(tracker);
-    resetTrackerForScAdd(tracker);
-    tracker.linkTrackVars = 'events,products';
-    tracker.linkTrackEvents = eventName;
-    tracker.events = eventName;
-    tracker.products = productID;
-    tracker.tl(true, 'o', eventName);
-  });
+  const tracker = getPrimaryAnalyticsTracker();
+  if (!tracker || typeof tracker.tl !== 'function') {
+    return;
+  }
+
+  resetTrackerForScAdd(tracker);
+  tracker.linkTrackVars = 'events,products';
+  tracker.linkTrackEvents = eventName;
+  tracker.events = eventName;
+  tracker.products = productID;
+  tracker.tl(true, 'o', eventName);
 }
 
 /**
- * Assign Commerce-shaped cart data to digitalData and clear prodView carry-over.
+ * Assign cart context to digitalData and clear prodView carry-over in digitalData.
+ * AppMeasurement is flushed separately before cart/checkout direct calls only.
  * @param {object} cartData digitalData.cart payload
  */
-function setDigitalDataCart(cartData) {
+function assignDigitalDataCart(cartData) {
   window.digitalData = window.digitalData || {};
-  window.digitalData.cart = {};
   window.digitalData.cart = cartData;
   delete window.digitalData.product;
-  getAnalyticsTrackers().forEach(resetTrackerForScAdd);
+}
+
+/**
+ * Prepare digitalData and reset tracker state before a synchronous link beacon (s.tl).
+ * @param {object} cartData digitalData.cart payload
+ */
+function setDigitalDataCartForLinkBeacon(cartData) {
+  assignDigitalDataCart(cartData);
+  flushLaunchTrackers();
 }
 
 /**
@@ -723,6 +741,45 @@ export function ensureAnalyticsTrackingConfigured() {
 }
 
 /**
+ * Poll until a readiness predicate passes, then run callback.
+ * @param {() => boolean} isReady
+ * @param {() => void} callback
+ * @param {{
+ *   eventLabel?: string,
+ *   maxAttempts?: number,
+ *   intervalMs?: number,
+ *   skipMessage?: string,
+ *   onSetup?: (run: () => void) => void,
+ * }} [options]
+ */
+function whenReady(isReady, callback, {
+  eventLabel = 'event',
+  maxAttempts = 50,
+  intervalMs = 100,
+  skipMessage = 'skipped',
+  onSetup,
+} = {}) {
+  let attempts = 0;
+  let done = false;
+  const run = () => {
+    if (done) return;
+    if (isReady()) {
+      done = true;
+      callback();
+      return;
+    }
+    attempts += 1;
+    if (attempts < maxAttempts) {
+      setTimeout(run, intervalMs);
+    } else {
+      debugWarn(skipMessage || `${eventLabel} skipped`);
+    }
+  };
+  onSetup?.(run);
+  run();
+}
+
+/**
  * @param {() => void} callback
  * @param {string} [eventLabel]
  * @param {number} [maxAttempts]
@@ -734,21 +791,19 @@ export function whenSatelliteReady(
   maxAttempts = 50,
   intervalMs = 100,
 ) {
-  let attempts = 0;
-  const check = () => {
-    const satellite = getSatellite();
-    if (satellite && typeof satellite.track === 'function') {
-      callback();
-      return;
-    }
-    attempts += 1;
-    if (attempts < maxAttempts) {
-      setTimeout(check, intervalMs);
-    } else {
-      debugWarn(`Adobe Analytics ${eventLabel} skipped: Adobe Launch (_satellite) not available`);
-    }
-  };
-  check();
+  whenReady(
+    () => {
+      const satellite = getSatellite();
+      return Boolean(satellite && typeof satellite.track === 'function');
+    },
+    callback,
+    {
+      eventLabel,
+      maxAttempts,
+      intervalMs,
+      skipMessage: `Adobe Analytics ${eventLabel} skipped: Adobe Launch (_satellite) not available`,
+    },
+  );
 }
 
 /**
@@ -763,25 +818,20 @@ export function whenTargetReady(
   maxAttempts = 100,
   intervalMs = 100,
 ) {
-  let attempts = 0;
-  let done = false;
-  const run = () => {
-    if (done) return;
-    const target = getAdobeTarget();
-    if (target && typeof target.trackEvent === 'function') {
-      done = true;
-      callback();
-      return;
-    }
-    attempts += 1;
-    if (attempts < maxAttempts) {
-      setTimeout(run, intervalMs);
-    } else {
-      debugWarn(`Adobe Target ${eventLabel} skipped: adobe.target.trackEvent not available`);
-    }
-  };
-  document.addEventListener('at-library-loaded', run, { once: true });
-  run();
+  whenReady(
+    () => {
+      const target = getAdobeTarget();
+      return Boolean(target && typeof target.trackEvent === 'function');
+    },
+    callback,
+    {
+      eventLabel,
+      maxAttempts,
+      intervalMs,
+      skipMessage: `Adobe Target ${eventLabel} skipped: adobe.target.trackEvent not available`,
+      onSetup: (run) => document.addEventListener('at-library-loaded', run, { once: true }),
+    },
+  );
 }
 
 /**
@@ -796,7 +846,6 @@ async function triggerLaunchEvent(eventName, payload, { waitForBeacon = false } 
     return false;
   }
 
-  // Re-apply smetrics on all tracker instances right before Launch sends the beacon.
   configureAnalyticsTrackingServers();
   const beaconComplete = waitForBeacon ? waitForBeaconComplete() : null;
   satellite.track(eventName);
@@ -818,11 +867,51 @@ async function triggerLaunchEvent(eventName, payload, { waitForBeacon = false } 
  */
 async function pushProductEvent(eventName, productID, { waitForBeacon = false } = {}) {
   window.digitalData = window.digitalData || {};
+  delete window.digitalData.cart;
   window.digitalData.product = [{
     productInfo: { productID },
   }];
 
   return triggerLaunchEvent(eventName, window.digitalData.product, { waitForBeacon });
+}
+
+/** Dedupe window for repeat scAdd with the same product/qty (ms). */
+const SCADD_DEDUPE_MS = 1500;
+
+/**
+ * @param {string} name
+ * @param {number|string} quantity
+ * @returns {boolean} Whether this scAdd should be skipped as a duplicate
+ */
+function isDuplicateScAdd(name, quantity) {
+  const signature = `${name}|${quantity}`;
+  const now = Date.now();
+  const state = window.vitamixEdsAnalytics;
+  if (state.scAddInFlight === signature) {
+    return true;
+  }
+  if (
+    state.lastScAddSignature === signature
+    && now - (state.lastScAddAt || 0) < SCADD_DEDUPE_MS
+  ) {
+    return true;
+  }
+  state.scAddInFlight = signature;
+  return false;
+}
+
+/**
+ * @param {string} name
+ * @param {number|string} quantity
+ */
+function markScAddComplete(name, quantity) {
+  const signature = `${name}|${quantity}`;
+  const state = window.vitamixEdsAnalytics;
+  state.lastScAddSignature = signature;
+  state.lastScAddAt = Date.now();
+  if (state.scAddInFlight === signature) {
+    state.scAddInFlight = null;
+  }
 }
 
 /**
@@ -833,7 +922,8 @@ async function pushProductEvent(eventName, productID, { waitForBeacon = false } 
  * @returns {Promise<boolean>} Whether the Launch rule was triggered
  */
 async function pushScAddEvent(productID, { isFirstCart = false, waitForBeacon = false } = {}) {
-  setDigitalDataCart(buildScAddCartData(productID, isFirstCart));
+  assignDigitalDataCart(buildScAddCartData(productID, isFirstCart));
+  flushLaunchTrackers();
   return triggerLaunchEvent('scAdd', window.digitalData.cart, { waitForBeacon });
 }
 
@@ -845,10 +935,21 @@ async function pushScAddEvent(productID, { isFirstCart = false, waitForBeacon = 
  * @returns {boolean} Whether a beacon was sent
  */
 function pushScAddLinkEvent(productID, { isFirstCart = false } = {}) {
-  setDigitalDataCart(buildScAddCartData(productID, isFirstCart));
+  const productName = productID.replace(/^;([^;]*).*/, '$1').trim();
+  const quantityMatch = productID.match(/^;[^;]*;([^;]*)/);
+  const quantity = quantityMatch ? quantityMatch[1] : 1;
+  if (productName && isDuplicateScAdd(productName, quantity)) {
+    debugLog('Adobe Analytics scAdd deduped (link beacon)', { productName, quantity });
+    return false;
+  }
+
+  setDigitalDataCartForLinkBeacon(buildScAddCartData(productID, isFirstCart));
   configureAnalyticsTrackingServers();
   sendCartLinkBeacon('scAdd', productID);
   debugLog('Adobe Analytics scAdd fired (link beacon)', window.digitalData.cart);
+  if (productName) {
+    markScAddComplete(productName, quantity);
+  }
   return Boolean(productID);
 }
 
@@ -861,7 +962,8 @@ function pushScAddLinkEvent(productID, { isFirstCart = false } = {}) {
  * @returns {Promise<boolean>} Whether the Launch rule was triggered
  */
 async function pushScViewEvent(items, { waitForBeacon = false } = {}) {
-  setDigitalDataCart(buildScViewCartData(items, items.length === 1));
+  assignDigitalDataCart(buildScViewCartData(items, items.length === 1));
+  flushLaunchTrackers();
   return triggerLaunchEvent('scView', window.digitalData.cart, { waitForBeacon });
 }
 
@@ -881,7 +983,7 @@ async function pushScRemoveEvent(items, { waitForBeacon = false } = {}) {
     return false;
   }
 
-  setDigitalDataCart(cartData);
+  assignDigitalDataCart(cartData);
   debugLog('Adobe Analytics scRemove payload', window.digitalData.cart.item);
 
   configureAnalyticsTrackingServers();
@@ -917,20 +1019,8 @@ async function pushCartCheckoutEvent(
     }],
   };
 
-  const satellite = getSatellite();
-  if (!satellite?.track) {
-    return false;
-  }
-
-  configureAnalyticsTrackingServers();
-  const beaconComplete = waitForBeacon ? waitForBeaconComplete() : null;
-  satellite.track(eventName);
-
-  if (beaconComplete) {
-    await beaconComplete;
-  }
-  debugLog(`Adobe Analytics ${eventName} fired`, window.digitalData.cart);
-  return true;
+  flushLaunchTrackers();
+  return triggerLaunchEvent(eventName, window.digitalData.cart, { waitForBeacon });
 }
 
 /**
@@ -952,11 +1042,29 @@ function trackOrderConfirmPage(params) {
   return true;
 }
 
+let instrumentationInitialized = false;
+let prodViewTrackScheduled = false;
+
+/**
+ * @param {string} name
+ * @param {number|string} quantity
+ */
+function clearScAddInFlight(name, quantity) {
+  const signature = `${name}|${quantity}`;
+  if (window.vitamixEdsAnalytics.scAddInFlight === signature) {
+    window.vitamixEdsAnalytics.scAddInFlight = null;
+  }
+}
+
 /**
  * Fire the prodView event after the product name is found on the PDP.
  * @returns {Promise<void>}
  */
 export async function fireProdView() {
+  if (window.vitamixEdsAnalytics.prodViewFired) {
+    return;
+  }
+
   if (!hasMarketingConsent()) {
     return;
   }
@@ -969,22 +1077,37 @@ export async function fireProdView() {
 
   if (!(await pushProductEvent('prodView', buildProductId(productName)))) {
     debugWarn('Adobe Analytics prodView skipped: Adobe Launch (_satellite) not available');
+    return;
   }
+
+  window.vitamixEdsAnalytics.prodViewFired = true;
 }
 
 /**
  * Retry briefly so jsonLdData / PDP DOM are ready after consent scripts load.
+ * Uses a single Launch readiness wait; only product-name polling retries.
  * @param {number} [attempt]
  */
 export function trackProdView(attempt = 0) {
-  whenSatelliteReady(() => {
+  const tryTrack = () => {
     const productName = `${getProductName()}`;
     if (!productName && attempt < 10) {
       setTimeout(() => trackProdView(attempt + 1), 100);
       return;
     }
     fireProdView();
-  }, 'prodView');
+  };
+
+  if (attempt > 0) {
+    tryTrack();
+    return;
+  }
+
+  if (prodViewTrackScheduled || window.vitamixEdsAnalytics.prodViewFired) {
+    return;
+  }
+  prodViewTrackScheduled = true;
+  whenSatelliteReady(tryTrack, 'prodView');
 }
 
 /**
@@ -1009,11 +1132,24 @@ export async function fireScAdd(
     return;
   }
 
-  if (!(await pushScAddEvent(buildCartProductId(name, quantity), {
-    isFirstCart,
-    waitForBeacon: true,
-  }))) {
-    debugWarn('Adobe Analytics scAdd skipped: Adobe Launch (_satellite) not available');
+  if (isDuplicateScAdd(name, quantity)) {
+    debugLog('Adobe Analytics scAdd deduped', { name, quantity });
+    return;
+  }
+
+  try {
+    if (!(await pushScAddEvent(buildCartProductId(name, quantity), {
+      isFirstCart,
+      waitForBeacon: true,
+    }))) {
+      clearScAddInFlight(name, quantity);
+      debugWarn('Adobe Analytics scAdd skipped: Adobe Launch (_satellite) not available');
+      return;
+    }
+    markScAddComplete(name, quantity);
+  } catch (err) {
+    clearScAddInFlight(name, quantity);
+    throw err;
   }
 }
 
@@ -1239,6 +1375,10 @@ let scCheckoutFired = false;
 export async function fireScCheckout(cartData = getCheckoutCartData()) {
   if (scCheckoutFired) return;
 
+  if (!hasMarketingConsent()) {
+    return;
+  }
+
   if (!cartData?.productID) {
     debugWarn('Adobe Analytics scCheckout skipped: cart data not available');
     return;
@@ -1267,15 +1407,19 @@ export function trackScCheckout(attempt = 0) {
   }, 'scCheckout');
 }
 
-let orderSuccessPageFired = false;
+let orderConfirmTargetFired = false;
 
 /**
  * Fire Adobe Target orderConfirmPage when confirmation params are available.
  * @param {ReturnType<typeof getOrderConfirmTargetParams>} [params]
  * @returns {void}
  */
-export function fireOrderSuccessPage(params = getOrderConfirmTargetParams()) {
-  if (orderSuccessPageFired) return;
+export function fireOrderConfirmTarget(params = getOrderConfirmTargetParams()) {
+  if (orderConfirmTargetFired) return;
+
+  if (!hasMarketingConsent()) {
+    return;
+  }
 
   if (!params?.productPurchasedId) {
     debugWarn(`Adobe Target ${TARGET_ORDER_CONFIRM_MBOX} skipped: order data not available`);
@@ -1287,26 +1431,23 @@ export function fireOrderSuccessPage(params = getOrderConfirmTargetParams()) {
     return;
   }
 
-  orderSuccessPageFired = true;
+  orderConfirmTargetFired = true;
 }
 
 /**
  * Retry briefly so checkout sessionStorage and at.js are available after consent scripts load.
  * @param {number} [attempt]
  */
-export function trackOrderSuccessPage(attempt = 0) {
+export function trackOrderConfirmTarget(attempt = 0) {
   whenTargetReady(() => {
     const params = getOrderConfirmTargetParams();
     if (!params?.productPurchasedId && attempt < 20) {
-      setTimeout(() => trackOrderSuccessPage(attempt + 1), 250);
+      setTimeout(() => trackOrderConfirmTarget(attempt + 1), 250);
       return;
     }
-    fireOrderSuccessPage(params);
+    fireOrderConfirmTarget(params);
   }, TARGET_ORDER_CONFIRM_MBOX);
 }
-
-/** @deprecated Use trackCartChange */
-export const trackScRemove = trackCartChange;
 
 /**
  * Initialize page-level Adobe Analytics (prodView on PDP, scView on cart, scCheckout)
@@ -1315,6 +1456,12 @@ export const trackScRemove = trackCartChange;
  * @returns {void}
  */
 export function initInstrumentation() {
+  if (instrumentationInitialized || window.vitamixEdsAnalytics.instrumentationInitialized) {
+    return;
+  }
+  instrumentationInitialized = true;
+  window.vitamixEdsAnalytics.instrumentationInitialized = true;
+
   debugLog('Adobe Analytics instrumentation loaded');
   if (isPdpPage()) {
     trackProdView();
@@ -1326,6 +1473,6 @@ export function initInstrumentation() {
     trackScCheckout();
   }
   if (isOrderSuccessPage()) {
-    trackOrderSuccessPage();
+    trackOrderConfirmTarget();
   }
 }
