@@ -5,6 +5,11 @@ import {
 } from '../commerce-api.js';
 import { getUser, isLoggedIn } from '../auth-api.js';
 import { logOperation, getCheckoutId } from '../operations-log.js';
+import {
+  APPLE_PAY_CART_CONTEXT,
+  buildApplePayCartOrderPayload,
+  buildApplePayCartPreviewPayload,
+} from './apple-pay-context.js';
 
 const APPLE_PAY_SDK_URL = 'https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js';
 
@@ -78,6 +83,7 @@ function startExpressSession(btn, config, callbacks) {
           contact.administrativeArea,
           contact.postalCode,
           cart.getItemsForAPI(),
+          APPLE_PAY_CART_CONTEXT,
         );
         const methods = result.shippingMethods || [];
         if (!methods.length) {
@@ -116,21 +122,14 @@ function startExpressSession(btn, config, callbacks) {
 
     session.onshippingmethodselected = async (e) => {
       try {
-        const contact = lastShippingContact;
-        const countryCode = contact?.countryCode?.toLowerCase();
-        const previewResult = await callbacks.previewOrderDirect({
-          items: cart.getItemsForAPI(),
-          shippingMethod: { id: e.shippingMethod.identifier },
-          locale: bcp47,
-          ...(countryCode ? {
-            country: countryCode,
-            shipping: {
-              country: countryCode,
-              state: contact.administrativeArea,
-              zip: contact.postalCode || '',
-            },
-          } : {}),
-        });
+        const previewResult = await callbacks.previewOrderDirect(
+          buildApplePayCartPreviewPayload(
+            cart,
+            e.shippingMethod.identifier,
+            bcp47,
+            lastShippingContact,
+          ),
+        );
         lastShippingMethodId = e.shippingMethod.identifier;
         callbacks.getState().currentEstimateToken = previewResult.estimateToken;
         session.completeShippingMethodSelection({
@@ -151,39 +150,21 @@ function startExpressSession(btn, config, callbacks) {
       const { payment } = e;
       const contact = payment.shippingContact;
       try {
-        const shippingAddr = {
-          name: `${contact.givenName} ${contact.familyName}`.trim(),
-          address1: (contact.addressLines || [])[0] || '',
-          address2: (contact.addressLines || [])[1] || '',
-          city: contact.locality,
-          state: contact.administrativeArea,
-          zip: contact.postalCode,
-          country: contact.countryCode?.toLowerCase() || locale,
-          phone: contact.phoneNumber || '',
-          email: contact.emailAddress || '',
-        };
-
         // When the user is signed in, use their account email so the order is linked
         // to the right account. The Apple Pay contact email may differ from the
         // commerce account email, which causes assertEmail to reject the request.
         const customerEmail = (isLoggedIn() && getUser()?.email) || contact.emailAddress || '';
         const customerTimezone = getCustomerTimezone();
-        const orderBody = {
-          customer: {
-            firstName: contact.givenName || '',
-            lastName: contact.familyName || '',
-            email: customerEmail,
-            phone: contact.phoneNumber || '',
-          },
-          shipping: shippingAddr,
-          billing: shippingAddr,
-          items: cart.getItemsForAPI(),
-          shippingMethod: { id: lastShippingMethodId || e.payment.shippingMethod?.identifier || '' },
+        const orderBody = buildApplePayCartOrderPayload({
+          payment,
+          cart,
+          shippingMethodId: lastShippingMethodId || e.payment.shippingMethod?.identifier || '',
           estimateToken: callbacks.getState().currentEstimateToken,
           country: locale,
           locale: bcp47,
-          ...(customerTimezone ? { customerTimezone } : {}),
-        };
+          customerEmail,
+          customerTimezone,
+        });
 
         const createdOrder = await callbacks.createOrder(orderBody);
         const fraudToken = (() => {
