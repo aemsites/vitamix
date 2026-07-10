@@ -110,3 +110,38 @@ test('buildApplePayCartOrderPayload includes cart context and full address data'
   });
   assert.deepEqual(payload.billing, payload.shipping);
 });
+
+test('Apple Pay cart preview and order payloads use matching context facts', () => {
+  const preview = buildApplePayCartPreviewPayload(
+    cart,
+    'standard',
+    'en-US',
+    shippingContact,
+  );
+  const order = buildApplePayCartOrderPayload({
+    payment: { shippingContact: paymentContact },
+    cart,
+    shippingMethodId: 'standard',
+    estimateToken: 'estimate-token',
+    country: 'us',
+    locale: 'en-US',
+    customerEmail: 'account@example.com',
+  });
+
+  assert.deepEqual(
+    {
+      paymentMethod: preview.paymentMethod,
+      checkoutFlow: preview.checkoutFlow,
+      entryPoint: preview.entryPoint,
+    },
+    APPLE_PAY_CART_CONTEXT,
+  );
+  assert.deepEqual(
+    {
+      paymentMethod: order.paymentMethod,
+      checkoutFlow: order.checkoutFlow,
+      entryPoint: order.entryPoint,
+    },
+    APPLE_PAY_CART_CONTEXT,
+  );
+});
