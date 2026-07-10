@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildOrderJSON, getCheckoutContext } from '../../blocks/checkout/checkout-order.js';
+import { APPLE_PAY_CART_CONTEXT } from '../../scripts/payments/apple-pay-context.js';
 
 function formData(values) {
   return {
@@ -90,6 +91,14 @@ test('buildOrderJSON includes checkout entry point for checkout-page Apple Pay',
   assert.equal(order.paymentMethod, 'apple-pay');
   assert.equal(order.checkoutFlow, 'express');
   assert.equal(order.entryPoint, 'checkout');
+});
+
+test('checkout-page Apple Pay context does not reuse cart entry point', () => {
+  const order = buildOrder({ paymentMethod: 'apple-pay' });
+
+  assert.equal(APPLE_PAY_CART_CONTEXT.entryPoint, 'cart');
+  assert.equal(order.entryPoint, 'checkout');
+  assert.notEqual(order.entryPoint, APPLE_PAY_CART_CONTEXT.entryPoint);
 });
 
 test('buildOrderJSON omits checkout context when payment method is absent', () => {
