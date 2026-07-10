@@ -7,7 +7,11 @@ import affirm from '../../scripts/payments/affirm.js';
 import chase from '../../scripts/payments/chase.js';
 import buildForm, { initCollapse } from './checkout-form.js';
 import { initAddress } from './checkout-address.js';
-import { initShipping, updatePreview } from './checkout-shipping.js';
+import {
+  clearPreviewState,
+  initShipping,
+  updatePreview,
+} from './checkout-shipping.js';
 import { initOrder } from './checkout-order.js';
 import { initPayment } from './checkout-payment.js';
 import { parsePreview } from '../../scripts/commerce-api.js';
@@ -443,7 +447,12 @@ export default async function decorate(block) {
     const input = form.querySelector(`[name="${name}"]`);
     if (!input) return;
     input.addEventListener('blur', () => {
-      if (input.value && state.selectedShippingMethodId && !state.currentPreview) {
+      if (
+        input.value
+        && state.selectedShippingMethodId
+        && !state.currentPreview
+        && state.paymentMethodSelected
+      ) {
         updatePreview(form, cart, state, config);
       }
     });
@@ -475,7 +484,10 @@ export default async function decorate(block) {
 
   // Re-run preview on payment method change — tax may vary by type (e.g. Avalara surcharge)
   paymentContainer.addEventListener('change', (e) => {
-    if (e.target.name === 'paymentMethod') updatePreview(form, cart, state, config);
+    if (e.target.name !== 'paymentMethod') return;
+    state.paymentMethodSelected = true;
+    clearPreviewState(state);
+    if (state.selectedShippingMethodId) updatePreview(form, cart, state, config);
   });
 
   // Inject order-summary block into this section if the author didn't add one

@@ -1,6 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { findShippingMethodRadio } from '../../blocks/checkout/checkout-shipping.js';
+import {
+  clearPreviewState,
+  findShippingMethodRadio,
+  hasExplicitPaymentSelection,
+  shouldUpdatePreviewAfterPaymentSelection,
+} from '../../blocks/checkout/checkout-shipping.js';
 
 function radio(value, type, label) {
   return {
@@ -60,4 +65,33 @@ test('findShippingMethodRadio falls back to label, then first method', () => {
     standard,
   );
   assert.equal(findShippingMethodRadio(container([]), { id: '218' }), null);
+});
+
+test('clearPreviewState clears signed estimate state', () => {
+  const state = { currentEstimateToken: 'token', currentPreview: { total: 10 } };
+
+  clearPreviewState(state);
+
+  assert.equal(state.currentEstimateToken, null);
+  assert.equal(state.currentPreview, null);
+});
+
+test('hasExplicitPaymentSelection is true only after explicit payment selection', () => {
+  assert.equal(hasExplicitPaymentSelection({}), false);
+  assert.equal(hasExplicitPaymentSelection({ paymentMethodSelected: false }), false);
+  assert.equal(hasExplicitPaymentSelection({ paymentMethodSelected: true }), true);
+});
+
+test('shouldUpdatePreviewAfterPaymentSelection requires payment and shipping selection', () => {
+  assert.equal(shouldUpdatePreviewAfterPaymentSelection({}), false);
+  assert.equal(shouldUpdatePreviewAfterPaymentSelection({
+    paymentMethodSelected: true,
+  }), false);
+  assert.equal(shouldUpdatePreviewAfterPaymentSelection({
+    selectedShippingMethodId: 'standard',
+  }), false);
+  assert.equal(shouldUpdatePreviewAfterPaymentSelection({
+    paymentMethodSelected: true,
+    selectedShippingMethodId: 'standard',
+  }), true);
 });

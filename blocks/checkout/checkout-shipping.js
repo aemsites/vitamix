@@ -157,6 +157,47 @@ export async function updatePreview(form, cart, state, config) {
 }
 
 /**
+ * Clears the currently signed preview state after order-affecting changes.
+ * @param {Object} state
+ */
+export function clearPreviewState(state) {
+  state.currentEstimateToken = null;
+  state.currentPreview = null;
+}
+
+/**
+ * Returns whether the shopper has explicitly selected a payment method.
+ * @param {Object} state
+ * @returns {boolean}
+ */
+export function hasExplicitPaymentSelection(state) {
+  return state.paymentMethodSelected === true;
+}
+
+/**
+ * Returns whether a preview should run after order-affecting changes.
+ * @param {Object} state
+ * @returns {boolean}
+ */
+export function shouldUpdatePreviewAfterPaymentSelection(state) {
+  return hasExplicitPaymentSelection(state) && Boolean(state.selectedShippingMethodId);
+}
+
+/**
+ * Refreshes the order preview only after explicit payment selection.
+ * @param {HTMLFormElement} form
+ * @param {Object} cart
+ * @param {Object} state
+ * @param {Object} config
+ * @returns {Promise<void>}
+ */
+export async function updatePreviewAfterPaymentSelection(form, cart, state, config) {
+  if (shouldUpdatePreviewAfterPaymentSelection(state)) {
+    await updatePreview(form, cart, state, config);
+  }
+}
+
+/**
  * Fetches shipping rates then triggers a preview.
  * @param {HTMLFormElement} form
  * @param {HTMLFieldSetElement} shippingContainer
@@ -199,8 +240,9 @@ async function fetchAndPreview(form, shippingContainer, cart, state, config, str
     if (targetRadio) {
       targetRadio.checked = true;
       state.selectedShippingMethodId = targetRadio.value;
+      clearPreviewState(state);
       shippingContainer.dispatchEvent(new CustomEvent('checkout:shipping-selected', { bubbles: true }));
-      await updatePreview(form, cart, state, config);
+      await updatePreviewAfterPaymentSelection(form, cart, state, config);
     }
   } catch {
     renderShippingMethods(shippingContainer, [], strings, currencyCode);
@@ -239,8 +281,9 @@ export function initShipping(form, shippingContainer, cart, state, config, strin
   shippingContainer.addEventListener('change', (e) => {
     if (e.target.name === 'shippingMethod') {
       state.selectedShippingMethodId = e.target.value;
+      clearPreviewState(state);
       shippingContainer.dispatchEvent(new CustomEvent('checkout:shipping-selected', { bubbles: true }));
-      updatePreview(form, cart, state, config);
+      updatePreviewAfterPaymentSelection(form, cart, state, config);
     }
   });
 
