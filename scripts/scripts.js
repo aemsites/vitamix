@@ -573,6 +573,7 @@ function buildPDPBlock(main) {
       ['nav', `/${locale}/${language}/nav/nav`],
       ['footer', `/${locale}/${language}/footer/footer`],
       ['nav-banners', `/${locale}/${language}/nav/nav-banners`],
+      ['nav-promos', `/${locale}/${language}/nav/nav-promos`],
     ].forEach(([name, content]) => {
       const meta = document.createElement('meta');
       meta.name = name;
@@ -1160,6 +1161,38 @@ export function parseEasternDateTime(dateStr) {
 }
 
 /**
+ * Parses the start/end date cells of a scheduled content row.
+ * Empty cells are treated as open-ended (always started / never expires).
+ * @param {HTMLElement} startEl - Cell containing the start datetime text
+ * @param {HTMLElement} endEl - Cell containing the end datetime text
+ * @returns {Object} `{ valid, start, end }`, or `{ valid: false, error, start: null, end: null }`
+ */
+function parseScheduleDates(startEl, endEl) {
+  const parseDateOrNull = (dateStr) => {
+    const trimmed = dateStr ? dateStr.trim() : '';
+    if (!trimmed) {
+      return null; // Empty = open-ended
+    }
+    return parseEasternDateTime(trimmed);
+  };
+
+  try {
+    return {
+      valid: true,
+      start: parseDateOrNull(startEl.textContent),
+      end: parseDateOrNull(endEl.textContent),
+    };
+  } catch (e) {
+    return {
+      valid: false,
+      error: e.message,
+      start: null,
+      end: null,
+    };
+  }
+}
+
+/**
  * Parses alert banner rows from a block element and returns an array of banner objects.
  * Expected row format:
  *   Column 1: Start datetime (e.g., "6/23/2025 9am")
@@ -1171,43 +1204,37 @@ export function parseEasternDateTime(dateStr) {
  * @returns {Array<Object>} Array of parsed banner objects with properties:
  */
 export function parseAlertBanners(block) {
-  /**
-   * Parses a datetime string, returning null for empty values (open-ended).
-   * @param {string} dateStr - The datetime string to parse
-   * @returns {Date|null} The parsed Date or null if empty
-   */
-  const parseDateOrNull = (dateStr) => {
-    const trimmed = dateStr?.trim();
-    if (!trimmed) {
-      return null; // Empty = open-ended
-    }
-    return parseEasternDateTime(trimmed);
-  };
-
   const rows = [...block.children];
-  const banners = rows.map((row) => {
+  return rows.map((row) => {
     const [startEl, endEl, content, colorEl] = [...row.children];
     const color = colorEl.textContent.trim();
-    try {
-      return ({
-        valid: true,
-        start: parseDateOrNull(startEl.textContent),
-        end: parseDateOrNull(endEl.textContent),
-        content,
-        color,
-      });
-    } catch (e) {
-      return {
-        valid: false,
-        error: e.message,
-        start: null,
-        end: null,
-        content,
-        color,
-      };
-    }
+    return {
+      ...parseScheduleDates(startEl, endEl),
+      content,
+      color,
+    };
   });
-  return banners;
+}
+
+/**
+ * Parses nav-promo rows from a block element and returns an array of promo objects.
+ * Expected row format:
+ *   Column 1: Start datetime
+ *   Column 2: End datetime
+ *   Column 3: Content
+ * Defaults to Eastern time, same as parseAlertBanners.
+ * @param {HTMLElement} block - The DOM element containing nav-promo rows as children.
+ * @returns {Array<Object>} Array of parsed promo objects.
+ */
+export function parseNavPromos(block) {
+  const rows = [...block.children];
+  return rows.map((row) => {
+    const [startEl, endEl, content] = [...row.children];
+    return {
+      ...parseScheduleDates(startEl, endEl),
+      content,
+    };
+  });
 }
 
 /**
@@ -1233,21 +1260,436 @@ export function currentPastFuture(start, end, date = new Date()) {
 }
 
 /**
- * Finds the "best" alert banner from an array of banners, based on the current date.
- * @param {Array<Object>} banners - Array of banner objects as returned by parseAlertBanners.
+ * Finds the "best" (currently active) item from an array of scheduled items.
+ * Works for any array of `{ valid, start, end }` objects, e.g. banners or nav-promos.
+ * @param {Array<Object>} items - Array of item objects from parseAlertBanners/parseNavPromos.
  * @param {Date} [date=new Date()] - The reference date/time to use (defaults to now).
- * @returns {Object|null} The best banner object, or null if none are current.
+ * @returns {Object|null} The best item object, or null if none are current.
  */
-export function findBestAlertBanner(banners, date = new Date()) {
-  let bestBanner = null;
-  banners.forEach((banner) => {
-    if (banner.valid) {
-      if (currentPastFuture(banner.start, banner.end, date) === 'current') {
-        bestBanner = banner;
+export function findCurrentScheduledItem(items, date = new Date()) {
+  let bestItem = null;
+  items.forEach((item) => {
+    if (item.valid) {
+      if (currentPastFuture(item.start, item.end, date) === 'current') {
+        bestItem = item;
       }
     }
   });
-  return bestBanner;
+  return bestItem;
+}
+
+/**
+ * Formats a Date object into a short date-time string format (M/D HHam/pm).
+ * @param {Date} date - The date to format
+ * @returns {string} Formatted date string, or "Invalid Date" or "Open"
+ */
+export function formatShortDateTime(date) {
+  if (date === null) {
+    return 'Open';
+  }
+  if (!date || !(date instanceof Date) || Number.isNaN(date.getTime())) {
+    return 'Invalid Date';
+  }
+
+  const month = date.getMonth() + 1; // getMonth() returns 0-11
+  const day = date.getDate();
+  let hours = date.getHours();
+  const minutes = date.getMinutes();
+
+  // Convert to 12-hour format
+  const ampm = hours >= 12 ? 'pm' : 'am';
+  hours %= 12;
+  if (hours === 0) hours = 12; // 12am/12pm instead of 0am/0pm
+
+  // Format time - only show minutes if not :00
+  let timeStr = `${hours}${ampm}`;
+  if (minutes !== 0) {
+    const paddedMinutes = minutes.toString().padStart(2, '0');
+    timeStr = `${hours}:${paddedMinutes}${ampm}`;
+  }
+
+  return `${month}/${day} ${timeStr}`;
+}
+
+/**
+ * Formats a duration in milliseconds into a human-readable string.
+ * Shows only the largest rounded unit (weeks for 21+ days, days for 1+ days, etc.)
+ * @param {number} ms - Duration in milliseconds
+ * @returns {string} Formatted duration string (e.g., "3d", "2w", "5h")
+ */
+export function formatDuration(ms) {
+  if (ms === null || Number.isNaN(ms)) return '';
+
+  const negative = ms < 0;
+  const absMs = Math.abs(ms);
+
+  const totalMinutes = Math.round(absMs / (1000 * 60));
+  const totalHours = totalMinutes / 60;
+  const totalDays = totalHours / 24;
+  const totalWeeks = totalDays / 7;
+
+  let value;
+  let unit;
+  if (totalDays >= 21) {
+    // 3+ weeks: show weeks
+    value = Math.round(totalWeeks);
+    unit = value === 1 ? 'week' : 'weeks';
+  } else if (totalDays >= 1) {
+    // 1+ days: show days
+    value = Math.round(totalDays);
+    unit = value === 1 ? 'day' : 'days';
+  } else if (totalHours >= 1) {
+    // 1+ hours: show hours
+    value = Math.round(totalHours);
+    unit = value === 1 ? 'hour' : 'hours';
+  } else {
+    // Less than 1 hour: show minutes
+    value = Math.round(totalMinutes);
+    unit = value === 1 ? 'minute' : 'minutes';
+  }
+
+  const result = `${value} ${unit}`;
+  return negative ? `-${result}` : result;
+}
+
+/**
+ * Creates a timeline visualization showing scheduled items across 6 months.
+ * Shows 3 months before and 3 months after the current date.
+ * @param {Array<Object>} items - Array of scheduled item objects
+ * @param {Object|null} [bestItem=null] - The optimal item to highlight
+ * @param {Date} [date=new Date()] - Reference date for the "now" marker
+ * @param {Function} [onDateChange=null] - Callback when date is changed via drag (receives newDate)
+ * @param {Function} [onPreviewChange=null] - Callback when selected item changes
+ * @returns {HTMLElement} Timeline container element
+ */
+export function createTimeline(
+  items,
+  bestItem = null,
+  date = new Date(),
+  onDateChange = null,
+  onPreviewChange = null,
+) {
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const container = document.createElement('div');
+  container.classList.add('alert-banners-timeline');
+
+  // Calculate 6-month window: 3 months before and 3 months after current date
+  const currentMonth = date.getMonth();
+  const currentYear = date.getFullYear();
+
+  // Start 3 months before (beginning of that month)
+  let startMonth = currentMonth - 3;
+  let startYear = currentYear;
+  if (startMonth < 0) {
+    startMonth += 12;
+    startYear -= 1;
+  }
+  const rangeStart = new Date(startYear, startMonth, 1);
+
+  // End 3 months after (end of that month)
+  let endMonth = currentMonth + 3;
+  let endYear = currentYear;
+  if (endMonth > 11) {
+    endMonth -= 12;
+    endYear += 1;
+  }
+  // Get last day of the end month
+  const rangeEnd = new Date(endYear, endMonth + 1, 0, 23, 59, 59);
+
+  const rangeDuration = rangeEnd.getTime() - rangeStart.getTime();
+
+  // Build array of months to display
+  const displayMonths = [];
+  let m = startMonth;
+  let y = startYear;
+  for (let i = 0; i < 7; i += 1) {
+    displayMonths.push({ month: m, year: y, name: monthNames[m] });
+    m += 1;
+    if (m > 11) {
+      m = 0;
+      y += 1;
+    }
+  }
+
+  // Create header with months
+  const header = document.createElement('div');
+  header.classList.add('timeline-header');
+
+  // Show year range or single year
+  const yearLabel = document.createElement('div');
+  yearLabel.classList.add('timeline-year');
+  if (startYear === endYear) {
+    yearLabel.textContent = startYear;
+  } else {
+    yearLabel.textContent = `${startYear}–${endYear}`;
+  }
+  header.appendChild(yearLabel);
+
+  const monthsRow = document.createElement('div');
+  monthsRow.classList.add('timeline-months');
+  displayMonths.forEach(({ name }) => {
+    const monthDiv = document.createElement('div');
+    monthDiv.classList.add('timeline-month');
+    monthDiv.textContent = name;
+    monthsRow.appendChild(monthDiv);
+  });
+  header.appendChild(monthsRow);
+  container.appendChild(header);
+
+  // Create item rows
+  const rowsContainer = document.createElement('div');
+  rowsContainer.classList.add('timeline-rows');
+
+  const visibleItems = []; // Track which items have visible bars
+
+  items.forEach((item) => {
+    if (!item.valid) return;
+
+    // Skip items with negative duration (end before start)
+    if (item.start && item.end && item.end < item.start) return;
+
+    // Calculate bar position
+    const startTime = item.start ? item.start.getTime() : rangeStart.getTime();
+    const endTime = item.end ? item.end.getTime() : rangeEnd.getTime();
+
+    // Clamp to visible range
+    const visibleStart = Math.max(startTime, rangeStart.getTime());
+    const visibleEnd = Math.min(endTime, rangeEnd.getTime());
+
+    // Only show row if item overlaps with the visible range
+    if (visibleEnd < rangeStart.getTime() || visibleStart > rangeEnd.getTime()) return;
+
+    const row = document.createElement('div');
+    row.classList.add('timeline-row');
+
+    // Track for the bar
+    const track = document.createElement('div');
+    track.classList.add('timeline-track');
+    track.title = (item.content && item.content.textContent) ? item.content.textContent.trim() : '';
+
+    const leftPercent = ((visibleStart - rangeStart.getTime()) / rangeDuration) * 100;
+    const widthPercent = ((visibleEnd - visibleStart) / rangeDuration) * 100;
+
+    const bar = document.createElement('div');
+    bar.classList.add('timeline-bar');
+    bar.classList.add(`timeline-bar-${currentPastFuture(item.start, item.end, date)}`);
+
+    if (bestItem === item) {
+      bar.classList.add('timeline-bar-selected');
+    }
+
+    // Show arrows for open-ended dates
+    if (!item.start || item.start.getTime() < rangeStart.getTime()) {
+      bar.classList.add('timeline-bar-open-start');
+    }
+    if (!item.end || item.end.getTime() > rangeEnd.getTime()) {
+      bar.classList.add('timeline-bar-open-end');
+    }
+
+    bar.style.left = `${Math.max(0, leftPercent)}%`;
+    bar.style.width = `${Math.min(100, widthPercent)}%`;
+
+    // Tooltip
+    const startStr = item.start ? formatShortDateTime(item.start) : '∞';
+    const endStr = item.end ? formatShortDateTime(item.end) : '∞';
+    bar.title = `${startStr} → ${endStr}`;
+
+    track.appendChild(bar);
+    visibleItems.push(item); // Track this item has a visible bar
+
+    row.appendChild(track);
+    rowsContainer.appendChild(row);
+  });
+
+  container.appendChild(rowsContainer);
+
+  // Add draggable "now" marker
+  const nowTime = date.getTime();
+  if (nowTime >= rangeStart.getTime() && nowTime <= rangeEnd.getTime()) {
+    const nowPercent = ((nowTime - rangeStart.getTime()) / rangeDuration) * 100;
+    const nowMarker = document.createElement('div');
+    nowMarker.classList.add('timeline-now');
+    nowMarker.title = 'Drag to change date';
+
+    // Add date label (M/D format)
+    const dateLabel = document.createElement('div');
+    dateLabel.classList.add('timeline-now-label');
+    dateLabel.textContent = `${date.getMonth() + 1}/${date.getDate()}`;
+    nowMarker.appendChild(dateLabel);
+
+    // Add drag handle
+    const handle = document.createElement('div');
+    handle.classList.add('timeline-now-handle');
+    nowMarker.appendChild(handle);
+
+    // Position marker after container is in DOM
+    nowMarker.dataset.percent = nowPercent;
+
+    // Drag functionality
+    if (onDateChange) {
+      let isDragging = false;
+      let trackBoundsCache = null;
+
+      // Cache bars and track for performance
+      let barsCache = null;
+      let lastBestIdx = -1;
+
+      const cacheTrackBounds = () => {
+        const track = container.querySelector('.timeline-track');
+        if (track) {
+          trackBoundsCache = track.getBoundingClientRect();
+        } else {
+          const months = container.querySelector('.timeline-months');
+          trackBoundsCache = months ? months.getBoundingClientRect() : null;
+        }
+        // Also cache bars
+        barsCache = [...container.querySelectorAll('.timeline-bar')];
+      };
+
+      // Update item bar colors and selection based on the new date
+      // Returns the current best item (for passing to onDateChange)
+      const updateBarColors = (newDate) => {
+        if (!barsCache) return null;
+
+        let newBestIdx = -1;
+
+        // Update bar classes
+        for (let i = 0; i < barsCache.length; i += 1) {
+          const bar = barsCache[i];
+          const item = visibleItems[i];
+          if (!item) continue; // eslint-disable-line no-continue
+
+          const state = currentPastFuture(item.start, item.end, newDate);
+
+          // Update state class (toggle instead of remove all + add)
+          bar.classList.toggle('timeline-bar-past', state === 'past');
+          bar.classList.toggle('timeline-bar-current', state === 'current');
+          bar.classList.toggle('timeline-bar-future', state === 'future');
+
+          if (state === 'current') {
+            newBestIdx = i;
+          }
+        }
+
+        // Update selected class only if changed
+        if (newBestIdx !== lastBestIdx) {
+          if (lastBestIdx >= 0 && barsCache[lastBestIdx]) {
+            barsCache[lastBestIdx].classList.remove('timeline-bar-selected');
+          }
+          if (newBestIdx >= 0 && barsCache[newBestIdx]) {
+            barsCache[newBestIdx].classList.add('timeline-bar-selected');
+          }
+          lastBestIdx = newBestIdx;
+
+          // Only notify preview change when selection changes
+          if (onPreviewChange) {
+            onPreviewChange(newBestIdx >= 0 ? visibleItems[newBestIdx] : null);
+          }
+        }
+
+        return newBestIdx >= 0 ? visibleItems[newBestIdx] : null;
+      };
+
+      const updateMarkerFromX = (clientX) => {
+        if (!trackBoundsCache || trackBoundsCache.width === 0) return null;
+
+        const relativeX = clientX - trackBoundsCache.left;
+        const percent = Math.max(0, Math.min(relativeX / trackBoundsCache.width, 1));
+
+        // Update marker position directly (don't re-render timeline)
+        const containerRect = container.getBoundingClientRect();
+        const leftOffset = trackBoundsCache.left - containerRect.left;
+        const newLeft = leftOffset + (percent * trackBoundsCache.width);
+        nowMarker.style.left = `${newLeft}px`;
+
+        // Calculate the new date
+        const newTime = rangeStart.getTime() + (percent * rangeDuration);
+        const newDate = new Date(newTime);
+
+        // Update the date label
+        dateLabel.textContent = `${newDate.getMonth() + 1}/${newDate.getDate()}`;
+
+        // Update bar colors and get current best item
+        const currentBest = updateBarColors(newDate);
+
+        return { newDate, bestItem: currentBest };
+      };
+
+      const onMouseMove = (e) => {
+        if (!isDragging) return;
+        e.preventDefault();
+        const result = updateMarkerFromX(e.clientX);
+        if (result) {
+          onDateChange(result.newDate, result.bestItem);
+        }
+      };
+
+      const onMouseUp = () => {
+        isDragging = false;
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        nowMarker.classList.remove('timeline-now-dragging');
+        trackBoundsCache = null;
+      };
+
+      nowMarker.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        isDragging = true;
+        cacheTrackBounds(); // Cache bounds at start of drag
+        nowMarker.classList.add('timeline-now-dragging');
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      });
+
+      // Touch support
+      const onTouchMove = (e) => {
+        if (!isDragging) return;
+        e.preventDefault();
+        const touch = e.touches[0];
+        const result = updateMarkerFromX(touch.clientX);
+        if (result) {
+          onDateChange(result.newDate, result.bestItem);
+        }
+      };
+
+      const onTouchEnd = () => {
+        isDragging = false;
+        document.removeEventListener('touchmove', onTouchMove);
+        document.removeEventListener('touchend', onTouchEnd);
+        nowMarker.classList.remove('timeline-now-dragging');
+        trackBoundsCache = null;
+      };
+
+      nowMarker.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        isDragging = true;
+        cacheTrackBounds();
+        nowMarker.classList.add('timeline-now-dragging');
+        document.addEventListener('touchmove', onTouchMove, { passive: false });
+        document.addEventListener('touchend', onTouchEnd);
+      });
+
+      // Position marker after a frame so DOM is ready
+      requestAnimationFrame(() => {
+        const track = container.querySelector('.timeline-track');
+        if (track) {
+          const trackRect = track.getBoundingClientRect();
+          const containerRect = container.getBoundingClientRect();
+          const leftOffset = trackRect.left - containerRect.left;
+          const newLeft = leftOffset + (nowPercent / 100) * trackRect.width;
+          nowMarker.style.left = `${newLeft}px`;
+        }
+      });
+    } else {
+      // Non-interactive: use CSS calc
+      nowMarker.style.left = `${nowPercent}%`;
+    }
+
+    container.appendChild(nowMarker);
+  }
+
+  return container;
 }
 
 /**
@@ -1267,7 +1709,7 @@ async function loadNavBanner(main) {
     const block = dom.querySelector('.alert-banners');
 
     const banners = parseAlertBanners(block);
-    const selectedBanner = findBestAlertBanner(banners);
+    const selectedBanner = findCurrentScheduledItem(banners);
 
     if (selectedBanner && selectedBanner.content) {
       const banner = document.createElement('aside');
