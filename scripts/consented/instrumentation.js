@@ -50,6 +50,14 @@ export function isPdpPage() {
 }
 
 /**
+ * Search-result page detection via .search-results container.
+ * @returns {boolean}
+ */
+export function isSearchPage() {
+  return !!document.querySelector('.search-results');
+}
+
+/**
  * Product display name for Adobe Analytics productID (Magento parity: ;{name};;;;).
  * @returns {string}
  */
@@ -335,12 +343,102 @@ export function trackProdView(attempt = 0) {
 }
 
 /**
- * Initialize Adobe Analytics instrumentation (prodView on PDP).
+ * Derive onsiteSearchToolType from the current URL ?type= param.
+ * Matches AEM logic: recipe → browseRecipe, article → browseArticle, else siteSearch.
+ * @returns {string}
+ */
+function getSearchToolTypeFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const type = (params.get('type') || '').toLowerCase();
+  if (type === 'recipe') return 'browseRecipe';
+  if (type === 'article') return 'browseArticle';
+  return 'siteSearch';
+}
+
+/**
+ * Set digitalData search properties and fire the matching Launch direct-call rule.
+ * Mirrors AEM setDigitalDataForSearch(). Called after every search run in the
+ * search-results widget so onsiteSearchTerm/Results/ToolType are always populated.
+ * @param {string} searchTerm - The search string entered by the user
+ * @param {string} toolType - 'siteSearch' | 'browseRecipe' | 'browseArticle'
+ * @param {number} resultCount - Total number of results returned
+ */
+export function setDigitalDataForSearch(searchTerm, toolType, resultCount) {
+  window.digitalData = window.digitalData || {};
+  window.digitalData.page = window.digitalData.page || {};
+  window.digitalData.page.pageInfo = window.digitalData.page.pageInfo || {};
+
+  window.digitalData.page.pageInfo.onsiteSearchTerm = searchTerm || '';
+  window.digitalData.page.pageInfo.onsiteSearchToolType = toolType;
+  window.digitalData.page.pageInfo.onsiteSearchResults = resultCount;
+
+  whenSatelliteReady(() => {
+    configureAnalyticsTrackingServers();
+    const satellite = getSatellite();
+    if (toolType === 'siteSearch') {
+      satellite.track('searchSiteSearch');
+    } else if (toolType === 'browseRecipe') {
+      satellite.track('searchBrowseRecipe');
+    } else if (toolType === 'browseArticle') {
+      satellite.track('searchBrowseArticle');
+    }
+    debugLog('Adobe Analytics search event fired', window.digitalData.page.pageInfo);
+  }, `search:${toolType}`);
+}
+
+/**
+ * Attach a MutationObserver to #results-count so digitalData is updated
+ * automatically every time the search widget finishes a runSearch cycle.
+ * @param {Element} resultsCountEl
+ */
+function attachSearchResultsObserver(resultsCountEl) {
+  const observer = new MutationObserver(() => {
+    const params = new URLSearchParams(window.location.search);
+    const searchTerm = params.get('search') || '';
+    const toolType = getSearchToolTypeFromUrl();
+    const count = parseInt(resultsCountEl.textContent, 10) || 0;
+    setDigitalDataForSearch(searchTerm, toolType, count);
+  });
+  observer.observe(resultsCountEl, { childList: true, characterData: true, subtree: true });
+}
+
+/**
+ * Initialize search analytics tracking on search-result pages.
+ * Observes #results-count — written by the search widget after every runSearch —
+ * so no changes to the widget itself are needed.
+ * Falls back to a MutationObserver on the container if the widget hasn't rendered yet.
+ */
+export function trackSearchResults() {
+  const container = document.querySelector('.search-results');
+  if (!container) return;
+
+  const resultsCountEl = container.querySelector('#results-count');
+  if (resultsCountEl) {
+    attachSearchResultsObserver(resultsCountEl);
+    return;
+  }
+
+  // #results-count is injected dynamically by buildSearchFiltering — wait for it
+  const containerObserver = new MutationObserver((_, obs) => {
+    const el = container.querySelector('#results-count');
+    if (el) {
+      obs.disconnect();
+      attachSearchResultsObserver(el);
+    }
+  });
+  containerObserver.observe(container, { childList: true, subtree: true });
+}
+
+/**
+ * Initialize Adobe Analytics instrumentation (prodView on PDP, search tracking on search pages).
  * @returns {void}
  */
 export function initInstrumentation() {
   debugLog('Adobe Analytics instrumentation loaded');
   if (isPdpPage()) {
     trackProdView();
+  }
+  if (isSearchPage()) {
+    trackSearchResults();
   }
 }
