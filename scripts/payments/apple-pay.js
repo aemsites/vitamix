@@ -7,9 +7,9 @@ import {
 import { getUser, isLoggedIn } from '../auth-api.js';
 import { logOperation, getCheckoutId } from '../operations-log.js';
 import {
-  APPLE_PAY_CART_CONTEXT,
-  buildApplePayCartOrderPayload,
-  buildApplePayCartPreviewPayload,
+  buildApplePayExpressOrderPayload,
+  buildApplePayExpressPreviewPayload,
+  getApplePayExpressContext,
 } from './apple-pay-context.js';
 
 const APPLE_PAY_SDK_URL = 'https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js';
@@ -40,6 +40,7 @@ function startExpressSession(btn, config, callbacks) {
     const locale = config.getLocale();
     const language = config.getLanguage();
     const bcp47 = `${language.split('_')[0]}-${(language.split('_')[1] || locale).toUpperCase()}`;
+    const checkoutContext = getApplePayExpressContext(callbacks.expressEntryPoint);
 
     let lastShippingContact = null;
     let lastShippingMethodId = null;
@@ -84,7 +85,7 @@ function startExpressSession(btn, config, callbacks) {
           contact.administrativeArea,
           contact.postalCode,
           cart.getItemsForAPI(),
-          APPLE_PAY_CART_CONTEXT,
+          checkoutContext,
         );
         const methods = result.shippingMethods || [];
         if (!methods.length) {
@@ -124,11 +125,12 @@ function startExpressSession(btn, config, callbacks) {
     session.onshippingmethodselected = async (e) => {
       try {
         const previewResult = await callbacks.previewOrderDirect(
-          buildApplePayCartPreviewPayload(
+          buildApplePayExpressPreviewPayload(
             cart,
             e.shippingMethod.identifier,
             bcp47,
             lastShippingContact,
+            checkoutContext,
           ),
         );
         lastShippingMethodId = e.shippingMethod.identifier;
@@ -157,7 +159,7 @@ function startExpressSession(btn, config, callbacks) {
         // commerce account email, which causes assertEmail to reject the request.
         const customerEmail = (isLoggedIn() && getUser()?.email) || contact.emailAddress || '';
         const customerTimezone = getCustomerTimezone();
-        const orderBody = buildApplePayCartOrderPayload({
+        const orderBody = buildApplePayExpressOrderPayload({
           payment,
           cart,
           shippingMethodId: lastShippingMethodId || e.payment.shippingMethod?.identifier || '',
@@ -166,6 +168,7 @@ function startExpressSession(btn, config, callbacks) {
           locale: bcp47,
           customerEmail,
           customerTimezone,
+          checkoutContext,
         });
 
         const createdOrder = await callbacks.createOrder(orderBody);
@@ -348,6 +351,9 @@ export default {
   isAvailable: () => Boolean(window.ApplePaySession),
 
   renderExpressButton(container, callbacks) {
+    if (!callbacks.expressEntryPoint) {
+      throw new Error('Apple Pay express checkout requires an entry point');
+    }
     const config = callbacks.getConfig();
     const locale = config.getLocale();
     const language = config.getLanguage();

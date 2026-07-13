@@ -10,22 +10,9 @@ import { FORMS_ENDPOINT, getLocaleAndLanguage } from '../../scripts/scripts.js';
 import { validateLinkIntegrity } from './link-integrity.js';
 import { validateForm } from './checkout-validation.js';
 import { logOperation, getCheckoutId } from '../../scripts/operations-log.js';
+import { getStandardCheckoutContext } from '../../scripts/checkout-context.js';
 
 export { validateLinkIntegrity };
-
-/**
- * Builds checkout context fields for full-checkout order payloads.
- * @param {string|null} paymentMethod
- * @returns {Object|null}
- */
-export function getCheckoutContext(paymentMethod) {
-  if (!paymentMethod) return null;
-  return {
-    paymentMethod,
-    checkoutFlow: paymentMethod === 'apple-pay' ? 'express' : 'standard',
-    entryPoint: 'checkout',
-  };
-}
 
 /**
  * Returns the explicitly selected checkout payment method, if any.
@@ -110,7 +97,7 @@ export function buildOrderJSON(formData, form, cart, state, config) {
   order.locale = `${language.split('_')[0]}-${(language.split('_')[1] || locale).toUpperCase()}`;
   order.country = locale;
 
-  const checkoutContext = getCheckoutContext(formData.get('paymentMethod'));
+  const checkoutContext = getStandardCheckoutContext(formData.get('paymentMethod'));
   if (checkoutContext) Object.assign(order, checkoutContext);
 
   const customerTimezone = getCustomerTimezone();
@@ -185,6 +172,7 @@ function subscribeNewsletter(formData) {
  */
 export function initOrder(form, cart, state, config, strings) {
   const callbacks = {
+    expressEntryPoint: 'checkout',
     getCart: () => cart,
     getConfig: () => config,
     strings,

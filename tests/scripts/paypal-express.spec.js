@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { withPayPalExpressContext } from '../../scripts/payments/paypal-context.js';
 
 /**
  * Unit tests for renderExpressButton callbacks in scripts/payments/paypal.js.
@@ -76,7 +77,7 @@ async function handleShippingOptionsChange(data, actions, closureState, callback
     shippingRate: method.rate,
   });
   const countryCode = closureState.lastShippingAddress?.countryCode?.toLowerCase();
-  const preview = await callbacks.previewOrderDirect({
+  const preview = await callbacks.previewOrderDirect(withPayPalExpressContext({
     items: cart.getItemsForAPI(),
     shippingMethod: { id: method.id },
     ...(countryCode ? {
@@ -87,7 +88,7 @@ async function handleShippingOptionsChange(data, actions, closureState, callback
         zip: closureState.lastShippingAddress.postalCode || '',
       },
     } : {}),
-  });
+  }, callbacks.expressEntryPoint));
   state.currentEstimateToken = preview.estimateToken;
   return undefined;
 }
@@ -104,7 +105,7 @@ async function handleApprove(callbacks, deps) {
     const config = callbacks.getConfig();
     const accountEmail = deps.isLoggedInFn?.() ? deps.getUserFn?.()?.email : '';
     const customerEmail = accountEmail || session.payer.email || '';
-    const orderBody = {
+    const orderBody = withPayPalExpressContext({
       customer: {
         firstName: session.payer.firstName,
         lastName: session.payer.lastName,
@@ -126,7 +127,7 @@ async function handleApprove(callbacks, deps) {
       estimateToken: state.currentEstimateToken,
       country: session.shippingAddress.country,
       locale: config.getLanguage(),
-    };
+    }, callbacks.expressEntryPoint);
     const createdOrder = await callbacks.createOrder(orderBody);
     const fraudToken = (() => {
       try {
@@ -191,6 +192,7 @@ function makeState(overrides = {}) {
 
 function makeCallbacks(state = makeState(), overrides = {}) {
   return {
+    expressEntryPoint: 'cart',
     getConfig: () => ({
       getLanguage: () => 'en-US',
       currency: 'USD',
@@ -378,6 +380,11 @@ test.describe('onShippingOptionsChange callback', () => {
     expect(previewArg.shipping.state).toBe('CA');
     expect(previewArg.shipping.zip).toBe('90210');
     expect(previewArg.shippingMethod.id).toBe('std');
+    expect(previewArg).toMatchObject({
+      paymentMethod: 'paypal',
+      checkoutFlow: 'express',
+      entryPoint: 'cart',
+    });
   });
 
   test('calls previewOrderDirect without country/shipping when lastShippingAddress is null', async () => {
@@ -466,6 +473,11 @@ test.describe('onApprove callback', () => {
     expect(orderBody.shippingMethod.id).toBe('std');
     expect(orderBody.estimateToken).toBe('est-tok');
     expect(orderBody.country).toBe('us');
+    expect(orderBody).toMatchObject({
+      paymentMethod: 'paypal',
+      checkoutFlow: 'express',
+      entryPoint: 'cart',
+    });
   });
 
   test('uses authenticated account email for order customer when signed in', async () => {

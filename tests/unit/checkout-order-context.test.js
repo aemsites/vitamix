@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildOrderJSON, getCheckoutContext } from '../../blocks/checkout/checkout-order.js';
+import { buildOrderJSON } from '../../blocks/checkout/checkout-order.js';
+import { getStandardCheckoutContext } from '../../scripts/checkout-context.js';
 import { APPLE_PAY_CART_CONTEXT } from '../../scripts/payments/apple-pay-context.js';
 
 function formData(values) {
@@ -56,23 +57,23 @@ function buildOrder(values) {
   );
 }
 
-test('getCheckoutContext returns null when payment method is absent', () => {
-  assert.equal(getCheckoutContext(''), null);
-  assert.equal(getCheckoutContext(null), null);
+test('getStandardCheckoutContext returns null when payment method is absent', () => {
+  assert.equal(getStandardCheckoutContext(''), null);
+  assert.equal(getStandardCheckoutContext(null), null);
 });
 
-test('getCheckoutContext returns standard checkout context for card payments', () => {
-  assert.deepEqual(getCheckoutContext('chase'), {
+test('getStandardCheckoutContext returns standard checkout context for card payments', () => {
+  assert.deepEqual(getStandardCheckoutContext('chase'), {
     paymentMethod: 'chase',
     checkoutFlow: 'standard',
     entryPoint: 'checkout',
   });
 });
 
-test('getCheckoutContext returns express checkout context for checkout-page Apple Pay', () => {
-  assert.deepEqual(getCheckoutContext('apple-pay'), {
+test('getStandardCheckoutContext returns standard context for form-based Apple Pay', () => {
+  assert.deepEqual(getStandardCheckoutContext('apple-pay'), {
     paymentMethod: 'apple-pay',
-    checkoutFlow: 'express',
+    checkoutFlow: 'standard',
     entryPoint: 'checkout',
   });
 });
@@ -85,20 +86,28 @@ test('buildOrderJSON includes checkout context for card checkout', () => {
   assert.equal(order.entryPoint, 'checkout');
 });
 
-test('buildOrderJSON includes checkout entry point for checkout-page Apple Pay', () => {
+test('buildOrderJSON includes standard context for form-based Apple Pay', () => {
   const order = buildOrder({ paymentMethod: 'apple-pay' });
 
   assert.equal(order.paymentMethod, 'apple-pay');
-  assert.equal(order.checkoutFlow, 'express');
+  assert.equal(order.checkoutFlow, 'standard');
   assert.equal(order.entryPoint, 'checkout');
 });
 
-test('checkout-page Apple Pay context does not reuse cart entry point', () => {
+test('form-based Apple Pay uses standard checkout rather than express cart context', () => {
   const order = buildOrder({ paymentMethod: 'apple-pay' });
 
   assert.equal(APPLE_PAY_CART_CONTEXT.entryPoint, 'cart');
+  assert.equal(APPLE_PAY_CART_CONTEXT.checkoutFlow, 'express');
   assert.equal(order.entryPoint, 'checkout');
-  assert.notEqual(order.entryPoint, APPLE_PAY_CART_CONTEXT.entryPoint);
+  assert.equal(order.checkoutFlow, 'standard');
+  assert.notDeepEqual({
+    checkoutFlow: order.checkoutFlow,
+    entryPoint: order.entryPoint,
+  }, {
+    checkoutFlow: APPLE_PAY_CART_CONTEXT.checkoutFlow,
+    entryPoint: APPLE_PAY_CART_CONTEXT.entryPoint,
+  });
 });
 
 test('buildOrderJSON omits checkout context when payment method is absent', () => {

@@ -1,21 +1,38 @@
-export const APPLE_PAY_CART_CONTEXT = {
-  paymentMethod: 'apple-pay',
-  checkoutFlow: 'express',
-  entryPoint: 'cart',
-};
+import { getExpressCheckoutContext } from '../checkout-context.js';
+
+export const APPLE_PAY_CART_CONTEXT = getExpressCheckoutContext('apple-pay', 'cart');
 
 /**
- * Builds the Apple Pay cart preview payload for a selected shipping method.
+ * Builds Apple Pay express context for the page where the button is rendered.
+ * @param {'cart'|'checkout'|'pdp'} entryPoint
+ * @returns {Object}
+ */
+export function getApplePayExpressContext(entryPoint) {
+  return getExpressCheckoutContext('apple-pay', entryPoint);
+}
+
+/**
+ * Builds the Apple Pay express preview payload for a selected shipping method.
  * @param {Object} cart
  * @param {string} shippingMethodId
  * @param {string} locale
  * @param {Object|null} contact
+ * @param {Object} checkoutContext
  * @returns {Object}
  */
-export function buildApplePayCartPreviewPayload(cart, shippingMethodId, locale, contact) {
+export function buildApplePayExpressPreviewPayload(
+  cart,
+  shippingMethodId,
+  locale,
+  contact,
+  checkoutContext,
+) {
+  if (!checkoutContext) {
+    throw new Error('Apple Pay express preview requires checkout context');
+  }
   const countryCode = contact?.countryCode?.toLowerCase();
   return {
-    ...APPLE_PAY_CART_CONTEXT,
+    ...checkoutContext,
     items: cart.getItemsForAPI(),
     shippingMethod: { id: shippingMethodId },
     locale,
@@ -31,7 +48,7 @@ export function buildApplePayCartPreviewPayload(cart, shippingMethodId, locale, 
 }
 
 /**
- * Builds the Apple Pay cart order payload from the authorized payment contact.
+ * Builds the Apple Pay express order payload from the authorized payment contact.
  * @param {Object} params
  * @param {Object} params.payment
  * @param {Object} params.cart
@@ -41,9 +58,10 @@ export function buildApplePayCartPreviewPayload(cart, shippingMethodId, locale, 
  * @param {string} params.locale
  * @param {string} params.customerEmail
  * @param {string} [params.customerTimezone]
+ * @param {Object} params.checkoutContext
  * @returns {Object}
  */
-export function buildApplePayCartOrderPayload(params) {
+export function buildApplePayExpressOrderPayload(params) {
   const {
     payment,
     cart,
@@ -53,7 +71,11 @@ export function buildApplePayCartOrderPayload(params) {
     locale,
     customerEmail,
     customerTimezone,
+    checkoutContext,
   } = params;
+  if (!checkoutContext) {
+    throw new Error('Apple Pay express order requires checkout context');
+  }
   const contact = payment.shippingContact;
   const shippingAddr = {
     name: `${contact.givenName} ${contact.familyName}`.trim(),
@@ -68,7 +90,7 @@ export function buildApplePayCartOrderPayload(params) {
   };
 
   return {
-    ...APPLE_PAY_CART_CONTEXT,
+    ...checkoutContext,
     customer: {
       firstName: contact.givenName || '',
       lastName: contact.familyName || '',

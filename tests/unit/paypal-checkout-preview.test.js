@@ -1,6 +1,29 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import ensureCheckoutPreviewToken from '../../scripts/payments/paypal-context.js';
+import ensureCheckoutPreviewToken, {
+  getPayPalExpressContext,
+  withPayPalExpressContext,
+} from '../../scripts/payments/paypal-context.js';
+
+test('getPayPalExpressContext preserves the express button entry point', () => {
+  assert.deepEqual(getPayPalExpressContext('checkout'), {
+    paymentMethod: 'paypal',
+    checkoutFlow: 'express',
+    entryPoint: 'checkout',
+  });
+});
+
+test('withPayPalExpressContext adds authoritative context to payloads', () => {
+  assert.deepEqual(withPayPalExpressContext({
+    paymentMethod: 'incorrect',
+    items: [{ sku: 'sku-1' }],
+  }, 'cart'), {
+    paymentMethod: 'paypal',
+    checkoutFlow: 'express',
+    entryPoint: 'cart',
+    items: [{ sku: 'sku-1' }],
+  });
+});
 
 function callbacksForState(state) {
   let updatePreviewCalls = 0;

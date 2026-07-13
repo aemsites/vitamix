@@ -1,5 +1,6 @@
 import { estimateShipping, previewOrder } from '../../scripts/commerce-api.js';
 import { formatPrice } from '../../scripts/commerce-config.js';
+import { getStandardCheckoutContext } from '../../scripts/checkout-context.js';
 import { wireRadioTabNav } from './checkout-form.js';
 
 /**
@@ -140,13 +141,14 @@ export async function updatePreview(form, cart, state, config) {
     email,
   };
 
+  const checkoutContext = getStandardCheckoutContext(data.get('paymentMethod'));
   const orderBody = {
     shipping: Object.fromEntries(Object.entries(shippingAddr).filter(([, v]) => v !== '')),
     items: cart.getItemsForAPI(),
     shippingMethod: { id: state.selectedShippingMethodId },
     locale: `${language.split('_')[0]}-${(language.split('_')[1] || locale).toUpperCase()}`,
     country: locale,
-    paymentMethod: data.get('paymentMethod') || null,
+    ...(checkoutContext || {}),
   };
 
   const couponCode = sessionStorage.getItem('checkout_coupon_code') || undefined;
