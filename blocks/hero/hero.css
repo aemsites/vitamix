@@ -307,7 +307,7 @@
 
 .hero a.button:hover,
 .hero a.button:focus {
-  background-color: rgb(from currentcolor r g b / 15%);
+  background-color: color-mix(in srgb, currentcolor 15%, transparent);
 }
 
 .hero.image-dark a.button,
