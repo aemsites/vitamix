@@ -13,7 +13,6 @@ import { logOperation, getCheckoutId } from '../../scripts/operations-log.js';
 import { getStandardCheckoutContext } from '../../scripts/checkout-context.js';
 
 export { validateLinkIntegrity };
-export { getStandardCheckoutContext as getCheckoutContext };
 
 /**
  * Returns the explicitly selected checkout payment method, if any.
