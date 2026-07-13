@@ -298,6 +298,15 @@ async function fillBilling(page, address = VALID_ADDRESS) {
   await field(page, 'billing-state').selectOption(address.state);
 }
 
+async function selectCreditCardAndWaitForPreview(page) {
+  const previewResponse = page.waitForResponse(
+    (res) => res.url().includes('/orders/preview') && res.request().method() === 'POST',
+    { timeout: 15000 },
+  );
+  await page.locator('.checkout-form [name="paymentMethod"][value="chase"]').check();
+  await previewResponse;
+}
+
 // ─── Tests ──────────────────────────────────────────────────────────────────
 
 test.describe('Edge Checkout Page', () => {
@@ -550,12 +559,14 @@ test.describe('Edge Checkout Page', () => {
       await expect(page.locator('.checkout-form')).toBeVisible({ timeout: 15000 });
       await expandOrderSummary(page);
 
-      // Start from quantity 2, then select a shipping address. The first
-      // estimate/preview should use the qty-2 standard id.
+      // Start from quantity 2, then select a shipping address. Shipping alone
+      // must not create a signed preview; selecting a payment method should.
       await page.locator('.order-summary-items .qty-inc').first().click();
       await fillShipping(page);
       await expect(page.locator('.checkout-form [name="shippingMethod"][value="797"]')).toBeChecked({ timeout: 10000 });
-      await expect.poll(() => previewRequests.some(
+      expect(previewRequests).toHaveLength(0);
+      await selectCreditCardAndWaitForPreview(page);
+      expect(previewRequests.some(
         (body) => body.items?.[0]?.quantity === 2 && body.shippingMethod?.id === '797',
       )).toBe(true);
 
@@ -619,13 +630,12 @@ test.describe('Edge Checkout Page', () => {
       await expect(page.locator('.checkout-form')).toBeVisible({ timeout: 15000 });
       await fillShipping(page);
 
-      // Wait for the preview call triggered by state-change → shipping-selected
-      await page.waitForResponse(
-        (res) => res.url().includes('/orders/preview') && res.request().method() === 'POST',
-        { timeout: 15000 },
-      );
-
       const total = page.locator('.order-summary-grand-total');
+      await expect(page.locator('.order-summary-shipping')).toContainText('5.99', { timeout: 10000 });
+      await expect(total).toContainText('555.98', { timeout: 10000 });
+
+      await selectCreditCardAndWaitForPreview(page);
+
       // MOCK_PREVIEW.total = 604.10 — formatted as $604.10
       await expect(total).toContainText('604.10', { timeout: 10000 });
       console.log('✓ Order summary total reflects mocked preview response');
@@ -728,10 +738,7 @@ test.describe('Edge Checkout Page', () => {
       await expect(page.locator('.checkout-form')).toBeVisible({ timeout: 15000 });
       await fillContact(page);
       await fillShipping(page);
-      await page.waitForResponse(
-        (res) => res.url().includes('/orders/preview') && res.request().method() === 'POST',
-        { timeout: 15000 },
-      );
+      await selectCreditCardAndWaitForPreview(page);
 
       await page.locator('.checkout-submit-btn').click();
 
@@ -766,10 +773,7 @@ test.describe('Edge Checkout Page', () => {
       await expect(page.locator('.checkout-form')).toBeVisible({ timeout: 15000 });
       await fillContact(page);
       await fillShipping(page);
-      await page.waitForResponse(
-        (res) => res.url().includes('/orders/preview') && res.request().method() === 'POST',
-        { timeout: 15000 },
-      );
+      await selectCreditCardAndWaitForPreview(page);
       await page.locator('.checkout-form [name="billing-choice"][value="different"]').check();
       await fillBilling(page, BILLING_ADDRESS);
 
@@ -824,10 +828,7 @@ test.describe('Edge Checkout Page', () => {
       await expect(page.locator('.checkout-form')).toBeVisible({ timeout: 15000 });
       await fillContact(page);
       await fillShipping(page);
-      await page.waitForResponse(
-        (res) => res.url().includes('/orders/preview') && res.request().method() === 'POST',
-        { timeout: 15000 },
-      );
+      await selectCreditCardAndWaitForPreview(page);
       await page.locator('.checkout-form [name="billing-choice"][value="different"]').check();
       await fillBilling(page, BILLING_ADDRESS);
 
@@ -874,10 +875,7 @@ test.describe('Edge Checkout Page', () => {
       await expect(page.locator('.checkout-form')).toBeVisible({ timeout: 15000 });
       await fillContact(page);
       await fillShipping(page);
-      await page.waitForResponse(
-        (res) => res.url().includes('/orders/preview') && res.request().method() === 'POST',
-        { timeout: 15000 },
-      );
+      await selectCreditCardAndWaitForPreview(page);
       previewCount = 0;
 
       await page.locator('.checkout-form [name="billing-choice"][value="different"]').check();
@@ -921,13 +919,10 @@ test.describe('Edge Checkout Page', () => {
       await expect(page.locator('.checkout-form')).toBeVisible({ timeout: 15000 });
       await fillContact(page);
       await fillShipping(page);
-      await page.waitForResponse(
-        (res) => res.url().includes('/orders/preview') && res.request().method() === 'POST',
-        { timeout: 15000 },
-      );
+      await selectCreditCardAndWaitForPreview(page);
 
-      await page.locator('.checkout-submit-btn').click();
-
+      // Selecting payment moves focus out of the address fields and can open
+      // the validation dialog before submit. Exercise that existing dialog.
       const dialog = page.locator('.address-validation-dialog');
       await expect(dialog).toBeVisible({ timeout: 10000 });
       await expect(dialog.locator('button', { hasText: 'Use this address' })).toBeVisible();
@@ -987,10 +982,7 @@ test.describe('Edge Checkout Page', () => {
       await expect(page.locator('.checkout-form')).toBeVisible({ timeout: 15000 });
       await fillContact(page);
       await fillShipping(page);
-      await page.waitForResponse(
-        (res) => res.url().includes('/orders/preview') && res.request().method() === 'POST',
-        { timeout: 15000 },
-      );
+      await selectCreditCardAndWaitForPreview(page);
 
       await page.locator('.checkout-submit-btn').click();
       const dialog = page.locator('.address-validation-dialog');
@@ -1060,11 +1052,8 @@ test.describe('Edge Checkout Page', () => {
       await fillContact(page);
       await fillShipping(page);
 
-      // Wait for shipping rates + first preview to land
-      await page.waitForResponse(
-        (res) => res.url().includes('/orders/preview') && res.request().method() === 'POST',
-        { timeout: 15000 },
-      );
+      // Shipping rates land first; explicit payment selection creates the preview.
+      await selectCreditCardAndWaitForPreview(page);
 
       // Submit
       await page.locator('.checkout-submit-btn').click();
@@ -1100,10 +1089,7 @@ test.describe('Edge Checkout Page', () => {
       await expect(page.locator('.checkout-form')).toBeVisible({ timeout: 15000 });
       await fillContact(page);
       await fillShipping(page);
-      await page.waitForResponse(
-        (res) => res.url().includes('/orders/preview') && res.request().method() === 'POST',
-        { timeout: 15000 },
-      );
+      await selectCreditCardAndWaitForPreview(page);
 
       await page.locator('.checkout-submit-btn').click();
       await expect.poll(
@@ -1134,10 +1120,7 @@ test.describe('Edge Checkout Page', () => {
       await expect(page.locator('.checkout-form')).toBeVisible({ timeout: 15000 });
       await fillContact(page);
       await fillShipping(page);
-      await page.waitForResponse(
-        (res) => res.url().includes('/orders/preview') && res.request().method() === 'POST',
-        { timeout: 15000 },
-      );
+      await selectCreditCardAndWaitForPreview(page);
 
       await page.locator('.checkout-submit-btn').click();
       await expect.poll(
@@ -1181,10 +1164,7 @@ test.describe('Edge Checkout Page', () => {
       await expect(page.locator('.checkout-form')).toBeVisible({ timeout: 15000 });
       await fillContact(page);
       await fillShipping(page);
-      await page.waitForResponse(
-        (res) => res.url().includes('/orders/preview') && res.request().method() === 'POST',
-        { timeout: 15000 },
-      );
+      await selectCreditCardAndWaitForPreview(page);
 
       await page.locator('.checkout-submit-btn').click();
       await page.waitForURL(redirectUrl, { timeout: 15000 });
@@ -1237,10 +1217,7 @@ test.describe('Edge Checkout Page', () => {
       await expect(page.locator('.checkout-form')).toBeVisible({ timeout: 15000 });
       await fillContact(page);
       await fillShipping(page);
-      await page.waitForResponse(
-        (res) => res.url().includes('/orders/preview') && res.request().method() === 'POST',
-        { timeout: 15000 },
-      );
+      await selectCreditCardAndWaitForPreview(page);
 
       await page.locator('.checkout-submit-btn').click();
 
@@ -1270,10 +1247,7 @@ test.describe('Edge Checkout Page', () => {
       await expect(page.locator('.checkout-form')).toBeVisible({ timeout: 15000 });
       await fillContact(page);
       await fillShipping(page);
-      await page.waitForResponse(
-        (res) => res.url().includes('/orders/preview') && res.request().method() === 'POST',
-        { timeout: 15000 },
-      );
+      await selectCreditCardAndWaitForPreview(page);
 
       await page.locator('.checkout-submit-btn').click();
 
