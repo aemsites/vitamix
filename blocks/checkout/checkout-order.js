@@ -14,6 +14,29 @@ import { logOperation, getCheckoutId } from '../../scripts/operations-log.js';
 export { validateLinkIntegrity };
 
 /**
+ * Builds checkout context fields for full-checkout order payloads.
+ * @param {string|null} paymentMethod
+ * @returns {Object|null}
+ */
+export function getCheckoutContext(paymentMethod) {
+  if (!paymentMethod) return null;
+  return {
+    paymentMethod,
+    checkoutFlow: paymentMethod === 'apple-pay' ? 'express' : 'standard',
+    entryPoint: 'checkout',
+  };
+}
+
+/**
+ * Returns the explicitly selected checkout payment method, if any.
+ * @param {HTMLFormElement} form
+ * @returns {string|null}
+ */
+export function getSelectedPaymentMethod(form) {
+  return form.querySelector('[name="paymentMethod"]:checked')?.value || null;
+}
+
+/**
  * Writes checkout state to sessionStorage before a payment redirect.
  * @param {string} email
  * @param {Object} cart
@@ -87,8 +110,8 @@ export function buildOrderJSON(formData, form, cart, state, config) {
   order.locale = `${language.split('_')[0]}-${(language.split('_')[1] || locale).toUpperCase()}`;
   order.country = locale;
 
-  const paymentMethod = formData.get('paymentMethod');
-  if (paymentMethod) order.paymentMethod = paymentMethod;
+  const checkoutContext = getCheckoutContext(formData.get('paymentMethod'));
+  if (checkoutContext) Object.assign(order, checkoutContext);
 
   const customerTimezone = getCustomerTimezone();
   if (customerTimezone) order.customerTimezone = customerTimezone;
@@ -254,7 +277,11 @@ export function initOrder(form, cart, state, config, strings) {
       }
 
       // Delegate to the selected provider's own button if not credit-card
-      const selectedMethod = form.querySelector('[name="paymentMethod"]:checked')?.value;
+      const selectedMethod = getSelectedPaymentMethod(form);
+      if (!selectedMethod) {
+        showError(form, strings.errorSelectPayment);
+        return;
+      }
 
       if (selectedMethod === 'apple-pay') {
         submitBtn.disabled = true;

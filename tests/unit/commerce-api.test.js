@@ -214,6 +214,21 @@ test('estimateExpressCheckout: sends locale and order shape', async () => {
   assert.deepEqual(body.items, items);
 });
 
+test('estimateExpressCheckout: includes optional checkout context fields', async () => {
+  const items = [{ sku: 'abc', quantity: 1, price: { final: '50.00' } }];
+  mockFetch(200, { subtotal: '50.00', shippingMethods: [] });
+  await estimateExpressCheckout('us', 'MN', '55441', items, {
+    paymentMethod: 'apple-pay',
+    checkoutFlow: 'express',
+    entryPoint: 'cart',
+  });
+
+  const body = JSON.parse(lastInit.body);
+  assert.equal(body.paymentMethod, 'apple-pay');
+  assert.equal(body.checkoutFlow, 'express');
+  assert.equal(body.entryPoint, 'cart');
+});
+
 test('estimatePrice: includes couponSource when provided with couponCode', async () => {
   mockFetch(200, { discounts: [], orderDiscountTotal: 0 });
   await estimatePrice('us', [], 'IDME10', 'auto');

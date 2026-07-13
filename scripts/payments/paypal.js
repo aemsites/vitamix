@@ -7,6 +7,7 @@ import {
 import { getLocaleAndLanguage } from '../scripts.js';
 import { getUser, isLoggedIn } from '../auth-api.js';
 import { logOperation, getCheckoutId } from '../operations-log.js';
+import ensureCheckoutPreviewToken from './paypal-context.js';
 
 let sdkLoadPromise = null;
 
@@ -360,14 +361,10 @@ export default {
       callbacks.clearError();
       btn.disabled = true;
 
-      const state = callbacks.getState();
-      if (!state.currentEstimateToken) {
-        await callbacks.updatePreview();
-        if (!callbacks.getState().currentEstimateToken) {
-          callbacks.showError('Unable to calculate totals. Please try again.');
-          btn.disabled = false;
-          return;
-        }
+      if (!await ensureCheckoutPreviewToken(callbacks)) {
+        callbacks.showError('Unable to calculate totals. Please try again.');
+        btn.disabled = false;
+        return;
       }
 
       const formData = callbacks.getFormData();

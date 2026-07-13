@@ -7,7 +7,11 @@ import affirm from '../../scripts/payments/affirm.js';
 import chase from '../../scripts/payments/chase.js';
 import buildForm, { initCollapse } from './checkout-form.js';
 import { initAddress } from './checkout-address.js';
-import { initShipping, updatePreview } from './checkout-shipping.js';
+import {
+  clearPreviewState,
+  initShipping,
+  updatePreview,
+} from './checkout-shipping.js';
 import { initOrder } from './checkout-order.js';
 import { initPayment } from './checkout-payment.js';
 import { parsePreview } from '../../scripts/commerce-api.js';
@@ -66,6 +70,7 @@ const LOCAL_STRINGS = {
     noShippingMethods: 'No shipping methods available for this address.',
     shippingPlaceholder: 'Enter your shipping address to see available methods.',
     errorSelectShipping: 'Please select a shipping method.',
+    errorSelectPayment: 'Please select a payment method.',
     errorCalculateTotals: 'Unable to calculate totals. Please try again.',
     errorRecaptcha: 'Security verification failed. Please refresh the page and try again.',
     errorGeneric: 'An error occurred. Please try again.',
@@ -138,6 +143,7 @@ const LOCAL_STRINGS = {
     noShippingMethods: 'Aucune méthode de livraison disponible pour cette adresse.',
     shippingPlaceholder: 'Entrez votre adresse de livraison pour voir les méthodes disponibles.',
     errorSelectShipping: 'Veuillez sélectionner une méthode de livraison.',
+    errorSelectPayment: 'Veuillez sélectionner un mode de paiement.',
     errorCalculateTotals: 'Impossible de calculer les totaux. Veuillez réessayer.',
     errorRecaptcha: 'Échec de la vérification de sécurité. Veuillez actualiser la page et réessayer.',
     errorGeneric: 'Une erreur est survenue. Veuillez réessayer.',
@@ -443,7 +449,12 @@ export default async function decorate(block) {
     const input = form.querySelector(`[name="${name}"]`);
     if (!input) return;
     input.addEventListener('blur', () => {
-      if (input.value && state.selectedShippingMethodId && !state.currentPreview) {
+      if (
+        input.value
+        && state.selectedShippingMethodId
+        && !state.currentPreview
+        && state.paymentMethodSelected
+      ) {
         updatePreview(form, cart, state, config);
       }
     });
@@ -475,7 +486,10 @@ export default async function decorate(block) {
 
   // Re-run preview on payment method change — tax may vary by type (e.g. Avalara surcharge)
   paymentContainer.addEventListener('change', (e) => {
-    if (e.target.name === 'paymentMethod') updatePreview(form, cart, state, config);
+    if (e.target.name !== 'paymentMethod') return;
+    state.paymentMethodSelected = true;
+    clearPreviewState(state);
+    if (state.selectedShippingMethodId) updatePreview(form, cart, state, config);
   });
 
   // Inject order-summary block into this section if the author didn't add one
