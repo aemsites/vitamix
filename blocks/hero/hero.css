@@ -177,6 +177,15 @@
   padding: 0;
 }
 
+.hero.split.left-text picture[data-bg] img {
+  object-position: left;
+}
+
+.hero.split.right-text picture[data-bg] img {
+  object-position: right;
+}
+
+
 .hero.split .text-wrapper {
   position: relative;
   z-index: 3;
@@ -240,6 +249,15 @@
   .hero.split.right-text::after {
     background: linear-gradient(to left, transparent, var(--image-color) 50%);
   }
+
+  .hero.split.left-text picture[data-bg] img {
+    object-position: 25%;
+  }
+  
+  .hero.split.right-text picture[data-bg] img {
+    object-position: 75%;
+  }
+  
 }
 
 @media (width >= 1200px) {
