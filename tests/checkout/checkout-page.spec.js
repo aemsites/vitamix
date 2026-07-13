@@ -936,7 +936,12 @@ test.describe('Edge Checkout Page', () => {
 
       await dialog.locator('button', { hasText: 'Edit address' }).click();
       await expect(dialog).toHaveCount(0);
-      await expect(page.locator('.checkout-form > .checkout-error')).toBeVisible({ timeout: 10000 });
+      await expect(page.locator('.checkout-form > .checkout-error')).toBeHidden();
+
+      // Editing does not approve the address. A submit attempt must validate
+      // again and reopen the confirmation dialog instead of creating an order.
+      await page.locator('.checkout-submit-btn').click();
+      await expect(dialog).toBeVisible({ timeout: 10000 });
       expect(orderCreateCalled).toBe(false);
       expect(page.url()).toContain('/order/checkout');
       console.log('✓ Suggestion dialog only allows approved address or edit');
@@ -984,10 +989,13 @@ test.describe('Edge Checkout Page', () => {
       await fillShipping(page);
       await selectCreditCardAndWaitForPreview(page);
 
-      await page.locator('.checkout-submit-btn').click();
+      // Payment selection can open validation before submit. Approve that
+      // suggestion, then submit the validated address to continue checkout.
       const dialog = page.locator('.address-validation-dialog');
       await expect(dialog).toBeVisible({ timeout: 10000 });
       await dialog.locator('button', { hasText: 'Use this address' }).click();
+      await expect(dialog).toHaveCount(0);
+      await page.locator('.checkout-submit-btn').click();
 
       await expect.poll(
         () => page.url(),
