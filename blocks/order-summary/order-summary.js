@@ -293,30 +293,49 @@ export default async function decorate(block) {
     discountsEl.appendChild(row);
   };
 
-  const updateTotals = () => {
-    const currency = getCurrencyCode();
-    const subtotal = formatPrice(cart.subtotal, currency);
-    subtotalEl.textContent = subtotal;
-    shippingEl.textContent = '--';
-    taxesEl.textContent = '--';
-    grandTotalEl.textContent = subtotal;
-    headerTotalEl.textContent = subtotal;
-  };
-
   let priceEstimateRequest = 0;
   let hasOrderPreview = false;
-  const renderPriceEstimate = (estimate) => {
+  let estimatedSubtotal = cart.subtotal;
+  let estimatedDiscountTotal = 0;
+  let estimatedShippingMethod = null;
+
+  const renderEstimatedTotals = () => {
     if (hasOrderPreview) return;
     const currency = getCurrencyCode();
-    const subtotal = parseFloat(estimate.subtotal) || cart.subtotal;
-    const discountTotal = parseFloat(estimate.orderDiscountTotal) || 0;
-    const total = Math.max(0, subtotal - discountTotal);
-    subtotalEl.textContent = formatPrice(subtotal, currency);
-    renderDiscountRows(estimate.discounts ?? [], currency);
-    shippingEl.textContent = '--';
+    const shippingRate = estimatedShippingMethod
+      ? parseFloat(estimatedShippingMethod.rate) || 0
+      : null;
+    const total = Math.max(
+      0,
+      estimatedSubtotal - estimatedDiscountTotal + (shippingRate ?? 0),
+    );
+
+    subtotalEl.textContent = formatPrice(estimatedSubtotal, currency);
+    if (shippingRate == null) {
+      shippingEl.textContent = '--';
+    } else {
+      shippingEl.textContent = shippingRate === 0 ? s.free : formatPrice(shippingRate, currency);
+    }
     taxesEl.textContent = '--';
     grandTotalEl.textContent = formatPrice(total, currency);
     headerTotalEl.textContent = formatPrice(total, currency);
+  };
+
+  const updateTotals = ({ resetShipping = false } = {}) => {
+    estimatedSubtotal = cart.subtotal;
+    estimatedDiscountTotal = 0;
+    if (resetShipping) estimatedShippingMethod = null;
+    renderEstimatedTotals();
+  };
+
+  const renderPriceEstimate = (estimate) => {
+    if (hasOrderPreview) return;
+    const currency = getCurrencyCode();
+    estimatedSubtotal = parseFloat(estimate.subtotal) || cart.subtotal;
+    estimatedDiscountTotal = parseFloat(estimate.orderDiscountTotal) || 0;
+    subtotalEl.textContent = formatPrice(estimatedSubtotal, currency);
+    renderDiscountRows(estimate.discounts ?? [], currency);
+    renderEstimatedTotals();
   };
 
   const updatePriceEstimate = async () => {
@@ -466,7 +485,7 @@ export default async function decorate(block) {
 
   const refreshSummary = () => {
     renderItems();
-    updateTotals();
+    updateTotals({ resetShipping: true });
     updatePriceEstimate();
     syncVisibility();
   };
@@ -480,6 +499,12 @@ export default async function decorate(block) {
     if (!couponCode || couponSource === 'auto') updatePriceEstimate();
   });
 
+  document.addEventListener('checkout:shipping-selected', (e) => {
+    if (hasOrderPreview) return;
+    estimatedShippingMethod = e.detail?.shippingMethod || null;
+    renderEstimatedTotals();
+  });
+
   const summaryContent = block.querySelector('.order-summary-content');
   document.addEventListener('checkout:preview-loading', () => {
     hasOrderPreview = true;
@@ -490,6 +515,7 @@ export default async function decorate(block) {
     summaryContent?.classList.remove('loading');
     const { preview, couponError } = e.detail || {};
     hasOrderPreview = Boolean(preview);
+    if (!preview) renderEstimatedTotals();
 
     if (couponError) {
       sessionStorage.removeItem('checkout_coupon_source');
