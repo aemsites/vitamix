@@ -7,7 +7,7 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  getOrder, estimateShipping, estimatePrice, estimateExpressCheckout,
+  getOrder, estimateShipping, estimatePrice, estimateExpressCheckout, parsePreview,
 } from '../../scripts/commerce-api.js';
 import { __setLocale, __resetScripts } from './mocks/scripts.mjs';
 
@@ -236,4 +236,23 @@ test('estimatePrice: includes couponSource when provided with couponCode', async
   assert.equal(lastUrl, `${API_ORIGIN}/estimate/price`);
   assert.equal(body.couponCode, 'IDME10');
   assert.equal(body.couponSource, 'auto');
+});
+
+test('parsePreview: returns zero shipping when a cart rule grants free shipping', () => {
+  const preview = {
+    subtotal: '379.95',
+    taxAmount: '37.09',
+    shippingMethod: { rate: '12.63' },
+    discounts: [{ id: 'us-free-shipping', freeShipping: true, source: 'pricing_rule' }],
+    total: '417.04',
+  };
+  assert.equal(parsePreview(preview, 379.95).shippingRate, 0);
+});
+
+test('parsePreview: preserves the quoted shipping rate without free shipping', () => {
+  const preview = {
+    shippingMethod: { rate: '12.63' },
+    discounts: [{ id: 'save-10', amount: 10 }],
+  };
+  assert.equal(parsePreview(preview, 379.95).shippingRate, '12.63');
 });

@@ -1,6 +1,7 @@
 import {
   estimateExpressCheckout,
   getCustomerTimezone,
+  parsePreview,
   validateApplePayMerchant,
 } from '../commerce-api.js';
 import { getUser, isLoggedIn } from '../auth-api.js';
@@ -132,12 +133,13 @@ function startExpressSession(btn, config, callbacks) {
         );
         lastShippingMethodId = e.shippingMethod.identifier;
         callbacks.getState().currentEstimateToken = previewResult.estimateToken;
+        const { shippingRate } = parsePreview(previewResult, cart.subtotal);
         session.completeShippingMethodSelection({
           newTotal: { label: config.site || 'Store', amount: String(previewResult.total) },
           newLineItems: [
             { label: 'Subtotal', amount: String(previewResult.subtotal) },
             { label: 'Tax', amount: String(previewResult.taxAmount) },
-            { label: 'Shipping', amount: String(previewResult.shippingMethod?.rate ?? 0) },
+            { label: 'Shipping', amount: String(shippingRate) },
           ],
         });
       } catch {
