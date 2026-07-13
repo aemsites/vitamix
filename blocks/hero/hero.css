@@ -305,6 +305,11 @@
   background-color: transparent;
 }
 
+.hero a.button:hover,
+.hero a.button:focus {
+  background-color: rgb(from currentcolor r g b / 15%);
+}
+
 .hero.image-dark a.button,
 .hero.image-darkest a.button,
 .hero.image-dark a.button:hover,
