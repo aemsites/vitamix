@@ -2,8 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   APPLE_PAY_CART_CONTEXT,
-  buildApplePayCartOrderPayload,
-  buildApplePayCartPreviewPayload,
+  buildApplePayExpressOrderPayload,
+  buildApplePayExpressPreviewPayload,
+  getApplePayExpressContext,
 } from '../../scripts/payments/apple-pay-context.js';
 
 const ITEMS = [{
@@ -43,12 +44,40 @@ test('APPLE_PAY_CART_CONTEXT identifies cart-origin Apple Pay express checkout',
   });
 });
 
-test('buildApplePayCartPreviewPayload includes cart context and partial shipping', () => {
-  const payload = buildApplePayCartPreviewPayload(
+test('getApplePayExpressContext preserves the express button entry point', () => {
+  assert.deepEqual(getApplePayExpressContext('checkout'), {
+    paymentMethod: 'apple-pay',
+    checkoutFlow: 'express',
+    entryPoint: 'checkout',
+  });
+});
+
+test('Apple Pay express payload builders require explicit context', () => {
+  assert.throws(
+    () => buildApplePayExpressPreviewPayload(cart, 'standard', 'en-US', shippingContact),
+    /preview requires checkout context/,
+  );
+  assert.throws(
+    () => buildApplePayExpressOrderPayload({
+      payment: { shippingContact: paymentContact },
+      cart,
+      shippingMethodId: 'standard',
+      estimateToken: 'estimate-token',
+      country: 'us',
+      locale: 'en-US',
+      customerEmail: 'account@example.com',
+    }),
+    /order requires checkout context/,
+  );
+});
+
+test('buildApplePayExpressPreviewPayload includes cart context and partial shipping', () => {
+  const payload = buildApplePayExpressPreviewPayload(
     cart,
     'standard',
     'en-US',
     shippingContact,
+    APPLE_PAY_CART_CONTEXT,
   );
 
   assert.equal(payload.paymentMethod, 'apple-pay');
@@ -65,16 +94,22 @@ test('buildApplePayCartPreviewPayload includes cart context and partial shipping
   });
 });
 
-test('buildApplePayCartPreviewPayload omits shipping when contact has no country', () => {
-  const payload = buildApplePayCartPreviewPayload(cart, 'standard', 'en-US', null);
+test('buildApplePayExpressPreviewPayload omits shipping when contact has no country', () => {
+  const payload = buildApplePayExpressPreviewPayload(
+    cart,
+    'standard',
+    'en-US',
+    null,
+    APPLE_PAY_CART_CONTEXT,
+  );
 
   assert.equal(payload.paymentMethod, 'apple-pay');
   assert.equal(payload.country, undefined);
   assert.equal(payload.shipping, undefined);
 });
 
-test('buildApplePayCartOrderPayload includes cart context and full address data', () => {
-  const payload = buildApplePayCartOrderPayload({
+test('buildApplePayExpressOrderPayload includes cart context and full address data', () => {
+  const payload = buildApplePayExpressOrderPayload({
     payment: { shippingContact: paymentContact },
     cart,
     shippingMethodId: 'standard',
@@ -83,6 +118,7 @@ test('buildApplePayCartOrderPayload includes cart context and full address data'
     locale: 'en-US',
     customerEmail: 'account@example.com',
     customerTimezone: 'America/New_York',
+    checkoutContext: APPLE_PAY_CART_CONTEXT,
   });
 
   assert.equal(payload.paymentMethod, 'apple-pay');
@@ -111,14 +147,16 @@ test('buildApplePayCartOrderPayload includes cart context and full address data'
   assert.deepEqual(payload.billing, payload.shipping);
 });
 
-test('Apple Pay cart preview and order payloads use matching context facts', () => {
-  const preview = buildApplePayCartPreviewPayload(
+test('Apple Pay checkout express preview and order use matching context facts', () => {
+  const checkoutContext = getApplePayExpressContext('checkout');
+  const preview = buildApplePayExpressPreviewPayload(
     cart,
     'standard',
     'en-US',
     shippingContact,
+    checkoutContext,
   );
-  const order = buildApplePayCartOrderPayload({
+  const order = buildApplePayExpressOrderPayload({
     payment: { shippingContact: paymentContact },
     cart,
     shippingMethodId: 'standard',
@@ -126,6 +164,38 @@ test('Apple Pay cart preview and order payloads use matching context facts', () 
     country: 'us',
     locale: 'en-US',
     customerEmail: 'account@example.com',
+    checkoutContext,
+  });
+
+  assert.deepEqual({
+    paymentMethod: preview.paymentMethod,
+    checkoutFlow: preview.checkoutFlow,
+    entryPoint: preview.entryPoint,
+  }, checkoutContext);
+  assert.deepEqual({
+    paymentMethod: order.paymentMethod,
+    checkoutFlow: order.checkoutFlow,
+    entryPoint: order.entryPoint,
+  }, checkoutContext);
+});
+
+test('Apple Pay cart preview and order payloads use matching context facts', () => {
+  const preview = buildApplePayExpressPreviewPayload(
+    cart,
+    'standard',
+    'en-US',
+    shippingContact,
+    APPLE_PAY_CART_CONTEXT,
+  );
+  const order = buildApplePayExpressOrderPayload({
+    payment: { shippingContact: paymentContact },
+    cart,
+    shippingMethodId: 'standard',
+    estimateToken: 'estimate-token',
+    country: 'us',
+    locale: 'en-US',
+    customerEmail: 'account@example.com',
+    checkoutContext: APPLE_PAY_CART_CONTEXT,
   });
 
   assert.deepEqual(

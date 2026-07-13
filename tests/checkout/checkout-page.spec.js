@@ -566,9 +566,14 @@ test.describe('Edge Checkout Page', () => {
       await expect(page.locator('.checkout-form [name="shippingMethod"][value="797"]')).toBeChecked({ timeout: 10000 });
       expect(previewRequests).toHaveLength(0);
       await selectCreditCardAndWaitForPreview(page);
-      expect(previewRequests.some(
+      const initialPreview = previewRequests.find(
         (body) => body.items?.[0]?.quantity === 2 && body.shippingMethod?.id === '797',
-      )).toBe(true);
+      );
+      expect(initialPreview).toMatchObject({
+        paymentMethod: 'chase',
+        checkoutFlow: 'standard',
+        entryPoint: 'checkout',
+      });
 
       // Changing quantity invalidates the provider-specific shipping id. The
       // checkout should re-fetch rates, preserve the Standard service by type,
@@ -1085,6 +1090,9 @@ test.describe('Edge Checkout Page', () => {
       expect(orderRequest.body.shipping.city).toBe(VALID_ADDRESS.city);
       expect(orderRequest.body.shipping.state).toBe(VALID_ADDRESS.state);
       expect(orderRequest.body.estimateToken).toBe(MOCK_PREVIEW.estimateToken);
+      expect(orderRequest.body.paymentMethod).toBe('chase');
+      expect(orderRequest.body.checkoutFlow).toBe('standard');
+      expect(orderRequest.body.entryPoint).toBe('checkout');
       expect(orderRequest.body.items).toHaveLength(1);
       console.log('✓ Place order happy path: preview → order → payment → /order/complete');
     });

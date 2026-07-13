@@ -221,7 +221,7 @@ export async function initPayment(container, providers, callbacks, config, strin
 
   renderPaymentSection(container, available, callbacks, strings, config);
 
-  // Render express buttons on the cart page (order-summary block)
+  // Render express buttons above the checkout form when the authored container exists.
   const expressContainer = document.querySelector('.express-checkout-buttons');
   if (expressContainer) {
     available.filter((p) => p.supportsExpress).forEach((p) => {

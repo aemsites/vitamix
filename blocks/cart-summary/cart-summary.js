@@ -339,6 +339,7 @@ export default async function decorate(block) {
   const state = { currentEstimateToken: null, currentPreview: null };
 
   const callbacks = {
+    expressEntryPoint: 'cart',
     getCart: () => cart,
     getConfig: () => config,
     getState: () => state,
