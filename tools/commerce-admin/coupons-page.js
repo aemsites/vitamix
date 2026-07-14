@@ -1226,7 +1226,8 @@ async function openDialog(title, innerHtml, onSubmit, afterMount, dialogClass, s
   });
   dialog.querySelector('[data-cp-submit]')?.addEventListener('click', async () => {
     try {
-      await onSubmit(dialog);
+      const result = await onSubmit(dialog);
+      if (result && typeof result === 'object' && result.keepOpen === true) return;
       dialog.close();
       dialog.remove();
     } catch (err) {
@@ -2330,6 +2331,99 @@ function wireAddCodesDialog(dlg) {
   wireAddCodesGridPasteExpansion(dlg);
 }
 
+const ADD_CODES_SUBMIT_LABEL = 'Create codes';
+
+function getAddCodesDialogControls(dlg) {
+  return {
+    submit: dlg.querySelector('[data-cp-submit]'),
+    cancel: dlg.querySelector('[data-cp-cancel]'),
+    status: dlg.querySelector('[data-cp-add-codes-status]'),
+  };
+}
+
+function clearAddCodesRowErrors(dlg) {
+  dlg.querySelectorAll('tr[data-cp-add-code-line]').forEach((tr) => {
+    tr.removeAttribute('data-cp-add-code-failed');
+    tr.removeAttribute('title');
+  });
+}
+
+function markAddCodesRowErrors(dlg, fails) {
+  const byCode = new Map(fails.map((f) => [f.code, f.message]));
+  dlg.querySelectorAll('tr[data-cp-add-code-line]').forEach((tr) => {
+    const code = tr.querySelector('[data-cp-add-code-val]')?.value?.trim() ?? '';
+    const msg = byCode.get(code);
+    if (msg) {
+      tr.setAttribute('data-cp-add-code-failed', '1');
+      tr.setAttribute('title', msg);
+    }
+  });
+}
+
+function setAddCodesProgress(dlg, { current, total, failCount = 0 }) {
+  const { submit, cancel, status } = getAddCodesDialogControls(dlg);
+  if (submit instanceof HTMLButtonElement) {
+    submit.disabled = true;
+    submit.textContent = `Creating… (${current}/${total})`;
+  }
+  if (cancel instanceof HTMLButtonElement) cancel.disabled = true;
+  if (status) {
+    status.hidden = false;
+    status.className = 'cp-add-codes-status cp-add-codes-status-progress';
+    let text = `Creating codes… ${current} of ${total} sent to the API.`;
+    if (failCount > 0) text += ` (${failCount} failed so far)`;
+    status.textContent = text;
+  }
+}
+
+function showAddCodesFailures(dlg, fails, { total }) {
+  const { submit, cancel, status } = getAddCodesDialogControls(dlg);
+  if (submit instanceof HTMLButtonElement) {
+    submit.disabled = false;
+    submit.textContent = ADD_CODES_SUBMIT_LABEL;
+  }
+  if (cancel instanceof HTMLButtonElement) cancel.disabled = false;
+  if (!status) return;
+  const ok = total - fails.length;
+  status.hidden = false;
+  status.className = 'cp-add-codes-status cp-add-codes-status-error';
+  const head = ok > 0
+    ? `<p class="cp-add-codes-status-summary">Created <strong>${ok}</strong> of <strong>${total}</strong> code(s). <strong>${fails.length}</strong> failed:</p>`
+    : `<p class="cp-add-codes-status-summary"><strong>${fails.length}</strong> code(s) could not be created:</p>`;
+  const items = fails.map((f) => `<li><code>${escapeHtml(f.code)}</code>: ${escapeHtml(f.message)}</li>`).join('');
+  status.innerHTML = `${head}<ul class="cp-add-codes-status-list">${items}</ul>`;
+  markAddCodesRowErrors(dlg, fails);
+}
+
+function resetAddCodesDialogControls(dlg) {
+  const { submit, cancel, status } = getAddCodesDialogControls(dlg);
+  if (submit instanceof HTMLButtonElement) {
+    submit.disabled = false;
+    submit.textContent = ADD_CODES_SUBMIT_LABEL;
+  }
+  if (cancel instanceof HTMLButtonElement) cancel.disabled = false;
+  if (status) {
+    status.hidden = true;
+    status.textContent = '';
+    status.innerHTML = '';
+    status.className = 'cp-add-codes-status';
+  }
+  clearAddCodesRowErrors(dlg);
+}
+
+function mountAddCodesDialogStatus(dlg) {
+  const actions = dlg.querySelector('.coupons-dialog-actions');
+  if (!actions || actions.querySelector('[data-cp-add-codes-status]')) return;
+  actions.classList.add('cp-add-codes-actions');
+  const status = document.createElement('div');
+  status.className = 'cp-add-codes-status';
+  status.setAttribute('data-cp-add-codes-status', '');
+  status.setAttribute('role', 'status');
+  status.setAttribute('aria-live', 'polite');
+  status.hidden = true;
+  actions.insertBefore(status, actions.firstChild);
+}
+
 function openAddCodesDialog() {
   if (!state.selectedCouponId) return;
   const idEsc = escapeHtml(state.selectedCouponId);
@@ -2384,45 +2478,47 @@ function openAddCodesDialog() {
     async (dlg) => {
       const bodies = readCouponCodeBodiesFromAddGrid(dlg);
       if (!bodies.length) throw new Error('Add at least one code in the grid.');
-      const sub = dlg.querySelector('[data-cp-submit]');
-      if (sub instanceof HTMLButtonElement) sub.disabled = true;
+      resetAddCodesDialogControls(dlg);
       const fails = [];
-      try {
-        /* eslint-disable no-await-in-loop -- serial POSTs are gentler on the API */
-        for (let bi = 0; bi < bodies.length; bi += 1) {
-          const body = bodies[bi];
-          try {
-            await couponsApiFetch('coupons', {
-              method: 'POST',
-              body: JSON.stringify(body),
-            });
-          } catch (err) {
-            fails.push({ code: body.code, message: err?.message || String(err) });
-          }
+      const total = bodies.length;
+      setAddCodesProgress(dlg, { current: 0, total, failCount: 0 });
+      /* eslint-disable no-await-in-loop -- serial POSTs are gentler on the API */
+      for (let bi = 0; bi < bodies.length; bi += 1) {
+        const body = bodies[bi];
+        try {
+          await couponsApiFetch('coupons', {
+            method: 'POST',
+            body: JSON.stringify(body),
+          });
+        } catch (err) {
+          fails.push({ code: body.code, message: err?.message || String(err) });
         }
-        /* eslint-enable no-await-in-loop */
-      } finally {
-        if (sub instanceof HTMLButtonElement) sub.disabled = false;
+        setAddCodesProgress(dlg, { current: bi + 1, total, failCount: fails.length });
       }
-      if (fails.length === bodies.length) {
+      /* eslint-enable no-await-in-loop */
+      if (fails.length === total) {
+        showAddCodesFailures(dlg, fails, { total });
         const samp = fails.slice(0, 3).map((f) => `${f.code}: ${f.message}`).join('; ');
         throw new Error(`No codes were created (${fails.length}). ${samp}${fails.length > 3 ? '...' : ''}`);
       }
+      if (fails.length) {
+        await fetchCodesForCoupon();
+        afterCodesRefresh();
+        showAddCodesFailures(dlg, fails, { total });
+        console.warn('[commerce-admin/coupons] create codes partial failure', fails);
+        showToast(`Created ${total - fails.length} of ${total} code(s). See errors below.`, 'error');
+        return { keepOpen: true };
+      }
       await fetchCodesForCoupon();
       afterCodesRefresh();
-      if (fails.length) {
-        console.warn('[commerce-admin/coupons] create codes partial failure', fails);
-        const ok = bodies.length - fails.length;
-        showToast(`Created ${ok} of ${bodies.length} code(s). Failures: open the console.`, 'error');
-      } else {
-        showToast(`Created ${bodies.length} code(s)`, 'success');
-      }
+      showToast(`Created ${total} code(s)`, 'success');
     },
     async (dlg) => {
       wireAddCodesDialog(dlg);
+      mountAddCodesDialogStatus(dlg);
     },
     'coupons-dialog-wide',
-    'Create codes',
+    ADD_CODES_SUBMIT_LABEL,
   );
 }
 
