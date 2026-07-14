@@ -6,6 +6,7 @@ import {
   normalizeAddresses,
   populateDefaultShippingAddress,
   prefillDefaultShippingAddress,
+  watchCustomerAddressPrefill,
 } from '../../blocks/checkout/checkout-customer-address.js';
 
 function field(value = '') {
@@ -199,6 +200,27 @@ describe('default checkout customer address', () => {
 
     assert.equal(activated, true);
     assert.deepEqual(calls, ['save', 'validate', 'refresh']);
+  });
+
+  test('reruns prefill after login but not after logout', () => {
+    const listeners = new Map();
+    const eventTarget = {
+      addEventListener: (type, listener) => listeners.set(type, listener),
+      removeEventListener: (type, listener) => {
+        if (listeners.get(type) === listener) listeners.delete(type);
+      },
+    };
+    let prefillCalls = 0;
+    const stopWatching = watchCustomerAddressPrefill(eventTarget, () => { prefillCalls += 1; });
+
+    assert.equal(prefillCalls, 1);
+    listeners.get('commerce:auth-state-changed')({ detail: { loggedIn: true } });
+    assert.equal(prefillCalls, 2);
+    listeners.get('commerce:auth-state-changed')({ detail: { loggedIn: false } });
+    assert.equal(prefillCalls, 2);
+
+    stopWatching();
+    assert.equal(listeners.has('commerce:auth-state-changed'), false);
   });
 
   test('does not refresh shipping when prefill is skipped or validation fails', async () => {

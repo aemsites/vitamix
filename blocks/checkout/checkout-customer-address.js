@@ -1,4 +1,5 @@
 import {
+  AUTH_EVENT,
   authFetch,
   getUser,
   isLoggedIn,
@@ -119,4 +120,19 @@ export async function prefillDefaultShippingAddress({
   if (!await validate()) return false;
   refresh();
   return true;
+}
+
+/**
+ * Runs address prefill on checkout load and again whenever the shopper signs in.
+ * @param {Document|EventTarget} eventTarget
+ * @param {() => void} prefill
+ * @returns {() => void} removes the authentication listener
+ */
+export function watchCustomerAddressPrefill(eventTarget, prefill) {
+  const handleAuthChange = (event) => {
+    if (event.detail?.loggedIn) prefill();
+  };
+  eventTarget.addEventListener(AUTH_EVENT, handleAuthChange);
+  prefill();
+  return () => eventTarget.removeEventListener(AUTH_EVENT, handleAuthChange);
 }
