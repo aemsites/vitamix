@@ -67,7 +67,7 @@ export async function getDefaultCustomerAddress() {
 export function populateDefaultShippingAddress(form, address, locale) {
   if (!address || form.elements['shipping-street-0']?.value?.trim()) return false;
   const country = String(address.country || '').toLowerCase();
-  if (country && country !== String(locale).toLowerCase()) return false;
+  if (!country || country !== String(locale).toLowerCase()) return false;
 
   const fullName = String(address.name || '').trim().split(/\s+/);
   const values = {
@@ -79,7 +79,7 @@ export function populateDefaultShippingAddress(form, address, locale) {
     'shipping-city': address.city,
     'shipping-state': address.state,
     'shipping-zip': address.zip,
-    'shipping-phone': address.phone,
+    'shipping-telephone': address.phone,
   };
 
   Object.entries(values).forEach(([name, value]) => {
@@ -90,5 +90,33 @@ export function populateDefaultShippingAddress(form, address, locale) {
     'has-value',
     !!form.elements['shipping-state'].value,
   );
+  return true;
+}
+
+/**
+ * Loads, populates, validates, and activates a signed-in customer's default address.
+ * Dependencies are injectable so the checkout lifecycle can be tested without rendering the block.
+ * @param {Object} options
+ * @param {HTMLFormElement} options.form
+ * @param {string} options.locale
+ * @param {() => Promise<Record<string, unknown>|null>} [options.loadAddress]
+ * @param {(form: HTMLFormElement, locale: string) => void} options.save
+ * @param {() => Promise<boolean>} options.validate
+ * @param {() => void} options.refresh
+ * @returns {Promise<boolean>} whether a validated default address was activated
+ */
+export async function prefillDefaultShippingAddress({
+  form,
+  locale,
+  loadAddress = getDefaultCustomerAddress,
+  save,
+  validate,
+  refresh,
+}) {
+  const address = await loadAddress();
+  if (!populateDefaultShippingAddress(form, address, locale)) return false;
+  save(form, locale);
+  if (!await validate()) return false;
+  refresh();
   return true;
 }

@@ -20,10 +20,7 @@ import { validateField } from './checkout-validation.js';
 import { formStateKey, saveFormState, restoreFormState } from './checkout-session-state.js';
 import { logOperation, getCheckoutId } from '../../scripts/operations-log.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
-import {
-  getDefaultCustomerAddress,
-  populateDefaultShippingAddress,
-} from './checkout-customer-address.js';
+import { prefillDefaultShippingAddress } from './checkout-customer-address.js';
 
 const ALL_PROVIDERS = [chase, applePay, paypal, affirm];
 
@@ -427,10 +424,12 @@ export default async function decorate(block) {
   // Start a signed-in customer's blank checkout with their default mailing address.
   // Treat saved addresses like manually entered ones: Address Doctor must accept or
   // correct the address before shipping rates are requested.
-  getDefaultCustomerAddress().then(async (address) => {
-    if (!populateDefaultShippingAddress(form, address, locale)) return;
-    saveFormState(form, locale);
-    if (await runShippingValidation()) refreshShipping();
+  prefillDefaultShippingAddress({
+    form,
+    locale,
+    save: saveFormState,
+    validate: runShippingValidation,
+    refresh: refreshShipping,
   }).catch(() => { /* signed-in address prefill is best-effort */ });
 
   // If the address was restored from sessionStorage on this page load, the
