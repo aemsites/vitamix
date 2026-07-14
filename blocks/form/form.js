@@ -496,12 +496,12 @@ function enableFooterSignUp(form) {
 
     const payload = {
       formId: `${locale}/${language}/newsletter`,
+      pageUrl: window.location.href,
       email,
       mobile,
-      sms_optin: optIn ? '1' : '0',
-      lead_source: leadSource,
-      pageUrl: window.location.href,
-      actionUrl: `/${locale}/${language}/rest/V1/vitamix-api/newslettersubscribe`,
+      smsOptIn: optIn,
+      emailOptIn: true,
+      leadSource,
     };
     try {
       const url = getFormSubmissionUrl();
