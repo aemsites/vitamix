@@ -80,11 +80,11 @@ function toggleFixedAddToCart(container) {
  * @returns {boolean} True if the variant is available for sale, false otherwise
  */
 export function isVariantAvailableForSale(variant) {
-  const { managedStock, addToCart } = variant?.custom || {};
+  const { managedStock, addToCart, comingSoon } = variant?.custom || {};
 
   // Authored `addToCart` override wins over the product bus custom.addToCart.
   const effectiveAddToCart = getPdpOverride('addToCart') || addToCart;
-  if (!variant || effectiveAddToCart === 'No') {
+  if (!variant || effectiveAddToCart === 'No' || comingSoon === 'Yes') {
     return false;
   }
 
@@ -119,6 +119,14 @@ export default function renderAddToCart(ph, block, parent) {
   const findDealer = getPdpOverride('findDealer') || parent.custom.findDealer;
   block.classList.remove('pdp-find-locally');
   block.classList.remove('pdp-find-dealer');
+
+  // Coming-soon products cannot be added to cart or redirected to a local seller.
+  // Keep an empty container so variant changes can restore the appropriate CTA.
+  if (parent.custom.comingSoon === 'Yes' || selectedVariant?.custom?.comingSoon === 'Yes') {
+    const emptyContainer = document.createElement('div');
+    emptyContainer.classList.add('add-to-cart');
+    return emptyContainer;
+  }
 
   // Figure out if the selected variant is available for sale
   const isAvailableForSale = isVariantAvailableForSale(selectedVariant);
