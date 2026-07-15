@@ -314,6 +314,7 @@ export default async function decorate(block) {
     }
 
     discountApply.disabled = true;
+    discountApply.classList.add('loading');
     try {
       const country = config.getLocale();
       const estimate = await estimatePrice(country, cart.getItemsForAPI(), code);
@@ -332,6 +333,7 @@ export default async function decorate(block) {
       couponErrorEl.hidden = false;
     } finally {
       discountApply.disabled = false;
+      discountApply.classList.remove('loading');
     }
   });
 
