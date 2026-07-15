@@ -15,6 +15,32 @@ import { getStandardCheckoutContext } from '../../scripts/checkout-context.js';
 export { validateLinkIntegrity };
 
 /**
+ * Minimum remaining lifetime (in ms) before an estimate token is considered
+ * "expiring soon" and should be proactively refreshed. 5 minutes gives enough
+ * headroom to complete the order-create + payment-initiate round-trips.
+ */
+const ESTIMATE_TOKEN_BUFFER_MS = 5 * 60 * 1000;
+
+/**
+ * Decode a JWT's `exp` claim and return whether the token is expired or will
+ * expire within the buffer window. Returns `true` (needs refresh) when the
+ * token cannot be decoded.
+ *
+ * @param {string|null|undefined} token - JWT estimate token
+ * @param {number} [bufferMs] - refresh when fewer than this many ms remain
+ * @returns {boolean}
+ */
+export function isEstimateExpiringSoon(token, bufferMs = ESTIMATE_TOKEN_BUFFER_MS) {
+  if (!token) return true;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return (payload.exp * 1000) - Date.now() < bufferMs;
+  } catch {
+    return true;
+  }
+}
+
+/**
  * Returns the explicitly selected checkout payment method, if any.
  * @param {HTMLFormElement} form
  * @returns {string|null}
@@ -203,6 +229,17 @@ export function initOrder(form, cart, state, config, strings) {
         console.error(integrity.error);
         throw new Error(integrity.error);
       }
+
+      // Proactively refresh the estimate token if it is expired or about to
+      // expire (e.g. the customer idled on the checkout page). Re-calling
+      // preview is invisible to the user; if totals changed we surface the
+      // updated amounts via the returned preview state.
+      if (isEstimateExpiringSoon(orderBody.estimateToken)) {
+        const refreshed = await callbacks.previewOrderDirect(orderBody);
+        // eslint-disable-next-line no-param-reassign
+        orderBody.estimateToken = refreshed.estimateToken;
+      }
+
       const result = await createOrder(orderBody);
       subscribeNewsletter(new FormData(form));
       return result;
@@ -315,7 +352,8 @@ export function initOrder(form, cart, state, config, strings) {
         return;
       }
 
-      if (!state.currentEstimateToken) {
+      if (!state.currentEstimateToken
+        || isEstimateExpiringSoon(state.currentEstimateToken)) {
         await callbacks.updatePreview();
         if (!state.currentEstimateToken) {
           showError(form, strings.errorCalculateTotals);

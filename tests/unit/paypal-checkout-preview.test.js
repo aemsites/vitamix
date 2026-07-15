@@ -25,6 +25,16 @@ test('withPayPalExpressContext adds authoritative context to payloads', () => {
   });
 });
 
+/**
+ * Build a minimal JWT with the given `exp` (seconds since epoch).
+ * The signature is irrelevant — only the payload is decoded client-side.
+ */
+function fakeJwt(exp) {
+  const header = btoa(JSON.stringify({ alg: 'HS256' }));
+  const payload = btoa(JSON.stringify({ exp }));
+  return `${header}.${payload}.fake-sig`;
+}
+
 function callbacksForState(state) {
   let updatePreviewCalls = 0;
   return {
@@ -40,12 +50,14 @@ function callbacksForState(state) {
 }
 
 test('ensureCheckoutPreviewToken reuses an existing PayPal checkout estimate token', async () => {
-  const state = { currentEstimateToken: 'existing-token' };
+  // Token that expires 1 hour from now — well within the buffer.
+  const validToken = fakeJwt(Math.floor(Date.now() / 1000) + 3600);
+  const state = { currentEstimateToken: validToken };
   const { callbacks, getUpdatePreviewCalls } = callbacksForState(state);
 
   assert.equal(await ensureCheckoutPreviewToken(callbacks), true);
   assert.equal(getUpdatePreviewCalls(), 0);
-  assert.equal(state.currentEstimateToken, 'existing-token');
+  assert.equal(state.currentEstimateToken, validToken);
 });
 
 test('ensureCheckoutPreviewToken creates a PayPal checkout estimate token when missing', async () => {
