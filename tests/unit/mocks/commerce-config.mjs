@@ -19,7 +19,10 @@ export function __resetConfig() {
 }
 
 export function formatPrice(value, currency = 'USD') {
-  return `${currency} ${Number(value).toFixed(2)}`;
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency,
+  }).format(value);
 }
 
 export function getConfig() {
