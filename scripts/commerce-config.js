@@ -152,6 +152,25 @@ export function formatPrice(amount, currencyCode) {
   }).format(amount);
 }
 
+/**
+ * Formats a numeric amount with currency-appropriate grouping and decimals
+ * but without the currency symbol. Used alongside a separate currency code
+ * label (e.g. the Total row: "USD $549.95" → "USD 549.95" with the symbol
+ * already provided by the label).
+ *
+ * @param {number} amount
+ * @returns {string}
+ */
+export function formatPriceAmount(amount) {
+  const lang = defaults.getLanguage();
+  const locale = lang.replace('_', '-').replace(/-([a-z]{2})$/, (_, r) => `-${r.toUpperCase()}`);
+  return new Intl.NumberFormat(locale, {
+    style: 'decimal',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
 export function getConfig() {
   const merged = { ...defaults, ...(window.CommerceConfig || {}) };
   merged.apiOrigin = resolveApiOrigin(merged.org, merged.site);

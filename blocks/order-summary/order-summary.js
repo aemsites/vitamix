@@ -1,6 +1,6 @@
 import { loadCSS } from '../../scripts/aem.js';
 import cart from '../../scripts/cart.js';
-import { getConfig, formatPrice } from '../../scripts/commerce-config.js';
+import { getConfig, formatPrice, formatPriceAmount } from '../../scripts/commerce-config.js';
 import buildCartItem, { buildGiftItem } from '../../scripts/commerce/cart-item.js';
 import buildWarrantySelector from '../cart/warranty-selector.js';
 import { parsePreview, estimatePrice } from '../../scripts/commerce-api.js';
@@ -317,7 +317,7 @@ export default async function decorate(block) {
       shippingEl.textContent = shippingRate === 0 ? s.free : formatPrice(shippingRate, currency);
     }
     taxesEl.textContent = '--';
-    grandTotalEl.textContent = formatPrice(total, currency);
+    grandTotalEl.textContent = formatPriceAmount(total, currency);
     headerTotalEl.textContent = formatPrice(total, currency);
   };
 
@@ -545,7 +545,7 @@ export default async function decorate(block) {
       ? s.free
       : formatPrice(parseFloat(shippingRate), currency);
     taxesEl.textContent = formatPrice(taxAmount, currency);
-    grandTotalEl.textContent = formatPrice(total, currency);
+    grandTotalEl.textContent = formatPriceAmount(total, currency);
     headerTotalEl.textContent = formatPrice(total, currency);
   });
 

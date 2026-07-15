@@ -25,6 +25,14 @@ export function formatPrice(value, currency = 'USD') {
   }).format(value);
 }
 
+export function formatPriceAmount(value) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'decimal',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
 export function getConfig() {
   return {
     getLocale: () => 'us',
