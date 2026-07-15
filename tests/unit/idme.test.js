@@ -224,4 +224,38 @@ describe('ID.me checkout integration', () => {
 
     assert.match(globalThis.window.location.href, /^https:\/\/groups\.id\.me\//);
   });
+
+  it('returns the idme_error value and cleans the URL', async () => {
+    setLocation(
+      'https://www.vitamix.com/us/en_us/order/checkout?idme_error=token_exchange_failed',
+    );
+    const { handleIDMeError } = await importIDMe();
+
+    assert.equal(handleIDMeError(), 'token_exchange_failed');
+    assert.equal(
+      globalThis.window.history.replaced,
+      '/us/en_us/order/checkout',
+    );
+  });
+
+  it('returns null when no idme_error param is present', async () => {
+    setLocation('https://www.vitamix.com/us/en_us/order/checkout');
+    const { handleIDMeError } = await importIDMe();
+
+    assert.equal(handleIDMeError(), null);
+    assert.equal(globalThis.window.history.replaced, null);
+  });
+
+  it('preserves other query params when cleaning idme_error', async () => {
+    setLocation(
+      'https://www.vitamix.com/us/en_us/order/checkout?foo=bar&idme_error=fail',
+    );
+    const { handleIDMeError } = await importIDMe();
+
+    assert.equal(handleIDMeError(), 'fail');
+    assert.equal(
+      globalThis.window.history.replaced,
+      '/us/en_us/order/checkout?foo=bar',
+    );
+  });
 });

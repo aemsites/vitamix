@@ -108,6 +108,22 @@ function watchIDMePopup(popupWindow) {
 }
 
 /**
+ * Reads ?idme_error= from the current URL. If present, removes it from
+ * the address bar and returns the error value so the caller can display
+ * a user-facing message. Returns null when the param is absent.
+ * @returns {string|null}
+ */
+export function handleIDMeError() {
+  const params = new URLSearchParams(window.location.search);
+  const error = params.get('idme_error');
+  if (!error) return null;
+  params.delete('idme_error');
+  const qs = params.size ? `?${params}` : '';
+  window.history.replaceState(null, '', window.location.pathname + qs);
+  return error;
+}
+
+/**
  * Reads ?idme_coupon= from the current URL, stores it as an auto-applied
  * coupon, fires checkout:coupon-apply, and cleans the param from the address
  * bar. Returns the coupon code if found, otherwise null.
