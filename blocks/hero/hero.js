@@ -38,6 +38,7 @@ function detectLayout(block) {
     const imgIndex = cells.findIndex((c) => c.classList.contains('img-wrapper'));
     block.classList.add(imgIndex === 0 ? 'left-text' : 'right-text');
   } else {
+    block.classList.add('center');
     const cell = row.firstElementChild;
     if (!cell) return;
     const [picture] = [...cell.querySelectorAll('picture')];
