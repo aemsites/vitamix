@@ -373,15 +373,6 @@ export function setDigitalDataForSearch(searchTerm, toolType, resultCount) {
   window.digitalData.page.pageInfo.onsiteSearchResults = resultCount;
 
   whenSatelliteReady(() => {
-    configureAnalyticsTrackingServers();
-    const satellite = getSatellite();
-    if (toolType === 'siteSearch') {
-      satellite.track('searchSiteSearch');
-    } else if (toolType === 'browseRecipe') {
-      satellite.track('searchBrowseRecipe');
-    } else if (toolType === 'browseArticle') {
-      satellite.track('searchBrowseArticle');
-    }
     debugLog('Adobe Analytics search event fired', window.digitalData.page.pageInfo);
   }, `search:${toolType}`);
 }
