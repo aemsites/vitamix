@@ -81,6 +81,14 @@
   margin: var(--spacing-m) 0;
 }
 
+@media (width < 480px) {
+  /* Guarantee breathing room on the left/right edges on narrow iPhone
+     widths, even when this form is placed inside a full-width section. */
+  .form .footer-sign-up {
+    padding-inline: var(--spacing-200);
+  }
+}
+
 .form .footer-sign-up input {
   padding: var(--spacing-60);
   font-size: var(--font-size-80);

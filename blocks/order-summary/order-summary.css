@@ -186,6 +186,15 @@
   margin-bottom: 24px;
 }
 
+@media (width <= 999px) {
+  /* Tighten the gap between the warranty selector (end of the items list)
+     and the discount code box that follows on narrow iPhone and iPad widths
+     (the breakpoint at which the order summary stacks above the form). */
+  .order-summary-items {
+    margin-bottom: 16px;
+  }
+}
+
 /* First item has no top padding (the card header provides the gap) */
 .order-summary-items .cart-item:first-child {
   padding-top: 0;
