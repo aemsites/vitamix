@@ -152,6 +152,7 @@ function subscribeNewsletter(formData) {
       firstName,
       lastName,
       country: locale,
+      leadSource: `sub-em-cart-${locale}`,
     }),
   }).catch((err) => {
     // eslint-disable-next-line no-console
