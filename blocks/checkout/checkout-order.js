@@ -315,10 +315,19 @@ export function initOrder(form, cart, state, config, strings) {
         return;
       }
 
+      // Disable immediately to prevent double-clicks from creating duplicate orders.
+      // The button is re-enabled in every error / early-return path below.
+      submitBtn.disabled = true;
+      submitBtn.classList.add('is-loading');
+      if (submitTextEl) submitTextEl.textContent = strings.processing;
+
       if (!state.currentEstimateToken) {
         await callbacks.updatePreview();
         if (!state.currentEstimateToken) {
           showError(form, strings.errorCalculateTotals);
+          submitBtn.disabled = false;
+          submitBtn.classList.remove('is-loading');
+          if (submitTextEl) submitTextEl.textContent = strings.continueToPayment;
           return;
         }
       }
@@ -332,11 +341,11 @@ export function initOrder(form, cart, state, config, strings) {
         // eslint-disable-next-line no-console
         console.error(integrity.error);
         showError(form, integrity.error);
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('is-loading');
+        if (submitTextEl) submitTextEl.textContent = strings.continueToPayment;
         return;
       }
-
-      submitBtn.disabled = true;
-      if (submitTextEl) submitTextEl.textContent = strings.processing;
 
       try {
         const createdOrder = await createOrder(orderBody);
@@ -367,6 +376,7 @@ export function initOrder(form, cart, state, config, strings) {
           });
           showError(form, payment.reason || strings.errorGeneric);
           submitBtn.disabled = false;
+          submitBtn.classList.remove('is-loading');
           if (submitTextEl) submitTextEl.textContent = strings.continueToPayment;
         }
       } catch (err) {
@@ -380,6 +390,7 @@ export function initOrder(form, cart, state, config, strings) {
           : err.body?.message || strings.errorGeneric;
         showError(form, msg);
         submitBtn.disabled = false;
+        submitBtn.classList.remove('is-loading');
         if (submitTextEl) submitTextEl.textContent = strings.continueToPayment;
       }
     });
