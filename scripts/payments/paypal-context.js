@@ -1,4 +1,5 @@
 import { getExpressCheckoutContext } from '../checkout-context.js';
+import { isEstimateExpiringSoon } from '../../blocks/checkout/checkout-order.js';
 
 /**
  * Builds PayPal express context for the page where the button is rendered.
@@ -28,7 +29,8 @@ export function withPayPalExpressContext(payload, entryPoint) {
  * @returns {Promise<boolean>}
  */
 export default async function ensureCheckoutPreviewToken(callbacks) {
-  if (callbacks.getState().currentEstimateToken) return true;
+  const { currentEstimateToken } = callbacks.getState();
+  if (currentEstimateToken && !isEstimateExpiringSoon(currentEstimateToken)) return true;
   await callbacks.updatePreview();
   return Boolean(callbacks.getState().currentEstimateToken);
 }

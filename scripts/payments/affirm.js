@@ -26,8 +26,10 @@ export default {
       callbacks.clearError();
       btn.disabled = true;
 
+      const { isEstimateExpiringSoon } = await import('../../blocks/checkout/checkout-order.js');
       const state = callbacks.getState();
-      if (!state.currentEstimateToken) {
+      if (!state.currentEstimateToken
+        || isEstimateExpiringSoon(state.currentEstimateToken)) {
         await callbacks.updatePreview();
         if (!callbacks.getState().currentEstimateToken) {
           callbacks.showError('Unable to calculate totals. Please try again.');
