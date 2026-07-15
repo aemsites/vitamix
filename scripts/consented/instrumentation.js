@@ -372,9 +372,7 @@ export function setDigitalDataForSearch(searchTerm, toolType, resultCount) {
   window.digitalData.page.pageInfo.onsiteSearchToolType = toolType;
   window.digitalData.page.pageInfo.onsiteSearchResults = resultCount;
 
-  whenSatelliteReady(() => {
-    debugLog('Adobe Analytics search event fired', window.digitalData.page.pageInfo);
-  }, `search:${toolType}`);
+  debugLog('Adobe Analytics search data set', window.digitalData.page.pageInfo);
 }
 
 /**
@@ -390,7 +388,7 @@ function attachSearchResultsObserver(resultsCountEl) {
     const count = parseInt(resultsCountEl.textContent, 10) || 0;
     setDigitalDataForSearch(searchTerm, toolType, count);
   });
-  observer.observe(resultsCountEl, { childList: true, characterData: true, subtree: true });
+  observer.observe(resultsCountEl, { childList: true, characterData: true });
 }
 
 /**
