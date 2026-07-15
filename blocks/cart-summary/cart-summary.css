@@ -377,6 +377,10 @@ dialog.paypal-not-configured-dialog::backdrop {
   font-size: var(--commerce-font-size-sm);
 }
 
+.cart-summary-discount-row[hidden] {
+  display: none;
+}
+
 .cart-summary-shipping {
   color: var(--commerce-color-text-muted);
   font-style: italic;

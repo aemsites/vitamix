@@ -27,6 +27,29 @@ async function getCart(page, key = CART_KEY_US) {
   return raw ? JSON.parse(raw) : null;
 }
 
+/**
+ * Seeds a visible item and optional coupon before the cart page initializes.
+ * @param {import('@playwright/test').Page} page Playwright page
+ * @param {string} couponCode Coupon code to restore, or an empty string
+ */
+async function seedCartSummary(page, couponCode = '') {
+  await page.addInitScript(({ cartKey, code }) => {
+    localStorage.setItem(cartKey, JSON.stringify({
+      version: 1,
+      items: [{
+        sku: 'summary-test-sku',
+        quantity: 1,
+        price: '549.99',
+        name: 'Summary Test Product',
+        path: '/us/en_us/products/ascent-x2',
+      }],
+    }));
+    sessionStorage.removeItem('checkout_coupon_code');
+    sessionStorage.removeItem('checkout_coupon_source');
+    if (code) sessionStorage.setItem('checkout_coupon_code', code);
+  }, { cartKey: CART_KEY_US, code: couponCode });
+}
+
 // Header cart link locator: the cart icon's parent <a>. Stable across
 // edge/Magento modes (href changes but the icon-cart child does not).
 const CART_LINK_SELECTOR = 'header a:has(.icon-cart)';
@@ -671,6 +694,46 @@ test.describe('Edge Checkout', () => {
       const cart = await getCart(page);
       expect(cart.items[0].local?.availableWarranties).toBeUndefined();
       console.log('✓ No availableWarranties stored for product without warranty options');
+    });
+  });
+
+  // ─── Cart summary coupon row ──────────────────────────────────────────────────
+
+  test.describe('Cart Summary Coupon Row @desktop', () => {
+    const cartPath = '/us/en_us/order/cart';
+
+    test.use({ viewport: { width: 1280, height: 720 } });
+
+    test('hides the coupon row when no coupon is applied', async ({ page }) => {
+      await seedCartSummary(page);
+      await page.goto(buildProductUrl(cartPath, currentBranch, { cart: 'edge' }));
+
+      const discountRow = page.locator('.cart-summary-discount-row');
+      await expect(page.locator('.cart-summary-content')).toBeVisible({ timeout: 30000 });
+      await expect(discountRow).toBeHidden();
+      await expect(discountRow.locator('.discount-remove')).toBeHidden();
+      console.log('✓ Coupon row is hidden without an applied coupon');
+    });
+
+    test('shows the remove action when a coupon is applied', async ({ page }) => {
+      await seedCartSummary(page, 'SAVE10');
+      await page.route('**/estimate/price', (route) => route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          subtotal: 549.99,
+          discounts: [{ source: 'coupon', name: 'SAVE10', amount: 10 }],
+          orderDiscountTotal: 10,
+        }),
+      }));
+      await page.goto(buildProductUrl(cartPath, currentBranch, { cart: 'edge' }));
+
+      const discountRow = page.locator('.cart-summary-discount-row');
+      await expect(discountRow).toBeVisible({ timeout: 30000 });
+      await expect(discountRow.locator('.cart-summary-discount-label')).toContainText('SAVE10');
+      await discountRow.hover();
+      await expect(discountRow.locator('.discount-remove')).toBeVisible();
+      console.log('✓ Coupon row includes its remove action for an applied coupon');
     });
   });
 
