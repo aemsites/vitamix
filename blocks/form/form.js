@@ -483,7 +483,7 @@ function enableSubmission(form, path) {
  */
 function buildField(field) {
   const {
-    type, label, help, field: fieldName, conditional,
+    type, label, help, field: fieldName, conditional, options,
   } = field;
   const controlled = conditional || null;
 
