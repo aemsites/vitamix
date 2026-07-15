@@ -327,8 +327,13 @@
   }
 
   .hero.center picture[data-bg] img {
+    object-position: 10%;
+  }
+
+  .hero.center.focus-right picture[data-bg] img {
     object-position: 90%;
   }
+
 
   .hero.center > div {
     align-items: end;
