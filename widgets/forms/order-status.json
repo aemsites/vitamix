@@ -19,7 +19,7 @@
         "partiallyShipped": "Partially Shipped",
         "shipped": "Order Shipped",
         "cancelled": "Order Cancelled",
-        "unavailable": "Status Unavailable"
+        "unavailable": "Order Status Unavailable"
       },
       "definitionsTitle": "What these statuses mean",
       "descriptions": {
@@ -52,7 +52,7 @@
         "partiallyShipped": "Partiellement expédiée",
         "shipped": "Commande expédiée",
         "cancelled": "Commande annulée",
-        "unavailable": "État indisponible"
+        "unavailable": "Statut de commande indisponible"
       },
       "definitionsTitle": "Signification de ces états",
       "descriptions": {
@@ -85,7 +85,7 @@
         "partiallyShipped": "Parcialmente enviado",
         "shipped": "Pedido enviado",
         "cancelled": "Pedido cancelado",
-        "unavailable": "Estado no disponible"
+        "unavailable": "Estado del pedido no disponible"
       },
       "definitionsTitle": "Qué significan estos estados",
       "descriptions": {
