@@ -66,12 +66,14 @@ export async function performOrderStatusLookup(orderNumber) {
  * @param {Record<string, any>|null} result - Parsed API response
  * @param {Record<string, any>} copy - Localized order-status copy
  * @param {HTMLElement} container - Element to render into
+ * @param {string} [inputOrderNumber] - The order number the user typed,
+ *   used as a fallback when the API response does not include one
  */
-export function renderOrderStatusResult(result, copy, container) {
+export function renderOrderStatusResult(result, copy, container, inputOrderNumber) {
   const resultLabels = copy.result?.labels ?? {};
   const resultStatuses = copy.result?.statuses ?? {};
 
-  const orderNumber = result?.order?.key ?? '—';
+  const orderNumber = result?.order?.key ?? inputOrderNumber ?? '—';
   const statusKey = deriveOrderStatusKey(result);
   const orderStatus = resultStatuses[statusKey] ?? statusKey;
 

@@ -46,7 +46,7 @@ export default async function decorate(widget) {
 
     try {
       const result = await performOrderStatusLookup(orderNumber);
-      renderOrderStatusResult(result, copy, resultEl);
+      renderOrderStatusResult(result, copy, resultEl, orderNumber);
       resultEl.hidden = false;
       resultEl.classList.add('order-status-result-visible');
     } catch (err) {
