@@ -1,9 +1,11 @@
+import { getMetadata } from './aem.mjs';
+
 /**
  * Minimal mock of scripts/scripts.js for unit tests.
  *
  * The real module bootstraps the page at import time, which crashes outside
  * a browser. Tests currently import modules that need `checkVariantOutOfStock`,
- * `getLocaleAndLanguage`, and `loggedFetch` from this module.
+ * `getLocaleAndLanguage`, `getPdpOverride`, and `loggedFetch` from this module.
  */
 
 let outOfStockSkus = new Set();
@@ -24,6 +26,11 @@ export function __resetScripts() {
 
 export function checkVariantOutOfStock(sku) {
   return outOfStockSkus.has(sku);
+}
+
+/** Returns the authored PDP override from mocked page metadata. */
+export function getPdpOverride(name) {
+  return getMetadata(name);
 }
 
 /**
