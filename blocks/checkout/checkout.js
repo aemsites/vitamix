@@ -527,6 +527,7 @@ export default async function decorate(block) {
       const submitBtn = form.querySelector('.checkout-submit-btn');
       if (submitBtn) {
         submitBtn.disabled = false;
+        submitBtn.classList.remove('is-loading');
         const submitTextEl = submitBtn.querySelector('.submit-btn-text');
         if (submitTextEl) submitTextEl.textContent = strings.continueToPayment;
       }
