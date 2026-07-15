@@ -137,7 +137,7 @@ body.modal-open {
   }
 }
 
-.modal[data-modal-path*="sign-up"] dialog .modal-content .section:nth-child(2) p:first-of-type {
+.modal[data-modal-path*="sign-up"] dialog .modal-content .section:nth-child(2) p:first-of-type:where(:not(.form-message)) {
   font-family: var(--heading-font-family);
   font-size: var(--heading-size-xl);
   line-height: 1;

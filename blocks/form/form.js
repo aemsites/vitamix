@@ -483,13 +483,30 @@ function enableSubmission(form, path) {
  */
 function buildField(field) {
   const {
-    type, label, help, field: fieldName, conditional,
+    type, label, help, field: fieldName, conditional, options,
   } = field;
   const controlled = conditional || null;
 
   // submit/reset buttons stand alone
   if (type === 'submit' || type === 'reset') {
     return buildButton(field);
+  }
+  if (type === 'message') {
+    const wrapper = createElement('div', `form-field ${type}-field`);
+    if (controlled) {
+      const controller = controlled.split('-')[0];
+      wrapper.dataset.controller = controller;
+      wrapper.dataset.condition = controlled;
+    }
+    const p = createElement('p', 'form-message');
+    p.textContent = label ? `${label} ` : '';
+    if (options) {
+      const span = createElement('span');
+      span.innerHTML = options;
+      p.append(span);
+    }
+    wrapper.append(p);
+    return wrapper;
   }
 
   // radio/checkbox groups get a fieldset
