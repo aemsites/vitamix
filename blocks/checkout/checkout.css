@@ -409,7 +409,7 @@ main > .section:has(.checkout-wrapper) {
 .billing-option-card {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 8px;
   padding: 14px 16px;
   border: 1px solid var(--commerce-color-border);
   border-radius: var(--commerce-radius-card);
@@ -1378,6 +1378,12 @@ button.checkout-submit-btn {
 
   .checkout-form .form-section {
     padding: 16px;
+  }
+
+  /* Tighten the gap between stacked section cards (e.g. Contact → Shipping
+     address) so the form doesn't feel overly spaced out on narrow screens. */
+  .checkout-form {
+    gap: 8px;
   }
 
 }
