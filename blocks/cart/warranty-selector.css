@@ -23,4 +23,5 @@
 
 .cart-item-warranty-option input[type="radio"] {
   margin: 0;
+  padding: 0;
 }
