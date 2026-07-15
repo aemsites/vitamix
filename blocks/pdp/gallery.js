@@ -148,12 +148,14 @@ export default function renderGallery(block, variants) {
   const carousel = buildCarousel(gallery);
   buildThumbnails(carousel);
 
-  // Add click-to-zoom on non-video slides
+  // Add click-to-zoom on non-video slides (desktop only)
+  const desktopQuery = window.matchMedia('(min-width: 900px)');
   carousel.querySelectorAll(':scope > ul > li').forEach((li) => {
     const pic = li.querySelector('picture');
     if (!pic || li.querySelector('a.video-wrapper')) return;
     li.classList.add('zoomable');
     li.addEventListener('click', async () => {
+      if (!desktopQuery.matches) return;
       const img = pic.querySelector('img');
       if (!img) return;
       const modalPicture = pic.cloneNode(true);
