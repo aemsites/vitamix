@@ -177,7 +177,7 @@ main > .section:has(.checkout-wrapper) {
 .form-field-checkbox label {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   cursor: pointer;
   font-size: var(--commerce-font-size-sm);
 }
@@ -798,6 +798,13 @@ button.checkout-submit-btn {
 }
 
 @media (width < 1000px) {
+  /* Tighten the gap between stacked section cards (e.g. Contact → Shipping
+     address) so the form doesn't feel overly spaced out on iPhone and iPad
+     widths, where the checkout form is a single stacked column. */
+  .checkout-form {
+    gap: 8px;
+  }
+
   .payment-option-card {
     display: grid;
     grid-template-columns: 18px 40px 1fr;
@@ -1378,12 +1385,6 @@ button.checkout-submit-btn {
 
   .checkout-form .form-section {
     padding: 16px;
-  }
-
-  /* Tighten the gap between stacked section cards (e.g. Contact → Shipping
-     address) so the form doesn't feel overly spaced out on narrow screens. */
-  .checkout-form {
-    gap: 8px;
   }
 
 }
