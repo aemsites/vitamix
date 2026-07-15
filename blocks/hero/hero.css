@@ -319,7 +319,7 @@
 
 @media (width <= 900px) {
   .hero.center h1 {
-    font-size: var(--heading-size-l);
+    font-size: var(--heading-size-xxxxl);
   }
 
   .hero.center p {
@@ -353,7 +353,8 @@
   }
 
   .hero.center p.button-wrapper {
-    margin-top: var(--spacing-400);
+    margin-top: var(--spacing-200);
+    margin-bottom: 0;
     justify-content: unset;
   }
 }
