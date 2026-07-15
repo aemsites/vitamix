@@ -320,6 +320,39 @@ body.modal-open {
 
 /* stylelint-disable no-descending-specificity */
 
+/* gallery image modal */
+.modal#gallery-image dialog {
+  max-width: 1200px;
+  width: 90vw;
+  background-color: transparent;
+  border: none;
+}
+
+.modal#gallery-image dialog .modal-content {
+  background-color: transparent;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal#gallery-image dialog .modal-content picture {
+  display: block;
+  width: 100%;
+  line-height: 0;
+}
+
+.modal#gallery-image dialog .modal-content picture img {
+  width: 100%;
+  height: auto;
+  max-height: 85vh;
+  object-fit: contain;
+}
+
+.modal#gallery-image .close-button {
+  z-index: 1;
+}
+
 /* foundation modals */
 .modal[data-modal-path*="/modals/foundation/"] dialog .modal-content {
   border-radius: var(--rounding-m);
