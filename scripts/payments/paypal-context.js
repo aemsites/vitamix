@@ -1,5 +1,5 @@
 import { getExpressCheckoutContext } from '../checkout-context.js';
-import { isEstimateExpiringSoon } from '../../blocks/checkout/checkout-order.js';
+import { isEstimateExpiringSoon } from '../estimate-token.js';
 
 /**
  * Builds PayPal express context for the page where the button is rendered.
