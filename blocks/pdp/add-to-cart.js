@@ -1,5 +1,7 @@
 import { getMetadata } from '../../scripts/aem.js';
-import { checkVariantOutOfStock, getLocaleAndLanguage, getPdpOverride } from '../../scripts/scripts.js';
+import {
+  checkVariantOutOfStock, getLocaleAndLanguage, getOrderPath, getPdpOverride,
+} from '../../scripts/scripts.js';
 import { getConfig } from '../../scripts/commerce-config.js';
 import { logOperation, logError } from '../../scripts/operations-log.js';
 
@@ -389,11 +391,22 @@ export default function renderAddToCart(ph, block, parent) {
           });
         }
 
-        // reenable button
-        addToCartButton.textContent = 'Add to Cart';
-        addToCartButton.removeAttribute('aria-disabled');
         logOperation('added-to-cart', { sku: targetSku, quantity: allowedQty });
         document.dispatchEvent(new CustomEvent('pdp:add-to-cart', { detail: { item } }));
+
+        // On mobile the header cart badge is too subtle — redirect to the
+        // cart page so the user gets clear feedback that the item was added.
+        // Flush first: addItem uses a debounced persist (300 ms) so
+        // localStorage may not have the new item yet.
+        if (window.innerWidth < 900) {
+          cartApi.flush();
+          window.location.href = getOrderPath('cart');
+          return;
+        }
+
+        // reenable button (desktop only — mobile redirects above)
+        addToCartButton.textContent = 'Add to Cart';
+        addToCartButton.removeAttribute('aria-disabled');
         return;
       }
 
