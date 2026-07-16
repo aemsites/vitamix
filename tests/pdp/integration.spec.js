@@ -88,6 +88,8 @@ test.describe('PDP Integration Tests', () => {
 
       await page.route('**/graphql', async (route) => {
         const requestBody = route.request().postDataJSON();
+        // Ascent X2 no longer has warranty options, so selected_options
+        // contains only the configurable color UID.
         expect(requestBody.variables).toEqual({
           cartId: 'test-cart-id',
           cartItems: [
@@ -96,7 +98,6 @@ test.describe('PDP Integration Tests', () => {
               quantity: '1',
               selected_options: [
                 'Y29uZmlndXJhYmxlLzkzLzUzNA==',
-                'Y3VzdG9tLW9wdGlvbi8zMDAwLzM5Mzk=',
               ],
             },
           ],
@@ -167,7 +168,6 @@ test.describe('PDP Integration Tests', () => {
               quantity: '1',
               selected_options: [
                 'Y29uZmlndXJhYmxlLzkzLzUzNA==',
-                'Y3VzdG9tLW9wdGlvbi8zMDAwLzM5Mzk=',
               ],
             },
           ],
@@ -240,6 +240,8 @@ test.describe('PDP Integration Tests', () => {
           const value = part.split('\n')[3].trim();
           data[name] = value;
         });
+        // Ascent X2 no longer has warranty options, so warranty fields
+        // are absent from the legacy form data.
         expect(data).toEqual({
           index_id: '534',
           product: '3627',
@@ -250,9 +252,6 @@ test.describe('PDP Integration Tests', () => {
           qty: '1',
           'super_attribute[93]': '534',
           vitamixProductId: '3627',
-          'options[3000]': '3939',
-          warranty_sku: 'sku-10-year-limited-warranty',
-          'warranty_skus[3939]': 'sku-10-year-limited-warranty',
         });
 
         // Log the arguments that were passed to addToCart
@@ -485,7 +484,7 @@ test.describe('PDP Integration Tests', () => {
           'options[3023]': '3965',
           'warranty_skus[3965]': '001314',
           warranty_sku: '001314',
-          'warranty_skus[3962]': 'sku-warranty-7yr-std',
+          'warranty_skus[3962]': '075843',
         });
 
         // Log the arguments that were passed to addToCart
