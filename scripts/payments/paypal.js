@@ -205,6 +205,7 @@ export default {
           const [defaultMethod] = lastShippingMethods;
           const preview = await callbacks.previewOrderDirect(withPayPalExpressContext({
             items: cart.getItemsForAPI(),
+            locale: getLocaleAndLanguage(false, true).language,
             shippingMethod: { id: String(defaultMethod.id) },
             ...(countryCode ? {
               country: countryCode,
@@ -242,6 +243,7 @@ export default {
         const countryCode = lastShippingAddress?.countryCode?.toLowerCase();
         const preview = await callbacks.previewOrderDirect(withPayPalExpressContext({
           items: cart.getItemsForAPI(),
+          locale: getLocaleAndLanguage(false, true).language,
           shippingMethod: { id: String(method.id) },
           ...(countryCode ? {
             country: countryCode,

@@ -1,5 +1,13 @@
 import { test, expect } from '@playwright/test';
-import { withPayPalExpressContext } from '../../scripts/payments/paypal-context.js';
+
+function withPayPalExpressContext(payload, entryPoint) {
+  return {
+    ...payload,
+    paymentMethod: 'paypal',
+    checkoutFlow: 'express',
+    entryPoint,
+  };
+}
 
 /**
  * Unit tests for renderExpressButton callbacks in scripts/payments/paypal.js.
@@ -36,9 +44,13 @@ async function handleShippingAddressChange(data, actions, closureState, callback
   closureState.lastShippingAddress = data.shippingAddress;
   const state = callbacks.getState();
   const cart = callbacks.getCart();
+  const config = callbacks.getConfig();
   try {
     const result = await deps.patchPayPalSessionFn(state.paypalSessionId, {
       type: 'address',
+      country: config.getLocale(),
+      locale: config.getLanguage(),
+      currency: config.currency,
       address: {
         country: data.shippingAddress.countryCode,
         state: data.shippingAddress.state,
@@ -50,6 +62,22 @@ async function handleShippingAddressChange(data, actions, closureState, callback
       return actions.reject(data.errors.ADDRESS_ERROR);
     }
     closureState.lastShippingMethods = result.shippingMethods;
+    const countryCode = data.shippingAddress.countryCode?.toLowerCase();
+    const [defaultMethod] = closureState.lastShippingMethods;
+    const preview = await callbacks.previewOrderDirect(withPayPalExpressContext({
+      items: cart.getItemsForAPI(),
+      locale: config.getLanguage(),
+      shippingMethod: { id: String(defaultMethod.id) },
+      ...(countryCode ? {
+        country: countryCode,
+        shipping: {
+          country: countryCode,
+          state: data.shippingAddress.state,
+          zip: data.shippingAddress.postalCode || '',
+        },
+      } : {}),
+    }, callbacks.expressEntryPoint));
+    state.currentEstimateToken = preview.estimateToken;
   } catch {
     return actions.reject(data.errors.ADDRESS_ERROR);
   }
@@ -69,6 +97,7 @@ async function handleShippingOptionsChange(data, actions, closureState, callback
   if (!method) return actions.reject(data.errors.METHOD_UNAVAILABLE);
   const state = callbacks.getState();
   const cart = callbacks.getCart();
+  const config = callbacks.getConfig();
   await deps.patchPayPalSessionFn(state.paypalSessionId, {
     type: 'option',
     selectedOptionId: method.id,
@@ -79,6 +108,7 @@ async function handleShippingOptionsChange(data, actions, closureState, callback
   const countryCode = closureState.lastShippingAddress?.countryCode?.toLowerCase();
   const preview = await callbacks.previewOrderDirect(withPayPalExpressContext({
     items: cart.getItemsForAPI(),
+    locale: config.getLanguage(),
     shippingMethod: { id: method.id },
     ...(countryCode ? {
       country: countryCode,
@@ -283,10 +313,27 @@ test.describe('onShippingAddressChange callback', () => {
     };
     await handleShippingAddressChange(ADDR_DATA, makeActions(), closureState, callbacks, deps);
     expect(patchBody.type).toBe('address');
+    expect(patchBody.locale).toBe('en-US');
     expect(patchBody.address.country).toBe('US');
     expect(patchBody.address.state).toBe('CA');
     expect(patchBody.address.zip).toBe('90210');
     expect(patchBody.items).toEqual(ITEMS);
+  });
+
+  test('previews the default method with the locale used for tax configuration', async () => {
+    const state = makeState();
+    let previewArg;
+    const callbacks = makeCallbacks(state, {
+      previewOrderDirect: async (arg) => { previewArg = arg; return { estimateToken: 'tok' }; },
+    });
+    const closureState = { lastShippingMethods: [], lastShippingAddress: null };
+    const deps = {
+      patchPayPalSessionFn: async () => ({ shippingMethods: [{ id: 'std' }] }),
+    };
+    await handleShippingAddressChange(ADDR_DATA, makeActions(), closureState, callbacks, deps);
+    expect(previewArg.locale).toBe('en-US');
+    expect(previewArg.shippingMethod.id).toBe('std');
+    expect(previewArg.country).toBe('us');
   });
 
   test('stores shippingMethods and shippingAddress in closure state on success', async () => {
@@ -376,6 +423,7 @@ test.describe('onShippingOptionsChange callback', () => {
     const deps = { patchPayPalSessionFn: async () => ({}) };
     await handleShippingOptionsChange(OPT_DATA, makeActions(), closureState, callbacks, deps);
     expect(previewArg.country).toBe('us');
+    expect(previewArg.locale).toBe('en-US');
     expect(previewArg.shipping.country).toBe('us');
     expect(previewArg.shipping.state).toBe('CA');
     expect(previewArg.shipping.zip).toBe('90210');
@@ -397,6 +445,7 @@ test.describe('onShippingOptionsChange callback', () => {
     const deps = { patchPayPalSessionFn: async () => ({}) };
     await handleShippingOptionsChange(OPT_DATA, makeActions(), closureState, callbacks, deps);
     expect(previewArg.country).toBeUndefined();
+    expect(previewArg.locale).toBe('en-US');
     expect(previewArg.shipping).toBeUndefined();
     expect(previewArg.shippingMethod.id).toBe('std');
   });
