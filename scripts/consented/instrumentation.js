@@ -368,11 +368,18 @@ export function setDigitalDataForSearch(searchTerm, toolType, resultCount) {
   window.digitalData.page = window.digitalData.page || {};
   window.digitalData.page.pageInfo = window.digitalData.page.pageInfo || {};
 
-  window.digitalData.page.pageInfo.onsiteSearchTerm = searchTerm || '';
-  window.digitalData.page.pageInfo.onsiteSearchToolType = toolType;
-  window.digitalData.page.pageInfo.onsiteSearchResults = resultCount;
-
-  debugLog('Adobe Analytics search data set', window.digitalData.page.pageInfo);
+  if (resultCount === 0) {
+    const satellite = getSatellite();
+    if (satellite?.track) {
+      satellite.track('nullSearch');
+      debugLog('Adobe Analytics nullSearch fired', { searchTerm, toolType });
+    }
+  } else {
+    window.digitalData.page.pageInfo.onsiteSearchTerm = searchTerm || '';
+    window.digitalData.page.pageInfo.onsiteSearchToolType = toolType;
+    window.digitalData.page.pageInfo.onsiteSearchResults = resultCount;
+    debugLog('Adobe Analytics search data set', window.digitalData.page.pageInfo);
+  }
 }
 
 /**
