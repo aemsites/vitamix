@@ -53,7 +53,7 @@ export function isPdpPage() {
  * Search-result page detection via .search-results container.
  * @returns {boolean}
  */
-export function isSearchPage() {
+function isSearchPage() {
   return !!document.querySelector('.search-results');
 }
 
@@ -381,9 +381,13 @@ export function setDigitalDataForSearch(searchTerm, toolType, resultCount) {
  * @param {Element} resultsCountEl
  */
 function attachSearchResultsObserver(resultsCountEl) {
+  let lastSearchTerm = null;
   const observer = new MutationObserver(() => {
     const params = new URLSearchParams(window.location.search);
     const searchTerm = params.get('search') || '';
+    // Only fire on an actual new search term, not pagination/filter changes
+    if (searchTerm === lastSearchTerm) return;
+    lastSearchTerm = searchTerm;
     const toolType = getSearchToolTypeFromUrl();
     const count = parseInt(resultsCountEl.textContent, 10) || 0;
     setDigitalDataForSearch(searchTerm, toolType, count);
