@@ -419,9 +419,16 @@ function attachSearchResultsObserver(resultsCountEl) {
 
   // Process the already-rendered result immediately so the initial URL-driven
   // search is not missed (MutationObserver does not replay past mutations).
+  // Only lock in lastSearchTerm when the element already has a real count (> 0).
+  // If the count is still 0/empty the widget hasn't finished rendering yet —
+  // leaving lastSearchTerm as null lets the first observer mutation fire correctly
+  // instead of being silently skipped by the dedup guard.
   if (initialSearchTerm) {
-    lastSearchTerm = initialSearchTerm;
-    processCurrentSearchResult(resultsCountEl, initialSearchTerm);
+    const initialCount = parseInt(resultsCountEl.textContent, 10) || 0;
+    if (initialCount > 0) {
+      lastSearchTerm = initialSearchTerm;
+      processCurrentSearchResult(resultsCountEl, initialSearchTerm);
+    }
   }
 
   const observer = new MutationObserver(() => {
