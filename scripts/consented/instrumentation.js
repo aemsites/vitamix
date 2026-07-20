@@ -64,49 +64,23 @@ const PAGE_TYPE = {
   CONTENT: 'Content',
   COMMERCIAL: 'Commercial',
   SEARCH: 'Search Results',
+  ERROR: 'Error Page',
 };
 
 /**
- * URL → pageType overrides for legacy AEM-style pageType values.
- * Exact keys match the full pathname; keys ending in `/` match as prefix (longest wins).
+ * Suffix paths under /{locale}/{lang} → pageType (locale resolved at lookup).
+ * Keys ending in `/` match as prefix (longest wins).
  * @type {Record<string, string>}
  */
 const PAGE_TYPE_URL_MAP = {
-  '/us/en_us/recipes': 'recipeoverviewpage',
-  '/us/en_us/recipes/': 'recipedetailpage',
+  '/recipes': 'recipeoverviewpage',
+  '/recipes/': 'recipedetailpage',
 };
 
-/**
- * @param {string} pathname
- * @returns {string}
- */
-function normalizePathForPageTypeMap(pathname) {
-  if (!pathname || pathname === '/') return pathname;
-  return pathname.replace(/\/+$/, '');
-}
-
-/**
- * Resolve pageType from PAGE_TYPE_URL_MAP (exact match, then longest prefix).
- * @param {string} [pathname]
- * @returns {string}
- */
-function getPageTypeFromUrlMap(pathname = window.location.pathname) {
-  const normalizedPath = normalizePathForPageTypeMap(pathname);
-  if (PAGE_TYPE_URL_MAP[normalizedPath]) {
-    return PAGE_TYPE_URL_MAP[normalizedPath];
-  }
-
-  let bestPrefix = '';
-  let pageType = '';
-  Object.entries(PAGE_TYPE_URL_MAP).forEach(([key, value]) => {
-    if (!key.endsWith('/') || !normalizedPath.startsWith(key)) return;
-    if (key.length > bestPrefix.length) {
-      bestPrefix = key;
-      pageType = value;
-    }
-  });
-  return pageType;
-}
+/** First path segment after a prefix key that should not match (e.g. /recipes/data). */
+const PAGE_TYPE_URL_PREFIX_EXCLUSIONS = {
+  '/recipes/': ['data'],
+};
 
 /**
  * @returns {string}
@@ -122,6 +96,74 @@ function getStoreLocaleKey() {
 export function getActiveLanguageLocale() {
   const segments = window.location.pathname.split('/').filter(Boolean);
   return segments[1] || 'en_us';
+}
+
+/**
+ * @returns {string}
+ */
+function getLocalePathPrefix() {
+  return `/${getStoreLocaleKey()}/${getActiveLanguageLocale()}`;
+}
+
+/**
+ * @param {string} pathname
+ * @returns {string}
+ */
+function normalizePathForPageTypeMap(pathname) {
+  if (!pathname || pathname === '/') return pathname;
+  return pathname.replace(/\/+$/, '');
+}
+
+/**
+ * @param {string} suffixKey
+ * @param {string} normalizedPath
+ * @param {string} prefixBase
+ * @returns {boolean}
+ */
+function isExcludedPrefixMatch(suffixKey, normalizedPath, prefixBase) {
+  const exclusions = PAGE_TYPE_URL_PREFIX_EXCLUSIONS[suffixKey];
+  if (!exclusions?.length) return false;
+  const remainder = normalizedPath.slice(prefixBase.length + 1);
+  const firstSegment = remainder.split('/')[0];
+  return exclusions.includes(firstSegment);
+}
+
+/**
+ * Resolve pageType from PAGE_TYPE_URL_MAP (exact match, then longest prefix).
+ * @param {string} [pathname]
+ * @returns {string}
+ */
+function getPageTypeFromUrlMap(pathname = window.location.pathname) {
+  const normalizedPath = normalizePathForPageTypeMap(pathname);
+  const localePrefix = getLocalePathPrefix();
+
+  const exactEntry = Object.entries(PAGE_TYPE_URL_MAP).find(([suffix]) => {
+    if (suffix.endsWith('/')) return false;
+    const fullKey = normalizePathForPageTypeMap(`${localePrefix}${suffix}`);
+    return normalizedPath === fullKey;
+  });
+  if (exactEntry) return exactEntry[1];
+
+  let bestPrefix = '';
+  let pageType = '';
+  Object.entries(PAGE_TYPE_URL_MAP).forEach(([suffix, value]) => {
+    if (!suffix.endsWith('/')) return;
+    const prefixBase = normalizePathForPageTypeMap(`${localePrefix}${suffix.replace(/\/+$/, '')}`);
+    if (!normalizedPath.startsWith(`${prefixBase}/`)) return;
+    if (isExcludedPrefixMatch(suffix, normalizedPath, prefixBase)) return;
+    if (prefixBase.length > bestPrefix.length) {
+      bestPrefix = prefixBase;
+      pageType = value;
+    }
+  });
+  return pageType;
+}
+
+/**
+ * @returns {boolean}
+ */
+function isCommercialPath() {
+  return /\/commercial(?:\/|$)/.test(window.location.pathname);
 }
 
 /**
@@ -307,19 +349,28 @@ function detectEdsPageKind() {
  *   subCat1: string,
  *   subCat2: string,
  *   homeVsComm: string,
+ *   pageTypeSource: 'url-map' | 'detected',
  * }}
  */
 export function buildPageAnalyticsContext(pageKind = detectEdsPageKind()) {
   const websiteCode = getStoreLocaleKey();
-  const isCommercial = window.location.href.includes('commercial');
+  const isCommercial = isCommercialPath();
   let pageType = '';
   let primaryCat = '';
   let subCat1 = '';
   let subCat2 = '';
   let pageID = '';
   let homeVsComm = '';
+  let pageTypeSource = 'detected';
 
-  if (
+  if (pageKind === 'error404') {
+    homeVsComm = 'br';
+    pageType = PAGE_TYPE.ERROR;
+    primaryCat = `vitamix:${websiteCode}`;
+    subCat1 = `vitamix:${websiteCode}:br`;
+    subCat2 = `vitamix:${websiteCode}:br:toplevel`;
+    pageID = `${subCat2}:404`;
+  } else if (
     !isCommercial
     && (pageKind === 'plp' || pageKind === 'cart' || pageKind === 'checkout')
   ) {
@@ -392,9 +443,10 @@ export function buildPageAnalyticsContext(pageKind = detectEdsPageKind()) {
     pageType = PAGE_TYPE.COMMERCIAL;
   }
 
-  const mappedPageType = getPageTypeFromUrlMap();
+  const mappedPageType = pageKind === 'cms' ? getPageTypeFromUrlMap() : '';
   if (mappedPageType) {
     pageType = mappedPageType;
+    pageTypeSource = 'url-map';
   }
 
   return {
@@ -404,6 +456,7 @@ export function buildPageAnalyticsContext(pageKind = detectEdsPageKind()) {
     subCat1,
     subCat2,
     homeVsComm,
+    pageTypeSource,
   };
 }
 
@@ -470,39 +523,39 @@ function applyDigitalDataPageContext(categories) {
 }
 
 /**
- * Populate global digitalData.page and digitalData.user before Launch loads.
- * Mirrors Magento adobeLaunch.js page context (pageType is a data-layer field, not track()).
+ * Detect and apply digitalData.page context for the current URL.
+ * @param {string} logLabel
+ * @returns {ReturnType<typeof buildPageAnalyticsContext> | null}
  */
-export function initDigitalDataPage() {
-  if (!hasMarketingConsent()) return;
+function refreshDigitalDataPageContext(logLabel) {
+  if (!hasMarketingConsent()) return null;
 
   const pageKind = detectEdsPageKind();
   const categories = buildPageAnalyticsContext(pageKind);
   applyDigitalDataPageContext(categories);
 
-  debugLog('Adobe Analytics digitalData.page initialized', {
+  debugLog(logLabel, {
     pageKind,
     pageType: categories.pageType,
     pageID: categories.pageID,
-    pageTypeSource: getPageTypeFromUrlMap() ? 'url-map' : 'detected',
+    pageTypeSource: categories.pageTypeSource,
   });
+  return categories;
+}
+
+/**
+ * Populate global digitalData.page and digitalData.user before Launch loads.
+ * Mirrors Magento adobeLaunch.js page context (pageType is a data-layer field, not track()).
+ */
+export function initDigitalDataPage() {
+  refreshDigitalDataPageContext('Adobe Analytics digitalData.page initialized');
 }
 
 /**
  * Re-apply pageType after Launch loads (Launch defaults unknown types to defaultpage).
  */
 export function syncDigitalDataPageContext() {
-  if (!hasMarketingConsent()) return;
-
-  const pageKind = detectEdsPageKind();
-  const categories = buildPageAnalyticsContext(pageKind);
-  applyDigitalDataPageContext(categories);
-
-  debugLog('Adobe Analytics digitalData.page synced', {
-    pageKind,
-    pageType: categories.pageType,
-    pageTypeSource: getPageTypeFromUrlMap() ? 'url-map' : 'detected',
-  });
+  refreshDigitalDataPageContext('Adobe Analytics digitalData.page synced');
 }
 
 /**
@@ -823,7 +876,6 @@ export function trackProdView(attempt = 0) {
  */
 export function initInstrumentation() {
   debugLog('Adobe Analytics instrumentation loaded');
-  syncDigitalDataPageContext();
   guardDigitalDataPageType();
   if (isPdpPage() || isProductsPathPage()) {
     trackProdView();
