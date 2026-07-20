@@ -17,6 +17,12 @@
   justify-content: center;
 }
 
+@media (width >= 900px) {
+  .gallery.carousel > ul > li.zoomable {
+    cursor: pointer;
+  }
+}
+
 .gallery.carousel > ul > li picture {
   width: 100%;
 }
