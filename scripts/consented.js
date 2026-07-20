@@ -4,10 +4,14 @@ import {
   configureAnalyticsTrackingServers,
   ensureAnalyticsTrackingConfigured,
   getDeploymentEnv,
+  initDigitalDataPage,
   initInstrumentation,
+  syncDigitalDataPageContext,
 } from './consented/instrumentation.js';
 
 document.body.classList.add('consented');
+// Populate digitalData.page (pageType, categories, user profile) before Launch page view.
+initDigitalDataPage();
 
 // add delayed functionality here
 window.config = {
@@ -46,8 +50,10 @@ if (currentEnvironment.dataset.deploymentEnv === 'prod') {
 }
 
 configureAnalyticsTrackingServers();
+// Launch overwrites pageType to defaultpage — restore Edge page-specific values.
+syncDigitalDataPageContext();
 
-// PDP prodView via Launch direct call; Launch rule maps digitalData and sends the beacon.
+// digitalData.page pageType + prodView via Launch direct call.
 initInstrumentation();
 ensureAnalyticsTrackingConfigured();
 
