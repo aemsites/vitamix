@@ -58,7 +58,8 @@ if (currentEnvironment.dataset.deploymentEnv === 'prod') {
 // Re-apply tracker config after Launch creates late AppMeasurement instances.
 configureAnalyticsTrackingServers();
 
-// Page events (prodView, scView, scCheckout, purchase) and Target orderConfirmPage after Launch is available.
+// Page events (prodView, scView, scCheckout, purchase)
+// and Target orderConfirmPage after Launch is available.
 initInstrumentation();
 ensureAnalyticsTrackingConfigured();
 
