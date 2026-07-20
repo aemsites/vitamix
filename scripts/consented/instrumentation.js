@@ -80,6 +80,17 @@ export function isOrderSuccessPage() {
 }
 
 /**
+ * 404 / no-route page detection. The EDS error template sets
+ * `window.isErrorPage` and renders a `main.error` wrapper (see 404.html).
+ * @returns {boolean}
+ */
+export function isErrorPage() {
+  if (window.isErrorPage === true) return true;
+  return typeof document.querySelector === 'function'
+    && !!document.querySelector('main.error');
+}
+
+/**
  * @param {string} sku
  * @returns {boolean}
  */
@@ -110,7 +121,7 @@ export function shouldTrackCartLine(item, { excludeWarranty = false } = {}) {
   return true;
 }
 
-/** Adobe Target conversion mbox for order confirmation (Magento parity). */
+/** Adobe Target conversion mbox for order confirmation. */
 const TARGET_ORDER_CONFIRM_MBOX = 'orderConfirmPage';
 
 /**
@@ -313,7 +324,7 @@ export function readOrderSuccessContext() {
 
 /**
  * Comma-separated SKUs for Adobe Target order confirmation.
- * Mirrors Magento `getAllVisibleItems()` + `getPurchasedProductIdsString()`.
+ * Mirrors Adobe Commerce `getAllVisibleItems()` + `getPurchasedProductIdsString()`.
  * @param {object[]} items Order or cart line items with `sku`
  * @returns {string}
  */
@@ -928,7 +939,7 @@ async function pushScAddEvent(productID, { isFirstCart = false, waitForBeacon = 
 }
 
 /**
- * Push scAdd context and send a synchronous link beacon (Magento redirect path).
+ * Push scAdd context and send a synchronous link beacon (Adobe Commerce redirect path).
  * Uses s.tl only — Launch scAdd rules would double-count if _satellite.track ran too.
  * @param {string} productID Adobe Analytics products string
  * @param {{ isFirstCart?: boolean }} [options]
@@ -970,7 +981,6 @@ async function pushScViewEvent(items, { waitForBeacon = false } = {}) {
 /**
  * Push removed-item context to digitalData and send scRemove via s.tl.
  * Uses link beacon only — Launch scRemove rules would double-count if
- * _satellite.track ran too (same fix as Magento scAdd).
  * @param {Array<{name: string, quantity?: number|string}>} items Removed cart lines
  * @param {{ waitForBeacon?: boolean }} [options]
  * @returns {Promise<boolean>} Whether the scRemove beacon was sent
@@ -1024,7 +1034,7 @@ async function pushCartCheckoutEvent(
 }
 
 /**
- * Fire Adobe Target order-confirmation conversion (Magento parity).
+ * Fire Adobe Target order-confirmation conversion.
  * @param {{ orderId: string, orderTotal: string, productPurchasedId: string }} params
  * @returns {boolean} Whether trackEvent was invoked
  */
@@ -1298,7 +1308,7 @@ export function handleCartAddChange(detail) {
 }
 
 /**
- * Handle analytics:cart-add from the Magento cart layer (redirect-safe path).
+ * Handle analytics:cart-add from the Adobe Commerce cart layer (redirect-safe path).
  * @param {{ name?: string, quantity?: number|string, isFirstCart?: boolean }} detail
  * @returns {void}
  */
@@ -1345,8 +1355,8 @@ export function resetScRemoveBatchState() {
 }
 
 /**
- * Track scAdd/scRemove via cart:change and scAdd via analytics:cart-add (Magento).
- * scAdd edge: cart:change action=add. scAdd Magento: analytics:cart-add after addToCart.
+ * Track scAdd/scRemove via cart:change and scAdd via analytics:cart-add (Adobe Commerce).
+ * scAdd edge: cart:change action=add. scAdd Adobe Commerce: analytics:cart-add after addToCart.
  * scRemove: cart:change action=remove.
  * @returns {void}
  */
@@ -1407,6 +1417,313 @@ export function trackScCheckout(attempt = 0) {
   }, 'scCheckout');
 }
 
+/**
+ * Adobe Commerce parity: payment-step page identifier for formStart after a new checkout
+ * address is saved (setShippingInformation / saveNewAddress). EDS fires on address
+ * section collapse but keeps the same pageID so the Launch formStart rule maps
+ * variables correctly.
+ * @param {string} [locale] Store locale key from URL path (e.g. us, ca)
+ * @returns {{ pageID: string, pageName: string }}
+ */
+export function buildCheckoutPaymentPageInfo(locale = getStoreLocaleKey()) {
+  const pageId = `vitamix:${locale}:sh:checkout:payment`;
+  return { pageID: pageId, pageName: pageId };
+}
+
+/**
+ * @param {{ pageID: string, pageName: string }} pageInfo
+ */
+function assignDigitalDataPageInfo(pageInfo) {
+  window.digitalData = window.digitalData || {};
+  window.digitalData.page = window.digitalData.page || {};
+  window.digitalData.page.pageInfo = {
+    ...window.digitalData.page.pageInfo,
+    ...pageInfo,
+  };
+}
+
+let formStartFiredFor = new Set();
+let checkoutShippingTrackingInstalled = false;
+
+/**
+ * Fire formStart when a new checkout address is saved (Adobe Commerce setShippingInformation
+ * and saveNewAddress parity). Updates digitalData.page.pageInfo and triggers the
+ * Launch formStart direct-call rule. Deduped per address type so shipping and billing
+ * can each fire once.
+ * @param {'shipping' | 'billing'} [addressType]
+ * @returns {Promise<void>}
+ */
+export async function fireFormStart(addressType = 'shipping') {
+  if (formStartFiredFor.has(addressType)) return;
+
+  if (!hasMarketingConsent()) {
+    return;
+  }
+
+  if (!isCheckoutPage()) {
+    return;
+  }
+
+  const pageInfo = buildCheckoutPaymentPageInfo();
+  assignDigitalDataPageInfo(pageInfo);
+  flushLaunchTrackers();
+
+  if (!(await triggerLaunchEvent('formStart', pageInfo))) {
+    debugWarn('Adobe Analytics formStart skipped: Adobe Launch (_satellite) not available');
+    return;
+  }
+
+  formStartFiredFor.add(addressType);
+  debugLog(`Adobe Analytics formStart fired (${addressType} address)`, pageInfo);
+}
+
+/**
+ * Handle checkout:shipping-address-validated.
+ * @returns {void}
+ */
+export function handleShippingAddressValidated() {
+  whenSatelliteReady(() => {
+    fireFormStart('shipping');
+  }, 'formStart');
+}
+
+/**
+ * Handle checkout:billing-address-validated.
+ * @returns {void}
+ */
+export function handleBillingAddressValidated() {
+  whenSatelliteReady(() => {
+    fireFormStart('billing');
+  }, 'formStart');
+}
+
+/**
+ * Listen for new checkout address saves (register early in consented.js).
+ * @returns {void}
+ */
+export function trackCheckoutShipping() {
+  if (checkoutShippingTrackingInstalled) {
+    return;
+  }
+  checkoutShippingTrackingInstalled = true;
+
+  document.addEventListener('checkout:shipping-address-validated', () => {
+    handleShippingAddressValidated();
+  });
+  document.addEventListener('checkout:billing-address-validated', () => {
+    handleBillingAddressValidated();
+  });
+}
+
+/** Reset formStart dedupe state (for unit tests). */
+export function resetFormStartState() {
+  formStartFiredFor = new Set();
+  checkoutShippingTrackingInstalled = false;
+}
+
+/**
+ * digitalData.page.pageInfo payload for a 404/no-route page (Adobe Commerce parity).
+ * Mirrors Commerce: { errorCode, errorPage, technicalErrors }. Reads the code
+ * the 404 template exposed on window.errorCode, falling back to '404'.
+ * @returns {{ errorCode: string, errorPage: string, technicalErrors: string }}
+ */
+export function buildErrorPageInfo() {
+  const errorCode = `${window.errorCode || '404'}`;
+  return { errorCode, errorPage: 'errorPage', technicalErrors: errorCode };
+}
+
+let pageErrorFired = false;
+
+/**
+ * Fire Adobe Analytics pageError on a 404/no-route page (Adobe Commerce parity).
+ * Sets digitalData.page.pageInfo (errorCode, errorPage, technicalErrors) and
+ * triggers the Launch pageError direct-call rule. Deduped per page view.
+ * @returns {Promise<void>}
+ */
+export async function firePageError() {
+  if (pageErrorFired) return;
+
+  if (!hasMarketingConsent()) {
+    return;
+  }
+
+  if (!isErrorPage()) {
+    return;
+  }
+
+  const pageInfo = buildErrorPageInfo();
+  assignDigitalDataPageInfo(pageInfo);
+  flushLaunchTrackers();
+
+  if (!(await triggerLaunchEvent('pageError', window.digitalData.page.pageInfo))) {
+    debugWarn('Adobe Analytics pageError skipped: Adobe Launch (_satellite) not available');
+    return;
+  }
+
+  pageErrorFired = true;
+  debugLog('Adobe Analytics pageError fired', window.digitalData.page.pageInfo);
+}
+
+/**
+ * Wait for Launch, then fire pageError on a 404/no-route page.
+ * @returns {void}
+ */
+export function trackPageError() {
+  whenSatelliteReady(() => {
+    firePageError();
+  }, 'pageError');
+}
+
+/** Reset pageError state (for unit tests). */
+export function resetPageErrorState() {
+  pageErrorFired = false;
+}
+
+/**
+ * SHA-256 hex digest of the given input, used to derive a pseudonymous user id
+ * from the email (avoids putting raw PII into the analytics data layer).
+ * @param {string} input
+ * @returns {Promise<string>} Lowercase hex digest, or '' if hashing is unavailable
+ */
+export async function sha256Hex(input) {
+  const subtle = window.crypto?.subtle;
+  if (!subtle || !input) return '';
+  try {
+    const bytes = new TextEncoder().encode(input);
+    const digest = await subtle.digest('SHA-256', bytes);
+    return [...new Uint8Array(digest)]
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * digitalData.page.user payload for a successful login (Adobe Commerce parity).
+ * @param {string} userId Pseudonymous user id (hashed email)
+ * @returns {{ userID: string, status: string, globalID: string }}
+ */
+export function buildLoginUserData(userId) {
+  return { userID: userId, status: 'success', globalID: userId };
+}
+
+function assignDigitalDataUser(userData) {
+  window.digitalData = window.digitalData || {};
+  window.digitalData.page = window.digitalData.page || {};
+  window.digitalData.page.user = userData;
+}
+
+let loginStartFired = false;
+let logoutFired = false;
+
+/**
+ * Fire login analytics after a successful edge OTP login (Adobe Commerce parity).
+ * Sets digitalData.page.user with a hashed user id, then fires formStart and
+ * loginStart. Deduped so repeat/cross-tab auth events don't re-fire.
+ * @param {string} email The authenticated user's email
+ * @returns {Promise<void>}
+ */
+export async function fireLoginStart(email) {
+  if (loginStartFired) return;
+
+  if (!hasMarketingConsent()) {
+    return;
+  }
+
+  const trimmedEmail = `${email || ''}`.trim().toLowerCase();
+  if (!trimmedEmail) {
+    return;
+  }
+
+  const userId = await sha256Hex(trimmedEmail);
+  assignDigitalDataUser(buildLoginUserData(userId));
+  flushLaunchTrackers();
+
+  if (!(await triggerLaunchEvent('formStart', window.digitalData.page.user))) {
+    debugWarn('Adobe Analytics login formStart skipped: Adobe Launch (_satellite) not available');
+    return;
+  }
+
+  if (!(await triggerLaunchEvent('loginStart', window.digitalData.page.user))) {
+    debugWarn('Adobe Analytics loginStart skipped: Adobe Launch (_satellite) not available');
+    return;
+  }
+
+  loginStartFired = true;
+  debugLog('Adobe Analytics loginStart fired', window.digitalData.page.user);
+}
+
+/**
+ * Fire logout analytics after a successful sign-out (Adobe Commerce parity).
+ * Mirrors Commerce: _satellite.track('loggedOut'). Deduped so repeat/cross-tab
+ * auth events don't re-fire within the same page view.
+ * @returns {Promise<void>}
+ */
+export async function fireLoggedOut() {
+  if (logoutFired) return;
+
+  if (!hasMarketingConsent()) {
+    return;
+  }
+
+  flushLaunchTrackers();
+
+  if (!(await triggerLaunchEvent('loggedOut', window.digitalData?.page?.user))) {
+    debugWarn('Adobe Analytics loggedOut skipped: Adobe Launch (_satellite) not available');
+    return;
+  }
+
+  logoutFired = true;
+  debugLog('Adobe Analytics loggedOut fired');
+}
+
+/**
+ * Handle commerce:auth-state-changed. Fires login analytics on a fresh login and
+ * logout analytics on sign-out, resetting the opposite dedupe flag so the next
+ * transition is tracked again.
+ * @param {{ loggedIn?: boolean, email?: string }} detail
+ * @returns {void}
+ */
+export function handleAuthStateChanged(detail) {
+  const { loggedIn, email } = detail || {};
+  if (!loggedIn) {
+    loginStartFired = false;
+    whenSatelliteReady(() => {
+      fireLoggedOut();
+    }, 'loggedOut');
+    return;
+  }
+  logoutFired = false;
+  whenSatelliteReady(() => {
+    fireLoginStart(email);
+  }, 'loginStart');
+}
+
+let loginTrackingInstalled = false;
+
+/**
+ * Listen for edge OTP login state changes (register early in consented.js).
+ * @returns {void}
+ */
+export function trackLogin() {
+  if (loginTrackingInstalled) {
+    return;
+  }
+  loginTrackingInstalled = true;
+
+  document.addEventListener('commerce:auth-state-changed', (ev) => {
+    handleAuthStateChanged(ev.detail);
+  });
+}
+
+/** Reset login analytics state (for unit tests). */
+export function resetLoginState() {
+  loginStartFired = false;
+  logoutFired = false;
+  loginTrackingInstalled = false;
+}
+
 let orderConfirmTargetFired = false;
 
 /**
@@ -1450,9 +1767,10 @@ export function trackOrderConfirmTarget(attempt = 0) {
 }
 
 /**
- * Initialize page-level Adobe Analytics (prodView on PDP, scView on cart, scCheckout)
- * and Adobe Target orderConfirmPage on order success.
- * Cart mutation listeners are registered early via trackCartChange() in consented.js.
+ * Initialize page-level Adobe Analytics (prodView on PDP, scView on cart, scCheckout,
+ * pageError on 404) and Adobe Target
+ * orderConfirmPage on order success. Cart mutation listeners are registered early via
+ * trackCartChange() in consented.js.
  * @returns {void}
  */
 export function initInstrumentation() {
@@ -1471,6 +1789,9 @@ export function initInstrumentation() {
   }
   if (isCheckoutPage()) {
     trackScCheckout();
+  }
+  if (isErrorPage()) {
+    trackPageError();
   }
   if (isOrderSuccessPage()) {
     trackOrderConfirmTarget();

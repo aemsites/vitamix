@@ -6,6 +6,8 @@ import {
   getDeploymentEnv,
   initInstrumentation,
   trackCartChange,
+  trackCheckoutShipping,
+  trackLogin,
 } from './consented/instrumentation.js';
 
 document.body.classList.add('consented');
@@ -13,6 +15,8 @@ document.body.classList.add('consented');
 // add-to-cart and Magento redirect paths are never missed. Idempotent — safe if
 // called again; initInstrumentation() intentionally does not re-register.
 trackCartChange();
+trackCheckoutShipping();
+trackLogin();
 
 // add delayed functionality here
 window.config = {
