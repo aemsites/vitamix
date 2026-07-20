@@ -157,7 +157,7 @@ body.modal-open {
   }
 }
 
-.modal[data-modal-path*="sign-up"] dialog .modal-content .section:nth-child(2) p:first-of-type {
+.modal[data-modal-path*="sign-up"] dialog .modal-content .section:nth-child(2) p:first-of-type:where(:not(.form-message)) {
   font-family: var(--heading-font-family);
   font-size: var(--heading-size-xl);
   line-height: 1;
@@ -339,6 +339,55 @@ body.modal-open {
 }
 
 /* stylelint-disable no-descending-specificity */
+
+/* gallery image modal */
+.modal#gallery-image dialog {
+  max-width: fit-content;
+  width: auto;
+  max-height: none;
+  background-color: transparent;
+  border: none;
+  overflow: visible;
+}
+
+.modal#gallery-image dialog .modal-content {
+  background-color: transparent;
+  overflow: visible;
+  max-height: none;
+  margin-top: 0;
+  padding: 0;
+  line-height: 0;
+}
+
+.modal#gallery-image dialog .modal-content picture {
+  display: block;
+}
+
+.modal#gallery-image dialog .modal-content picture img {
+  display: block;
+  max-width: calc(100vw - 48px);
+  max-height: calc(100dvh - 48px);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+@media (width >= 900px) {
+  .modal#gallery-image dialog .modal-content {
+    padding: 0;
+  }
+
+  .modal#gallery-image dialog .modal-content picture img {
+    max-width: calc(100vw - 96px);
+    max-height: calc(100dvh - 96px);
+  }
+}
+
+.modal#gallery-image .close-button {
+  z-index: 1;
+  top: -44px;
+  right: -44px;
+}
 
 /* foundation modals */
 .modal[data-modal-path*="/modals/foundation/"] dialog .modal-content {
