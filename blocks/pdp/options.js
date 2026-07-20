@@ -3,6 +3,7 @@ import { rebuildIndices, checkVariantOutOfStock, formatPrice } from '../../scrip
 import { toClassName } from '../../scripts/aem.js';
 import renderPricing from './pricing.js';
 import renderAddToCart from './add-to-cart.js';
+import { updateAlert } from './alert.js';
 
 /**
  * Updates the OOS message text based on whether parent or variant is out of stock.
@@ -136,6 +137,7 @@ export function onOptionChange(ph, block, variants, color, isParentOutOfStock = 
 
   // update add to cart, preserving the user's current quantity selection
   const currentQty = block.querySelector('.quantity-container select')?.value;
+  updateAlert(ph, block, window.jsonLdData.custom, variant.custom);
   const addToCartContainer = renderAddToCart(ph, block, window.jsonLdData);
   if (addToCartContainer) {
     block.querySelector('.add-to-cart').replaceWith(addToCartContainer);
