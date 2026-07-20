@@ -7,15 +7,24 @@ import affirm from '../../scripts/payments/affirm.js';
 import chase from '../../scripts/payments/chase.js';
 import buildForm, { initCollapse } from './checkout-form.js';
 import { initAddress } from './checkout-address.js';
-import { initShipping, updatePreview } from './checkout-shipping.js';
+import {
+  clearPreviewState,
+  initShipping,
+  updatePreview,
+} from './checkout-shipping.js';
 import { initOrder } from './checkout-order.js';
 import { initPayment } from './checkout-payment.js';
 import { parsePreview } from '../../scripts/commerce-api.js';
 import { ensurePriceRulesLoaded, evaluateGWP } from '../../scripts/gift-with-purchase.js';
+import { handleIDMeError } from '../../scripts/commerce/idme.js';
 import { validateField } from './checkout-validation.js';
 import { formStateKey, saveFormState, restoreFormState } from './checkout-session-state.js';
 import { logOperation, getCheckoutId } from '../../scripts/operations-log.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import {
+  prefillDefaultShippingAddress,
+  watchCustomerAddressPrefill,
+} from './checkout-customer-address.js';
 
 const ALL_PROVIDERS = [chase, applePay, paypal, affirm];
 
@@ -66,9 +75,11 @@ const LOCAL_STRINGS = {
     noShippingMethods: 'No shipping methods available for this address.',
     shippingPlaceholder: 'Enter your shipping address to see available methods.',
     errorSelectShipping: 'Please select a shipping method.',
+    errorSelectPayment: 'Please select a payment method.',
     errorCalculateTotals: 'Unable to calculate totals. Please try again.',
     errorRecaptcha: 'Security verification failed. Please refresh the page and try again.',
     errorGeneric: 'An error occurred. Please try again.',
+    errorIdMe: 'ID.me verification failed. Please try again.',
     processing: 'Processing…',
     addressEyebrow: 'Address verification',
     addressHeading: 'We found a more accurate version',
@@ -138,9 +149,11 @@ const LOCAL_STRINGS = {
     noShippingMethods: 'Aucune méthode de livraison disponible pour cette adresse.',
     shippingPlaceholder: 'Entrez votre adresse de livraison pour voir les méthodes disponibles.',
     errorSelectShipping: 'Veuillez sélectionner une méthode de livraison.',
+    errorSelectPayment: 'Veuillez sélectionner un mode de paiement.',
     errorCalculateTotals: 'Impossible de calculer les totaux. Veuillez réessayer.',
     errorRecaptcha: 'Échec de la vérification de sécurité. Veuillez actualiser la page et réessayer.',
     errorGeneric: 'Une erreur est survenue. Veuillez réessayer.',
+    errorIdMe: 'La vérification ID.me a échoué. Veuillez réessayer.',
     processing: 'Traitement en cours…',
     addressEyebrow: "Vérification d'adresse",
     addressHeading: 'Nous avons trouvé une version plus précise',
@@ -184,6 +197,10 @@ export default async function decorate(block) {
   // and a visitor who newly qualifies needs the gift added so totals reflect
   // it. Fire-and-forget; the cart:change re-render path picks up the result.
   ensurePriceRulesLoaded({ reason: 'checkout-block-init' }).then(() => evaluateGWP());
+
+  // Read and clean any ID.me error param before the empty-cart guard so the
+  // query string is always tidied, even when the cart is empty.
+  const idmeError = handleIDMeError();
 
   // Empty cart guard
   if (cart.itemCount === 0) {
@@ -229,6 +246,15 @@ export default async function decorate(block) {
 
   // Build form
   const form = buildForm(block, config, strings);
+
+  // Surface ID.me errors carried back via ?idme_error= after redirect
+  if (idmeError) {
+    const errorEl = form.querySelector('.checkout-error');
+    if (errorEl) {
+      errorEl.textContent = strings.errorIdMe;
+      errorEl.hidden = false;
+    }
+  }
 
   // Seed and update order total amount + mobile breakdown
   const orderTotalAmountEl = form.querySelector('.order-total-amount');
@@ -414,6 +440,18 @@ export default async function decorate(block) {
   const shippingContainer = form.querySelector('.shipping-methods');
   const refreshShipping = initShipping(form, shippingContainer, cart, state, config, strings);
 
+  // Start a signed-in customer's blank checkout with their default mailing address.
+  // Treat saved addresses like manually entered ones: Address Doctor must accept or
+  // correct the address before shipping rates are requested.
+  const prefillCustomerAddress = () => prefillDefaultShippingAddress({
+    form,
+    locale,
+    save: saveFormState,
+    validate: runShippingValidation,
+    refresh: refreshShipping,
+  }).catch(() => { /* signed-in address prefill is best-effort */ });
+  watchCustomerAddressPrefill(document, prefillCustomerAddress);
+
   // If the address was restored from sessionStorage on this page load, the
   // state select has a value but no `change` event ever fired — so the
   // estimate/preview chain never ran. Trigger it once now. fetchAndPreview
@@ -443,7 +481,12 @@ export default async function decorate(block) {
     const input = form.querySelector(`[name="${name}"]`);
     if (!input) return;
     input.addEventListener('blur', () => {
-      if (input.value && state.selectedShippingMethodId && !state.currentPreview) {
+      if (
+        input.value
+        && state.selectedShippingMethodId
+        && !state.currentPreview
+        && state.paymentMethodSelected
+      ) {
         updatePreview(form, cart, state, config);
       }
     });
@@ -475,7 +518,10 @@ export default async function decorate(block) {
 
   // Re-run preview on payment method change — tax may vary by type (e.g. Avalara surcharge)
   paymentContainer.addEventListener('change', (e) => {
-    if (e.target.name === 'paymentMethod') updatePreview(form, cart, state, config);
+    if (e.target.name !== 'paymentMethod') return;
+    state.paymentMethodSelected = true;
+    clearPreviewState(state);
+    if (state.selectedShippingMethodId) updatePreview(form, cart, state, config);
   });
 
   // Inject order-summary block into this section if the author didn't add one
@@ -497,6 +543,7 @@ export default async function decorate(block) {
       const submitBtn = form.querySelector('.checkout-submit-btn');
       if (submitBtn) {
         submitBtn.disabled = false;
+        submitBtn.classList.remove('is-loading');
         const submitTextEl = submitBtn.querySelector('.submit-btn-text');
         if (submitTextEl) submitTextEl.textContent = strings.continueToPayment;
       }

@@ -1,10 +1,16 @@
 import {
   estimateExpressCheckout,
   getCustomerTimezone,
+  parsePreview,
   validateApplePayMerchant,
 } from '../commerce-api.js';
 import { getUser, isLoggedIn } from '../auth-api.js';
 import { logOperation, getCheckoutId } from '../operations-log.js';
+import {
+  buildApplePayExpressOrderPayload,
+  buildApplePayExpressPreviewPayload,
+  getApplePayExpressContext,
+} from './apple-pay-context.js';
 
 const APPLE_PAY_SDK_URL = 'https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js';
 
@@ -34,6 +40,7 @@ function startExpressSession(btn, config, callbacks) {
     const locale = config.getLocale();
     const language = config.getLanguage();
     const bcp47 = `${language.split('_')[0]}-${(language.split('_')[1] || locale).toUpperCase()}`;
+    const checkoutContext = getApplePayExpressContext(callbacks.expressEntryPoint);
 
     let lastShippingContact = null;
     let lastShippingMethodId = null;
@@ -78,6 +85,7 @@ function startExpressSession(btn, config, callbacks) {
           contact.administrativeArea,
           contact.postalCode,
           cart.getItemsForAPI(),
+          checkoutContext,
         );
         const methods = result.shippingMethods || [];
         if (!methods.length) {
@@ -116,29 +124,24 @@ function startExpressSession(btn, config, callbacks) {
 
     session.onshippingmethodselected = async (e) => {
       try {
-        const contact = lastShippingContact;
-        const countryCode = contact?.countryCode?.toLowerCase();
-        const previewResult = await callbacks.previewOrderDirect({
-          items: cart.getItemsForAPI(),
-          shippingMethod: { id: e.shippingMethod.identifier },
-          locale: bcp47,
-          ...(countryCode ? {
-            country: countryCode,
-            shipping: {
-              country: countryCode,
-              state: contact.administrativeArea,
-              zip: contact.postalCode || '',
-            },
-          } : {}),
-        });
+        const previewResult = await callbacks.previewOrderDirect(
+          buildApplePayExpressPreviewPayload(
+            cart,
+            e.shippingMethod.identifier,
+            bcp47,
+            lastShippingContact,
+            checkoutContext,
+          ),
+        );
         lastShippingMethodId = e.shippingMethod.identifier;
         callbacks.getState().currentEstimateToken = previewResult.estimateToken;
+        const { shippingRate } = parsePreview(previewResult, cart.subtotal);
         session.completeShippingMethodSelection({
           newTotal: { label: config.site || 'Store', amount: String(previewResult.total) },
           newLineItems: [
             { label: 'Subtotal', amount: String(previewResult.subtotal) },
             { label: 'Tax', amount: String(previewResult.taxAmount) },
-            { label: 'Shipping', amount: String(previewResult.shippingMethod?.rate ?? 0) },
+            { label: 'Shipping', amount: String(shippingRate) },
           ],
         });
       } catch {
@@ -151,39 +154,22 @@ function startExpressSession(btn, config, callbacks) {
       const { payment } = e;
       const contact = payment.shippingContact;
       try {
-        const shippingAddr = {
-          name: `${contact.givenName} ${contact.familyName}`.trim(),
-          address1: (contact.addressLines || [])[0] || '',
-          address2: (contact.addressLines || [])[1] || '',
-          city: contact.locality,
-          state: contact.administrativeArea,
-          zip: contact.postalCode,
-          country: contact.countryCode?.toLowerCase() || locale,
-          phone: contact.phoneNumber || '',
-          email: contact.emailAddress || '',
-        };
-
         // When the user is signed in, use their account email so the order is linked
         // to the right account. The Apple Pay contact email may differ from the
         // commerce account email, which causes assertEmail to reject the request.
         const customerEmail = (isLoggedIn() && getUser()?.email) || contact.emailAddress || '';
         const customerTimezone = getCustomerTimezone();
-        const orderBody = {
-          customer: {
-            firstName: contact.givenName || '',
-            lastName: contact.familyName || '',
-            email: customerEmail,
-            phone: contact.phoneNumber || '',
-          },
-          shipping: shippingAddr,
-          billing: shippingAddr,
-          items: cart.getItemsForAPI(),
-          shippingMethod: { id: lastShippingMethodId || e.payment.shippingMethod?.identifier || '' },
+        const orderBody = buildApplePayExpressOrderPayload({
+          payment,
+          cart,
+          shippingMethodId: lastShippingMethodId || e.payment.shippingMethod?.identifier || '',
           estimateToken: callbacks.getState().currentEstimateToken,
           country: locale,
           locale: bcp47,
-          ...(customerTimezone ? { customerTimezone } : {}),
-        };
+          customerEmail,
+          customerTimezone,
+          checkoutContext,
+        });
 
         const createdOrder = await callbacks.createOrder(orderBody);
         const fraudToken = (() => {
@@ -365,6 +351,9 @@ export default {
   isAvailable: () => Boolean(window.ApplePaySession),
 
   renderExpressButton(container, callbacks) {
+    if (!callbacks.expressEntryPoint) {
+      throw new Error('Apple Pay express checkout requires an entry point');
+    }
     const config = callbacks.getConfig();
     const locale = config.getLocale();
     const language = config.getLanguage();

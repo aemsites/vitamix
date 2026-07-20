@@ -639,6 +639,7 @@ a.button.pdp-find-locally-button {
   height: 24px;
   width: 24px;
   margin: 0;
+  padding: 0;
 }
 
 .pdp p + h1 {

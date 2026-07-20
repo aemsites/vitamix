@@ -1,5 +1,6 @@
 import { estimateShipping, previewOrder } from '../../scripts/commerce-api.js';
 import { formatPrice } from '../../scripts/commerce-config.js';
+import { getStandardCheckoutContext } from '../../scripts/checkout-context.js';
 import { wireRadioTabNav } from './checkout-form.js';
 
 /**
@@ -80,6 +81,37 @@ export function findShippingMethodRadio(container, previousSelection = {}) {
 }
 
 /**
+ * Finds the estimated shipping method details for a selected radio.
+ * @param {Array<{id: string|number, type?: string, label?: string, rate?: string|number}>} rates
+ * @param {HTMLInputElement|null} radio
+ * @returns {Object|null}
+ */
+export function findShippingMethodRate(rates, radio) {
+  if (!radio) return null;
+  return rates.find((rate) => String(rate.id) === String(radio.value))
+    || rates.find((rate) => rate.type && rate.type === radio.dataset.shippingType)
+    || rates.find((rate) => rate.label && rate.label === radio.dataset.shippingLabel)
+    || null;
+}
+
+/**
+ * Dispatches the selected estimated shipping method for summary-only updates.
+ * @param {HTMLElement} shippingContainer
+ * @param {Object|null} shippingMethod
+ */
+function dispatchShippingSelected(shippingContainer, shippingMethod) {
+  shippingContainer.dispatchEvent(new CustomEvent('checkout:shipping-selected', {
+    bubbles: true,
+    detail: {
+      shippingMethod: shippingMethod ? {
+        ...shippingMethod,
+        id: String(shippingMethod.id),
+      } : null,
+    },
+  }));
+}
+
+/**
  * Fetches a preview and dispatches checkout:preview event.
  * @param {HTMLFormElement} form
  * @param {Object} cart
@@ -109,13 +141,14 @@ export async function updatePreview(form, cart, state, config) {
     email,
   };
 
+  const checkoutContext = getStandardCheckoutContext(data.get('paymentMethod'));
   const orderBody = {
     shipping: Object.fromEntries(Object.entries(shippingAddr).filter(([, v]) => v !== '')),
     items: cart.getItemsForAPI(),
     shippingMethod: { id: state.selectedShippingMethodId },
     locale: `${language.split('_')[0]}-${(language.split('_')[1] || locale).toUpperCase()}`,
     country: locale,
-    paymentMethod: data.get('paymentMethod') || null,
+    ...(checkoutContext || {}),
   };
 
   const couponCode = sessionStorage.getItem('checkout_coupon_code') || undefined;
@@ -157,6 +190,47 @@ export async function updatePreview(form, cart, state, config) {
 }
 
 /**
+ * Clears the currently signed preview state after order-affecting changes.
+ * @param {Object} state
+ */
+export function clearPreviewState(state) {
+  state.currentEstimateToken = null;
+  state.currentPreview = null;
+}
+
+/**
+ * Returns whether the shopper has explicitly selected a payment method.
+ * @param {Object} state
+ * @returns {boolean}
+ */
+export function hasExplicitPaymentSelection(state) {
+  return state.paymentMethodSelected === true;
+}
+
+/**
+ * Returns whether a preview should run after order-affecting changes.
+ * @param {Object} state
+ * @returns {boolean}
+ */
+export function shouldUpdatePreviewAfterPaymentSelection(state) {
+  return hasExplicitPaymentSelection(state) && Boolean(state.selectedShippingMethodId);
+}
+
+/**
+ * Refreshes the order preview only after explicit payment selection.
+ * @param {HTMLFormElement} form
+ * @param {Object} cart
+ * @param {Object} state
+ * @param {Object} config
+ * @returns {Promise<void>}
+ */
+export async function updatePreviewAfterPaymentSelection(form, cart, state, config) {
+  if (shouldUpdatePreviewAfterPaymentSelection(state)) {
+    await updatePreview(form, cart, state, config);
+  }
+}
+
+/**
  * Fetches shipping rates then triggers a preview.
  * @param {HTMLFormElement} form
  * @param {HTMLFieldSetElement} shippingContainer
@@ -192,18 +266,26 @@ async function fetchAndPreview(form, shippingContainer, cart, state, config, str
       couponCode,
       couponSource,
     );
-    renderShippingMethods(shippingContainer, result.rates || [], strings, currencyCode);
+    const rates = result.rates || [];
+    state.shippingMethods = rates;
+    renderShippingMethods(shippingContainer, rates, strings, currencyCode);
 
     // Preserve the user's previous selection; fall back to the first method.
     const targetRadio = findShippingMethodRadio(shippingContainer, previousSelection);
     if (targetRadio) {
+      const selectedRate = findShippingMethodRate(rates, targetRadio);
       targetRadio.checked = true;
       state.selectedShippingMethodId = targetRadio.value;
-      shippingContainer.dispatchEvent(new CustomEvent('checkout:shipping-selected', { bubbles: true }));
-      await updatePreview(form, cart, state, config);
+      clearPreviewState(state);
+      dispatchShippingSelected(shippingContainer, selectedRate);
+      await updatePreviewAfterPaymentSelection(form, cart, state, config);
+    } else {
+      dispatchShippingSelected(shippingContainer, null);
     }
   } catch {
+    state.shippingMethods = [];
     renderShippingMethods(shippingContainer, [], strings, currencyCode);
+    dispatchShippingSelected(shippingContainer, null);
   }
 }
 
@@ -231,6 +313,7 @@ export function initShipping(form, shippingContainer, cart, state, config, strin
   if (stateSelect) {
     stateSelect.addEventListener('change', () => {
       state.selectedShippingMethodId = null;
+      dispatchShippingSelected(shippingContainer, null);
       fetchAndPreview(form, shippingContainer, cart, state, config, strings, currencyCode);
     });
   }
@@ -239,8 +322,12 @@ export function initShipping(form, shippingContainer, cart, state, config, strin
   shippingContainer.addEventListener('change', (e) => {
     if (e.target.name === 'shippingMethod') {
       state.selectedShippingMethodId = e.target.value;
-      shippingContainer.dispatchEvent(new CustomEvent('checkout:shipping-selected', { bubbles: true }));
-      updatePreview(form, cart, state, config);
+      clearPreviewState(state);
+      dispatchShippingSelected(
+        shippingContainer,
+        findShippingMethodRate(state.shippingMethods || [], e.target),
+      );
+      updatePreviewAfterPaymentSelection(form, cart, state, config);
     }
   });
 

@@ -136,10 +136,11 @@ export async function estimatePrice(country, items, couponCode, couponSource) {
  * @param {string} state - State or province code (e.g. 'QC', 'CA')
  * @param {string} zip - Postal/ZIP code
  * @param {Array<{sku: string, path: string, quantity: number, price: Object}>} items
+ * @param {Object} [context={}] - Optional checkout context fields for tax rules
  * @returns {Promise<{ subtotal: number, shippingMethods: Array<Object> }>}
  * @throws {CommerceApiError}
  */
-export async function estimateExpressCheckout(country, state, zip, items) {
+export async function estimateExpressCheckout(country, state, zip, items, context = {}) {
   // BCP-47 store-view locale (e.g. 'fr-CA') so the API can localize method labels.
   const { language: locale } = getLocaleAndLanguage(false, true);
   return post('/estimate/order', {
@@ -147,6 +148,7 @@ export async function estimateExpressCheckout(country, state, zip, items) {
     locale,
     shipping: { country, state, zip },
     items,
+    ...context,
   });
 }
 

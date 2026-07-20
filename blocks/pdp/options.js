@@ -135,9 +135,10 @@ export function onOptionChange(ph, block, variants, color, isParentOutOfStock = 
 
   window.selectedVariant = variant;
 
+  updateAlert(ph, block, window.jsonLdData.custom, variant.custom);
+
   // update add to cart, preserving the user's current quantity selection
   const currentQty = block.querySelector('.quantity-container select')?.value;
-  updateAlert(ph, block, window.jsonLdData.custom, variant.custom);
   const addToCartContainer = renderAddToCart(ph, block, window.jsonLdData);
   if (addToCartContainer) {
     block.querySelector('.add-to-cart').replaceWith(addToCartContainer);

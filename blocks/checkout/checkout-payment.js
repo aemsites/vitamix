@@ -95,13 +95,12 @@ export function renderPaymentSection(container, activeProviders, callbacks, stri
   // Credit card option
   if (chaseActive) {
     const cardLabel = document.createElement('label');
-    cardLabel.className = 'payment-option-card payment-option-active';
+    cardLabel.className = 'payment-option-card';
 
     const cardRadio = document.createElement('input');
     cardRadio.type = 'radio';
     cardRadio.name = 'paymentMethod';
     cardRadio.value = cardProviderId;
-    cardRadio.checked = true;
     cardRadio.id = 'payment-credit-card';
 
     const cardIcon = document.createElement('span');
@@ -179,20 +178,6 @@ export function renderPaymentSection(container, activeProviders, callbacks, stri
   container.appendChild(optionsWrapper);
   wireRadioTabNav(optionsWrapper, 'paymentMethod');
 
-  // When Chase is disabled, default-select the first available provider
-  if (!chaseActive) {
-    const firstRadio = optionsWrapper.querySelector('input[type="radio"]');
-    if (firstRadio) {
-      firstRadio.checked = true;
-      firstRadio.closest('.payment-option-card')?.classList.add('payment-option-active');
-      const firstProvider = activeProviders.find((p) => p.id !== cardProviderId);
-      const billingSection = container.closest('form')?.querySelector('.billing-section');
-      if (billingSection && firstProvider) {
-        billingSection.hidden = firstProvider.hidesBilling ?? false;
-      }
-    }
-  }
-
   // Wire radio changes
   container.addEventListener('change', (e) => {
     if (e.target.name !== 'paymentMethod') return;
@@ -236,7 +221,7 @@ export async function initPayment(container, providers, callbacks, config, strin
 
   renderPaymentSection(container, available, callbacks, strings, config);
 
-  // Render express buttons on the cart page (order-summary block)
+  // Render express buttons above the checkout form when the authored container exists.
   const expressContainer = document.querySelector('.express-checkout-buttons');
   if (expressContainer) {
     available.filter((p) => p.supportsExpress).forEach((p) => {

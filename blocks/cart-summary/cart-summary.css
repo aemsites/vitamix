@@ -344,6 +344,26 @@ dialog.paypal-not-configured-dialog::backdrop {
   background: var(--commerce-color-text);
 }
 
+.cart-summary .discount-apply.loading {
+  color: transparent;
+  position: relative;
+  pointer-events: none;
+}
+
+.cart-summary .discount-apply.loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border: 2px solid rgba(255 255 255 / 40%);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: cart-summary-spin 0.7s linear infinite;
+}
+
 /* ID.me verification */
 .cart-summary .idme-verify {
   margin-bottom: var(--commerce-card-padding);
@@ -375,6 +395,10 @@ dialog.paypal-not-configured-dialog::backdrop {
   justify-content: space-between;
   align-items: center;
   font-size: var(--commerce-font-size-sm);
+}
+
+.cart-summary-discount-row[hidden] {
+  display: none;
 }
 
 .cart-summary-shipping {
@@ -430,22 +454,11 @@ dialog.paypal-not-configured-dialog::backdrop {
   font-size: 16px;
   color: var(--commerce-color-text-muted);
   cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.15s ease, color 0.15s ease;
-}
-
-.cart-summary-discount-row:hover .discount-remove {
-  opacity: 1;
+  transition: color 0.15s ease;
 }
 
 .cart-summary-discount-row .discount-remove:hover {
   color: var(--commerce-color-error);
-}
-
-@media (width <= 999px) {
-  .cart-summary-discount-row .discount-remove {
-    opacity: 1;
-  }
 }
 
 /* Coupon error — lives inside .cart-summary-discount, wraps to its own row */

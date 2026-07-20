@@ -1110,7 +1110,19 @@ function initPlacesAutocomplete(section, config) {
     }, 300);
   });
 
+  // Dismiss the dropdown when clicking anywhere outside the wrapper so
+  // the user does not have to blur the input to close the suggestion list.
+  document.addEventListener('mousedown', (e) => {
+    if (dropdown && !wrapper.contains(e.target)) {
+      clearTimeout(debounceTimer);
+      removeDropdown();
+    }
+  });
+
   addressInput.addEventListener('blur', () => {
+    // Cancel any pending autocomplete fetch so a late response cannot
+    // re-open the dropdown after the input has already lost focus.
+    clearTimeout(debounceTimer);
     setTimeout(removeDropdown, 200);
   });
 

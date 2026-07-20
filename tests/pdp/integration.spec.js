@@ -251,8 +251,8 @@ test.describe('PDP Integration Tests', () => {
           'super_attribute[93]': '534',
           vitamixProductId: '3627',
           'options[3000]': '3939',
-          warranty_sku: 'sku-10-year-standard-warranty',
-          'warranty_skus[3939]': 'sku-10-year-standard-warranty',
+          warranty_sku: 'sku-10-year-limited-warranty',
+          'warranty_skus[3939]': 'sku-10-year-limited-warranty',
         });
 
         // Log the arguments that were passed to addToCart

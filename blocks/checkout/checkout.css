@@ -177,7 +177,7 @@ main > .section:has(.checkout-wrapper) {
 .form-field-checkbox label {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   cursor: pointer;
   font-size: var(--commerce-font-size-sm);
 }
@@ -186,6 +186,7 @@ main > .section:has(.checkout-wrapper) {
   width: 16px;
   height: 16px;
   margin: 0;
+  padding: 0;
   flex-shrink: 0;
   cursor: pointer;
 }
@@ -409,7 +410,7 @@ main > .section:has(.checkout-wrapper) {
 .billing-option-card {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 10px;
   padding: 14px 16px;
   border: 1px solid var(--commerce-color-border);
   border-radius: var(--commerce-radius-card);
@@ -424,7 +425,8 @@ main > .section:has(.checkout-wrapper) {
 .billing-option-card input[type="radio"] {
   width: 18px;
   height: 18px;
-  margin: 2px 0 0;
+  margin: 0;
+  padding: 0;
   flex-shrink: 0;
   cursor: pointer;
   accent-color: var(--commerce-color-text);
@@ -798,6 +800,13 @@ button.checkout-submit-btn {
 }
 
 @media (width < 1000px) {
+  /* Tighten the gap between stacked section cards (e.g. Contact → Shipping
+     address) so the form doesn't feel overly spaced out on iPhone and iPad
+     widths, where the checkout form is a single stacked column. */
+  .checkout-form {
+    gap: 8px;
+  }
+
   .payment-option-card {
     display: grid;
     grid-template-columns: 18px 40px 1fr;

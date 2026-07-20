@@ -10,8 +10,44 @@ import { FORMS_ENDPOINT, getLocaleAndLanguage } from '../../scripts/scripts.js';
 import { validateLinkIntegrity } from './link-integrity.js';
 import { validateForm } from './checkout-validation.js';
 import { logOperation, getCheckoutId } from '../../scripts/operations-log.js';
+import { getStandardCheckoutContext } from '../../scripts/checkout-context.js';
 
 export { validateLinkIntegrity };
+
+/**
+ * Minimum remaining lifetime (in ms) before an estimate token is considered
+ * "expiring soon" and should be proactively refreshed. 5 minutes gives enough
+ * headroom to complete the order-create + payment-initiate round-trips.
+ */
+const ESTIMATE_TOKEN_BUFFER_MS = 5 * 60 * 1000;
+
+/**
+ * Decode a JWT's `exp` claim and return whether the token is expired or will
+ * expire within the buffer window. Returns `true` (needs refresh) when the
+ * token cannot be decoded.
+ *
+ * @param {string|null|undefined} token - JWT estimate token
+ * @param {number} [bufferMs] - refresh when fewer than this many ms remain
+ * @returns {boolean}
+ */
+export function isEstimateExpiringSoon(token, bufferMs = ESTIMATE_TOKEN_BUFFER_MS) {
+  if (!token) return true;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return (payload.exp * 1000) - Date.now() < bufferMs;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Returns the explicitly selected checkout payment method, if any.
+ * @param {HTMLFormElement} form
+ * @returns {string|null}
+ */
+export function getSelectedPaymentMethod(form) {
+  return form.querySelector('[name="paymentMethod"]:checked')?.value || null;
+}
 
 /**
  * Writes checkout state to sessionStorage before a payment redirect.
@@ -87,8 +123,8 @@ export function buildOrderJSON(formData, form, cart, state, config) {
   order.locale = `${language.split('_')[0]}-${(language.split('_')[1] || locale).toUpperCase()}`;
   order.country = locale;
 
-  const paymentMethod = formData.get('paymentMethod');
-  if (paymentMethod) order.paymentMethod = paymentMethod;
+  const checkoutContext = getStandardCheckoutContext(formData.get('paymentMethod'));
+  if (checkoutContext) Object.assign(order, checkoutContext);
 
   const customerTimezone = getCustomerTimezone();
   if (customerTimezone) order.customerTimezone = customerTimezone;
@@ -142,6 +178,7 @@ function subscribeNewsletter(formData) {
       firstName,
       lastName,
       country: locale,
+      leadSource: `sub-em-cart-${locale}`,
     }),
   }).catch((err) => {
     // eslint-disable-next-line no-console
@@ -162,6 +199,7 @@ function subscribeNewsletter(formData) {
  */
 export function initOrder(form, cart, state, config, strings) {
   const callbacks = {
+    expressEntryPoint: 'checkout',
     getCart: () => cart,
     getConfig: () => config,
     strings,
@@ -191,6 +229,17 @@ export function initOrder(form, cart, state, config, strings) {
         console.error(integrity.error);
         throw new Error(integrity.error);
       }
+
+      // Proactively refresh the estimate token if it is expired or about to
+      // expire (e.g. the customer idled on the checkout page). Re-calling
+      // preview is invisible to the user; if totals changed we surface the
+      // updated amounts via the returned preview state.
+      if (isEstimateExpiringSoon(orderBody.estimateToken)) {
+        const refreshed = await callbacks.previewOrderDirect(orderBody);
+        // eslint-disable-next-line no-param-reassign
+        orderBody.estimateToken = refreshed.estimateToken;
+      }
+
       const result = await createOrder(orderBody);
       subscribeNewsletter(new FormData(form));
       return result;
@@ -254,7 +303,11 @@ export function initOrder(form, cart, state, config, strings) {
       }
 
       // Delegate to the selected provider's own button if not credit-card
-      const selectedMethod = form.querySelector('[name="paymentMethod"]:checked')?.value;
+      const selectedMethod = getSelectedPaymentMethod(form);
+      if (!selectedMethod) {
+        showError(form, strings.errorSelectPayment);
+        return;
+      }
 
       if (selectedMethod === 'apple-pay') {
         submitBtn.disabled = true;
@@ -299,10 +352,20 @@ export function initOrder(form, cart, state, config, strings) {
         return;
       }
 
-      if (!state.currentEstimateToken) {
+      // Disable immediately to prevent double-clicks from creating duplicate orders.
+      // The button is re-enabled in every error / early-return path below.
+      submitBtn.disabled = true;
+      submitBtn.classList.add('is-loading');
+      if (submitTextEl) submitTextEl.textContent = strings.processing;
+
+      if (!state.currentEstimateToken
+        || isEstimateExpiringSoon(state.currentEstimateToken)) {
         await callbacks.updatePreview();
         if (!state.currentEstimateToken) {
           showError(form, strings.errorCalculateTotals);
+          submitBtn.disabled = false;
+          submitBtn.classList.remove('is-loading');
+          if (submitTextEl) submitTextEl.textContent = strings.continueToPayment;
           return;
         }
       }
@@ -316,11 +379,11 @@ export function initOrder(form, cart, state, config, strings) {
         // eslint-disable-next-line no-console
         console.error(integrity.error);
         showError(form, integrity.error);
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('is-loading');
+        if (submitTextEl) submitTextEl.textContent = strings.continueToPayment;
         return;
       }
-
-      submitBtn.disabled = true;
-      if (submitTextEl) submitTextEl.textContent = strings.processing;
 
       try {
         const createdOrder = await createOrder(orderBody);
@@ -351,6 +414,7 @@ export function initOrder(form, cart, state, config, strings) {
           });
           showError(form, payment.reason || strings.errorGeneric);
           submitBtn.disabled = false;
+          submitBtn.classList.remove('is-loading');
           if (submitTextEl) submitTextEl.textContent = strings.continueToPayment;
         }
       } catch (err) {
@@ -364,6 +428,7 @@ export function initOrder(form, cart, state, config, strings) {
           : err.body?.message || strings.errorGeneric;
         showError(form, msg);
         submitBtn.disabled = false;
+        submitBtn.classList.remove('is-loading');
         if (submitTextEl) submitTextEl.textContent = strings.continueToPayment;
       }
     });

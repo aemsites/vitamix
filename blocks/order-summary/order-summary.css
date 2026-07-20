@@ -186,6 +186,15 @@
   margin-bottom: 24px;
 }
 
+@media (width <= 999px) {
+  /* Tighten the gap between the warranty selector (end of the items list)
+     and the discount code box that follows on narrow iPhone and iPad widths
+     (the breakpoint at which the order summary stacks above the form). */
+  .order-summary-items {
+    margin-bottom: 16px;
+  }
+}
+
 /* First item has no top padding (the card header provides the gap) */
 .order-summary-items .cart-item:first-child {
   padding-top: 0;
@@ -229,6 +238,26 @@
 
 .discount-apply:hover {
   background: var(--commerce-color-text);
+}
+
+.discount-apply.loading {
+  color: transparent;
+  position: relative;
+  pointer-events: none;
+}
+
+.discount-apply.loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border: 2px solid rgba(255 255 255 / 40%);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: order-summary-spin 0.7s linear infinite;
 }
 
 /* ID.me verification */
@@ -299,22 +328,11 @@
   font-size: 16px;
   color: var(--commerce-color-text-muted);
   cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.15s ease, color 0.15s ease;
-}
-
-.order-summary-discount-item:hover .discount-remove {
-  opacity: 1;
+  transition: color 0.15s ease;
 }
 
 .order-summary-discount-item .discount-remove:hover {
   color: var(--commerce-color-error);
-}
-
-@media (width <= 999px) {
-  .order-summary-discount-item .discount-remove {
-    opacity: 1;
-  }
 }
 
 /* Coupon error — lives inside .order-summary-discount, wraps to its own row */

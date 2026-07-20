@@ -130,14 +130,44 @@ const defaults = {
 
 /**
  * Formats a numeric amount as a localized currency string.
+ *
+ * 1. Resolve the store language from the URL path (e.g. 'en_us', 'fr_ca')
+ * 2. Convert to a BCP 47 locale tag (e.g. 'en-US', 'fr-CA')
+ * 3. Format with Intl.NumberFormat using that deterministic locale
+ *
+ * Using a store-derived locale instead of the browser default ensures
+ * consistent currency symbol rendering ('$399.95') regardless of the
+ * visitor's OS/browser language settings.
+ *
  * @param {number} amount
  * @param {string} currencyCode - ISO 4217 code, e.g. 'USD', 'CAD'
  * @returns {string}
  */
 export function formatPrice(amount, currencyCode) {
-  return new Intl.NumberFormat(undefined, {
+  const lang = defaults.getLanguage();
+  const locale = lang.replace('_', '-').replace(/-([a-z]{2})$/, (_, r) => `-${r.toUpperCase()}`);
+  return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency: currencyCode || 'USD',
+  }).format(amount);
+}
+
+/**
+ * Formats a numeric amount with currency-appropriate grouping and decimals
+ * but without the currency symbol. Used alongside a separate currency code
+ * label (e.g. the Total row: "USD $549.95" → "USD 549.95" with the symbol
+ * already provided by the label).
+ *
+ * @param {number} amount
+ * @returns {string}
+ */
+export function formatPriceAmount(amount) {
+  const lang = defaults.getLanguage();
+  const locale = lang.replace('_', '-').replace(/-([a-z]{2})$/, (_, r) => `-${r.toUpperCase()}`);
+  return new Intl.NumberFormat(locale, {
+    style: 'decimal',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(amount);
 }
 

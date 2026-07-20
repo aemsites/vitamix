@@ -7,6 +7,7 @@ import {
 import { getLocaleAndLanguage } from '../scripts.js';
 import { getUser, isLoggedIn } from '../auth-api.js';
 import { logOperation, getCheckoutId } from '../operations-log.js';
+import ensureCheckoutPreviewToken, { withPayPalExpressContext } from './paypal-context.js';
 
 let sdkLoadPromise = null;
 
@@ -144,6 +145,10 @@ export default {
       return;
     }
 
+    if (!callbacks.expressEntryPoint) {
+      throw new Error('PayPal express checkout requires an entry point');
+    }
+
     let lastShippingMethods = [];
     let lastShippingAddress = null;
 
@@ -198,8 +203,9 @@ export default {
           // only fires on an explicit option change, not on initial address selection).
           const countryCode = data.shippingAddress.countryCode?.toLowerCase();
           const [defaultMethod] = lastShippingMethods;
-          const preview = await callbacks.previewOrderDirect({
+          const preview = await callbacks.previewOrderDirect(withPayPalExpressContext({
             items: cart.getItemsForAPI(),
+            locale: getLocaleAndLanguage(false, true).language,
             shippingMethod: { id: String(defaultMethod.id) },
             ...(countryCode ? {
               country: countryCode,
@@ -209,7 +215,7 @@ export default {
                 zip: data.shippingAddress.postalCode || '',
               },
             } : {}),
-          });
+          }, callbacks.expressEntryPoint));
           state.currentEstimateToken = preview.estimateToken;
         } catch {
           return actions.reject(data.errors.ADDRESS_ERROR);
@@ -235,8 +241,9 @@ export default {
           shippingRate: method.rate,
         });
         const countryCode = lastShippingAddress?.countryCode?.toLowerCase();
-        const preview = await callbacks.previewOrderDirect({
+        const preview = await callbacks.previewOrderDirect(withPayPalExpressContext({
           items: cart.getItemsForAPI(),
+          locale: getLocaleAndLanguage(false, true).language,
           shippingMethod: { id: String(method.id) },
           ...(countryCode ? {
             country: countryCode,
@@ -246,7 +253,7 @@ export default {
               zip: lastShippingAddress.postalCode || '',
             },
           } : {}),
-        });
+        }, callbacks.expressEntryPoint));
         state.currentEstimateToken = preview.estimateToken;
         return undefined;
       },
@@ -266,7 +273,7 @@ export default {
           // return a different payer email, which remains on billing/shipping.
           const accountEmail = isLoggedIn() ? getUser()?.email : '';
           const customerEmail = accountEmail || session.payer.email || '';
-          const orderBody = {
+          const orderBody = withPayPalExpressContext({
             customer: {
               firstName: session.payer.firstName,
               lastName: session.payer.lastName,
@@ -289,7 +296,7 @@ export default {
             country: session.shippingAddress.country,
             locale: getLocaleAndLanguage(false, true).language,
             ...(customerTimezone ? { customerTimezone } : {}),
-          };
+          }, callbacks.expressEntryPoint);
           const createdOrder = await callbacks.createOrder(orderBody);
           const fraudToken = (() => {
             try { return sessionStorage.getItem('forter_token') || undefined; } catch { return undefined; }
@@ -360,14 +367,10 @@ export default {
       callbacks.clearError();
       btn.disabled = true;
 
-      const state = callbacks.getState();
-      if (!state.currentEstimateToken) {
-        await callbacks.updatePreview();
-        if (!callbacks.getState().currentEstimateToken) {
-          callbacks.showError('Unable to calculate totals. Please try again.');
-          btn.disabled = false;
-          return;
-        }
+      if (!await ensureCheckoutPreviewToken(callbacks)) {
+        callbacks.showError('Unable to calculate totals. Please try again.');
+        btn.disabled = false;
+        return;
       }
 
       const formData = callbacks.getFormData();

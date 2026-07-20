@@ -1,5 +1,5 @@
 import { loadCSS } from '../../scripts/aem.js';
-import { getConfig, formatPrice } from '../../scripts/commerce-config.js';
+import { getConfig, formatPrice, formatPriceAmount } from '../../scripts/commerce-config.js';
 import cart from '../../scripts/cart.js';
 import {
   previewOrder, createOrder, initiatePayment, estimatePrice,
@@ -215,9 +215,9 @@ export default async function decorate(block) {
 
   // 3. Bind cart:change to keep totals in sync
   const updateTotals = () => {
-    const formatted = formatPrice(cart.subtotal, getCurrencyCode());
-    subtotalEl.textContent = formatted;
-    grandTotalEl.textContent = formatted;
+    const currency = getCurrencyCode();
+    subtotalEl.textContent = formatPrice(cart.subtotal, currency);
+    grandTotalEl.textContent = formatPriceAmount(cart.subtotal, currency);
   };
   updateTotals();
   document.addEventListener('cart:change', updateTotals);
@@ -237,7 +237,7 @@ export default async function decorate(block) {
     const discountTotal = parseFloat(estimate.orderDiscountTotal) || 0;
     const total = Math.max(0, subtotal - discountTotal);
     subtotalEl.textContent = formatPrice(subtotal, currency);
-    grandTotalEl.textContent = formatPrice(total, currency);
+    grandTotalEl.textContent = formatPriceAmount(total, currency);
     showDiscountRow(couponCode, `-${formatPrice(discountTotal, currency)}`);
   };
 
@@ -314,6 +314,7 @@ export default async function decorate(block) {
     }
 
     discountApply.disabled = true;
+    discountApply.classList.add('loading');
     try {
       const country = config.getLocale();
       const estimate = await estimatePrice(country, cart.getItemsForAPI(), code);
@@ -332,6 +333,7 @@ export default async function decorate(block) {
       couponErrorEl.hidden = false;
     } finally {
       discountApply.disabled = false;
+      discountApply.classList.remove('loading');
     }
   });
 
@@ -339,6 +341,7 @@ export default async function decorate(block) {
   const state = { currentEstimateToken: null, currentPreview: null };
 
   const callbacks = {
+    expressEntryPoint: 'cart',
     getCart: () => cart,
     getConfig: () => config,
     getState: () => state,
