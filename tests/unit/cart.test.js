@@ -135,6 +135,19 @@ test('clear persists the empty state to localStorage immediately', () => {
   assert.deepEqual(stored.items, []);
 });
 
+// --- flush ------------------------------------------------------------------
+
+test('flush persists a debounced addItem to localStorage immediately', () => {
+  const cart = new Cart();
+  cart.addItem(sampleItem({ sku: 'pending' }));
+  // addItem uses a debounced persist — localStorage may still be stale.
+  // flush() forces the write so a subsequent page load sees the item.
+  cart.flush();
+  const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
+  assert.equal(stored.items.length, 1);
+  assert.equal(stored.items[0].sku, 'pending');
+});
+
 // --- itemCount / subtotal ---------------------------------------------------
 
 test('itemCount sums quantities across entries', () => {

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isEstimateExpiringSoon } from '../../blocks/checkout/checkout-order.js';
+import { isEstimateExpiringSoon } from '../../scripts/estimate-token.js';
 
 /**
  * Build a minimal JWT with the given `exp` (seconds since epoch).
