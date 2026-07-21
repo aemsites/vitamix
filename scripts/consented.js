@@ -5,10 +5,13 @@ import {
   ensureAnalyticsTrackingConfigured,
   getDeploymentEnv,
   initInstrumentation,
+  bootstrapEarlyTracking,
   trackCartChange,
   trackCheckoutShipping,
   trackLogin,
-} from './consented/instrumentation.js';
+} from './consented/instrumentation/index.js';
+
+bootstrapEarlyTracking();
 
 document.body.classList.add('consented');
 // Register cart:change / analytics:cart-add listeners before Launch loads so edge
