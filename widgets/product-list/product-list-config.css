@@ -1,0 +1,94 @@
+.product-list-config-mode {
+  margin-top: 4rem;
+}
+
+.product-list-config {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 3rem;
+  padding: 0.375rem 0.75rem;
+  background: #323232;
+  color: #fff;
+  border-radius: 1rem;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 24%);
+  flex-wrap: nowrap;
+  position: fixed;
+  inset: 0.75rem 0.75rem auto;
+  z-index: 9999;
+}
+
+.product-list-config-controls {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.product-list-config-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.product-list-config-item span {
+  color: rgb(255 255 255 / 72%);
+  font-size: 0.8125rem;
+}
+
+.product-list-config-item input {
+  min-height: 1.75rem;
+  width: 14rem;
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 0.375rem;
+  background: rgb(255 255 255 / 10%);
+  color: #fff;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+
+.product-list-config-item input::placeholder {
+  color: rgb(255 255 255 / 45%);
+}
+
+.product-list-config-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding-left: 0.75rem;
+  border-left: 1px solid rgb(255 255 255 / 18%);
+}
+
+.product-list-config-actions button {
+  min-height: 1.75rem;
+  padding: 0.25rem 0.75rem;
+  border: 0;
+  border-radius: 0.375rem;
+  background: #0265dc;
+  color: #fff;
+  font: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.product-list-config-actions button:hover {
+  background: #0054b6;
+}
+
+.product-list-config-actions button:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+body > header {
+  display: none;
+}
+
+body > footer {
+  display: none;
+}

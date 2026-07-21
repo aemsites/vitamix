@@ -2,8 +2,9 @@
 import {
   fetchPlaceholders, loadCSS, loadScript, toClassName, toCamelCase,
 } from '../../scripts/aem.js';
-import { buildCarousel, formatPrice, getLocaleAndLanguage } from '../../scripts/scripts.js';
-import lookupPlpWidgetProducts from './products.js';
+import { formatPrice, getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { loadFragment } from '../../blocks/fragment/fragment.js';
+import lookupProductListProducts from './products.js';
 
 const COMPARE_STORAGE_KEY = 'vitamix-compare-list';
 const MAX_COMPARE = 4;
@@ -155,7 +156,7 @@ function getReviewsId(product) {
 
 function createProductImage(product) {
   const wrap = document.createElement('div');
-  wrap.className = 'plp-widget-image-wrap';
+  wrap.className = 'product-list-widget-image-wrap';
 
   const img = document.createElement('img');
   img.loading = 'lazy';
@@ -172,10 +173,10 @@ function createProductImage(product) {
 
 function createCallouts(product, copy) {
   const wrap = document.createElement('div');
-  wrap.className = 'plp-widget-callouts';
+  wrap.className = 'product-list-widget-callouts';
   getProductCallouts(product, copy).forEach(({ type, label }) => {
     const badge = document.createElement('span');
-    badge.className = `plp-widget-callout plp-widget-callout-${type}`;
+    badge.className = `product-list-widget-callout product-list-widget-callout-${type}`;
     badge.textContent = label;
     wrap.appendChild(badge);
   });
@@ -185,7 +186,7 @@ function createCallouts(product, copy) {
 function createCompareButton(product, copy) {
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.className = 'plp-widget-compare-btn';
+  btn.className = 'product-list-widget-compare-btn';
   btn.setAttribute('aria-label', copy.addToComparison);
   btn.innerHTML = '<span aria-hidden="true">+</span>';
   btn.addEventListener('click', (e) => {
@@ -212,7 +213,7 @@ function createProductTitle(product) {
 
 function createProductColors(product) {
   const colors = document.createElement('div');
-  colors.className = 'plp-colors';
+  colors.className = 'product-list-colors';
   if (!hasVariants(product)) return colors;
 
   const sortedVariants = [...product.variants].sort((a, b) => {
@@ -232,9 +233,9 @@ function createProductColors(product) {
     swatch.dataset.color = colorSlug;
     swatch.setAttribute('aria-label', color);
     const inner = document.createElement('span');
-    inner.className = 'plp-color-inner';
+    inner.className = 'product-list-color-inner';
     inner.style.backgroundColor = `var(--color-${colorSlug}, #888)`;
-    if (availability !== 'InStock') inner.classList.add('plp-color-swatch-oos');
+    if (availability !== 'InStock') inner.classList.add('product-list-color-swatch-oos');
     swatch.appendChild(inner);
     colors.appendChild(swatch);
   });
@@ -243,7 +244,7 @@ function createProductColors(product) {
 
 function createProductReviews(product) {
   const wrap = document.createElement('div');
-  wrap.className = 'plp-widget-reviews';
+  wrap.className = 'product-list-widget-reviews';
   wrap.innerHTML = `<div data-bv-show="inline_rating" data-bv-product-id="${getReviewsId(product)}"></div>`;
   return wrap;
 }
@@ -252,7 +253,7 @@ function createProductBullets(product) {
   const bullets = getProductBullets(product);
   if (!bullets.length) return document.createElement('div');
   const list = document.createElement('ul');
-  list.className = 'plp-widget-bullets';
+  list.className = 'product-list-widget-bullets';
   bullets.forEach((text) => {
     const li = document.createElement('li');
     li.textContent = text;
@@ -263,7 +264,7 @@ function createProductBullets(product) {
 
 function createProductPrice(product, ph) {
   const price = document.createElement('p');
-  price.className = 'plp-widget-price';
+  price.className = 'product-list-widget-price';
   price.textContent = product.price ? formatPrice(product.price, ph) : '';
   const regular = product.originalPrice || product.regularPrice;
   if (regular && Number(regular) > Number(product.price)) {
@@ -274,8 +275,8 @@ function createProductPrice(product, ph) {
   return price;
 }
 
-async function handleAddToCart(button, product, ph) {
-  button.textContent = ph.adding || 'Adding...';
+async function handleAddToCart(button, product, copy) {
+  button.textContent = copy.adding;
   button.setAttribute('aria-disabled', 'true');
   try {
     const { cartApi } = await import('../../scripts/minicart/api.js');
@@ -284,18 +285,18 @@ async function handleAddToCart(button, product, ph) {
     if (!currentCache?.customer) await updateMagentoCacheSections(['customer']);
     const sku = hasVariants(product) ? product.variants[0].sku : product.sku;
     await cartApi.addToCart(sku, {}, 1);
-    button.textContent = ph.addedToCart || 'Added to Cart';
+    button.textContent = copy.addedToCart;
   } catch (e) {
     // eslint-disable-next-line no-console
-    console.warn('plp-widget: add to cart failed', e);
-    button.textContent = ph.addToCart || 'Add to Cart';
+    console.warn('product-list-widget: add to cart failed', e);
+    button.textContent = copy.addToCart;
     button.removeAttribute('aria-disabled');
   }
 }
 
-function createProductCta(product, ph) {
+function createProductCta(product, copy) {
   const wrap = document.createElement('p');
-  wrap.className = 'plp-widget-cta button-container';
+  wrap.className = 'product-list-widget-cta button-container';
   const inStockColors = getAvailableColors(product);
   const singleColor = !hasVariants(product) || inStockColors.length <= 1;
   const link = document.createElement('a');
@@ -303,14 +304,14 @@ function createProductCta(product, ph) {
   link.className = 'button emphasis';
 
   if (singleColor && product.sku) {
-    link.textContent = ph.addToCart || 'Add to Cart';
+    link.textContent = copy.addToCart;
     link.addEventListener('click', async (e) => {
       e.preventDefault();
       e.stopPropagation();
-      await handleAddToCart(link, product, ph);
+      await handleAddToCart(link, product, copy);
     });
   } else {
-    link.textContent = ph.viewDetails || 'View Details';
+    link.textContent = copy.viewDetails;
   }
   wrap.appendChild(link);
   return wrap;
@@ -321,9 +322,9 @@ function singleColorCard(product) {
   return !hasVariants(product) || inStockColors.length <= 1;
 }
 
-function createPlpWidgetProductCard(product, ph, copy) {
+function createProductListCard(product, ph, copy) {
   const card = document.createElement('div');
-  card.className = 'plp-widget-product-card';
+  card.className = 'product-list-widget-product-card';
   card.setAttribute('role', 'listitem');
 
   const imageWrap = createProductImage(product);
@@ -334,7 +335,7 @@ function createPlpWidgetProductCard(product, ph, copy) {
   const reviews = createProductReviews(product);
   const bullets = createProductBullets(product);
   const price = createProductPrice(product, ph);
-  const cta = createProductCta(product, ph);
+  const cta = createProductCta(product, copy);
 
   card.append(imageWrap, title, colors, reviews, bullets, price, cta);
 
@@ -422,7 +423,7 @@ function syncFilterConfigToUrl(filterConfig) {
 }
 
 function wireLifestyleCards(widget, runSearch, getFilterConfig, setFilterConfig) {
-  const cards = widget.querySelectorAll('.plp-lifestyle-card');
+  const cards = widget.querySelectorAll('.product-list-lifestyle-card');
   cards.forEach((card) => {
     card.addEventListener('click', () => {
       const next = { ...getFilterConfig() };
@@ -451,7 +452,7 @@ function renderFilterTags(container, tags, copy, onRemove) {
   tags.forEach(({ key, value }) => {
     const tag = document.createElement('button');
     tag.type = 'button';
-    tag.className = 'plp-widget-filter-tag';
+    tag.className = 'product-list-widget-filter-tag';
     tag.textContent = value;
     tag.setAttribute('aria-label', `${copy.clearAll}: ${value}`);
     tag.addEventListener('click', () => onRemove(key, value));
@@ -469,7 +470,7 @@ function renderDrawerFacets(listEl, facets, filterConfig, copy, ph, onChange) {
     if (!visibleValues.length) return;
 
     const details = document.createElement('details');
-    details.className = 'plp-widget-facet-group';
+    details.className = 'product-list-widget-facet-group';
     details.open = (filterConfig[key] || '').length > 0;
 
     const summary = document.createElement('summary');
@@ -477,11 +478,11 @@ function renderDrawerFacets(listEl, facets, filterConfig, copy, ph, onChange) {
     details.appendChild(summary);
 
     const options = document.createElement('div');
-    options.className = 'plp-widget-facet-options';
+    options.className = 'product-list-widget-facet-options';
     const selected = (filterConfig[key] || '').split(',').map((t) => t.trim());
 
     visibleValues.forEach((facetValue) => {
-      const id = `plp-widget-filter-${key}-${toClassName(facetValue)}`;
+      const id = `product-list-widget-filter-${key}-${toClassName(facetValue)}`;
       const input = document.createElement('input');
       input.type = 'checkbox';
       input.id = id;
@@ -508,7 +509,7 @@ function renderDropdownFilters(container, facets, filterConfig, copy, ph, onSele
     if (!facetValues.length) return;
 
     const details = document.createElement('details');
-    details.className = 'plp-widget-filter-dropdown';
+    details.className = 'product-list-widget-filter-dropdown';
 
     const summary = document.createElement('summary');
     const selected = (filterConfig[key] || '').split(',').map((t) => t.trim()).filter(Boolean);
@@ -533,7 +534,7 @@ function renderDropdownFilters(container, facets, filterConfig, copy, ph, onSele
     details.appendChild(menu);
     details.addEventListener('toggle', () => {
       if (!details.open) return;
-      container.querySelectorAll('.plp-widget-filter-dropdown[open]').forEach((openDetails) => {
+      container.querySelectorAll('.product-list-widget-filter-dropdown[open]').forEach((openDetails) => {
         if (openDetails !== details) openDetails.open = false;
       });
     });
@@ -542,8 +543,8 @@ function renderDropdownFilters(container, facets, filterConfig, copy, ph, onSele
 }
 
 function getFilterConfigFromInputs(widget) {
-  const config = { ...widget.plpBaseConfig };
-  widget.querySelectorAll('.plp-facet-drawer input[type="checkbox"]:checked').forEach((input) => {
+  const config = { ...widget.productListBaseConfig };
+  widget.querySelectorAll('.product-list-facet-drawer input[type="checkbox"]:checked').forEach((input) => {
     const { name, value } = input;
     if (config[name]) config[name] += `, ${value}`;
     else config[name] = value;
@@ -552,7 +553,7 @@ function getFilterConfigFromInputs(widget) {
 }
 
 function setDrawerInputsFromConfig(widget, filterConfig) {
-  widget.querySelectorAll('.plp-facet-drawer input[type="checkbox"]').forEach((input) => {
+  widget.querySelectorAll('.product-list-facet-drawer input[type="checkbox"]').forEach((input) => {
     const selected = (filterConfig[input.name] || '').split(',').map((t) => t.trim());
     input.checked = selected.includes(input.value);
   });
@@ -566,7 +567,7 @@ async function loadBazaarvoice(ph) {
 }
 
 /**
- * Decorates the PLP widget with lifestyle filters, facet UI, and enhanced product cards.
+ * Decorates the product-list widget with lifestyle filters, facet UI, and enhanced product cards.
  * @param {HTMLElement} widget - Widget root element
  */
 export default async function decorate(widget) {
@@ -577,33 +578,33 @@ export default async function decorate(widget) {
   const copy = await loadWidgetCopy(lang);
   const ph = await fetchPlaceholders(`/${locale}/${language}/products/config`);
   const baseConfig = buildInitialConfig(widget);
-  widget.plpFilterConfig = { ...baseConfig };
-  widget.plpBaseConfig = { ...baseConfig };
+  widget.productListFilterConfig = { ...baseConfig };
+  widget.productListBaseConfig = { ...baseConfig };
 
-  loadCSS(`${window.hlx?.codeBasePath || ''}/widgets/plp/plp.css`);
+  loadCSS(`${window.hlx?.codeBasePath || ''}/widgets/product-list/product-list.css`);
   loadCSS(`${window.hlx?.codeBasePath || ''}/styles/color-swatches.css`);
 
-  const lifestyleHeading = widget.querySelector('.plp-lifestyle-heading');
-  const recommenderLink = widget.querySelector('.plp-lifestyle-recommender');
-  const filtersTrigger = widget.querySelector('.plp-filters-trigger');
-  const filtersCount = widget.querySelector('.plp-filters-count');
-  const filterDropdowns = widget.querySelector('.plp-filter-dropdowns');
-  const countEl = widget.querySelector('#plp-widget-results-count');
-  const countLabel = widget.querySelector('.plp-item-count-label');
-  const sortLabel = widget.querySelector('.plp-sort-label');
-  const sortByEl = widget.querySelector('#plp-widget-sortby');
-  const sortButtons = widget.querySelectorAll('.plp-sort menu button');
-  const activeFilters = widget.querySelector('.plp-active-filters');
-  const clearAllBtn = widget.querySelector('.plp-clear-all');
-  const filterTags = widget.querySelector('.plp-filter-tags');
-  const drawer = widget.querySelector('.plp-facet-drawer');
-  const drawerTitle = widget.querySelector('.plp-facet-drawer-title');
-  const drawerClose = widget.querySelector('.plp-facet-drawer-close');
-  const drawerCancel = widget.querySelector('.plp-facet-drawer-cancel');
-  const drawerApply = widget.querySelector('.plp-facet-drawer-apply');
-  const drawerList = widget.querySelector('.plp-facet-drawer-list');
-  const resultsEl = widget.querySelector('.plp-results');
-  const emptyEl = widget.querySelector('.plp-empty');
+  const lifestyleHeading = widget.querySelector('.product-list-lifestyle-heading');
+  const recommenderLink = widget.querySelector('.product-list-lifestyle-recommender');
+  const filtersTrigger = widget.querySelector('.product-list-filters-trigger');
+  const filtersCount = widget.querySelector('.product-list-filters-count');
+  const filterDropdowns = widget.querySelector('.product-list-filter-dropdowns');
+  const countEl = widget.querySelector('#product-list-widget-results-count');
+  const countLabel = widget.querySelector('.product-list-item-count-label');
+  const sortLabel = widget.querySelector('.product-list-sort-label');
+  const sortByEl = widget.querySelector('#product-list-widget-sortby');
+  const sortButtons = widget.querySelectorAll('.product-list-sort menu button');
+  const activeFilters = widget.querySelector('.product-list-active-filters');
+  const clearAllBtn = widget.querySelector('.product-list-clear-all');
+  const filterTags = widget.querySelector('.product-list-filter-tags');
+  const drawer = widget.querySelector('.product-list-facet-drawer');
+  const drawerTitle = widget.querySelector('.product-list-facet-drawer-title');
+  const drawerClose = widget.querySelector('.product-list-facet-drawer-close');
+  const drawerCancel = widget.querySelector('.product-list-facet-drawer-cancel');
+  const drawerApply = widget.querySelector('.product-list-facet-drawer-apply');
+  const drawerList = widget.querySelector('.product-list-facet-drawer-list');
+  const resultsEl = widget.querySelector('.product-list-results');
+  const emptyEl = widget.querySelector('.product-list-empty');
 
   if (!resultsEl) return;
 
@@ -612,7 +613,7 @@ export default async function decorate(widget) {
     recommenderLink.textContent = copy.blenderRecommender;
     recommenderLink.href = `/${locale}/${language}/blender-recommender`;
   }
-  filtersTrigger.querySelector('.plp-filters-trigger-label').textContent = copy.filters;
+  filtersTrigger.querySelector('.product-list-filters-trigger-label').textContent = copy.filters;
   countLabel.textContent = copy.items;
   sortLabel.textContent = copy.sortBy;
   sortByEl.textContent = copy.featured;
@@ -632,20 +633,27 @@ export default async function decorate(widget) {
     btn.textContent = sortLabels[btn.dataset.sort] || btn.dataset.sort;
   });
 
-  const lifestyleCarousel = widget.querySelector('.plp-lifestyle-carousel');
-  if (lifestyleCarousel) buildCarousel(lifestyleCarousel);
+  const lifestyleSection = widget.querySelector('.product-list-lifestyle');
+  const lifestyleCarousel = widget.querySelector('.product-list-lifestyle-carousel');
+  if (widget.dataset.highlights) {
+    const fragment = await loadFragment(`/${locale}/${language}/${widget.dataset.highlights}`);
+    if (fragment && lifestyleCarousel) lifestyleCarousel.replaceChildren(...fragment.childNodes);
+    else if (lifestyleSection) lifestyleSection.hidden = true;
+  } else if (lifestyleSection) {
+    lifestyleSection.hidden = true;
+  }
 
-  const getFilterConfig = () => ({ ...widget.plpFilterConfig });
+  const getFilterConfig = () => ({ ...widget.productListFilterConfig });
   const setFilterConfig = (config) => {
-    widget.plpFilterConfig = { ...config };
+    widget.productListFilterConfig = { ...config };
   };
 
   let runSearch;
 
   const updateFilterUi = (filterConfig, facets) => {
-    const activeCount = countActiveFilters(filterConfig, widget.plpBaseConfig);
+    const activeCount = countActiveFilters(filterConfig, widget.productListBaseConfig);
     filtersCount.textContent = activeCount ? `(${activeCount})` : '';
-    const tags = getSelectedFilterTags(filterConfig, widget.plpBaseConfig);
+    const tags = getSelectedFilterTags(filterConfig, widget.productListBaseConfig);
     activeFilters.hidden = tags.length === 0;
     renderFilterTags(filterTags, tags, copy, (key, value) => {
       const next = removeFilterValue(getFilterConfig(), key, value);
@@ -672,14 +680,14 @@ export default async function decorate(widget) {
     }
     emptyEl.hidden = true;
     results.forEach((product) => {
-      resultsEl.appendChild(createPlpWidgetProductCard(product, ph, copy));
+      resultsEl.appendChild(createProductListCard(product, ph, copy));
     });
     loadBazaarvoice(ph);
   };
 
   runSearch = async (filterConfig = getFilterConfig()) => {
     const facets = FACET_KEYS.reduce((acc, key) => ({ ...acc, [key]: {} }), {});
-    const results = await lookupPlpWidgetProducts(filterConfig, facets);
+    const results = await lookupProductListProducts(filterConfig, facets);
     const sortKey = sortByEl.dataset.sort || 'featured';
     const sorts = {
       name: (a, b) => a.title.localeCompare(b.title),
@@ -706,13 +714,13 @@ export default async function decorate(widget) {
     setDrawerInputsFromConfig(widget, getFilterConfig());
     drawer.classList.add('visible');
     drawer.setAttribute('aria-hidden', 'false');
-    document.body.classList.add('plp-widget-drawer-open');
+    document.body.classList.add('product-list-widget-drawer-open');
   };
 
   const closeDrawer = () => {
     drawer.classList.remove('visible');
     drawer.setAttribute('aria-hidden', 'true');
-    document.body.classList.remove('plp-widget-drawer-open');
+    document.body.classList.remove('product-list-widget-drawer-open');
   };
 
   filtersTrigger.addEventListener('click', openDrawer);
@@ -728,10 +736,10 @@ export default async function decorate(widget) {
     runSearch(next);
   });
   clearAllBtn.addEventListener('click', () => {
-    setFilterConfig({ ...widget.plpBaseConfig });
-    setDrawerInputsFromConfig(widget, widget.plpBaseConfig);
-    widget.querySelectorAll('.plp-lifestyle-card').forEach((c) => c.classList.remove('selected'));
-    runSearch(widget.plpBaseConfig);
+    setFilterConfig({ ...widget.productListBaseConfig });
+    setDrawerInputsFromConfig(widget, widget.productListBaseConfig);
+    widget.querySelectorAll('.product-list-lifestyle-card').forEach((c) => c.classList.remove('selected'));
+    runSearch(widget.productListBaseConfig);
   });
 
   wireLifestyleCards(widget, runSearch, getFilterConfig, setFilterConfig);

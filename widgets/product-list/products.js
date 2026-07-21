@@ -47,13 +47,13 @@ function parseData(data, locale, language) {
 }
 
 /**
- * Fetches and filters products for the PLP widget.
+ * Fetches and filters products for the product-list widget.
  * Self-contained: does not depend on blocks/plp/plp.js.
  * @param {Object} config - Filter criteria (only known facet keys are applied)
  * @param {Object} facets - Optional object to populate with facet counts
  * @returns {Promise<Array<Object>>} Filtered parent products with variants
  */
-export default async function lookupPlpWidgetProducts(config = {}, facets = {}) {
+export default async function lookupProductListProducts(config = {}, facets = {}) {
   const { locale, language } = getProductIndexLocale();
   const corsProxyFetch = async (url) => {
     const corsProxy = 'https://fcors.org/?url=';
@@ -62,7 +62,7 @@ export default async function lookupPlpWidgetProducts(config = {}, facets = {}) 
     return fetch(`${corsProxy}${encodeURIComponent(fullUrl)}${corsKey}`);
   };
 
-  if (!window.plpWidgetProductIndex) {
+  if (!window.productListWidgetIndex) {
     const isProd = window.location.hostname.includes('vitamix.com')
       || window.location.hostname.includes('.aem.network');
     const indexPath = window.location.pathname.includes('/commercial/') ? 'commercial/products' : 'products';
@@ -118,7 +118,7 @@ export default async function lookupPlpWidgetProducts(config = {}, facets = {}) 
       }
     });
 
-    window.plpWidgetProductIndex = {
+    window.productListWidgetIndex = {
       lookup: urlLookup,
       parents: Object.values(parentProductsBySKU),
     };
@@ -132,7 +132,7 @@ export default async function lookupPlpWidgetProducts(config = {}, facets = {}) 
     tokens[key] = config[key].split(',').map((t) => t.trim());
   });
 
-  return window.plpWidgetProductIndex.parents.filter((product) => {
+  return window.productListWidgetIndex.parents.filter((product) => {
     const filterMatches = {};
     const matchedAll = filterKeys.every((filterKey) => {
       const key = cleanKeys[filterKey] || filterKey;

@@ -1,0 +1,54 @@
+<div class="product-list-widget">
+  <section class="product-list-lifestyle" aria-label="Shop by lifestyle">
+    <div class="product-list-lifestyle-header">
+      <h2 class="product-list-lifestyle-heading"></h2>
+      <a class="product-list-lifestyle-recommender" href="#"></a>
+    </div>
+    <div class="product-list-lifestyle-carousel"></div>
+  </section>
+
+  <div class="product-list-toolbar">
+    <button type="button" class="product-list-filters-trigger secondary">
+      <span class="product-list-filters-trigger-label"></span>
+      <span class="product-list-filters-count"></span>
+    </button>
+    <div class="product-list-filter-dropdowns" aria-label="Product filters"></div>
+    <p class="product-list-item-count" aria-live="polite">
+      <span id="product-list-widget-results-count">0</span>
+      <span class="product-list-item-count-label"></span>
+    </p>
+    <details class="product-list-sort">
+      <summary><span class="product-list-sort-label"></span> <span id="product-list-widget-sortby" data-sort="featured"></span></summary>
+      <menu>
+        <li><button type="button" data-sort="featured"></button></li>
+        <li><button type="button" data-sort="price-desc"></button></li>
+        <li><button type="button" data-sort="price-asc"></button></li>
+        <li><button type="button" data-sort="name"></button></li>
+      </menu>
+    </details>
+  </div>
+
+  <div class="product-list-active-filters" hidden>
+    <button type="button" class="product-list-clear-all"></button>
+    <div class="product-list-filter-tags"></div>
+  </div>
+
+  <aside class="product-list-facet-drawer" aria-hidden="true" aria-label="Filters">
+    <div class="product-list-facet-drawer-panel">
+      <div class="product-list-facet-drawer-header">
+        <h2 class="product-list-facet-drawer-title"></h2>
+        <button type="button" class="product-list-facet-drawer-close" aria-label="Close filters"></button>
+      </div>
+      <div class="product-list-facet-drawer-selected"></div>
+      <div class="product-list-facet-drawer-list"></div>
+      <div class="product-list-facet-drawer-actions">
+        <button type="button" class="product-list-facet-drawer-cancel secondary"></button>
+        <button type="button" class="product-list-facet-drawer-apply"></button>
+      </div>
+    </div>
+  </aside>
+
+  <p class="product-list-empty" hidden></p>
+  <div class="product-list-results" role="list"></div>
+</div>
+<script type="module" src="../configurator.js"></script>
