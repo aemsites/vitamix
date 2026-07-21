@@ -7,13 +7,19 @@ function buildProductsUrl(locale, language, path) {
   return `/${locale}/${language}/products/${path}`;
 }
 
-function getProductIndexLocale() {
-  let { locale, language } = getLocaleAndLanguage();
-  if (window.location.pathname.startsWith('/drafts/')) {
-    locale = 'us';
-    language = 'en_us';
+/**
+ * Locale and language for the widget. The pathname carries no real
+ * locale/language segments when authoring (`/drafts/...`) or when the
+ * widget is opened directly at its own `/widgets/...` URL, so both
+ * cases default to `us`/`en_us`.
+ * @returns {Object} Object with locale and language.
+ */
+export function getWidgetLocaleAndLanguage() {
+  const { pathname } = window.location;
+  if (pathname.startsWith('/drafts/') || pathname.startsWith('/widgets/')) {
+    return { locale: 'us', language: 'en_us' };
   }
-  return { locale, language };
+  return getLocaleAndLanguage();
 }
 
 function parseData(data, locale, language) {
@@ -54,7 +60,7 @@ function parseData(data, locale, language) {
  * @returns {Promise<Array<Object>>} Filtered parent products with variants
  */
 export default async function lookupProductListProducts(config = {}, facets = {}) {
-  const { locale, language } = getProductIndexLocale();
+  const { locale, language } = getWidgetLocaleAndLanguage();
   const corsProxyFetch = async (url) => {
     const corsProxy = 'https://fcors.org/?url=';
     const corsKey = '&key=Mg23N96GgR8O3NjU';

@@ -1,5 +1,5 @@
 import { loadFragment } from '../../blocks/fragment/fragment.js';
-import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { getWidgetLocaleAndLanguage } from './products.js';
 import decorate from './product-list.js';
 
 async function updateHighlightsCarousel(widget, highlights) {
@@ -12,7 +12,7 @@ async function updateHighlightsCarousel(widget, highlights) {
     return;
   }
 
-  const { locale, language } = getLocaleAndLanguage();
+  const { locale, language } = getWidgetLocaleAndLanguage();
   const fragment = await loadFragment(`/${locale}/${language}/${highlights}`);
   if (fragment) {
     lifestyleCarousel.replaceChildren(...fragment.childNodes);

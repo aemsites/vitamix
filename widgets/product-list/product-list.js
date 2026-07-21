@@ -2,9 +2,9 @@
 import {
   fetchPlaceholders, loadCSS, loadScript, toClassName, toCamelCase,
 } from '../../scripts/aem.js';
-import { formatPrice, getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { formatPrice } from '../../scripts/scripts.js';
 import { loadFragment } from '../../blocks/fragment/fragment.js';
-import lookupProductListProducts from './products.js';
+import lookupProductListProducts, { getWidgetLocaleAndLanguage } from './products.js';
 
 const COMPARE_STORAGE_KEY = 'vitamix-compare-list';
 const MAX_COMPARE = 4;
@@ -99,7 +99,7 @@ function addToCompareList(productUrl) {
 }
 
 function getComparePageUrl(list) {
-  const { locale, language } = getLocaleAndLanguage();
+  const { locale, language } = getWidgetLocaleAndLanguage();
   const base = `/${locale}/${language}/products/compare`;
   if (!list.length) return base;
   return `${base}?compare-products=${list.map(encodeURIComponent).join(',')}`;
@@ -573,7 +573,7 @@ async function loadBazaarvoice(ph) {
 export default async function decorate(widget) {
   stripQueryParams(['show']);
   delete widget.dataset.show;
-  const { locale, language } = getLocaleAndLanguage();
+  const { locale, language } = getWidgetLocaleAndLanguage();
   const lang = (language || 'en_us').split('_')[0];
   const copy = await loadWidgetCopy(lang);
   const ph = await fetchPlaceholders(`/${locale}/${language}/products/config`);
