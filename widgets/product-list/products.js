@@ -1,7 +1,7 @@
 /* eslint-disable max-len */
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 
-const FILTER_KEYS = ['series', 'collection', 'colors', 'productType', 'categories', 'fulltext'];
+const FILTER_KEYS = ['series', 'collection', 'colors', 'productType', 'categories', 'categoriesUrlKey', 'fulltext'];
 
 function buildProductsUrl(locale, language, path) {
   return `/${locale}/${language}/products/${path}`;
@@ -178,4 +178,18 @@ export async function loadAllProductTypes() {
   const facets = { productType: {} };
   await lookupProductListProducts({}, facets);
   return Object.keys(facets.productType || {}).sort((a, b) => a.localeCompare(b));
+}
+
+const HIDDEN_CATEGORIES = ['Products', 'Commercial', 'Shop'];
+
+/**
+ * Loads all distinct category facet values from the product index.
+ * @returns {Promise<string[]>}
+ */
+export async function loadAllCategories() {
+  const facets = { categories: {} };
+  await lookupProductListProducts({}, facets);
+  return Object.keys(facets.categories || {})
+    .filter((value) => !HIDDEN_CATEGORIES.includes(value))
+    .sort((a, b) => a.localeCompare(b));
 }

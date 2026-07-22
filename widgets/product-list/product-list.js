@@ -9,8 +9,9 @@ import lookupProductListProducts, { getWidgetLocaleAndLanguage } from './product
 const COMPARE_STORAGE_KEY = 'vitamix-compare-list';
 const MAX_COMPARE = 4;
 const HIDDEN_CATEGORIES = ['Products', 'Commercial', 'Shop'];
+const HIDDEN_CATEGORY_URL_KEYS = ['products', 'commercial', 'shop'];
 
-const FACET_KEYS = ['series', 'collection', 'colors', 'productType', 'categories'];
+const FACET_KEYS = ['series', 'collection', 'colors', 'productType', 'categories', 'categoriesUrlKey'];
 const LIFESTYLE_TILE_SELECTOR = '.block > div, .block > ul > li';
 const LIFESTYLE_TILE_SELECTED_SELECTOR = '.block > div.selected, .block > ul > li.selected';
 const FILTER_PARAM_KEYS = [...FACET_KEYS, 'fulltext'];
@@ -21,9 +22,11 @@ const DRAWER_FACET_GROUPS = [
   { key: 'productType', labelKey: 'type' },
   { key: 'colors', labelKey: 'color' },
   { key: 'categories', labelKey: 'lifestyle' },
+  { key: 'categoriesUrlKey', labelKey: 'categoriesUrlKey' },
 ];
 
 const DROPDOWN_FACET_GROUPS = [
+  { key: 'categories', labelKey: 'categories' },
   { key: 'collection', labelKey: 'collections' },
   { key: 'productType', labelKey: 'type' },
   { key: 'colors', labelKey: 'color' },
@@ -431,12 +434,14 @@ function syncFilterConfigToUrl(filterConfig, widget) {
 
 function findFacetMatchForLabel(label, facets) {
   const normalized = label.trim().toLowerCase();
+  const slug = toClassName(label.trim());
   if (!normalized) return null;
   for (let i = 0; i < FACET_KEYS.length; i += 1) {
     const key = FACET_KEYS[i];
-    const match = Object.keys(facets[key] || {}).find(
-      (value) => value.trim().toLowerCase() === normalized,
-    );
+    const match = Object.keys(facets[key] || {}).find((value) => {
+      const facetValue = value.trim().toLowerCase();
+      return facetValue === normalized || (slug && facetValue === slug);
+    });
     if (match) return { key, value: match };
   }
   return null;
@@ -480,6 +485,16 @@ function wireLifestyleFragment(widget, runSearch, setFilterConfig, setDrawerInpu
   });
 }
 
+function getVisibleFacetValues(key, facetValues) {
+  if (key === 'categories') {
+    return facetValues.filter((v) => !HIDDEN_CATEGORIES.includes(v));
+  }
+  if (key === 'categoriesUrlKey') {
+    return facetValues.filter((v) => !HIDDEN_CATEGORY_URL_KEYS.includes(v));
+  }
+  return facetValues;
+}
+
 function renderFilterTags(container, tags, copy, onRemove) {
   container.innerHTML = '';
   if (!tags.length) return;
@@ -498,9 +513,7 @@ function renderDrawerFacets(listEl, facets, filterConfig, copy, ph, onChange) {
   listEl.innerHTML = '';
   DRAWER_FACET_GROUPS.forEach(({ key, labelKey }) => {
     const facetValues = Object.keys(facets[key] || {}).sort((a, b) => a.localeCompare(b));
-    const visibleValues = key === 'categories'
-      ? facetValues.filter((v) => !HIDDEN_CATEGORIES.includes(v))
-      : facetValues;
+    const visibleValues = getVisibleFacetValues(key, facetValues);
     if (!visibleValues.length) return;
 
     const details = document.createElement('details');
@@ -540,7 +553,8 @@ function renderDropdownFilters(container, facets, filterConfig, copy, ph, onSele
   container.innerHTML = '';
   DROPDOWN_FACET_GROUPS.forEach(({ key, labelKey }) => {
     const facetValues = Object.keys(facets[key] || {}).sort((a, b) => a.localeCompare(b));
-    if (!facetValues.length) return;
+    const visibleValues = getVisibleFacetValues(key, facetValues);
+    if (!visibleValues.length) return;
 
     const details = document.createElement('details');
     details.className = 'product-list-widget-filter-dropdown';
@@ -557,7 +571,7 @@ function renderDropdownFilters(container, facets, filterConfig, copy, ph, onSele
     allBtn.addEventListener('click', () => onSelect(key, null));
     menu.appendChild(allBtn);
 
-    facetValues.forEach((facetValue) => {
+    visibleValues.forEach((facetValue) => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.textContent = `${facetValue} (${facets[key][facetValue]})`;

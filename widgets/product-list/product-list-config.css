@@ -25,6 +25,7 @@
   gap: 1.25rem;
   min-width: 0;
   flex: 1;
+  flex-wrap: wrap;
 }
 
 .product-list-config-item {

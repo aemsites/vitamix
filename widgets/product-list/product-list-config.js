@@ -1,6 +1,7 @@
 import { loadFragment } from '../../blocks/fragment/fragment.js';
 import {
   getWidgetLocaleAndLanguage,
+  loadAllCategories,
   loadAllProductTypes,
 } from './products.js';
 
@@ -40,6 +41,10 @@ function readProductTypeFromUrl() {
   return new URLSearchParams(window.location.search).get('productType') || '';
 }
 
+function readCategoriesFromUrl() {
+  return new URLSearchParams(window.location.search).get('categories') || '';
+}
+
 function syncHighlightsToUrl(highlights) {
   const params = new URLSearchParams(window.location.search);
   params.delete('highlight');
@@ -59,6 +64,15 @@ function syncProductTypeToUrl(productType) {
   window.history.replaceState(null, '', nextUrl);
 }
 
+function syncCategoriesToUrl(categories) {
+  const params = new URLSearchParams(window.location.search);
+  if (categories) params.set('categories', categories);
+  else params.delete('categories');
+  const qs = params.toString();
+  const nextUrl = `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash || ''}`;
+  window.history.replaceState(null, '', nextUrl);
+}
+
 function syncHighlightsToWidget(widget, highlights) {
   if (highlights) widget.dataset.highlights = highlights;
   else delete widget.dataset.highlights;
@@ -68,6 +82,11 @@ function syncHighlightsToWidget(widget, highlights) {
 function syncProductTypeToWidget(widget, productType) {
   if (productType) widget.dataset.productType = productType;
   else delete widget.dataset.productType;
+}
+
+function syncCategoriesToWidget(widget, categories) {
+  if (categories) widget.dataset.categories = categories;
+  else delete widget.dataset.categories;
 }
 
 function syncPreviewLink() {
@@ -111,7 +130,13 @@ function buildSelectControl(label, name, options, value) {
   return { item, select };
 }
 
-function buildConfigPanel(widget, productTypes, initialHighlights, initialProductType) {
+function buildConfigPanel(widget, {
+  categories,
+  productTypes,
+  initialHighlights,
+  initialCategories,
+  initialProductType,
+}) {
   const panel = document.createElement('div');
   panel.className = 'product-list-config';
 
@@ -129,6 +154,13 @@ function buildConfigPanel(widget, productTypes, initialHighlights, initialProduc
   highlightsInput.value = initialHighlights;
   highlightsItem.append(highlightsLabel, highlightsInput);
 
+  const { item: categoriesItem, select: categoriesSelect } = buildSelectControl(
+    'Category',
+    'categories',
+    categories,
+    initialCategories,
+  );
+
   const { item: productTypeItem, select: productTypeSelect } = buildSelectControl(
     'Product type',
     'productType',
@@ -136,7 +168,7 @@ function buildConfigPanel(widget, productTypes, initialHighlights, initialProduc
     initialProductType,
   );
 
-  controls.append(highlightsItem, productTypeItem);
+  controls.append(highlightsItem, categoriesItem, productTypeItem);
 
   const actions = document.createElement('div');
   actions.className = 'product-list-config-actions';
@@ -150,10 +182,13 @@ function buildConfigPanel(widget, productTypes, initialHighlights, initialProduc
 
   const update = async () => {
     const highlights = highlightsInput.value.trim();
+    const category = categoriesSelect.value;
     const productType = productTypeSelect.value;
     syncHighlightsToUrl(highlights);
+    syncCategoriesToUrl(category);
     syncProductTypeToUrl(productType);
     syncHighlightsToWidget(widget, highlights);
+    syncCategoriesToWidget(widget, category);
     syncProductTypeToWidget(widget, productType);
     syncPreviewLink();
     await updateHighlightsSection(widget, highlights);
@@ -161,6 +196,7 @@ function buildConfigPanel(widget, productTypes, initialHighlights, initialProduc
   };
 
   highlightsInput.addEventListener('input', () => { update(); });
+  categoriesSelect.addEventListener('change', () => { update(); });
   productTypeSelect.addEventListener('change', () => { update(); });
 
   copyButton.addEventListener('click', async () => {
@@ -176,7 +212,7 @@ function buildConfigPanel(widget, productTypes, initialHighlights, initialProduc
   });
 
   return {
-    panel, highlightsInput, productTypeSelect, update,
+    panel, highlightsInput, categoriesSelect, productTypeSelect, update,
   };
 }
 
@@ -194,6 +230,12 @@ export default async function decorateConfig(widget) {
     syncHighlightsToUrl(highlights);
   }
 
+  let categories = readCategoriesFromUrl();
+  if (!categories && widget.dataset.categories) {
+    categories = widget.dataset.categories.trim();
+    syncCategoriesToUrl(categories);
+  }
+
   let productType = readProductTypeFromUrl();
   if (!productType && widget.dataset.productType) {
     productType = widget.dataset.productType.trim();
@@ -201,20 +243,31 @@ export default async function decorateConfig(widget) {
   }
 
   syncHighlightsToWidget(widget, highlights);
+  syncCategoriesToWidget(widget, categories);
   syncProductTypeToWidget(widget, productType);
   syncPreviewLink();
 
-  const productTypes = await loadAllProductTypes();
-  const { panel, highlightsInput, productTypeSelect, update } = buildConfigPanel(
-    widget,
+  const [categoryOptions, productTypes] = await Promise.all([
+    loadAllCategories(),
+    loadAllProductTypes(),
+  ]);
+
+  const {
+    panel, highlightsInput, categoriesSelect, productTypeSelect, update,
+  } = buildConfigPanel(widget, {
+    categories: categoryOptions,
     productTypes,
-    highlights,
-    productType,
-  );
+    initialHighlights: highlights,
+    initialCategories: categories,
+    initialProductType: productType,
+  });
   document.body.prepend(panel);
 
   if (highlights && !highlightsInput.value.trim()) {
     highlightsInput.value = highlights;
+  }
+  if (categories && categoriesSelect.value !== categories) {
+    categoriesSelect.value = categories;
   }
   if (productType && productTypeSelect.value !== productType) {
     productTypeSelect.value = productType;
