@@ -375,12 +375,17 @@ export function setDigitalDataForSearch(searchTerm, toolType, resultCount) {
   window.digitalData.page.pageInfo.onsiteSearchResults = resultCount;
 
   if (resultCount === 0) {
-    const satellite = getSatellite();
-    if (satellite?.track) {
+    whenSatelliteReady(() => {
+      const satellite = getSatellite();
       satellite.track('nullSearch');
       debugLog('Adobe Analytics nullSearch fired', { searchTerm, toolType });
-    }
+    }, 'nullSearch');
   } else {
+    whenSatelliteReady(() => {
+      const satellite = getSatellite();
+      satellite.track('successfulSearch');
+      debugLog('Adobe Analytics successfulSearch fired', { searchTerm, toolType });
+    }, 'successfulSearch');
     debugLog('Adobe Analytics search data set', window.digitalData.page.pageInfo);
   }
 }
@@ -388,7 +393,7 @@ export function setDigitalDataForSearch(searchTerm, toolType, resultCount) {
 /** Debounce delay (ms) for the results-count observer — prevents rapid live-search prefixes
  *  from each firing a separate nullSearch event before the user finishes typing.
  */
-const SEARCH_DEBOUNCE_MS = 300;
+const SEARCH_DEBOUNCE_MS = 800;
 
 /**
  * Read the current state of resultsCountEl and fire search tracking immediately.
