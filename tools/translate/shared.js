@@ -11,7 +11,8 @@
  */
 
 import {
-  ADMIN_URL, TRANSLATION_SERVICE_URL, CONFIG_PATH, METADATA_FIELDS_TO_TRANSLATE, LOCALES,
+  ADMIN_URL, AEM_ADMIN_URL, TRANSLATION_SERVICE_URL, CONFIG_PATH,
+  METADATA_FIELDS_TO_TRANSLATE, LOCALES,
 } from './config.js';
 
 const CONFIG_CONTENT_DNT_SHEET = 'dnt-content-rules';
@@ -443,6 +444,147 @@ const translate = async (htmlInput, language, context, format, daFetch, skipPrep
   return postProcess(combined, context, format);
 };
 
+function localeKey(prefix) {
+  return prefix.replace(/^\//, '').replace(/\//g, '-');
+}
+
+function parsePath(path) {
+  const normalized = path.startsWith('/') ? path : `/${path}`;
+  const matched = LOCALES.find(({ prefix }) => normalized === prefix || normalized.startsWith(`${prefix}/`));
+  if (!matched) return null;
+  const { prefix } = matched;
+  const pagePath = normalized.slice(prefix.length) || '';
+  return { prefix, pagePath, repoPath: `${prefix}${pagePath}` };
+}
+
+const withHtmlExt = (path) => (path.endsWith('.html') ? path : `${path}.html`);
+
+/** Existence + last-modified (from the HEAD response) of a page's DA source. */
+const sourceStatus = async (targetPagePath, context, daFetch) => {
+  const url = `${ADMIN_URL}/source/${context.org}/${context.repo}${withHtmlExt(targetPagePath)}`;
+  const resp = await daFetch(url, { method: 'HEAD' });
+  return {
+    exists: resp.ok,
+    lastModified: resp.headers.get('last-modified'),
+  };
+};
+
+const JOB_POLL_INTERVAL_MS = 1000;
+const JOB_POLL_MAX_ATTEMPTS = 30;
+
+const wait = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
+
+/**
+ * Fetches preview/publish status for many paths in a single AEM Admin bulk-status
+ * job. `forceAsync` keeps the response shape identical regardless of path count
+ * (always a pollable job, never an inlined result), so there's one code path:
+ * poll job.links.self until state is 'stopped', then fetch job.links.details for
+ * the per-path results. Returns a map keyed by path, each value holding
+ * previewLastModified / publishLastModified.
+ */
+const bulkStatus = async (paths, context, daFetch) => {
+  if (paths.length === 0) return {};
+
+  const url = `${AEM_ADMIN_URL}/status/${context.org}/${context.repo}/main/*`;
+  const resp = await daFetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ paths, select: ['preview', 'live'], forceAsync: true }),
+  });
+  if (!resp.ok) throw new Error(`Bulk status failed: ${resp.status}`);
+  let job = await resp.json();
+
+  let attempts = 0;
+  while (job.state !== 'stopped' && job.links?.self && attempts < JOB_POLL_MAX_ATTEMPTS) {
+    // eslint-disable-next-line no-await-in-loop
+    await wait(JOB_POLL_INTERVAL_MS);
+    // eslint-disable-next-line no-await-in-loop
+    const pollResp = await daFetch(job.links.self);
+    if (!pollResp.ok) throw new Error(`Bulk status poll failed: ${pollResp.status}`);
+    // eslint-disable-next-line no-await-in-loop
+    job = await pollResp.json();
+    attempts += 1;
+  }
+
+  const detailsUrl = job.links?.details;
+  if (!detailsUrl) return {};
+
+  const detailsResp = await daFetch(detailsUrl);
+  if (!detailsResp.ok) throw new Error(`Bulk status details failed: ${detailsResp.status}`);
+  const details = await detailsResp.json();
+
+  const result = {};
+  (details.data?.resources || []).forEach((entry) => {
+    if (entry?.path) result[entry.path] = entry;
+  });
+  return result;
+};
+
+/**
+ * Rolls out a source page's HTML to a single target locale: translates (or just
+ * adjusts URLs if same language), saves to DA, then optionally previews/publishes.
+ * Shared between the rollout plugin (single page) and the rollout app (batch).
+ */
+const rolloutToLocale = async ({
+  sourceHtml, sourceTranslateCode, targetPrefix, targetTranslateCode, pagePath,
+  context, daFetch, preview, publish, onStatus,
+}) => {
+  const targetPagePath = `${targetPrefix}${pagePath}`;
+  const targetContext = { ...context, sourcePath: targetPagePath };
+
+  onStatus?.('loading', 'Translating...');
+  let translatedHtml;
+  if (targetTranslateCode === sourceTranslateCode) {
+    const doc = new DOMParser().parseFromString(sourceHtml, 'text/html');
+    const adjusted = adjustURLs(doc, targetContext);
+    translatedHtml = adjusted.documentElement.outerHTML
+      .replace(/^<html><head><\/head><body>/, '')
+      .replace(/<\/body><\/html>$/, '');
+  } else {
+    translatedHtml = await translate(
+      sourceHtml,
+      targetTranslateCode,
+      targetContext,
+      undefined,
+      daFetch,
+    );
+  }
+
+  onStatus?.('saving', 'Saving...');
+  const blob = new Blob([translatedHtml], { type: 'text/html' });
+  const formData = new FormData();
+  formData.append('data', blob);
+  const p = withHtmlExt(targetPagePath);
+  const targetUrl = `${ADMIN_URL}/source/${context.org}/${context.repo}${p}`;
+  const saveResp = await daFetch(targetUrl, { method: 'PUT', body: formData });
+  if (!saveResp.ok) throw new Error(`Save failed: ${saveResp.status}`);
+
+  const base = `${AEM_ADMIN_URL}/%s/${context.org}/${context.repo}/main${targetPagePath}`;
+  const versionUrl = `${ADMIN_URL}/versionsource/${context.org}/${context.repo}${p}`;
+  const versionOpts = (versionLabel) => ({
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ label: versionLabel }),
+  });
+
+  if (preview) {
+    onStatus?.('previewing', 'Previewing...');
+    const previewResp = await daFetch(base.replace('%s', 'preview'), { method: 'POST' });
+    if (!previewResp.ok) throw new Error(`Preview failed: ${previewResp.status}`);
+    daFetch(versionUrl, versionOpts('Previewed'));
+  }
+
+  if (publish) {
+    onStatus?.('publishing', 'Publishing...');
+    const publishResp = await daFetch(base.replace('%s', 'live'), { method: 'POST' });
+    if (!publishResp.ok) throw new Error(`Publish failed: ${publishResp.status}`);
+    daFetch(versionUrl, versionOpts('Published'));
+  }
+
+  return targetPagePath;
+};
+
 export {
   preprocess, translate, adjustURLs, EDITOR_FORMAT, ADMIN_FORMAT,
+  localeKey, parsePath, sourceStatus, bulkStatus, rolloutToLocale,
 };
