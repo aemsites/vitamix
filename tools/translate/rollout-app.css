@@ -359,6 +359,21 @@ button:hover:not(:disabled) {
   color: var(--primary-dark);
 }
 
+.rollout-status-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: rollout-spin 0.7s linear infinite;
+}
+
+@keyframes rollout-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .app-error {
   color: #c62828;
   font-size: 13px;

@@ -205,6 +205,16 @@ function resolveResourcePath(urlStr, context) {
     return a;
   };
 
+  const buildPendingStatusIcons = () => {
+    const container = document.createElement('span');
+    container.className = 'rollout-status-icons rollout-status-icons-pending';
+    const spinner = document.createElement('span');
+    spinner.className = 'rollout-status-spinner';
+    spinner.title = 'Checking preview/publish status…';
+    container.appendChild(spinner);
+    return container;
+  };
+
   const buildStatusIcons = (entry, targetPagePath) => {
     const container = document.createElement('span');
     container.className = 'rollout-status-icons';
@@ -271,6 +281,7 @@ function resolveResourcePath(urlStr, context) {
       const content = document.createElement('div');
       content.className = 'rollout-app-cell-content';
       content.appendChild(labelEl);
+      content.appendChild(buildPendingStatusIcons());
       td.appendChild(content);
 
       return {
@@ -371,6 +382,7 @@ function resolveResourcePath(urlStr, context) {
 
     const statusMap = await statusMapPromise;
     allTargetInfos.forEach(({ targetPagePath, content }) => {
+      content.querySelector('.rollout-status-icons-pending')?.remove();
       content.appendChild(buildStatusIcons(statusMap[targetPagePath], targetPagePath));
     });
 
