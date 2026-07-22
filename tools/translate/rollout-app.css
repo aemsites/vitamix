@@ -275,12 +275,26 @@ button:hover:not(:disabled) {
   white-space: nowrap;
 }
 
+.rollout-app-table tfoot tr {
+  border-top: 2px solid var(--border);
+  background: var(--bg);
+}
+
 .rollout-app-table tbody tr + tr {
   border-top: 1px solid var(--border);
 }
 
 .rollout-app-table tbody tr:nth-child(even) {
   background: color-mix(in srgb, var(--bg) 50%, transparent);
+}
+
+.rollout-app-select-all-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
 }
 
 .rollout-app-path-cell,

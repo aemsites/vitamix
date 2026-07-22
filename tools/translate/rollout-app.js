@@ -67,6 +67,7 @@ function resolveResourcePath(urlStr, context) {
   const publishCheckbox = document.querySelector('input[name="publish"]');
   const tableHead = document.querySelector('.rollout-app-table thead');
   const tableBody = document.querySelector('.rollout-app-table tbody');
+  const tableFoot = document.querySelector('.rollout-app-table tfoot');
   const errorMessage = document.querySelector('.app-error');
   const loadFromFolderLink = document.querySelector('#load-from-folder');
   const loaderRow = document.querySelector('.app-input-loader');
@@ -162,6 +163,53 @@ function resolveResourcePath(urlStr, context) {
     });
 
     tableHead.appendChild(tr);
+  };
+
+  const renderTableFoot = () => {
+    tableFoot.innerHTML = '';
+    if (rows.length === 0) return;
+
+    const tr = document.createElement('tr');
+
+    const labelTd = document.createElement('td');
+    labelTd.className = 'rollout-app-path-cell rollout-app-select-all-label';
+    labelTd.textContent = 'Select all';
+    tr.appendChild(labelTd);
+
+    LOCALES.forEach((locale) => {
+      const { prefix } = locale;
+      const td = document.createElement('td');
+      td.className = 'rollout-app-cell';
+
+      const checkboxes = rows.flatMap(
+        (row) => row.locales.filter((l) => l.prefix === prefix).map((l) => l.checkbox),
+      );
+
+      if (checkboxes.length > 0) {
+        const labelEl = document.createElement('label');
+        labelEl.className = 'rollout-checkbox';
+        const localeName = [locale.country, locale.label].filter(Boolean).join(' — ');
+        labelEl.title = `Select all — ${localeName}`;
+
+        const selectAllCheckbox = document.createElement('input');
+        selectAllCheckbox.type = 'checkbox';
+        selectAllCheckbox.checked = checkboxes.every((cb) => cb.checked);
+        selectAllCheckbox.addEventListener('change', () => {
+          checkboxes.forEach((cb) => { cb.checked = selectAllCheckbox.checked; });
+        });
+
+        const box = document.createElement('span');
+        box.className = 'rollout-checkbox-box';
+
+        labelEl.appendChild(selectAllCheckbox);
+        labelEl.appendChild(box);
+        td.appendChild(labelEl);
+      }
+
+      tr.appendChild(td);
+    });
+
+    tableFoot.appendChild(tr);
   };
 
   const buildPathCell = (index, urlStr, text) => {
@@ -313,6 +361,7 @@ function resolveResourcePath(urlStr, context) {
     errorMessage.textContent = '';
     errorMessage.style.display = 'none';
     tableBody.innerHTML = '';
+    tableFoot.innerHTML = '';
     renderTableHead();
     optionsRow.hidden = true;
     rolloutButton.hidden = true;
@@ -379,6 +428,8 @@ function resolveResourcePath(urlStr, context) {
         allTargetInfos.push(...(targetInfos || []));
       }
     }
+
+    renderTableFoot();
 
     const statusMap = await statusMapPromise;
     allTargetInfos.forEach(({ targetPagePath, content }) => {
