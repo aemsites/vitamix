@@ -381,7 +381,7 @@ header .nav-sections .nav-category > ul {
 }
 
 header .nav-sections .nav-category ul > li > strong > a {
-  font-weight: bold;
+  font-weight: var(--weight-medium);
   text-decoration: underline;
   text-underline-offset: var(--spacing-20);
 }
@@ -416,12 +416,14 @@ header .nav-sections .nav-category ul > li em {
   header .nav-sections nav > ul > li.submenu-wrapper > [aria-expanded="true"] + div.nav-mega {
     display: grid;
     grid-template-columns: 4fr 1fr;
-    gap: var(--spacing-xl);
+    gap: var(--spacing-xxl);
+    padding-left: var(--spacing-xxl);
+    padding-right: var(--spacing-xxl);
   }
 
   header .nav-sections .nav-categories {
     column-count: 4;
-    column-gap: var(--spacing-xl);
+    column-gap: var(--spacing-xxl);
   }
 
   header .nav-sections ul > li.nav-category {
