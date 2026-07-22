@@ -1,5 +1,6 @@
 import { loadScript } from './aem.js';
 import './consented/newsletter.js';
+/* eslint-disable import/no-cycle -- loaded dynamically by scripts.js after consent */
 import {
   configureAnalyticsTrackingServers,
   ensureAnalyticsTrackingConfigured,

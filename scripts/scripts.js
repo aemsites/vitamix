@@ -1568,10 +1568,12 @@ async function loadDelayed() {
       }
     });
     if (params.get('martech') === 'on') {
+      // eslint-disable-next-line import/no-cycle -- consent bundle loads after main scripts
       import('./consented.js');
     } else {
       window.addEventListener('CookiebotOnConsentReady', () => {
         if (window.Cookiebot.consented) {
+          // eslint-disable-next-line import/no-cycle -- consent bundle loads after main scripts
           import('./consented.js');
         }
       });

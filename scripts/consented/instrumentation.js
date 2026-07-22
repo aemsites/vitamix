@@ -1,3 +1,4 @@
+// eslint-disable-next-line import/no-cycle -- scripts.js loads consented dynamically
 import { getLocaleAndLanguage } from '../scripts.js';
 
 export function isDebugMode() {
