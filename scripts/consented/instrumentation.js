@@ -1,3 +1,5 @@
+import { getLocaleAndLanguage } from '../scripts.js';
+
 export function isDebugMode() {
   return window.location.hostname === 'localhost'
     || window.location.search.includes('instrumentation=debug');
@@ -74,7 +76,7 @@ const PAGE_TYPE = {
  */
 const PAGE_TYPE_URL_MAP = {
   '/recipes': 'recipeoverviewpage',
-  '/recipes/': 'recipedetailpage',
+  '/recipes/': 'recipepage',
 };
 
 /** First path segment after a prefix key that should not match (e.g. /recipes/data). */
@@ -86,7 +88,7 @@ const PAGE_TYPE_URL_PREFIX_EXCLUSIONS = {
  * @returns {string}
  */
 function getStoreLocaleKey() {
-  return window.location.pathname.split('/').filter(Boolean)[0] || 'us';
+  return getLocaleAndLanguage().locale;
 }
 
 /**
@@ -94,15 +96,15 @@ function getStoreLocaleKey() {
  * @returns {string}
  */
 export function getActiveLanguageLocale() {
-  const segments = window.location.pathname.split('/').filter(Boolean);
-  return segments[1] || 'en_us';
+  return getLocaleAndLanguage().language;
 }
 
 /**
  * @returns {string}
  */
 function getLocalePathPrefix() {
-  return `/${getStoreLocaleKey()}/${getActiveLanguageLocale()}`;
+  const { locale, language } = getLocaleAndLanguage();
+  return `/${locale}/${language}`;
 }
 
 /**
@@ -502,10 +504,10 @@ function applyDigitalDataPageContext(categories) {
     },
     category: {
       ...(window.digitalData.page?.category || {}),
-      pageType: categories.pageType,
-      primaryCategory: categories.primaryCat,
-      subCategory1: categories.subCat1,
-      subCategory2: categories.subCat2,
+      pageType: categories.pageType || window.digitalData.page?.category?.pageType || '',
+      primaryCategory: categories.primaryCat || window.digitalData.page?.category?.primaryCategory || '',
+      subCategory1: categories.subCat1 || window.digitalData.page?.category?.subCategory1 || '',
+      subCategory2: categories.subCat2 || window.digitalData.page?.category?.subCategory2 || '',
     },
   };
   window.digitalData.user = {
@@ -799,13 +801,6 @@ function guardDigitalDataPageType() {
       pageTypeGuardIntervalId = 0;
     }
   }, 100);
-  whenSatelliteReady(() => {
-    syncDigitalDataPageContext();
-    if (pageTypeGuardIntervalId) {
-      clearInterval(pageTypeGuardIntervalId);
-      pageTypeGuardIntervalId = 0;
-    }
-  }, 'pageTypeGuard');
 }
 
 /**
