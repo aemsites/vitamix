@@ -362,11 +362,11 @@ function buildInitialConfig(widget) {
     if (key === 'source' || !FILTER_PARAM_KEYS.includes(key)) return;
     config[key] = value;
   });
-  const params = new URLSearchParams(window.location.search);
-  params.forEach((value, key) => {
-    if (FILTER_PARAM_KEYS.includes(key)) config[key] = value.trim();
-  });
   return config;
+}
+
+function isWidgetConfigPage() {
+  return /\/widgets\/[^/]+\/[^/]+\.html$/.test(window.location.pathname);
 }
 
 function stripQueryParams(keys) {
@@ -412,7 +412,7 @@ function removeFilterValue(filterConfig, facetKey, value) {
 }
 
 function syncFilterConfigToUrl(filterConfig, widget) {
-  if (widget?.classList?.contains('product-list-config-mode')) return;
+  if (widget?.classList?.contains('product-list-config-mode') || isWidgetConfigPage()) return;
 
   const params = new URLSearchParams(window.location.search);
   FILTER_PARAM_KEYS.forEach((key) => params.delete(key));
@@ -577,7 +577,7 @@ async function loadBazaarvoice(ph) {
  */
 export default async function decorate(widget) {
   const configMode = widget.classList.contains('product-list-config-mode');
-  if (!configMode) {
+  if (!configMode && !isWidgetConfigPage()) {
     stripQueryParams(['show']);
   }
   delete widget.dataset.show;

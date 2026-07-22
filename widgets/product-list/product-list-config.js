@@ -28,22 +28,10 @@ async function updateHighlightsSection(widget, highlights) {
   }
 }
 
-function buildWidgetHref(highlights) {
-  const base = `${window.location.origin}${window.hlx?.codeBasePath || ''}/widgets/product-list/product-list.html`;
-  if (!highlights) return base;
-  const params = new URLSearchParams();
-  params.set('highlights', highlights);
-  return `${base}?${params.toString()}`;
-}
-
-function readHighlightsValue(widget) {
+/** Reads highlights from the config page URL only. */
+function readHighlightsFromUrl() {
   const params = new URLSearchParams(window.location.search);
-  return (
-    params.get('highlights')
-    || params.get('highlight')
-    || widget?.dataset?.highlights
-    || ''
-  ).trim();
+  return (params.get('highlights') || params.get('highlight') || '').trim();
 }
 
 function syncHighlightsToUrl(highlights) {
@@ -56,8 +44,26 @@ function syncHighlightsToUrl(highlights) {
   window.history.replaceState(null, '', nextUrl);
 }
 
+function syncHighlightsToWidget(widget, highlights) {
+  if (highlights) widget.dataset.highlights = highlights;
+  else delete widget.dataset.highlights;
+  delete widget.dataset.highlight;
+}
+
+function syncPreviewLink() {
+  const link = document.querySelector('main[data-widget-config-preview] a[href^="/widgets"]');
+  if (!link) return;
+  link.href = `${window.location.pathname}${window.location.search}`;
+  link.textContent = `${window.location.origin}${link.href}`;
+}
+
+function buildWidgetHref() {
+  const base = `${window.location.origin}${window.hlx?.codeBasePath || ''}/widgets/product-list/product-list.html`;
+  return `${base}${window.location.search}`;
+}
+
 function buildConfigPanel(widget) {
-  const initial = readHighlightsValue(widget);
+  const initial = readHighlightsFromUrl();
   const panel = document.createElement('div');
   panel.className = 'product-list-config';
 
@@ -86,20 +92,18 @@ function buildConfigPanel(widget) {
   actions.append(copyButton);
   panel.append(controls, actions);
 
-  let widgetHref = buildWidgetHref(initial);
-
   const update = async () => {
     const highlights = input.value.trim();
-    widgetHref = buildWidgetHref(highlights);
     syncHighlightsToUrl(highlights);
-    if (highlights) widget.dataset.highlights = highlights;
-    else delete widget.dataset.highlights;
+    syncHighlightsToWidget(widget, highlights);
+    syncPreviewLink();
     await updateHighlightsSection(widget, highlights);
   };
 
   input.addEventListener('input', () => { update(); });
 
   copyButton.addEventListener('click', async () => {
+    const widgetHref = buildWidgetHref();
     try {
       await navigator.clipboard.writeText(widgetHref);
       copyButton.textContent = 'Copied';
@@ -121,16 +125,20 @@ function buildConfigPanel(widget) {
 export default async function decorateConfig(widget) {
   widget.classList.add('product-list-config-mode');
 
-  const highlights = readHighlightsValue(widget);
-  if (highlights) {
-    widget.dataset.highlights = highlights;
+  let highlights = readHighlightsFromUrl();
+  if (!highlights && widget.dataset.highlights) {
+    highlights = widget.dataset.highlights.trim();
+    syncHighlightsToUrl(highlights);
   }
+  syncHighlightsToWidget(widget, highlights);
+  syncPreviewLink();
 
   const { panel, input } = buildConfigPanel(widget);
   document.body.prepend(panel);
-  if (!input.value.trim() && highlights) {
+
+  if (highlights && !input.value.trim()) {
     input.value = highlights;
   }
 
-  await updateHighlightsSection(widget, highlights || input.value.trim());
+  await updateHighlightsSection(widget, highlights);
 }
