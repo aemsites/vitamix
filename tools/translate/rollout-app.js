@@ -335,7 +335,7 @@ function resolveResourcePath(urlStr, context) {
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       if (isSource) {
-        checkbox.checked = true;
+        checkbox.checked = false;
         checkbox.disabled = true;
       } else {
         checkbox.checked = !status.exists;
