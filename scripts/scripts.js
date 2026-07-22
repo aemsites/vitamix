@@ -260,7 +260,10 @@ function setAffiliateCoupon() {
 
   if (COUPON) {
     sessionStorage.setItem('checkout_coupon_code', COUPON);
-    sessionStorage.removeItem('checkout_coupon_source');
+    // Affiliate URL coupons are applied programmatically, not typed by the
+    // customer, so they must validate as 'auto' — otherwise auto-apply-only
+    // types (allowManualEntry: false) are rejected as manual entries.
+    sessionStorage.setItem('checkout_coupon_source', 'auto');
 
     // TODO: remove once all locales migrate off Magento — applies the coupon to the PHP cart
     const { locale, language } = getLocaleAndLanguage();
