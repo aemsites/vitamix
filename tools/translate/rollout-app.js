@@ -86,9 +86,7 @@ function resolveResourcePath(urlStr, context) {
 
   loadFromFolderLink.addEventListener('click', (e) => {
     e.preventDefault();
-    // TODO restore
-    // folderInput.value = `https://da.live/#/${context.org}/${context.repo}/drafts`;
-    folderInput.value = `https://da.live/#/${context.org}/${context.repo}/us/en_us/articles`;
+    folderInput.value = `https://da.live/#/${context.org}/${context.repo}/us/en_us`;
 
     loaderRow.classList.toggle('open');
   });
