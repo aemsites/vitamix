@@ -38,6 +38,19 @@ function formatDate(value) {
   return dateFormatter.format(date);
 }
 
+// A manual-redirect HEAD request never exposes the actual status code (browsers
+// collapse any 3xx into an opaque "opaqueredirect" response), so a detected
+// redirect is reported as "301" — the only redirect status AEM Edge Delivery's
+// redirects.json ever issues.
+async function checkLiveRedirect(liveUrl) {
+  try {
+    const resp = await fetch(liveUrl, { method: 'HEAD', redirect: 'manual' });
+    return resp.type === 'opaqueredirect';
+  } catch {
+    return false;
+  }
+}
+
 function resolveResourcePath(urlStr, context) {
   let url;
   try {
@@ -263,6 +276,17 @@ function resolveResourcePath(urlStr, context) {
     return container;
   };
 
+  const buildRedirectIcon = (href) => {
+    const a = document.createElement('a');
+    a.className = 'rollout-status-icon rollout-status-icon-redirect';
+    a.textContent = '301';
+    a.title = 'Live page redirects (HTTP redirect detected)';
+    a.href = href;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    return a;
+  };
+
   const buildStatusIcons = (entry, targetPagePath) => {
     const container = document.createElement('span');
     container.className = 'rollout-status-icons';
@@ -279,7 +303,7 @@ function resolveResourcePath(urlStr, context) {
     );
     container.appendChild(buildStatusIcon(PUBLISH_ICON_SVG, !!publishDate, publishTitle, liveUrl));
 
-    return container;
+    return { container, liveUrl, published: !!publishDate };
   };
 
   const buildDataRow = async (i, urlStr, parsed) => {
@@ -300,25 +324,22 @@ function resolveResourcePath(urlStr, context) {
       const status = await sourceStatus(targetPagePath, context, daFetch);
       const lastModified = formatDate(status.lastModified);
 
-      if (isSource) {
-        td.classList.add('rollout-app-cell-source');
-        const badgeEl = document.createElement('span');
-        badgeEl.className = 'rollout-source-badge';
-        badgeEl.textContent = 'Source';
-        if (lastModified) badgeEl.title = `Last modified ${lastModified}`;
-        td.appendChild(badgeEl);
-        return {
-          td, locale: null, targetInfo: null,
-        };
-      }
+      if (isSource) td.classList.add('rollout-app-cell-source');
 
       const labelEl = document.createElement('label');
       labelEl.className = 'rollout-checkbox';
-      if (lastModified) labelEl.title = `Last modified ${lastModified}`;
+      const titleParts = [isSource ? 'Source' : null, lastModified ? `Last modified ${lastModified}` : null];
+      const title = titleParts.filter(Boolean).join(' — ');
+      if (title) labelEl.title = title;
 
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
-      checkbox.checked = !status.exists;
+      if (isSource) {
+        checkbox.checked = true;
+        checkbox.disabled = true;
+      } else {
+        checkbox.checked = !status.exists;
+      }
 
       const box = document.createElement('span');
       box.className = 'rollout-checkbox-box';
@@ -334,7 +355,7 @@ function resolveResourcePath(urlStr, context) {
 
       return {
         td,
-        locale: { ...locale, checkbox },
+        locale: isSource ? null : { ...locale, checkbox },
         targetInfo: { targetPagePath, content },
       };
     }));
@@ -397,8 +418,8 @@ function resolveResourcePath(urlStr, context) {
     parsedEntries.forEach(({ parsed }) => {
       if (!parsed) return;
       LOCALES.forEach(({ prefix }) => {
-        if (prefix === parsed.prefix) return;
-        allTargetPaths.push(`${prefix}${parsed.pagePath}`);
+        const targetPagePath = prefix === parsed.prefix ? parsed.repoPath : `${prefix}${parsed.pagePath}`;
+        allTargetPaths.push(targetPagePath);
       });
     });
 
@@ -432,10 +453,27 @@ function resolveResourcePath(urlStr, context) {
     renderTableFoot();
 
     const statusMap = await statusMapPromise;
+    const publishedInfos = [];
     allTargetInfos.forEach(({ targetPagePath, content }) => {
       content.querySelector('.rollout-status-icons-pending')?.remove();
-      content.appendChild(buildStatusIcons(statusMap[targetPagePath], targetPagePath));
+      const {
+        container, liveUrl, published,
+      } = buildStatusIcons(statusMap[targetPagePath], targetPagePath);
+      content.appendChild(container);
+      if (published) publishedInfos.push({ container, liveUrl });
     });
+
+    // Redirect check runs after the fact, batched the same way as everything
+    // else, and only for pages that are actually published (nothing to check
+    // otherwise).
+    for (let start = 0; start < publishedInfos.length; start += PREPARE_BATCH_SIZE) {
+      const batch = publishedInfos.slice(start, start + PREPARE_BATCH_SIZE);
+      // eslint-disable-next-line no-await-in-loop
+      await Promise.all(batch.map(async ({ container, liveUrl }) => {
+        const isRedirect = await checkLiveRedirect(liveUrl);
+        if (isRedirect) container.appendChild(buildRedirectIcon(liveUrl));
+      }));
+    }
 
     prepareButton.disabled = false;
 

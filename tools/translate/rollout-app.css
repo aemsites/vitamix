@@ -84,6 +84,19 @@ body {
   box-shadow: 0 0 0 3px var(--ring);
 }
 
+.rollout-checkbox input:disabled {
+  cursor: not-allowed;
+}
+
+.rollout-checkbox input:disabled + .rollout-checkbox-box {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.rollout-checkbox:has(input:disabled) {
+  cursor: not-allowed;
+}
+
 .app-input-loader {
   display: grid;
   grid-template-rows: 0fr;
@@ -109,6 +122,7 @@ body {
   padding-bottom: 12px;
 }
 
+/* stylelint-disable-next-line no-descending-specificity -- unrelated component, shares only the bare "input" tag */
 .app-input-loader input {
   flex: 1;
   border: 1px solid var(--border);
@@ -334,15 +348,6 @@ button:hover:not(:disabled) {
   background: color-mix(in srgb, var(--primary) 6%, transparent);
 }
 
-.rollout-source-badge {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--muted);
-  cursor: default;
-}
-
 .rollout-app-cell-content {
   display: inline-flex;
   align-items: center;
@@ -371,6 +376,22 @@ button:hover:not(:disabled) {
 
 .rollout-status-icon.active:hover {
   color: var(--primary-dark);
+}
+
+.rollout-status-icon-redirect {
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 3px 5px;
+  border-radius: 4px;
+  border: 1px solid var(--primary);
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.rollout-status-icon-redirect:hover {
+  background: var(--primary);
+  color: #fff;
 }
 
 .rollout-status-spinner {
