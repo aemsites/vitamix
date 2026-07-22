@@ -15,7 +15,7 @@
 // eslint-disable-next-line import/no-unresolved
 import DA_SDK from 'https://da.live/nx/utils/sdk.js';
 import {
-  localeKey, parsePath, sourceStatus, bulkStatus, rolloutToLocale,
+  localeKey, parsePath, sourceStatus, bulkStatus, getRedirects, rolloutToLocale,
 } from './shared.js';
 import { ADMIN_URL, LOCALES } from './config.js';
 
@@ -36,19 +36,6 @@ function formatDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
   return dateFormatter.format(date);
-}
-
-// A manual-redirect HEAD request never exposes the actual status code (browsers
-// collapse any 3xx into an opaque "opaqueredirect" response), so a detected
-// redirect is reported as "301" — the only redirect status AEM Edge Delivery's
-// redirects.json ever issues.
-async function checkLiveRedirect(liveUrl) {
-  try {
-    const resp = await fetch(liveUrl, { method: 'HEAD', redirect: 'manual' });
-    return resp.type === 'opaqueredirect';
-  } catch {
-    return false;
-  }
 }
 
 function resolveResourcePath(urlStr, context) {
@@ -280,7 +267,7 @@ function resolveResourcePath(urlStr, context) {
     const a = document.createElement('a');
     a.className = 'rollout-status-icon rollout-status-icon-redirect';
     a.textContent = '301';
-    a.title = 'Live page redirects (HTTP redirect detected)';
+    a.title = 'Redirects (301) — open destination';
     a.href = href;
     a.target = '_blank';
     a.rel = 'noopener';
@@ -303,7 +290,7 @@ function resolveResourcePath(urlStr, context) {
     );
     container.appendChild(buildStatusIcon(PUBLISH_ICON_SVG, !!publishDate, publishTitle, liveUrl));
 
-    return { container, liveUrl, published: !!publishDate };
+    return container;
   };
 
   const buildDataRow = async (i, urlStr, parsed) => {
@@ -429,6 +416,7 @@ function resolveResourcePath(urlStr, context) {
       console.error('Bulk status failed', err);
       return {};
     });
+    const redirectsPromise = getRedirects(context, daFetch);
 
     // Rows are built in fixed-size batches (each row's own locale checks run in
     // parallel within a batch) so folders with thousands of pages don't fire
@@ -452,28 +440,20 @@ function resolveResourcePath(urlStr, context) {
 
     renderTableFoot();
 
-    const statusMap = await statusMapPromise;
-    const publishedInfos = [];
+    const [statusMap, redirects] = await Promise.all([statusMapPromise, redirectsPromise]);
     allTargetInfos.forEach(({ targetPagePath, content }) => {
       content.querySelector('.rollout-status-icons-pending')?.remove();
-      const {
-        container, liveUrl, published,
-      } = buildStatusIcons(statusMap[targetPagePath], targetPagePath);
+      const container = buildStatusIcons(statusMap[targetPagePath], targetPagePath);
       content.appendChild(container);
-      if (published) publishedInfos.push({ container, liveUrl });
-    });
 
-    // Redirect check runs after the fact, batched the same way as everything
-    // else, and only for pages that are actually published (nothing to check
-    // otherwise).
-    for (let start = 0; start < publishedInfos.length; start += PREPARE_BATCH_SIZE) {
-      const batch = publishedInfos.slice(start, start + PREPARE_BATCH_SIZE);
-      // eslint-disable-next-line no-await-in-loop
-      await Promise.all(batch.map(async ({ container, liveUrl }) => {
-        const isRedirect = await checkLiveRedirect(liveUrl);
-        if (isRedirect) container.appendChild(buildRedirectIcon(liveUrl));
-      }));
-    }
+      const destination = redirects.get(targetPagePath);
+      if (destination) {
+        const destinationUrl = destination.startsWith('http')
+          ? destination
+          : `https://main--${context.repo}--${context.org}.aem.live${destination}`;
+        container.appendChild(buildRedirectIcon(destinationUrl));
+      }
+    });
 
     prepareButton.disabled = false;
 

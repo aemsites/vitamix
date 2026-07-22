@@ -469,6 +469,34 @@ const sourceStatus = async (targetPagePath, context, daFetch) => {
   };
 };
 
+const REDIRECTS_PATH = '/redirects.json';
+
+/**
+ * The project's redirects.json (a DA sheet with Source/Destination columns),
+ * fetched once via daFetch — same-origin admin call, no CORS issue, unlike
+ * probing the live site directly. AEM Edge Delivery applies every listed
+ * Source as a 301 redirect at the CDN, so a path's presence here (regardless
+ * of its publish state) means the live URL will redirect.
+ * Returns a Map keyed by Source path, empty if the project has none.
+ */
+const getRedirects = async (context, daFetch) => {
+  try {
+    const resp = await daFetch(`${ADMIN_URL}/source/${context.org}/${context.repo}${REDIRECTS_PATH}`);
+    if (!resp.ok) return new Map();
+    const json = await resp.json();
+    const rows = json?.data || [];
+    const map = new Map();
+    rows.forEach((row) => {
+      const source = row.Source;
+      if (!source) return;
+      map.set(source.startsWith('/') ? source : `/${source}`, row.Destination || '');
+    });
+    return map;
+  } catch {
+    return new Map();
+  }
+};
+
 const JOB_POLL_INTERVAL_MS = 1000;
 const JOB_POLL_MAX_ATTEMPTS = 30;
 
@@ -586,5 +614,5 @@ const rolloutToLocale = async ({
 
 export {
   preprocess, translate, adjustURLs, EDITOR_FORMAT, ADMIN_FORMAT,
-  localeKey, parsePath, sourceStatus, bulkStatus, rolloutToLocale,
+  localeKey, parsePath, sourceStatus, bulkStatus, getRedirects, rolloutToLocale,
 };
