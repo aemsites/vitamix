@@ -13,11 +13,6 @@ function parseWidgetLocation() {
   return { widgetPath: match[1], widgetName: match[2] };
 }
 
-/**
- * Derives `window.hlx.codeBasePath` from the widget URL.
- * @param {string} widgetPath
- * @param {string} widgetName
- */
 function setupCodeBasePath(widgetPath, widgetName) {
   window.hlx = window.hlx || {};
   if (window.hlx.codeBasePath !== undefined) return;
@@ -26,55 +21,42 @@ function setupCodeBasePath(widgetPath, widgetName) {
     .replace(/\/$/, '');
 }
 
-/**
- * Wraps widget markup in a simulated page shell (`header`, `main`, `footer`).
- * @param {string} widgetName
- * @returns {HTMLElement} Widget root element
- */
-function setupPageShell(widgetName) {
-  const existing = document.querySelector(`.${widgetName}.widget, .${widgetName}`);
-  if (existing) return existing;
+function ensurePreviewShell() {
+  if (document.querySelector('main[data-widget-config-preview]')) return;
 
-  const { body } = document;
-  const markup = [...body.children].filter((el) => el.tagName !== 'SCRIPT');
-
-  const header = document.createElement('header');
+  const widgetHref = `${window.location.pathname}${window.location.search}`;
   const main = document.createElement('main');
-  const footer = document.createElement('footer');
+  main.dataset.widgetConfigPreview = '';
   const section = document.createElement('div');
   section.className = 'section';
-  const container = document.createElement('div');
-  container.className = `${widgetName}-container`;
-  const wrapper = document.createElement('div');
-  wrapper.className = `${widgetName}-wrapper`;
-  const widget = document.createElement('div');
-  widget.className = `${widgetName} widget`;
-
-  markup.forEach((node) => widget.append(node));
-  wrapper.append(widget);
-  container.append(wrapper);
-  section.append(container);
+  const div = document.createElement('div');
+  const link = document.createElement('a');
+  link.href = widgetHref;
+  link.textContent = `${window.location.origin}${widgetHref}`;
+  div.append(link);
+  section.append(div);
   main.append(section);
-  body.replaceChildren(header, main, footer);
 
-  if (!document.querySelector('meta[name="viewport"]')) {
-    const viewport = document.createElement('meta');
-    viewport.name = 'viewport';
-    viewport.content = 'width=device-width, initial-scale=1';
-    document.head.append(viewport);
-  }
-
-  return widget;
+  document.body.prepend(main);
+  document.body.classList.add('appear');
 }
 
 /**
- * Applies URL search params to the widget dataset.
- * @param {HTMLElement} widget
+ * Waits for the widget block to finish loading and decorating.
+ * @returns {Promise<HTMLElement|null>}
  */
-function applySearchParams(widget) {
-  new URLSearchParams(window.location.search).forEach((value, key) => {
-    widget.dataset[key] = value;
-  });
+async function waitForWidgetBlock() {
+  const deadline = Date.now() + 30000;
+  while (Date.now() < deadline) {
+    const widget = document.querySelector('.widget.block, .widget');
+    const named = document.querySelector('.product-list.block, .product-list.widget, .product-list');
+    const target = named || widget;
+    const hasSource = !!target?.dataset?.source;
+    const hasMarkup = !!target?.querySelector('.product-list-widget, .product-list-results');
+    if (target && (hasSource || hasMarkup)) return target;
+    await new Promise((resolve) => { requestAnimationFrame(resolve); });
+  }
+  return null;
 }
 
 /**
@@ -87,7 +69,6 @@ async function loadConfigStyles(widgetPath, widgetName) {
   const widgetBase = `${base}/widgets/${widgetPath}`;
   await Promise.all([
     loadCSS(`${base}/styles/styles.css`),
-    loadCSS(`${widgetBase}/${widgetName}.css`),
     loadCSS(`${widgetBase}/${widgetName}-config.css`),
   ]);
 }
@@ -101,13 +82,28 @@ async function initWidgetConfig() {
 
   const { widgetPath, widgetName } = location;
   setupCodeBasePath(widgetPath, widgetName);
-  const widget = setupPageShell(widgetName);
-  applySearchParams(widget);
-  await loadConfigStyles(widgetPath, widgetName);
 
-  const base = window.hlx.codeBasePath;
-  const mod = await import(`${base}/widgets/${widgetPath}/${widgetName}-config.js`);
-  if (mod.default) await mod.default(widget);
+  document.querySelectorAll('body > .product-list-widget').forEach((el) => {
+    el.remove();
+  });
+
+  ensurePreviewShell();
+
+  try {
+    const { loadPage } = await import('../scripts/scripts.js');
+    await loadPage();
+
+    await loadConfigStyles(widgetPath, widgetName);
+
+    const widget = await waitForWidgetBlock();
+    if (!widget) return;
+
+    const base = window.hlx.codeBasePath;
+    const mod = await import(`${base}/widgets/${widgetPath}/${widgetName}-config.js`);
+    if (mod.default) await mod.default(widget);
+  } catch {
+    // fail gracefully
+  }
 }
 
 initWidgetConfig();

@@ -380,7 +380,7 @@ function stripQueryParams(keys) {
   });
   if (!changed) return;
   const search = params.toString();
-  window.history.replaceState(null, '', `${window.location.pathname}${search ? `?${search}` : ''}`);
+  window.history.replaceState(null, '', `${window.location.pathname}${search ? `?${search}` : ''}${window.location.hash || ''}`);
 }
 
 function countActiveFilters(filterConfig, baseConfig) {
@@ -411,14 +411,19 @@ function removeFilterValue(filterConfig, facetKey, value) {
   return next;
 }
 
-function syncFilterConfigToUrl(filterConfig) {
-  const params = new URLSearchParams();
+function syncFilterConfigToUrl(filterConfig, widget) {
+  if (widget?.classList?.contains('product-list-config-mode')) return;
+
+  const params = new URLSearchParams(window.location.search);
+  FILTER_PARAM_KEYS.forEach((key) => params.delete(key));
   Object.entries(filterConfig).forEach(([key, value]) => {
+    if (!FILTER_PARAM_KEYS.includes(key)) return;
     const v = value != null ? String(value).trim() : '';
     if (v) params.set(key, v);
+    else params.delete(key);
   });
   const search = params.toString();
-  const url = `${window.location.pathname}${search ? `?${search}` : ''}`;
+  const url = `${window.location.pathname}${search ? `?${search}` : ''}${window.location.hash || ''}`;
   window.history.replaceState(null, '', url);
 }
 
@@ -571,7 +576,10 @@ async function loadBazaarvoice(ph) {
  * @param {HTMLElement} widget - Widget root element
  */
 export default async function decorate(widget) {
-  stripQueryParams(['show']);
+  const configMode = widget.classList.contains('product-list-config-mode');
+  if (!configMode) {
+    stripQueryParams(['show']);
+  }
   delete widget.dataset.show;
   const { locale, language } = getWidgetLocaleAndLanguage();
   const lang = (language || 'en_us').split('_')[0];
@@ -584,8 +592,6 @@ export default async function decorate(widget) {
   loadCSS(`${window.hlx?.codeBasePath || ''}/widgets/product-list/product-list.css`);
   loadCSS(`${window.hlx?.codeBasePath || ''}/styles/color-swatches.css`);
 
-  const lifestyleHeading = widget.querySelector('.product-list-lifestyle-heading');
-  const recommenderLink = widget.querySelector('.product-list-lifestyle-recommender');
   const filtersTrigger = widget.querySelector('.product-list-filters-trigger');
   const filtersCount = widget.querySelector('.product-list-filters-count');
   const filterDropdowns = widget.querySelector('.product-list-filter-dropdowns');
@@ -608,11 +614,6 @@ export default async function decorate(widget) {
 
   if (!resultsEl) return;
 
-  lifestyleHeading.textContent = copy.shopByLifestyle;
-  if (recommenderLink) {
-    recommenderLink.textContent = copy.blenderRecommender;
-    recommenderLink.href = `/${locale}/${language}/blender-recommender`;
-  }
   filtersTrigger.querySelector('.product-list-filters-trigger-label').textContent = copy.filters;
   countLabel.textContent = copy.items;
   sortLabel.textContent = copy.sortBy;
@@ -634,11 +635,16 @@ export default async function decorate(widget) {
   });
 
   const lifestyleSection = widget.querySelector('.product-list-lifestyle');
-  const lifestyleCarousel = widget.querySelector('.product-list-lifestyle-carousel');
   if (widget.dataset.highlights) {
-    const fragment = await loadFragment(`/${locale}/${language}/${widget.dataset.highlights}`);
-    if (fragment && lifestyleCarousel) lifestyleCarousel.replaceChildren(...fragment.childNodes);
-    else if (lifestyleSection) lifestyleSection.hidden = true;
+    const highlightsPath = widget.dataset.highlights.startsWith('/')
+      ? widget.dataset.highlights
+      : `/${locale}/${language}/${widget.dataset.highlights}`;
+    const fragment = await loadFragment(highlightsPath);
+    if (fragment && lifestyleSection) {
+      lifestyleSection.replaceChildren(...fragment.childNodes);
+    } else if (lifestyleSection) {
+      lifestyleSection.hidden = true;
+    }
   } else if (lifestyleSection) {
     lifestyleSection.hidden = true;
   }
@@ -699,7 +705,7 @@ export default async function decorate(widget) {
     countEl.textContent = String(results.length);
     displayResults(results);
     updateFilterUi(filterConfig, facets);
-    syncFilterConfigToUrl(filterConfig);
+    syncFilterConfigToUrl(filterConfig, widget);
   };
 
   sortButtons.forEach((btn) => {

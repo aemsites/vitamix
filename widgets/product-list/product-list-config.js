@@ -1,23 +1,29 @@
 import { loadFragment } from '../../blocks/fragment/fragment.js';
 import { getWidgetLocaleAndLanguage } from './products.js';
-import decorate from './product-list.js';
 
-async function updateHighlightsCarousel(widget, highlights) {
+function resolveHighlightsFragmentPath(highlights) {
+  const value = (highlights || '').trim();
+  if (!value) return null;
+  if (value.startsWith('/')) return value;
+  const { locale, language } = getWidgetLocaleAndLanguage();
+  return `/${locale}/${language}/${value}`;
+}
+
+async function updateHighlightsSection(widget, highlights) {
   const lifestyleSection = widget.querySelector('.product-list-lifestyle');
-  const lifestyleCarousel = widget.querySelector('.product-list-lifestyle-carousel');
-  if (!lifestyleCarousel) return;
+  if (!lifestyleSection) return;
 
   if (!highlights) {
-    if (lifestyleSection) lifestyleSection.hidden = true;
+    lifestyleSection.hidden = true;
     return;
   }
 
-  const { locale, language } = getWidgetLocaleAndLanguage();
-  const fragment = await loadFragment(`/${locale}/${language}/${highlights}`);
+  const fragmentPath = resolveHighlightsFragmentPath(highlights);
+  const fragment = fragmentPath ? await loadFragment(fragmentPath) : null;
   if (fragment) {
-    lifestyleCarousel.replaceChildren(...fragment.childNodes);
-    if (lifestyleSection) lifestyleSection.hidden = false;
-  } else if (lifestyleSection) {
+    lifestyleSection.replaceChildren(...fragment.childNodes);
+    lifestyleSection.hidden = false;
+  } else {
     lifestyleSection.hidden = true;
   }
 }
@@ -30,13 +36,28 @@ function buildWidgetHref(highlights) {
   return `${base}?${params.toString()}`;
 }
 
-function readConfigFromSearch() {
+function readHighlightsValue(widget) {
   const params = new URLSearchParams(window.location.search);
-  return params.get('highlights') || '';
+  return (
+    params.get('highlights')
+    || params.get('highlight')
+    || widget?.dataset?.highlights
+    || ''
+  ).trim();
+}
+
+function syncHighlightsToUrl(highlights) {
+  const params = new URLSearchParams(window.location.search);
+  params.delete('highlight');
+  if (highlights) params.set('highlights', highlights);
+  else params.delete('highlights');
+  const qs = params.toString();
+  const nextUrl = `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash || ''}`;
+  window.history.replaceState(null, '', nextUrl);
 }
 
 function buildConfigPanel(widget) {
-  const initial = readConfigFromSearch();
+  const initial = readHighlightsValue(widget);
   const panel = document.createElement('div');
   panel.className = 'product-list-config';
 
@@ -50,7 +71,7 @@ function buildConfigPanel(widget) {
   const input = document.createElement('input');
   input.type = 'text';
   input.name = 'highlights';
-  input.placeholder = 'product-list-fragment';
+  input.placeholder = 'plp-fragment or /drafts/.../fragment';
   input.value = initial;
   item.append(text, input);
   controls.append(item);
@@ -65,21 +86,15 @@ function buildConfigPanel(widget) {
   actions.append(copyButton);
   panel.append(controls, actions);
 
-  let widgetHref = '';
+  let widgetHref = buildWidgetHref(initial);
 
   const update = async () => {
     const highlights = input.value.trim();
     widgetHref = buildWidgetHref(highlights);
-
-    const search = new URLSearchParams(window.location.search);
-    if (highlights) search.set('highlights', highlights);
-    else search.delete('highlights');
-    const qs = search.toString();
-    const nextUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
-    window.history.replaceState(null, '', nextUrl);
-
-    widget.dataset.highlights = highlights;
-    await updateHighlightsCarousel(widget, highlights);
+    syncHighlightsToUrl(highlights);
+    if (highlights) widget.dataset.highlights = highlights;
+    else delete widget.dataset.highlights;
+    await updateHighlightsSection(widget, highlights);
   };
 
   input.addEventListener('input', () => { update(); });
@@ -95,24 +110,27 @@ function buildConfigPanel(widget) {
     }
   });
 
-  return { panel, update };
+  return { panel, input, update };
 }
 
 /**
- * Decorates the product-list widget config UI: runs the real widget decoration
- * (filters, product grid, highlights carousel — everything), then overlays
- * a config bar letting an author pick which fragment renders in the
- * "Shop by lifestyle" highlights carousel, with a live preview.
- * The config bar is attached directly to `document.body`, outside the
- * widget subtree, so it survives regardless of what the widget does to
- * its own DOM.
+ * Overlays the product-list config bar on an already-decorated widget
+ * (loaded via the widget block during loadPage).
  * @param {HTMLElement} widget
  */
 export default async function decorateConfig(widget) {
   widget.classList.add('product-list-config-mode');
-  await decorate(widget);
 
-  const { panel, update } = buildConfigPanel(widget);
+  const highlights = readHighlightsValue(widget);
+  if (highlights) {
+    widget.dataset.highlights = highlights;
+  }
+
+  const { panel, input } = buildConfigPanel(widget);
   document.body.prepend(panel);
-  await update();
+  if (!input.value.trim() && highlights) {
+    input.value = highlights;
+  }
+
+  await updateHighlightsSection(widget, highlights || input.value.trim());
 }

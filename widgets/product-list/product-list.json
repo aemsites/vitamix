@@ -1,7 +1,5 @@
 {
   "en": {
-    "shopByLifestyle": "Shop by Lifestyle",
-    "blenderRecommender": "Still need help choosing? Try our Blender Recommender",
     "filters": "Filters",
     "filter": "Filter",
     "sort": "Sort",
@@ -45,8 +43,6 @@
     "results": "results"
   },
   "fr": {
-    "shopByLifestyle": "Magasiner par style de vie",
-    "blenderRecommender": "Besoin d'aide pour choisir? Essayez notre recommandeur de mélangeurs",
     "filters": "Filtres",
     "filter": "Filtrer",
     "sort": "Trier",
@@ -90,8 +86,6 @@
     "results": "résultats"
   },
   "es": {
-    "shopByLifestyle": "Comprar por estilo de vida",
-    "blenderRecommender": "¿Necesita ayuda para elegir? Pruebe nuestro recomendador de licuadoras",
     "filters": "Filtros",
     "filter": "Filtrar",
     "sort": "Ordenar",
