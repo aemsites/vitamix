@@ -1,5 +1,8 @@
 import { loadFragment } from '../../blocks/fragment/fragment.js';
-import { getWidgetLocaleAndLanguage } from './products.js';
+import {
+  getWidgetLocaleAndLanguage,
+  loadAllProductTypes,
+} from './products.js';
 
 function resolveHighlightsFragmentPath(highlights) {
   const value = (highlights || '').trim();
@@ -28,10 +31,13 @@ async function updateHighlightsSection(widget, highlights) {
   }
 }
 
-/** Reads highlights from the config page URL only. */
 function readHighlightsFromUrl() {
   const params = new URLSearchParams(window.location.search);
   return (params.get('highlights') || params.get('highlight') || '').trim();
+}
+
+function readProductTypeFromUrl() {
+  return new URLSearchParams(window.location.search).get('productType') || '';
 }
 
 function syncHighlightsToUrl(highlights) {
@@ -44,10 +50,24 @@ function syncHighlightsToUrl(highlights) {
   window.history.replaceState(null, '', nextUrl);
 }
 
+function syncProductTypeToUrl(productType) {
+  const params = new URLSearchParams(window.location.search);
+  if (productType) params.set('productType', productType);
+  else params.delete('productType');
+  const qs = params.toString();
+  const nextUrl = `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash || ''}`;
+  window.history.replaceState(null, '', nextUrl);
+}
+
 function syncHighlightsToWidget(widget, highlights) {
   if (highlights) widget.dataset.highlights = highlights;
   else delete widget.dataset.highlights;
   delete widget.dataset.highlight;
+}
+
+function syncProductTypeToWidget(widget, productType) {
+  if (productType) widget.dataset.productType = productType;
+  else delete widget.dataset.productType;
 }
 
 function syncPreviewLink() {
@@ -62,25 +82,61 @@ function buildWidgetHref() {
   return `${base}${window.location.search}`;
 }
 
-function buildConfigPanel(widget) {
-  const initial = readHighlightsFromUrl();
+function buildSelectControl(label, name, options, value) {
+  const item = document.createElement('label');
+  item.className = 'product-list-config-item';
+  const text = document.createElement('span');
+  text.textContent = label;
+  const select = document.createElement('select');
+  select.name = name;
+  const empty = document.createElement('option');
+  empty.value = '';
+  empty.textContent = 'All';
+  select.append(empty);
+  options.forEach((optionValue) => {
+    const option = document.createElement('option');
+    option.value = optionValue;
+    option.textContent = optionValue;
+    option.selected = optionValue === value;
+    select.append(option);
+  });
+  if (value && !options.includes(value)) {
+    const custom = document.createElement('option');
+    custom.value = value;
+    custom.textContent = value;
+    custom.selected = true;
+    select.append(custom);
+  }
+  item.append(text, select);
+  return { item, select };
+}
+
+function buildConfigPanel(widget, productTypes, initialHighlights, initialProductType) {
   const panel = document.createElement('div');
   panel.className = 'product-list-config';
 
   const controls = document.createElement('div');
   controls.className = 'product-list-config-controls';
 
-  const item = document.createElement('label');
-  item.className = 'product-list-config-item';
-  const text = document.createElement('span');
-  text.textContent = 'Highlights fragment';
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.name = 'highlights';
-  input.placeholder = 'plp-fragment or /drafts/.../fragment';
-  input.value = initial;
-  item.append(text, input);
-  controls.append(item);
+  const highlightsItem = document.createElement('label');
+  highlightsItem.className = 'product-list-config-item';
+  const highlightsLabel = document.createElement('span');
+  highlightsLabel.textContent = 'Highlights fragment';
+  const highlightsInput = document.createElement('input');
+  highlightsInput.type = 'text';
+  highlightsInput.name = 'highlights';
+  highlightsInput.placeholder = 'plp-fragment or /drafts/.../fragment';
+  highlightsInput.value = initialHighlights;
+  highlightsItem.append(highlightsLabel, highlightsInput);
+
+  const { item: productTypeItem, select: productTypeSelect } = buildSelectControl(
+    'Product type',
+    'productType',
+    productTypes,
+    initialProductType,
+  );
+
+  controls.append(highlightsItem, productTypeItem);
 
   const actions = document.createElement('div');
   actions.className = 'product-list-config-actions';
@@ -93,14 +149,19 @@ function buildConfigPanel(widget) {
   panel.append(controls, actions);
 
   const update = async () => {
-    const highlights = input.value.trim();
+    const highlights = highlightsInput.value.trim();
+    const productType = productTypeSelect.value;
     syncHighlightsToUrl(highlights);
+    syncProductTypeToUrl(productType);
     syncHighlightsToWidget(widget, highlights);
+    syncProductTypeToWidget(widget, productType);
     syncPreviewLink();
     await updateHighlightsSection(widget, highlights);
+    await widget.productListApplyDatasetDefaults?.();
   };
 
-  input.addEventListener('input', () => { update(); });
+  highlightsInput.addEventListener('input', () => { update(); });
+  productTypeSelect.addEventListener('change', () => { update(); });
 
   copyButton.addEventListener('click', async () => {
     const widgetHref = buildWidgetHref();
@@ -114,7 +175,9 @@ function buildConfigPanel(widget) {
     }
   });
 
-  return { panel, input, update };
+  return {
+    panel, highlightsInput, productTypeSelect, update,
+  };
 }
 
 /**
@@ -130,15 +193,32 @@ export default async function decorateConfig(widget) {
     highlights = widget.dataset.highlights.trim();
     syncHighlightsToUrl(highlights);
   }
-  syncHighlightsToWidget(widget, highlights);
-  syncPreviewLink();
 
-  const { panel, input } = buildConfigPanel(widget);
-  document.body.prepend(panel);
-
-  if (highlights && !input.value.trim()) {
-    input.value = highlights;
+  let productType = readProductTypeFromUrl();
+  if (!productType && widget.dataset.productType) {
+    productType = widget.dataset.productType.trim();
+    syncProductTypeToUrl(productType);
   }
 
-  await updateHighlightsSection(widget, highlights);
+  syncHighlightsToWidget(widget, highlights);
+  syncProductTypeToWidget(widget, productType);
+  syncPreviewLink();
+
+  const productTypes = await loadAllProductTypes();
+  const { panel, highlightsInput, productTypeSelect, update } = buildConfigPanel(
+    widget,
+    productTypes,
+    highlights,
+    productType,
+  );
+  document.body.prepend(panel);
+
+  if (highlights && !highlightsInput.value.trim()) {
+    highlightsInput.value = highlights;
+  }
+  if (productType && productTypeSelect.value !== productType) {
+    productTypeSelect.value = productType;
+  }
+
+  await update();
 }

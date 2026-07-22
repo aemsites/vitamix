@@ -169,3 +169,13 @@ export default async function lookupProductListProducts(config = {}, facets = {}
     return matchedAll;
   });
 }
+
+/**
+ * Loads all distinct productType facet values from the product index.
+ * @returns {Promise<string[]>}
+ */
+export async function loadAllProductTypes() {
+  const facets = { productType: {} };
+  await lookupProductListProducts({}, facets);
+  return Object.keys(facets.productType || {}).sort((a, b) => a.localeCompare(b));
+}

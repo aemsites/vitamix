@@ -1,6 +1,6 @@
 /* eslint-disable max-len */
 import {
-  fetchPlaceholders, loadCSS, loadScript, toClassName, toCamelCase,
+  fetchPlaceholders, loadCSS, loadScript, toClassName,
 } from '../../scripts/aem.js';
 import { formatPrice } from '../../scripts/scripts.js';
 import { loadFragment } from '../../blocks/fragment/fragment.js';
@@ -11,6 +11,8 @@ const MAX_COMPARE = 4;
 const HIDDEN_CATEGORIES = ['Products', 'Commercial', 'Shop'];
 
 const FACET_KEYS = ['series', 'collection', 'colors', 'productType', 'categories'];
+const LIFESTYLE_TILE_SELECTOR = '.block > div, .block > ul > li';
+const LIFESTYLE_TILE_SELECTED_SELECTOR = '.block > div.selected, .block > ul > li.selected';
 const FILTER_PARAM_KEYS = [...FACET_KEYS, 'fulltext'];
 
 const DRAWER_FACET_GROUPS = [
@@ -427,27 +429,54 @@ function syncFilterConfigToUrl(filterConfig, widget) {
   window.history.replaceState(null, '', url);
 }
 
-function wireLifestyleCards(widget, runSearch, getFilterConfig, setFilterConfig) {
-  const cards = widget.querySelectorAll('.product-list-lifestyle-card');
-  cards.forEach((card) => {
-    card.addEventListener('click', () => {
-      const next = { ...getFilterConfig() };
-      cards.forEach((c) => c.classList.remove('selected'));
-      card.classList.add('selected');
+function findFacetMatchForLabel(label, facets) {
+  const normalized = label.trim().toLowerCase();
+  if (!normalized) return null;
+  for (let i = 0; i < FACET_KEYS.length; i += 1) {
+    const key = FACET_KEYS[i];
+    const match = Object.keys(facets[key] || {}).find(
+      (value) => value.trim().toLowerCase() === normalized,
+    );
+    if (match) return { key, value: match };
+  }
+  return null;
+}
 
-      Object.keys(next).forEach((key) => {
-        if (FACET_KEYS.includes(key)) delete next[key];
-      });
+function clearLifestyleFragmentSelection(widget) {
+  const section = widget.querySelector('.product-list-lifestyle');
+  if (!section) return;
+  section.querySelectorAll(LIFESTYLE_TILE_SELECTED_SELECTOR).forEach((el) => {
+    el.classList.remove('selected');
+  });
+}
 
-      [...card.attributes].forEach((attr) => {
-        if (!attr.name.startsWith('data-filter-')) return;
-        const facetKey = toCamelCase(attr.name.replace('data-filter-', ''));
-        next[facetKey] = attr.value;
-      });
+function applyFacetFilter(match, widget, runSearch, setFilterConfig, setDrawerInputsFromConfig, tile) {
+  const next = { ...widget.productListBaseConfig };
+  next[match.key] = match.value;
+  clearLifestyleFragmentSelection(widget);
+  if (tile) tile.classList.add('selected');
+  setFilterConfig(next);
+  setDrawerInputsFromConfig(widget, next);
+  runSearch(next);
+}
 
-      setFilterConfig(next);
-      runSearch(next);
-    });
+function wireLifestyleFragment(widget, runSearch, setFilterConfig, setDrawerInputsFromConfig, getAllFacets) {
+  const section = widget.querySelector('.product-list-lifestyle');
+  if (!section || section.dataset.lifestyleWired === 'true') return;
+  section.dataset.lifestyleWired = 'true';
+
+  section.addEventListener('click', (e) => {
+    const tile = e.target.closest(LIFESTYLE_TILE_SELECTOR);
+    if (!tile || !section.contains(tile)) return;
+
+    const heading = tile.querySelector('h1, h2, h3, h4, h5, h6');
+    if (!heading) return;
+
+    const match = findFacetMatchForLabel(heading.textContent, getAllFacets());
+    if (!match) return;
+
+    e.preventDefault();
+    applyFacetFilter(match, widget, runSearch, setFilterConfig, setDrawerInputsFromConfig, tile);
   });
 }
 
@@ -694,6 +723,7 @@ export default async function decorate(widget) {
   runSearch = async (filterConfig = getFilterConfig()) => {
     const facets = FACET_KEYS.reduce((acc, key) => ({ ...acc, [key]: {} }), {});
     const results = await lookupProductListProducts(filterConfig, facets);
+    widget.productListLastFacets = facets;
     const sortKey = sortByEl.dataset.sort || 'featured';
     const sorts = {
       name: (a, b) => a.title.localeCompare(b.title),
@@ -744,10 +774,30 @@ export default async function decorate(widget) {
   clearAllBtn.addEventListener('click', () => {
     setFilterConfig({ ...widget.productListBaseConfig });
     setDrawerInputsFromConfig(widget, widget.productListBaseConfig);
-    widget.querySelectorAll('.product-list-lifestyle-card').forEach((c) => c.classList.remove('selected'));
+    clearLifestyleFragmentSelection(widget);
     runSearch(widget.productListBaseConfig);
   });
 
-  wireLifestyleCards(widget, runSearch, getFilterConfig, setFilterConfig);
+  const allFacets = FACET_KEYS.reduce((acc, key) => ({ ...acc, [key]: {} }), {});
+  await lookupProductListProducts({}, allFacets);
+  widget.productListAllFacets = allFacets;
+
+  wireLifestyleFragment(
+    widget,
+    runSearch,
+    setFilterConfig,
+    setDrawerInputsFromConfig,
+    () => widget.productListAllFacets || {},
+  );
+
+  widget.productListApplyDatasetDefaults = async () => {
+    const base = buildInitialConfig(widget);
+    widget.productListBaseConfig = { ...base };
+    widget.productListFilterConfig = { ...base };
+    setDrawerInputsFromConfig(widget, base);
+    clearLifestyleFragmentSelection(widget);
+    await runSearch(base);
+  };
+
   await runSearch(getFilterConfig());
 }

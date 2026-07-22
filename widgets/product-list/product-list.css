@@ -96,6 +96,17 @@
   font-size: var(--body-size-s, 0.875rem);
 }
 
+.product-list-widget .product-list-lifestyle .block > div,
+.product-list-widget .product-list-lifestyle .block > ul > li {
+  cursor: pointer;
+}
+
+.product-list-widget .product-list-lifestyle .block > div.selected,
+.product-list-widget .product-list-lifestyle .block > ul > li.selected {
+  outline: 2px solid var(--color-charcoal);
+  outline-offset: 2px;
+}
+
 .product-list-widget .product-list-lifestyle-carousel nav {
   display: none;
 }

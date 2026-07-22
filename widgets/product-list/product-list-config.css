@@ -40,7 +40,8 @@
   font-size: 0.8125rem;
 }
 
-.product-list-config-item input {
+.product-list-config-item input,
+.product-list-config-item select {
   min-height: 1.75rem;
   width: 14rem;
   padding: 0.25rem 0.625rem;
@@ -50,6 +51,14 @@
   color: #fff;
   font: inherit;
   font-size: 0.8125rem;
+}
+
+.product-list-config-item select {
+  cursor: pointer;
+}
+
+.product-list-config-item select option {
+  color: #323232;
 }
 
 .product-list-config-item input::placeholder {
