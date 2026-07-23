@@ -198,7 +198,7 @@ export function resetFormStartState() {
 
 /** Adobe Analytics numbered success event fired when Place Order is clicked. */
 export const PLACE_ORDER_CLICK_EVENT = 'event46';
-export const PLACE_ORDER_FORM_START  = 'formStart';
+export const PLACE_ORDER_FORM_START = 'formStart';
 
 /**
  * Fire the payment-event46 success event when the Place Order button is clicked.
