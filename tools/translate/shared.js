@@ -396,7 +396,89 @@ const postProcess = (text, context, format) => {
   return html.documentElement.outerHTML.replace(/^<html><head><\/head><body>/, '').replace(/<\/body><\/html>$/, '');
 };
 
-const translate = async (htmlInput, language, context, format, daFetch, skipPreprocess = false) => {
+const CANONICALIZE_BLOCK_SELECTOR = 'p, h1, h2, h3, h4, h5, h6, li, blockquote, td, th, div';
+
+// Only these get entity-encoded on save (matches da-collab's da-parser tohtml());
+// every other attribute (href, src, srcset, ...) is emitted completely raw.
+const CANONICALIZE_TEXT_ATTRS = new Set(['alt', 'title']);
+
+/** Trims whitespace at the start/end of a block element's inline content. */
+function trimBlockEdges(root) {
+  root.querySelectorAll(CANONICALIZE_BLOCK_SELECTOR).forEach((block) => {
+    let first = block.firstChild;
+    while (first && first.nodeType !== Node.TEXT_NODE) first = first.firstChild;
+    if (first) first.nodeValue = first.nodeValue.replace(/^\s+/, '');
+
+    let last = block.lastChild;
+    while (last && last.nodeType !== Node.TEXT_NODE) last = last.lastChild;
+    if (last) last.nodeValue = last.nodeValue.replace(/\s+$/, '');
+  });
+}
+
+/** Collapses nbsp (entity or literal U+00A0) down to a plain space. */
+const NBSP = String.fromCharCode(160);
+function normalizeNbsp(root) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (node.nodeValue.includes(NBSP)) {
+      node.nodeValue = node.nodeValue.split(NBSP).join(' ');
+    }
+  }
+}
+
+/**
+ * DOMParser/outerHTML always entity-encodes `&` in every attribute value; the
+ * editor's own serializer only does that (plus `'`/`"`) for alt/title, and
+ * leaves every other attribute (href, src, srcset, ...) completely raw.
+ */
+function reencodeAttributes(html) {
+  return html.replace(/(\s)([a-zA-Z0-9:-]+)="([^"]*)"/g, (match, ws, name, value) => {
+    if (CANONICALIZE_TEXT_ATTRS.has(name)) {
+      const encoded = value
+        .replace(/&amp;/g, '&#x26;')
+        .replace(/&quot;/g, '&#x22;')
+        .replace(/'/g, '&#x27;');
+      return `${ws}${name}="${encoded}"`;
+    }
+    return `${ws}${name}="${value.replace(/&amp;/g, '&')}"`;
+  });
+}
+
+/**
+ * Matches the formatting the DA Live editor's own save produces — verified
+ * byte-for-byte against a real editor open+save round-trip — via plain
+ * DOM/string handling. Without this, saving HTML built here differs just
+ * enough from the editor's own output that simply opening the page
+ * afterward re-saves it and registers as a spurious modification.
+ *
+ * The stored file is always `<body>\n  <header>...</header>\n  <main>...</main>\n
+ * <footer>...</footer>\n</body>` (2-space indent, no leading/trailing newline
+ * outside the tag) — not just the flattened header/main/footer postProcess
+ * returns, so the body wrapper is rebuilt explicitly here rather than stripped.
+ */
+const canonicalizeHtml = (html) => {
+  const doc = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html');
+  trimBlockEdges(doc.body);
+  normalizeNbsp(doc.body);
+
+  if (!doc.body.querySelector('main')) {
+    // Not a full page (e.g. a plugin.js text/table selection) — nothing to
+    // rebuild a body/header/main/footer wrapper around.
+    return reencodeAttributes(doc.body.innerHTML);
+  }
+
+  const sectionHtml = (tag) => reencodeAttributes(doc.body.querySelector(tag)?.innerHTML || '');
+  return `\n<body>\n  <header>${sectionHtml('header')}</header>\n  <main>${sectionHtml('main')}</main>\n  <footer>${sectionHtml('footer')}</footer>\n</body>\n`;
+};
+
+const translate = async (
+  htmlInput,
+  language,
+  context,
+  format,
+  daFetch,
+  skipPreprocess = false,
+) => {
   let html = htmlInput;
   if (!skipPreprocess) {
     html = await preprocess(html, format, context, daFetch);
@@ -441,7 +523,7 @@ const translate = async (htmlInput, language, context, format, daFetch, skipPrep
 
   const translatedParts = await Promise.all(splits.map((split) => translateSplit(split)));
   const combined = translatedParts.join('');
-  return postProcess(combined, context, format);
+  return canonicalizeHtml(postProcess(combined, context, format));
 };
 
 function localeKey(prefix) {
@@ -565,9 +647,10 @@ const rolloutToLocale = async ({
   if (targetTranslateCode === sourceTranslateCode) {
     const doc = new DOMParser().parseFromString(sourceHtml, 'text/html');
     const adjusted = adjustURLs(doc, targetContext);
-    translatedHtml = adjusted.documentElement.outerHTML
+    const adjustedHtml = adjusted.documentElement.outerHTML
       .replace(/^<html><head><\/head><body>/, '')
       .replace(/<\/body><\/html>$/, '');
+    translatedHtml = canonicalizeHtml(adjustedHtml);
   } else {
     translatedHtml = await translate(
       sourceHtml,
@@ -575,6 +658,7 @@ const rolloutToLocale = async ({
       targetContext,
       undefined,
       daFetch,
+      false,
     );
   }
 
