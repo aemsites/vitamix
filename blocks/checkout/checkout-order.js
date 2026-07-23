@@ -266,6 +266,7 @@ export function initOrder(form, cart, state, config, strings) {
     submitBtn.addEventListener('click', async (e) => {
       e.preventDefault();
       clearError(form);
+      document.dispatchEvent(new CustomEvent('checkout:place-order-clicked'));
 
       if (!validateForm(form)) return;
 

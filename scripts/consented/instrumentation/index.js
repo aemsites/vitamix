@@ -46,11 +46,7 @@ export function bootstrapEarlyTracking() {
 let checkoutShippingTrackingRequested = false;
 
 /**
- * Register checkout address-validation listeners — on the checkout page only.
- * Checkout formStart events fire in-page (no cross-page redirect), so checkout.js
- * is loaded lazily here instead of shipping in the base bundle for every page.
- * The dynamic import resolves long before a user fills and validates an address,
- * so the early-listener guarantee is preserved on the page that needs it.
+ * Register checkout address-validation and Place Order click listeners.
  * @returns {void}
  */
 export function trackCheckoutShipping() {
@@ -58,7 +54,10 @@ export function trackCheckoutShipping() {
     return;
   }
   checkoutShippingTrackingRequested = true;
-  import('./checkout.js').then((m) => m.trackCheckoutShipping());
+  import('./checkout.js').then((m) => {
+    m.trackCheckoutShipping();
+    m.trackPlaceOrderClick();
+  });
 }
 
 let instrumentationInitialized = false;

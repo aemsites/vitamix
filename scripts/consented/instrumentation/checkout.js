@@ -12,8 +12,10 @@ import {
 } from './shared.js';
 import {
   assignDigitalDataPageInfo,
+  configureAnalyticsTrackingServers,
   flushLaunchTrackers,
   pushCartCheckoutEvent,
+  sendCustomLinkBeacon,
   triggerLaunchEvent,
   whenSatelliteReady,
 } from './adobe-runtime.js';
@@ -192,4 +194,51 @@ export function trackCheckoutShipping() {
 export function resetFormStartState() {
   formStartFiredFor = new Set();
   checkoutShippingTrackingInstalled = false;
+}
+
+/** Adobe Analytics numbered success event fired when Place Order is clicked. */
+export const PLACE_ORDER_CLICK_EVENT = 'event46';
+export const PLACE_ORDER_FORM_START  = 'formStart';
+
+/**
+ * Fire the payment-event46 success event when the Place Order button is clicked.
+ * Uses a synchronous AppMeasurement link-tracking beacon
+ * rather than a Launch direct-call rule, so the
+ * click is counted even if it leads straight into a payment-provider redirect.
+ * @returns {void}
+ */
+export function firePlaceOrderClick() {
+  if (!hasMarketingConsent()) {
+    return;
+  }
+
+  configureAnalyticsTrackingServers();
+  sendCustomLinkBeacon(PLACE_ORDER_CLICK_EVENT);
+  sendCustomLinkBeacon(PLACE_ORDER_FORM_START);
+  debugLog(`Adobe Analytics ${PLACE_ORDER_CLICK_EVENT} fired (place order click)`);
+}
+
+/**
+ * Handle checkout:place-order-clicked.
+ * @returns {void}
+ */
+export function handlePlaceOrderClicked() {
+  firePlaceOrderClick();
+}
+
+let placeOrderClickTrackingInstalled = false;
+
+/**
+ * Listen for Place Order button clicks (register early in consented.js).
+ * @returns {void}
+ */
+export function trackPlaceOrderClick() {
+  if (placeOrderClickTrackingInstalled) {
+    return;
+  }
+  placeOrderClickTrackingInstalled = true;
+
+  document.addEventListener('checkout:place-order-clicked', () => {
+    handlePlaceOrderClicked();
+  });
 }
