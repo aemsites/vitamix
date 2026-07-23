@@ -441,6 +441,18 @@ export default async function decorate(block) {
 
   block.replaceChildren(container);
 
+  const analyticsContext = {
+    orderId,
+    order,
+    preview: cacheMatches ? preview : null,
+    cartItems: cacheMatches ? cartItems : null,
+    displayItems,
+    couponCode: sessionStorage.getItem('checkout_coupon_code') || '',
+  };
+  window.vitamixEdsAnalytics = window.vitamixEdsAnalytics || {};
+  window.vitamixEdsAnalytics.orderConfirmedContext = analyticsContext;
+  document.dispatchEvent(new CustomEvent('order:confirmed', { detail: analyticsContext }));
+
   logOperation('checkout-complete', {
     checkoutId: getCheckoutId(),
     orderId,

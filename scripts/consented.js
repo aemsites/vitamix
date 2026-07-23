@@ -5,9 +5,21 @@ import {
   ensureAnalyticsTrackingConfigured,
   getDeploymentEnv,
   initInstrumentation,
-} from './consented/instrumentation.js';
+  bootstrapEarlyTracking,
+  trackCartChange,
+  trackCheckoutShipping,
+  trackLogin,
+} from './consented/instrumentation/index.js';
+
+bootstrapEarlyTracking();
 
 document.body.classList.add('consented');
+// Register cart:change / analytics:cart-add listeners before Launch loads so edge
+// add-to-cart and Magento redirect paths are never missed. Idempotent — safe if
+// called again; initInstrumentation() intentionally does not re-register.
+trackCartChange();
+trackCheckoutShipping();
+trackLogin();
 
 // add delayed functionality here
 window.config = {
@@ -34,6 +46,7 @@ loadScript('https://www.vitamix.com/etc.clientlibs/core/wcm/components/commons/s
 
 await loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-library.lc-259cf15444c5fe1f89e5c54df7b6e1e9-lc.min.js');
 await loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-analytics.lc-26814920488a848ff91c1f425646d010-lc.min.js');
+// Patch AppMeasurement trackers (smetrics/ssl) as soon as clientlib-analytics loads.
 configureAnalyticsTrackingServers();
 loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-base.lc-daf5b8dac79e9cf7cb1c0b30d8372e7a-lc.min.js');
 
@@ -45,9 +58,11 @@ if (currentEnvironment.dataset.deploymentEnv === 'prod') {
   await loadScript('https://assets.adobedtm.com/8639b8ee2552/0f7a35c4f04b/launch-EN10955306e5aa4722aaabcdd1910448ad-development.min.js');
 }
 
+// Re-apply tracker config after Launch creates late AppMeasurement instances.
 configureAnalyticsTrackingServers();
 
-// PDP prodView via Launch direct call; Launch rule maps digitalData and sends the beacon.
+// Page events (prodView, scView, scCheckout, purchase)
+// and Target orderConfirmPage after Launch is available.
 initInstrumentation();
 ensureAnalyticsTrackingConfigured();
 

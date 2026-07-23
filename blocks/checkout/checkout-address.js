@@ -1204,6 +1204,9 @@ export function initAddress(form, state, config, strings) {
         (value) => { state.shippingAddressIsValidated = value; },
       );
       state.shippingAddressValidated = isValid;
+      if (isValid) {
+        document.dispatchEvent(new CustomEvent('checkout:shipping-address-validated'));
+      }
       return isValid;
     },
     validateBillingAndCollapse: async (collapse) => {
@@ -1223,6 +1226,9 @@ export function initAddress(form, state, config, strings) {
         (value) => { state.billingAddressIsValidated = value; },
       );
       state.billingAddressValidated = isValid;
+      if (isValid) {
+        document.dispatchEvent(new CustomEvent('checkout:billing-address-validated'));
+      }
       return isValid;
     },
   };
