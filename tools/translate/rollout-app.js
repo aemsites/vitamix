@@ -86,7 +86,7 @@ function resolveResourcePath(urlStr, context) {
 
   loadFromFolderLink.addEventListener('click', (e) => {
     e.preventDefault();
-    folderInput.value = `https://da.live/#/${context.org}/${context.repo}/us/en_us`;
+    folderInput.value = `https://da.live/#/${context.org}/${context.repo}/en/en-us`;
 
     loaderRow.classList.toggle('open');
   });
@@ -281,8 +281,10 @@ function resolveResourcePath(urlStr, context) {
 
     const previewTitle = previewDate ? `Previewed ${previewDate}` : 'Not previewed';
     const publishTitle = publishDate ? `Published ${publishDate}` : 'Not published';
+    const editUrl = `https://da.live/edit#/${context.org}/${context.repo}${targetPagePath}`;
     const previewUrl = `https://main--${context.repo}--${context.org}.aem.page${targetPagePath}`;
     const liveUrl = `https://main--${context.repo}--${context.org}.aem.live${targetPagePath}`;
+    container.appendChild(buildStatusIcon(EDIT_ICON_SVG, true, 'Edit', editUrl));
     container.appendChild(
       buildStatusIcon(PREVIEW_ICON_SVG, !!previewDate, previewTitle, previewUrl),
     );

@@ -366,6 +366,11 @@ button:hover:not(:disabled) {
   cursor: pointer;
 }
 
+.rollout-status-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
 .rollout-status-icon:hover {
   color: var(--text);
 }
