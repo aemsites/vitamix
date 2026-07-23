@@ -1,0 +1,445 @@
+@import url('./shared.css');
+
+body {
+  align-items: flex-start;
+}
+
+.app-container {
+  width: 100%;
+  max-width: 1200px;
+}
+
+.app-form {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 16px;
+}
+
+.app-input {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr;
+  align-items: start;
+}
+
+.rollout-checkbox {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.rollout-checkbox input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.rollout-checkbox-box {
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.rollout-checkbox-box::after {
+  content: "";
+  width: 5px;
+  height: 10px;
+  margin-top: -2px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) scale(0);
+  transition: transform 0.15s ease;
+}
+
+.rollout-checkbox input:checked + .rollout-checkbox-box {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.rollout-checkbox input:checked + .rollout-checkbox-box::after {
+  transform: rotate(45deg) scale(1);
+}
+
+.rollout-checkbox input:hover + .rollout-checkbox-box {
+  border-color: var(--primary);
+}
+
+.rollout-checkbox input:focus-visible + .rollout-checkbox-box {
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+.rollout-checkbox input:disabled {
+  cursor: not-allowed;
+}
+
+.rollout-checkbox input:disabled + .rollout-checkbox-box {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.rollout-checkbox:has(input:disabled) {
+  cursor: not-allowed;
+}
+
+.app-input-loader {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s ease-out;
+  overflow: hidden;
+}
+
+.app-input-loader.open {
+  grid-template-rows: 1fr;
+}
+
+.app-input-loader-content {
+  min-height: 0;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding-bottom: 0;
+  transition: padding-bottom 0.3s ease-out;
+  flex-wrap: wrap;
+}
+
+.app-input-loader.open .app-input-loader-content {
+  padding-bottom: 12px;
+}
+
+/* stylelint-disable-next-line no-descending-specificity -- unrelated component, shares only the bare "input" tag */
+.app-input-loader input {
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--text);
+  background: #fff;
+}
+
+.app-input-loader input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+textarea {
+  width: 100%;
+  min-height: 200px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text);
+  background: #fff;
+  box-shadow: none;
+}
+
+textarea:focus,
+button:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+button {
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.08s ease, box-shadow 0.2s ease, background 0.2s ease;
+  background: var(--primary);
+  color: #fff;
+  box-shadow: none;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button:hover:not(:disabled) {
+  background: var(--primary-dark);
+}
+
+.rollout-app-options:not([hidden]) {
+  display: flex;
+  gap: 16px;
+}
+
+.rollout-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.rollout-option input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.rollout-option input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.rollout-option:has(input:disabled) {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.rollout-status {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.rollout-status.loading,
+.rollout-status.saving,
+.rollout-status.previewing,
+.rollout-status.publishing {
+  color: #0052cc;
+  background: #deebff;
+}
+
+.rollout-status.done {
+  color: #064;
+  background: #e3fcef;
+}
+
+.rollout-status.error {
+  color: #bf2600;
+  background: #ffebe6;
+}
+
+.rollout-status svg {
+  vertical-align: middle;
+  margin-left: 4px;
+  width: 14px;
+  height: 14px;
+}
+
+.app-output {
+  display: grid;
+  gap: 12px;
+}
+
+.app-li-number {
+  font-weight: bold;
+  margin-right: 8px;
+  color: var(--muted);
+}
+
+.rollout-app-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.rollout-app-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.rollout-app-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  text-align: left;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.rollout-app-table tfoot tr {
+  border-top: 2px solid var(--border);
+  background: var(--bg);
+}
+
+.rollout-app-table tbody tr + tr {
+  border-top: 1px solid var(--border);
+}
+
+.rollout-app-table tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--bg) 50%, transparent);
+}
+
+.rollout-app-select-all-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.rollout-app-path-cell,
+.rollout-app-cell {
+  padding: 10px 14px;
+  vertical-align: middle;
+}
+
+.rollout-app-path-cell {
+  color: var(--text);
+  white-space: nowrap;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rollout-app-path-cell a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.rollout-app-path-cell a:hover {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.rollout-app-cell {
+  text-align: center;
+}
+
+.rollout-app-cell .rollout-status {
+  display: block;
+  margin-top: 6px;
+}
+
+.rollout-app-cell-source {
+  background: color-mix(in srgb, var(--primary) 6%, transparent);
+}
+
+.rollout-app-cell-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rollout-status-icons {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rollout-status-icon {
+  display: inline-flex;
+  color: var(--border);
+  cursor: pointer;
+}
+
+.rollout-status-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.rollout-status-icon:hover {
+  color: var(--text);
+}
+
+.rollout-status-icon.active {
+  color: var(--primary);
+}
+
+.rollout-status-icon.active:hover {
+  color: var(--primary-dark);
+}
+
+.rollout-status-icon-redirect {
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 3px 5px;
+  border-radius: 4px;
+  border: 1px solid var(--primary);
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.rollout-status-icon-redirect:hover {
+  background: var(--primary);
+  color: #fff;
+}
+
+.rollout-status-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: rollout-spin 0.7s linear infinite;
+}
+
+@keyframes rollout-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.app-error {
+  color: #c62828;
+  font-size: 13px;
+  min-height: 16px;
+  display: none;
+  margin-top: 4px;
+}
+
+.app-folder-loader-error {
+  color: #c62828;
+  font-size: 13px;
+  flex-basis: 100%;
+  margin-top: 4px;
+  display: none;
+}
+
+@media (width <= 720px) {
+  .app-form {
+    padding: 20px;
+  }
+
+  .app-input {
+    grid-template-columns: 1fr;
+  }
+
+  button {
+    width: 100%;
+  }
+}

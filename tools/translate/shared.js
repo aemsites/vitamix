@@ -11,7 +11,8 @@
  */
 
 import {
-  ADMIN_URL, TRANSLATION_SERVICE_URL, CONFIG_PATH, METADATA_FIELDS_TO_TRANSLATE, LOCALES,
+  ADMIN_URL, AEM_ADMIN_URL, TRANSLATION_SERVICE_URL, CONFIG_PATH,
+  METADATA_FIELDS_TO_TRANSLATE, LOCALES,
 } from './config.js';
 
 const CONFIG_CONTENT_DNT_SHEET = 'dnt-content-rules';
@@ -395,7 +396,89 @@ const postProcess = (text, context, format) => {
   return html.documentElement.outerHTML.replace(/^<html><head><\/head><body>/, '').replace(/<\/body><\/html>$/, '');
 };
 
-const translate = async (htmlInput, language, context, format, daFetch, skipPreprocess = false) => {
+const CANONICALIZE_BLOCK_SELECTOR = 'p, h1, h2, h3, h4, h5, h6, li, blockquote, td, th, div';
+
+// Only these get entity-encoded on save (matches da-collab's da-parser tohtml());
+// every other attribute (href, src, srcset, ...) is emitted completely raw.
+const CANONICALIZE_TEXT_ATTRS = new Set(['alt', 'title']);
+
+/** Trims whitespace at the start/end of a block element's inline content. */
+function trimBlockEdges(root) {
+  root.querySelectorAll(CANONICALIZE_BLOCK_SELECTOR).forEach((block) => {
+    let first = block.firstChild;
+    while (first && first.nodeType !== Node.TEXT_NODE) first = first.firstChild;
+    if (first) first.nodeValue = first.nodeValue.replace(/^\s+/, '');
+
+    let last = block.lastChild;
+    while (last && last.nodeType !== Node.TEXT_NODE) last = last.lastChild;
+    if (last) last.nodeValue = last.nodeValue.replace(/\s+$/, '');
+  });
+}
+
+/** Collapses nbsp (entity or literal U+00A0) down to a plain space. */
+const NBSP = String.fromCharCode(160);
+function normalizeNbsp(root) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (node.nodeValue.includes(NBSP)) {
+      node.nodeValue = node.nodeValue.split(NBSP).join(' ');
+    }
+  }
+}
+
+/**
+ * DOMParser/outerHTML always entity-encodes `&` in every attribute value; the
+ * editor's own serializer only does that (plus `'`/`"`) for alt/title, and
+ * leaves every other attribute (href, src, srcset, ...) completely raw.
+ */
+function reencodeAttributes(html) {
+  return html.replace(/(\s)([a-zA-Z0-9:-]+)="([^"]*)"/g, (match, ws, name, value) => {
+    if (CANONICALIZE_TEXT_ATTRS.has(name)) {
+      const encoded = value
+        .replace(/&amp;/g, '&#x26;')
+        .replace(/&quot;/g, '&#x22;')
+        .replace(/'/g, '&#x27;');
+      return `${ws}${name}="${encoded}"`;
+    }
+    return `${ws}${name}="${value.replace(/&amp;/g, '&')}"`;
+  });
+}
+
+/**
+ * Matches the formatting the DA Live editor's own save produces — verified
+ * byte-for-byte against a real editor open+save round-trip — via plain
+ * DOM/string handling. Without this, saving HTML built here differs just
+ * enough from the editor's own output that simply opening the page
+ * afterward re-saves it and registers as a spurious modification.
+ *
+ * The stored file is always `<body>\n  <header>...</header>\n  <main>...</main>\n
+ * <footer>...</footer>\n</body>` (2-space indent, no leading/trailing newline
+ * outside the tag) — not just the flattened header/main/footer postProcess
+ * returns, so the body wrapper is rebuilt explicitly here rather than stripped.
+ */
+const canonicalizeHtml = (html) => {
+  const doc = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html');
+  trimBlockEdges(doc.body);
+  normalizeNbsp(doc.body);
+
+  if (!doc.body.querySelector('main')) {
+    // Not a full page (e.g. a plugin.js text/table selection) — nothing to
+    // rebuild a body/header/main/footer wrapper around.
+    return reencodeAttributes(doc.body.innerHTML);
+  }
+
+  const sectionHtml = (tag) => reencodeAttributes(doc.body.querySelector(tag)?.innerHTML || '');
+  return `\n<body>\n  <header>${sectionHtml('header')}</header>\n  <main>${sectionHtml('main')}</main>\n  <footer>${sectionHtml('footer')}</footer>\n</body>\n`;
+};
+
+const translate = async (
+  htmlInput,
+  language,
+  context,
+  format,
+  daFetch,
+  skipPreprocess = false,
+) => {
   let html = htmlInput;
   if (!skipPreprocess) {
     html = await preprocess(html, format, context, daFetch);
@@ -440,9 +523,180 @@ const translate = async (htmlInput, language, context, format, daFetch, skipPrep
 
   const translatedParts = await Promise.all(splits.map((split) => translateSplit(split)));
   const combined = translatedParts.join('');
-  return postProcess(combined, context, format);
+  return canonicalizeHtml(postProcess(combined, context, format));
+};
+
+function localeKey(prefix) {
+  return prefix.replace(/^\//, '').replace(/\//g, '-');
+}
+
+function parsePath(path) {
+  const normalized = path.startsWith('/') ? path : `/${path}`;
+  const matched = LOCALES.find(({ prefix }) => normalized === prefix || normalized.startsWith(`${prefix}/`));
+  if (!matched) return null;
+  const { prefix } = matched;
+  const pagePath = normalized.slice(prefix.length) || '';
+  return { prefix, pagePath, repoPath: `${prefix}${pagePath}` };
+}
+
+const withHtmlExt = (path) => (path.endsWith('.html') ? path : `${path}.html`);
+
+/** Existence + last-modified (from the HEAD response) of a page's DA source. */
+const sourceStatus = async (targetPagePath, context, daFetch) => {
+  const url = `${ADMIN_URL}/source/${context.org}/${context.repo}${withHtmlExt(targetPagePath)}`;
+  const resp = await daFetch(url, { method: 'HEAD' });
+  return {
+    exists: resp.ok,
+    lastModified: resp.headers.get('last-modified'),
+  };
+};
+
+const REDIRECTS_PATH = '/redirects.json';
+
+/**
+ * The project's redirects.json (a DA sheet with Source/Destination columns),
+ * fetched once via daFetch — same-origin admin call, no CORS issue, unlike
+ * probing the live site directly. AEM Edge Delivery applies every listed
+ * Source as a 301 redirect at the CDN, so a path's presence here (regardless
+ * of its publish state) means the live URL will redirect.
+ * Returns a Map keyed by Source path, empty if the project has none.
+ */
+const getRedirects = async (context, daFetch) => {
+  try {
+    const resp = await daFetch(`${ADMIN_URL}/source/${context.org}/${context.repo}${REDIRECTS_PATH}`);
+    if (!resp.ok) return new Map();
+    const json = await resp.json();
+    const rows = json?.data || [];
+    const map = new Map();
+    rows.forEach((row) => {
+      const source = row.Source;
+      if (!source) return;
+      map.set(source.startsWith('/') ? source : `/${source}`, row.Destination || '');
+    });
+    return map;
+  } catch {
+    return new Map();
+  }
+};
+
+const JOB_POLL_INTERVAL_MS = 1000;
+const JOB_POLL_MAX_ATTEMPTS = 30;
+
+const wait = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
+
+/**
+ * Fetches preview/publish status for many paths in a single AEM Admin bulk-status
+ * job. `forceAsync` keeps the response shape identical regardless of path count
+ * (always a pollable job, never an inlined result), so there's one code path:
+ * poll job.links.self until state is 'stopped', then fetch job.links.details for
+ * the per-path results. Returns a map keyed by path, each value holding
+ * previewLastModified / publishLastModified.
+ */
+const bulkStatus = async (paths, context, daFetch) => {
+  if (paths.length === 0) return {};
+
+  const url = `${AEM_ADMIN_URL}/status/${context.org}/${context.repo}/main/*`;
+  const resp = await daFetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ paths, select: ['preview', 'live'], forceAsync: true }),
+  });
+  if (!resp.ok) throw new Error(`Bulk status failed: ${resp.status}`);
+  let job = await resp.json();
+
+  let attempts = 0;
+  while (job.state !== 'stopped' && job.links?.self && attempts < JOB_POLL_MAX_ATTEMPTS) {
+    // eslint-disable-next-line no-await-in-loop
+    await wait(JOB_POLL_INTERVAL_MS);
+    // eslint-disable-next-line no-await-in-loop
+    const pollResp = await daFetch(job.links.self);
+    if (!pollResp.ok) throw new Error(`Bulk status poll failed: ${pollResp.status}`);
+    // eslint-disable-next-line no-await-in-loop
+    job = await pollResp.json();
+    attempts += 1;
+  }
+
+  const detailsUrl = job.links?.details;
+  if (!detailsUrl) return {};
+
+  const detailsResp = await daFetch(detailsUrl);
+  if (!detailsResp.ok) throw new Error(`Bulk status details failed: ${detailsResp.status}`);
+  const details = await detailsResp.json();
+
+  const result = {};
+  (details.data?.resources || []).forEach((entry) => {
+    if (entry?.path) result[entry.path] = entry;
+  });
+  return result;
+};
+
+/**
+ * Rolls out a source page's HTML to a single target locale: translates (or just
+ * adjusts URLs if same language), saves to DA, then optionally previews/publishes.
+ * Shared between the rollout plugin (single page) and the rollout app (batch).
+ */
+const rolloutToLocale = async ({
+  sourceHtml, sourceTranslateCode, targetPrefix, targetTranslateCode, pagePath,
+  context, daFetch, preview, publish, onStatus,
+}) => {
+  const targetPagePath = `${targetPrefix}${pagePath}`;
+  const targetContext = { ...context, sourcePath: targetPagePath };
+
+  onStatus?.('loading', 'Translating...');
+  let translatedHtml;
+  if (targetTranslateCode === sourceTranslateCode) {
+    const doc = new DOMParser().parseFromString(sourceHtml, 'text/html');
+    const adjusted = adjustURLs(doc, targetContext);
+    const adjustedHtml = adjusted.documentElement.outerHTML
+      .replace(/^<html><head><\/head><body>/, '')
+      .replace(/<\/body><\/html>$/, '');
+    translatedHtml = canonicalizeHtml(adjustedHtml);
+  } else {
+    translatedHtml = await translate(
+      sourceHtml,
+      targetTranslateCode,
+      targetContext,
+      undefined,
+      daFetch,
+      false,
+    );
+  }
+
+  onStatus?.('saving', 'Saving...');
+  const blob = new Blob([translatedHtml], { type: 'text/html' });
+  const formData = new FormData();
+  formData.append('data', blob);
+  const p = withHtmlExt(targetPagePath);
+  const targetUrl = `${ADMIN_URL}/source/${context.org}/${context.repo}${p}`;
+  const saveResp = await daFetch(targetUrl, { method: 'PUT', body: formData });
+  if (!saveResp.ok) throw new Error(`Save failed: ${saveResp.status}`);
+
+  const base = `${AEM_ADMIN_URL}/%s/${context.org}/${context.repo}/main${targetPagePath}`;
+  const versionUrl = `${ADMIN_URL}/versionsource/${context.org}/${context.repo}${p}`;
+  const versionOpts = (versionLabel) => ({
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ label: versionLabel }),
+  });
+
+  if (preview) {
+    onStatus?.('previewing', 'Previewing...');
+    const previewResp = await daFetch(base.replace('%s', 'preview'), { method: 'POST' });
+    if (!previewResp.ok) throw new Error(`Preview failed: ${previewResp.status}`);
+    daFetch(versionUrl, versionOpts('Previewed via rollout'));
+  }
+
+  if (publish) {
+    onStatus?.('publishing', 'Publishing...');
+    const publishResp = await daFetch(base.replace('%s', 'live'), { method: 'POST' });
+    if (!publishResp.ok) throw new Error(`Publish failed: ${publishResp.status}`);
+    daFetch(versionUrl, versionOpts('Published via rollout'));
+  }
+
+  return targetPagePath;
 };
 
 export {
   preprocess, translate, adjustURLs, EDITOR_FORMAT, ADMIN_FORMAT,
+  localeKey, parsePath, sourceStatus, bulkStatus, getRedirects, rolloutToLocale,
 };

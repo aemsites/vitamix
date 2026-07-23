@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Rollout tool</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <link rel="stylesheet" href="./rollout-app.css">
+    <script src="./rollout-app.js" type="module"></script>
+  </head>
+  <body>
+    <div class="app-container">
+      <h1>Rollout tool</h1>
+      <p>Enter list of URLs to rollout or <a href="#" id="load-from-folder">load from folder</a></p>
+      <form class="app-form">
+        <div class="app-input">
+          <div class="app-input-loader">
+            <div class="app-input-loader-content">
+              <input type="text" name="folder" placeholder="Enter da.live folder url"/>
+              <button name="load-from-folder">Load from folder</button>
+              <div class="app-folder-loader-error" aria-live="polite"></div>
+            </div>
+          </div>
+          <textarea name="urls" placeholder="Enter list of URLs to rollout"></textarea>
+          <button name="prepare">Prepare</button>
+          <div class="app-error" aria-live="polite"></div>
+        </div>
+        <div class="app-output">
+          <div class="rollout-app-table-wrap">
+            <table class="rollout-app-table">
+              <thead></thead>
+              <tbody></tbody>
+              <tfoot></tfoot>
+            </table>
+          </div>
+        </div>
+        <div class="rollout-app-options" hidden>
+          <label class="rollout-option">
+            <input type="checkbox" name="preview" checked>
+            <span>Preview</span>
+          </label>
+          <label class="rollout-option">
+            <input type="checkbox" name="publish" checked>
+            <span>Publish</span>
+          </label>
+        </div>
+        <button name="rollout" hidden>Rollout</button>
+      </form>
+    </div>
+  </body>
+</html>

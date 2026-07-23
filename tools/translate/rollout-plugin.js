@@ -12,23 +12,10 @@
 
 // eslint-disable-next-line import/no-unresolved
 import DA_SDK from 'https://da.live/nx/utils/sdk.js';
-import { translate, adjustURLs } from './shared.js';
-import { ADMIN_URL, AEM_ADMIN_URL, LOCALES } from './config.js';
-
-function localeKey(prefix) {
-  return prefix.replace(/^\//, '').replace(/\//g, '-');
-}
+import { localeKey, parsePath, rolloutToLocale } from './shared.js';
+import { ADMIN_URL, LOCALES } from './config.js';
 
 const EDIT_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
-
-function parsePath(path) {
-  const normalized = path.startsWith('/') ? path : `/${path}`;
-  const matched = LOCALES.find(({ prefix }) => normalized === prefix || normalized.startsWith(`${prefix}/`));
-  if (!matched) return null;
-  const { prefix } = matched;
-  const pagePath = normalized.slice(prefix.length) || '';
-  return { prefix, pagePath, repoPath: `${prefix}${pagePath}` };
-}
 
 function updateStatus(prefix, status, text) {
   const labelEl = document.querySelector(`label[for="lang-${localeKey(prefix)}"]`);
@@ -139,67 +126,20 @@ publishCheckbox.addEventListener('change', () => {
 
     // eslint-disable-next-line no-restricted-syntax
     for (const { prefix, translateCode } of selectedLocales) {
-      updateStatus(prefix, 'loading', 'Translating...');
-
-      const targetPagePath = `${prefix}${parsed.pagePath}`;
-
-      // eslint-disable-next-line no-await-in-loop
       try {
-        const targetContext = { ...context, sourcePath: targetPagePath };
-
-        let translatedHtml;
-        if (translateCode === sourceTranslateCode) {
-          const doc = new DOMParser().parseFromString(sourceHtml, 'text/html');
-          const adjusted = adjustURLs(doc, targetContext);
-          translatedHtml = adjusted.documentElement.outerHTML
-            .replace(/^<html><head><\/head><body>/, '')
-            .replace(/<\/body><\/html>$/, '');
-        } else {
-          // eslint-disable-next-line no-await-in-loop
-          translatedHtml = await translate(
-            sourceHtml,
-            translateCode,
-            targetContext,
-            undefined, // format: handle both editor and admin format
-            daFetch,
-          );
-        }
-
-        updateStatus(prefix, 'saving', 'Saving...');
-
-        const blob = new Blob([translatedHtml], { type: 'text/html' });
-        const formData = new FormData();
-        formData.append('data', blob);
-
-        const p = targetPagePath.endsWith('.html') ? targetPagePath : `${targetPagePath}.html`;
-        const targetUrl = `${ADMIN_URL}/source/${context.org}/${context.repo}${p}`;
         // eslint-disable-next-line no-await-in-loop
-        const saveResp = await daFetch(targetUrl, { method: 'PUT', body: formData });
-        if (!saveResp.ok) throw new Error(`Save failed: ${saveResp.status}`);
-
-        const base = `${AEM_ADMIN_URL}/%s/${context.org}/${context.repo}/main${targetPagePath}`;
-        const versionUrl = `${ADMIN_URL}/versionsource/${context.org}/${context.repo}${p}`;
-        const versionOpts = (versionLabel) => ({
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ label: versionLabel }),
+        const targetPagePath = await rolloutToLocale({
+          sourceHtml,
+          sourceTranslateCode,
+          targetPrefix: prefix,
+          targetTranslateCode: translateCode,
+          pagePath: parsed.pagePath,
+          context,
+          daFetch,
+          preview: previewCheckbox.checked,
+          publish: publishCheckbox.checked,
+          onStatus: (status, text) => updateStatus(prefix, status, text),
         });
-
-        if (previewCheckbox.checked) {
-          updateStatus(prefix, 'previewing', 'Previewing...');
-          // eslint-disable-next-line no-await-in-loop
-          const previewResp = await daFetch(base.replace('%s', 'preview'), { method: 'POST' });
-          if (!previewResp.ok) throw new Error(`Preview failed: ${previewResp.status}`);
-          daFetch(versionUrl, versionOpts('Previewed'));
-        }
-
-        if (publishCheckbox.checked) {
-          updateStatus(prefix, 'publishing', 'Publishing...');
-          // eslint-disable-next-line no-await-in-loop
-          const publishResp = await daFetch(base.replace('%s', 'live'), { method: 'POST' });
-          if (!publishResp.ok) throw new Error(`Publish failed: ${publishResp.status}`);
-          daFetch(versionUrl, versionOpts('Published'));
-        }
 
         const daHref = `https://da.live/edit#/${context.org}/${context.repo}${targetPagePath}`;
         updateStatus(prefix, 'done', `Done! <a href="${daHref}" target="_blank">${EDIT_ICON_SVG}</a>`);
