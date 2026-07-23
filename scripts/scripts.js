@@ -805,6 +805,8 @@ function decorateButtons(main) {
       a.className = 'button';
       const strong = a.closest('strong');
       const em = a.closest('em');
+      const hasSup = a.querySelector('sup') !== null;
+      const hasSub = a.querySelector('sub') !== null;
       if (strong && em) {
         a.classList.add('accent');
         const outer = strong.contains(em) ? strong : em;
@@ -815,6 +817,14 @@ function decorateButtons(main) {
       } else if (em) {
         a.classList.add('link');
         em.replaceWith(a);
+      } else if (hasSup) {
+        // superscript inside link, white outline button
+        a.classList.add('outline-white');
+        a.querySelector('sup').replaceWith(...a.querySelector('sup').childNodes);
+      } else if (hasSub) {
+        // subscript inside link, charcoal outline button
+        a.classList.add('outline-charcoal');
+        a.querySelector('sub').replaceWith(...a.querySelector('sub').childNodes);
       }
       p.className = 'button-wrapper';
     }
