@@ -683,14 +683,14 @@ const rolloutToLocale = async ({
     onStatus?.('previewing', 'Previewing...');
     const previewResp = await daFetch(base.replace('%s', 'preview'), { method: 'POST' });
     if (!previewResp.ok) throw new Error(`Preview failed: ${previewResp.status}`);
-    daFetch(versionUrl, versionOpts('Previewed'));
+    daFetch(versionUrl, versionOpts('Previewed via rollout'));
   }
 
   if (publish) {
     onStatus?.('publishing', 'Publishing...');
     const publishResp = await daFetch(base.replace('%s', 'live'), { method: 'POST' });
     if (!publishResp.ok) throw new Error(`Publish failed: ${publishResp.status}`);
-    daFetch(versionUrl, versionOpts('Published'));
+    daFetch(versionUrl, versionOpts('Published via rollout'));
   }
 
   return targetPagePath;
