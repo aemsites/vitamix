@@ -608,7 +608,7 @@ function parsePDPContentSections(sections) {
   sections.forEach((section) => {
     const h3 = section.querySelector('h3')?.textContent.toLowerCase();
     if (h3) {
-      if (h3.includes('features') || h3.includes('caractéristiques') || h3.includes('características')) {
+      if (h3.includes('features') || h3.includes('caractéristiques') || h3.includes('fonctionnalités') || h3.includes('características')) {
         window.features = section;
       } else if (h3.includes('specifications') || h3.includes('spécifications') || h3.includes('especificaciones')) {
         window.specifications = section;
