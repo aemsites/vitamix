@@ -31,6 +31,7 @@ export {
 export { getDeploymentEnv } from './shared.js';
 export { trackCartChange } from './cart.js';
 export { trackLogin } from './auth.js';
+export { trackSocialEvents, resetSocialEventsState } from './social.js';
 
 /**
  * Load order-success tracking early on confirmation pages (before Launch loads).
