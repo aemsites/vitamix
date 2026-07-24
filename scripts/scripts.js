@@ -1451,10 +1451,11 @@ async function loadEager(doc) {
   if (main) {
     decorateMain(main);
     /* adjust shop images to locale root path, util all of shop is mapped */
-    if (window.location.pathname.includes('/shop/')
+    if ((window.location.pathname.includes('/shop/')
       || window.location.pathname.includes('/foundation/')
       || window.location.pathname.includes('/commercial/')
-      || window.location.pathname.includes('/catalog/product_compare/')) {
+      || window.location.pathname.includes('/catalog/product_compare/'))
+      && !window.location.pathname.includes('/products/commercial/')) {
       const images = doc.querySelectorAll('img[src*="/media_"]');
       images.forEach((img) => {
         img.setAttribute('src', `/us/en_us/media_${img.getAttribute('src').split('/media_').pop()}`);
