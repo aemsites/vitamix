@@ -1,0 +1,400 @@
+.section > .order-review-wrapper {
+  margin-top: 24px;
+}
+
+.order-review-page {
+  max-width: var(--commerce-max-width);
+  margin: 0 auto;
+  padding: 0 24px 64px;
+  color: var(--commerce-color-text);
+  font-family: var(--commerce-font-family);
+}
+
+/* ── Reassurance banner ─────────────────────────────────────────── */
+.order-review-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  margin: 0 -24px 24px;
+  background: color-mix(in srgb, var(--commerce-color-success) 12%, #fff);
+  color: var(--commerce-color-text);
+  font-size: var(--commerce-font-size-sm);
+}
+
+.order-review-banner-icon {
+  flex: 0 0 auto;
+  color: var(--commerce-color-success);
+}
+
+.order-review-banner-title {
+  font-weight: var(--commerce-font-weight-bold);
+}
+
+/* ── Heading row ────────────────────────────────────────────────── */
+.order-review-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.order-review-title {
+  margin: 0;
+  font-size: 2.5rem;
+  line-height: 1.1;
+}
+
+.order-review-subtitle {
+  margin: 8px 0 0;
+  color: var(--commerce-color-text-muted);
+  font-size: var(--commerce-font-size-base);
+}
+
+.order-review-secured {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  border: 1px solid var(--commerce-color-border);
+  border-radius: 999px;
+  color: var(--commerce-color-text-muted);
+  font-size: var(--commerce-font-size-xs);
+  white-space: nowrap;
+}
+
+/* ── Layout grid ────────────────────────────────────────────────── */
+.order-review-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (width >= 900px) {
+  .order-review-grid {
+    grid-template-columns: minmax(0, 1fr) var(--commerce-summary-width);
+  }
+}
+
+.order-review-main {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+
+/* ── Cards ──────────────────────────────────────────────────────── */
+.order-review-card {
+  background: var(--commerce-color-background);
+  border: 1px solid var(--commerce-color-border);
+  border-radius: var(--commerce-radius-card);
+  padding: 20px 24px;
+}
+
+.order-review-card > h2 {
+  margin: 0 0 16px;
+  font-size: var(--commerce-font-size-base);
+  font-weight: var(--commerce-font-weight-bold);
+}
+
+.order-review-card-header {
+  margin-bottom: 16px;
+}
+
+.order-review-card-header h2 {
+  margin: 0;
+  font-size: var(--commerce-font-size-base);
+  font-weight: var(--commerce-font-weight-bold);
+}
+
+.order-review-card-sub {
+  margin: 2px 0 0;
+  color: var(--commerce-color-text-muted);
+  font-size: var(--commerce-font-size-sm);
+}
+
+/* ── Shipping method (chosen, static) ───────────────────────────── */
+.order-review-method {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--commerce-color-border);
+  border-radius: var(--commerce-input-radius);
+}
+
+.order-review-method-label {
+  font-weight: var(--commerce-font-weight-bold);
+}
+
+.order-review-method-price {
+  font-weight: var(--commerce-font-weight-bold);
+  text-align: right;
+}
+
+.order-review-method-eta {
+  grid-column: 1 / -1;
+  color: var(--commerce-color-text-muted);
+  font-size: var(--commerce-font-size-sm);
+}
+
+/* ── Address + payment side-by-side ─────────────────────────────── */
+.order-review-info-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+
+@media (width >= 560px) {
+  .order-review-info-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.order-review-address-body p,
+.order-review-payment-method {
+  margin: 0;
+  font-size: var(--commerce-font-size-sm);
+  line-height: 1.6;
+}
+
+.order-review-verified,
+.order-review-authorized {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 16px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--commerce-color-border);
+  color: var(--commerce-color-text-muted);
+  font-size: var(--commerce-font-size-xs);
+}
+
+.order-review-verified svg {
+  color: var(--commerce-color-success);
+}
+
+.order-review-payment-method {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 16px;
+  border: 1px solid var(--commerce-color-border);
+  border-radius: var(--commerce-input-radius);
+}
+
+.order-review-payment-name {
+  font-weight: var(--commerce-font-weight-bold);
+}
+
+.order-review-payment-email {
+  color: var(--commerce-color-text-muted);
+  font-size: var(--commerce-font-size-sm);
+}
+
+/* ── Items list (static) ────────────────────────────────────────── */
+.order-review-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 80px 48px 90px;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0;
+  border-top: 1px solid var(--commerce-color-border);
+}
+
+.order-review-item-head {
+  padding: 0 0 8px;
+  border-top: none;
+  color: var(--commerce-color-text-muted);
+  font-size: var(--commerce-font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.order-review-col-price,
+.order-review-col-subtotal {
+  text-align: right;
+}
+
+.order-review-col-qty {
+  text-align: center;
+}
+
+.order-review-item .order-review-col-subtotal {
+  font-weight: var(--commerce-font-weight-bold);
+}
+
+.order-review-free {
+  color: var(--commerce-color-success);
+}
+
+.order-review-item-lead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.order-review-item-image {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--commerce-color-surface);
+  border-radius: var(--commerce-radius-badge);
+  overflow: hidden;
+}
+
+.order-review-item-image img {
+  max-width: 52px;
+  max-height: 52px;
+  object-fit: contain;
+}
+
+.order-review-item-details {
+  min-width: 0;
+}
+
+.order-review-item-name {
+  margin: 0;
+  font-weight: var(--commerce-font-weight-bold);
+  font-size: var(--commerce-font-size-sm);
+  line-height: 1.3;
+}
+
+.order-review-item-variant {
+  margin: 2px 0 0;
+  color: var(--commerce-color-text-muted);
+  font-size: var(--commerce-font-size-sm);
+}
+
+.order-review-item-gift {
+  margin: 2px 0 0;
+  color: var(--commerce-color-success);
+  font-size: var(--commerce-font-size-xs);
+}
+
+/* ── Order-total summary (right column) ─────────────────────────── */
+.order-review-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (width >= 900px) {
+  .order-review-aside {
+    position: sticky;
+    top: var(--commerce-sticky-top);
+  }
+}
+
+.order-review-totals {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.order-review-totals-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: var(--commerce-font-size-sm);
+}
+
+.order-review-totals-discount {
+  color: var(--commerce-color-discount);
+}
+
+.order-review-grand {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--commerce-color-border);
+}
+
+.order-review-grand-label {
+  font-weight: var(--commerce-font-weight-bold);
+}
+
+.order-review-grand-value {
+  font-size: var(--commerce-font-size-total);
+  font-weight: var(--commerce-font-weight-bold);
+}
+
+/* ── Complete order button ──────────────────────────────────────── */
+.order-review-complete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: var(--commerce-button-height);
+  margin-top: 16px;
+}
+
+.order-review-complete:disabled,
+.order-review-complete.order-review-busy {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.order-review-error {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  background: var(--commerce-color-error-bg);
+  border: 1px solid var(--commerce-color-error-border);
+  border-radius: var(--commerce-input-radius);
+  color: var(--commerce-color-error);
+  font-size: var(--commerce-font-size-sm);
+}
+
+.order-review-terms {
+  margin: 12px 0 0;
+  color: var(--commerce-color-text-muted);
+  font-size: var(--commerce-font-size-xs);
+  text-align: center;
+  line-height: 1.5;
+}
+
+.order-review-terms a {
+  color: var(--commerce-color-text);
+  text-decoration: underline;
+}
+
+.order-review-cancel-wrap {
+  margin: 12px 0 0;
+  text-align: center;
+}
+
+.order-review-cancel {
+  padding: 4px 8px;
+  background: none;
+  border: none;
+  color: var(--commerce-color-text-muted);
+  font-size: var(--commerce-font-size-sm);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.order-review-cancel:hover {
+  color: var(--commerce-color-text);
+}
+
+/* ── Trust signals ──────────────────────────────────────────────── */
+.order-review-trust {
+  margin: 0;
+  padding: 0 4px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--commerce-color-text-muted);
+  font-size: var(--commerce-font-size-sm);
+}

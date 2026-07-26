@@ -82,6 +82,7 @@ window.CommerceConfig = {
   paypal: {
     clientId: PAYPAL_CLIENT_IDS[siteLocale] ?? PAYPAL_CLIENT_IDS.us,
     intent: 'authorize',
+    orderReview: { express: true },
   },
 };
 

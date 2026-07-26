@@ -207,6 +207,40 @@ export async function initiatePayment(orderId, idempotencyKey, fraudToken, provi
 }
 
 /**
+ * Confirms (captures) a payment for an order that is awaiting confirmation on
+ * the order-review page. The order arrives in state `payment_requires_confirmation`
+ * after PayPal authorization; this endpoint finalizes the charge.
+ *
+ * The idempotency key ensures retrying the same request (e.g. after a network
+ * failure or a retryable 5xx) does not result in a duplicate capture.
+ *
+ * @param {string} orderId - The order ID returned by createOrder
+ * @param {string} idempotencyKey - A unique key for this confirmation attempt (a UUID)
+ * @returns {Promise<{ status: 'completed'|'pending'|'failed', transactionId?: string,
+ *   amount?: number, currency?: string, reason?: string }>}
+ * @throws {CommerceApiError}
+ */
+export async function confirmPayment(orderId, idempotencyKey) {
+  return post(`/orders/${orderId}/payments/confirm`, { idempotencyKey });
+}
+
+/**
+ * Cancels the pending payment for an order awaiting confirmation, releasing the
+ * PayPal authorization. Called when the buyer leaves the order-review page
+ * without completing (explicit "Cancel and return to cart" or abandonment).
+ *
+ * Idempotent: safe to call more than once for the same order/attempt.
+ *
+ * @param {string} orderId - The order ID returned by createOrder
+ * @param {string} idempotencyKey - A unique key for this cancellation attempt (a UUID)
+ * @returns {Promise<{ status: 'cancelled' }>}
+ * @throws {CommerceApiError}
+ */
+export async function cancelPayment(orderId, idempotencyKey) {
+  return post(`/orders/${orderId}/payments/cancel`, { idempotencyKey });
+}
+
+/**
  * Makes an authenticated HTTP request to the Commerce API.
  * Attaches a Bearer token from localStorage when present.
  * No reCAPTCHA support — PayPal session endpoints are Cloudflare-rate-limited.
