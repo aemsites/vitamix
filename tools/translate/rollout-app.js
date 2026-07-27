@@ -15,13 +15,15 @@
 // eslint-disable-next-line import/no-unresolved
 import DA_SDK from 'https://da.live/nx/utils/sdk.js';
 import {
-  localeKey, parsePath, sourceStatus, bulkStatus, getRedirects, rolloutToLocale,
+  localeKey, parsePath, sourceStatus, bulkStatus, getRedirects,
+  hasChangedSinceLastRollout, rolloutToLocale,
 } from './shared.js';
 import { ADMIN_URL, LOCALES } from './config.js';
 
 const EDIT_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
 const PREVIEW_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
 const PUBLISH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>';
+const WARNING_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
 
 // Number of URLs prepared (and HEAD-checked against every locale) concurrently per batch.
 // Keeps large folders (thousands of pages) from firing thousands of requests at once.
@@ -86,7 +88,7 @@ function resolveResourcePath(urlStr, context) {
 
   loadFromFolderLink.addEventListener('click', (e) => {
     e.preventDefault();
-    folderInput.value = `https://da.live/#/${context.org}/${context.repo}/en/en-us`;
+    folderInput.value = `https://da.live/#/${context.org}/${context.repo}/us/en_us`;
 
     loaderRow.classList.toggle('open');
   });
@@ -251,6 +253,14 @@ function resolveResourcePath(urlStr, context) {
     return a;
   };
 
+  const buildWarningIcon = () => {
+    const span = document.createElement('span');
+    span.className = 'rollout-warning-icon';
+    span.innerHTML = WARNING_ICON_SVG;
+    span.title = 'This page was modified since the last rollout — rolling out will overwrite those changes.';
+    return span;
+  };
+
   const buildPendingStatusIcons = () => {
     const container = document.createElement('span');
     container.className = 'rollout-status-icons rollout-status-icons-pending';
@@ -311,6 +321,11 @@ function resolveResourcePath(urlStr, context) {
       const status = await sourceStatus(targetPagePath, context, daFetch);
       const lastModified = formatDate(status.lastModified);
 
+      // Only a page that's about to be overwritten (a real target, not the
+      // source) and that actually exists can have "local" changes at risk.
+      const hasLocalChanges = !isSource && status.exists
+        && await hasChangedSinceLastRollout(targetPagePath, context, daFetch);
+
       if (isSource) td.classList.add('rollout-app-cell-source');
 
       const labelEl = document.createElement('label');
@@ -337,6 +352,7 @@ function resolveResourcePath(urlStr, context) {
       const content = document.createElement('div');
       content.className = 'rollout-app-cell-content';
       content.appendChild(labelEl);
+      if (hasLocalChanges) content.appendChild(buildWarningIcon());
       content.appendChild(buildPendingStatusIcons());
       td.appendChild(content);
 

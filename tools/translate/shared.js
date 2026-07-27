@@ -630,6 +630,35 @@ const bulkStatus = async (paths, context, daFetch) => {
   return result;
 };
 
+// Exactly one of these is always created by rolloutToLocale on every run, so
+// the most recent one marks "the last time this tool wrote to this page."
+const ROLLOUT_ANCHOR_LABELS = new Set([
+  'Rollout', 'Previewed via Rollout', 'Previewed & Publish via Rollout',
+]);
+
+/**
+ * True if the target page has a real edit (an audit-log entry with no label
+ * at all) newer than the last rollout-created version. Labeled entries — a
+ * human's repeated manual Published/Previewed included — never represent a
+ * content change by themselves, so they're skipped; only an unlabeled entry
+ * means someone actually edited it. If there's no prior rollout version to
+ * anchor on, there's nothing to detect a change against, so this returns false.
+ */
+const hasChangedSinceLastRollout = async (targetPagePath, context, daFetch) => {
+  const p = withHtmlExt(targetPagePath);
+  const url = `${ADMIN_URL}/versionlist/${context.org}/${context.repo}${p}`;
+  try {
+    const resp = await daFetch(url);
+    if (!resp.ok) return false;
+    const entries = await resp.json();
+    const anchorIndex = entries.findIndex((entry) => ROLLOUT_ANCHOR_LABELS.has(entry.label));
+    if (anchorIndex <= 0) return false;
+    return entries.slice(0, anchorIndex).some((entry) => !entry.label);
+  } catch {
+    return false;
+  }
+};
+
 /**
  * Rolls out a source page's HTML to a single target locale: translates (or just
  * adjusts URLs if same language), saves to DA, then optionally previews/publishes.
@@ -641,6 +670,19 @@ const rolloutToLocale = async ({
 }) => {
   const targetPagePath = `${targetPrefix}${pagePath}`;
   const targetContext = { ...context, sourcePath: targetPagePath };
+  const p = withHtmlExt(targetPagePath);
+  const versionUrl = `${ADMIN_URL}/versionsource/${context.org}/${context.repo}${p}`;
+  const versionOpts = (versionLabel) => ({
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ label: versionLabel }),
+  });
+
+  // Snapshot whatever currently exists at the target, but only if it's actually
+  // at risk of being lost (i.e. someone touched it since the last rollout).
+  if (await hasChangedSinceLastRollout(targetPagePath, context, daFetch)) {
+    daFetch(versionUrl, versionOpts('Before Rollout'));
+  }
 
   onStatus?.('loading', 'Translating...');
   let translatedHtml;
@@ -666,37 +708,37 @@ const rolloutToLocale = async ({
   const blob = new Blob([translatedHtml], { type: 'text/html' });
   const formData = new FormData();
   formData.append('data', blob);
-  const p = withHtmlExt(targetPagePath);
   const targetUrl = `${ADMIN_URL}/source/${context.org}/${context.repo}${p}`;
   const saveResp = await daFetch(targetUrl, { method: 'PUT', body: formData });
   if (!saveResp.ok) throw new Error(`Save failed: ${saveResp.status}`);
 
   const base = `${AEM_ADMIN_URL}/%s/${context.org}/${context.repo}/main${targetPagePath}`;
-  const versionUrl = `${ADMIN_URL}/versionsource/${context.org}/${context.repo}${p}`;
-  const versionOpts = (versionLabel) => ({
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ label: versionLabel }),
-  });
 
   if (preview) {
     onStatus?.('previewing', 'Previewing...');
     const previewResp = await daFetch(base.replace('%s', 'preview'), { method: 'POST' });
     if (!previewResp.ok) throw new Error(`Preview failed: ${previewResp.status}`);
-    daFetch(versionUrl, versionOpts('Previewed via rollout'));
   }
 
   if (publish) {
     onStatus?.('publishing', 'Publishing...');
     const publishResp = await daFetch(base.replace('%s', 'live'), { method: 'POST' });
     if (!publishResp.ok) throw new Error(`Publish failed: ${publishResp.status}`);
-    daFetch(versionUrl, versionOpts('Published via rollout'));
   }
+
+  let rolloutLabel = 'Rollout';
+  if (publish) {
+    rolloutLabel = 'Previewed & Publish via Rollout';
+  } else if (preview) {
+    rolloutLabel = 'Previewed via Rollout';
+  }
+  daFetch(versionUrl, versionOpts(rolloutLabel));
 
   return targetPagePath;
 };
 
 export {
   preprocess, translate, adjustURLs, EDITOR_FORMAT, ADMIN_FORMAT,
-  localeKey, parsePath, sourceStatus, bulkStatus, getRedirects, rolloutToLocale,
+  localeKey, parsePath, sourceStatus, bulkStatus, getRedirects,
+  hasChangedSinceLastRollout, rolloutToLocale,
 };

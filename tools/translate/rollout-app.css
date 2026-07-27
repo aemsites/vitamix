@@ -399,6 +399,17 @@ button:hover:not(:disabled) {
   color: #fff;
 }
 
+.rollout-warning-icon {
+  display: inline-flex;
+  color: #b45309;
+  cursor: default;
+}
+
+.rollout-warning-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
 .rollout-status-spinner {
   width: 14px;
   height: 14px;
