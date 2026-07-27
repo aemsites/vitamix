@@ -8,6 +8,7 @@ import {
   createCancelHandler,
   createAbandonmentHandler,
   isOrderNotConfirmable,
+  resolveLineItem,
 } from '../../blocks/order-review/order-review.js';
 
 beforeEach(() => {
@@ -256,6 +257,40 @@ describe('createCancelHandler', () => {
     });
     await handler();
     assert.equal(routed, true);
+  });
+});
+
+describe('resolveLineItem', () => {
+  test('a gift-with-purchase is free and flagged as a gift', () => {
+    const r = resolveLineItem({ price: { final: '0' }, quantity: 1, custom: { giftWithPurchase: true } });
+    assert.equal(r.isGift, true);
+    assert.equal(r.isFree, true);
+  });
+
+  test('a linkedTo add-on (paid warranty) is NOT free and NOT a gift', () => {
+    const r = resolveLineItem({
+      sku: '001314',
+      price: { final: '117.00' },
+      quantity: 1,
+      custom: { linkedTo: '075861-04', coverageYears: 3 },
+    });
+    assert.equal(r.isGift, false);
+    assert.equal(r.isFree, false);
+    assert.equal(r.unitPrice, 117);
+    assert.equal(r.lineSubtotal, 117);
+  });
+
+  test('a zero-priced non-gift line is free but not flagged as a gift', () => {
+    const r = resolveLineItem({ price: { final: '0' }, quantity: 2 });
+    assert.equal(r.isGift, false);
+    assert.equal(r.isFree, true);
+  });
+
+  test('computes line subtotal from unit price x quantity', () => {
+    const r = resolveLineItem({ price: { final: '62' }, quantity: 2 });
+    assert.equal(r.unitPrice, 62);
+    assert.equal(r.lineSubtotal, 124);
+    assert.equal(r.isFree, false);
   });
 });
 

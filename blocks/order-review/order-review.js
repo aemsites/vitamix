@@ -219,6 +219,26 @@ function sendCancelBeacon(config, orderId) {
   }
 }
 
+/**
+ * Classifies a line item for display, matching the cart/order-summary rules so
+ * the three lists agree. A gift-with-purchase (`custom.giftWithPurchase`) is a
+ * free line. A `linkedTo` add-on (e.g. an extended warranty) is a PAID item and
+ * must NOT be treated as free just because it is linked to a parent product.
+ *
+ * @param {Object} item
+ * @returns {{ isGift: boolean, unitPrice: number, quantity: number,
+ *   lineSubtotal: number, isFree: boolean }}
+ */
+export function resolveLineItem(item = {}) {
+  const isGift = item.custom?.giftWithPurchase === true;
+  const unitPrice = parseFloat(item.price?.final ?? item.price) || 0;
+  const quantity = item.quantity || 0;
+  const lineSubtotal = unitPrice * quantity;
+  return {
+    isGift, unitPrice, quantity, lineSubtotal, isFree: isGift || lineSubtotal === 0,
+  };
+}
+
 /** Small helper to build an element with a class and optional text. */
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -448,26 +468,20 @@ export default async function decorate(block) {
         || item.selectedOptions?.map((o) => o.value).join(' · ')
         || null;
       if (variantLabel) details.appendChild(el('p', 'order-review-item-variant', variantLabel));
-      const isFreeGift = !!item.custom?.linkedTo;
-      if (isFreeGift) {
+      const line = resolveLineItem(item);
+      if (line.isGift) {
         details.appendChild(el('p', 'order-review-item-gift', s.freeGift || 'Free gift'));
       }
       const itemLead = el('div', 'order-review-item-lead');
       itemLead.append(imgWrap, details);
 
-      const unitPrice = parseFloat(item.price?.final ?? item.price) || 0;
-      const lineSubtotal = unitPrice * (item.quantity || 0);
-      const priceText = isFreeGift || unitPrice === 0
-        ? (s.free || 'Free')
-        : formatPrice(unitPrice, currencyCode);
-      const subtotalText = isFreeGift || lineSubtotal === 0
-        ? (s.free || 'Free')
-        : formatPrice(lineSubtotal, currencyCode);
-
+      const free = s.free || 'Free';
+      const priceText = line.isFree ? free : formatPrice(line.unitPrice, currencyCode);
+      const subtotalText = line.isFree ? free : formatPrice(line.lineSubtotal, currencyCode);
       const priceEl = el('span', 'order-review-col-price', priceText);
       const qtyEl = el('span', 'order-review-col-qty', String(item.quantity ?? ''));
       const subtotalEl = el('span', 'order-review-col-subtotal', subtotalText);
-      if (isFreeGift || lineSubtotal === 0) {
+      if (line.isFree) {
         priceEl.classList.add('order-review-free');
         subtotalEl.classList.add('order-review-free');
       }
