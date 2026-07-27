@@ -180,6 +180,41 @@ describe('createConfirmHandler', () => {
     assert.equal(notConfirmable, true);
     assert.equal(errored, null); // no generic error when the order is dead
   });
+
+  test('routes to cart on a 200 failed result flagged cancelled (terminal), not a retry error', async () => {
+    let errored = null;
+    let notConfirmable = false;
+    const handler = createConfirmHandler({
+      orderId: 'o',
+      confirm: async () => ({ status: 'failed', reason: 'PayPal order expired', cancelled: true }),
+      routeTo: () => {},
+      onError: (msg) => { errored = msg; },
+      onNotConfirmable: () => { notConfirmable = true; },
+      errorMessage: 'fallback message',
+    });
+    await handler();
+    assert.equal(notConfirmable, true);
+    assert.equal(errored, null); // terminal: routed to cart, not a stay-and-retry error
+  });
+
+  test('stays on the page with an error on a 200 failed result that is NOT cancelled (soft decline)', async () => {
+    let errored = null;
+    let notConfirmable = false;
+    const busy = [];
+    const handler = createConfirmHandler({
+      orderId: 'o',
+      confirm: async () => ({ status: 'failed', reason: 'Your card was declined.' }),
+      routeTo: () => {},
+      onError: (msg) => { errored = msg; },
+      onNotConfirmable: () => { notConfirmable = true; },
+      setBusy: (b) => busy.push(b),
+      errorMessage: 'fallback message',
+    });
+    await handler();
+    assert.equal(notConfirmable, false);
+    assert.equal(errored, 'Your card was declined.');
+    assert.deepEqual(busy, [true, false]);
+  });
 });
 
 describe('isOrderNotConfirmable', () => {

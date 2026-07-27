@@ -265,7 +265,27 @@ test.describe('Order review page (display-only)', () => {
       await expect(page.locator('.order-review-error')).toContainText('declined');
       await page.waitForTimeout(500);
       expect(page.url()).toContain('/order/review');
-      console.log('✓ Failed confirm stays on review with an error');
+      console.log('✓ Soft decline (failed, not cancelled) stays on review with an error');
+    });
+
+    test('a failed confirm flagged cancelled routes to the cart (terminal)', async ({ page }) => {
+      await setupReviewMocks(page, {
+        confirm: async (route) => {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ status: 'failed', reason: 'PayPal order expired', cancelled: true }),
+          });
+        },
+      });
+      await gotoReview(page, baseUrl);
+
+      await expect(page.locator('.order-review-complete')).toBeVisible({ timeout: 15000 });
+      await page.locator('.order-review-complete').click();
+
+      await expect(page.locator('.order-review-error')).toContainText(/expired or been cancelled/i, { timeout: 10000 });
+      await expect.poll(() => page.url(), { timeout: 15000 }).toMatch(/\/order\/cart/);
+      console.log('✓ Failed + cancelled:true → clear message → cart');
     });
 
     test('a cancelled/expired order shows a clear message and returns to the cart', async ({ page }) => {

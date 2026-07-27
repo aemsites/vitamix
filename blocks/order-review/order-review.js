@@ -67,10 +67,9 @@ export function isOrderNotConfirmable(err) {
  * @param {(orderId: string, key: string) => Promise<Object>} deps.confirm
  * @param {(action: 'complete'|'processing') => void} deps.routeTo
  * @param {(message: string) => void} deps.onError
- * @param {(busy: boolean) => void} [deps.setBusy]
- * @param {(message: string) => void} deps.onError
  * @param {() => void} [deps.onNotConfirmable] - called when the order can no
  *   longer be confirmed (cancelled/expired) so retrying is futile
+ * @param {(busy: boolean) => void} [deps.setBusy]
  * @param {string} deps.errorMessage
  * @param {() => string} [deps.newKey]
  * @returns {() => Promise<void>}
@@ -86,6 +85,15 @@ export function createConfirmHandler({
       const result = await confirm(orderId, idempotencyKey);
       const { action } = resolveConfirmResult(result);
       if (action === 'failed') {
+        // A `cancelled` failure is terminal — the order was moved to
+        // payment_cancelled server-side, so retrying is futile. Route back to
+        // the cart (same as the 422 order_not_confirmable path) instead of a
+        // stay-and-retry error. A failure without `cancelled` is a soft decline
+        // the buyer can retry on this page.
+        if (result?.cancelled && onNotConfirmable) {
+          onNotConfirmable();
+          return;
+        }
         onError(result?.reason || errorMessage);
         setBusy?.(false);
         return;
