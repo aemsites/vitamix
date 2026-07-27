@@ -11,6 +11,7 @@ import {
   isVariantAvailableForSale,
   computeAllowedQty,
   shippingDimensionsFromOffer,
+  resolveLineItemCustom,
 } from '../../blocks/pdp/add-to-cart.js';
 import { __setMetadata, __resetMetadata } from './mocks/aem.mjs';
 import { __setOutOfStockSkus, __resetScripts } from './mocks/scripts.mjs';
@@ -182,4 +183,30 @@ test('shippingDimensionsFromOffer: returns undefined when value is not numeric',
 test('shippingDimensionsFromOffer: returns undefined for null/undefined input', () => {
   assert.equal(shippingDimensionsFromOffer(null), undefined);
   assert.equal(shippingDimensionsFromOffer(undefined), undefined);
+});
+
+// --- resolveLineItemCustom ---------------------------------------------------
+
+test('resolveLineItemCustom: forwards isCommercial when the parent is commercial', () => {
+  assert.deepEqual(
+    resolveLineItemCustom({ custom: { isCommercial: true } }),
+    { custom: { isCommercial: true } },
+  );
+});
+
+test('resolveLineItemCustom: empty object for household products', () => {
+  assert.deepEqual(resolveLineItemCustom({ custom: { type: 'simple' } }), {});
+});
+
+test('resolveLineItemCustom: empty object when custom is absent', () => {
+  assert.deepEqual(resolveLineItemCustom({}), {});
+});
+
+test('resolveLineItemCustom: empty object for null/undefined parent', () => {
+  assert.deepEqual(resolveLineItemCustom(null), {});
+  assert.deepEqual(resolveLineItemCustom(undefined), {});
+});
+
+test('resolveLineItemCustom: ignores a falsy isCommercial flag', () => {
+  assert.deepEqual(resolveLineItemCustom({ custom: { isCommercial: false } }), {});
 });
