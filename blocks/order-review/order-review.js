@@ -477,12 +477,9 @@ export default async function decorate(block) {
   const completeBtn = document.createElement('button');
   completeBtn.type = 'button';
   completeBtn.className = 'button emphasis order-review-complete';
-  completeBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>';
-  completeBtn.appendChild(el(
-    'span',
-    null,
-    `${s.reviewCompleteOrder} · ${formatPrice(totals.total, currencyCode)}`,
-  ));
+  const completeIcon = el('span', 'order-review-complete-icon');
+  completeIcon.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>';
+  completeBtn.append(completeIcon, el('span', 'order-review-complete-label', s.reviewCompleteOrder));
   summary.appendChild(completeBtn);
   summary.appendChild(errorEl);
 
@@ -508,13 +505,6 @@ export default async function decorate(block) {
   summary.appendChild(cancelWrap);
 
   aside.appendChild(summary);
-
-  // Trust signals.
-  const trust = el('ul', 'order-review-trust');
-  [s.reviewTrustReturns, s.reviewTrustWarranty, s.reviewTrustSupport]
-    .filter(Boolean)
-    .forEach((text) => trust.appendChild(el('li', null, text)));
-  aside.appendChild(trust);
 
   grid.append(main, aside);
   container.appendChild(grid);

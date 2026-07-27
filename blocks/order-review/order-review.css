@@ -17,7 +17,7 @@
   gap: 8px;
   padding: 12px 20px;
   margin: 0 -24px 24px;
-  background: color-mix(in srgb, var(--commerce-color-success) 12%, #fff);
+  background: color-mix(in srgb, var(--commerce-color-success) 12%, var(--commerce-color-background));
   color: var(--commerce-color-text);
   font-size: var(--commerce-font-size-sm);
 }
@@ -69,7 +69,7 @@
 .order-review-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 24px;
+  gap: var(--commerce-gap);
   align-items: start;
 }
 
@@ -82,7 +82,7 @@
 .order-review-main {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: var(--commerce-gap);
   min-width: 0;
 }
 
@@ -145,7 +145,7 @@
 .order-review-info-row {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 24px;
+  gap: var(--commerce-gap);
 }
 
 @media (width >= 560px) {
@@ -328,15 +328,37 @@
   font-weight: var(--commerce-font-weight-bold);
 }
 
-/* ── Complete order button ──────────────────────────────────────── */
-.order-review-complete {
+/* ── Complete order button ──────────────────────────────────────────
+   Mirrors the checkout page's primary button (checkout-submit-btn): base text
+   size, padding-based height for reliable vertical centering, and an icon
+   wrapper with line-height:0 so the lock aligns to the label. The `button.`
+   prefix matches the global `button.button` specificity so display/padding/
+   font-size actually win (a bare `.order-review-complete` loses to it). */
+button.order-review-complete {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--commerce-gap-sm);
   width: 100%;
-  height: var(--commerce-button-height);
+  padding: 14px 24px;
   margin-top: 16px;
+  font-size: var(--commerce-font-size-base);
+}
+
+.order-review-complete-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+/* Constrain the inline SVG: without an explicit CSS size it falls back to its
+   ~300px default intrinsic width inside a flex row, which blows up the wrapper
+   and throws off both horizontal grouping and vertical centering. */
+.order-review-complete-icon svg {
+  display: block;
+  width: 16px;
+  height: 16px;
 }
 
 .order-review-complete:disabled,
@@ -385,16 +407,4 @@
 
 .order-review-cancel:hover {
   color: var(--commerce-color-text);
-}
-
-/* ── Trust signals ──────────────────────────────────────────────── */
-.order-review-trust {
-  margin: 0;
-  padding: 0 4px;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  color: var(--commerce-color-text-muted);
-  font-size: var(--commerce-font-size-sm);
 }
