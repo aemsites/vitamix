@@ -154,11 +154,19 @@
   }
 }
 
-.order-review-address-body p,
-.order-review-payment-method {
+.order-review-address-body p {
   margin: 0;
   font-size: var(--commerce-font-size-sm);
   line-height: 1.6;
+}
+
+/* Address + payment cards are flex columns so the "Verified by PayPal" /
+   "Authorized" notes can be pinned to the bottom (margin-top:auto) and stay
+   aligned across the two equal-height (grid-stretched) cards. */
+.order-review-address,
+.order-review-payment {
+  display: flex;
+  flex-direction: column;
 }
 
 .order-review-verified,
@@ -166,7 +174,8 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  margin: 16px 0 0;
+  margin: 0;
+  margin-top: auto;
   padding-top: 12px;
   border-top: 1px solid var(--commerce-color-border);
   color: var(--commerce-color-text-muted);
@@ -177,22 +186,52 @@
   color: var(--commerce-color-success);
 }
 
+/* PayPal Express box: light-gray surface so it reads as a distinct element
+   on the white card, with a PayPal mark chip beside the name/email. */
 .order-review-payment-method {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 14px 16px;
+  align-items: center;
+  gap: var(--commerce-gap-sm);
+  margin-bottom: 16px;
+  padding: 12px;
+  background: var(--commerce-color-surface);
   border: 1px solid var(--commerce-color-border);
   border-radius: var(--commerce-input-radius);
 }
 
+.order-review-payment-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  background: #eaf1fb;
+  border-radius: var(--commerce-radius-badge);
+}
+
+.order-review-payment-icon svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+
+.order-review-payment-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
 .order-review-payment-name {
   font-weight: var(--commerce-font-weight-bold);
+  font-size: var(--commerce-font-size-sm);
 }
 
 .order-review-payment-email {
   color: var(--commerce-color-text-muted);
   font-size: var(--commerce-font-size-sm);
+  word-break: break-all;
 }
 
 /* ── Items list (static) ────────────────────────────────────────── */
@@ -385,9 +424,12 @@ button.order-review-complete {
   line-height: 1.5;
 }
 
+/* Keep the link as one unit so it wraps to its own line instead of breaking
+   mid-phrase ("Terms and Conditions of" / "Sale"). */
 .order-review-terms a {
   color: var(--commerce-color-text);
   text-decoration: underline;
+  white-space: nowrap;
 }
 
 .order-review-cancel-wrap {
