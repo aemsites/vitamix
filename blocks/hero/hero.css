@@ -298,3 +298,34 @@
     max-width: 400px;
   }
 }
+
+
+.hero a.button {
+  border-color: currentcolor;
+  background-color: transparent;
+}
+
+.hero a.button:hover,
+.hero a.button:focus {
+  background-color: color-mix(in srgb, currentcolor 15%, transparent);
+}
+
+.hero:is(.image-dark, .dark, .image-darkest, .darkest) a.button,
+.hero:is(.image-dark, .dark, .image-darkest, .darkest) a.button:hover {
+  border-color: var(--color-white);
+  color: var(--color-white);
+}
+
+.hero a.button.emphasis,
+.hero a.button.emphasis:hover {
+  border-color: var(--color-charcoal);
+  background-color: var(--color-charcoal);
+  color: var(--color-white);  
+}
+
+.hero:is(.image-dark, .dark, .image-darkest, .darkest) a.button.emphasis,
+.hero:is(.image-dark, .dark, .image-darkest, .darkest) a.button.emphasis:hover {
+  border-color: var(--color-white);
+  background-color: var(--color-white);
+  color: var(--color-charcoal);
+}

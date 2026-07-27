@@ -47,6 +47,7 @@ function detectLayout(block) {
 
 /** @param {Element} block */
 export default function decorate(block) {
+  block.querySelectorAll('a.button').forEach((button) => button.classList.toggle('emphasis'));
   detectLayout(block);
   buildVideo(block);
 
