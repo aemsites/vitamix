@@ -17,14 +17,17 @@
   gap: 8px;
   padding: 12px 20px;
   margin: 0 -24px 24px;
-  background: color-mix(in srgb, var(--commerce-color-success) 12%, var(--commerce-color-background));
+
+  /* Informational blue (not green) so the banner reads as "in progress / review"
+     rather than implying the order is already complete. */
+  background: color-mix(in srgb, #0070e0 10%, var(--commerce-color-background));
   color: var(--commerce-color-text);
   font-size: var(--commerce-font-size-sm);
 }
 
 .order-review-banner-icon {
   flex: 0 0 auto;
-  color: var(--commerce-color-success);
+  color: #0070e0;
 }
 
 .order-review-banner-title {
