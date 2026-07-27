@@ -253,14 +253,6 @@ function resolveResourcePath(urlStr, context) {
     return a;
   };
 
-  const buildWarningIcon = () => {
-    const span = document.createElement('span');
-    span.className = 'rollout-warning-icon';
-    span.innerHTML = WARNING_ICON_SVG;
-    span.title = 'This page was modified since the last rollout — rolling out will overwrite those changes.';
-    return span;
-  };
-
   const buildPendingStatusIcons = () => {
     const container = document.createElement('span');
     container.className = 'rollout-status-icons rollout-status-icons-pending';
@@ -352,7 +344,6 @@ function resolveResourcePath(urlStr, context) {
       const content = document.createElement('div');
       content.className = 'rollout-app-cell-content';
       content.appendChild(labelEl);
-      if (hasLocalChanges) content.appendChild(buildWarningIcon());
       content.appendChild(buildPendingStatusIcons());
       td.appendChild(content);
 
