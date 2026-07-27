@@ -208,8 +208,8 @@ test.describe('Order review page (display-only)', () => {
       await expect(totals).toContainText('$12.00'); // shipping
       await expect(totals).toContainText('$33.78'); // tax
       await expect(page.locator('.order-review-grand-value')).toHaveText('$511.78');
-      await expect(page.locator('.order-review-complete')).toContainText('Complete order');
-      await expect(page.locator('.order-review-complete')).toContainText('$511.78');
+      // The button reads just "Complete order" (the total lives in the summary).
+      await expect(page.locator('.order-review-complete')).toContainText(/complete order/i);
       await expect(page.locator('.order-review-terms a')).toHaveAttribute('href', /legal-notice$/);
       await expect(page.locator('.order-review-cancel')).toBeVisible();
       console.log('✓ Totals summary + Complete button render with grand total');
@@ -266,6 +266,33 @@ test.describe('Order review page (display-only)', () => {
       await page.waitForTimeout(500);
       expect(page.url()).toContain('/order/review');
       console.log('✓ Failed confirm stays on review with an error');
+    });
+
+    test('a cancelled/expired order shows a clear message and returns to the cart', async ({ page }) => {
+      await setupReviewMocks(page, {
+        confirm: async (route) => {
+          await route.fulfill({
+            status: 422,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              code: 'ADOBE_COMMERCE_UNPROCESSABLE',
+              message: "item not available in country ''",
+              details: { rule: 'order_not_confirmable', state: 'payment_cancelled' },
+              retryable: false,
+            }),
+          });
+        },
+      });
+      await gotoReview(page, baseUrl);
+
+      await expect(page.locator('.order-review-complete')).toBeVisible({ timeout: 15000 });
+      await page.locator('.order-review-complete').click();
+
+      // Clear, non-generic message (not the misleading API "item not available").
+      await expect(page.locator('.order-review-error')).toContainText(/expired or been cancelled/i, { timeout: 10000 });
+      // Then routed back to the cart to start over.
+      await expect.poll(() => page.url(), { timeout: 15000 }).toMatch(/\/order\/cart/);
+      console.log('✓ Cancelled/expired order → clear message → cart');
     });
 
     test('Cancel and return to cart → cancel endpoint (with idempotencyKey) → cart', async ({ page }) => {

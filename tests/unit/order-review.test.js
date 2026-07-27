@@ -7,6 +7,7 @@ import {
   createConfirmHandler,
   createCancelHandler,
   createAbandonmentHandler,
+  isOrderNotConfirmable,
 } from '../../blocks/order-review/order-review.js';
 
 beforeEach(() => {
@@ -159,6 +160,41 @@ describe('createConfirmHandler', () => {
     assert.equal(routedTo, null);
     assert.equal(errored, 'fallback message');
   });
+
+  test('routes to not-confirmable handling on a 422 order_not_confirmable, not a generic error', async () => {
+    let errored = null;
+    let notConfirmable = false;
+    const err = Object.assign(new Error('unprocessable'), {
+      status: 422,
+      body: { details: { rule: 'order_not_confirmable', state: 'payment_cancelled' } },
+    });
+    const handler = createConfirmHandler({
+      orderId: 'o',
+      confirm: async () => { throw err; },
+      routeTo: () => {},
+      onError: (msg) => { errored = msg; },
+      onNotConfirmable: () => { notConfirmable = true; },
+      errorMessage: 'fallback message',
+    });
+    await handler();
+    assert.equal(notConfirmable, true);
+    assert.equal(errored, null); // no generic error when the order is dead
+  });
+});
+
+describe('isOrderNotConfirmable', () => {
+  test('true for a 422 with order_not_confirmable rule or payment_cancelled state', () => {
+    assert.equal(isOrderNotConfirmable({ status: 422, body: { details: { rule: 'order_not_confirmable' } } }), true);
+    assert.equal(isOrderNotConfirmable({ status: 422, body: { details: { state: 'payment_cancelled' } } }), true);
+  });
+
+  test('false for other statuses, other 422s, or missing errors', () => {
+    assert.equal(isOrderNotConfirmable({ status: 503, body: { retryable: true } }), false);
+    assert.equal(isOrderNotConfirmable({ status: 422, body: { details: { rule: 'something_else' } } }), false);
+    assert.equal(isOrderNotConfirmable({ status: 422 }), false);
+    assert.equal(isOrderNotConfirmable(null), false);
+    assert.equal(isOrderNotConfirmable(undefined), false);
+  });
 });
 
 describe('createCancelHandler', () => {
@@ -207,5 +243,25 @@ describe('createAbandonmentHandler', () => {
     });
     handler();
     assert.equal(sent, 0);
+  });
+
+  test('does not send on a back/forward-cache transition (pagehide persisted=true)', () => {
+    let sent = 0;
+    const handler = createAbandonmentHandler({
+      isFinalized: () => false,
+      sendCancel: () => { sent += 1; },
+    });
+    handler({ persisted: true });
+    assert.equal(sent, 0);
+  });
+
+  test('sends on a genuine terminal unload (pagehide persisted=false)', () => {
+    let sent = 0;
+    const handler = createAbandonmentHandler({
+      isFinalized: () => false,
+      sendCancel: () => { sent += 1; },
+    });
+    handler({ persisted: false });
+    assert.equal(sent, 1);
   });
 });

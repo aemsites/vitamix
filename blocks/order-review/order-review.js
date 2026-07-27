@@ -40,6 +40,20 @@ export function resolveConfirmResult(result = {}) {
 }
 
 /**
+ * Detects the confirm response that means the order can no longer be captured:
+ * a 422 whose details report `order_not_confirmable` or a `payment_cancelled`
+ * state (e.g. the order was cancelled by abandonment or expired on PayPal).
+ *
+ * @param {{ status?: number, body?: { details?: { rule?: string, state?: string } } }} err
+ * @returns {boolean}
+ */
+export function isOrderNotConfirmable(err) {
+  const details = err?.body?.details;
+  return err?.status === 422
+    && (details?.rule === 'order_not_confirmable' || details?.state === 'payment_cancelled');
+}
+
+/**
  * Builds the "Complete order" click handler. Calls the injected confirm
  * function with a fresh idempotency key, then routes on the resolved action
  * or surfaces the failure without navigating away.
@@ -54,12 +68,16 @@ export function resolveConfirmResult(result = {}) {
  * @param {(action: 'complete'|'processing') => void} deps.routeTo
  * @param {(message: string) => void} deps.onError
  * @param {(busy: boolean) => void} [deps.setBusy]
+ * @param {(message: string) => void} deps.onError
+ * @param {() => void} [deps.onNotConfirmable] - called when the order can no
+ *   longer be confirmed (cancelled/expired) so retrying is futile
  * @param {string} deps.errorMessage
  * @param {() => string} [deps.newKey]
  * @returns {() => Promise<void>}
  */
 export function createConfirmHandler({
-  orderId, confirm, routeTo, onError, setBusy, errorMessage, newKey = newIdempotencyKey,
+  orderId, confirm, routeTo, onError, onNotConfirmable, setBusy, errorMessage,
+  newKey = newIdempotencyKey,
 }) {
   return async () => {
     setBusy?.(true);
@@ -73,7 +91,14 @@ export function createConfirmHandler({
         return;
       }
       routeTo(action);
-    } catch {
+    } catch (err) {
+      // The order is no longer confirmable (cancelled / expired). Retrying is
+      // futile and the API's "item not available" message is misleading, so
+      // guide the buyer back to the cart instead of showing a generic retry.
+      if (isOrderNotConfirmable(err) && onNotConfirmable) {
+        onNotConfirmable();
+        return;
+      }
       onError(errorMessage);
       setBusy?.(false);
     }
@@ -147,7 +172,13 @@ export function resolveReviewTotals(order, preview) {
  * @returns {() => void}
  */
 export function createAbandonmentHandler({ isFinalized, sendCancel }) {
-  return () => {
+  return (event) => {
+    // Skip back/forward-cache transitions: `pagehide` fires with persisted=true
+    // on tab switch / app backgrounding / navigate-and-return, none of which are
+    // abandonment. Cancelling on those wrongly killed orders the buyer still
+    // intended to complete. Only a genuine terminal unload (persisted=false)
+    // counts as leaving the page.
+    if (event && event.persisted) return;
     if (isFinalized()) return;
     sendCancel();
   };
@@ -453,9 +484,8 @@ export default async function decorate(block) {
       'order-review-totals-discount',
     ]);
   });
-  const methodLabelForRow = method.label || method.name || method.title;
   rows.push([
-    methodLabelForRow ? `${s.shipping} · ${methodLabelForRow}` : s.shipping,
+    s.shipping,
     methodRate ? formatPrice(methodRate, currencyCode) : (s.free || 'Free'),
   ]);
   rows.push([s.estimatedTaxes || s.orderTax, formatPrice(totals.tax, currencyCode)]);
@@ -540,12 +570,26 @@ export default async function decorate(block) {
     });
     window.location.href = config.getOrderPath('cart');
   };
+  // The order can no longer be captured (cancelled/expired). Explain clearly
+  // and route back to the cart so the buyer can start over.
+  const onNotConfirmable = () => {
+    finalized = true;
+    showError(s.reviewOrderCancelled);
+    completeBtn.disabled = true;
+    logOperation('checkout-failed', {
+      checkoutId: getCheckoutId(), orderId, reason: 'order_not_confirmable',
+    });
+    window.setTimeout(() => {
+      window.location.href = config.getOrderPath('cart');
+    }, 3000);
+  };
 
   completeBtn.addEventListener('click', createConfirmHandler({
     orderId,
     confirm: confirmPayment,
     routeTo: routeToComplete,
     onError: showError,
+    onNotConfirmable,
     setBusy,
     errorMessage: s.reviewCompleteError,
   }));
