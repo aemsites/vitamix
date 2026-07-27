@@ -403,10 +403,30 @@ button.order-review-complete {
   height: 16px;
 }
 
-.order-review-complete:disabled,
-.order-review-complete.order-review-busy {
-  opacity: 0.6;
-  cursor: progress;
+.order-review-complete:disabled {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* Loading state mirrors checkout-submit-btn: hide the lock and spin a ring in
+   its place while the confirm request is in flight. */
+.order-review-complete.is-loading .order-review-complete-icon svg {
+  display: none;
+}
+
+.order-review-complete.is-loading .order-review-complete-icon::after {
+  content: '';
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgb(255 255 255 / 40%);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: order-review-spin 0.7s linear infinite;
+}
+
+@keyframes order-review-spin {
+  to { transform: rotate(360deg); }
 }
 
 .order-review-error {

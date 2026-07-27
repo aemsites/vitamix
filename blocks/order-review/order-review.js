@@ -559,7 +559,7 @@ export default async function decorate(block) {
   };
   const setBusy = (busy) => {
     completeBtn.disabled = busy;
-    completeBtn.classList.toggle('order-review-busy', busy);
+    completeBtn.classList.toggle('is-loading', busy);
   };
   // Guards the abandonment cancel: once the buyer completes or explicitly
   // cancels, leaving the page is intentional and must not trigger a cancel.
