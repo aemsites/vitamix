@@ -8,6 +8,11 @@ import { getLocaleAndLanguage } from '../scripts.js';
 import { getUser, isLoggedIn } from '../auth-api.js';
 import { logOperation, getCheckoutId } from '../operations-log.js';
 import ensureCheckoutPreviewToken, { withPayPalExpressContext } from './paypal-context.js';
+import {
+  isExpressReviewEnabled,
+  resolveExpressOutcome,
+  withInitiateRetry,
+} from './paypal-review.js';
 
 let sdkLoadPromise = null;
 
@@ -28,7 +33,7 @@ function getPayLaterLabel(language) {
   return PAY_LATER_LABELS[lang] || 'Pay Later';
 }
 
-function loadSdk(clientId, currency, locale, intent = 'capture') {
+function loadSdk(clientId, currency, locale, intent = 'capture', commit = false) {
   if (sdkLoadPromise) return sdkLoadPromise;
   sdkLoadPromise = new Promise((resolve, reject) => {
     if (window.paypal) { resolve(); return; }
@@ -41,7 +46,9 @@ function loadSdk(clientId, currency, locale, intent = 'capture') {
       components: 'buttons,messages',
       locale: normalizedLocale,
       intent,
-      commit: 'false',
+      // Review-mode express → "Continue" (commit:false), promising a review page;
+      // review-off → "Pay Now" (commit:true), finalizing on approval.
+      commit: String(commit),
       'enable-funding': 'paylater',
     });
     script.src = `https://www.paypal.com/sdk/js?${params}`;
@@ -101,8 +108,11 @@ export default {
       : (config.currency || 'USD');
     const locale = config.getLanguage().replace('-', '_');
     const intent = (window.CommerceConfig?.paypal?.intent || 'capture').toLowerCase();
+    // Review-mode express renders a "Continue" button (commit:false); otherwise
+    // "Pay Now" (commit:true). Gated on the surfaced orderReview.express flag.
+    const commit = !isExpressReviewEnabled();
     try {
-      await loadSdk(clientId, currency, locale, intent);
+      await loadSdk(clientId, currency, locale, intent, commit);
     } catch { /* fall back to stub buttons */ }
   },
 
@@ -301,16 +311,32 @@ export default {
           const fraudToken = (() => {
             try { return sessionStorage.getItem('forter_token') || undefined; } catch { return undefined; }
           })();
+          const orderId = createdOrder.order?.id ?? createdOrder.id;
           const idempotencyKey = crypto.randomUUID?.() || `${Date.now()}`;
-          const result = await callbacks.initiatePayment(
-            createdOrder.order?.id ?? createdOrder.id,
+          // Retry a transient (retryable 5xx) initiate against the SAME order and
+          // idempotencyKey rather than dead-ending an approved checkout.
+          const result = await withInitiateRetry(() => callbacks.initiatePayment(
+            orderId,
             idempotencyKey,
             fraudToken,
             'paypal-express',
             'paypal',
             { paypalOrderId: state.paypalSessionId },
-          );
-          if (result.status === 'completed') {
+          ));
+          const outcome = resolveExpressOutcome(result);
+          if (outcome === 'review') {
+            // Review mode: hand off to the storefront review page. Seed the
+            // checkout session first — especially the email proof — so the review
+            // page can resolve the order via getOrder (the express flow does not
+            // otherwise persist checkout_email like the checkout-page flow does).
+            callbacks.saveCheckoutSession(
+              customerEmail,
+              cart,
+              callbacks.getState().currentPreview,
+              createdOrder.order ?? createdOrder,
+            );
+            window.location.href = `${config.getOrderPath('review')}?orderId=${encodeURIComponent(orderId)}`;
+          } else if (outcome === 'completed') {
             callbacks.onComplete(createdOrder);
           } else {
             callbacks.showError(result.reason || 'PayPal payment failed. Please try again.');

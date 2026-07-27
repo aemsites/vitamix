@@ -1,4 +1,8 @@
 import { test, expect } from '@playwright/test';
+import {
+  resolveExpressOutcome,
+  withInitiateRetry,
+} from '../../scripts/payments/paypal-review.js';
 
 function withPayPalExpressContext(payload, entryPoint) {
   return {
@@ -166,16 +170,29 @@ async function handleApprove(callbacks, deps) {
           || undefined;
       } catch { return undefined; }
     })();
+    const orderId = createdOrder.order?.id ?? createdOrder.id;
     const idempotencyKey = crypto.randomUUID?.() || `${Date.now()}`;
-    const result = await callbacks.initiatePayment(
-      createdOrder.order?.id ?? createdOrder.id,
+    // Retry a transient (retryable 5xx) initiate against the same order and key.
+    const result = await withInitiateRetry(() => callbacks.initiatePayment(
+      orderId,
       idempotencyKey,
       fraudToken,
       'paypal-express',
       'paypal',
       { paypalOrderId: state.paypalSessionId },
-    );
-    if (result.status === 'completed') {
+    ));
+    const outcome = resolveExpressOutcome(result);
+    if (outcome === 'review') {
+      // Seed the checkout session (esp. the email proof) then route to the
+      // storefront review page. `deps.navigate` stands in for `window.location.href =`.
+      callbacks.saveCheckoutSession(
+        customerEmail,
+        cart,
+        callbacks.getState().currentPreview,
+        createdOrder.order ?? createdOrder,
+      );
+      deps.navigate(`${config.getOrderPath('review')}?orderId=${encodeURIComponent(orderId)}`);
+    } else if (outcome === 'completed') {
       callbacks.onComplete(createdOrder);
     } else {
       callbacks.showError(result.reason || 'PayPal payment failed. Please try again.');
@@ -193,13 +210,15 @@ async function handleApprove(callbacks, deps) {
  * @param {string} locale
  * @returns {string}
  */
-function buildSdkUrl(clientId, currency, locale) {
+function buildSdkUrl(clientId, currency, locale, commit = false) {
   const params = new URLSearchParams({
     'client-id': clientId,
     currency,
     components: 'buttons,messages',
     locale,
-    commit: 'false',
+    // Review-mode express → commit:false ("Continue"); review-off → commit:true
+    // ("Pay Now"). loadSdk derives this from orderReview.express.
+    commit: String(commit),
     'enable-funding': 'paylater',
   });
   return `https://www.paypal.com/sdk/js?${params}`;
@@ -227,13 +246,15 @@ function makeCallbacks(state = makeState(), overrides = {}) {
       getLanguage: () => 'en-US',
       currency: 'USD',
       getLocale: () => 'en-US',
+      getOrderPath: (page) => `/us/en_us/order/${page}`,
     }),
     getState: () => state,
-    getCart: () => ({ getItemsForAPI: () => ITEMS }),
+    getCart: () => ({ getItemsForAPI: () => ITEMS, items: ITEMS }),
     createOrder: async () => ({ order: { id: 'ORD-001' } }),
     initiatePayment: async () => ({ status: 'completed' }),
     onComplete: () => {},
     showError: () => {},
+    saveCheckoutSession: () => {},
     previewOrderDirect: async () => ({ estimateToken: 'est-new-456' }),
     ...overrides,
   };
@@ -620,6 +641,54 @@ test.describe('onApprove callback', () => {
     await handleApprove(callbacks, deps);
     expect(errorMsg).toBe('PayPal payment failed. Please try again.');
   });
+
+  test('routes to the review page and seeds the session when initiate returns action:review', async () => {
+    const state = makeState();
+    let navigatedTo = null;
+    let savedArgs = null;
+    let completed = false;
+    const callbacks = makeCallbacks(state, {
+      initiatePayment: async () => ({
+        action: 'review', status: 'requires_action', paypalOrderId: 'PP-1',
+      }),
+      saveCheckoutSession: (email, cart, preview, order) => {
+        savedArgs = {
+          email, cart, preview, order,
+        };
+      },
+      onComplete: () => { completed = true; },
+    });
+    const deps = {
+      getPayPalSessionFn: async () => SESSION,
+      navigate: (url) => { navigatedTo = url; },
+    };
+    await handleApprove(callbacks, deps);
+    expect(navigatedTo).toBe('/us/en_us/order/review?orderId=ORD-001');
+    expect(savedArgs.email).toBe('john@example.com'); // seeds the email proof
+    expect(savedArgs.order).toEqual({ id: 'ORD-001' });
+    expect(completed).toBe(false); // review mode does NOT finalize inline
+  });
+
+  test('retries a retryable initiate error against the same order, then completes', async () => {
+    const state = makeState();
+    let attempts = 0;
+    const orderIds = [];
+    let completed = false;
+    const callbacks = makeCallbacks(state, {
+      initiatePayment: async (orderId) => {
+        attempts += 1;
+        orderIds.push(orderId);
+        if (attempts === 1) throw Object.assign(new Error('PayPal outage'), { status: 502 });
+        return { status: 'completed' };
+      },
+      onComplete: () => { completed = true; },
+    });
+    const deps = { getPayPalSessionFn: async () => SESSION };
+    await handleApprove(callbacks, deps);
+    expect(attempts).toBe(2);
+    expect(orderIds).toEqual(['ORD-001', 'ORD-001']); // same order retried
+    expect(completed).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -627,9 +696,14 @@ test.describe('onApprove callback', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('SDK load parameters', () => {
-  test('includes commit=false in the SDK URL', () => {
-    const url = buildSdkUrl('test-client-id', 'USD', 'en_US');
+  test('uses commit=false ("Continue") when express review is enabled', () => {
+    const url = buildSdkUrl('test-client-id', 'USD', 'en_US', false);
     expect(url).toContain('commit=false');
+  });
+
+  test('uses commit=true ("Pay Now") when express review is disabled', () => {
+    const url = buildSdkUrl('test-client-id', 'USD', 'en_US', true);
+    expect(url).toContain('commit=true');
   });
 
   test('includes messages in the components parameter', () => {
