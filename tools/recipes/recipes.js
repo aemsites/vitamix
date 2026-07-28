@@ -326,6 +326,7 @@ function formatShortDate(dateValue) {
 }
 
 function buildRecipeTitleHtml(name, number, highlightTerm = '') {
+  // eslint-disable-next-line no-use-before-define
   const nameHtml = highlightTerm ? highlightText(name, highlightTerm) : name;
   return `${nameHtml} <span class="recipe-number">(${number})</span>`;
 }
@@ -497,12 +498,14 @@ async function lookupImporterImageUrl(recipeNumber, recipeName, daToken, daFetch
   const importerIndex = await loadImporterAssetIndex(daFetch, context);
   if (!importerIndex?.size) return '';
 
+  // eslint-disable-next-line no-use-before-define
   const { byNumber } = await getRecipeIndexCache();
   const entry = byNumber.get(recipeNumber.toUpperCase());
   const slug = getRecipeSlugFromEntry(entry, recipeName, recipeNumber);
   const assetName = importerIndex.get(getImporterAssetLookupKey(slug));
   if (!assetName) return '';
 
+  // eslint-disable-next-line no-use-before-define
   return resolveImporterPreviewImageUrl(assetName, daToken);
 }
 
@@ -511,6 +514,7 @@ async function fetchRecipeImageWithFallback(recipeNumber, kebabName, recipeName,
     onLog, daToken, daFetch, daContext,
   } = options;
 
+  // eslint-disable-next-line no-use-before-define
   const indexImage = await fetchRecipeImageFromIndex(recipeNumber, kebabName, recipeName, onLog);
   if (indexImage) return indexImage;
 
@@ -590,7 +594,13 @@ async function resolveImporterThumbnails(recipes, indexEntriesByNumber) {
     const number = recipe.getAttribute('Number');
     const name = recipe.getAttribute('Name');
 
-    const url = await lookupImporterImageUrl(number, name, sdk.token, sdk.actions.daFetch, sdk.context);
+    const url = await lookupImporterImageUrl(
+      number,
+      name,
+      sdk.token,
+      sdk.actions.daFetch,
+      sdk.context,
+    );
     if (url) {
       thumbnails.set(number, { url, isImporter: true });
     }
@@ -633,14 +643,12 @@ async function fetchRecipeIndexEntries() {
         credentials: proxied ? 'include' : 'same-origin',
       });
 
-      if (!response.ok) {
-        lastError = new Error(`HTTP error! status: ${response.status}`);
-        continue;
+      if (response.ok) {
+        // eslint-disable-next-line no-await-in-loop
+        const data = await response.json();
+        return data.data || [];
       }
-
-      // eslint-disable-next-line no-await-in-loop
-      const data = await response.json();
-      return data.data || [];
+      lastError = new Error(`HTTP error! status: ${response.status}`);
     } catch (error) {
       lastError = error;
     }
@@ -822,6 +830,7 @@ function applyLastWeekViewUI() {
   const resultsHeading = document.querySelector('#results h2');
   if (resultsHeading) resultsHeading.textContent = 'Last Week Modifications';
 
+  // eslint-disable-next-line no-use-before-define
   updateBulkSyncButton();
 }
 
