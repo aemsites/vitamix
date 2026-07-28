@@ -1,0 +1,59 @@
+<script type="module" src="/widgets/tco/tco.js"></script>
+<form class="tco-inputs" novalidate>
+  <div class="field">
+    <label for="tco-model"></label>
+    <select id="tco-model" required>
+      <option value=""></option>
+    </select>
+  </div>
+
+  <div class="field">
+    <label for="tco-msrp"></label>
+    <input id="tco-msrp" type="number" min="0" step="0.01" placeholder="0.00">
+  </div>
+
+  <div class="field">
+    <label for="tco-profit"></label>
+    <input id="tco-profit" type="number" min="0" step="0.01" placeholder="2.50">
+  </div>
+
+  <div class="field">
+    <label for="tco-blends-per-day"></label>
+    <input id="tco-blends-per-day" type="number" min="0" step="1" placeholder="150">
+  </div>
+
+  <div class="field">
+    <label for="tco-operating-days"></label>
+    <input id="tco-operating-days" type="number" min="0" max="7" step="1" placeholder="7">
+  </div>
+
+  <div class="field">
+    <label for="tco-blend-time"></label>
+    <input id="tco-blend-time" type="number" min="0" step="1" placeholder="45">
+  </div>
+</form>
+
+<section class="tco-results" aria-live="polite">
+  <dl>
+    <dt class="eyebrow" id="tco-dt-faster-blend-time"></dt>
+    <dd><output id="tco-faster-blend-time">—</output></dd>
+
+    <dt class="eyebrow" id="tco-dt-warranty-hours"></dt>
+    <dd><output id="tco-warranty-hours">—</output></dd>
+
+    <dt class="eyebrow" id="tco-dt-warranty-days"></dt>
+    <dd><output id="tco-warranty-days">—</output></dd>
+
+    <dt class="eyebrow" id="tco-dt-break-even"></dt>
+    <dd>
+      <output id="tco-break-even">—</output>
+      <meter id="tco-break-even-meter" aria-labelledby="tco-dt-break-even" min="0" value="0" hidden></meter>
+    </dd>
+
+    <dt class="eyebrow" id="tco-dt-cost-per-blend-days"></dt>
+    <dd><output id="tco-cost-per-blend-days">—</output></dd>
+
+    <dt class="eyebrow" id="tco-dt-cost-per-blend-hours"></dt>
+    <dd><output id="tco-cost-per-blend-hours">—</output></dd>
+  </dl>
+</section>

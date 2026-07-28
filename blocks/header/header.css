@@ -5,7 +5,7 @@ header {
   background-color: var(--layer-base);
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: 301;
 }
 
 header a:any-link {
@@ -280,6 +280,10 @@ header .nav-sections .submenu-wrapper ul > li.submenu-wrapper ul > li a:last-chi
     background-color: var(--color-background);
     font-size: var(--body-size-m);
     z-index: 2;
+  }
+
+  header .nav-sections nav > ul > li.submenu-wrapper:not([data-source="fragment"]) > [aria-expanded="true"] + ul {
+    display: block;
   }
 
   header.header-commercial .nav-sections nav > ul > li.submenu-wrapper > [aria-expanded="true"] + ul {

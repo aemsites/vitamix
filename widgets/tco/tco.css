@@ -1,0 +1,122 @@
+/* TCO Calculator Widget */
+.tco {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-400);
+  max-width: 900px;
+  margin: 0 auto;
+  padding: var(--spacing-400);
+  background-color: var(--color-charcoal);
+  color: var(--color-white);
+}
+
+@media (width >= 600px) {
+  .tco {
+    grid-template-columns: max-content 1fr;
+  }
+}
+
+.tco .tco-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 1em;
+  margin-bottom: var(--spacing-100);
+}
+
+.tco .field label {
+  color: inherit;
+}
+
+.tco .field input:focus-visible,
+.tco .field select:focus-visible {
+  outline: 2px solid var(--color-red);
+  outline-offset: 2px;
+  border-color: var(--color-charcoal);
+}
+
+.tco .tco-results {
+  display: flex;
+  align-items: center;
+  border-radius: var(--rounding-m);
+  padding: var(--spacing-300);
+  background-color: var(--color-gray-200);
+}
+
+.tco .tco-results dl {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.tco .tco-results dt.eyebrow {
+  color: var(--color-gray-900);
+}
+
+.tco .tco-results dt#tco-dt-break-even {
+  margin-top: var(--spacing-400);
+  border-top: var(--border-s) solid var(--color-gray-400);
+  padding-top: var(--spacing-400);
+}
+
+.tco .tco-results dd {
+  margin: 0;
+  color: var(--color-charcoal);
+  font-size: var(--heading-size-l);
+  font-weight: bold;
+}
+
+.tco .tco-results dd + dt {
+  margin-top: 1em;
+}
+
+.tco #tco-break-even-meter {
+  display: block;
+  width: 100%;
+  height: 8px;
+  margin: var(--spacing-60) 0 1em;
+  border-radius: var(--rounding-s);
+}
+
+.tco #tco-break-even-meter::-webkit-meter-bar {
+  height: var(--border-l);
+  border: none;
+  border-radius: var(--rounding-s);
+  background: var(--color-gray-100);
+}
+
+.tco #tco-break-even-meter[value="0"]::-webkit-meter-bar {
+  background: inherit;
+}
+
+.tco #tco-break-even-meter::-webkit-meter-optimum-value {
+  border-radius: var(--rounding-s);
+  background: var(--color-green);
+}
+
+.tco #tco-break-even-meter::-webkit-meter-suboptimum-value {
+  border-radius: var(--rounding-s);
+  background: var(--color-yellow);
+}
+
+.tco #tco-break-even-meter::-webkit-meter-even-less-good-value {
+  border-radius: var(--rounding-s);
+  background: var(--color-chili);
+}
+
+.tco #tco-dt-faster-blend-time,
+.tco #tco-dt-faster-blend-time + dd,
+.tco #tco-dt-warranty-hours,
+.tco #tco-dt-warranty-hours + dd,
+.tco #tco-dt-cost-per-blend-hours,
+.tco #tco-dt-cost-per-blend-hours + dd {
+  display: none;
+}
+
+.tco[data-model="quick-and-quiet"] #tco-dt-faster-blend-time,
+.tco[data-model="quick-and-quiet"] #tco-dt-faster-blend-time + dd,
+.tco[data-model="quick-and-quiet"] #tco-dt-warranty-hours,
+.tco[data-model="quick-and-quiet"] #tco-dt-warranty-hours + dd,
+.tco[data-model="quick-and-quiet"] #tco-dt-cost-per-blend-hours,
+.tco[data-model="quick-and-quiet"] #tco-dt-cost-per-blend-hours + dd {
+  display: block;
+}

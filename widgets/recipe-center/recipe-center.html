@@ -42,6 +42,25 @@
     <div class="list"></div>
     <button type="button" class="button accent apply">See Results</button>
   </aside>
+  <div class="no-results" hidden>
+    <div class="img-wrapper">
+      <img
+        src="/widgets/404/recipe-no-results-image.svg"
+        alt=""
+        width="234"
+        height="165"
+        loading="lazy"
+      />
+    </div>
+    <div class="copy">
+      <h2 class="no-results-title"></h2>
+      <p class="eyebrow"></p>
+      <p class="lead"></p>
+      <p class="button-wrapper">
+        <button type="button" class="button accent reset-selections" data-action="reset-recipe-filters">Reset Selections</button>
+      </p>
+    </div>
+  </div>
   <ul class="results" id="recipe-results" aria-live="polite"></ul>
   <nav class="pagination"></nav>
 </div>

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
+    <title>Recipe Redirect Generator | Vitamix</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="auth.css">
+    <link rel="stylesheet" href="redirects.css">
+</head>
+<body>
+    <header class="header">
+        <div class="header-inner">
+            <div>
+                <h1>Recipe Redirect Generator</h1>
+                <p>Paste 404 path reports, match recipe slugs, and export redirect mappings</p>
+            </div>
+            <nav class="header-nav">
+                <a href="reviews.html">Recipe Reviews</a>
+                <a href="redirects.html" aria-current="page">Redirect Generator</a>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <section class="input-section">
+            <label for="path-input">Paste paths (tab-separated export or one path per line)</label>
+            <textarea
+                id="path-input"
+                rows="14"
+                placeholder="Value&#9;Count&#9;OK (2xx/3xx)&#9;4xx&#9;5xx&#10;/us/en_us/recipes/chocolate-dessert-hummus?cid=...&#9;1053&#9;0&#9;1053&#9;0"
+                spellcheck="false"
+            ></textarea>
+            <div class="actions">
+                <button type="button" id="generate-btn" class="btn-primary">Generate Redirects</button>
+                <button type="button" id="clear-btn" class="btn-secondary">Clear</button>
+            </div>
+        </section>
+
+        <div id="status" class="status" hidden></div>
+
+        <div id="stats" class="stats-bar" hidden>
+            <div class="stat-card">
+                <div class="label">Recipe Paths</div>
+                <div class="value" id="stat-paths">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Redirects</div>
+                <div class="value" id="stat-redirects">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">No Match</div>
+                <div class="value" id="stat-unmatched">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Skipped</div>
+                <div class="value" id="stat-skipped">0</div>
+            </div>
+        </div>
+
+        <section id="results-section" class="results-section" hidden>
+            <div class="results-header">
+                <h2>Redirect mappings</h2>
+                <div class="results-actions">
+                    <button type="button" id="copy-tsv-btn" class="btn-export">Copy TSV</button>
+                    <button type="button" id="copy-sources-btn" class="btn-export">Copy Sources</button>
+                    <button type="button" id="copy-destinations-btn" class="btn-export">Copy Destinations</button>
+                </div>
+            </div>
+            <div class="table-wrap">
+                <table id="results-table">
+                    <thead>
+                        <tr>
+                            <th>Source</th>
+                            <th>Destination</th>
+                            <th>Count</th>
+                            <th>Match</th>
+                        </tr>
+                    </thead>
+                    <tbody id="results-body"></tbody>
+                </table>
+            </div>
+            <p id="unmatched-note" class="unmatched-note" hidden></p>
+        </section>
+    </div>
+
+    <script type="module" src="redirects.js"></script>
+</body>
+</html>

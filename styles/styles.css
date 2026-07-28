@@ -17,6 +17,7 @@
 @import url('typography.css');
 
 
+:host,
 :root {
   --color-brand-primary: var(--color-charcoal);
   --color-brand-secondary: var(--color-red);
@@ -71,6 +72,7 @@ body.pdp-template {
 }
 
 @media (width >= 900px) {
+  :host,
   :root {
     /* widths and heights */
     --horizontal-spacing: var(--spacing-800);
@@ -78,6 +80,7 @@ body.pdp-template {
 }
 
 @media (width >= 1000px) {
+  :host,
   :root {
     /* widths and heights */
     --header-height: 84px;
@@ -607,6 +610,11 @@ button.button.close:focus {
   background-color: var(--color-shadow);
 }
 
+.default-content-wrapper .button.link {
+  text-align: left;
+  line-height: var(--line-height-xl);
+}
+
 @media (width >= 800px) {
   a.button,
   button.button {
@@ -655,12 +663,6 @@ label,
 legend {
   color: var(--color-charcoal);
   font-size: var(--body-size-xs);
-}
-
-input:hover,
-textarea:hover,
-select:hover {
-  /* border-color: var(--color-gray-400); */
 }
 
 input:focus,
@@ -894,4 +896,31 @@ body.corp main .default-content-wrapper h1 {
 
 body.corp main .default-content-wrapper h2 {
   font-size: var(--font-size-500);
+}
+
+body.corp-no-toc main .default-content-wrapper {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.consented .target-delay {
+  animation: fadein 3.5s ease-in-out 0s 1 normal forwards;
+}
+
+.target-delay {
+  animation: fadein 1s ease-in-out 0s 1 normal forwards;
+}
+
+@keyframes fadein {
+  0% {
+    opacity: 0;
+  }
+
+  90% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
 }

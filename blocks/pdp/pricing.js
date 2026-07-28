@@ -1,4 +1,4 @@
-import { formatPrice, getOfferPricing } from '../../scripts/scripts.js';
+import { formatPrice, getOfferPricing, getPdpOverride } from '../../scripts/scripts.js';
 
 /**
  * Renders the pricing section of the PDP block.
@@ -9,12 +9,14 @@ export default function renderPricing(ph, block, variant) {
   const pricingContainer = document.createElement('div');
   pricingContainer.classList.add('pricing');
 
-  // Don't render pricing if addToCart is set to No
-  if (window.jsonLdData?.custom?.addToCart === 'No') {
+  // Don't render pricing if addToCart is set to No.
+  // Authored `addToCart` override wins over the product bus custom.addToCart.
+  const effectiveAddToCart = getPdpOverride('addToCart') || window.jsonLdData?.custom?.addToCart;
+  if (effectiveAddToCart === 'No') {
     return pricingContainer;
   }
 
-  const pricing = variant
+  let pricing = variant
     ? variant.price
     : getOfferPricing(window.jsonLdData?.offers?.[0]);
   if (!pricing) {
@@ -32,6 +34,20 @@ export default function renderPricing(ph, block, variant) {
   // If the variant is null, check if the location href includes 'reconditioned'
   // If both are false, item is not reconditioned
   const isReconditioned = variant && variant.itemCondition ? variant.itemCondition.includes('RefurbishedCondition') : window.location.href.includes('reconditioned') || false;
+
+  // Reconditioned products carry the original (pre-reconditioned) price in
+  // custom.originalPrice. Use it as the regular/"New" price so the savings row
+  // renders against the original price instead of the reconditioned price.
+  // Variant selection has custom on the variant; the initial (no-variant) render
+  // reads it from the parent product's custom in window.jsonLdData.
+  if (isReconditioned) {
+    const originalPrice = variant
+      ? variant.custom?.originalPrice
+      : window.jsonLdData?.custom?.originalPrice;
+    if (originalPrice) {
+      pricing = { ...pricing, regular: parseFloat(originalPrice) };
+    }
+  }
 
   if (pricing.regular && pricing.regular > pricing.final) {
     const nowLabel = document.createElement('div');

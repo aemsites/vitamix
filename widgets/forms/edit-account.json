@@ -1,0 +1,80 @@
+{
+  "en": {
+    "labels": {
+      "accountInformation": "Account Information",
+      "allFieldsMandatory": "All fields are mandatory unless otherwise indicated (optional).",
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "emailAddress": "Email Address",
+      "postalCodeOptional": "Postal code (optional)",
+      "ownVitamix": "Do you own a Vitamix?",
+      "yes": "Yes",
+      "no": "No",
+      "communications": "Communications",
+      "newsletterQuestion": "Would you like to receive periodic emails and newsletters from Vitamix?",
+      "newsletterYes": "Yes",
+      "newsletterNo": "No, do not send me electronic mail",
+      "emailConsentDisclaimer": "",
+      "saveChanges": "Save changes",
+      "sending": "Sending..."
+    },
+    "inputPlaceholders": {
+      "firstName": "",
+      "lastName": "",
+      "emailAddress": "",
+      "postalCode": ""
+    }
+  },
+  "fr": {
+    "labels": {
+      "accountInformation": "Informations du compte",
+      "allFieldsMandatory": "Tous les champs sont obligatoires sauf indication contraire (optionnel).",
+      "firstName": "Prénom",
+      "lastName": "Nom de famille",
+      "emailAddress": "Adresse courriel",
+      "postalCodeOptional": "Code postal (optionnel)",
+      "ownVitamix": "Possédez-vous un Vitamix?",
+      "yes": "Oui",
+      "no": "Non",
+      "communications": "Communications",
+      "newsletterQuestion": "Souhaitez-vous recevoir des courriels et bulletins de Vitamix?",
+      "newsletterYes": "Oui",
+      "newsletterNo": "Non, ne pas m'envoyer de courriel",
+      "emailConsentDisclaimer": "",
+      "saveChanges": "Enregistrer les modifications",
+      "sending": "Envoi en cours..."
+    },
+    "inputPlaceholders": {
+      "firstName": "",
+      "lastName": "",
+      "emailAddress": "",
+      "postalCode": ""
+    }
+  },
+  "es": {
+    "labels": {
+      "accountInformation": "Información de la cuenta",
+      "allFieldsMandatory": "Todos los campos son obligatorios salvo que se indique lo contrario (opcional).",
+      "firstName": "Nombre",
+      "lastName": "Apellido",
+      "emailAddress": "Correo electrónico",
+      "postalCodeOptional": "Código postal (opcional)",
+      "ownVitamix": "¿Tiene un Vitamix?",
+      "yes": "Sí",
+      "no": "No",
+      "communications": "Comunicaciones",
+      "newsletterQuestion": "¿Desea recibir correos y boletines de Vitamix?",
+      "newsletterYes": "Sí",
+      "newsletterNo": "No, no deseo recibir correos electrónicos",
+      "emailConsentDisclaimer": "",
+      "saveChanges": "Guardar cambios",
+      "sending": "Enviando..."
+    },
+    "inputPlaceholders": {
+      "firstName": "",
+      "lastName": "",
+      "emailAddress": "",
+      "postalCode": ""
+    }
+  }
+}

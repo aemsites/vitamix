@@ -4,6 +4,7 @@ import {
   decorateIcon,
   decorateIcons,
   decorateSections,
+  decorateBlock,
   decorateBlocks,
   decorateTemplateAndTheme,
   waitForFirstImage,
@@ -16,6 +17,11 @@ import {
   loadScript,
   getMetadata,
 } from './aem.js';
+
+const isProdHost = window.location.hostname.includes('vitamix.com');
+export const FORMS_ENDPOINT = isProdHost
+  ? ''
+  : 'https://main--vitamix--aemsites.aem.network';
 
 /**
  * Load fonts.css and set a session storage flag.
@@ -38,7 +44,12 @@ export function getOfferPricing(offer) {
   if (!offer) return null;
   return {
     final: parseFloat(offer.price),
-    regular: offer.priceSpecification?.price || null,
+    // Reconditioned products carry the original (pre-reconditioned) price in
+    // custom.originalPrice and use it as the regular/was price. Fall back to the
+    // offer's list price when originalPrice is not present.
+    regular: offer.custom?.originalPrice
+      ? parseFloat(offer.custom.originalPrice)
+      : (offer.priceSpecification?.price || null),
   };
 }
 
@@ -53,6 +64,59 @@ export function formatPrice(value, ph) {
   const locale = (ph.languageCode || 'en_US').replace('_', '-');
   const currency = ph.currencyCode || 'USD';
   return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(value);
+}
+
+/**
+ * Formats a time string from HH:MM:SS to a human-readable string.
+ * @param {string} timeString - Time string in HH:MM:SS format
+ * @param {Object} [placeholders={}] - Localized labels for hours/minutes
+ * @returns {string} Formatted time string
+ */
+export function formatTime(timeString, placeholders = {}) {
+  if (!timeString) return '';
+
+  const parts = timeString.split(':');
+  if (parts.length !== 3) return timeString;
+
+  const hours = parseInt(parts[0], 10);
+  const minutes = parseInt(parts[1], 10);
+  const seconds = parseInt(parts[2], 10);
+
+  let totalMinutes = hours * 60 + minutes;
+  if (seconds > 0) totalMinutes += 1;
+
+  const finalHours = Math.floor(totalMinutes / 60);
+  const finalMinutes = totalMinutes % 60;
+
+  const result = [];
+  if (finalHours > 0) {
+    const hourLabel = finalHours !== 1 ? (placeholders.hours || 'Hours') : (placeholders.hour || 'Hour');
+    result.push(`${finalHours} ${hourLabel}`);
+  }
+  if (finalMinutes > 0) {
+    const minuteLabel = finalMinutes !== 1 ? (placeholders.minutes || 'Minutes') : (placeholders.minute || 'Minute');
+    result.push(`${finalMinutes} ${minuteLabel}`);
+  }
+
+  return result.length > 0 ? result.join(' ') : `0 ${placeholders.minutes || 'Minutes'}`;
+}
+
+/**
+ * Formats a servings string like "8.00 servings" to "8 servings".
+ * @param {string} servingsString - Raw servings string
+ * @returns {string} Formatted servings string
+ */
+export function formatServings(servingsString) {
+  if (!servingsString) return '';
+
+  const match = servingsString.match(/^([\d.]+)\s*(.*)$/);
+  if (!match) return servingsString;
+
+  const number = parseFloat(match[1]);
+  const unit = match[2];
+  const formattedNumber = number % 1 === 0 ? Math.floor(number) : number;
+
+  return unit ? `${formattedNumber} ${unit}` : `${formattedNumber}`;
 }
 
 /**
@@ -71,6 +135,15 @@ export function getLocaleAndLanguage(forceEnCA = false) {
   }
 
   return { locale, language };
+}
+
+/**
+ * Gets the form submission URL for the current locale and language.
+ * @returns {string} The form submission URL
+ */
+export function getFormSubmissionUrl() {
+  const { locale, language } = getLocaleAndLanguage();
+  return `${FORMS_ENDPOINT}/${locale}/${language}/forms`;
 }
 
 /**
@@ -140,9 +213,10 @@ function swapIcon(icon) {
 
 /**
  * Replaces image icons with inline SVGs when they enter the viewport.
+ * @param {Document|Element} [root] Root to search (default: document). Pass block in embeds.
  */
-export function swapIcons() {
-  document.querySelectorAll('span.icon > img[src]').forEach((icon) => {
+export function swapIcons(root = document) {
+  root.querySelectorAll('span.icon > img[src]').forEach((icon) => {
     swapIcon(icon);
   });
 }
@@ -364,13 +438,54 @@ function parseVariants(sections) {
   });
 }
 
-// eslint-disable-next-line no-unused-vars
+/**
+ * Reads an authored PDP override flag from the page metadata.
+ *
+ * Authors set these via a metadata table in the document. The Edge Delivery
+ * pipeline normalizes metadata keys (lowercases them and converts any
+ * non-alphanumeric character to a hyphen), so a key authored as `In Stock`,
+ * `inStock`, or `in-stock` all surface as different meta names. To make the
+ * override resilient to authoring style, both the requested name and each
+ * meta tag name are normalized to lowercase alphanumerics before comparison.
+ *
+ * Recognized values are `Yes`/`No` (case-insensitive); any other value is
+ * returned verbatim. Missing overrides return an empty string so callers can
+ * fall back to the value coming from the product bus.
+ *
+ * @param {string} name The override name (e.g. 'inStock', 'addToCart')
+ * @returns {string} 'Yes', 'No', the raw value, or '' when not authored
+ */
+export function getPdpOverride(name) {
+  const normalize = (value) => (value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const target = normalize(name);
+  if (!target) return '';
+  const meta = [...document.head.querySelectorAll('meta[name]')]
+    .find((m) => normalize(m.getAttribute('name')) === target);
+  if (!meta) return '';
+  const value = (meta.content || '').trim();
+  if (/^yes$/i.test(value)) return 'Yes';
+  if (/^no$/i.test(value)) return 'No';
+  return value;
+}
+
 export function checkVariantOutOfStock(sku) {
+  // Authored `inStock` override wins over the product bus availability and
+  // applies to the whole product (every variant), per requirements.
+  const inStock = getPdpOverride('inStock');
+  if (inStock === 'Yes') return false;
+  if (inStock === 'No') return true;
+
   const { availability } = window.jsonLdData.offers.find((offer) => offer.sku === sku);
   return availability === 'https://schema.org/OutOfStock';
 }
 
 export function isProductOutOfStock() {
+  // Authored `inStock` override wins over the product bus availability and
+  // applies to the whole product, regardless of individual variants.
+  const inStock = getPdpOverride('inStock');
+  if (inStock === 'Yes') return false;
+  if (inStock === 'No') return true;
+
   // Check if all variants are out of stock, if any are in stock, return false
   const { offers, custom } = window.jsonLdData;
 
@@ -394,11 +509,11 @@ function parsePDPContentSections(sections) {
   sections.forEach((section) => {
     const h3 = section.querySelector('h3')?.textContent.toLowerCase();
     if (h3) {
-      if (h3.includes('features') || h3.includes('caractéristiques')) {
+      if (h3.includes('features') || h3.includes('caractéristiques') || h3.includes('fonctionnalités') || h3.includes('características')) {
         window.features = section;
-      } else if (h3.includes('specifications') || h3.includes('spécifications')) {
+      } else if (h3.includes('specifications') || h3.includes('spécifications') || h3.includes('especificaciones')) {
         window.specifications = section;
-      } else if (h3.includes('warranty') || h3.includes('garantie')) {
+      } else if (h3.includes('warranty') || h3.includes('garantie') || h3.includes('garantía')) {
         window.warranty = section;
       }
     }
@@ -471,6 +586,32 @@ function buildPDPBlock(main) {
 }
 
 /**
+ * Turns `/widgets/...` links into widget block DOM (class `widget`, not yet `block`).
+ * Top-level widgets are decorated by {@link decorateBlocks}; nested ones are picked up afterward
+ * in {@link decorateMain} via `div.widget:not(.block)`.
+ * @param {Element} main The container element
+ */
+function buildWidgetAutoBlocks(main) {
+  const widgetLinks = [...main.querySelectorAll('a[href^="/widgets"]')];
+  widgetLinks.forEach((link) => {
+    if (link.closest('.widget')) return;
+    const newLink = link.cloneNode(true);
+    const widgetBlock = buildBlock('widget', { elems: [newLink] });
+    const p = link.closest('p');
+    if (
+      p
+      && p.querySelectorAll('a').length === 1
+      && p.querySelector('a') === link
+      && p.textContent.trim() === link.textContent.trim()
+    ) {
+      p.replaceWith(widgetBlock);
+    } else {
+      link.replaceWith(widgetBlock);
+    }
+  });
+}
+
+/**
  * Builds all synthetic blocks in a container element.
  * @param {Element} main The container element
  */
@@ -493,6 +634,31 @@ function buildAutoBlocks(main) {
         });
       });
     }
+
+    buildWidgetAutoBlocks(main);
+
+    // migrate aligned banners to hero blocks
+    const alignedBanners = main.querySelectorAll('.banner.aligned');
+    alignedBanners.forEach((banner) => {
+      banner.className = 'hero';
+    });
+
+    // migrate compact banners to hero blocks
+    const compactBanners = main.querySelectorAll('.banner.compact');
+    compactBanners.forEach((banner) => {
+      const row = banner.firstElementChild;
+      if (row) {
+        const cells = [...row.children];
+        const imgCell = cells.find((c) => c.querySelector('picture'));
+        const textCell = cells.find((c) => c !== imgCell);
+        if (imgCell && textCell) {
+          const picture = imgCell.querySelector('picture');
+          if (picture) textCell.prepend(picture);
+          imgCell.remove();
+        }
+      }
+      banner.className = banner.classList.contains('full-width') ? 'hero full-width' : 'hero';
+    });
 
     // setup pdp
     const metaSku = document.querySelector('meta[name="sku"]');
@@ -552,6 +718,8 @@ function buildAutoBlocks(main) {
       section.classList.add('section');
       section.append(toc);
       main.prepend(section);
+    } else if ((getMetadata('template') === 'corp') && !document.querySelector('.toc')) {
+      document.body.classList.add('corp-no-toc');
     }
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -562,40 +730,47 @@ function buildAutoBlocks(main) {
 /**
  * Replaces an MP4 anchor element with a <video> element.
  * @param {HTMLElement} el - Container element
+ * @param {boolean} [autoplay=true] - Whether to autoplay the video on intersection
+ * @param {string} [ariaLabel=''] - Accessible label for non-autoplay (informational) videos
  * @returns {HTMLVideoElement|null} Created <video> element (or `null` if no video link found)
  */
-export function buildVideo(el) {
+export function buildVideo(el, autoplay = true, ariaLabel = '') {
   const vid = el.querySelector('a[href*=".mp4"]');
   if (vid) {
     const imgWrapper = vid.closest('.img-wrapper');
     if (imgWrapper) imgWrapper.classList.add('vid-wrapper');
     // create video element
     const video = document.createElement('video');
-    video.loop = true;
-    video.muted = true;
-    video.autoplay = true;
     video.playsInline = true;
-    video.setAttribute('autoplay', '');
-    video.setAttribute('muted', '');
-    video.setAttribute('preload', 'none');
+    video.setAttribute('preload', autoplay ? 'none' : 'metadata');
+    if (autoplay) {
+      video.setAttribute('aria-hidden', true);
+      video.loop = true;
+      video.muted = true;
+      video.autoplay = true;
+      video.setAttribute('autoplay', '');
+      video.setAttribute('muted', '');
+    } else if (ariaLabel) video.setAttribute('aria-label', ariaLabel);
     // create source element
     const source = document.createElement('source');
     source.type = 'video/mp4';
     source.dataset.src = vid.href;
     video.append(source);
-    // load and play video on observation
+    // load (and optionally play) video on observation
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting && !source.dataset.loaded) {
           source.src = source.dataset.src;
           video.load();
-          // handle play promise to catch autoplay blocks
-          const playPromise = video.play();
-          if (playPromise !== undefined) {
-            playPromise.catch((error) => {
-              // eslint-disable-next-line no-console
-              console.log('video autoplay prevented:', error);
-            });
+          if (autoplay) {
+            // handle play promise to catch autoplay blocks
+            const playPromise = video.play();
+            if (playPromise !== undefined) {
+              playPromise.catch((error) => {
+                // eslint-disable-next-line no-console
+                console.log('video autoplay prevented:', error);
+              });
+            }
           }
           source.dataset.loaded = true;
           observer.disconnect();
@@ -621,6 +796,7 @@ function decorateFullWidthBlocks(main) {
  */
 function decorateButtons(main) {
   main.querySelectorAll('p a[href]').forEach((a) => {
+    if (a.closest('[data-button-decoration="disabled"]')) return;
     a.title = a.title || a.textContent;
     const p = a.closest('p');
     const text = a.textContent.trim();
@@ -724,7 +900,7 @@ function decorateSectionBackgrounds(main) {
         const video = buildVideo(section);
         video.classList.add('section-background-video');
       } else {
-        const backgroundPicture = createOptimizedPicture(href, '', false, [
+        const backgroundPicture = createOptimizedPicture(pathname, '', false, [
           { media: '(min-width: 800px)', width: '2880' },
           { width: '1600' },
         ]);
@@ -771,13 +947,25 @@ export async function openModal(href) {
 }
 
 /**
+ * Finds the clicked modal link, including when the click originated inside a shadow root.
+ * @param {Event} e - Click event
+ * @returns {HTMLAnchorElement|null} The modal link or null
+ */
+function getModalLinkFromEvent(e) {
+  const path = e.composedPath ? e.composedPath() : [e.target];
+  const isModalLink = (el) => el?.tagName === 'A' && el.href && el.href.includes('/modals/');
+  return path.find(isModalLink) || null;
+}
+
+/**
  * Automatically loads and opens modal dialogs.
+ * Uses composedPath() so clicks on modal links inside shadow DOM (e.g. embedded header) work.
  * @param {Document|HTMLElement} doc - Document or container to attach the event listener to.
  */
 function autolinkModals(doc) {
   doc.addEventListener('click', async (e) => {
-    const origin = e.target.closest('a[href]');
-    if (origin && origin.href && origin.href.includes('/modals/')) {
+    const origin = getModalLinkFromEvent(e);
+    if (origin) {
       e.preventDefault();
       await openModal(origin.href);
     }
@@ -812,6 +1000,7 @@ export function decorateMain(main) {
   decorateSectionAnchors(main);
   decorateSectionBackgrounds(main);
   decorateBlocks(main);
+  main.querySelectorAll('div.widget:not(.block)').forEach(decorateBlock);
   decorateFullWidthBlocks(main);
   decorateButtons(main);
   decorateEyebrows(main);
@@ -845,7 +1034,7 @@ export function applyImgColor(block) {
       const thumbnailImg = new Image();
       thumbnailImg.src = thumbnail;
       thumbnailImg.onload = () => {
-        const color = colorThief.getColor(thumbnailImg, 5, 10);
+        const color = colorThief.getColor(thumbnailImg, 50);
         const [r, g, b] = color;
         const y = Math.floor(r * 0.2126 + g * 0.7152 + b * 0.0722);
         const brightness = {
@@ -856,7 +1045,8 @@ export function applyImgColor(block) {
         };
         const brightnessKey = Object.keys(brightness).find((key) => y <= brightness[key]);
         block.classList.add(`image-${brightnessKey}`);
-        block.style.setProperty('--image-color', `#${r.toString(16)}${g.toString(16)}${b.toString(16)}`);
+        const toHex = (n) => n.toString(16).padStart(2, '0');
+        block.style.setProperty('--image-color', `#${toHex(r)}${toHex(g)}${toHex(b)}`);
       };
     });
   }
@@ -1132,6 +1322,76 @@ async function simulatePDPPreview() {
 }
 
 /**
+ * Returns the locale prefix used for schedule and promotion fetches.
+ * @returns {string} Locale path prefix (e.g. /us/en_us)
+ */
+function getScheduleLocalePrefix() {
+  if (window.location.pathname.startsWith('/drafts/')) {
+    return '/us/en_us';
+  }
+  const { locale, language } = getLocaleAndLanguage();
+  return `/${locale}/${language}`;
+}
+
+/**
+ * Checks schedule metadata and swaps main content when a promotion is active.
+ */
+async function checkSchedule() {
+  try {
+    const scheduleName = getMetadata('schedule');
+    if (!scheduleName) return;
+
+    const localePrefix = getScheduleLocalePrefix();
+    const resp = await fetch(`${localePrefix}/promotions/${scheduleName}.json`);
+    if (!resp.ok) return;
+
+    const schedule = await resp.json();
+    if (!schedule?.data?.length) return;
+
+    const parseDateSafe = (dateStr) => {
+      if (!dateStr) return null;
+      try {
+        return parseEasternDateTime(dateStr);
+      } catch {
+        const fallback = new Date(dateStr);
+        return Number.isNaN(fallback.getTime()) ? null : fallback;
+      }
+    };
+
+    const now = window.simulateDate || new Date();
+    let activePromotion = null;
+    schedule.data.forEach((item) => {
+      const startDate = parseDateSafe(item.Start);
+      const endDate = parseDateSafe(item.End);
+      if ((now >= startDate || !startDate) && (now <= endDate || !endDate)) {
+        activePromotion = item.Promotion;
+      }
+    });
+
+    if (!activePromotion) return;
+
+    const pagePath = window.location.pathname.split('/').filter(Boolean).slice(2).join('/');
+    const promotionBase = `${localePrefix}/promotions/${activePromotion}`;
+    const promotionPath = pagePath ? `${promotionBase}/${pagePath}` : `${promotionBase}/`;
+
+    const promoResp = await fetch(promotionPath);
+    if (!promoResp.ok) return;
+
+    const html = await promoResp.text();
+    const dom = new DOMParser().parseFromString(html, 'text/html');
+    const promoMain = dom.querySelector('main');
+    if (!promoMain) return;
+
+    const main = document.querySelector('main');
+    if (!main) return;
+
+    main.innerHTML = promoMain.innerHTML;
+  } catch {
+    // leave page unchanged on any error
+  }
+}
+
+/**
  * Loads everything needed to get to LCP.
  * @param {Element} doc The container element
  */
@@ -1142,9 +1402,22 @@ async function loadEager(doc) {
 
   /* simulation date */
   const params = new URLSearchParams(window.location.search);
-  if (params.get('simulateDate')) {
-    window.simulateDate = params.get('simulateDate');
+  const simulateDateParam = params.get('simulateDate');
+  if (simulateDateParam) {
+    try {
+      window.simulateDate = parseEasternDateTime(simulateDateParam);
+    } catch {
+      const date = new Date(simulateDateParam);
+      if (!Number.isNaN(date.getTime())) {
+        window.simulateDate = date;
+      } else {
+        // eslint-disable-next-line no-console
+        console.warn(`Invalid simulateDate: ${simulateDateParam}`);
+      }
+    }
   }
+
+  await checkSchedule();
 
   /* query param based redirects: comma-separated pairs of
    * <queryparam>=<value>:<redirectPathname> (e.g. "product=123:/us/en_us/products/123")
@@ -1157,18 +1430,6 @@ async function loadEager(doc) {
       const matchParam = row.slice(0, i).trim();
       const pathname = row.slice(i + 1).trim();
       if (window.location.search.includes(matchParam)) window.location.pathname = pathname;
-    });
-  }
-
-  /* adjust shop images to locale root path, util all of shop is mapped */
-  if (window.location.pathname.includes('/shop/')) {
-    const images = doc.querySelectorAll('img[src^="./media_"]');
-    images.forEach((img) => {
-      img.setAttribute('src', img.getAttribute('src').replace('./media_', '/us/en_us/media_'));
-    });
-    const sources = doc.querySelectorAll('source[srcset^="./media_"]');
-    sources.forEach((source) => {
-      source.setAttribute('srcset', source.getAttribute('srcset').replace('./media_', '/us/en_us/media_'));
     });
   }
 
@@ -1189,6 +1450,21 @@ async function loadEager(doc) {
   const main = doc.querySelector('main');
   if (main) {
     decorateMain(main);
+    /* adjust shop images to locale root path, util all of shop is mapped */
+    if (window.location.pathname.includes('/shop/')
+      || window.location.pathname.includes('/foundation/')
+      || window.location.pathname.includes('/commercial/')
+      || window.location.pathname.includes('/catalog/product_compare/')) {
+      const images = doc.querySelectorAll('img[src*="/media_"]');
+      images.forEach((img) => {
+        img.setAttribute('src', `/us/en_us/media_${img.getAttribute('src').split('/media_').pop()}`);
+      });
+      const sources = doc.querySelectorAll('source[srcset*="/media_"]');
+      sources.forEach((source) => {
+        source.setAttribute('srcset', `/us/en_us/media_${source.getAttribute('srcset').split('/media_').pop()}`);
+      });
+    }
+
     await loadNavBanner(main);
     document.body.classList.add('appear');
     await loadSection(main.querySelector('.section'), (section) => {
@@ -1252,7 +1528,7 @@ async function loadLazy(doc) {
   } else {
     // wait for sidekick to be loaded
     document.addEventListener('sidekick-ready', () => {
-    // sidekick now loaded
+      // sidekick now loaded
       addSidekickListeners(document.querySelector('aem-sidekick'));
     }, { once: true });
   }
@@ -1269,7 +1545,7 @@ function decorateExternalLinks() {
   });
 }
 /**
- * Loads everything that happens a lot later,
+ * Loads everything that happens later,
  * without impacting the user experience.
  */
 async function loadDelayed() {
@@ -1311,7 +1587,30 @@ async function loadDelayed() {
     console.error('Error loading link checker', e);
   }
 
+  const initContentScore = async () => {
+    const CONTENT_SCORE = 'https://tools.aem.live/tools/content-score/src/scripts.js';
+    const { init } = await import(CONTENT_SCORE);
+    await init();
+  };
+
+  const sk = document.querySelector('aem-sidekick');
+
+  if (sk) initContentScore();
+  else {
+    document.addEventListener('sidekick-ready', initContentScore, { once: true });
+  }
+
   setTimeout(decorateExternalLinks, 1000);
+}
+
+/**
+ * Returns true when running inside an aem-embed (e.g. header/footer fragment).
+ * Suppress full page load so only the fragment is used.
+ */
+function isEmbedContext() {
+  return document.getRootNode() instanceof ShadowRoot
+    || new URL(window.location.href).searchParams.get('embed') === '1'
+    || window.hlx?.suppressLoadPage === true;
 }
 
 /**
@@ -1329,7 +1628,9 @@ if (window.location.hostname.includes('ue.da.live')) {
   import(`${window.hlx.codeBasePath}/ue/scripts/ue.js`).then(({ default: ue }) => ue());
 }
 
-loadPage();
+if (!isEmbedContext()) {
+  loadPage();
+}
 
 // DA Live Preview
 (async function loadDa() {

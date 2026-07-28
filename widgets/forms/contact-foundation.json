@@ -1,0 +1,83 @@
+{
+  "en": {
+    "labels": {
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "title": "Title",
+      "organization": "Organization",
+      "emailAddress": "Email Address",
+      "focusArea": "Focus Area",
+      "message": "Message",
+      "submit": "SUBMIT",
+      "sending": "Sending..."
+    },
+    "inputPlaceholders": {
+      "firstName": "",
+      "lastName": "",
+      "title": "",
+      "organization": "",
+      "emailAddress": "",
+      "message": ""
+    },
+    "selectOption": "Select an option",
+    "focusAreaOptions": [
+      { "label": "Prenatal", "value": "prenatal" },
+      { "label": "First 2,000 Days", "value": "first-2000-days" },
+      { "label": "Research", "value": "research" }
+    ]
+  },
+  "fr": {
+    "labels": {
+      "firstName": "Prénom",
+      "lastName": "Nom de famille",
+      "title": "Titre",
+      "organization": "Organisation",
+      "emailAddress": "Adresse courriel",
+      "focusArea": "Domaine d'intérêt",
+      "message": "Message",
+      "submit": "SOUMETTRE",
+      "sending": "Envoi en cours..."
+    },
+    "inputPlaceholders": {
+      "firstName": "",
+      "lastName": "",
+      "title": "",
+      "organization": "",
+      "emailAddress": "",
+      "message": ""
+    },
+    "selectOption": "Sélectionner une option",
+    "focusAreaOptions": [
+      { "label": "Prénatal", "value": "prenatal" },
+      { "label": "Premiers 2 000 jours", "value": "first-2000-days" },
+      { "label": "Recherche", "value": "research" }
+    ]
+  },
+  "es": {
+    "labels": {
+      "firstName": "Nombre",
+      "lastName": "Apellido",
+      "title": "Título",
+      "organization": "Organización",
+      "emailAddress": "Correo electrónico",
+      "focusArea": "Área de interés",
+      "message": "Mensaje",
+      "submit": "ENVIAR",
+      "sending": "Enviando..."
+    },
+    "inputPlaceholders": {
+      "firstName": "",
+      "lastName": "",
+      "title": "",
+      "organization": "",
+      "emailAddress": "",
+      "message": ""
+    },
+    "selectOption": "Seleccionar una opción",
+    "focusAreaOptions": [
+      { "label": "Prenatal", "value": "prenatal" },
+      { "label": "Primeros 2.000 días", "value": "first-2000-days" },
+      { "label": "Investigación", "value": "research" }
+    ]
+  }
+}

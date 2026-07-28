@@ -1,5 +1,5 @@
 @import url('./gallery.css');
-@import url('./color-swatches.css');
+@import url('../../styles/color-swatches.css');
 
 /* stylelint-disable no-descending-specificity */
 .pdp-wrapper {
@@ -67,14 +67,13 @@
 .pdp-color-options {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: var(--spacing-s);
 }
 
 .pdp-color-swatch {
-  width: 24px;
-  height: 24px;
-  border: 1px solid #333f48;
-  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  border: 1px solid var(--color-charcoal);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -83,10 +82,9 @@
 }
 
 .pdp-color-inner {
-  width: 16px;
-  height: 16px;
-  border: 1px solid #333f48;
-  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  border: 1px solid var(--color-charcoal);
   position: relative;
 }
 
@@ -98,16 +96,14 @@
   width: 100%;
   height: 100%;
   background: -webkit-gradient(linear, left top, right bottom, 
-  color-stop(0%, #fff0),
-  color-stop(42%, #fff0), 
-  color-stop(43%, #fff), 
-  color-stop(46%, #fff), 
-  color-stop(47%, #ff5216), 
-  color-stop(53%, #ff5216), 
-  color-stop(54%, #fff), 
-  color-stop(57%, #fff), 
-  color-stop(58%, #fff0), 
-  color-stop(100%, #fff0)
+    color-stop(0%, #fff0), 
+    color-stop(47%, #fff0), 
+    color-stop(48%, #fff), 
+    color-stop(49.5%, #ff5216), 
+    color-stop(50.5%, #ff5216), 
+    color-stop(52%, #fff), 
+    color-stop(53%, #fff0), 
+    color-stop(100%, #fff0)
   );
 }
 

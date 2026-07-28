@@ -1,0 +1,34 @@
+/* Wellness program form – vertical stack, labels above, centered */
+.forms-wellness-program {
+  padding: var(--spacing-300);
+  border-radius: var(--rounding-m);
+  max-width: 100%;
+}
+
+.forms-wellness-program .wellness-program-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-200);
+  max-width: 32rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.forms-wellness-program .wellness-program-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
+}
+
+.forms-wellness-program .wellness-program-field label {
+  margin-bottom: 0;
+}
+
+.forms-wellness-program .wellness-program-field .required {
+  color: var(--color-red);
+  margin-left: 0.15em;
+}
+
+.forms-wellness-program .wellness-program-actions {
+  margin-top: var(--spacing-100);
+}

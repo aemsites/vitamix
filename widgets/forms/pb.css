@@ -1,0 +1,25 @@
+.forms-pb form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-200);
+}
+
+.forms-pb [data-required]::after {
+  content: '*';
+  margin-left: 0.5ch;
+  color: var(--color-red);
+}
+
+.forms-pb .radio-group legend,
+.forms-pb .checkbox-group legend {
+  margin-bottom: 0.5em;
+}
+
+.forms-pb .radio-option,
+.forms-pb .checkbox-option {
+  cursor: pointer;
+}
+
+.forms-pb .pb-thank-you {
+  color: var(--color-asparagus);
+}

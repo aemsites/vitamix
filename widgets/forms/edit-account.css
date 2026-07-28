@@ -1,0 +1,105 @@
+/* Edit account form – same pattern as create-account, no password section */
+.forms-edit-account {
+  background-color: var(--color-gray-100);
+  padding: var(--spacing-300);
+  border-radius: var(--rounding-m);
+  max-width: 100%;
+}
+
+.forms-edit-account .edit-account-header {
+  margin-bottom: var(--spacing-300);
+}
+
+.forms-edit-account .edit-account-title {
+  margin: 0 0 var(--spacing-100);
+  font-size: var(--font-size-400, 1.25rem);
+  font-weight: var(--font-weight-bold, bold);
+  color: var(--color-charcoal, #333);
+}
+
+.forms-edit-account .edit-account-instruction {
+  margin: 0;
+  font-size: var(--font-size-200);
+  color: var(--color-gray-700);
+}
+
+.forms-edit-account .edit-account-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-200);
+  max-width: 32rem;
+}
+
+.forms-edit-account .edit-account-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
+}
+
+.forms-edit-account .edit-account-field label {
+  margin-bottom: 0;
+}
+
+.forms-edit-account .edit-account-field .required {
+  color: var(--color-red);
+  margin-left: 0.15em;
+}
+
+.forms-edit-account .edit-account-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+}
+
+.forms-edit-account .edit-account-radio-group .radio-legend {
+  font-weight: var(--font-weight-medium, 500);
+  display: block;
+}
+
+.forms-edit-account .edit-account-radio-group .radio-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
+}
+
+.forms-edit-account .edit-account-radio-group .radio-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  cursor: pointer;
+}
+
+.forms-edit-account .edit-account-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-200);
+}
+
+.forms-edit-account .edit-account-section-title {
+  margin: 0;
+  font-size: var(--font-size-300, 1.125rem);
+  font-weight: var(--font-weight-bold, bold);
+  color: var(--color-charcoal, #333);
+}
+
+.forms-edit-account .edit-account-consent {
+  margin: 0;
+  font-size: var(--font-size-20);
+  color: var(--color-gray-700);
+}
+
+.forms-edit-account .edit-account-actions {
+  margin-top: var(--spacing-100);
+}
+
+.forms-edit-account .edit-account-form button[type="submit"] {
+  background-color: var(--color-charcoal);
+  border-color: var(--color-charcoal);
+  color: var(--color-white);
+}
+
+.forms-edit-account .edit-account-form button[type="submit"]:hover,
+.forms-edit-account .edit-account-form button[type="submit"]:focus {
+  background-color: var(--color-gray-900);
+  border-color: var(--color-gray-900);
+}

@@ -121,7 +121,7 @@ export async function assertOptionElements(page) {
 
   // Assert that product options are available (if this product has variants)
   const optionsContainer = page.locator('.pdp-color-options');
-  const options = page.locator('.pdp-color-options .pdp-color-swatch');
+  const options = page.locator('.pdp-color-options .color-swatch');
 
   await expect(optionsContainer).toBeVisible();
   await expect(await options.count()).toBeGreaterThan(0);

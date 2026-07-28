@@ -1,5 +1,5 @@
 import { getMetadata } from '../../scripts/aem.js';
-import { checkVariantOutOfStock, getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { checkVariantOutOfStock, getLocaleAndLanguage, getPdpOverride } from '../../scripts/scripts.js';
 
 /**
  * Renders "Find Locally" button container.
@@ -80,8 +80,11 @@ function toggleFixedAddToCart(container) {
  * @returns {boolean} True if the variant is available for sale, false otherwise
  */
 export function isVariantAvailableForSale(variant) {
-  const { managedStock, addToCart } = variant.custom;
-  if (!variant || addToCart === 'No') {
+  const { managedStock, addToCart, comingSoon } = variant?.custom || {};
+
+  // Authored `addToCart` override wins over the product bus custom.addToCart.
+  const effectiveAddToCart = getPdpOverride('addToCart') || addToCart;
+  if (!variant || effectiveAddToCart === 'No' || comingSoon === 'Yes') {
     return false;
   }
 
@@ -110,10 +113,20 @@ export default function renderAddToCart(ph, block, parent) {
     selectedVariant = parent.offers.find((variant) => variant.sku === selectedSku);
   }
 
-  // Only look at findLocally and findDealer from parent product
-  const { findLocally, findDealer } = parent.custom;
+  // Only look at findLocally and findDealer from parent product.
+  // Authored overrides win over the product bus custom values.
+  const findLocally = getPdpOverride('findLocally') || parent.custom.findLocally;
+  const findDealer = getPdpOverride('findDealer') || parent.custom.findDealer;
   block.classList.remove('pdp-find-locally');
   block.classList.remove('pdp-find-dealer');
+
+  // Coming-soon products cannot be added to cart or redirected to a local seller.
+  // Keep an empty container so variant changes can restore the appropriate CTA.
+  if (parent.custom.comingSoon === 'Yes' || selectedVariant?.custom?.comingSoon === 'Yes') {
+    const emptyContainer = document.createElement('div');
+    emptyContainer.classList.add('add-to-cart');
+    return emptyContainer;
+  }
 
   // Figure out if the selected variant is available for sale
   const isAvailableForSale = isVariantAvailableForSale(selectedVariant);
@@ -144,6 +157,17 @@ export default function renderAddToCart(ph, block, parent) {
   // check if product should show "Find Dealer" instead of add to cart
   if (findDealer === 'Yes' && !isAvailableForSale) {
     return renderFindDealer(ph, block);
+  }
+
+  // When an authored `addToCart=No` override is set and no find-locally/dealer
+  // alternative applies, render nothing rather than falling through to the
+  // button. This is gated strictly on the authored override (a metadata-table
+  // value surfaced as a meta tag) and never on the product bus custom value,
+  // which only lives in JSON-LD and is left untouched. As the last branch, it
+  // also leaves every existing path (find locally/dealer, managed stock,
+  // availability) behaving exactly as before.
+  if (getPdpOverride('addToCart') === 'No') {
+    return '';
   }
 
   // create main add to cart container

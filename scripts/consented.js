@@ -1,9 +1,13 @@
-import { loadScript, getMetadata } from './aem.js';
+import { loadScript } from './aem.js';
 import './consented/newsletter.js';
+import {
+  configureAnalyticsTrackingServers,
+  ensureAnalyticsTrackingConfigured,
+  getDeploymentEnv,
+  initInstrumentation,
+} from './consented/instrumentation.js';
 
-if (getMetadata('target').toLowerCase() === 'on') {
-  import('./consented/adobe-target.js');
-}
+document.body.classList.add('consented');
 
 // add delayed functionality here
 window.config = {
@@ -17,7 +21,7 @@ window.adobeDataLayer = window.adobeDataLayer || [];
 
 const currentEnvironment = document.createElement('div');
 currentEnvironment.classList.add('currentEnvironment');
-currentEnvironment.dataset.deploymentEnv = 'prod';
+currentEnvironment.dataset.deploymentEnv = getDeploymentEnv();
 currentEnvironment.dataset.templatePath = '/conf/vitamix/settings/wcm/templates/default-page';
 document.body.appendChild(currentEnvironment);
 
@@ -30,17 +34,33 @@ loadScript('https://www.vitamix.com/etc.clientlibs/core/wcm/components/commons/s
 
 await loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-library.lc-259cf15444c5fe1f89e5c54df7b6e1e9-lc.min.js');
 await loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-analytics.lc-26814920488a848ff91c1f425646d010-lc.min.js');
+configureAnalyticsTrackingServers();
 loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-base.lc-daf5b8dac79e9cf7cb1c0b30d8372e7a-lc.min.js');
 
-loadScript('https://assets.adobedtm.com/launch-EN40f2d69539754c3ea73511e70c65c801.min.js');
+if (currentEnvironment.dataset.deploymentEnv === 'prod') {
+  // for production, use the production launch script
+  await loadScript('https://assets.adobedtm.com/launch-EN40f2d69539754c3ea73511e70c65c801.min.js');
+} else {
+  // for development, use the development launch script
+  await loadScript('https://assets.adobedtm.com/8639b8ee2552/0f7a35c4f04b/launch-EN10955306e5aa4722aaabcdd1910448ad-development.min.js');
+}
+
+configureAnalyticsTrackingServers();
+
+// PDP prodView via Launch direct call; Launch rule maps digitalData and sends the beacon.
+initInstrumentation();
+ensureAnalyticsTrackingConfigured();
+
+const { pathname } = window.location;
+
+if (pathname.startsWith('/us/en_us/')) {
+  import('./consented/adobe-target.js');
+}
 
 /* eslint-disable */
 
-loadScript('https://www.googletagmanager.com/gtag/js?id=AW-1070742187', { 'data-cookieconsent': 'marketing' });
 window.dataLayer = window.dataLayer || [];
 function gtag() { dataLayer.push(arguments); }
-gtag('js', new Date());
-gtag('config', 'AW-1070742187');
 
 loadScript('https://www.googletagmanager.com/gtag/js?id=G-XJB3SPQE38');
 gtag('js', new Date());
@@ -103,7 +123,7 @@ s.src="https://c.amazon-adsystem.com/aat/amzn.js";s.id="amznpixel";
 s.async=true;t=d.getElementsByTagName("script")[0];
 t.parentNode.insertBefore(s,t)
 }(window,document); amzn("setRegion", "NA");
-amzn("addTag", "56d3e600-30c0-4b2fb290-4e44c553d164");
+amzn("addTag", "56d3e600-30c0-4b2f-b290-4e44c553d164");
 amzn("trackEvent", "PageView");
 // End of Amazon DSP
 
@@ -189,21 +209,4 @@ loadScript('https://cdn.datasteam.io/js/D26F66D1AD707A.js');
   i=d.getElementsByTagName(t)[0],i.parentNode.insertBefore(n,i)
 })
 (window,document,"script","//bat.bing.com/bat.js","uetq");
-
-(function(w, d){
-  var id='spdt-capture', n='script';
-  if (!d.getElementById(id)) {
-    w.spdt =
-      w.spdt ||
-      function() {
-        (w.spdt.q = w.spdt.q || []).push(arguments);
-      };
-    var e = d.createElement(n); e.id = id; e.async=1;
-    e.src = 'https://pixel.byspotify.com/ping.min.js';
-    var s = d.getElementsByTagName(n)[0];
-    s.parentNode.insertBefore(e, s);
-  }
-  w.spdt('conf', { key: '18858202ee0c4082a0f7e6d3d8b53c94' });
-  w.spdt('view');
-})(window, document);
 

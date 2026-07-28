@@ -1,0 +1,24 @@
+{
+  "labels": {
+    "attendance": "Did you attend a Wine and Food Dinner?",
+    "yes": "Yes",
+    "no": "No",
+    "whichDinner": "Which one?",
+    "openText": "What would you make in a Vitamix Blender?",
+    "email": "Enter your Email",
+    "submit": "Sign up",
+    "sending": "Sending...",
+    "thankYou": "Thank you for entering."
+  },
+  "inputPlaceholders": {
+    "dinner": "Select Event",
+    "email": ""
+  },
+  "dinners": [
+    "Chef's Corner hosted by Amanda Freitag and Leah Cohen",
+    "Chef's Corner hosted by Maneet Chauhan",
+    "Chef's Corner hosted by Chef Mario Emilio Vitolo",
+    "Chef's Corner hosted by Robbie Felice",
+    "Chef's Corner with Rachael Ray"
+  ]
+}

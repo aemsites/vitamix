@@ -1,0 +1,14 @@
+{
+  "en": {
+    "results": "products on sale",
+    "noSaleProducts": "Sorry, no products are on sale at the moment. Please check back, as we regularly launch promotions."
+  },
+  "fr": {
+    "results": "produits en promotion",
+    "noSaleProducts": "Désolé, aucun produit n'est en vente actuellement. Revenez nous visiter, car nous lançons régulièrement des promotions."
+  },
+  "es": {
+    "results": "productos en oferta",
+    "noSaleProducts": "Lo sentimos, no hay productos en venta en este momento. Visítenos de nuevo, ya que lanzamos promociones con regularidad."
+  }
+}

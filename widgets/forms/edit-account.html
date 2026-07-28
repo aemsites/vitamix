@@ -1,0 +1,63 @@
+<div class="edit-account-header">
+  <h2 class="edit-account-title"></h2>
+  <p class="edit-account-instruction"></p>
+</div>
+<form class="edit-account-form" method="post" action="" aria-label="Edit account">
+  <div class="edit-account-field">
+    <label for="edit-account-first-name">
+      <span class="label-text">First Name</span><span class="required" aria-hidden="true">*</span>
+    </label>
+    <input id="edit-account-first-name" type="text" name="firstName" required aria-required="true" placeholder="" autocomplete="given-name">
+  </div>
+  <div class="edit-account-field">
+    <label for="edit-account-last-name">
+      <span class="label-text">Last Name</span><span class="required" aria-hidden="true">*</span>
+    </label>
+    <input id="edit-account-last-name" type="text" name="lastName" required aria-required="true" placeholder="" autocomplete="family-name">
+  </div>
+  <div class="edit-account-field">
+    <label for="edit-account-email">
+      <span class="label-text">Email Address</span>
+    </label>
+    <input id="edit-account-email" type="email" name="email" placeholder="" autocomplete="email">
+  </div>
+  <div class="edit-account-field">
+    <label for="edit-account-postal-code">
+      <span class="label-text">Postal code (optional)</span>
+    </label>
+    <input id="edit-account-postal-code" type="text" name="postalCode" placeholder="" autocomplete="postal-code">
+  </div>
+  <div class="edit-account-field edit-account-radio-group">
+    <span class="label-text radio-legend" id="edit-account-own-legend"></span><span class="required" aria-hidden="true">*</span>
+    <div class="radio-options" role="radiogroup" aria-labelledby="edit-account-own-legend">
+      <label class="radio-option">
+        <input type="radio" name="ownVitamix" value="yes" required aria-required="true">
+        <span class="radio-label"></span>
+      </label>
+      <label class="radio-option">
+        <input type="radio" name="ownVitamix" value="no">
+        <span class="radio-label"></span>
+      </label>
+    </div>
+  </div>
+  <div class="edit-account-section">
+    <h3 class="edit-account-section-title"></h3>
+    <div class="edit-account-field edit-account-radio-group">
+      <span class="label-text radio-legend" id="edit-account-newsletter-legend"></span>
+      <div class="radio-options" role="radiogroup" aria-labelledby="edit-account-newsletter-legend">
+        <label class="radio-option">
+          <input type="radio" name="newsletterOptIn" value="yes" required aria-required="true">
+          <span class="radio-label"></span>
+        </label>
+        <label class="radio-option">
+          <input type="radio" name="newsletterOptIn" value="no">
+          <span class="radio-label"></span>
+        </label>
+      </div>
+    </div>
+    <p class="edit-account-consent"></p>
+  </div>
+  <div class="edit-account-actions">
+    <button type="submit" class="button emphasis">Save changes</button>
+  </div>
+</form>

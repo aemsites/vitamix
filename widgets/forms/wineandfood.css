@@ -1,0 +1,23 @@
+.forms-wineandfood form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-200);
+}
+
+.forms-wineandfood [data-required]::after {
+  content: '*';
+  margin-left: 0.5ch;
+  color: var(--color-red);
+}
+
+.forms-wineandfood .radio-group legend {
+  margin-bottom: 0.5em;
+}
+
+.forms-wineandfood .radio-option {
+  cursor: pointer;
+}
+
+.forms-wineandfood .wf-thank-you {
+  color: var(--color-asparagus);
+}

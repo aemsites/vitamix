@@ -1,0 +1,121 @@
+/* Manage address form – two columns (Contact | Address), checkboxes, Save/Cancel */
+.forms-manage-address {
+  background-color: var(--color-gray-100);
+  padding: var(--spacing-300);
+  border-radius: var(--rounding-m);
+  max-width: 100%;
+}
+
+.forms-manage-address .manage-address-header {
+  margin-bottom: var(--spacing-300);
+}
+
+.forms-manage-address .manage-address-title {
+  margin: 0;
+  font-size: var(--font-size-400, 1.25rem);
+  font-weight: var(--font-weight-bold, bold);
+  color: var(--color-charcoal, #333);
+}
+
+.forms-manage-address .manage-address-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-300);
+  max-width: 56rem;
+}
+
+.forms-manage-address .manage-address-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-300);
+}
+
+@media (width <= 699px) {
+  .forms-manage-address .manage-address-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.forms-manage-address .manage-address-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-200);
+}
+
+.forms-manage-address .manage-address-section-title {
+  margin: 0 0 var(--spacing-100);
+  font-size: var(--font-size-300, 1.125rem);
+  font-weight: var(--font-weight-bold, bold);
+  color: var(--color-charcoal, #333);
+}
+
+.forms-manage-address .manage-address-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
+}
+
+.forms-manage-address .manage-address-field label {
+  margin-bottom: 0;
+}
+
+.forms-manage-address .manage-address-field .required {
+  color: var(--color-red);
+  margin-left: 0.15em;
+}
+
+.forms-manage-address .manage-address-field-help {
+  margin: 0.25em 0 0;
+  font-size: var(--font-size-20);
+  color: var(--color-gray-700);
+}
+
+.forms-manage-address .manage-address-checkboxes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-100);
+}
+
+.forms-manage-address .manage-address-checkbox .checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  cursor: pointer;
+}
+
+.forms-manage-address .manage-address-checkbox input[type="checkbox"] {
+  flex-shrink: 0;
+}
+
+.forms-manage-address .manage-address-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-200);
+}
+
+.forms-manage-address .manage-address-form button[type="submit"] {
+  background-color: var(--color-charcoal);
+  border-color: var(--color-charcoal);
+  color: var(--color-white);
+}
+
+.forms-manage-address .manage-address-form button[type="submit"]:hover,
+.forms-manage-address .manage-address-form button[type="submit"]:focus {
+  background-color: var(--color-gray-900);
+  border-color: var(--color-gray-900);
+}
+
+.forms-manage-address .manage-address-cancel.link-style {
+  background: none;
+  border: none;
+  color: var(--color-link, #06c);
+  text-decoration: underline;
+  padding: 0;
+  font: inherit;
+}
+
+.forms-manage-address .manage-address-cancel.link-style:hover,
+.forms-manage-address .manage-address-cancel.link-style:focus {
+  color: var(--color-charcoal);
+}

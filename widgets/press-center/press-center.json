@@ -1,0 +1,44 @@
+{
+  "en": {
+    "search": "Search",
+    "showing": "Showing",
+    "of": "of",
+    "sortBy": "Sort by",
+    "default": "Default",
+    "newest": "Newest",
+    "oldest": "Oldest",
+    "nameAZ": "Name A-Z",
+    "nameZA": "Name Z-A",
+    "previous": "Previous",
+    "next": "Next",
+    "pagination": "Pagination"
+  },
+  "fr": {
+    "search": "Rechercher",
+    "showing": "Affichage",
+    "of": "sur",
+    "sortBy": "Trier par",
+    "default": "Par défaut",
+    "newest": "Plus récent",
+    "oldest": "Plus ancien",
+    "nameAZ": "Nom A-Z",
+    "nameZA": "Nom Z-A",
+    "previous": "Précédent",
+    "next": "Suivant",
+    "pagination": "Pagination"
+  },
+  "es": {
+    "search": "Buscar",
+    "showing": "Mostrando",
+    "of": "de",
+    "sortBy": "Ordenar por",
+    "default": "Predeterminado",
+    "newest": "Más reciente",
+    "oldest": "Más antiguo",
+    "nameAZ": "Nombre A-Z",
+    "nameZA": "Nombre Z-A",
+    "previous": "Anterior",
+    "next": "Siguiente",
+    "pagination": "Paginación"
+  }
+}

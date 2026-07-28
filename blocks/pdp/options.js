@@ -3,6 +3,7 @@ import { rebuildIndices, checkVariantOutOfStock, formatPrice } from '../../scrip
 import { toClassName } from '../../scripts/aem.js';
 import renderPricing from './pricing.js';
 import renderAddToCart from './add-to-cart.js';
+import { updateAlert } from './alert.js';
 
 /**
  * Updates the OOS message text based on whether parent or variant is out of stock.
@@ -134,6 +135,8 @@ export function onOptionChange(ph, block, variants, color, isParentOutOfStock = 
 
   window.selectedVariant = variant;
 
+  updateAlert(ph, block, window.jsonLdData.custom, variant.custom);
+
   // update add to cart
   const addToCartContainer = renderAddToCart(ph, block, window.jsonLdData);
   if (addToCartContainer) {
@@ -225,7 +228,7 @@ export function renderOptions(ph, block, variants, custom, isParentOutOfStock) {
   const colorOptions = colors.map((color, index) => {
     const { sku } = variants[index];
     const colorOption = document.createElement('div');
-    colorOption.classList.add('pdp-color-swatch');
+    colorOption.classList.add('color-swatch');
 
     const colorSwatch = document.createElement('div');
     colorSwatch.classList.add('pdp-color-inner');

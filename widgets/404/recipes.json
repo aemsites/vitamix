@@ -1,0 +1,23 @@
+{
+  "en": {
+    "title": "Your plate is empty",
+    "eyebrow": "No recipe found",
+    "lead": "We couldn't find the recipe you're looking for. Try browsing our collection, or head to the recipe center to explore more ideas.",
+    "recipesCta": "Browse recipes",
+    "imageAlt": "Illustration of an empty plate with fork and knife"
+  },
+  "fr": {
+    "title": "Votre assiette est vide",
+    "eyebrow": "Recette introuvable",
+    "lead": "Nous n'avons pas trouvé la recette demandée. Parcourez notre sélection ou rendez-vous au centre de recettes pour découvrir d'autres idées.",
+    "recipesCta": "Parcourir les recettes",
+    "imageAlt": "Illustration d'une assiette vide avec une fourchette et un couteau"
+  },
+  "es": {
+    "title": "Tu plato está vacío",
+    "eyebrow": "Receta no encontrada",
+    "lead": "No encontramos la receta que buscas. Explora nuestra colección o ve al centro de recetas para descubrir más ideas.",
+    "recipesCta": "Explorar recetas",
+    "imageAlt": "Ilustración de un plato vacío con tenedor y cuchillo"
+  }
+}

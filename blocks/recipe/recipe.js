@@ -1,6 +1,31 @@
 import { getMetadata, toClassName, fetchPlaceholders } from '../../scripts/aem.js';
-import { getLocaleAndLanguage } from '../../scripts/scripts.js';
-import { normalizeCompatibleContainers, isFrenchContainerLocale } from './recipe-containers.js';
+import { resolveRecipeId } from './recipe-slug.js';
+import {
+  formatTime, formatServings, getLocaleAndLanguage, getCookies,
+} from '../../scripts/scripts.js';
+import { getHiddenContainers, isHiddenContainer } from './recipe-containers.js';
+import linkRecipeMentions from './recipe-links.js';
+
+const RECIPE_IDS_URL = '/assets/recipes/recipe-ids.json';
+let recipeIdsPromise;
+
+async function loadRecipeIds() {
+  if (!recipeIdsPromise) {
+    recipeIdsPromise = fetch(RECIPE_IDS_URL)
+      .then((resp) => (resp.ok ? resp.json() : null))
+      .catch(() => null);
+  }
+  return recipeIdsPromise;
+}
+
+function buildSaveHref(recipeId) {
+  const { locale, language } = getLocaleAndLanguage();
+  const recipebookUrl = `https://www.vitamix.com/${locale}/${language}/recipebook?recipe_id=${recipeId}`;
+  const { vitamix_customer: customer } = getCookies();
+  if (customer) return recipebookUrl;
+  const encodedReturn = btoa(recipebookUrl);
+  return `https://www.vitamix.com/${locale}/${language}/customer/account/login/referer/${encodeURIComponent(encodedReturn)}/`;
+}
 
 function wrapInDiv(element, className) {
   if (!element) return;
@@ -18,57 +43,6 @@ function wrapInDiv(element, className) {
   );
 }
 
-function formatTime(timeString, placeholders = {}) {
-  if (!timeString) return '';
-
-  // Parse HH:MM:SS format
-  const parts = timeString.split(':');
-  if (parts.length !== 3) return timeString;
-
-  const hours = parseInt(parts[0], 10);
-  const minutes = parseInt(parts[1], 10);
-  const seconds = parseInt(parts[2], 10);
-
-  // Round seconds up to next minute if > 0
-  let totalMinutes = hours * 60 + minutes;
-  if (seconds > 0) {
-    totalMinutes += 1;
-  }
-
-  // Convert back to hours and minutes
-  const finalHours = Math.floor(totalMinutes / 60);
-  const finalMinutes = totalMinutes % 60;
-
-  // Build readable string
-  const parts2 = [];
-  if (finalHours > 0) {
-    const hourLabel = finalHours !== 1 ? (placeholders.hours || 'Hours') : (placeholders.hour || 'Hour');
-    parts2.push(`${finalHours} ${hourLabel}`);
-  }
-  if (finalMinutes > 0) {
-    const minuteLabel = finalMinutes !== 1 ? (placeholders.minutes || 'Minutes') : (placeholders.minute || 'Minute');
-    parts2.push(`${finalMinutes} ${minuteLabel}`);
-  }
-
-  return parts2.length > 0 ? parts2.join(' ') : `0 ${placeholders.minutes || 'Minutes'}`;
-}
-
-function formatServings(servingsString) {
-  if (!servingsString) return '';
-
-  // Extract number from string like "8.00 servings"
-  const match = servingsString.match(/^([\d.]+)\s*(.*)$/);
-  if (!match) return servingsString;
-
-  const number = parseFloat(match[1]);
-  const unit = match[2];
-
-  // Remove decimals if not needed (e.g., 8.00 → 8, but 8.5 stays 8.5)
-  const formattedNumber = number % 1 === 0 ? Math.floor(number) : number;
-
-  return unit ? `${formattedNumber} ${unit}` : `${formattedNumber}`;
-}
-
 function buildToolbar(placeholders = {}) {
   const toolbar = document.createElement('div');
   toolbar.classList.add('recipe-toolbar');
@@ -82,7 +56,7 @@ function buildToolbar(placeholders = {}) {
   const shareEmailLabel = placeholders.shareViaEmail || 'Share via Email';
 
   toolbar.innerHTML = `
-    <button type="button" class="recipe-save"><img src="/blocks/recipe/save.svg" alt=""> ${saveLabel}</button>
+    <a class="recipe-save"><img src="/blocks/recipe/save.svg" alt=""> ${saveLabel}</a>
     <button type="button" class="recipe-print"><img src="/blocks/recipe/print.svg" alt=""> ${printLabel}</button>
     <div class="recipe-share-wrapper">
       <button type="button" class="recipe-share"><img src="/blocks/recipe/share.svg" alt=""> ${shareLabel}</button>
@@ -103,16 +77,17 @@ function buildToolbar(placeholders = {}) {
     </div>
   `;
 
-  // Save button
-  const saveButton = toolbar.querySelector('.recipe-save');
-  saveButton.addEventListener('click', () => {
-    const { locale, language } = getLocaleAndLanguage();
-    const title = document.querySelector('h1').textContent.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-    const recipeId = `rcp${title}recipe`;
-    const returnUrl = `https://www.vitamix.com/${locale}/${language}/recipebook?recipe_id=${recipeId}`;
-    const encodedReturn = btoa(returnUrl);
-    window.location.href = `https://www.vitamix.com/${locale}/${language}/customer/account/login/referer/${encodeURIComponent(encodedReturn)}/`;
-  });
+  const saveLink = toolbar.querySelector('.recipe-save');
+  setTimeout(async () => {
+    const payload = await loadRecipeIds();
+    const rows = Array.isArray(payload?.data) ? payload.data : [];
+    const recipeId = resolveRecipeId(window.location.pathname, rows);
+    if (!recipeId) {
+      saveLink.remove();
+      return;
+    }
+    saveLink.href = buildSaveHref(recipeId);
+  }, 500);
 
   // Print button
   const printButton = toolbar.querySelector('.recipe-print');
@@ -200,6 +175,7 @@ function writeDietaryInterests(data, locale, language) {
 export default async function decorate(block) {
   const { locale, language } = getLocaleAndLanguage();
   const placeholders = await fetchPlaceholders(`/${locale}/${language}`);
+  const hiddenContainers = getHiddenContainers(placeholders);
 
   const totalTime = getMetadata('total-time');
   const yields = getMetadata('yield');
@@ -359,16 +335,15 @@ export default async function decorate(block) {
       // Find all recipes with the same title
       const sameRecipes = data.data.filter((recipe) => recipe.title === recipeTitle);
 
-      // Build container display names (alias + French if needed) and map to a recipe path
-      const useFrenchDisplay = isFrenchContainerLocale(locale, language);
+      // Build container names from index and map to a recipe path
       const containerMap = new Map();
       sameRecipes.forEach((recipe) => {
         if (recipe['compatible-containers']) {
-          const raw = recipe['compatible-containers'].split(',').map((c) => c.trim()).filter(Boolean);
-          const displayNames = normalizeCompatibleContainers(raw, useFrenchDisplay);
-          displayNames.forEach((displayName) => {
-            if (!containerMap.has(displayName)) {
-              containerMap.set(displayName, recipe.path);
+          const names = recipe['compatible-containers'].split(',').map((c) => c.trim()).filter(Boolean);
+          names.forEach((name) => {
+            if (isHiddenContainer(name, hiddenContainers)) return;
+            if (!containerMap.has(name)) {
+              containerMap.set(name, recipe.path);
             }
           });
         }
@@ -417,4 +392,8 @@ export default async function decorate(block) {
       console.error('Error loading recipe containers:', error);
     }
   }
+
+  setTimeout(() => {
+    linkRecipeMentions(block, locale, language, recipeTitle);
+  }, 2000);
 }

@@ -7,45 +7,53 @@
     window.isErrorPage = true;
     window.errorCode = '404';
   </script>
+    
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta property="og:title" content="Page not found">
-  <script src="/scripts/scripts.js" type="module"></script>
-  <script type="module">
-    window.addEventListener('load', () => {
-      if (document.referrer) {
-        const { origin, pathname } = new URL(document.referrer);
-        if (origin === window.location.origin) {
-          const backBtn = document.createElement('a');
-          backBtn.classList.add('button', 'error-button-back');
-          backBtn.href = pathname;
-          backBtn.textContent = 'Go back';
-          backBtn.title = 'Go back';
-          const btnContainer = document.querySelector('.button-container');
-          btnContainer.append(backBtn);
-        }
+  <script>
+    function getCountryAndLanguage() {
+      if (!window.location.pathname.match(/^\/[a-z]{2}\/[a-z]{2}_[a-z]{2}\//)) {
+        return { locale: 'us', language: 'en_us' };
       }
-    });
+      const pathSegments = window.location.pathname.split('/').filter(Boolean);
+      const locale = pathSegments[0] || 'us';
+      const language = pathSegments[1] || 'en_us';
+      return { locale, language };
+    }
+
+    function setMetadata(name, content) {
+      const meta = document.createElement('meta');
+      meta.name = name;
+      meta.content = content;
+      document.head.append(meta);
+    }
+    const { locale, language } = getCountryAndLanguage();
+    setMetadata('nav', `/${locale}/${language}/nav/nav`);
+    setMetadata('footer', `/${locale}/${language}/footer/footer`);
+    setMetadata('nav-banners', `/${locale}/${language}/nav/nav-banners`);
+    setMetadata('theme', 'text-center');
+    
   </script>
+  <script src="/scripts/scripts.js" type="module"></script>
   <script type="module">
     import { sampleRUM } from '/scripts/aem.js';
     sampleRUM('404', { source: document.referrer });
   </script>
-  <link rel="stylesheet" href="/styles/styles.css">
   <style>
-    main.error {
+    main.error div.section {
       min-height: calc(100vh - var(--nav-height));
-      display: flex;
       align-items: center;
     }
 
-    main.error .error-number {
-      width: 100%;
-    }
-
-    main.error .error-number text {
-      font-family: monospace;
+    .error-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--spacing-m, 1rem);
+      justify-content: center;
+      margin-top: var(--spacing-l, 1.5rem);
     }
   </style>
+  <link rel="stylesheet" href="/styles/styles.css">
   <link rel="stylesheet" href="/styles/lazy-styles.css">
 </head>
 
@@ -53,16 +61,75 @@
   <header></header>
   <main class="error">
     <div class="section">
-      <svg viewBox="1 0 38 18" class="error-number">
-        <text x="0" y="17">404</text>
-      </svg>
-      <h2 class="error-message">Page Not Found</h2>
-      <p class="button-container">
-        <a href="/" class="button secondary error-button-home">Go home</a>
-      </p>
+      <h2 class="error-message">We're sorry that page is missing.</h2>
+      <div class="error-actions">
+        <a class="button error-home" href="/us/en_us/">Home</a>
+        <a class="button error-search" href="/us/en_us/search-result">Search</a>
+      </div>
     </div>
   </main>
+  <script>
+    (function injectRecipe404Widget() {
+      if (!window.location.pathname.includes('/recipes/')) return;
+      var section = document.querySelector('main.error .section');
+      if (!section) return;
+      var msg = section.querySelector('.error-message');
+      if (msg) msg.remove();
+      var actions = section.querySelector('.error-actions');
+      if (actions) actions.remove();
+      var a = document.createElement('a');
+      a.href = '/widgets/404/recipes';
+      a.textContent = a.href;
+      section.appendChild(a);
+    })();
+  </script>
   <footer></footer>
-</body>
+  <script>
+    function setDefault404NavLinks() {
+      var home = document.querySelector('.error-home');
+      var search = document.querySelector('.error-search');
+      if (!home && !search) return;
+      var loc = getCountryAndLanguage();
+      var base = '/' + loc.locale + '/' + loc.language;
+      if (home) {
+        home.href = base + '/';
+        home.title = 'Home';
+      }
+      if (search) {
+        search.href = base + '/search-result';
+        search.title = 'Search';
+      }
+    }
 
+    function localizeErrorMessage() {
+      const pathSegments = window.location.pathname.split('/').filter(Boolean);
+      const language = (pathSegments[1] || navigator.language || '').toLowerCase();
+      const lang = language.startsWith('fr') ? 'fr' : language.startsWith('es') ? 'es' : null;
+      const el = document.querySelector('.error-message');
+      if (el && lang) {
+        const messages = {
+          es: 'Lo sentimos, esa página no existe.',
+          fr: 'Nous sommes désolés, cette page est introuvable.',
+        };
+        el.textContent = messages[lang];
+      }
+      const home = document.querySelector('.error-home');
+      const search = document.querySelector('.error-search');
+      if (home && search && lang) {
+        const navLabels = {
+          es: { home: 'Inicio', search: 'Buscar' },
+          fr: { home: 'Accueil', search: 'Rechercher' },
+        };
+        const labels = navLabels[lang];
+        home.textContent = labels.home;
+        search.textContent = labels.search;
+        home.title = labels.home;
+        search.title = labels.search;
+      }
+    }
+
+    setDefault404NavLinks();
+    localizeErrorMessage();
+  </script>
+</body>
 </html>

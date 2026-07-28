@@ -5,10 +5,10 @@ import renderAddToCart from './add-to-cart.js';
 import renderGallery from './gallery.js';
 import renderSpecs from './specification-tabs.js';
 import renderPricing from './pricing.js';
+import { renderAlert } from './alert.js';
 // eslint-disable-next-line import/no-cycle
 import { renderOptions, onOptionChange, updateFreeGiftVisibility } from './options.js';
 import {
-  getOfferPricing,
   checkVariantOutOfStock,
   isProductOutOfStock,
   parseEasternDateTime,
@@ -167,36 +167,6 @@ function renderFreeShipping(ph, offers) {
   return freeShippingContainer;
 }
 
-function renderAlert(ph, block, custom) {
-  const alertContainer = document.createElement('div');
-  alertContainer.classList.add('pdp-alert');
-
-  /* retired and coming soon */
-  if (custom && custom.retired === 'Yes') {
-    alertContainer.innerText = ph.retiredProduct || 'Retired Product';
-    block.classList.add('pdp-retired');
-    return alertContainer;
-  }
-  /* promos */
-  const { promoButton } = custom;
-  if (promoButton) {
-    alertContainer.classList.add('pdp-promo-alert');
-    alertContainer.innerText = promoButton;
-    return alertContainer;
-  }
-
-  /* save now */
-  const pricing = getOfferPricing(window.jsonLdData?.offers?.[0]);
-  if (pricing && pricing.regular && pricing.regular > pricing.final) {
-    alertContainer.classList.add('pdp-promo-alert');
-    alertContainer.innerText = ph.saveNow || 'Save Now!';
-    return alertContainer;
-  }
-
-  block.dataset.alert = false;
-  return null;
-}
-
 function renderRelatedProducts(ph, custom) {
   const { relatedSkus } = custom;
   const relatedProducts = relatedSkus || [];
@@ -272,7 +242,8 @@ async function renderFreeGift() {
     };
 
     const fetchGifts = async () => {
-      const resp = await fetch('/us/en_us/products/config/free-gifts.plain.html');
+      const { locale, language } = getLocaleAndLanguage();
+      const resp = await fetch(`/${locale}/${language}/products/config/free-gifts.plain.html`);
       if (!resp.ok) return null;
       const text = await resp.text();
       const doc = new DOMParser().parseFromString(text, 'text/html');
@@ -342,7 +313,7 @@ export default async function decorate(block) {
   const reviewsId = custom.reviewsId || toClassName(getMetadata('sku')).replace(/-/g, '');
   const galleryContainer = renderGallery(block, variants);
   const titleContainer = renderTitle(block, custom, reviewsId);
-  const alertContainer = renderAlert(ph, block, custom);
+  const alertContainer = renderAlert(ph, block, custom, variants[0]?.custom);
   const relatedProductsContainer = renderRelatedProducts(ph, custom);
 
   const buyBox = document.createElement('div');

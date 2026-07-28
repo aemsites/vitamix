@@ -197,6 +197,12 @@
   background-color: var(--color-gray-200);
 }
 
+.search-results .card img.manual-icon {
+  object-fit: contain;
+  padding: var(--spacing-200);
+  box-sizing: border-box;
+}
+
 .search-results .card .placeholder {
   width: 100%;
   aspect-ratio: 1;

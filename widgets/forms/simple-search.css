@@ -1,0 +1,28 @@
+/* Simple Search widget – uses global form/button styles */
+.forms-simple-search .simple-search-form {
+  display: flex;
+  gap: var(--spacing-80, 0.5rem);
+  align-items: center;
+  max-width: 100%;
+}
+
+.forms-simple-search .simple-search-form input {
+  flex: 1;
+  min-width: 0;
+}
+
+.forms-simple-search .simple-search-form button {
+  flex-shrink: 0;
+}
+
+.forms-simple-search .visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

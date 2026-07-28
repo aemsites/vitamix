@@ -1,0 +1,95 @@
+@import url('./shared.css');
+@import url('./rollout-common.css');
+
+body {
+  background: var(--card);
+  padding: 0;
+  align-items: start;
+}
+
+.rollout-container {
+  width: 100%;
+}
+
+.rollout-form {
+  padding: 16px;
+  display: grid;
+  gap: 16px;
+}
+
+.rollout-page {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.rollout-languages {
+  display: grid;
+  gap: 10px;
+}
+
+.rollout-lang-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.rollout-lang-name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 14px;
+  color: var(--text);
+}
+
+/* The transient rollout status (Translating.../Saving.../Done!/error) is the
+   widest thing in the row and the panel is narrow — give it its own line
+   instead of letting it force the row wider than the plugin popup. */
+.rollout-lang-row .rollout-status {
+  flex: 1 0 100%;
+  margin-left: 32px;
+  width: auto;
+}
+
+.rollout-options:not([hidden]) {
+  display: flex;
+  gap: 16px;
+}
+
+.rollout-error {
+  color: #c62828;
+  font-size: 13px;
+  min-height: 16px;
+  display: none;
+}
+
+button {
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.08s ease, box-shadow 0.2s ease, background 0.2s ease;
+  background: var(--primary);
+  color: #fff;
+  box-shadow: none;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button:hover:not(:disabled) {
+  background: var(--primary-dark);
+}
+
+@media (width <= 500px) {
+  button {
+    width: 100%;
+  }
+}

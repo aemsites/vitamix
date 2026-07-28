@@ -1,5 +1,20 @@
-import { loadCSS, fetchPlaceholders } from '../../scripts/aem.js';
+import { loadCSS } from '../../scripts/aem.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+
+/**
+ * Load widget copy from the widget's local JSON (same name as the script).
+ * @param {string} lang - Language key (e.g. en, fr)
+ * @returns {Promise<Object>} Copy for that language (flat key-value)
+ */
+async function loadWidgetCopy(lang) {
+  const scriptPath = new URL(import.meta.url).pathname;
+  const jsonPath = scriptPath.replace(/\.js$/, '.json');
+  const url = `${window.hlx?.codeBasePath || ''}${jsonPath}`;
+  const resp = await fetch(url);
+  const data = await resp.json();
+  const key = data[lang] ? lang : 'en';
+  return data[key] || {};
+}
 
 /**
  * Normalize a single article from the articles query index.
@@ -62,6 +77,22 @@ function useFcors() {
 }
 
 /**
+ * Same-origin base path for owner's manuals assets (JSON + PDFs under /assets/manuals/{locale}/).
+ * @param {string} locale - Region (us, ca, mx, vr)
+ * @returns {string}
+ */
+function manualsAssetBase(locale) {
+  const loc = ['us', 'ca', 'mx', 'vr'].includes(locale) ? locale : 'us';
+  const path = `/assets/manuals/${loc}`;
+  return `${window.hlx?.codeBasePath || ''}${path}`;
+}
+
+/** @returns {string} */
+function getManualIconPath() {
+  return `${window.hlx?.codeBasePath || ''}/icons/manual-icon.svg`;
+}
+
+/**
  * Fetch URL via fcors proxy for non-prod origins.
  * @param {string} url - Path (e.g. /us/en_us/products/index.json)
  * @returns {Promise<Response>}
@@ -99,7 +130,37 @@ function normalizeProduct(row, locale, language) {
 }
 
 /**
- * Fetch and merge all search indices (articles, recipes, locale query-index, products).
+ * Owner's manuals sheet (same shape as AEM asset JSON).
+ * @param {Object} row
+ * @param {string} locale
+ */
+function normalizeManual(row, locale) {
+  const filename = (row.filename || '').trim();
+  const base = manualsAssetBase(locale);
+  const path = filename ? `${base}/${encodeURIComponent(filename)}` : '';
+  return {
+    type: 'manual',
+    path,
+    title: (row.title || '').trim(),
+    description: (row.summary || '').trim(),
+    image: getManualIconPath(),
+  };
+}
+
+/**
+ * @param {string} locale
+ * @returns {Promise<Array<Object>>}
+ */
+async function fetchManualRows(locale) {
+  const url = `${manualsAssetBase(locale)}/manuals.json`;
+  const res = await fetch(url);
+  if (!res.ok) return [];
+  const json = await res.json();
+  return Array.isArray(json.data) ? json.data : [];
+}
+
+/**
+ * Fetch and merge all search indices (articles, recipes, locale query-index, products, manuals).
  * Uses fcors for products on localhost, .aem.page, .aem.live.
  * @returns {Promise<Array<Object>>} Combined normalized items
  */
@@ -120,11 +181,12 @@ async function loadSearchIndex() {
     ? () => corsProxyFetch(productsUrl).then((r) => (r.ok ? r.json() : { data: [] }))
     : () => fetchJson(productsUrl);
 
-  const [articlesRes, recipesRes, queryRes, productsRes] = await Promise.allSettled([
+  const [articlesRes, recipesRes, queryRes, productsRes, manualRowsRes] = await Promise.allSettled([
     fetchJson(articlesUrl),
     fetchJson(recipesUrl),
     fetchJson(queryUrl),
     productsFetch(),
+    fetchManualRows(locale),
   ]);
 
   const combined = [];
@@ -154,6 +216,10 @@ async function loadSearchIndex() {
   if (productsRes.status === 'fulfilled' && Array.isArray(productsRes.value?.data)) {
     const parents = productsRes.value.data.filter((row) => !(row.parentSku || '').trim());
     parents.forEach((row) => combined.push(normalizeProduct(row, locale, language)));
+  }
+
+  if (manualRowsRes.status === 'fulfilled' && Array.isArray(manualRowsRes.value)) {
+    manualRowsRes.value.forEach((row) => combined.push(normalizeManual(row, locale)));
   }
 
   window.searchResultsIndex = combined;
@@ -202,12 +268,14 @@ function filterBySearch(index, searchTerm) {
   }).map((item) => ({ ...item, searchTerm: term }));
 }
 
-/** Type order for tie-break: product > recipe > article > query (lower = higher priority). */
+/** Type order for tie-break: product > manual > recipe > article > query
+ * (lower = higher priority). */
 const TYPE_ORDER = {
   product: 0,
-  recipe: 1,
-  article: 2,
-  query: 3,
+  manual: 1,
+  recipe: 2,
+  article: 3,
+  query: 4,
 };
 
 /**
@@ -218,7 +286,7 @@ const TYPE_ORDER = {
  */
 function sortByRelevance(results, searchTerm) {
   if (!searchTerm || !searchTerm.trim()) {
-    results.sort((a, b) => (TYPE_ORDER[a.type] ?? 4) - (TYPE_ORDER[b.type] ?? 4));
+    results.sort((a, b) => (TYPE_ORDER[a.type] ?? 5) - (TYPE_ORDER[b.type] ?? 5));
     return;
   }
 
@@ -234,7 +302,7 @@ function sortByRelevance(results, searchTerm) {
     const inDesc = descIdx !== -1;
 
     // Rank 0 = title match (earlier offset = better), 1 = description only, 2 = other (author/tags)
-    const typeOrder = TYPE_ORDER[item.type] ?? 4;
+    const typeOrder = TYPE_ORDER[item.type] ?? 5;
     if (inTitle) return [0, titleIdx, typeOrder];
     if (inDesc) return [1, descIdx, typeOrder];
     return [2, Number.MAX_SAFE_INTEGER, typeOrder];
@@ -298,11 +366,12 @@ function isUsableImageUrl(url) {
 
 /**
  * Get image src for a result card. Product images use .aem.network on preview origins.
- * Query index: only https:// URLs; others use placeholder. Rest: reject data:/invalid.
+ * Query index: only https:// URLs; others use fallback. Rest: reject data:/invalid.
  * @param {Object} item - Normalized search item
  * @returns {string}
  */
 function getResultImageSrc(item) {
+  if (item.type === 'manual') return getManualIconPath();
   if (!item?.image || !isUsableImageUrl(item.image)) return '';
   if (item.type === 'query' && !item.image.trim().startsWith('https://')) return '';
   if (item.type === 'product' && useFcors()) {
@@ -354,15 +423,19 @@ function highlightMatch(text, searchTerm) {
 /**
  * Create a result card DOM element.
  * @param {Object} item - Normalized search item
- * @param {Object} placeholders - i18n placeholders
+ * @param {Object} copy - Widget copy (i18n labels)
  * @returns {HTMLElement}
  */
-function createResultCard(item, placeholders = {}) {
+function createResultCard(item, copy = {}) {
   const li = document.createElement('li');
   li.className = 'card';
 
   const link = document.createElement('a');
   link.href = item.path || '#';
+  if (item.type === 'manual') {
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+  }
 
   let imageEl;
   const imageSrc = getResultImageSrc(item);
@@ -371,6 +444,7 @@ function createResultCard(item, placeholders = {}) {
     imageEl.src = imageSrc;
     imageEl.alt = '';
     imageEl.loading = 'lazy';
+    if (item.type === 'manual') imageEl.classList.add('manual-icon');
   } else {
     imageEl = document.createElement('div');
     imageEl.className = 'img placeholder';
@@ -381,10 +455,11 @@ function createResultCard(item, placeholders = {}) {
 
   // Type badges: use sheet keys Item, Recipe, Page, Product (e.g. Product => Produit for FR).
   const typeLabels = {
-    article: placeholders.typeArticle || placeholders.item || 'Article',
-    recipe: placeholders.typeRecipe || placeholders.recipe || 'Recipe',
-    query: placeholders.typeQuery || placeholders.page || 'Page',
-    product: placeholders.typeProduct || placeholders.product || 'Product',
+    article: copy.typeArticle || copy.item || 'Article',
+    recipe: copy.typeRecipe || copy.recipe || 'Recipe',
+    query: copy.typeQuery || copy.page || 'Page',
+    product: copy.typeProduct || copy.product || 'Product',
+    manual: copy.typeManual || 'Manual',
   };
   const typeBadge = document.createElement('span');
   typeBadge.className = 'type-badge';
@@ -435,13 +510,16 @@ function updateURL(filterConfig) {
   window.history.pushState({ filterConfig }, '', newURL);
 }
 
-/** Type filter options (value '' = all). Uses same placeholder keys as card badges. */
+/** Type filter options (value '' = all). Uses same copy keys as card badges. */
 const FILTER_TYPES = [
   {
     value: '', labelKey: 'filterAll', fallbackKey: null, defaultLabel: 'All',
   },
   {
     value: 'product', labelKey: 'typeProduct', fallbackKey: 'product', defaultLabel: 'Product',
+  },
+  {
+    value: 'manual', labelKey: 'typeManual', fallbackKey: null, defaultLabel: 'Manual',
   },
   {
     value: 'recipe', labelKey: 'typeRecipe', fallbackKey: 'recipe', defaultLabel: 'Recipe',
@@ -458,9 +536,9 @@ const FILTER_TYPES = [
  * Build search UI and wire search/pagination.
  * @param {HTMLElement} container - .search-results root
  * @param {Object} config - Initial config
- * @param {Object} placeholders - i18n placeholders
+ * @param {Object} copy - Widget copy (i18n labels)
  */
-function buildSearchFiltering(container, config = {}, placeholders = {}) {
+function buildSearchFiltering(container, config = {}, copy = {}) {
   const ITEMS_PER_PAGE = 12;
   let currentPage = 1;
   let currentTypeFilter = '';
@@ -482,7 +560,7 @@ function buildSearchFiltering(container, config = {}, placeholders = {}) {
     const start = (page - 1) * ITEMS_PER_PAGE;
     const end = start + ITEMS_PER_PAGE;
     const pageResults = results.slice(start, end);
-    pageResults.forEach((item) => resultsElement.append(createResultCard(item, placeholders)));
+    pageResults.forEach((item) => resultsElement.append(createResultCard(item, copy)));
     if (page > 1) container.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
@@ -495,7 +573,7 @@ function buildSearchFiltering(container, config = {}, placeholders = {}) {
     if (totalPages <= 1) return;
 
     const prevBtn = document.createElement('button');
-    prevBtn.textContent = placeholders.previous || 'Previous';
+    prevBtn.textContent = copy.previous || 'Previous';
     prevBtn.disabled = pageNum <= 1;
     if (pageNum > 1) prevBtn.dataset.page = pageNum - 1;
     paginationElement.appendChild(prevBtn);
@@ -532,7 +610,7 @@ function buildSearchFiltering(container, config = {}, placeholders = {}) {
     paginationElement.appendChild(pages);
 
     const nextBtn = document.createElement('button');
-    nextBtn.textContent = placeholders.next || 'Next';
+    nextBtn.textContent = copy.next || 'Next';
     nextBtn.disabled = pageNum >= totalPages;
     if (pageNum < totalPages) nextBtn.dataset.page = pageNum + 1;
     paginationElement.appendChild(nextBtn);
@@ -595,8 +673,8 @@ function buildSearchFiltering(container, config = {}, placeholders = {}) {
       btn.type = 'button';
       btn.className = 'type-filter';
       btn.dataset.type = value;
-      const label = placeholders[labelKey]
-        || (fallbackKey ? placeholders[fallbackKey] : null)
+      const label = copy[labelKey]
+        || (fallbackKey ? copy[fallbackKey] : null)
         || defaultLabel;
       btn.textContent = label;
       btn.setAttribute('aria-pressed', currentTypeFilter === value ? 'true' : 'false');
@@ -656,8 +734,9 @@ async function init() {
   const container = document.querySelector('.search-results');
   if (!container) return;
 
-  const { locale, language } = getLocaleAndLanguage();
-  const placeholders = await fetchPlaceholders(`/${locale}/${language}`);
+  const { language } = getLocaleAndLanguage();
+  const lang = (language || 'en_us').split('_')[0];
+  const copy = await loadWidgetCopy(lang);
 
   const existingH1 = document.querySelector('main h1');
   if (existingH1 && !container.contains(existingH1)) {
@@ -666,13 +745,13 @@ async function init() {
   }
 
   const searchInput = container.querySelector('#fulltext');
-  if (searchInput) searchInput.placeholder = placeholders.search || 'Search';
+  if (searchInput) searchInput.placeholder = copy.search || 'Search';
   const showingLabel = container.querySelector('.showing-label');
-  if (showingLabel) showingLabel.textContent = placeholders.showing || 'Showing';
+  if (showingLabel) showingLabel.textContent = copy.showing || 'Showing';
   const ofLabel = container.querySelector('.of-label');
-  if (ofLabel) ofLabel.textContent = placeholders.of || 'of';
+  if (ofLabel) ofLabel.textContent = copy.of || 'of';
 
-  buildSearchFiltering(container, {}, placeholders);
+  buildSearchFiltering(container, {}, copy);
 }
 
 if (document.readyState === 'loading') {
