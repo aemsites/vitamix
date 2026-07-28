@@ -661,6 +661,7 @@ function buildSearchFiltering(container, config = {}, copy = {}) {
     });
 
     if (updateURLState) updateURL(filterConfig);
+    container.dataset.searchState = 'complete';
   };
 
   const renderTypeFilters = () => {

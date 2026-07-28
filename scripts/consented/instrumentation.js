@@ -413,9 +413,10 @@ function processCurrentSearchResult(resultsCountEl, searchTerm) {
  * automatically every time the search widget finishes a runSearch cycle.
  * The callback is debounced so that rapid live-search mutations coalesce
  * into a single tracking call once the query has settled.
+ * @param {Element} container - .search-results container (reads dataset.searchState)
  * @param {Element} resultsCountEl
  */
-function attachSearchResultsObserver(resultsCountEl) {
+function attachSearchResultsObserver(container, resultsCountEl) {
   let lastSearchTerm = null;
   let debounceTimer = null;
 
@@ -424,16 +425,12 @@ function attachSearchResultsObserver(resultsCountEl) {
 
   // Process the already-rendered result immediately so the initial URL-driven
   // search is not missed (MutationObserver does not replay past mutations).
-  // Only lock in lastSearchTerm when the element already has a real count (> 0).
-  // If the count is still 0/empty the widget hasn't finished rendering yet —
-  // leaving lastSearchTerm as null lets the first observer mutation fire correctly
-  // instead of being silently skipped by the dedup guard.
-  if (initialSearchTerm) {
-    const initialCount = parseInt(resultsCountEl.textContent, 10) || 0;
-    if (initialCount > 0) {
-      lastSearchTerm = initialSearchTerm;
-      processCurrentSearchResult(resultsCountEl, initialSearchTerm);
-    }
+  // The widget sets container.dataset.searchState = 'complete' once runSearch has
+  // written real results (including a genuine zero-result count), so this is an
+  // unambiguous signal that the count is final rather than a not-yet-rendered default.
+  if (initialSearchTerm && container.dataset.searchState === 'complete') {
+    lastSearchTerm = initialSearchTerm;
+    processCurrentSearchResult(resultsCountEl, initialSearchTerm);
   }
 
   const observer = new MutationObserver(() => {
@@ -454,8 +451,7 @@ function attachSearchResultsObserver(resultsCountEl) {
 
 /**
  * Initialize search analytics tracking on search-result pages.
- * Observes #results-count — written by the search widget after every runSearch —
- * so no changes to the widget itself are needed.
+ * Observes #results-count — written by the search widget after every runSearch.
  * Falls back to a MutationObserver on the container if the widget hasn't rendered yet.
  */
 export function trackSearchResults() {
@@ -464,7 +460,7 @@ export function trackSearchResults() {
 
   const resultsCountEl = container.querySelector('#results-count');
   if (resultsCountEl) {
-    attachSearchResultsObserver(resultsCountEl);
+    attachSearchResultsObserver(container, resultsCountEl);
     return;
   }
 
@@ -475,7 +471,7 @@ export function trackSearchResults() {
     const el = container.querySelector('#results-count');
     if (el) {
       obs.disconnect();
-      attachSearchResultsObserver(el);
+      attachSearchResultsObserver(container, el);
     }
   });
   containerObserver.observe(container, { childList: true, subtree: true });
