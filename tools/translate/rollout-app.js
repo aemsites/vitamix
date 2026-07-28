@@ -22,7 +22,7 @@ import {
   EDIT_ICON_SVG, formatDate, buildPendingStatusIcons,
   buildRedirectIcon, buildWarningIcon, buildStatusIcons, redirectDestinationUrl,
 } from './rollout-ui.js';
-import { ADMIN_URL, LOCALES } from './config.js';
+import { ADMIN_URL, DEFAULT_FOLDER_PATH, LOCALES } from './config.js';
 
 // Number of URLs prepared (and HEAD-checked against every locale) concurrently per batch.
 // Keeps large folders (thousands of pages) from firing thousands of requests at once.
@@ -78,7 +78,7 @@ function resolveResourcePath(urlStr, context) {
 
   loadFromFolderLink.addEventListener('click', (e) => {
     e.preventDefault();
-    folderInput.value = `https://da.live/#/${context.org}/${context.repo}/us/en_us`;
+    folderInput.value = `https://da.live/#/${context.org}/${context.repo}${DEFAULT_FOLDER_PATH}`;
 
     loaderRow.classList.toggle('open');
   });
