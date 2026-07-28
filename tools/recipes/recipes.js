@@ -1,23 +1,12 @@
 // eslint-disable-next-line import/no-unresolved
 import DA_SDK from 'https://da.live/nx/utils/sdk.js';
 
-import { translate } from '../translate/shared.js';
+import { rolloutToLocale } from '../translate/shared.js';
+import { LOCALES } from '../translate/config.js';
 
-const LOCALES = [{
-  root: 'us/en_us',
-}, {
-  root: 'ca/en_us',
-}, {
-  root: 'mx/en_us',
-}, {
-  root: 'vr/en_us',
-}, {
-  root: 'ca/fr_ca',
-  translateLocale: 'fr-CA',
-}, {
-  root: 'mx/es_mx',
-  translateLocale: 'es-MX',
-}];
+// Recipe content is always authored in English; rolloutToLocale translates
+// into every other locale's translateCode and just adjusts URLs for the rest.
+const RECIPE_SOURCE_TRANSLATE_CODE = 'en';
 
 let daSdkPromise = null;
 const DA_SDK_TIMEOUT_MS = 2000;
@@ -518,7 +507,9 @@ async function lookupImporterImageUrl(recipeNumber, recipeName, daToken, daFetch
 }
 
 async function fetchRecipeImageWithFallback(recipeNumber, kebabName, recipeName, options = {}) {
-  const { onLog, daToken, daFetch, daContext } = options;
+  const {
+    onLog, daToken, daFetch, daContext,
+  } = options;
 
   const indexImage = await fetchRecipeImageFromIndex(recipeNumber, kebabName, recipeName, onLog);
   if (indexImage) return indexImage;
@@ -1379,7 +1370,7 @@ export async function removeDeletedRecipe(recipeNumber, recipeName, log = addLog
   log(`  Resolved filename: ${filename}`, 'info');
 
   for (let l = 0; l < LOCALES.length; l += 1) {
-    const { root } = LOCALES[l];
+    const root = LOCALES[l].prefix.replace(/^\//, '');
     log(`  Removing from ${root}...`, 'info');
 
     try {
@@ -1538,68 +1529,34 @@ export async function bulkSyncWithDA() {
 
         addLogEntry(`  Syncing to DA: ${filename}`, 'info');
 
-        const processPage = async (root, translateLocale) => {
-          let html = htmlContent;
-          if (translateLocale) {
-            daContext.sourcePath = `/${root}/recipes/${filename}`;
-            // eslint-disable-next-line max-len
-            html = await translate(htmlContent, translateLocale, daContext, undefined, daFetch);
-          }
+        const processPage = async (locale) => {
+          const { prefix, translateCode } = locale;
+          const root = prefix.replace(/^\//, '');
 
-          const blob = new Blob([html], { type: 'text/html' });
-          const body = new FormData();
-          body.append('data', blob);
+          const targetPagePath = await rolloutToLocale({
+            sourceHtml: htmlContent,
+            sourceTranslateCode: RECIPE_SOURCE_TRANSLATE_CODE,
+            targetPrefix: prefix,
+            targetTranslateCode: translateCode,
+            pagePath: `/recipes/${filename}`,
+            context: daContext,
+            daFetch,
+            preview: enablePublish,
+            publish: enablePublish,
+            onStatus: (status, text) => addLogEntry(`  [${root}] ${text}`, 'info'),
+          });
 
-          const opts = {
-            headers: { Authorization: `Bearer ${daToken}` },
-            method: 'POST',
-            body,
-          };
-
-          const daAdminPath = `https://admin.da.live/source/aemsites/vitamix/${root}/recipes/${filename}`;
-          const resp = await fetch(daAdminPath, opts);
-
-          if (!resp.ok) {
-            throw new Error(`${resp.status} ${resp.statusText}`);
-          }
-
-          const url = new URL(resp.url);
-          const segments = url.pathname.split('/');
-          const editUrl = `https://da.live/edit#/${segments.slice(2).join('/')}`;
-          const pathname = segments.slice(4).join('/');
-          if (translateLocale) {
-            addLogEntry(`  ✓ Successfully created and translated to ${translateLocale}: <a href="${editUrl}" target="_blank">${pathname}</a>`, 'success', true);
+          const editUrl = `https://da.live/edit#/${daContext.org}/${daContext.repo}${targetPagePath}`;
+          if (translateCode !== RECIPE_SOURCE_TRANSLATE_CODE) {
+            addLogEntry(`  ✓ Successfully created and translated to ${translateCode}: <a href="${editUrl}" target="_blank">${targetPagePath}</a>`, 'success', true);
           } else {
-            addLogEntry(`  ✓ Successfully created: <a href="${editUrl}" target="_blank">${pathname}</a>`, 'success', true);
-          }
-
-          // Preview and Publish if enabled
-          if (enablePublish) {
-            try {
-              addLogEntry('  Running preview...', 'info');
-              // eslint-disable-next-line no-await-in-loop
-              const previewUrl = await previewRecipe(root, filename);
-              addLogEntry(`  ✓ <a href="${previewUrl}" target="_blank">Preview complete</a>`, 'success', true);
-            } catch (previewError) {
-              addLogEntry(`  ⚠ Preview failed: ${previewError.message}`, 'warning');
-            }
-
-            try {
-              addLogEntry('  Publishing...', 'info');
-              // eslint-disable-next-line no-await-in-loop
-              const publishUrl = await publishRecipe(root, filename);
-              addLogEntry(`  ✓ <a href="${publishUrl}" target="_blank">Publish complete</a>`, 'success', true);
-              addLogEntry('  ✓ Publish complete', 'success');
-            } catch (publishError) {
-              addLogEntry(`  ⚠ Publish failed: ${publishError.message}`, 'warning');
-            }
+            addLogEntry(`  ✓ Successfully created: <a href="${editUrl}" target="_blank">${targetPagePath}</a>`, 'success', true);
           }
         };
 
         for (let l = 0; l < LOCALES.length; l += 1) {
-          const locale = LOCALES[l];
           // eslint-disable-next-line no-await-in-loop
-          await processPage(locale.root, locale.translateLocale);
+          await processPage(LOCALES[l]);
         }
 
         addLogEntry(`  ✓ Successfully synced to DA: ${filename}`, 'success');
@@ -1648,7 +1605,7 @@ export async function bulkSyncWithDA() {
 }
 
 // Sync recipe with DA
-export async function syncWithDA(recipeName, recipeNumber) {
+export async function syncWithDA(recipeName, recipeNumber, enablePublish = false) {
   const kebabName = toKebabName(recipeName);
 
   const lowercaseNumber = recipeNumber.toLowerCase();
@@ -1684,34 +1641,30 @@ ${recipeElement.innerHTML}
 
   const results = [];
   for (let l = 0; l < LOCALES.length; l += 1) {
-    const locale = LOCALES[l];
-    let html = htmlContent;
-    if (locale.translateLocale) {
-      daContext.sourcePath = `/${locale.root}/recipes/${filename}`;
-      // eslint-disable-next-line no-await-in-loop
-      html = await translate(htmlContent, locale.translateLocale, daContext, undefined, daFetch);
-    }
+    const { prefix, translateCode } = LOCALES[l];
+    const root = prefix.replace(/^\//, '');
 
-    // Create blob and form data
-    const blob = new Blob([html], { type: 'text/html' });
-    const body = new FormData();
-    body.append('data', blob);
-
-    const opts = {
-      headers: { Authorization: `Bearer ${daToken}` },
-      method: 'POST',
-      body,
-    };
-
-    const fullpath = `https://admin.da.live/source/aemsites/vitamix/${locale.root}/recipes/${filename}`;
     // eslint-disable-next-line no-await-in-loop
-    const resp = await fetch(fullpath, opts);
-    if (!resp.ok) {
-      throw new Error(`Failed to sync: ${resp.status} ${resp.statusText}`);
-    }
+    const targetPagePath = await rolloutToLocale({
+      sourceHtml: htmlContent,
+      sourceTranslateCode: RECIPE_SOURCE_TRANSLATE_CODE,
+      targetPrefix: prefix,
+      targetTranslateCode: translateCode,
+      pagePath: `/recipes/${filename}`,
+      context: daContext,
+      daFetch,
+      preview: enablePublish,
+      publish: enablePublish,
+      // eslint-disable-next-line no-console
+      onStatus: (status, text) => console.log(`[${root}] ${text}`),
+    });
+
+    const fullpath = `https://admin.da.live/source/${daContext.org}/${daContext.repo}${targetPagePath}`;
     // eslint-disable-next-line no-console
     console.log('Sync complete', fullpath);
-    results.push({ filename, url: fullpath, root: locale.root });
+    results.push({
+      filename, url: fullpath, root, targetPagePath,
+    });
   }
   return results;
 }
@@ -1887,34 +1840,7 @@ export async function displayRecipeDetails(recipeNumber) {
           syncWithDABtn.disabled = true;
           syncWithDABtn.textContent = 'Syncing...';
 
-          const results = await syncWithDA(recipeName, recipeNumber);
-
-          for (let i = 0; i < results.length; i += 1) {
-            const result = results[i];
-            // Preview and Publish if enabled
-            const { token: daToken } = await loadDaSdk();
-            if (enablePublish && daToken) {
-              try {
-                // eslint-disable-next-line no-await-in-loop
-                const previewUrl = await previewRecipe(result.root, result.filename);
-                // eslint-disable-next-line no-console
-                console.log('Preview complete', previewUrl);
-              } catch (previewError) {
-                // eslint-disable-next-line no-console
-                console.error('Preview failed:', previewError);
-              }
-
-              try {
-                // eslint-disable-next-line no-await-in-loop
-                const publishUrl = await publishRecipe(result.root, result.filename);
-                // eslint-disable-next-line no-console
-                console.log('Publish complete', publishUrl);
-              } catch (publishError) {
-                // eslint-disable-next-line no-console
-                console.error('Publish failed:', publishError);
-              }
-            }
-          }
+          const results = await syncWithDA(recipeName, recipeNumber, enablePublish);
 
           syncWithDABtn.textContent = '✓ Synced!';
           syncWithDABtn.style.backgroundColor = '#28a745';
