@@ -9,22 +9,33 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
+/* eslint-disable no-restricted-syntax */
+/* eslint-disable no-await-in-loop */
 
 // eslint-disable-next-line import/no-unresolved
 import DA_SDK from 'https://da.live/nx/utils/sdk.js';
-import { localeKey, parsePath, rolloutToLocale } from './shared.js';
+import {
+  localeKey, parsePath, sourceStatus, bulkStatus, getRedirects,
+  hasChangedSinceLastRollout, rolloutToLocale,
+} from './shared.js';
+import {
+  EDIT_ICON_SVG, formatDate, buildPendingStatusIcons,
+  buildRedirectIcon, buildWarningIcon, buildStatusIcons, redirectDestinationUrl,
+} from './rollout-ui.js';
 import { ADMIN_URL, LOCALES } from './config.js';
 
-const EDIT_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+function rowSelector(prefix) {
+  return `.rollout-lang-row[data-prefix="${localeKey(prefix)}"]`;
+}
 
 function updateStatus(prefix, status, text) {
-  const labelEl = document.querySelector(`label[for="lang-${localeKey(prefix)}"]`);
-  if (!labelEl) return;
-  let statusEl = labelEl.querySelector('.rollout-status');
+  const row = document.querySelector(rowSelector(prefix));
+  if (!row) return;
+  let statusEl = row.querySelector('.rollout-status');
   if (!statusEl) {
     statusEl = document.createElement('span');
     statusEl.className = 'rollout-status';
-    labelEl.appendChild(statusEl);
+    row.appendChild(statusEl);
   }
   statusEl.className = `rollout-status ${status}`;
   statusEl.innerHTML = text;
@@ -59,30 +70,78 @@ publishCheckbox.addEventListener('change', () => {
     return;
   }
 
-  LOCALES.forEach(({ prefix, country, label }) => {
-    if (prefix === parsed.prefix) return;
+  const targetLocales = LOCALES.filter(({ prefix }) => prefix !== parsed.prefix);
 
-    const id = `lang-${localeKey(prefix)}`;
+  // Each locale's own existence/local-changes checks run in parallel — this is a
+  // single page, not a batch, so there's no need for rollout-app's batching.
+  const rows = await Promise.all(targetLocales.map(async (locale) => {
+    const { prefix, country, label } = locale;
+    const targetPagePath = `${prefix}${parsed.pagePath}`;
+    const status = await sourceStatus(targetPagePath, context, daFetch);
+    const lastModified = formatDate(status.lastModified);
+    const hasLocalChanges = status.exists
+      && await hasChangedSinceLastRollout(targetPagePath, context, daFetch);
+
+    const row = document.createElement('div');
+    row.className = 'rollout-lang-row';
+    row.dataset.prefix = localeKey(prefix);
+
     const labelEl = document.createElement('label');
-    labelEl.className = 'rollout-lang';
-    labelEl.setAttribute('for', id);
+    labelEl.className = 'rollout-checkbox';
+    if (lastModified) labelEl.title = `Last modified ${lastModified}`;
 
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
-    checkbox.id = id;
-    checkbox.dataset.prefix = prefix;
-    checkbox.checked = true;
+    checkbox.checked = !status.exists;
 
-    const span = document.createElement('span');
-    span.textContent = [country, label].filter(Boolean).join(' — ');
+    const box = document.createElement('span');
+    box.className = 'rollout-checkbox-box';
 
     labelEl.appendChild(checkbox);
-    labelEl.appendChild(span);
-    languagesContainer.appendChild(labelEl);
-  });
+    labelEl.appendChild(box);
+    row.appendChild(labelEl);
+
+    const nameEl = document.createElement('span');
+    nameEl.className = 'rollout-lang-name';
+    nameEl.textContent = [country, label].filter(Boolean).join(' — ');
+    row.appendChild(nameEl);
+
+    if (hasLocalChanges) row.appendChild(buildWarningIcon());
+    row.appendChild(buildPendingStatusIcons());
+
+    languagesContainer.appendChild(row);
+
+    return {
+      prefix, translateCode: locale.translateCode, checkbox, targetPagePath, row,
+    };
+  }));
 
   rolloutOptions.hidden = false;
   rolloutBtn.hidden = false;
+
+  // Preview/publish status and redirects: one bulk-status job for every
+  // target and one redirects.json fetch, same as rollout-app, instead of a
+  // separate request per locale.
+  const [statusMap, redirects] = await Promise.all([
+    bulkStatus(rows.map((r) => r.targetPagePath), context, daFetch).catch((err) => {
+      // Non-fatal: rows stay usable, just without preview/publish icons.
+      // eslint-disable-next-line no-console
+      console.error('Bulk status failed', err);
+      return {};
+    }),
+    getRedirects(context, daFetch),
+  ]);
+
+  rows.forEach(({ targetPagePath, row }) => {
+    row.querySelector('.rollout-status-icons-pending')?.remove();
+    const container = buildStatusIcons(statusMap[targetPagePath], targetPagePath, context);
+    row.appendChild(container);
+
+    const destination = redirects.get(targetPagePath);
+    if (destination) {
+      container.appendChild(buildRedirectIcon(redirectDestinationUrl(destination, context)));
+    }
+  });
 
   rolloutBtn.addEventListener('click', async (e) => {
     e.preventDefault();
@@ -91,12 +150,9 @@ publishCheckbox.addEventListener('change', () => {
     errorMessage.style.display = 'none';
     document.querySelectorAll('.rollout-status').forEach((el) => el.remove());
 
-    const selectedLocales = LOCALES.filter(({ prefix }) => {
-      const checkbox = document.getElementById(`lang-${localeKey(prefix)}`);
-      return checkbox?.checked;
-    });
+    const selectedRows = rows.filter(({ checkbox }) => checkbox.checked);
 
-    if (selectedLocales.length === 0) {
+    if (selectedRows.length === 0) {
       errorMessage.textContent = 'Please select at least one target locale.';
       errorMessage.style.display = 'block';
       return;
@@ -107,7 +163,6 @@ publishCheckbox.addEventListener('change', () => {
     const sourceLocale = LOCALES.find(({ prefix }) => prefix === parsed.prefix);
     const sourceTranslateCode = sourceLocale?.translateCode;
 
-    // Fetch the source page HTML (repoPath is already relative to org/repo)
     let sourcePath = parsed.repoPath;
     if (!sourcePath.endsWith('.html')) sourcePath += '.html';
     const sourceUrl = `${ADMIN_URL}/source/${context.org}/${context.repo}${sourcePath}`;
@@ -124,10 +179,8 @@ publishCheckbox.addEventListener('change', () => {
       return;
     }
 
-    // eslint-disable-next-line no-restricted-syntax
-    for (const { prefix, translateCode } of selectedLocales) {
+    for (const { prefix, translateCode } of selectedRows) {
       try {
-        // eslint-disable-next-line no-await-in-loop
         const targetPagePath = await rolloutToLocale({
           sourceHtml,
           sourceTranslateCode,
@@ -144,7 +197,7 @@ publishCheckbox.addEventListener('change', () => {
         const daHref = `https://da.live/edit#/${context.org}/${context.repo}${targetPagePath}`;
         updateStatus(prefix, 'done', `Done! <a href="${daHref}" target="_blank">${EDIT_ICON_SVG}</a>`);
       } catch (err) {
-        updateStatus(prefix, 'error', err.message || 'Translation failed.');
+        updateStatus(prefix, 'error', err.message || 'Rollout failed.');
       }
     }
 
