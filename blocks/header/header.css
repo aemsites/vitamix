@@ -332,6 +332,7 @@ header .nav-sections .nav-category {
   display: grid;
   grid-template-columns: 1fr 48px;
   align-items: center;
+  font-size: var(--body-size-s);
 }
 
 header .nav-sections ul > li.nav-category {
@@ -381,7 +382,7 @@ header .nav-sections .nav-category > ul {
 }
 
 header .nav-sections .nav-category ul > li > strong > a {
-  font-weight: var(--weight-medium);
+  font-weight: bold;
   text-decoration: underline;
   text-underline-offset: var(--spacing-20);
 }
