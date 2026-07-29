@@ -1,6 +1,6 @@
 # Translation Tools
 
-Three tools for translating and rolling out localized pages via [DA Live](https://da.live).
+Four tools for translating and rolling out localized pages via [DA Live](https://da.live).
 
 ---
 
@@ -46,6 +46,19 @@ DA Live editor panel plugin. Rolls out the current page to all configured locale
    - If same language: URLs are adjusted for the target locale, no translation needed.
    - If different language: page is translated then URLs are adjusted.
    - Page is saved to DA, then optionally previewed and published via AEM Admin.
+
+---
+
+### 4. Rollout App (`rollout-app.html`)
+
+Standalone batch rollout tool. Rolls out multiple pages to all configured locales at once.
+
+**How it works:**
+1. Open the app inside DA Live.
+2. Enter a list of DA Live edit URLs or preview URLs — one per line, each already under a configured locale path — or click **load from folder**.
+3. Click **Prepare**. For each URL, the page path and a checkbox per other locale is shown. A checkbox is pre-checked if the target page does not exist yet (ready to roll out), and unchecked if it already exists.
+4. Adjust checkboxes as needed, choose **Preview** / **Publish**, then click **Rollout**.
+5. For each checked locale, the page is created or overwritten (translated if the target language differs), then optionally previewed and published — same underlying logic as the Rollout Plugin.
 
 **Configured locales** (defined in `config.js`):
 
@@ -134,8 +147,8 @@ Plugins are registered via the site config spreadsheet in DA Live.
 | Translate | `https://main--<site>--<org>.aem.live/tools/translate/plugin.html` |
 | Rollout | `https://main--<site>--<org>.aem.live/tools/translate/rollout-plugin.html` |
 
-The Translation App (`app.html`) is a standalone tool accessed at:
-`https://da.live/app/<org>/<site>/tools/translate/app`
+The Translation App (`app.html`) and Rollout App (`rollout-app.html`) are standalone tools accessed at:
+`https://da.live/app/<org>/<site>/tools/translate/app` and `https://da.live/app/<org>/<site>/tools/translate/rollout-app` respectively.
 
 ---
 
@@ -175,7 +188,7 @@ Same as production — open `https://da.live/config#/<org>/<site>/`, open the **
 | Translate | `http://localhost:3000/tools/translate/plugin.html` |
 | Rollout | `http://localhost:3000/tools/translate/rollout-plugin.html` |
 
-For the Translation App, use the DA Live app URL with your localhost origin, or navigate directly to `http://localhost:3000/tools/translate/app.html`.
+For the Translation App or Rollout App, use the DA Live app URL with your localhost origin, or navigate directly to `http://localhost:3000/tools/translate/app.html` or `http://localhost:3000/tools/translate/rollout-app.html`.
 
 ### 4. Authentication
 

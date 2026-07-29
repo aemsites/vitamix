@@ -1,4 +1,5 @@
 @import url('./shared.css');
+@import url('./rollout-common.css');
 
 body {
   background: var(--card);
@@ -27,63 +28,35 @@ body {
   gap: 10px;
 }
 
-.rollout-lang {
+.rollout-lang-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  cursor: pointer;
-  font-size: 14px;
-  color: var(--text);
-  user-select: none;
+  flex-wrap: wrap;
 }
 
-.rollout-lang > span:not(.rollout-status) {
+.rollout-lang-name {
   flex: 1;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: 14px;
+  color: var(--text);
 }
 
-.rollout-lang input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--primary);
-  cursor: pointer;
-  flex-shrink: 0;
+/* The transient rollout status (Translating.../Saving.../Done!/error) is the
+   widest thing in the row and the panel is narrow — give it its own line
+   instead of letting it force the row wider than the plugin popup. */
+.rollout-lang-row .rollout-status {
+  flex: 1 0 100%;
+  margin-left: 32px;
+  width: auto;
 }
 
 .rollout-options:not([hidden]) {
   display: flex;
   gap: 16px;
-}
-
-.rollout-option {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 14px;
-  color: var(--text);
-  cursor: pointer;
-  user-select: none;
-}
-
-.rollout-option input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--primary);
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.rollout-option input[type="checkbox"]:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-.rollout-option:has(input:disabled) {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .rollout-error {
@@ -113,43 +86,6 @@ button:disabled {
 
 button:hover:not(:disabled) {
   background: var(--primary-dark);
-}
-
-.rollout-status {
-  font-size: 13px;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 12px;
-  display: inline-flex;
-  align-items: center;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.rollout-status.loading,
-.rollout-status.saving,
-.rollout-status.previewing,
-.rollout-status.publishing {
-  color: #0052cc;
-  background: #deebff;
-}
-
-.rollout-status.done,
-.rollout-status.saved {
-  color: #064;
-  background: #e3fcef;
-}
-
-.rollout-status.error {
-  color: #bf2600;
-  background: #ffebe6;
-}
-
-.rollout-status svg {
-  vertical-align: middle;
-  margin-left: 4px;
-  width: 14px;
-  height: 14px;
 }
 
 @media (width <= 500px) {

@@ -1,6 +1,7 @@
 import { buildCarousel } from '../../scripts/scripts.js';
 import { getMetadata } from '../../scripts/aem.js';
 import { embedYoutube } from '../video/video.js';
+import { createModal } from '../modal/modal.js';
 
 /**
  * Checks if a link is a YouTube video.
@@ -146,6 +147,29 @@ export default function renderGallery(block, variants) {
 
   const carousel = buildCarousel(gallery);
   buildThumbnails(carousel);
+
+  // Add click-to-zoom on non-video slides (desktop only)
+  const desktopQuery = window.matchMedia('(min-width: 900px)');
+  carousel.querySelectorAll(':scope > ul > li').forEach((li) => {
+    const pic = li.querySelector('picture');
+    if (!pic || li.querySelector('a.video-wrapper')) return;
+    li.classList.add('zoomable');
+    li.addEventListener('click', async () => {
+      if (!desktopQuery.matches) return;
+      const img = pic.querySelector('img');
+      if (!img) return;
+      const modalPicture = pic.cloneNode(true);
+      const modalImg = modalPicture.querySelector('img');
+      modalImg.removeAttribute('width');
+      modalImg.removeAttribute('height');
+      modalImg.removeAttribute('loading');
+      const { showModal } = await createModal(
+        [modalPicture],
+        '/modals/gallery-image',
+      );
+      showModal();
+    });
+  });
 
   return carousel;
 }
