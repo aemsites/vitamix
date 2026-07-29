@@ -24,6 +24,9 @@ export const TRANSLATION_SERVICE_URL = 'https://translate.da.live/google';
 // Path to the translation config spreadsheet within the repository
 export const CONFIG_PATH = '/.da/translate.json';
 
+// Default folder suggested by "load from folder" in app.html and rollout-app.html.
+export const DEFAULT_FOLDER_PATH = '/us/en_us';
+
 // Metadata fields that should be translated by default.
 // Additional fields can be added via the dt-metadata-fields sheet in CONFIG_PATH.
 export const METADATA_FIELDS_TO_TRANSLATE = ['title', 'description'];

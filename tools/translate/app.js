@@ -15,7 +15,7 @@
 // eslint-disable-next-line import/no-unresolved
 import DA_SDK from 'https://da.live/nx/utils/sdk.js';
 import { translate } from './shared.js';
-import { ADMIN_URL, LANGUAGES } from './config.js';
+import { ADMIN_URL, DEFAULT_FOLDER_PATH, LANGUAGES } from './config.js';
 
 const EDIT_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-edit"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
 
@@ -43,7 +43,7 @@ const EDIT_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height
 
   loadFromFolderLink.addEventListener('click', (e) => {
     e.preventDefault();
-    folderInput.value = `https://da.live/#/${context.org}/${context.repo}/drafts`;
+    folderInput.value = `https://da.live/#/${context.org}/${context.repo}${DEFAULT_FOLDER_PATH}`;
     loaderRow.classList.toggle('open');
   });
 
