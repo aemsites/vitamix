@@ -373,6 +373,18 @@ export default async function decorate(block) {
     },
     createOrder: (orderBody) => createOrder(orderBody),
     initiatePayment: (...args) => initiatePayment(...args),
+    // Persist the checkout session so the order-review page (express review
+    // flow) can resolve the order via getOrder + the email proof. The express
+    // onApprove handler calls this before routing to the review page; the
+    // checkout-page flow provides the same callback from checkout-order.js.
+    saveCheckoutSession: (email, c, preview, order) => {
+      try {
+        if (email) sessionStorage.setItem('checkout_email', email);
+        sessionStorage.setItem('checkout_cart_items', JSON.stringify(c.items));
+        if (preview) sessionStorage.setItem('checkout_preview', JSON.stringify(preview));
+        if (order) sessionStorage.setItem('checkout_order', JSON.stringify(order));
+      } catch { /* ignore */ }
+    },
     showError: (msg) => {
       errorEl.textContent = msg;
       errorEl.hidden = false;

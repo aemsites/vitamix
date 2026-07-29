@@ -120,6 +120,23 @@ export function shippingDimensionsFromOffer(offer) {
   return { weight: { value: w.value, unit: w.unitText } };
 }
 
+/**
+ * Build the `custom` fragment forwarded onto a cart line item from Product Bus.
+ *
+ * Only commercial products need to carry data today: the order body relays
+ * `custom` verbatim to the Commerce API, and the EBS sync job reads
+ * `item.custom.isCommercial === true` to set the "Commercial" order type.
+ * Commercial is a product-level trait, so it is read from the parent product
+ * rather than a selected variant. Returns an empty object for household
+ * products so the spread adds nothing and their payloads stay unchanged.
+ *
+ * @param {Object} parent - The parent product object from Product Bus
+ * @returns {{custom: {isCommercial: true}} | {}}
+ */
+export function resolveLineItemCustom(parent) {
+  return parent?.custom?.isCommercial ? { custom: { isCommercial: true } } : {};
+}
+
 function getCartCompatibility(parent) {
   const { type, compatibleWith, compatibilityGroup } = parent.custom || {};
   if (!compatibleWith && !compatibilityGroup) return null;
@@ -365,6 +382,9 @@ export default function renderAddToCart(ph, block, parent) {
           image: selectedVariant.image?.[0] ?? parent.image?.[0],
           variant: window.selectedVariant?.options?.color || '',
           selectedOptions: semanticOptions,
+          // Forward the commercial flag from Product Bus so the order carries it
+          // and the EBS sync job can set the "Commercial" order type.
+          ...resolveLineItemCustom(parent),
           ...(parent.bundleItems ? { bundleItems: parent.bundleItems } : {}),
           ...((availableWarranties || compatibility) ? {
             local: {

@@ -230,6 +230,30 @@ export function sendCartLinkBeacon(eventName, productID) {
 }
 
 /**
+ * Send a generic custom event via AppMeasurement link tracking (s.tl),
+ * with no product context. Uses the Launch
+ * primary tracker only — mirrors sendCartLinkBeacon's redirect-safe pattern for
+ * clicks that may lead straight into a payment-provider redirect.
+ * @param {string} eventName Adobe Analytics event (e.g. event46)
+ */
+export function sendCustomLinkBeacon(eventName) {
+  if (!eventName) {
+    return;
+  }
+
+  const tracker = getPrimaryAnalyticsTracker();
+  if (!tracker || typeof tracker.tl !== 'function') {
+    return;
+  }
+
+  resetTrackerForScAdd(tracker);
+  tracker.linkTrackVars = 'events';
+  tracker.linkTrackEvents = eventName;
+  tracker.events = eventName;
+  tracker.tl(true, 'o', eventName);
+}
+
+/**
  * Assign cart context to digitalData and clear prodView carry-over in digitalData.
  * AppMeasurement is flushed separately before cart/checkout direct calls only.
  * @param {object} cartData digitalData.cart payload

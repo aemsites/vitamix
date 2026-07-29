@@ -1,5 +1,3 @@
-import './at-prehide.js';
-
 function initATJS(path, config) {
   window.targetGlobalSettings = config;
   return new Promise((resolve) => {
