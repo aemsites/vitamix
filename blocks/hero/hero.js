@@ -18,6 +18,21 @@ function isMediaCell(cell) {
 }
 
 /**
+ * Parses `data-focal:x,y` percentages from an image's data-title value.
+ * @param {string} [title]
+ * @returns {{ x: number, y: number } | null}
+ */
+function parseFocalPoint(title) {
+  if (!title) return null;
+  const match = title.match(/data-focal:([\d.]+),([\d.]+)/);
+  if (!match) return null;
+  const x = Number(match[1]);
+  const y = Number(match[2]);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  return { x, y };
+}
+
+/**
  * Detects layout from column count and marks background images with data-bg.
  * @param {Element} block - Hero block element
  */
@@ -69,11 +84,15 @@ export default function decorate(block) {
   const bgPicture = block.querySelector('picture[data-bg]');
   if (bgPicture) {
     const bgImg = bgPicture.querySelector('img');
+    const focal = parseFocalPoint(bgImg.dataset.title);
     const optimizedBg = createOptimizedPicture(bgImg.src, bgImg.alt, false, [{ width: '2000' }]);
     optimizedBg.dataset.bg = '';
+    const newImg = optimizedBg.querySelector('img');
+    if (focal && newImg) {
+      newImg.style.objectPosition = `${focal.x}% ${focal.y}%`;
+    }
     bgPicture.replaceWith(optimizedBg);
-    if (!colorOverride) {
-      const newImg = optimizedBg.querySelector('img');
+    if (!colorOverride && newImg) {
       if (newImg.complete) applyImgColor(block);
       else newImg.addEventListener('load', () => applyImgColor(block));
     }
