@@ -43,7 +43,7 @@ function parseFocalPoint(title) {
 function focalObjectPosition(focalPct, container, rendered) {
   const overflow = container - rendered;
   if (Math.abs(overflow) < 0.5) return 50;
-  const pos = ((container / 2) - (rendered * (focalPct / 100))) / overflow * 100;
+  const pos = (((container / 2) - (rendered * (focalPct / 100))) / overflow) * 100;
   return Math.max(0, Math.min(100, pos));
 }
 
