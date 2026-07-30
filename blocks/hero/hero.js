@@ -33,41 +33,24 @@ function parseFocalPoint(title) {
 }
 
 /**
- * object-position % that places `focalPct` of the rendered image as close to
- * the container center as possible without exposing empty edges.
- * @param {number} focalPct - Focal point along this axis (0–100)
- * @param {number} container - Container size in px
- * @param {number} rendered - Scaled image size in px (object-fit: cover)
- * @returns {number}
- */
-function focalObjectPosition(focalPct, container, rendered) {
-  const overflow = container - rendered;
-  if (Math.abs(overflow) < 0.5) return 50;
-  const pos = (((container / 2) - (rendered * (focalPct / 100))) / overflow) * 100;
-  return Math.max(0, Math.min(100, pos));
-}
-
-/**
- * Keeps the image focal point centered under object-fit: cover as the box resizes.
+ * Sets the custom properties the CSS focal-point rule needs to keep the
+ * focal point centered under object-fit: cover as the box resizes.
  * @param {HTMLImageElement} img
  * @param {{ x: number, y: number }} focal
  */
 function applyFocalPoint(img, focal) {
-  const update = () => {
+  const setProps = () => {
     const { naturalWidth: nw, naturalHeight: nh } = img;
     if (!nw || !nh) return;
-    const { width: cw, height: ch } = img.getBoundingClientRect();
-    if (!cw || !ch) return;
-
-    const scale = Math.max(cw / nw, ch / nh);
-    const x = focalObjectPosition(focal.x, cw, nw * scale);
-    const y = focalObjectPosition(focal.y, ch, nh * scale);
-    img.style.objectPosition = `${x}% ${y}%`;
+    img.style.setProperty('--fx', focal.x);
+    img.style.setProperty('--fy', focal.y);
+    img.style.setProperty('--iw', nw);
+    img.style.setProperty('--ih', nh);
+    img.dataset.focal = '';
   };
 
-  if (img.complete) update();
-  else img.addEventListener('load', update, { once: true });
-  new ResizeObserver(update).observe(img);
+  if (img.complete) setProps();
+  else img.addEventListener('load', setProps, { once: true });
 }
 
 /**

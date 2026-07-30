@@ -60,6 +60,15 @@
   --image-color: var(--color-charcoal);
 }
 
+.hero picture[data-bg] {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  height: 100%;
+  width: 100%;
+  container-type: size;
+}
+
 .hero picture[data-bg] img,
 .hero video {
   position: absolute;
@@ -68,6 +77,19 @@
   height: 100%;
   width: 100%;
   object-fit: cover;
+}
+
+.hero picture[data-bg] img[data-focal] {
+  --scale-w: calc(100cqw / var(--iw));
+  --scale-h: calc(100cqh / var(--ih));
+  --rendered-w: calc(var(--iw) * max(var(--scale-w), var(--scale-h)));
+  --rendered-h: calc(var(--ih) * max(var(--scale-w), var(--scale-h)));
+  --safe-overflow-x: min(calc(100cqw - var(--rendered-w)), -0.5px);
+  --safe-overflow-y: min(calc(100cqh - var(--rendered-h)), -0.5px);
+
+  object-position:
+    clamp(0%, calc(((50cqw - var(--rendered-w) * var(--fx) / 100) / var(--safe-overflow-x)) * 100%), 100%)
+    clamp(0%, calc(((50cqh - var(--rendered-h) * var(--fy) / 100) / var(--safe-overflow-y)) * 100%), 100%);
 }
 
 .hero .icon svg {
@@ -177,11 +199,11 @@
   padding: 0;
 }
 
-.hero.split.left-text picture[data-bg] img {
+.hero.split.left-text picture[data-bg] img:not([data-focal]) {
   object-position: left;
 }
 
-.hero.split.right-text picture[data-bg] img {
+.hero.split.right-text picture[data-bg] img:not([data-focal]) {
   object-position: right;
 }
 
@@ -250,11 +272,11 @@
     background: linear-gradient(to left, transparent, var(--image-color) 50%);
   }
 
-  .hero.split.left-text picture[data-bg] img {
+  .hero.split.left-text picture[data-bg] img:not([data-focal]) {
     object-position: 25%;
   }
-  
-  .hero.split.right-text picture[data-bg] img {
+
+  .hero.split.right-text picture[data-bg] img:not([data-focal]) {
     object-position: 75%;
   }
   
@@ -326,11 +348,11 @@
     font-size: var(--body-size-m);
   }
 
-  .hero.center picture[data-bg] img {
+  .hero.center picture[data-bg] img:not([data-focal]) {
     object-position: 10%;
   }
 
-  .hero.center.focus-right picture[data-bg] img {
+  .hero.center.focus-right picture[data-bg] img:not([data-focal]) {
     object-position: 90%;
   }
 
