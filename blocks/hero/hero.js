@@ -18,6 +18,42 @@ function isMediaCell(cell) {
 }
 
 /**
+ * Parses `data-focal:x,y` percentages from an image's data-title value.
+ * @param {string} [title]
+ * @returns {{ x: number, y: number } | null}
+ */
+function parseFocalPoint(title) {
+  if (!title) return null;
+  const match = title.match(/data-focal:([\d.]+),([\d.]+)/);
+  if (!match) return null;
+  const x = Number(match[1]);
+  const y = Number(match[2]);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  return { x, y };
+}
+
+/**
+ * Sets the custom properties the CSS focal-point rule needs to keep the
+ * focal point centered under object-fit: cover as the box resizes.
+ * @param {HTMLImageElement} img
+ * @param {{ x: number, y: number }} focal
+ */
+function applyFocalPoint(img, focal) {
+  const setProps = () => {
+    const { naturalWidth: nw, naturalHeight: nh } = img;
+    if (!nw || !nh) return;
+    img.style.setProperty('--fx', focal.x);
+    img.style.setProperty('--fy', focal.y);
+    img.style.setProperty('--iw', nw);
+    img.style.setProperty('--ih', nh);
+    img.dataset.focal = '';
+  };
+
+  if (img.complete) setProps();
+  else img.addEventListener('load', setProps, { once: true });
+}
+
+/**
  * Detects layout from column count and marks background images with data-bg.
  * @param {Element} block - Hero block element
  */
@@ -38,6 +74,7 @@ function detectLayout(block) {
     const imgIndex = cells.findIndex((c) => c.classList.contains('img-wrapper'));
     block.classList.add(imgIndex === 0 ? 'left-text' : 'right-text');
   } else {
+    block.classList.add('center');
     const cell = row.firstElementChild;
     if (!cell) return;
     const [picture] = [...cell.querySelectorAll('picture')];
@@ -68,11 +105,13 @@ export default function decorate(block) {
   const bgPicture = block.querySelector('picture[data-bg]');
   if (bgPicture) {
     const bgImg = bgPicture.querySelector('img');
+    const focal = parseFocalPoint(bgImg.dataset.title);
     const optimizedBg = createOptimizedPicture(bgImg.src, bgImg.alt, false, [{ width: '2000' }]);
     optimizedBg.dataset.bg = '';
+    const newImg = optimizedBg.querySelector('img');
+    if (focal && newImg) applyFocalPoint(newImg, focal);
     bgPicture.replaceWith(optimizedBg);
-    if (!colorOverride) {
-      const newImg = optimizedBg.querySelector('img');
+    if (!colorOverride && newImg) {
       if (newImg.complete) applyImgColor(block);
       else newImg.addEventListener('load', () => applyImgColor(block));
     }
