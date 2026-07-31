@@ -304,6 +304,17 @@
   padding: 8px 12px;
 }
 
+.pr-promo-form-error {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #b42318;
+  text-align: left;
+  align-self: center;
+}
+
 .pim-search.pr-promo-search-wide {
   flex: 1 1 280px;
   max-width: none;
@@ -838,6 +849,10 @@
   border-bottom: none;
 }
 
+.pr-promo-sale-grid tbody tr.pr-promo-row-invalid td {
+  background: #fef3f2;
+}
+
 .pr-promo-sale-row:hover,
 .pr-promo-sale-row:focus-within,
 .pr-promo-sale-row.pr-promo-line-selected {
@@ -940,11 +955,29 @@
   border-radius: 4px;
 }
 
+.pr-promo-product-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
 .pr-promo-path-text {
   font-size: 12px;
   word-break: break-all;
   white-space: normal;
   margin: 0;
+}
+
+.pr-promo-product-invalid {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.3;
+  color: #b42318;
+}
+
+.pr-promo-sale-row.pr-promo-row-invalid .pr-promo-path-text {
+  color: #b42318;
 }
 
 .pr-promo-cell-wide {

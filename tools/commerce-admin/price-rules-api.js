@@ -353,6 +353,53 @@ export function catalogPathToProductUrl(path) {
 }
 
 /**
+ * Color slug from a product URL's `?color=` query (`''` when absent). This is the
+ * user-facing variant selector; it maps to a variant SKU for the API (see
+ * `commerce-variant-color.js`).
+ *
+ * @param {string} productUrl
+ * @returns {string}
+ */
+export function colorFromProductUrl(productUrl) {
+  const s = String(productUrl || '').trim();
+  if (!s) return '';
+  try {
+    const u = new URL(s, STOREFRONT_ORIGIN);
+    return (u.searchParams.get('color') || '').trim();
+  } catch {
+    const m = s.match(/[?&]color=([^&#]+)/);
+    return m ? decodeURIComponent(m[1]).trim() : '';
+  }
+}
+
+/**
+ * Display path with an optional `?color=` suffix, e.g. `/us/en_us/products/e320?color=very-berry`.
+ * Used everywhere the grid shows a variant so the user only ever sees the color form.
+ *
+ * @param {string} path base catalog path (no query)
+ * @param {string} [colorSlug]
+ * @returns {string}
+ */
+export function catalogDisplayPathWithColor(path, colorSlug) {
+  const base = productUrlToCatalogPath(path) || String(path || '').trim();
+  const c = String(colorSlug || '').trim();
+  return c ? `${base}?color=${c}` : base;
+}
+
+/**
+ * Product URL (for the hidden round-trip input) with an optional `?color=` suffix.
+ *
+ * @param {string} path base catalog path
+ * @param {string} [colorSlug]
+ * @returns {string}
+ */
+export function catalogProductUrlWithColor(path, colorSlug) {
+  const url = catalogPathToProductUrl(path);
+  const c = String(colorSlug || '').trim();
+  return c && url ? `${url}?color=${c}` : url;
+}
+
+/**
  * String-key map from rule `custom` (helix).
  *
  * @param {unknown} raw
@@ -387,6 +434,39 @@ export function catalogRuleToPromotionRow(rule) {
     regularPrice: regular,
     salePrice: rule.price != null ? String(rule.price) : '—',
   };
+}
+
+/**
+ * Expand a catalog rule to one or more table rows. A rule with a `variants` map yields one
+ * row per variant SKU (each carries `sku` so the grid can show `?color=` after resolving the
+ * catalog index); a plain rule yields a single row.
+ *
+ * @param {CatalogPriceRule} rule
+ * @returns {Array<object>} PromotionRow-compatible objects (variant rows include `sku`)
+ */
+export function catalogRuleToPromotionRows(rule) {
+  const variants = rule?.variants;
+  const skus = variants && typeof variants === 'object' && !Array.isArray(variants)
+    ? Object.keys(variants)
+    : [];
+  if (skus.length === 0) return [catalogRuleToPromotionRow(rule)];
+
+  const base = catalogRuleToPromotionRow(rule);
+  const regular = base.regularPrice;
+  return skus.map((sku) => {
+    const v = variants[sku] || {};
+    const vStart = v.start != null && String(v.start).trim() !== '' ? String(v.start) : base.start;
+    const vEnd = v.end != null && String(v.end).trim() !== '' ? String(v.end) : base.end;
+    return {
+      start: vStart,
+      end: vEnd,
+      // Base path only; the grid appends `?color=` once the SKU resolves to a color.
+      product: catalogPathToProductUrl(rule.path),
+      sku: String(v.sku || sku),
+      regularPrice: regular,
+      salePrice: v.price != null ? String(v.price) : base.salePrice,
+    };
+  });
 }
 
 /**

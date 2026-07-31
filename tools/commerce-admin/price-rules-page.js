@@ -14,7 +14,10 @@ import {
   catalogPriceStringForApi,
   catalogRulesForCountryTab,
   catalogTimestampStringForApi,
-  catalogRuleToPromotionRow,
+  catalogRuleToPromotionRows,
+  catalogDisplayPathWithColor,
+  catalogProductUrlWithColor,
+  colorFromProductUrl,
   countryKeyFromCatalogPath,
   fetchCartPriceRules,
   fetchCatalogPriceRules,
@@ -24,6 +27,7 @@ import {
   putCartPriceRules,
   putCatalogPriceRules,
 } from './price-rules-api.js';
+import { buildVariantColorMapsForLocale, colorSlugFromValue } from './commerce-variant-color.js';
 import {
   applyCartRuleProductScopeToConditions,
   cartRuleProductScopeFromConditions,
@@ -85,6 +89,7 @@ const ET_TIMEZONE = 'America/New_York';
  * @property {string} product
  * @property {string} regularPrice
  * @property {string} salePrice
+ * @property {string} [sku] resolved variant SKU when the product targets a `?color=` variant
  * @property {string} [startSourceText] original spreadsheet cell (shown until edited)
  * @property {string} [endSourceText]
  */
@@ -874,24 +879,89 @@ function catalogCustomStringMap(raw) {
 }
 
 /**
+ * Resolve each row's `?color=` selection to a variant SKU, in place. A row that already carries
+ * a `sku` (loaded from an existing rule) is trusted as-is; a row with no `?color=` is left plain.
+ * Blocks the save (throws) when a color cannot be resolved, so variant targeting is never
+ * silently dropped.
+ *
  * @param {PromotionRow[]} rows
+ * @returns {Promise<PromotionRow[]>} the same rows, with `sku` filled where a color was resolved
+ */
+async function resolveRowVariantSkus(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  const pending = [];
+  list.forEach((row, i) => {
+    if (row.sku) return; // authoritative SKU already on the row
+    const color = colorFromProductUrl(row.product);
+    if (!color) return; // whole-product row, no variant targeting
+    pending.push({
+      row,
+      index: i,
+      color,
+      locale: catalogLocaleFromVitamixProductUrl(row.product),
+    });
+  });
+  if (!pending.length) return list;
+
+  const locales = [...new Set(pending.map((p) => p.locale).filter(Boolean))];
+  /** @type {Map<string, import('./commerce-variant-color.js').VariantColorMaps>} */
+  const mapsByLocale = new Map();
+  await Promise.all(locales.map(async (loc) => {
+    try {
+      mapsByLocale.set(loc, await buildVariantColorMapsForLocale(loc));
+    } catch {
+      // left unset — reported per-row below
+    }
+  }));
+
+  pending.forEach((p) => {
+    const where = productUrlToCatalogPath(p.row.product) || p.row.product;
+    const maps = p.locale ? mapsByLocale.get(p.locale) : null;
+    if (!maps) {
+      throw new Error(
+        `Sale line ${p.index + 1}: could not load the catalog to match color “${p.color}” for ${where}. Try again.`,
+      );
+    }
+    const sku = maps.skuForColor(p.row.product, colorSlugFromValue(p.color));
+    if (!sku) {
+      throw new Error(
+        `Sale line ${p.index + 1}: “${p.color}” is not a known color variant of ${where}. Check the ?color= value.`,
+      );
+    }
+    p.row.sku = sku;
+  });
+  return list;
+}
+
+/**
+ * @param {PromotionRow[]} rows rows whose variant `?color=` selections are already resolved to
+ *   `sku` (see {@link resolveRowVariantSkus})
  * @param {string} group Calendar / grouping label stored on each rule as `custom.group`
  * @param {import('./price-rules-api.js').CatalogPriceRule[] | undefined} [preserveFromRules]
- *   rules for this market before edit — merged by `path` so extra `custom` keys (e.g. `debug`)
- *   and `variants` survive Save
+ *   rules for this market before edit — matched by `path` (and `sku` for variant rules) so extra
+ *   `custom` keys survive Save
  * @returns {import('./price-rules-api.js').CatalogPriceRule[]}
  */
 function promotionRowsToCatalogRules(rows, group, preserveFromRules) {
   const g = String(group || '').trim() || String(new Date().getFullYear());
   /** @type {Map<string, import('./price-rules-api.js').CatalogPriceRule>} */
-  const prevByPath = new Map(
-    (preserveFromRules || []).filter((r) => r && r.path).map((r) => [String(r.path), r]),
-  );
+  const prevByKey = new Map();
+  (preserveFromRules || []).filter((r) => r && r.path).forEach((r) => {
+    const variants = r.variants && typeof r.variants === 'object' && !Array.isArray(r.variants)
+      ? Object.keys(r.variants)
+      : [];
+    if (variants.length) {
+      variants.forEach((sku) => prevByKey.set(`${r.path}\0${sku}`, r));
+    } else {
+      prevByKey.set(String(r.path), r);
+    }
+  });
   return rows.map((row) => {
     const path = productUrlToCatalogPath(row.product);
     if (!path) throw new Error('Each sale line needs a valid product URL');
+    const sku = String(row.sku || '').trim();
     const price = catalogPriceStringForApi(row.salePrice);
-    const prevRule = prevByPath.get(path);
+    const prevRule = prevByKey.get(sku ? `${path}\0${sku}` : path);
     /** @type {import('./price-rules-api.js').CatalogPriceRule} */
     const rule = { path, price };
     const start = normalizeDateForCatalogApi(String(row.start || '').trim());
@@ -907,12 +977,15 @@ function promotionRowsToCatalogRules(rows, group, preserveFromRules) {
     delete custom.minimumSubtotal;
     rule.custom = custom;
 
-    if (prevRule?.variants && typeof prevRule.variants === 'object' && !Array.isArray(prevRule.variants)) {
-      try {
-        rule.variants = structuredClone(prevRule.variants);
-      } catch {
-        rule.variants = /** @type {typeof prevRule.variants} */ ({ ...prevRule.variants });
-      }
+    if (sku) {
+      // Variant-targeted row → API keys the override by SKU under this product path.
+      /** @type {import('./price-rules-api.js').HelixVariantPriceRule} */
+      const variant = { sku, price };
+      if (start) variant.start = start;
+      if (end) variant.end = end;
+      const prevVariant = prevRule?.variants?.[sku];
+      if (prevVariant?.custom) variant.custom = { ...prevVariant.custom };
+      rule.variants = { [sku]: variant };
     }
     return rule;
   }).filter((r) => r.path);
@@ -1023,6 +1096,11 @@ function refreshPromotionSaleLinesVisuals(dlg) {
     }
   });
   hydratePromotionTableThumbs(dlg, promotionDialogMarketSafe(dlg)).catch(() => {});
+  // Validate after `?color=` is appended so a user-typed color is checked against the index.
+  hydratePromotionRowColors(dlg)
+    .catch(() => {})
+    .then(() => validatePromotionRows(dlg))
+    .catch(() => {});
 }
 
 /** @param {HTMLDialogElement} dlg */
@@ -1031,6 +1109,7 @@ function readPromotionLineRowsFromDom(dlg) {
   const out = [];
   dlg.querySelectorAll('[data-pr-promo-line]').forEach((line) => {
     const product = String(line.querySelector('.pr-promo-h-product')?.value ?? '').trim();
+    const sku = String(line.getAttribute('data-sku') ?? '').trim();
     const saleDigits = String(line.querySelector('.pr-promo-h-sale')?.value ?? '').trim();
     const regDigits = String(line.querySelector('.pr-promo-h-regular')?.value ?? '').trim();
     let start = String(line.querySelector('.pr-promo-h-start')?.value ?? '').trim();
@@ -1061,6 +1140,7 @@ function readPromotionLineRowsFromDom(dlg) {
     }
     out.push({
       product,
+      ...(sku ? { sku } : {}),
       regularPrice: regDigits || '—',
       salePrice: saleDigits,
       start,
@@ -1130,7 +1210,8 @@ function syncPromotionSaleRowView(tr) {
       : formatIsoForSaleLineView(hEnd?.value || '');
   }
   const path = productUrlToCatalogPath(hProduct?.value || '');
-  if (pathEl) pathEl.textContent = path || '—';
+  const displayPath = catalogDisplayPathWithColor(path, colorFromProductUrl(hProduct?.value || ''));
+  if (pathEl) pathEl.textContent = displayPath || '—';
   if (vReg) vReg.textContent = hReg?.value?.trim() ? hReg.value : '—';
   if (vSale) vSale.textContent = hSale?.value?.trim() ? hSale.value : '—';
 }
@@ -1167,6 +1248,170 @@ async function hydratePromotionTableThumbs(dlg, countryKey) {
       ? `<img src="${escapeHtml(src)}" alt="" loading="lazy" width="48" height="48" class="pim-thumb-img" />`
       : '<span class="pim-thumb-placeholder" aria-hidden="true"></span>';
   });
+}
+
+/**
+ * Loaded variant rows carry `data-sku` but their hidden product URL has no `?color=` yet (SKU→color
+ * needs the catalog index). Resolve it and append `?color=` to both the hidden URL (so a re-save
+ * keeps the same variant) and the visible path (so the user sees the color form). Best-effort:
+ * rows whose catalog can't be loaded keep the plain path. Mirrors thumbnail hydration.
+ *
+ * @param {HTMLDialogElement} dlg
+ */
+async function hydratePromotionRowColors(dlg) {
+  const productValue = (tr) => String(
+    /** @type {HTMLInputElement | null} */ (tr.querySelector('.pr-promo-h-product'))?.value ?? '',
+  );
+  const rows = [...dlg.querySelectorAll('tr[data-pr-promo-line]')].filter((tr) => {
+    const sku = tr.getAttribute('data-sku');
+    const url = productValue(tr);
+    return Boolean(sku) && Boolean(url) && !colorFromProductUrl(url);
+  });
+  if (!rows.length) return;
+
+  /** @type {Map<string, Element[]>} */
+  const byLocale = new Map();
+  rows.forEach((tr) => {
+    const loc = catalogLocaleFromVitamixProductUrl(productValue(tr)) || 'us/en_us';
+    if (!byLocale.has(loc)) byLocale.set(loc, []);
+    byLocale.get(loc).push(tr);
+  });
+
+  await Promise.all([...byLocale.entries()].map(async ([loc, trs]) => {
+    let maps;
+    try {
+      maps = await buildVariantColorMapsForLocale(loc);
+    } catch {
+      return; // best-effort; leave plain path
+    }
+    trs.forEach((tr) => {
+      const slug = maps.colorSlugForSku(tr.getAttribute('data-sku') || '');
+      if (!slug) return;
+      const h = /** @type {HTMLInputElement | null} */ (tr.querySelector('.pr-promo-h-product'));
+      const path = productUrlToCatalogPath(h?.value || '');
+      if (h) h.value = catalogProductUrlWithColor(path, slug);
+      const pathEl = tr.querySelector('.pr-promo-path-text');
+      if (pathEl) pathEl.textContent = catalogDisplayPathWithColor(path, slug);
+    });
+  }));
+}
+
+/**
+ * Append `?color=` to the `product` of variant rows (those carrying `sku`) so the read-only
+ * promotion detail table shows the color form, never the bare parent path. Best-effort per locale.
+ *
+ * @param {PromotionRow[]} rows
+ * @returns {Promise<PromotionRow[]>} the same rows, with colored `product` where resolved
+ */
+async function enrichPromotionRowsWithColorSuffix(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  const pending = list.filter((r) => r && r.sku && !colorFromProductUrl(r.product));
+  if (!pending.length) return list;
+
+  /** @type {Map<string, PromotionRow[]>} */
+  const byLocale = new Map();
+  pending.forEach((r) => {
+    const loc = catalogLocaleFromVitamixProductUrl(r.product) || 'us/en_us';
+    if (!byLocale.has(loc)) byLocale.set(loc, []);
+    byLocale.get(loc).push(r);
+  });
+
+  await Promise.all([...byLocale.entries()].map(async ([loc, rs]) => {
+    let maps;
+    try {
+      maps = await buildVariantColorMapsForLocale(loc);
+    } catch {
+      return; // best-effort; leave plain path
+    }
+    rs.forEach((r) => {
+      const slug = maps.colorSlugForSku(r.sku);
+      if (slug) r.product = catalogProductUrlWithColor(productUrlToCatalogPath(r.product), slug);
+    });
+  }));
+  return list;
+}
+
+/**
+ * Highlight one row as invalid (or clear it) and show the reason inline.
+ *
+ * @param {Element} tr
+ * @param {string} reason empty string clears the invalid state
+ */
+function setPromotionRowValidity(tr, reason) {
+  tr.classList.toggle('pr-promo-row-invalid', Boolean(reason));
+  const msg = tr.querySelector('.pr-promo-product-invalid');
+  if (msg instanceof HTMLElement) {
+    msg.textContent = reason || '';
+    msg.hidden = !reason;
+  }
+}
+
+/**
+ * Disable the dialog's Add/Save button while any product row is invalid.
+ *
+ * @param {HTMLDialogElement} dlg
+ * @param {number} invalidCount
+ */
+function togglePromotionSubmitDisabled(dlg, invalidCount) {
+  const btn = dlg.querySelector('[data-pr-promo-form-submit]');
+  if (!(btn instanceof HTMLButtonElement)) return;
+  btn.disabled = invalidCount > 0;
+  btn.title = invalidCount > 0
+    ? `Fix ${invalidCount} highlighted product${invalidCount === 1 ? '' : 's'} before saving.`
+    : '';
+}
+
+/**
+ * Validate every sale-line product against the catalog index entirely client-side: the product
+ * path must exist and any `?color=` must be a real variant. Invalid rows are highlighted with a
+ * reason and the submit button is disabled until they are fixed. Best-effort on index-load failure
+ * (rows are left unmarked so a transient outage never blocks a save; the save-time resolver still
+ * guards variant colors).
+ *
+ * @param {HTMLDialogElement} dlg
+ * @returns {Promise<number>} count of invalid rows
+ */
+async function validatePromotionRows(dlg) {
+  const productValueOf = (tr) => String(
+    /** @type {HTMLInputElement | null} */ (tr.querySelector('.pr-promo-h-product'))?.value ?? '',
+  ).trim();
+  const entries = [...dlg.querySelectorAll('tr[data-pr-promo-line]')]
+    .map((tr) => ({ tr, url: productValueOf(tr), loc: '' }))
+    .filter((e) => e.url);
+  entries.forEach((e) => { e.loc = catalogLocaleFromVitamixProductUrl(e.url) || 'us/en_us'; });
+
+  /** @type {Map<string, import('./commerce-variant-color.js').VariantColorMaps>} */
+  const mapsByLocale = new Map();
+  await Promise.all([...new Set(entries.map((e) => e.loc))].map(async (loc) => {
+    try {
+      mapsByLocale.set(loc, await buildVariantColorMapsForLocale(loc));
+    } catch {
+      // leave unset — that locale's rows stay unmarked (best-effort)
+    }
+  }));
+
+  const market = promotionDialogMarketSafe(dlg);
+  let invalid = 0;
+  entries.forEach((e) => {
+    const maps = mapsByLocale.get(e.loc);
+    let reason = '';
+    // Country mismatch is path-based, so it is checked first and works even if the index failed.
+    const rowCountry = countryKeyFromCatalogPath(productUrlToCatalogPath(e.url));
+    if (rowCountry && rowCountry !== market) {
+      reason = `Product is in market ${rowCountry.toUpperCase()}, but this promotion is for ${market.toUpperCase()}.`;
+    } else if (maps) {
+      const color = colorFromProductUrl(e.url);
+      if (!maps.productExists(e.url)) {
+        reason = 'Product not found in the catalog.';
+      } else if (color && !maps.skuForColor(e.url, colorSlugFromValue(color))) {
+        reason = `“${color}” is not a color variant of this product.`;
+      }
+    }
+    setPromotionRowValidity(e.tr, reason);
+    if (reason) invalid += 1;
+  });
+  togglePromotionSubmitDisabled(dlg, invalid);
+  return invalid;
 }
 
 /** @param {HTMLDialogElement} dlg */
@@ -1280,6 +1525,8 @@ function commitPromotionSaleLineFieldsBeforeSave(dlg) {
     if (field === 'product') {
       const h = tr.querySelector('.pr-promo-h-product');
       if (h && 'value' in h) /** @type {HTMLInputElement} */ (h).value = resolveProductUrlForRow(inp.value);
+      // User edited the product/color by hand — drop the resolved SKU so save re-resolves ?color=.
+      tr.removeAttribute('data-sku');
     } else if (field === 'regular') {
       const h = tr.querySelector('.pr-promo-h-regular');
       if (h && 'value' in h) /** @type {HTMLInputElement} */ (h).value = priceDigitsForUi(inp.value);
@@ -1314,6 +1561,8 @@ function wirePromotionSaleLineTableCells(dlg) {
 
   const rehydrateThumbs = () => {
     hydratePromotionTableThumbs(dlg, safeMarket()).catch(() => {});
+    // Re-validate on any edit (product path/color may have changed); cheap via the locale cache.
+    validatePromotionRows(dlg).catch(() => {});
   };
 
   dlg.querySelector('#pr-promo-form-market')?.addEventListener('change', rehydrateThumbs);
@@ -1360,7 +1609,9 @@ function wirePromotionSaleLineTableCells(dlg) {
       );
     } else if (field === 'product') {
       const full = /** @type {HTMLInputElement} */ (tr.querySelector('.pr-promo-h-product')).value;
-      inp.value = productUrlToCatalogPath(full) || full;
+      // Edit the color form the user sees (path + ?color=), not the query-stripped path.
+      const basePath = productUrlToCatalogPath(full);
+      inp.value = catalogDisplayPathWithColor(basePath, colorFromProductUrl(full)) || full;
     } else if (field === 'regular') {
       inp.value = /** @type {HTMLInputElement} */ (tr.querySelector('.pr-promo-h-regular')).value;
     } else if (field === 'sale') {
@@ -1391,6 +1642,8 @@ function wirePromotionSaleLineTableCells(dlg) {
       tr.removeAttribute('data-pr-end-paste');
     } else if (field === 'product') {
       /** @type {HTMLInputElement} */ (tr.querySelector('.pr-promo-h-product')).value = resolveProductUrlForRow(t.value);
+      // User edited the product/color by hand — drop the resolved SKU so save re-resolves ?color=.
+      tr.removeAttribute('data-sku');
     } else if (field === 'regular') {
       /** @type {HTMLInputElement} */ (tr.querySelector('.pr-promo-h-regular')).value = priceDigitsForUi(t.value);
     } else if (field === 'sale') {
@@ -1410,6 +1663,12 @@ function wirePromotionSaleLineTableCells(dlg) {
 function promotionFormTableRowHtml(r, index) {
   const productUrl = resolveProductUrlForRow(String(r.product || '').trim());
   const path = productUrlToCatalogPath(productUrl);
+  // The user only ever sees the storefront `?color=` form; a `sku` on a loaded row has no color
+  // in the URL yet — hydratePromotionRowColors() appends it after the catalog index resolves.
+  const colorSlug = colorFromProductUrl(productUrl);
+  const displayPath = catalogDisplayPathWithColor(path, colorSlug);
+  const sku = String(r.sku || '').trim();
+  const skuAttr = sku ? ` data-sku="${escapeHtml(sku)}"` : '';
   const startPrimary = String(r.start ?? '').trim();
   const endPrimary = String(r.end ?? '').trim();
   const startPaste = String(r.startSourceText ?? '').trim();
@@ -1430,7 +1689,7 @@ function promotionFormTableRowHtml(r, index) {
   const endPasteAttr = endPaste ? ` data-pr-end-paste="${escapeHtml(endPaste)}"` : '';
   const startViewLabel = startPaste || formatIsoForSaleLineView(startIso);
   const endViewLabel = endPaste || formatIsoForSaleLineView(endIso);
-  return `<tr class="pr-promo-sale-row" data-pr-promo-line data-pr-promo-line-idx="${index}"${startPasteAttr}${endPasteAttr}>
+  return `<tr class="pr-promo-sale-row" data-pr-promo-line data-pr-promo-line-idx="${index}"${skuAttr}${startPasteAttr}${endPasteAttr}>
     <td class="pr-promo-sale-col-del">
       <button type="button" class="coupons-btn pr-promo-line-remove-btn" data-pr-promo-line-remove aria-label="Remove row">×</button>
     </td>
@@ -1453,7 +1712,10 @@ function promotionFormTableRowHtml(r, index) {
       <input type="hidden" class="pr-promo-h-product" value="${escapeHtml(productUrl)}" />
       <div class="pr-promo-cell-view pr-promo-product-view" tabindex="0" role="button">
         <span class="pr-promo-thumb-cell"></span>
-        <code class="pr-promo-path-text">${path ? escapeHtml(path) : '—'}</code>
+        <div class="pr-promo-product-main">
+          <code class="pr-promo-path-text">${displayPath ? escapeHtml(displayPath) : '—'}</code>
+          <p class="pr-promo-product-invalid" role="alert" hidden></p>
+        </div>
       </div>
       <div class="pr-promo-cell-edit" hidden>
         <input type="text" class="pr-promo-input-product" placeholder="/us/en_us/products/… or https://…" />
@@ -1812,6 +2074,20 @@ function logPromotionFormSaveFailure(action, err) {
   });
 }
 
+/**
+ * Show (or clear) an inline error banner inside a promotion dialog. Toasts render behind the
+ * modal `<dialog>`, so save/server failures need a message the user can actually see.
+ *
+ * @param {HTMLElement} dlg
+ * @param {string} message empty string hides the banner
+ */
+function setPromotionFormError(dlg, message) {
+  const el = dlg.querySelector('.pr-promo-form-error');
+  if (!(el instanceof HTMLElement)) return;
+  el.textContent = message || '';
+  el.hidden = !message;
+}
+
 async function openPromotionAddDialog() {
   const ok = await fetchCatalogFromServerOrNotify();
   if (!ok) return;
@@ -1826,6 +2102,7 @@ async function openPromotionAddDialog() {
         ${promotionEditFormInnerHtml(initial, [], { edit: false })}
       </div>
       <div class="coupons-dialog-actions">
+        <p class="pr-promo-form-error" role="alert" hidden></p>
         <button type="button" class="coupons-btn" data-pr-promo-form-cancel>Cancel</button>
         <button type="button" class="coupons-btn coupons-btn-primary" data-pr-promo-form-submit>Add promotion</button>
       </div>
@@ -1850,6 +2127,7 @@ async function openPromotionAddDialog() {
   dialog.querySelector('[data-pr-promo-form-cancel]')?.addEventListener('click', close);
   dialog.querySelector('[data-pr-promo-form-submit]')?.addEventListener('click', async () => {
     try {
+      setPromotionFormError(dialog, '');
       commitPromotionSaleLineFieldsBeforeSave(dialog);
       blurOpenPromotionSaleLineEditors(dialog);
       closePromotionSaleLineCellEdits(dialog);
@@ -1870,7 +2148,7 @@ async function openPromotionAddDialog() {
           throw new Error('Minimum cart subtotal must be a positive number when that condition is enabled.');
         }
       }
-      const lineRows = readPromotionLineRowsFromDom(dialog);
+      const lineRows = await resolveRowVariantSkus(readPromotionLineRowsFromDom(dialog));
       const rulesNew = promotionRowsToCatalogRules(lineRows, group);
       for (let i = 0; i < rulesNew.length; i += 1) {
         if (countryKeyFromCatalogPath(rulesNew[i].path) !== market) {
@@ -1901,7 +2179,9 @@ async function openPromotionAddDialog() {
       render();
     } catch (err) {
       logPromotionFormSaveFailure('add', err);
-      showToast(err?.message || 'Failed to add promotion', 'error');
+      const message = err?.message || 'Failed to add promotion. Please try again.';
+      setPromotionFormError(dialog, message);
+      showToast(message, 'error');
     }
   });
   dialog.addEventListener('click', (e) => {
@@ -1929,7 +2209,7 @@ async function openPromotionEditDialog(countryKey, promoId) {
   const ck = /** @type {(typeof COUNTRIES)[number]} */ (
     COUNTRIES.includes(/** @type {(typeof COUNTRIES)[number]} */(countryKey)) ? countryKey : 'us'
   );
-  const rows = rulesCo.map(catalogRuleToPromotionRow);
+  const rows = rulesCo.flatMap(catalogRuleToPromotionRows);
   const groupGuess = promotionCatalogGroup(promo, ck);
   const selectedCouponId = promotionCouponGateSelection(promoId);
 
@@ -1943,6 +2223,7 @@ async function openPromotionEditDialog(countryKey, promoId) {
       </div>
       <div class="coupons-dialog-actions pr-cart-rule-edit-dialog-actions">
         <button type="button" class="coupons-btn coupons-btn-danger" data-pr-promo-form-delete>Delete promotion…</button>
+        <p class="pr-promo-form-error" role="alert" hidden></p>
         <div class="pr-cart-rule-edit-actions-end">
           <button type="button" class="coupons-btn" data-pr-promo-form-cancel>Cancel</button>
           <button type="button" class="coupons-btn coupons-btn-primary" data-pr-promo-form-submit>Save changes</button>
@@ -1996,6 +2277,7 @@ async function openPromotionEditDialog(countryKey, promoId) {
   });
   dialog.querySelector('[data-pr-promo-form-submit]')?.addEventListener('click', async () => {
     try {
+      setPromotionFormError(dialog, '');
       commitPromotionSaleLineFieldsBeforeSave(dialog);
       blurOpenPromotionSaleLineEditors(dialog);
       closePromotionSaleLineCellEdits(dialog);
@@ -2016,7 +2298,7 @@ async function openPromotionEditDialog(countryKey, promoId) {
           throw new Error('Minimum cart subtotal must be a positive number when that condition is enabled.');
         }
       }
-      const lineRows = readPromotionLineRowsFromDom(dialog);
+      const lineRows = await resolveRowVariantSkus(readPromotionLineRowsFromDom(dialog));
       const list = Array.isArray(state.catalogPromotions) ? state.catalogPromotions : [];
       const idx = list.findIndex((p) => String(p.id) === String(promoId));
       if (idx === -1) {
@@ -2060,7 +2342,9 @@ async function openPromotionEditDialog(countryKey, promoId) {
       render();
     } catch (err) {
       logPromotionFormSaveFailure('edit', err);
-      showToast(err?.message || 'Failed to update promotion', 'error');
+      const message = err?.message || 'Failed to update promotion. Please try again.';
+      setPromotionFormError(dialog, message);
+      showToast(message, 'error');
     }
   });
   dialog.addEventListener('click', (e) => {
@@ -2556,7 +2840,7 @@ function allPromotionRowsForCountry() {
       id: p.id,
       title: p.name,
       rowCount: rulesForCo.length,
-      rows: rulesForCo.map(catalogRuleToPromotionRow),
+      rows: rulesForCo.flatMap(catalogRuleToPromotionRows),
       minCartDigits,
     });
   });
@@ -3425,12 +3709,12 @@ async function openPromotionDetailModal(countryKey, promoId) {
   const set = {
     id: catalogPromo.id,
     title: catalogPromo.name,
-    rows: rulesForCo.map(catalogRuleToPromotionRow),
+    rows: rulesForCo.flatMap(catalogRuleToPromotionRows),
     minimumSubtotalDigits: promotionMinimumSubtotal(catalogPromo),
   };
   const countryLabel = marketLabel(countryKey) || countryKey;
   closePromotionDetailDialog();
-  const rows = Array.isArray(set.rows) ? set.rows : [];
+  const rows = await enrichPromotionRowsWithColorSuffix(Array.isArray(set.rows) ? set.rows : []);
   const thumbByProductUrl = await buildThumbUrlMapForPromotionRows(rows, countryKey);
   const humanHtml = promotionDetailModalInnerHtml(
     countryKey,
