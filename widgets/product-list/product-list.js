@@ -4,34 +4,24 @@ import {
 } from '../../scripts/aem.js';
 import { formatPrice } from '../../scripts/scripts.js';
 import { loadFragment } from '../../blocks/fragment/fragment.js';
-import lookupProductListProducts, { getWidgetLocaleAndLanguage } from './products.js';
+import { openModal } from '../../blocks/modal/modal.js';
+import lookupProductListProducts, { getWidgetLocaleAndLanguage, getFacetDefinitions } from './products.js';
 
-const COMPARE_STORAGE_KEY = 'vitamix-compare-list';
-const MAX_COMPARE = 4;
-const HIDDEN_CATEGORIES = ['Products', 'Commercial', 'Shop'];
-const HIDDEN_CATEGORY_URL_KEYS = ['products', 'commercial', 'shop'];
+const AEM_NETWORK_ORIGIN = 'https://main--vitamix--aemsites.aem.network';
 
-const FACET_KEYS = ['series', 'collection', 'colors', 'productType', 'categories', 'categoriesUrlKey'];
 const LIFESTYLE_TILE_SELECTOR = '.block > div, .block > ul > li';
 const LIFESTYLE_TILE_SELECTED_SELECTOR = '.block > div.selected, .block > ul > li.selected';
-const FILTER_PARAM_KEYS = [...FACET_KEYS, 'fulltext'];
 
-const DRAWER_FACET_GROUPS = [
-  { key: 'series', labelKey: 'blendingPrograms' },
-  { key: 'collection', labelKey: 'collections' },
-  { key: 'productType', labelKey: 'type' },
-  { key: 'colors', labelKey: 'color' },
-  { key: 'categories', labelKey: 'lifestyle' },
-  { key: 'categoriesUrlKey', labelKey: 'categoriesUrlKey' },
-];
+// Populated at runtime from the "* Facet" columns discovered in plp-data.json.
+let FACET_KEYS = [];
+let FACET_LABELS = {};
+let FILTER_PARAM_KEYS = ['fulltext'];
 
-const DROPDOWN_FACET_GROUPS = [
-  { key: 'categories', labelKey: 'categories' },
-  { key: 'collection', labelKey: 'collections' },
-  { key: 'productType', labelKey: 'type' },
-  { key: 'colors', labelKey: 'color' },
-  { key: 'series', labelKey: 'blendingPrograms' },
-];
+function setFacetDefinitions(facetDefs) {
+  FACET_KEYS = facetDefs.map((d) => d.key);
+  FACET_LABELS = Object.fromEntries(facetDefs.map((d) => [d.key, d.label]));
+  FILTER_PARAM_KEYS = [...FACET_KEYS, 'fulltext'];
+}
 
 const COLOR_ORDER = {
   black: 1,
@@ -79,44 +69,61 @@ async function loadWidgetCopy(lang) {
   return data[key] || {};
 }
 
-function getCompareList() {
-  try {
-    const raw = sessionStorage.getItem(COMPARE_STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
+/**
+ * Whether to route product-page fetches through the fcors proxy (localhost, .aem.page, .aem.live).
+ * @returns {boolean}
+ */
+function useFcors() {
+  const { hostname } = window.location;
+  return hostname === 'localhost'
+    || hostname.endsWith('.aem.page')
+    || hostname.endsWith('.aem.live');
+}
+
+/**
+ * Fetches a product page's HTML so its JSON-LD (and Magento entityId) can be read.
+ * @param {string} path - Product path (e.g. /us/en_us/products/ascent-x2)
+ * @returns {Promise<string|null>}
+ */
+async function fetchProductPageHtml(path) {
+  const pathOnly = path.startsWith('http') ? new URL(path).pathname : path;
+  let resp;
+  if (useFcors()) {
+    const corsProxy = 'https://fcors.org/?url=';
+    const corsKey = '&key=Mg23N96GgR8O3NjU';
+    const fullUrl = `${AEM_NETWORK_ORIGIN}${pathOnly}`;
+    resp = await fetch(`${corsProxy}${encodeURIComponent(fullUrl)}${corsKey}`);
+  } else {
+    resp = await fetch(pathOnly);
   }
+  return resp.ok ? resp.text() : null;
 }
 
-function saveCompareList(list) {
-  sessionStorage.setItem(COMPARE_STORAGE_KEY, JSON.stringify(list.slice(0, MAX_COMPARE)));
-}
-
-function addToCompareList(productUrl) {
-  const normalized = productUrl.split('?')[0].split('#')[0];
-  const list = getCompareList();
-  if (list.includes(normalized)) return list;
-  if (list.length >= MAX_COMPARE) return list;
-  list.push(normalized);
-  saveCompareList(list);
-  return list;
-}
-
-function getComparePageUrl(list) {
-  const { locale, language } = getWidgetLocaleAndLanguage();
-  const base = `/${locale}/${language}/products/compare`;
-  if (!list.length) return base;
-  return `${base}?compare-products=${list.map(encodeURIComponent).join(',')}`;
+/**
+ * Resolves the Magento entityId for a product, fetching and parsing its page's JSON-LD
+ * on first use (the product-list index has no entityId of its own). Caches on the product.
+ * @param {Object} product
+ * @returns {Promise<string|null>}
+ */
+async function getProductEntityId(product) {
+  if (product.entityId) return product.entityId;
+  if (!product.url) return null;
+  try {
+    const html = await fetchProductPageHtml(product.url);
+    if (!html) return null;
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const jsonLdScript = doc.querySelector('script[type="application/ld+json"]');
+    if (!jsonLdScript?.textContent) return null;
+    const jsonLd = JSON.parse(jsonLdScript.textContent);
+    product.entityId = jsonLd?.custom?.entityId || null;
+    return product.entityId;
+  } catch {
+    return null;
+  }
 }
 
 function hasVariants(product) {
   return product.variants && product.variants.length > 0;
-}
-
-function getAvailableColors(product) {
-  if (!hasVariants(product)) return [];
-  return product.variants.filter((v) => v.color && v.availability === 'InStock');
 }
 
 function isOnSale(product) {
@@ -159,21 +166,43 @@ function getReviewsId(product) {
   return toClassName(String(sku)).replace(/-/g, '');
 }
 
-function createProductImage(product) {
+function createProductImage() {
   const wrap = document.createElement('div');
   wrap.className = 'product-list-widget-image-wrap';
-
   const img = document.createElement('img');
   img.loading = 'lazy';
-  if (hasVariants(product)) {
-    const variant = product.variants[0];
-    if (variant.image) img.src = variant.image;
-    if (variant.title) img.alt = variant.title;
-  }
-  if (!img.src) img.src = product.image || '';
-  if (!img.alt) img.alt = product.title || '';
   wrap.appendChild(img);
-  return wrap;
+  return { wrap, img };
+}
+
+function getSortedVariants(product) {
+  if (!hasVariants(product)) return [];
+  return [...product.variants].sort((a, b) => {
+    const colorA = COLOR_ORDER[toClassName(a.color)] ?? 9;
+    const colorB = COLOR_ORDER[toClassName(b.color)] ?? 9;
+    return colorA - colorB;
+  });
+}
+
+function findVariantBySlug(product, colorSlug) {
+  if (!hasVariants(product) || !colorSlug) return null;
+  return product.variants.find((v) => v.color && toClassName(v.color) === colorSlug) || null;
+}
+
+function updateCardImage(img, product, variant) {
+  if (variant && variant.image) {
+    img.src = variant.image;
+    img.alt = variant.title || product.title || '';
+  } else {
+    img.src = product.image || '';
+    img.alt = product.title || '';
+  }
+}
+
+function setSelectedSwatch(colorsEl, colorSlug) {
+  colorsEl.querySelectorAll('.color-swatch').forEach((el) => {
+    el.classList.toggle('selected', el.dataset.color === colorSlug);
+  });
 }
 
 function createCallouts(product, copy) {
@@ -191,17 +220,31 @@ function createCallouts(product, copy) {
 function createCompareButton(product, copy) {
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.className = 'product-list-widget-compare-btn';
-  btn.setAttribute('aria-label', copy.addToComparison);
-  btn.innerHTML = '<span aria-hidden="true">+</span>';
-  btn.addEventListener('click', (e) => {
+  btn.className = 'product-list-widget-compare-btn pdp-compare-button';
+  btn.textContent = copy.compare || 'Compare';
+  btn.addEventListener('click', async (e) => {
     e.stopPropagation();
-    const list = addToCompareList(product.url);
-    btn.classList.add('added');
-    btn.setAttribute('aria-label', copy.addedToComparison);
-    btn.title = copy.addedToComparison;
-    if (list.length) {
-      btn.dataset.compareUrl = getComparePageUrl(list);
+    const { locale, language } = getWidgetLocaleAndLanguage();
+    const entityId = await getProductEntityId(product);
+    if (!entityId) return;
+    const resp = await fetch(`/${locale}/${language}/catalog/product_compare/add/`, {
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'x-requested-with': 'XMLHttpRequest',
+      },
+      body: `product=${entityId}&uenc=${encodeURIComponent(window.location.href)}`,
+      method: 'POST',
+      credentials: 'include',
+    });
+    if (resp.ok) {
+      const modal = await openModal(`/${locale}/${language}/products/modals/compare`);
+      if (modal) {
+        const content = modal.querySelector('.default-content-wrapper');
+        const productEl = document.createElement('p');
+        productEl.className = 'product';
+        productEl.textContent = product.title || '';
+        content.prepend(productEl);
+      }
     }
   });
   return btn;
@@ -216,18 +259,12 @@ function createProductTitle(product) {
   return title;
 }
 
-function createProductColors(product) {
+function createProductColors(product, onSelect) {
   const colors = document.createElement('div');
   colors.className = 'product-list-colors';
   if (!hasVariants(product)) return colors;
 
-  const sortedVariants = [...product.variants].sort((a, b) => {
-    const colorA = COLOR_ORDER[toClassName(a.color)] ?? 9;
-    const colorB = COLOR_ORDER[toClassName(b.color)] ?? 9;
-    return colorA - colorB;
-  });
-
-  sortedVariants.forEach((variant) => {
+  getSortedVariants(product).forEach((variant) => {
     const { color, availability } = variant;
     if (!color) return;
     const colorSlug = toClassName(color);
@@ -242,6 +279,11 @@ function createProductColors(product) {
     inner.style.backgroundColor = `var(--color-${colorSlug}, #888)`;
     if (availability !== 'InStock') inner.classList.add('product-list-color-swatch-oos');
     swatch.appendChild(inner);
+    swatch.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      onSelect(variant, swatch);
+    });
     colors.appendChild(swatch);
   });
   return colors;
@@ -280,81 +322,47 @@ function createProductPrice(product, ph) {
   return price;
 }
 
-async function handleAddToCart(button, product, copy) {
-  button.textContent = copy.adding;
-  button.setAttribute('aria-disabled', 'true');
-  try {
-    const { cartApi } = await import('../../scripts/minicart/api.js');
-    const { updateMagentoCacheSections, getMagentoCache } = await import('../../scripts/storage/util.js');
-    const currentCache = getMagentoCache();
-    if (!currentCache?.customer) await updateMagentoCacheSections(['customer']);
-    const sku = hasVariants(product) ? product.variants[0].sku : product.sku;
-    await cartApi.addToCart(sku, {}, 1);
-    button.textContent = copy.addedToCart;
-  } catch (e) {
-    // eslint-disable-next-line no-console
-    console.warn('product-list-widget: add to cart failed', e);
-    button.textContent = copy.addToCart;
-    button.removeAttribute('aria-disabled');
-  }
-}
-
 function createProductCta(product, copy) {
   const wrap = document.createElement('p');
   wrap.className = 'product-list-widget-cta button-container';
-  const inStockColors = getAvailableColors(product);
-  const singleColor = !hasVariants(product) || inStockColors.length <= 1;
   const link = document.createElement('a');
   link.href = product.url || '#';
   link.className = 'button emphasis';
-
-  if (singleColor && product.sku) {
-    link.textContent = copy.addToCart;
-    link.addEventListener('click', async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      await handleAddToCart(link, product, copy);
-    });
-  } else {
-    link.textContent = copy.viewDetails;
-  }
+  link.textContent = copy.viewDetails;
   wrap.appendChild(link);
   return wrap;
 }
 
-function singleColorCard(product) {
-  const inStockColors = getAvailableColors(product);
-  return !hasVariants(product) || inStockColors.length <= 1;
-}
-
-function createProductListCard(product, ph, copy) {
+function createProductListCard(product, ph, copy, activeColorSlug) {
   const card = document.createElement('div');
   card.className = 'product-list-widget-product-card';
   card.setAttribute('role', 'listitem');
 
-  const imageWrap = createProductImage(product);
+  const { wrap: imageWrap, img } = createProductImage();
   imageWrap.append(createCallouts(product, copy), createCompareButton(product, copy));
 
   const title = createProductTitle(product);
-  const colors = createProductColors(product);
+  const colors = createProductColors(product, (variant, swatch) => {
+    updateCardImage(img, product, variant);
+    setSelectedSwatch(colors, swatch.dataset.color);
+  });
   const reviews = createProductReviews(product);
   const bullets = createProductBullets(product);
   const price = createProductPrice(product, ph);
   const cta = createProductCta(product, copy);
 
+  const initialVariant = findVariantBySlug(product, activeColorSlug)
+    || getSortedVariants(product)[0]
+    || null;
+  updateCardImage(img, product, initialVariant);
+  if (initialVariant) setSelectedSwatch(colors, toClassName(initialVariant.color));
+
   card.append(imageWrap, title, colors, reviews, bullets, price, cta);
 
   card.addEventListener('click', (e) => {
     if (e.target.closest('button, a.button')) return;
-    const swatch = e.target.closest('[data-color]');
     const detailsLink = cta.querySelector('a');
-    if (swatch && detailsLink) {
-      const url = new URL(detailsLink.href, window.location.origin);
-      url.searchParams.set('color', swatch.dataset.color);
-      window.location.href = url.href;
-      return;
-    }
-    if (detailsLink && !singleColorCard(product)) detailsLink.click();
+    if (detailsLink) detailsLink.click();
     else if (title.querySelector('a')) title.querySelector('a').click();
   });
 
@@ -388,19 +396,19 @@ function stripQueryParams(keys) {
   window.history.replaceState(null, '', `${window.location.pathname}${search ? `?${search}` : ''}${window.location.hash || ''}`);
 }
 
-function countActiveFilters(filterConfig, baseConfig) {
+function countActiveFilters(filterConfig) {
   return FACET_KEYS.reduce((count, key) => {
     const val = filterConfig[key];
-    if (!val || val === baseConfig[key]) return count;
+    if (!val) return count;
     return count + val.split(',').filter(Boolean).length;
   }, 0);
 }
 
-function getSelectedFilterTags(filterConfig, baseConfig) {
+function getSelectedFilterTags(filterConfig) {
   const tags = [];
   FACET_KEYS.forEach((key) => {
     const val = filterConfig[key];
-    if (!val || val === baseConfig[key]) return;
+    if (!val) return;
     val.split(',').map((t) => t.trim()).filter(Boolean).forEach((value) => {
       tags.push({ key, value });
     });
@@ -485,14 +493,14 @@ function wireLifestyleFragment(widget, runSearch, setFilterConfig, setDrawerInpu
   });
 }
 
-function getVisibleFacetValues(key, facetValues) {
-  if (key === 'categories') {
-    return facetValues.filter((v) => !HIDDEN_CATEGORIES.includes(v));
-  }
-  if (key === 'categoriesUrlKey') {
-    return facetValues.filter((v) => !HIDDEN_CATEGORY_URL_KEYS.includes(v));
-  }
-  return facetValues;
+function createFacetSwatch(facetValue) {
+  const swatch = document.createElement('span');
+  swatch.className = 'color-swatch product-list-widget-facet-swatch';
+  const inner = document.createElement('span');
+  inner.className = 'product-list-color-inner';
+  inner.style.backgroundColor = `var(--color-${toClassName(facetValue)}, #888)`;
+  swatch.appendChild(inner);
+  return swatch;
 }
 
 function renderFilterTags(container, tags, copy, onRemove) {
@@ -502,90 +510,101 @@ function renderFilterTags(container, tags, copy, onRemove) {
     const tag = document.createElement('button');
     tag.type = 'button';
     tag.className = 'product-list-widget-filter-tag';
-    tag.textContent = value;
+    if (key === 'color') tag.appendChild(createFacetSwatch(value));
+    tag.append(value);
     tag.setAttribute('aria-label', `${copy.clearAll}: ${value}`);
     tag.addEventListener('click', () => onRemove(key, value));
     container.appendChild(tag);
   });
 }
 
-function renderDrawerFacets(listEl, facets, filterConfig, copy, ph, onChange) {
+function renderDrawerFacets(listEl, facets, filterConfig, copy, onChange) {
   listEl.innerHTML = '';
-  DRAWER_FACET_GROUPS.forEach(({ key, labelKey }) => {
+  FACET_KEYS.forEach((key) => {
     const facetValues = Object.keys(facets[key] || {}).sort((a, b) => a.localeCompare(b));
-    const visibleValues = getVisibleFacetValues(key, facetValues);
-    if (!visibleValues.length) return;
+    const isEmpty = facetValues.length === 0;
 
     const details = document.createElement('details');
     details.className = 'product-list-widget-facet-group';
-    details.open = (filterConfig[key] || '').length > 0;
+    details.classList.toggle('product-list-widget-facet-group-disabled', isEmpty);
+    details.open = !isEmpty && (filterConfig[key] || '').length > 0;
 
     const summary = document.createElement('summary');
-    summary.textContent = copy[labelKey] || ph[key] || key;
+    summary.textContent = copy[key] || FACET_LABELS[key] || key;
+    if (isEmpty) {
+      summary.setAttribute('aria-disabled', 'true');
+      summary.addEventListener('click', (e) => e.preventDefault());
+    }
     details.appendChild(summary);
 
-    const options = document.createElement('div');
-    options.className = 'product-list-widget-facet-options';
-    const selected = (filterConfig[key] || '').split(',').map((t) => t.trim());
+    if (!isEmpty) {
+      const options = document.createElement('div');
+      options.className = 'product-list-widget-facet-options';
+      const selected = (filterConfig[key] || '').split(',').map((t) => t.trim());
 
-    visibleValues.forEach((facetValue) => {
-      const id = `product-list-widget-filter-${key}-${toClassName(facetValue)}`;
-      const input = document.createElement('input');
-      input.type = 'checkbox';
-      input.id = id;
-      input.name = key;
-      input.value = facetValue;
-      input.checked = selected.includes(facetValue);
-      input.addEventListener('change', onChange);
+      facetValues.forEach((facetValue) => {
+        const id = `product-list-widget-filter-${key}-${toClassName(facetValue)}`;
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.id = id;
+        input.name = key;
+        input.value = facetValue;
+        input.checked = selected.includes(facetValue);
+        input.addEventListener('change', onChange);
 
-      const label = document.createElement('label');
-      label.setAttribute('for', id);
-      label.textContent = `${facetValue} (${facets[key][facetValue]})`;
-      options.append(input, label);
-    });
+        const label = document.createElement('label');
+        label.setAttribute('for', id);
+        if (key === 'color') label.appendChild(createFacetSwatch(facetValue));
+        label.append(`${facetValue} (${facets[key][facetValue]})`);
+        options.append(input, label);
+      });
 
-    details.appendChild(options);
+      details.appendChild(options);
+    }
+
     listEl.appendChild(details);
   });
 }
 
-function renderDropdownFilters(container, facets, filterConfig, copy, ph, onSelect) {
+function renderDropdownFilters(container, facets, filterConfig, copy, onSelect) {
   container.innerHTML = '';
-  DROPDOWN_FACET_GROUPS.forEach(({ key, labelKey }) => {
+  FACET_KEYS.forEach((key) => {
     const facetValues = Object.keys(facets[key] || {}).sort((a, b) => a.localeCompare(b));
-    const visibleValues = getVisibleFacetValues(key, facetValues);
-    if (!visibleValues.length) return;
+    const isEmpty = facetValues.length === 0;
 
     const details = document.createElement('details');
     details.className = 'product-list-widget-filter-dropdown';
+    details.classList.toggle('product-list-widget-filter-dropdown-disabled', isEmpty);
 
     const summary = document.createElement('summary');
-    const selected = (filterConfig[key] || '').split(',').map((t) => t.trim()).filter(Boolean);
-    summary.textContent = selected[0] || copy[labelKey] || ph[key] || key;
+    summary.textContent = copy[key] || FACET_LABELS[key] || key;
+    if (isEmpty) {
+      summary.setAttribute('aria-disabled', 'true');
+      summary.addEventListener('click', (e) => e.preventDefault());
+    }
     details.appendChild(summary);
 
-    const menu = document.createElement('menu');
-    const allBtn = document.createElement('button');
-    allBtn.type = 'button';
-    allBtn.textContent = copy.viewAll;
-    allBtn.addEventListener('click', () => onSelect(key, null));
-    menu.appendChild(allBtn);
+    if (!isEmpty) {
+      const menu = document.createElement('menu');
 
-    visibleValues.forEach((facetValue) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.textContent = `${facetValue} (${facets[key][facetValue]})`;
-      btn.addEventListener('click', () => onSelect(key, facetValue));
-      menu.appendChild(btn);
-    });
-
-    details.appendChild(menu);
-    details.addEventListener('toggle', () => {
-      if (!details.open) return;
-      container.querySelectorAll('.product-list-widget-filter-dropdown[open]').forEach((openDetails) => {
-        if (openDetails !== details) openDetails.open = false;
+      facetValues.forEach((facetValue) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        if (key === 'color') btn.appendChild(createFacetSwatch(facetValue));
+        btn.append(`${facetValue} (${facets[key][facetValue]})`);
+        btn.addEventListener('click', () => onSelect(key, facetValue));
+        menu.appendChild(btn);
       });
-    });
+
+      details.appendChild(menu);
+      details.addEventListener('toggle', () => {
+        if (!details.open) return;
+        container.querySelectorAll('.product-list-widget-filter-dropdown[open]').forEach((openDetails) => {
+          if (openDetails !== details) openDetails.open = false;
+        });
+      });
+    }
+
     container.appendChild(details);
   });
 }
@@ -628,6 +647,7 @@ export default async function decorate(widget) {
   const lang = (language || 'en_us').split('_')[0];
   const copy = await loadWidgetCopy(lang);
   const ph = await fetchPlaceholders(`/${locale}/${language}/products/config`);
+  setFacetDefinitions(await getFacetDefinitions());
   const baseConfig = buildInitialConfig(widget);
   widget.productListFilterConfig = { ...baseConfig };
   widget.productListBaseConfig = { ...baseConfig };
@@ -671,7 +691,6 @@ export default async function decorate(widget) {
     featured: copy.featured,
     'price-desc': copy.priceHighToLow,
     'price-asc': copy.priceLowToHigh,
-    name: copy.productName,
   };
   sortButtons.forEach((btn) => {
     btn.textContent = sortLabels[btn.dataset.sort] || btn.dataset.sort;
@@ -700,9 +719,9 @@ export default async function decorate(widget) {
   let runSearch;
 
   const updateFilterUi = (filterConfig, facets) => {
-    const activeCount = countActiveFilters(filterConfig, widget.productListBaseConfig);
+    const activeCount = countActiveFilters(filterConfig);
     filtersCount.textContent = activeCount ? `(${activeCount})` : '';
-    const tags = getSelectedFilterTags(filterConfig, widget.productListBaseConfig);
+    const tags = getSelectedFilterTags(filterConfig);
     activeFilters.hidden = tags.length === 0;
     renderFilterTags(filterTags, tags, copy, (key, value) => {
       const next = removeFilterValue(getFilterConfig(), key, value);
@@ -710,8 +729,8 @@ export default async function decorate(widget) {
       setDrawerInputsFromConfig(widget, next);
       runSearch(next);
     });
-    renderDrawerFacets(drawerList, facets, filterConfig, copy, ph, () => {});
-    renderDropdownFilters(filterDropdowns, facets, filterConfig, copy, ph, (key, value) => {
+    renderDrawerFacets(drawerList, facets, filterConfig, copy, () => {});
+    renderDropdownFilters(filterDropdowns, facets, filterConfig, copy, (key, value) => {
       const next = { ...getFilterConfig() };
       if (value) next[key] = value;
       else delete next[key];
@@ -721,7 +740,7 @@ export default async function decorate(widget) {
     });
   };
 
-  const displayResults = (results) => {
+  const displayResults = (results, activeColorSlug) => {
     resultsEl.innerHTML = '';
     if (!results.length) {
       emptyEl.hidden = false;
@@ -729,7 +748,7 @@ export default async function decorate(widget) {
     }
     emptyEl.hidden = true;
     results.forEach((product) => {
-      resultsEl.appendChild(createProductListCard(product, ph, copy));
+      resultsEl.appendChild(createProductListCard(product, ph, copy, activeColorSlug));
     });
     loadBazaarvoice(ph);
   };
@@ -740,14 +759,14 @@ export default async function decorate(widget) {
     widget.productListLastFacets = facets;
     const sortKey = sortByEl.dataset.sort || 'featured';
     const sorts = {
-      name: (a, b) => a.title.localeCompare(b.title),
       'price-asc': (a, b) => Number(a.price) - Number(b.price),
       'price-desc': (a, b) => Number(b.price) - Number(a.price),
       featured: (a, b) => Number(b.price) - Number(a.price),
     };
     results.sort(sorts[sortKey] || sorts.featured);
     countEl.textContent = String(results.length);
-    displayResults(results);
+    const activeColor = (filterConfig.color || '').split(',')[0].trim();
+    displayResults(results, activeColor ? toClassName(activeColor) : null);
     updateFilterUi(filterConfig, facets);
     syncFilterConfigToUrl(filterConfig, widget);
   };

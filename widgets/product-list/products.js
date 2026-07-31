@@ -1,7 +1,11 @@
 /* eslint-disable max-len */
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 
-const FILTER_KEYS = ['series', 'collection', 'colors', 'productType', 'categories', 'categoriesUrlKey', 'fulltext'];
+// Column-name overrides for the label derived from a "* Facet" column in plp-data.json.
+// Anything not listed here uses the column name with the trailing "Facet" stripped.
+const FACET_LABEL_OVERRIDES = {
+  'Type Facet': 'Product Type',
+};
 
 function buildProductsUrl(locale, language, path) {
   return `/${locale}/${language}/products/${path}`;
@@ -22,7 +26,35 @@ export function getWidgetLocaleAndLanguage() {
   return getLocaleAndLanguage();
 }
 
-function parseData(data, locale, language) {
+function toCamelCase(label) {
+  return label
+    .trim()
+    .split(/\s+/)
+    .map((word, i) => (i === 0 ? word.toLowerCase() : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()))
+    .join('');
+}
+
+/**
+ * Discovers facets dynamically from any plp-data.json column whose name ends in "Facet".
+ * @param {Array<Object>} rows - Raw plp-data.json rows
+ * @returns {Array<{rawKey: string, label: string, key: string}>}
+ */
+function getFacetDefsFromRows(rows) {
+  const columns = new Set();
+  rows.forEach((row) => Object.keys(row).forEach((key) => columns.add(key)));
+  return [...columns]
+    .filter((key) => /Facet$/i.test(key.trim()))
+    .map((rawKey) => {
+      const label = FACET_LABEL_OVERRIDES[rawKey] || rawKey.replace(/\s*Facet$/i, '').trim();
+      return { rawKey, label, key: toCamelCase(label) };
+    });
+}
+
+function parseFacetValues(value) {
+  return value ? String(value).split(',').map((s) => s.trim()).filter(Boolean) : [];
+}
+
+function parseIndexProduct(data, locale, language) {
   const parsed = {};
   Object.entries(data).forEach(([key, value]) => {
     switch (key) {
@@ -34,11 +66,6 @@ function parseData(data, locale, language) {
       case 'originalPrice':
         parsed[key] = parseFloat(value, 10);
         break;
-      case 'categories':
-      case 'categoriesUrlKey':
-      case 'collections':
-      case 'productType':
-      case 'series':
       case 'variantSkus':
       case 'visibility':
         parsed[key] = value ? value.split(',').map((s) => s.trim()) : [];
@@ -48,27 +75,67 @@ function parseData(data, locale, language) {
         break;
     }
   });
-  if (parsed.collections) parsed.collection = parsed.collections;
   return parsed;
+}
+
+function titleFromUrl(pathname) {
+  const slug = pathname.split('/').filter(Boolean).pop() || '';
+  return slug.split('-').map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w)).join(' ');
+}
+
+function pathnameFromUrl(rawUrl) {
+  try {
+    return new URL(rawUrl, window.location.origin).pathname;
+  } catch {
+    return rawUrl;
+  }
+}
+
+// Matching plp-data.json rows to products/index.json entries by full pathname is brittle:
+// plp-data.json Product URLs use a "/shop/" path while products/index.json rows may only carry
+// a "urlKey" that resolves to a "/products/" path. The trailing slug is stable across both.
+function slugFromUrl(rawUrl) {
+  return pathnameFromUrl(rawUrl).split('/').filter(Boolean).pop() || '';
+}
+
+/**
+ * Fetches plp-data.json, the source of truth for which products are listed and for
+ * every dynamically-discovered "* Facet" column.
+ * @param {string} locale
+ * @param {string} language
+ * @returns {Promise<Array<Object>>}
+ */
+async function fetchPlpData(locale, language) {
+  const resp = await fetch(`/${locale}/${language}/products/config/plp-data.json`);
+  if (!resp.ok) return [];
+  const json = await resp.json();
+  return Array.isArray(json.data) ? json.data : [];
 }
 
 /**
  * Fetches and filters products for the product-list widget.
  * Self-contained: does not depend on blocks/plp/plp.js.
+ *
+ * The product list and its facets come from plp-data.json; each row is augmented with
+ * image/price/variants/etc. from products/index.json when a matching product is found there.
  * @param {Object} config - Filter criteria (only known facet keys are applied)
  * @param {Object} facets - Optional object to populate with facet counts
- * @returns {Promise<Array<Object>>} Filtered parent products with variants
+ * @returns {Promise<Array<Object>>} Filtered products
  */
 export default async function lookupProductListProducts(config = {}, facets = {}) {
   const { locale, language } = getWidgetLocaleAndLanguage();
-  const corsProxyFetch = async (url) => {
-    const corsProxy = 'https://fcors.org/?url=';
-    const corsKey = '&key=Mg23N96GgR8O3NjU';
-    const fullUrl = `https://main--vitamix--aemsites.aem.network${url}`;
-    return fetch(`${corsProxy}${encodeURIComponent(fullUrl)}${corsKey}`);
-  };
 
   if (!window.productListWidgetIndex) {
+    const plpRows = await fetchPlpData(locale, language);
+    const facetDefs = getFacetDefsFromRows(plpRows);
+
+    const corsProxyFetch = async (url) => {
+      const corsProxy = 'https://fcors.org/?url=';
+      const corsKey = '&key=Mg23N96GgR8O3NjU';
+      const fullUrl = `https://main--vitamix--aemsites.aem.network${url}`;
+      return fetch(`${corsProxy}${encodeURIComponent(fullUrl)}${corsKey}`);
+    };
+
     const isProd = window.location.hostname.includes('vitamix.com')
       || window.location.hostname.includes('.aem.network');
     const indexPath = window.location.pathname.includes('/commercial/') ? 'commercial/products' : 'products';
@@ -83,71 +150,71 @@ export default async function lookupProductListProducts(config = {}, facets = {}
       });
     }
 
-    const parentProductsBySKU = {};
+    const parentsBySku = {};
     const variants = [];
-
     data.forEach((d) => {
-      const product = parseData(d, locale, language);
+      const product = parseIndexProduct(d, locale, language);
       if (product.sku && !product.parentSku) {
-        parentProductsBySKU[product.sku] = product;
+        parentsBySku[product.sku] = product;
       } else {
         variants.push(product);
       }
     });
 
     variants.forEach((variant) => {
-      const parent = parentProductsBySKU[variant.parentSku];
+      const parent = parentsBySku[variant.parentSku];
       if (parent) {
         parent.variants = parent.variants || [];
         parent.variants.push(variant);
         parent.colors = parent.colors || [];
         parent.colors.push(variant.color);
-      } else {
-        // eslint-disable-next-line no-console
-        console.warn(variant.sku, 'has no parent product');
       }
     });
 
-    const urlLookup = {};
-    Object.values(parentProductsBySKU).forEach((product) => {
-      if (product.url) {
-        const url = new URL(product.url, window.location.origin);
-        product.url = url.pathname;
-        urlLookup[url.pathname] = product;
-      } else if (product.urlKey) {
-        const url = buildProductsUrl(locale, language, product.urlKey);
-        urlLookup[url] = product;
-        product.url = url;
-      } else {
-        // eslint-disable-next-line no-console
-        console.warn(product.sku, 'has no URL key');
-      }
+    const indexBySlug = {};
+    Object.values(parentsBySku).forEach((product) => {
+      const rawUrl = product.url || (product.urlKey ? buildProductsUrl(locale, language, product.urlKey) : '');
+      const slug = rawUrl ? slugFromUrl(rawUrl) : '';
+      if (slug) indexBySlug[slug] = product;
     });
 
-    window.productListWidgetIndex = {
-      lookup: urlLookup,
-      parents: Object.values(parentProductsBySKU),
-    };
+    const parents = plpRows
+      .filter((row) => slugFromUrl((row.Product || '').trim()) in indexBySlug)
+      .map((row) => {
+        const rowUrl = (row.Product || '').trim();
+        const urlPathname = pathnameFromUrl(rowUrl);
+        const augmented = indexBySlug[slugFromUrl(rowUrl)];
+        const product = { ...augmented };
+        product.url = urlPathname;
+        if (!product.title) product.title = titleFromUrl(urlPathname);
+        product.description = (row.Bullets || '').trim() || product.description || '';
+        facetDefs.forEach(({ rawKey, key }) => {
+          product[key] = parseFacetValues(row[rawKey]);
+        });
+        return product;
+      })
+      .filter((product) => !!product.image);
+
+    window.productListWidgetIndex = { parents, facetDefs };
   }
 
+  const { parents, facetDefs } = window.productListWidgetIndex;
+  const facetKeySet = new Set(facetDefs.map((d) => d.key));
+  const filterKeys = Object.keys(config).filter((key) => key === 'fulltext' || facetKeySet.has(key));
   const facetKeys = Object.keys(facets);
-  const filterKeys = Object.keys(config).filter((key) => FILTER_KEYS.includes(key));
-  const cleanKeys = { collection: 'collections' };
   const tokens = {};
   filterKeys.forEach((key) => {
-    tokens[key] = config[key].split(',').map((t) => t.trim());
+    if (key !== 'fulltext') tokens[key] = config[key].split(',').map((t) => t.trim());
   });
 
-  return window.productListWidgetIndex.parents.filter((product) => {
+  return parents.filter((product) => {
     const filterMatches = {};
     const matchedAll = filterKeys.every((filterKey) => {
-      const key = cleanKeys[filterKey] || filterKey;
       let matched = false;
-      if (product[key]) {
-        matched = tokens[filterKey].some((t) => product[key].includes(t));
-      }
-      if (key === 'fulltext') {
-        matched = product.title.toLowerCase().includes(config.fulltext.toLowerCase());
+      if (filterKey === 'fulltext') {
+        matched = (product.title || '').toLowerCase().includes(config.fulltext.toLowerCase());
+      } else if (product[filterKey]) {
+        matched = tokens[filterKey].some((t) => product[filterKey].includes(t));
       }
       filterMatches[filterKey] = matched;
       return matched;
@@ -160,8 +227,7 @@ export default async function lookupProductListProducts(config = {}, facets = {}
       });
       if (includeInFacet && product[facetKey]) {
         product[facetKey].forEach((val) => {
-          if (facets[facetKey][val]) facets[facetKey][val] += 1;
-          else facets[facetKey][val] = 1;
+          facets[facetKey][val] = (facets[facetKey][val] || 0) + 1;
         });
       }
     });
@@ -171,25 +237,24 @@ export default async function lookupProductListProducts(config = {}, facets = {}
 }
 
 /**
- * Loads all distinct productType facet values from the product index.
+ * Loads the facet definitions (key + display label) dynamically discovered from
+ * every "* Facet" column in plp-data.json.
+ * @returns {Promise<Array<{rawKey: string, label: string, key: string}>>}
+ */
+export async function getFacetDefinitions() {
+  if (!window.productListWidgetIndex) {
+    await lookupProductListProducts({}, {});
+  }
+  return window.productListWidgetIndex.facetDefs;
+}
+
+/**
+ * Loads all distinct productType facet values from plp-data.json (sourced from the
+ * "Type Facet" column, displayed as "Product Type").
  * @returns {Promise<string[]>}
  */
 export async function loadAllProductTypes() {
   const facets = { productType: {} };
   await lookupProductListProducts({}, facets);
   return Object.keys(facets.productType || {}).sort((a, b) => a.localeCompare(b));
-}
-
-const HIDDEN_CATEGORIES = ['Products', 'Commercial', 'Shop'];
-
-/**
- * Loads all distinct category facet values from the product index.
- * @returns {Promise<string[]>}
- */
-export async function loadAllCategories() {
-  const facets = { categories: {} };
-  await lookupProductListProducts({}, facets);
-  return Object.keys(facets.categories || {})
-    .filter((value) => !HIDDEN_CATEGORIES.includes(value))
-    .sort((a, b) => a.localeCompare(b));
 }
