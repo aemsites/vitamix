@@ -267,6 +267,40 @@ test.describe('PDP Integration Tests', () => {
         console.log('ℹ No variant options found for this product');
       }
     });
+
+    test('coming-soon variant should show alert and suppress purchase CTAs', async ({ page }) => {
+      const productUrl = buildProductUrl(productPath, currentBranch);
+      await page.goto(productUrl);
+      await page.waitForSelector('.pdp-color-options .color-swatch');
+
+      await page.evaluate(() => {
+        window.jsonLdData.custom.comingSoon = 'No';
+        window.variants.forEach((variant) => {
+          variant.custom.comingSoon = 'No';
+        });
+        window.jsonLdData.offers.forEach((offer) => {
+          offer.custom.comingSoon = 'No';
+        });
+
+        window.variants[1].custom.comingSoon = 'Yes';
+        const offer = window.jsonLdData.offers
+          .find(({ sku }) => sku === window.variants[1].sku);
+        offer.custom.comingSoon = 'Yes';
+      });
+
+      const variantOptions = page.locator('.pdp-color-options .color-swatch');
+      await variantOptions.nth(1).click();
+
+      await expect(page.locator('.pdp-alert')).toHaveText(/coming soon/i);
+      await expect(page.locator('.pdp')).toHaveClass(/pdp-coming-soon/);
+      await expect(page.locator('.quantity-container button')).toHaveCount(0);
+      await expect(page.locator('.pdp-find-locally-button')).toHaveCount(0);
+
+      await variantOptions.nth(0).click();
+
+      await expect(page.locator('.pdp')).not.toHaveClass(/pdp-coming-soon/);
+      await expect(page.locator('.quantity-container button')).toBeVisible();
+    });
   });
 
   test.describe('Bundle Product Page', () => {

@@ -119,6 +119,36 @@ function buildLanguageSelector(tool) {
 }
 
 /**
+ * Builds a submenu toggle button for a given label and submenu list, wiring up its aria state.
+ * @param {string} labelText - Text used to generate the submenu id and aria-label
+ * @param {HTMLElement} submenu - The <ul> this toggle controls
+ * @returns {HTMLButtonElement} The constructed toggle button (not yet inserted into the DOM)
+ */
+function buildSubmenuToggle(labelText, submenu) {
+  // generate unique id from label text
+  const id = `submenu-${toClassName(labelText)}`;
+  submenu.id = id;
+  submenu.setAttribute('aria-hidden', true);
+
+  const toggle = document.createElement('button');
+  toggle.setAttribute('aria-expanded', false);
+  toggle.setAttribute('aria-controls', id);
+  toggle.setAttribute('aria-label', `Toggle ${labelText} submenu`);
+  toggle.className = 'submenu-toggle';
+  const chevron = document.createElement('i');
+  chevron.className = 'symbol symbol-chevron';
+  toggle.prepend(chevron);
+
+  toggle.addEventListener('click', () => {
+    const expanded = toggle.getAttribute('aria-expanded') === 'true';
+    toggle.setAttribute('aria-expanded', !expanded);
+    submenu.setAttribute('aria-hidden', expanded);
+  });
+
+  return toggle;
+}
+
+/**
  * Sanitizes navigation list.
  * @param {HTMLElement} ul - Navigation list element
  */
@@ -139,30 +169,10 @@ function sanitizeNavList(ul) {
 
     if (a && submenu && !li.querySelector('button.submenu-toggle')) {
       const text = a.textContent.trim();
-
-      // generate unique id from link text
-      const id = `submenu-${toClassName(text)}`;
-      submenu.id = id;
-      submenu.setAttribute('aria-hidden', true);
-
-      // add toggle button
-      const toggle = document.createElement('button');
-      toggle.setAttribute('aria-expanded', false);
-      toggle.setAttribute('aria-controls', id);
-      toggle.setAttribute('aria-label', `Toggle ${text} submenu`);
-      toggle.className = 'submenu-toggle';
-      const chevron = document.createElement('i');
-      chevron.className = 'symbol symbol-chevron';
-      toggle.prepend(chevron);
+      const toggle = buildSubmenuToggle(text, submenu);
 
       li.insertBefore(toggle, submenu);
       li.classList.add('submenu-wrapper');
-
-      toggle.addEventListener('click', () => {
-        const expanded = toggle.getAttribute('aria-expanded') === 'true';
-        toggle.setAttribute('aria-expanded', !expanded);
-        submenu.setAttribute('aria-hidden', expanded);
-      });
 
       // handled nested submenus
       sanitizeNavList(submenu);
@@ -175,8 +185,12 @@ function sanitizeNavList(ul) {
  * @param {HTMLElement} nav - Navigation container element
  */
 function enforceSubmenuState(nav) {
-  const submenuProducts = nav.querySelector('#submenu-products') || nav.querySelector('#submenu-produits');
-  const toggleProducts = nav.querySelector('[aria-controls="submenu-products"]') || nav.querySelector('[aria-controls="submenu-produits"]');
+  const submenuProducts = nav.querySelector('#submenu-products')
+    || nav.querySelector('#submenu-produits')
+    || nav.querySelector('#submenu-productos');
+  const toggleProducts = nav.querySelector('[aria-controls="submenu-products"]')
+    || nav.querySelector('[aria-controls="submenu-produits"]')
+    || nav.querySelector('[aria-controls="submenu-productos"]');
 
   if (!submenuProducts || !toggleProducts) return;
 
@@ -184,29 +198,34 @@ function enforceSubmenuState(nav) {
     submenuProducts.setAttribute('aria-hidden', true);
     toggleProducts.setAttribute('aria-expanded', false);
 
-    submenuProducts.querySelectorAll('ul').forEach((ul) => {
+    submenuProducts.querySelectorAll('ul:not(.nav-categories)').forEach((ul) => {
       ul.setAttribute('aria-hidden', false);
       const li = ul.closest('li');
       const toggle = li.querySelector('.submenu-toggle');
       if (toggle) toggle.setAttribute('aria-expanded', true);
     });
-  } else { // on mobile, open parent and allow children to toggle
+  } else { // on mobile, open parent and collapse children so they can be toggled
     submenuProducts.setAttribute('aria-hidden', false);
     toggleProducts.setAttribute('aria-expanded', true);
+
+    submenuProducts.querySelectorAll('ul:not(.nav-categories)').forEach((ul) => {
+      ul.setAttribute('aria-hidden', true);
+      const li = ul.closest('li');
+      const toggle = li.querySelector('.submenu-toggle');
+      if (toggle) toggle.setAttribute('aria-expanded', false);
+    });
   }
 }
 
 /**
- * Fetches navigation fragments from given link.
- * @param {string} a - Anchor href pointing to a nav fragment
- * @returns {Promise} NodeList of <ul> elements (or null on error)
+ * Fetches the Products submenu fragment from a given link.
+ * @param {string} a - Anchor href pointing to the products nav fragment
+ * @returns {Promise<Element|null>} The fetched fragment's root element, or null on error
  */
-async function fetchNavFragments(a) {
+async function fetchProductsFragment(a) {
   try {
     const { pathname } = new URL(a, window.location);
-    const fragment = await loadFragment(pathname);
-    const uls = fragment.querySelectorAll('div > ul');
-    return [...uls];
+    return await loadFragment(pathname);
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Error fetching nav fragment:', error);
@@ -215,29 +234,159 @@ async function fetchNavFragments(a) {
 }
 
 /**
- * Replaces <li> element with new list items fetched from navigation fragment.
- * @param {HTMLLIElement} li - Original list item element
- * @param {string} a - URL to fetch the fragment from
+ * Fetches the currently-scheduled nav-promo content for the Products mega-menu.
+ * @returns {Promise<Element|null>} The already-selected promo content element, or null if none
  */
-async function populateNavFragments(li, a) {
-  const ul = li.closest('ul');
-  if (!ul) return;
+async function fetchNavPromo() {
+  const meta = getMetadata('nav-promos');
+  if (!meta) return null;
+  try {
+    const { pathname } = new URL(meta, window.location);
+    const fragment = await loadFragment(pathname);
+    if (!fragment) return null;
+    const block = fragment.querySelector('.nav-promos');
+    return block && block.children.length > 0 ? block : null;
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error fetching nav promo:', error);
+  }
+  return null;
+}
 
-  // remove the original <li> (to be replaced with fragment content)
-  li.remove();
+/**
+ * Detects whether a fetched Products fragment uses the legacy nested-link accordion shape
+ * (identified by per-item product images) rather than the new heading+list shape.
+ * @param {Element} fragment - The fetched products fragment
+ * @returns {boolean} True if the fragment should be treated as legacy content
+ */
+function isLegacyProductsFragment(fragment) {
+  return fragment.querySelector('picture, img') !== null;
+}
 
-  const fragments = await fetchNavFragments(a);
-  if (!fragments) return;
-
-  // insert all <li> children from fetched fragment into current <ul>
-  fragments.forEach((fragmentUl) => {
+/**
+ * Flattens the legacy Products fragment's <li> children directly into the target list,
+ * matching the original nested <a>+<ul> accordion shape that sanitizeNavList already
+ * builds toggles for automatically.
+ * @param {Element} fragment - The fetched products fragment
+ * @param {HTMLElement} ul - The target <ul> to append into (#submenu-products)
+ */
+function populateLegacyProductsFragment(fragment, ul) {
+  const uls = fragment.querySelectorAll('div > ul');
+  uls.forEach((fragmentUl) => {
     [...fragmentUl.children].forEach((childLi) => {
       ul.appendChild(childLi);
     });
   });
+  rewriteLinks(ul);
+  sanitizeNavList(ul);
+}
 
-  const header = ul.closest('header');
-  const trigger = ul.closest('[data-source]');
+/**
+ * Moves any <em> badge out from beside its link and inside it.
+ * @param {HTMLElement} submenu - A category's <ul> of links
+ */
+function moveBadgesIntoLinks(submenu) {
+  submenu.querySelectorAll(':scope > li > em').forEach((em) => {
+    const a = em.previousElementSibling;
+    if (a && a.tagName === 'A') a.append(em);
+  });
+}
+
+/**
+ * Builds category list items for the new Products mega-menu shape: a <p> heading followed
+ * by its own nested <ul> of links, per category.
+ * @param {Element} fragment - The fetched products fragment (from fetchProductsFragment)
+ * @returns {HTMLLIElement[]} The category <li> elements, each with a toggle button wired up
+ */
+function buildProductCategories(fragment) {
+  const wrapper = fragment.querySelector(':scope > div > div');
+  if (!wrapper) return [];
+  const categoryList = wrapper.querySelector(':scope > ul');
+  if (!categoryList) return [];
+
+  return [...categoryList.children].map((li) => {
+    const heading = li.querySelector(':scope > p');
+    const submenu = li.querySelector(':scope > ul');
+    if (!heading || !submenu) return li;
+
+    moveBadgesIntoLinks(submenu);
+
+    const toggle = buildSubmenuToggle(heading.textContent.trim(), submenu);
+    li.insertBefore(toggle, submenu);
+    li.classList.add('nav-category');
+
+    heading.addEventListener('click', () => {
+      if (isDesktop.matches) return;
+      toggle.click();
+    });
+
+    return li;
+  });
+}
+
+/**
+ * Wraps already-decorated promo content into the <div> used by the Products mega-menu.
+ * Exported so blocks/nav-promos/nav-promos.js can build the same markup for its author preview.
+ * @param {HTMLElement} promoContent - Decorated content element (picture/eyebrow/heading/CTA)
+ * @returns {HTMLDivElement} The <div class="nav-promo">, ready to insert into the mega-menu
+ */
+export function buildPromoCard(promoContent) {
+  const div = document.createElement('div');
+  div.className = 'nav-promo';
+  div.append(...promoContent.childNodes);
+  return div;
+}
+
+/**
+ * Replaces <li> element with new list items fetched from the navigation fragment, handling
+ * both the legacy and new Products submenu shapes (see isLegacyProductsFragment).
+ * @param {HTMLLIElement} li - Original list item element
+ * @param {string} a - URL to fetch the fragment from
+ */
+async function populateNavFragments(li, a) {
+  let panel = li.closest('ul');
+  if (!panel) return;
+
+  // remove the original <li> (to be replaced with fragment content)
+  li.remove();
+
+  const [fragment, promoBlock] = await Promise.all([
+    fetchProductsFragment(a),
+    fetchNavPromo(),
+  ]);
+  if (!fragment) return;
+
+  if (isLegacyProductsFragment(fragment)) {
+    populateLegacyProductsFragment(fragment, panel);
+  } else {
+    // #submenu-products' id/aria-hidden are set generically before the fragment shape is known
+    // (see buildSubmenuToggle), so they're carried over to the new wrapper that replaces it.
+    const wrapper = document.createElement('div');
+    wrapper.className = 'nav-mega';
+    wrapper.id = panel.id;
+    wrapper.setAttribute('aria-hidden', panel.getAttribute('aria-hidden'));
+
+    const categories = document.createElement('ul');
+    categories.className = 'nav-categories';
+    buildProductCategories(fragment).forEach((categoryLi) => categories.appendChild(categoryLi));
+    rewriteLinks(categories);
+    wrapper.append(categories);
+
+    if (promoBlock) wrapper.append(buildPromoCard(promoBlock));
+
+    const toggle = panel.closest('[data-source]').querySelector('button');
+    panel.replaceWith(wrapper);
+    panel = wrapper;
+
+    // buildSubmenuToggle's own click listener still targets the replaced <ul>, so keep the
+    // new wrapper's aria-hidden in sync with the button too.
+    toggle.addEventListener('click', () => {
+      wrapper.setAttribute('aria-hidden', toggle.getAttribute('aria-expanded') !== 'true');
+    });
+  }
+
+  const header = panel.closest('header');
+  const trigger = panel.closest('[data-source]');
   const button = trigger.querySelector('button');
 
   trigger.addEventListener('mouseenter', () => {
@@ -252,9 +401,6 @@ async function populateNavFragments(li, a) {
       if (button.getAttribute('aria-expanded') === 'true') button.click();
     }
   });
-
-  rewriteLinks(ul);
-  sanitizeNavList(ul);
 }
 
 /**
