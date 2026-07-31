@@ -327,6 +327,14 @@ export function assignDigitalDataUser(userData) {
 }
 
 /**
+ * @param {object} componentData
+ */
+export function assignDigitalDataComponent(componentData) {
+  window.digitalData = window.digitalData || {};
+  window.digitalData.component = componentData;
+}
+
+/**
  * Launch keeps its tracker in AppMeasurement's s_c_il registry, not always window.s.
  */
 export function configureAnalyticsTrackingServers() {

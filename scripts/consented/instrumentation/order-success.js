@@ -12,12 +12,14 @@ import {
   normalizePurchaseLineItem,
 } from './shared.js';
 import {
+  assignDigitalDataComponent,
   assignDigitalDataTransaction,
   configureAnalyticsTrackingServers,
   getAdobeTarget,
   getPrimaryAnalyticsTracker,
   getSatellite,
   resetTrackerForScAdd,
+  triggerLaunchEvent,
   waitForBeaconComplete,
   whenSatelliteReady,
   whenTargetReady,
@@ -335,6 +337,7 @@ function trackOrderConfirmPage(params) {
 
 let orderConfirmTargetFired = false;
 let purchaseFired = false;
+let registrationCompleteFired = false;
 let orderPurchaseTrackingRegistered = false;
 
 /**
@@ -385,6 +388,35 @@ function trackPurchaseFromContext(context, attempt = 0) {
 }
 
 /**
+ * Fire registration-complete analytics when order-complete reports a new
+ * customer account was created for this order (Adobe Commerce parity).
+ * @param {{ order?: object|null }} context Analytics context from order-complete
+ * @returns {Promise<void>}
+ */
+export async function fireRegistrationComplete(context) {
+  if (registrationCompleteFired) return;
+
+  if (!hasMarketingConsent()) {
+    return;
+  }
+
+  if (!context?.order?.customerCreated) {
+    return;
+  }
+
+  assignDigitalDataComponent({ form: { formName: 'register' } });
+
+  if (!(await triggerLaunchEvent('formStart', window.digitalData.component))
+    || !(await triggerLaunchEvent('registrationComplete', window.digitalData.component))) {
+    debugWarn('Adobe Analytics registrationComplete skipped: Adobe Launch (_satellite) not available');
+    return;
+  }
+
+  registrationCompleteFired = true;
+  debugLog('Adobe Analytics registrationComplete fired', window.digitalData.component);
+}
+
+/**
  * Listen for order-complete confirmation before firing purchase.
  * Purchase must run after the page has authoritative order/line-item data,
  * not on the initial Launch page-view beacon.
@@ -397,11 +429,13 @@ export function registerOrderPurchaseTracking() {
 
   document.addEventListener('order:confirmed', (event) => {
     trackPurchaseFromContext(event.detail);
+    whenSatelliteReady(() => fireRegistrationComplete(event.detail), 'registrationComplete');
   }, { once: true });
 
   const pendingContext = window.vitamixEdsAnalytics?.orderConfirmedContext;
   if (pendingContext) {
     trackPurchaseFromContext(pendingContext);
+    whenSatelliteReady(() => fireRegistrationComplete(pendingContext), 'registrationComplete');
   }
 }
 
