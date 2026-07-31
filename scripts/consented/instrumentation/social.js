@@ -2,11 +2,6 @@ import { hasMarketingConsent, debugLog } from './shared.js';
 import { whenSatelliteReady, triggerLaunchEvent } from './adobe-runtime.js';
 
 /**
- * Register social media analytics event listeners using event delegation.
- *
- * EDS blocks (footer, recipe, article-info) are decorated asynchronously,
- * so we delegate from document rather than querying elements at load time.
- *
  * Mirrors the AEM jQuery listeners:
  *   - $(".omni-socialmedia-link a").click → _satellite.track('socialMediaFollow')
  *   - $(".omni-socialmedia-share a").click → _satellite.track('productSocialShare')
@@ -17,6 +12,12 @@ import { whenSatelliteReady, triggerLaunchEvent } from './adobe-runtime.js';
  *   - productSocialShare : .recipe-share-popup button (recipe share popup buttons)
  *   - articleSocialShare : .article-info ul.share button (article-info share buttons)
  */
+const SOCIAL_TARGETS = [
+  { selector: '.footer-social a.button', eventName: 'socialMediaFollow' },
+  { selector: '.recipe-share-popup button', eventName: 'productSocialShare' },
+  { selector: '.article-info ul.share button', eventName: 'articleSocialShare' },
+];
+
 let socialEventsRegistered = false;
 
 /** Reset social events registration state (for unit tests). */
@@ -24,41 +25,58 @@ export function resetSocialEventsState() {
   socialEventsRegistered = false;
 }
 
+/**
+ * Attach a click listener directly to a social button/link and fire its Launch event.
+ * Guarded by a dataset flag so a button already wired up is never attached twice.
+ * @param {Element} element
+ * @param {string} eventName
+ */
+function attachSocialClickTracking(element, eventName) {
+  if (element.dataset.socialAnalyticsAttached) return;
+  element.dataset.socialAnalyticsAttached = 'true';
+
+  element.addEventListener('click', () => {
+    if (!hasMarketingConsent()) return;
+
+    whenSatelliteReady(async () => {
+      await triggerLaunchEvent(eventName, { element });
+      debugLog(`Adobe Analytics ${eventName} fired`);
+    }, eventName);
+  });
+}
+
+/** Scan the page for social targets and wire up any that aren't attached yet. */
+function attachSocialTargets() {
+  SOCIAL_TARGETS.forEach(({ selector, eventName }) => {
+    document.querySelectorAll(selector).forEach((el) => attachSocialClickTracking(el, eventName));
+  });
+}
+
+/**
+ * Register direct click listeners on social buttons/links (no document-wide delegation).
+ *
+ * recipe/article-info are already decorated by the time this runs — loadLazy() awaits
+ * loadSections(main) before consented.js loads — but the footer is not, since
+ * loadFooter() is fire-and-forget. So after the initial scan, a MutationObserver watches
+ * <footer> for its data-block-status="loaded" flip (the same "block decorated" signal
+ * scripts/consented/adobe-target.js uses) and re-scans once the footer's social links exist.
+ */
 export function trackSocialEvents() {
   if (socialEventsRegistered) return;
   socialEventsRegistered = true;
 
-  whenSatelliteReady(() => {
-    document.addEventListener('click', async (e) => {
-      if (!hasMarketingConsent()) return;
+  attachSocialTargets();
 
-      // 1. socialMediaFollow — footer "Follow Us" social icon links
-      //    AEM: .omni-socialmedia-link a
-      //    EDS: .footer-social li.button-wrapper > a.button
-      if (e.target.closest('.footer-social a.button')) {
-        await triggerLaunchEvent('socialMediaFollow', { element: e.target });
-        debugLog('Adobe Analytics socialMediaFollow fired');
-        return;
-      }
-
-      // 2. productSocialShare — recipe block social share popup buttons
-      //    AEM: .omni-socialmedia-share a
-      //    EDS: .recipe-share-popup button
-      if (e.target.closest('.recipe-share-popup button')) {
-        await triggerLaunchEvent('productSocialShare', { element: e.target });
-        debugLog('Adobe Analytics productSocialShare fired');
-        return;
-      }
-
-      // 3. articleSocialShare — article-info block share buttons
-      //    AEM: #SocialMediaButtons li
-      //    EDS: .article-info ul.share li button
-      if (e.target.closest('.article-info ul.share button')) {
-        await triggerLaunchEvent('articleSocialShare', { element: e.target });
-        debugLog('Adobe Analytics articleSocialShare fired');
-      }
+  const footer = document.querySelector('footer');
+  if (footer) {
+    const observer = new MutationObserver(() => attachSocialTargets());
+    observer.observe(footer, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ['data-block-status'],
     });
+  }
 
-    debugLog('Adobe Analytics social event tracking registered');
-  }, 'socialEvents');
+  debugLog('Adobe Analytics social event tracking registered');
 }
