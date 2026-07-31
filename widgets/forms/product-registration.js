@@ -133,6 +133,9 @@ export default async function decorate(widget) {
   const purchasedOnInput = form.querySelector('#product-registration-purchased-on');
   if (purchasedOnInput && inputHints.date) purchasedOnInput.setAttribute('placeholder', inputHints.date);
 
+  const smsCheckboxText = form.querySelector('.sms-consent-text');
+  if (smsCheckboxText) smsCheckboxText.textContent = labels.smsOptInOptional ?? 'By checking this box, I am opting in to receive promotional SMS messages from Vitamix. Message frequency varies. Text HELP for help. Text STOP to end. Msg & data rates may apply. By leaving this box unchecked, I will not be opting in for SMS messages at this time. (optional)';
+
   const marketingCheckboxText = form.querySelector('.product-registration-consent .checkbox-text');
   if (marketingCheckboxText) marketingCheckboxText.textContent = labels.sendNewsPromotionsOptional ?? 'Please send the latest Vitamix news and promotions to my email address. (optional)';
   const termsCheckboxText = form.querySelector('.terms-text');
