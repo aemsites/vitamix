@@ -19,7 +19,7 @@ import {
   triggerLaunchEvent,
   whenSatelliteReady,
 } from './adobe-runtime.js';
-
+import { getCartItemsForFbq } from './meta.js';
 /**
  * Build checkout analytics payload from normalized cart line items.
  * @param {Array<{ name: string, qty: number, unitPrice: number }>} items
@@ -65,6 +65,48 @@ export function getCheckoutCartData() {
 let scCheckoutFired = false;
 
 /**
+ * Fire Meta InitiateCheckout using the current checkout cart snapshot from localStorage.
+ * @returns {void}
+ */
+export function fireMetaInitiateCheckout() {
+  if (!hasMarketingConsent()) {
+    return;
+  }
+
+  const cartDataForFbq = getCartItemsForFbq();
+  const {
+    content_ids: productIds = [],
+    num_items: numItems = 0,
+    value: totalCartValue = 0,
+    currency: currencyCode = 'USD',
+  } = cartDataForFbq || {};
+
+  if (!Array.isArray(productIds) || productIds.length === 0) {
+    debugWarn('Meta InitiateCheckout skipped: no checkout product IDs available');
+    return;
+  }
+  /* global fbq */
+  try {
+    fbq('track', 'InitiateCheckout', {
+      content_type: 'product',
+      content_ids: productIds,
+      num_items: Number(numItems) || 0,
+      value: Number(totalCartValue) || 0,
+      currency: currencyCode,
+    });
+
+    debugLog('Meta InitiateCheckout fired', {
+      content_ids: productIds,
+      num_items: Number(numItems) || 0,
+      value: Number(totalCartValue) || 0,
+      currency: currencyCode,
+    });
+  } catch (error) {
+    debugWarn('Meta InitiateCheckout failed', error);
+  }
+}
+
+/**
  * Fire the scCheckout event when checkout cart data is available.
  * @param {{ productID: string, cartTotal: string }} [cartData]
  * @returns {Promise<void>}
@@ -87,6 +129,7 @@ export async function fireScCheckout(cartData = getCheckoutCartData()) {
   }
 
   scCheckoutFired = true;
+  fireMetaInitiateCheckout();
 }
 
 /**

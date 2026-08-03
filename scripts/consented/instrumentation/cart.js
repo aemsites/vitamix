@@ -18,7 +18,7 @@ import {
   waitForBeaconComplete,
   whenSatelliteReady,
 } from './adobe-runtime.js';
-
+import { getProductData } from './meta.js';
 /**
  * Read the current cart lines for scView from the shared cart singleton.
  * Uses the already-instantiated window.cart when present, otherwise imports
@@ -224,6 +224,70 @@ async function pushScRemoveEvent(items, { waitForBeacon = false } = {}) {
 }
 
 /**
+ * Fires the Meta AddToCart event for Facebook Pixel tracking.
+ * @param {string} [productName]
+ * @param {number|string} [quantity]
+ * @param {{ isFirstCart?: boolean }} [options]
+ * @returns {void}
+ */
+export function fireMetaAddToCart(
+  productName = getProductName(),
+  quantity = 1,
+  { isFirstCart = false } = {},
+) {
+  if (!hasMarketingConsent()) {
+    return;
+  }
+
+  const productNameTrimmed = `${productName || ''}`.trim();
+  if (!productNameTrimmed) {
+    debugWarn('Meta AddToCart skipped: product name not found');
+    return;
+  }
+
+  try {
+    const jsonLdDataOffers = Array.isArray(window.jsonLdData?.offers)
+      ? window.jsonLdData.offers
+      : [];
+    const jsonLdProductCustom = window.jsonLdData?.custom || {};
+    const product = getProductData();
+
+    if (!product?.productIds?.length) {
+      debugWarn('Meta AddToCart skipped: product IDs not available', product);
+      return;
+    }
+
+    const productPriceAndCurrency = jsonLdDataOffers[0] || {};
+    const value = Number(product.productPrice || productPriceAndCurrency?.price || 0);
+    const currency = productPriceAndCurrency?.priceCurrency || 'USD';
+    const contentCategory = jsonLdProductCustom?.categories
+      ? jsonLdProductCustom.categories.map((category) => category.name).join(' > ')
+      : '';
+    /* global fbq */
+    fbq('track', 'AddToCart', {
+      content_ids: product.productIds,
+      content_type: product.productGroup,
+      content_name: productNameTrimmed,
+      content_category: contentCategory,
+      value,
+      currency,
+      num_items: Number(quantity) || 1,
+    });
+
+    debugLog('Meta AddToCart fired', {
+      productName: productNameTrimmed,
+      quantity,
+      isFirstCart,
+      contentIds: product.productIds,
+      value,
+      currency,
+    });
+  } catch (error) {
+    debugWarn('Meta AddToCart failed', error);
+  }
+}
+
+/**
  * Fire the scAdd event after a successful add to cart.
  * @param {string} [productName]
  * @param {number|string} [quantity]
@@ -287,7 +351,7 @@ export function trackScAdd(
       settled = true;
       resolve();
     };
-
+    fireMetaAddToCart(productName, quantity, { isFirstCart });
     whenSatelliteReady(() => {
       fireScAdd(productName, quantity, { isFirstCart }).then(finish);
     }, 'scAdd');
