@@ -2,7 +2,14 @@ import { loadFragment } from '../../blocks/fragment/fragment.js';
 import {
   getWidgetLocaleAndLanguage,
   loadAllProductTypes,
+  PLP_DATASETS,
 } from './products.js';
+
+const DATASET_LABELS = {
+  blenders: 'Blenders',
+  accessories: 'Accessories',
+  commercial: 'Commercial',
+};
 
 function resolveHighlightsFragmentPath(highlights) {
   const value = (highlights || '').trim();
@@ -40,6 +47,10 @@ function readProductTypeFromUrl() {
   return new URLSearchParams(window.location.search).get('productType') || '';
 }
 
+function readDatasetFromUrl() {
+  return new URLSearchParams(window.location.search).get('dataset') || '';
+}
+
 function syncHighlightsToUrl(highlights) {
   const params = new URLSearchParams(window.location.search);
   params.delete('highlight');
@@ -59,6 +70,15 @@ function syncProductTypeToUrl(productType) {
   window.history.replaceState(null, '', nextUrl);
 }
 
+function syncDatasetToUrl(dataset) {
+  const params = new URLSearchParams(window.location.search);
+  if (dataset) params.set('dataset', dataset);
+  else params.delete('dataset');
+  const qs = params.toString();
+  const nextUrl = `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash || ''}`;
+  window.history.replaceState(null, '', nextUrl);
+}
+
 function syncHighlightsToWidget(widget, highlights) {
   if (highlights) widget.dataset.highlights = highlights;
   else delete widget.dataset.highlights;
@@ -68,6 +88,11 @@ function syncHighlightsToWidget(widget, highlights) {
 function syncProductTypeToWidget(widget, productType) {
   if (productType) widget.dataset.productType = productType;
   else delete widget.dataset.productType;
+}
+
+function syncDatasetToWidget(widget, dataset) {
+  if (dataset) widget.dataset.dataset = dataset;
+  else delete widget.dataset.dataset;
 }
 
 function syncPreviewLink() {
@@ -82,13 +107,8 @@ function buildWidgetHref() {
   return `${base}${window.location.search}`;
 }
 
-function buildSelectControl(label, name, options, value) {
-  const item = document.createElement('label');
-  item.className = 'product-list-config-item';
-  const text = document.createElement('span');
-  text.textContent = label;
-  const select = document.createElement('select');
-  select.name = name;
+function setSelectOptions(select, options, value) {
+  select.innerHTML = '';
   const empty = document.createElement('option');
   empty.value = '';
   empty.textContent = 'All';
@@ -107,6 +127,35 @@ function buildSelectControl(label, name, options, value) {
     custom.selected = true;
     select.append(custom);
   }
+}
+
+function buildSelectControl(label, name, options, value) {
+  const item = document.createElement('label');
+  item.className = 'product-list-config-item';
+  const text = document.createElement('span');
+  text.textContent = label;
+  const select = document.createElement('select');
+  select.name = name;
+  setSelectOptions(select, options, value);
+  item.append(text, select);
+  return { item, select };
+}
+
+function buildDatasetSelectControl(value) {
+  const item = document.createElement('label');
+  item.className = 'product-list-config-item';
+  const text = document.createElement('span');
+  text.textContent = 'Dataset';
+  const select = document.createElement('select');
+  select.name = 'dataset';
+  const selected = PLP_DATASETS.includes(value) ? value : PLP_DATASETS[0];
+  PLP_DATASETS.forEach((dataset) => {
+    const option = document.createElement('option');
+    option.value = dataset;
+    option.textContent = DATASET_LABELS[dataset] || dataset;
+    option.selected = dataset === selected;
+    select.append(option);
+  });
   item.append(text, select);
   return { item, select };
 }
@@ -115,12 +164,15 @@ function buildConfigPanel(widget, {
   productTypes,
   initialHighlights,
   initialProductType,
+  initialDataset,
 }) {
   const panel = document.createElement('div');
   panel.className = 'product-list-config';
 
   const controls = document.createElement('div');
   controls.className = 'product-list-config-controls';
+
+  const { item: datasetItem, select: datasetSelect } = buildDatasetSelectControl(initialDataset);
 
   const highlightsItem = document.createElement('label');
   highlightsItem.className = 'product-list-config-item';
@@ -140,7 +192,7 @@ function buildConfigPanel(widget, {
     initialProductType,
   );
 
-  controls.append(highlightsItem, productTypeItem);
+  controls.append(datasetItem, highlightsItem, productTypeItem);
 
   const actions = document.createElement('div');
   actions.className = 'product-list-config-actions';
@@ -153,10 +205,13 @@ function buildConfigPanel(widget, {
   panel.append(controls, actions);
 
   const update = async () => {
+    const dataset = datasetSelect.value;
     const highlights = highlightsInput.value.trim();
     const productType = productTypeSelect.value;
+    syncDatasetToUrl(dataset);
     syncHighlightsToUrl(highlights);
     syncProductTypeToUrl(productType);
+    syncDatasetToWidget(widget, dataset);
     syncHighlightsToWidget(widget, highlights);
     syncProductTypeToWidget(widget, productType);
     syncPreviewLink();
@@ -164,6 +219,11 @@ function buildConfigPanel(widget, {
     await widget.productListApplyDatasetDefaults?.();
   };
 
+  datasetSelect.addEventListener('change', async () => {
+    const productTypesForDataset = await loadAllProductTypes(datasetSelect.value);
+    setSelectOptions(productTypeSelect, productTypesForDataset, '');
+    await update();
+  });
   highlightsInput.addEventListener('input', () => { update(); });
   productTypeSelect.addEventListener('change', () => { update(); });
 
@@ -180,7 +240,7 @@ function buildConfigPanel(widget, {
   });
 
   return {
-    panel, highlightsInput, productTypeSelect, update,
+    panel, highlightsInput, productTypeSelect, datasetSelect, update,
   };
 }
 
@@ -204,18 +264,28 @@ export default async function decorateConfig(widget) {
     syncProductTypeToUrl(productType);
   }
 
+  const [defaultDataset] = PLP_DATASETS;
+  let dataset = readDatasetFromUrl();
+  if (!dataset && widget.dataset.dataset) {
+    dataset = widget.dataset.dataset.trim();
+  }
+  if (!PLP_DATASETS.includes(dataset)) dataset = defaultDataset;
+  syncDatasetToUrl(dataset);
+
   syncHighlightsToWidget(widget, highlights);
   syncProductTypeToWidget(widget, productType);
+  syncDatasetToWidget(widget, dataset);
   syncPreviewLink();
 
-  const productTypes = await loadAllProductTypes();
+  const productTypes = await loadAllProductTypes(dataset);
 
   const {
-    panel, highlightsInput, productTypeSelect, update,
+    panel, highlightsInput, productTypeSelect, datasetSelect, update,
   } = buildConfigPanel(widget, {
     productTypes,
     initialHighlights: highlights,
     initialProductType: productType,
+    initialDataset: dataset,
   });
   document.body.prepend(panel);
 
@@ -224,6 +294,9 @@ export default async function decorateConfig(widget) {
   }
   if (productType && productTypeSelect.value !== productType) {
     productTypeSelect.value = productType;
+  }
+  if (dataset && datasetSelect.value !== dataset) {
+    datasetSelect.value = dataset;
   }
 
   await update();

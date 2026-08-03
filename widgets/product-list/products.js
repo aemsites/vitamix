@@ -11,6 +11,13 @@ function buildProductsUrl(locale, language, path) {
   return `/${locale}/${language}/products/${path}`;
 }
 
+export const PLP_DATASETS = ['blenders', 'accessories', 'commercial'];
+const DEFAULT_PLP_DATASET = 'blenders';
+
+function normalizePlpDataset(dataset) {
+  return PLP_DATASETS.includes(dataset) ? dataset : DEFAULT_PLP_DATASET;
+}
+
 /**
  * Locale and language for the widget. The pathname carries no real
  * locale/language segments when authoring (`/drafts/...`) or when the
@@ -99,14 +106,15 @@ function slugFromUrl(rawUrl) {
 }
 
 /**
- * Fetches plp-data.json, the source of truth for which products are listed and for
- * every dynamically-discovered "* Facet" column.
+ * Fetches plp-data-{dataset}.json, the source of truth for which products are listed and
+ * for every dynamically-discovered "* Facet" column.
  * @param {string} locale
  * @param {string} language
+ * @param {string} dataset - One of PLP_DATASETS
  * @returns {Promise<Array<Object>>}
  */
-async function fetchPlpData(locale, language) {
-  const resp = await fetch(`/${locale}/${language}/products/config/plp-data.json`);
+async function fetchPlpData(locale, language, dataset) {
+  const resp = await fetch(`/${locale}/${language}/products/config/plp-data-${dataset}.json`);
   if (!resp.ok) return [];
   const json = await resp.json();
   return Array.isArray(json.data) ? json.data : [];
@@ -116,17 +124,20 @@ async function fetchPlpData(locale, language) {
  * Fetches and filters products for the product-list widget.
  * Self-contained: does not depend on blocks/plp/plp.js.
  *
- * The product list and its facets come from plp-data.json; each row is augmented with
- * image/price/variants/etc. from products/index.json when a matching product is found there.
+ * The product list and its facets come from plp-data-{dataset}.json; each row is augmented
+ * with image/price/variants/etc. from products/index.json when a matching product is found there.
  * @param {Object} config - Filter criteria (only known facet keys are applied)
  * @param {Object} facets - Optional object to populate with facet counts
+ * @param {string} [dataset] - Which plp-data-{dataset}.json to load; defaults to 'blenders'
  * @returns {Promise<Array<Object>>} Filtered products
  */
-export default async function lookupProductListProducts(config = {}, facets = {}) {
+export default async function lookupProductListProducts(config = {}, facets = {}, dataset = DEFAULT_PLP_DATASET) {
   const { locale, language } = getWidgetLocaleAndLanguage();
+  const plpDataset = normalizePlpDataset(dataset);
 
-  if (!window.productListWidgetIndex) {
-    const plpRows = await fetchPlpData(locale, language);
+  window.productListWidgetIndexByDataset = window.productListWidgetIndexByDataset || {};
+  if (!window.productListWidgetIndexByDataset[plpDataset]) {
+    const plpRows = await fetchPlpData(locale, language, plpDataset);
     const facetDefs = getFacetDefsFromRows(plpRows);
 
     const corsProxyFetch = async (url) => {
@@ -138,7 +149,7 @@ export default async function lookupProductListProducts(config = {}, facets = {}
 
     const isProd = window.location.hostname.includes('vitamix.com')
       || window.location.hostname.includes('.aem.network');
-    const indexPath = window.location.pathname.includes('/commercial/') ? 'commercial/products' : 'products';
+    const indexPath = plpDataset === 'commercial' ? 'products/commercial' : 'products';
     const pathname = `/${locale}/${language}/${indexPath}/index.json?include=all`;
     const resp = await (isProd ? fetch(pathname) : corsProxyFetch(pathname));
     const { data } = await resp.json();
@@ -195,10 +206,10 @@ export default async function lookupProductListProducts(config = {}, facets = {}
       })
       .filter((product) => !!product.image);
 
-    window.productListWidgetIndex = { parents, facetDefs };
+    window.productListWidgetIndexByDataset[plpDataset] = { parents, facetDefs };
   }
 
-  const { parents, facetDefs } = window.productListWidgetIndex;
+  const { parents, facetDefs } = window.productListWidgetIndexByDataset[plpDataset];
   const facetKeySet = new Set(facetDefs.map((d) => d.key));
   const filterKeys = Object.keys(config).filter((key) => key === 'fulltext' || facetKeySet.has(key));
   const facetKeys = Object.keys(facets);
@@ -238,23 +249,26 @@ export default async function lookupProductListProducts(config = {}, facets = {}
 
 /**
  * Loads the facet definitions (key + display label) dynamically discovered from
- * every "* Facet" column in plp-data.json.
+ * every "* Facet" column in plp-data-{dataset}.json.
+ * @param {string} [dataset] - Which plp-data-{dataset}.json to load; defaults to 'blenders'
  * @returns {Promise<Array<{rawKey: string, label: string, key: string}>>}
  */
-export async function getFacetDefinitions() {
-  if (!window.productListWidgetIndex) {
-    await lookupProductListProducts({}, {});
+export async function getFacetDefinitions(dataset) {
+  const plpDataset = normalizePlpDataset(dataset);
+  if (!window.productListWidgetIndexByDataset?.[plpDataset]) {
+    await lookupProductListProducts({}, {}, plpDataset);
   }
-  return window.productListWidgetIndex.facetDefs;
+  return window.productListWidgetIndexByDataset[plpDataset].facetDefs;
 }
 
 /**
- * Loads all distinct productType facet values from plp-data.json (sourced from the
- * "Type Facet" column, displayed as "Product Type").
+ * Loads all distinct productType facet values from plp-data-{dataset}.json (sourced from
+ * the "Type Facet" column, displayed as "Product Type").
+ * @param {string} [dataset] - Which plp-data-{dataset}.json to load; defaults to 'blenders'
  * @returns {Promise<string[]>}
  */
-export async function loadAllProductTypes() {
+export async function loadAllProductTypes(dataset) {
   const facets = { productType: {} };
-  await lookupProductListProducts({}, facets);
+  await lookupProductListProducts({}, facets, dataset);
   return Object.keys(facets.productType || {}).sort((a, b) => a.localeCompare(b));
 }

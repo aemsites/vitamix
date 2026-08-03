@@ -647,7 +647,8 @@ export default async function decorate(widget) {
   const lang = (language || 'en_us').split('_')[0];
   const copy = await loadWidgetCopy(lang);
   const ph = await fetchPlaceholders(`/${locale}/${language}/products/config`);
-  setFacetDefinitions(await getFacetDefinitions());
+  widget.productListDataset = widget.dataset.dataset || 'blenders';
+  setFacetDefinitions(await getFacetDefinitions(widget.productListDataset));
   const baseConfig = buildInitialConfig(widget);
   widget.productListFilterConfig = { ...baseConfig };
   widget.productListBaseConfig = { ...baseConfig };
@@ -755,7 +756,7 @@ export default async function decorate(widget) {
 
   runSearch = async (filterConfig = getFilterConfig()) => {
     const facets = FACET_KEYS.reduce((acc, key) => ({ ...acc, [key]: {} }), {});
-    const results = await lookupProductListProducts(filterConfig, facets);
+    const results = await lookupProductListProducts(filterConfig, facets, widget.productListDataset);
     widget.productListLastFacets = facets;
     const sortKey = sortByEl.dataset.sort || 'featured';
     const sorts = {
@@ -812,7 +813,7 @@ export default async function decorate(widget) {
   });
 
   const allFacets = FACET_KEYS.reduce((acc, key) => ({ ...acc, [key]: {} }), {});
-  await lookupProductListProducts({}, allFacets);
+  await lookupProductListProducts({}, allFacets, widget.productListDataset);
   widget.productListAllFacets = allFacets;
 
   wireLifestyleFragment(
@@ -824,6 +825,8 @@ export default async function decorate(widget) {
   );
 
   widget.productListApplyDatasetDefaults = async () => {
+    widget.productListDataset = widget.dataset.dataset || 'blenders';
+    setFacetDefinitions(await getFacetDefinitions(widget.productListDataset));
     const base = buildInitialConfig(widget);
     widget.productListBaseConfig = { ...base };
     widget.productListFilterConfig = { ...base };
