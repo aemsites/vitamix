@@ -52,6 +52,14 @@ export function isPdpPage() {
   return !!document.querySelector('meta[name="sku"]');
 }
 
+/**
+ * Search-result page detection via .search-results container.
+ * @returns {boolean}
+ */
+function isSearchPage() {
+  return !!document.querySelector('.search-results');
+}
+
 /** Analytics server identifier in digitalData (EDS uses aem; Magento used Magento). */
 const ANALYTICS_SERVER_ID = 'AEM';
 
@@ -867,6 +875,142 @@ export function trackProdView(attempt = 0) {
 }
 
 /**
+ * Derive onsiteSearchToolType from the current URL ?type= param.
+ * Matches AEM logic: recipe → browseRecipe, article → browseArticle, else siteSearch.
+ * @returns {string}
+ */
+function getSearchToolTypeFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const type = (params.get('type') || '').toLowerCase();
+  if (type === 'recipe') return 'browseRecipe';
+  if (type === 'article') return 'browseArticle';
+  return 'siteSearch';
+}
+
+/**
+ * Set digitalData search properties and fire the matching Launch direct-call rule.
+ * Mirrors AEM setDigitalDataForSearch(). Called after every search run in the
+ * search-results widget so onsiteSearchTerm/Results/ToolType are always populated.
+ * @param {string} searchTerm - The search string entered by the user
+ * @param {string} toolType - 'siteSearch' | 'browseRecipe' | 'browseArticle'
+ * @param {number} resultCount - Total number of results returned
+ */
+export function setDigitalDataForSearch(searchTerm, toolType, resultCount) {
+  window.digitalData = window.digitalData || {};
+  window.digitalData.page = window.digitalData.page || {};
+  window.digitalData.page.pageInfo = window.digitalData.page.pageInfo || {};
+
+  // Always populate pageInfo fields first so the Launch rule reads current values,
+  // regardless of whether this is a null-result or normal search.
+  window.digitalData.page.pageInfo.onsiteSearchTerm = searchTerm || '';
+  window.digitalData.page.pageInfo.onsiteSearchToolType = toolType;
+  window.digitalData.page.pageInfo.onsiteSearchResults = resultCount;
+
+  if (resultCount === 0) {
+    whenSatelliteReady(() => {
+      const satellite = getSatellite();
+      satellite.track('nullSearch');
+      debugLog('Adobe Analytics nullSearch fired', { searchTerm, toolType });
+    }, 'nullSearch');
+  } else {
+    whenSatelliteReady(() => {
+      const satellite = getSatellite();
+      satellite.track('successfulSearch');
+      debugLog('Adobe Analytics successfulSearch fired', { searchTerm, toolType });
+    }, 'successfulSearch');
+    debugLog('Adobe Analytics search data set', window.digitalData.page.pageInfo);
+  }
+}
+
+/** Debounce delay (ms) for the results-count observer — prevents rapid live-search prefixes
+ *  from each firing a separate nullSearch event before the user finishes typing.
+ */
+const SEARCH_DEBOUNCE_MS = 800;
+
+/**
+ * Read the current state of resultsCountEl and fire search tracking immediately.
+ * Called on initial attach so URL-driven searches that completed before the observer
+ * was registered are not missed.
+ * @param {Element} resultsCountEl
+ * @param {string} searchTerm
+ */
+function processCurrentSearchResult(resultsCountEl, searchTerm) {
+  const toolType = getSearchToolTypeFromUrl();
+  const count = parseInt(resultsCountEl.textContent, 10) || 0;
+  setDigitalDataForSearch(searchTerm, toolType, count);
+}
+
+/**
+ * Attach a MutationObserver to #results-count so digitalData is updated
+ * automatically every time the search widget finishes a runSearch cycle.
+ * The callback is debounced so that rapid live-search mutations coalesce
+ * into a single tracking call once the query has settled.
+ * @param {Element} container - .search-results container (reads dataset.searchState)
+ * @param {Element} resultsCountEl
+ */
+function attachSearchResultsObserver(container, resultsCountEl) {
+  let lastSearchTerm = null;
+  let debounceTimer = null;
+
+  const params = new URLSearchParams(window.location.search);
+  const initialSearchTerm = params.get('search') || '';
+
+  // Process the already-rendered result immediately so the initial URL-driven
+  // search is not missed (MutationObserver does not replay past mutations).
+  // The widget sets container.dataset.searchState = 'complete' once runSearch has
+  // written real results (including a genuine zero-result count), so this is an
+  // unambiguous signal that the count is final rather than a not-yet-rendered default.
+  if (initialSearchTerm && container.dataset.searchState === 'complete') {
+    lastSearchTerm = initialSearchTerm;
+    processCurrentSearchResult(resultsCountEl, initialSearchTerm);
+  }
+
+  const observer = new MutationObserver(() => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      const currentParams = new URLSearchParams(window.location.search);
+      const searchTerm = currentParams.get('search') || '';
+      // Only fire on an actual new search term, not pagination/filter changes
+      if (searchTerm === lastSearchTerm) return;
+      lastSearchTerm = searchTerm;
+      const toolType = getSearchToolTypeFromUrl();
+      const count = parseInt(resultsCountEl.textContent, 10) || 0;
+      setDigitalDataForSearch(searchTerm, toolType, count);
+    }, SEARCH_DEBOUNCE_MS);
+  });
+  observer.observe(resultsCountEl, { childList: true, characterData: true, subtree: true });
+}
+
+/**
+ * Initialize search analytics tracking on search-result pages.
+ * Observes #results-count — written by the search widget after every runSearch.
+ * Falls back to a MutationObserver on the container if the widget hasn't rendered yet.
+ */
+export function trackSearchResults() {
+  const container = document.querySelector('.search-results');
+  if (!container) return;
+
+  const resultsCountEl = container.querySelector('#results-count');
+  if (resultsCountEl) {
+    attachSearchResultsObserver(container, resultsCountEl);
+    return;
+  }
+
+  // #results-count is injected dynamically by buildSearchFiltering — wait for it.
+  // Once found, disconnect immediately and attach the debounced search observer
+  // which will also process the current (already-completed) result.
+  const containerObserver = new MutationObserver((_, obs) => {
+    const el = container.querySelector('#results-count');
+    if (el) {
+      obs.disconnect();
+      attachSearchResultsObserver(container, el);
+    }
+  });
+  containerObserver.observe(container, { childList: true, subtree: true });
+}
+
+/**
+ * Initialize Adobe Analytics instrumentation (prodView on PDP, search tracking on search pages).
  * Initialize Adobe Analytics instrumentation (digitalData.page pageType + prodView on PDP).
  * @returns {void}
  */
@@ -875,5 +1019,8 @@ export function initInstrumentation() {
   guardDigitalDataPageType();
   if (isPdpPage() || isProductsPathPage()) {
     trackProdView();
+  }
+  if (isSearchPage()) {
+    trackSearchResults();
   }
 }
