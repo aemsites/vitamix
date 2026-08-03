@@ -1,6 +1,7 @@
 import createSlidePanel from '../../scripts/slide-panel.js';
 import { login, verifyCode } from '../../scripts/auth-api.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { getLoggedInCustomer, unwrapCustomerResponse, updateCustomer } from '../../widgets/account/account-api.js';
 
 /**
  * Builds the first step of the auth flow: an email input form.
@@ -131,6 +132,48 @@ function buildSuccessStep(email) {
 }
 
 /**
+ * Builds the profile-completion step shown after a successful OTP verification when the
+ * customer record is missing a first name, last name, or ZIP code. Pre-fills any fields the
+ * customer already has on file.
+ *
+ * @param {Record<string, unknown>} customer - The customer record fetched after verification
+ * @returns {HTMLElement}
+ */
+function buildProfileStep(customer) {
+  const step = document.createElement('div');
+  step.className = 'auth-step auth-step-profile';
+  step.innerHTML = `
+    <h3>Complete your profile</h3>
+    <p class="auth-step-desc">Add a few more details to personalize your account.</p>
+    <form class="auth-form">
+      <input type="text" class="auth-input" name="firstName"
+             placeholder="First name" autocomplete="given-name">
+      <input type="text" class="auth-input" name="lastName"
+             placeholder="Last name" autocomplete="family-name">
+      <input type="text" class="auth-input" name="zipCode"
+             placeholder="ZIP code" autocomplete="postal-code">
+      <button type="submit" class="auth-submit">Save</button>
+      <p class="auth-error"></p>
+    </form>
+    <button type="button" class="auth-back auth-skip">Skip for now</button>
+  `;
+  step.querySelector('[name="firstName"]').value = String(customer.firstName ?? '');
+  step.querySelector('[name="lastName"]').value = String(customer.lastName ?? '');
+  step.querySelector('[name="zipCode"]').value = String(customer.zipCode ?? '');
+  return step;
+}
+
+/**
+ * Whether the customer record is missing a first name, last name, or ZIP code.
+ *
+ * @param {Record<string, unknown>} customer
+ * @returns {boolean}
+ */
+function isProfileIncomplete(customer) {
+  return !customer.firstName || !customer.lastName || !customer.zipCode;
+}
+
+/**
  * Creates the slide-out authentication panel and returns controls for it.
  *
  * The panel manages a two-step passwordless OTP flow:
@@ -150,7 +193,7 @@ export default function createAuthPanel() {
 
   const {
     dialog, content, open, close,
-  } = createSlidePanel('auth-panel', 'Account', 'auth-panel');
+  } = createSlidePanel('auth-panel', 'Login or Create Account', 'auth-panel');
 
   /**
    * Replaces the panel's current content with the given step element and
@@ -198,10 +241,86 @@ export default function createAuthPanel() {
   }
 
   /**
+   * Shows the success step and auto-closes the panel after a short delay.
+   *
+   * @param {string} email - The authenticated user's email address
+   */
+  function finishLogin(email) {
+    showStep(buildSuccessStep(email));
+    setTimeout(close, 1500);
+  }
+
+  /**
+   * Renders the profile-completion step and wires its Save/Skip handlers.
+   * Saving calls `updateCustomer` with the entered fields; skipping proceeds
+   * without saving. Either action finishes the login flow.
+   *
+   * @param {string} email - The authenticated user's email address
+   * @param {Record<string, unknown>} customer - The customer record fetched after verification
+   */
+  function showProfileStep(email, customer) {
+    const step = buildProfileStep(customer);
+    step.querySelector('form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = step.querySelector('.auth-submit');
+      const errEl = step.querySelector('.auth-error');
+      errEl.textContent = '';
+
+      const firstName = step.querySelector('[name="firstName"]').value.trim();
+      const lastName = step.querySelector('[name="lastName"]').value.trim();
+      const zipCode = step.querySelector('[name="zipCode"]').value.trim();
+      if (!firstName || !lastName || !zipCode) {
+        errEl.textContent = 'Please fill out all fields.';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+      try {
+        await updateCustomer(email, { firstName, lastName, zipCode });
+        finishLogin(email);
+      } catch (err) {
+        errEl.textContent = err.message || 'Failed to save your details';
+        btn.disabled = false;
+        btn.textContent = 'Save';
+      }
+    });
+
+    step.querySelector('.auth-skip').addEventListener('click', () => finishLogin(email));
+    showStep(step);
+  }
+
+  /**
+   * Fetches the customer record after verification and, when the first name, last name, or
+   * ZIP code is missing, shows the profile-completion step instead of finishing immediately.
+   * If the customer record can't be fetched, fails open and finishes the login normally rather
+   * than blocking sign-in on a flaky profile lookup.
+   *
+   * @param {string} email - The authenticated user's email address
+   */
+  async function proceedAfterVerify(email) {
+    let customer;
+    try {
+      customer = unwrapCustomerResponse(await getLoggedInCustomer(email));
+      if (Array.isArray(customer) && customer.length === 1) [customer] = customer;
+    } catch {
+      finishLogin(email);
+      return;
+    }
+    const c = customer && typeof customer === 'object' ? customer : {};
+    if (isProfileIncomplete(c)) {
+      showProfileStep(email, c);
+    } else {
+      finishLogin(email);
+    }
+  }
+
+  /**
    * Renders the code entry step and wires its submit handler.
    * Validates that all 6 digits are filled before calling the API to avoid
    * consuming one of the 3 server-side attempts with an incomplete code.
-   * On success, clears OTP state, shows the success step, and auto-closes.
+   * On success, clears OTP state and checks whether the customer's profile
+   * needs completing before finishing the login.
    *
    * @param {string} email - The email address the OTP was sent to
    */
@@ -225,8 +344,7 @@ export default function createAuthPanel() {
       try {
         await verifyCode(email, code, otpState.hash, otpState.exp);
         otpState = null;
-        showStep(buildSuccessStep(email));
-        setTimeout(close, 1500);
+        await proceedAfterVerify(email);
       } catch (err) {
         errEl.textContent = err.message || 'Invalid code';
         btn.disabled = false;
