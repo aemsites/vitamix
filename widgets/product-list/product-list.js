@@ -762,9 +762,9 @@ export default async function decorate(widget) {
     const sorts = {
       'price-asc': (a, b) => Number(a.price) - Number(b.price),
       'price-desc': (a, b) => Number(b.price) - Number(a.price),
-      featured: (a, b) => Number(b.price) - Number(a.price),
     };
-    results.sort(sorts[sortKey] || sorts.featured);
+    // 'featured' (Most Popular) keeps the row order from plp-data-{dataset}.json as-is.
+    if (sorts[sortKey]) results.sort(sorts[sortKey]);
     countEl.textContent = String(results.length);
     const activeColor = (filterConfig.color || '').split(',')[0].trim();
     displayResults(results, activeColor ? toClassName(activeColor) : null);
