@@ -198,7 +198,7 @@ export default async function lookupProductListProducts(config = {}, facets = {}
         const product = { ...augmented };
         product.url = urlPathname;
         if (!product.title) product.title = titleFromUrl(urlPathname);
-        product.description = (row.Bullets || '').trim() || product.description || '';
+        product.bullets = (row.Bullets || '').split(';').map((s) => s.trim()).filter(Boolean);
         facetDefs.forEach(({ rawKey, key }) => {
           product[key] = parseFacetValues(row[rawKey]);
         });

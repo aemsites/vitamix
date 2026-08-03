@@ -151,16 +151,6 @@ function getProductCallouts(product, copy) {
   return callouts.slice(0, 2);
 }
 
-function getProductBullets(product) {
-  const source = product.description || product.title || '';
-  if (!source) return [];
-  return source
-    .split(/[.•]\s+/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 10 && s.length < 120)
-    .slice(0, 3);
-}
-
 function getReviewsId(product) {
   const sku = product.sku || product.urlKey || product.title || '';
   return toClassName(String(sku)).replace(/-/g, '');
@@ -297,7 +287,7 @@ function createProductReviews(product) {
 }
 
 function createProductBullets(product) {
-  const bullets = getProductBullets(product);
+  const bullets = product.bullets || [];
   if (!bullets.length) return document.createElement('div');
   const list = document.createElement('ul');
   list.className = 'product-list-widget-bullets';
