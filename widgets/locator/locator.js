@@ -475,7 +475,6 @@ function displayCommResults(results, labels = {}) {
       emailWrapper.append(emailLink);
       li.append(emailWrapper);
     }
-
     return li;
   };
 
@@ -522,7 +521,24 @@ function displayCommResults(results, labels = {}) {
 
       li.append(webWrapper);
     }
+    // Email
+    if (result.EMAIL) {
+      const emailWrapper = document.createElement('span');
+      emailWrapper.classList.add('locator-email');
 
+      const emailLabel = document.createElement('strong');
+      emailLabel.textContent = labels.email ?? 'Email: ';
+      emailWrapper.append(emailLabel);
+
+      const emailLink = document.createElement('a');
+      emailLink.href = `mailto:${result.EMAIL}`;
+      emailLink.textContent = result.EMAIL;
+      emailLink.target = '_blank';
+      emailLink.rel = 'noopener noreferrer';
+
+      emailWrapper.append(emailLink);
+      li.append(emailWrapper);
+    }
     return li;
   };
 
