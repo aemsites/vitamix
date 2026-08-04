@@ -1,11 +1,15 @@
 import { loadScript } from './aem.js';
 import './consented/newsletter.js';
+/* eslint-disable-next-line import/no-cycle -- instrumentation/page-context.js reaches
+   scripts.js, which only reaches this file via a dynamic import() in loadDelayed() */
 import {
   configureAnalyticsTrackingServers,
   ensureAnalyticsTrackingConfigured,
   getDeploymentEnv,
+  initDigitalDataPage,
   initInstrumentation,
   bootstrapEarlyTracking,
+  syncDigitalDataPageContext,
   trackCartChange,
   trackCheckoutShipping,
   trackLogin,
@@ -14,6 +18,8 @@ import {
 bootstrapEarlyTracking();
 
 document.body.classList.add('consented');
+// Populate digitalData.page (pageType, categories, user profile) before Launch page view.
+initDigitalDataPage();
 // Register cart:change / analytics:cart-add listeners before Launch loads so edge
 // add-to-cart and Magento redirect paths are never missed. Idempotent — safe if
 // called again; initInstrumentation() intentionally does not re-register.
@@ -60,6 +66,8 @@ if (currentEnvironment.dataset.deploymentEnv === 'prod') {
 
 // Re-apply tracker config after Launch creates late AppMeasurement instances.
 configureAnalyticsTrackingServers();
+// Launch overwrites pageType to defaultpage — restore Edge page-specific values.
+syncDigitalDataPageContext();
 
 // Page events (prodView, scView, scCheckout, purchase)
 // and Target orderConfirmPage after Launch is available.
