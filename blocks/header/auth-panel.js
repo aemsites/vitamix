@@ -133,7 +133,7 @@ function buildSuccessStep(email) {
 
 /**
  * Builds the profile-completion step shown after a successful OTP verification when the
- * customer record is missing a first name, last name, or ZIP code. Pre-fills any fields the
+ * customer record is missing a first name or last name. Pre-fills any fields the
  * customer already has on file.
  *
  * @param {Record<string, unknown>} customer - The customer record fetched after verification
@@ -150,8 +150,6 @@ function buildProfileStep(customer) {
              placeholder="First name" autocomplete="given-name">
       <input type="text" class="auth-input" name="lastName"
              placeholder="Last name" autocomplete="family-name">
-      <input type="text" class="auth-input" name="zipCode"
-             placeholder="ZIP code" autocomplete="postal-code">
       <button type="submit" class="auth-submit">Save</button>
       <p class="auth-error"></p>
     </form>
@@ -159,18 +157,17 @@ function buildProfileStep(customer) {
   `;
   step.querySelector('[name="firstName"]').value = String(customer.firstName ?? '');
   step.querySelector('[name="lastName"]').value = String(customer.lastName ?? '');
-  step.querySelector('[name="zipCode"]').value = String(customer.zipCode ?? '');
   return step;
 }
 
 /**
- * Whether the customer record is missing a first name, last name, or ZIP code.
+ * Whether the customer record is missing a first name or last name.
  *
  * @param {Record<string, unknown>} customer
  * @returns {boolean}
  */
 function isProfileIncomplete(customer) {
-  return !customer.firstName || !customer.lastName || !customer.zipCode;
+  return !customer.firstName || !customer.lastName;
 }
 
 /**
@@ -268,8 +265,7 @@ export default function createAuthPanel() {
 
       const firstName = step.querySelector('[name="firstName"]').value.trim();
       const lastName = step.querySelector('[name="lastName"]').value.trim();
-      const zipCode = step.querySelector('[name="zipCode"]').value.trim();
-      if (!firstName || !lastName || !zipCode) {
+      if (!firstName || !lastName) {
         errEl.textContent = 'Please fill out all fields.';
         return;
       }
@@ -277,7 +273,7 @@ export default function createAuthPanel() {
       btn.disabled = true;
       btn.textContent = 'Saving…';
       try {
-        await updateCustomer(email, { firstName, lastName, zipCode });
+        await updateCustomer(email, { firstName, lastName });
         finishLogin(email);
       } catch (err) {
         errEl.textContent = err.message || 'Failed to save your details';
@@ -291,8 +287,8 @@ export default function createAuthPanel() {
   }
 
   /**
-   * Fetches the customer record after verification and, when the first name, last name, or
-   * ZIP code is missing, shows the profile-completion step instead of finishing immediately.
+   * Fetches the customer record after verification and, when the first name or last name is
+   * missing, shows the profile-completion step instead of finishing immediately.
    * If the customer record can't be fetched, fails open and finishes the login normally rather
    * than blocking sign-in on a flaky profile lookup.
    *
