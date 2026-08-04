@@ -331,28 +331,30 @@ function findCommResults(
   const searchedStateLong = normLower(stateLong);
 
   const localRep = cleaned
-   .filter((item) => normLower(item.TYPE) === 'local rep')
-   .filter((item) => {
-    if (hasState) {
-      const itemStateProvince = normLower(item.STATE_PROVINCE);
-      const itemStateName = normLower(item.STATE_NAME);
+    .filter((item) => normLower(item.TYPE) === 'local rep')
+    .filter((item) => {
+      if (hasState) {
+        const itemStateProvince = normLower(item.STATE_PROVINCE);
+        const itemStateName = normLower(item.STATE_NAME);
 
-      return (
-        itemStateProvince === searchedStateShort
+        return (
+          itemStateProvince === searchedStateShort
         || itemStateProvince === searchedStateLong
         || itemStateName === searchedStateShort
         || itemStateName === searchedStateLong
-      );
-    }
+        );
+      }
 
-    return (
-      normLower(item.COUNTRY) === normLower(countryShort)
+      return (
+        normLower(item.COUNTRY) === normLower(countryShort)
       || normLower(item.COUNTRY) === normLower(countryLong)
       || normLower(item.COUNTRY_CODE) === normLower(countryShort)
       || normLower(item.COUNTRY_NAME) === normLower(countryLong)
+      );
+    })
+    .sort(
+      (a, b) => normLower(a.NAME).localeCompare(normLower(b.NAME)),
     );
-  })
-  .sort((a, b) => normLower(a.NAME).localeCompare(normLower(b.NAME)));
 
   return { distributors, localRep };
 }
