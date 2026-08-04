@@ -328,7 +328,7 @@ function findCommResults(
 
   const hasState = !!(stateShort || stateLong);
 
-  let localRep = cleaned
+  const localRep = cleaned
     .filter((i) => i.TYPE === 'LOCAL REP')
     .filter((i) => {
       if (hasState) {
