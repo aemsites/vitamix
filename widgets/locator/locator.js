@@ -326,27 +326,33 @@ function findCommResults(
       .sort((a, b) => normLower(a.CITY).localeCompare(normLower(b.CITY)));
   }
 
-  const hasState = !!(stateShort || stateLong);
+  const hasState = Boolean(stateShort || stateLong);
+  const searchedStateShort = normLower(stateShort);
+  const searchedStateLong = normLower(stateLong);
 
   const localRep = cleaned
-    .filter((i) => i.TYPE === 'LOCAL REP')
-    .filter((i) => {
-      if (hasState) {
-        return (
-          norm(i.STATE_PROVINCE) === norm(stateShort)
-          || norm(i.STATE_NAME) === norm(stateLong)
-          || norm(i.CITY) === norm(stateShort)
-          || norm(i.CITY) === norm(stateLong)
-        );
-      }
+   .filter((item) => normLower(item.TYPE) === 'local rep')
+   .filter((item) => {
+    if (hasState) {
+      const itemStateProvince = normLower(item.STATE_PROVINCE);
+      const itemStateName = normLower(item.STATE_NAME);
 
       return (
-        norm(i.COUNTRY) === norm(countryShort)
-        || norm(i.COUNTRY) === norm(countryLong)
-        || norm(i.COUNTRY_CODE) === norm(countryShort)
-        || norm(i.COUNTRY_NAME) === norm(countryLong)
+        itemStateProvince === searchedStateShort
+        || itemStateProvince === searchedStateLong
+        || itemStateName === searchedStateShort
+        || itemStateName === searchedStateLong
       );
-    });
+    }
+
+    return (
+      normLower(item.COUNTRY) === normLower(countryShort)
+      || normLower(item.COUNTRY) === normLower(countryLong)
+      || normLower(item.COUNTRY_CODE) === normLower(countryShort)
+      || normLower(item.COUNTRY_NAME) === normLower(countryLong)
+    );
+  })
+  .sort((a, b) => normLower(a.NAME).localeCompare(normLower(b.NAME)));
 
   return { distributors, localRep };
 }
