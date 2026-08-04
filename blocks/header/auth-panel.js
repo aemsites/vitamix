@@ -4,6 +4,12 @@ import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 import { getLoggedInCustomer, unwrapCustomerResponse, updateCustomer } from '../../widgets/account/account-api.js';
 import { isValidPostalCode } from '../../scripts/address-validation.js';
 
+// Temporarily disabled: the post-login "complete your profile" step calls an
+// update endpoint the customer API does not support yet (PUT/PATCH
+// /customers/{email}), so saving fails for testers. Flip back to `true` once the
+// backend exposes a self-service customer update/create route.
+const PROFILE_STEP_ENABLED = false;
+
 /**
  * Localized UI strings for the auth panel, keyed by BCP-47 language tag
  * (lowercased). Mirrors the translation approach used by the commerce checkout
@@ -410,7 +416,7 @@ export default function createAuthPanel() {
       return;
     }
     const c = customer && typeof customer === 'object' ? customer : {};
-    if (isProfileIncomplete(c)) {
+    if (PROFILE_STEP_ENABLED && isProfileIncomplete(c)) {
       showProfileStep(email, c);
     } else {
       finishLogin(email);
