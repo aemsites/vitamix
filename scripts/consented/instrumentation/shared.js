@@ -46,6 +46,14 @@ export function isPdpPage() {
 }
 
 /**
+ * Search-result page detection via .search-results container.
+ * @returns {boolean}
+ */
+export function isSearchResultsPage() {
+  return !!document.querySelector('.search-results');
+}
+
+/**
  * EDS checkout page detection (`/order/checkout`).
  * @returns {boolean}
  */
