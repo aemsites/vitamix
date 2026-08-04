@@ -539,7 +539,6 @@ function displayCommResults(results, labels = {}) {
       emailWrapper.append(emailLink);
       li.append(emailWrapper);
     }
-    
     return li;
   };
 
