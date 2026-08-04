@@ -347,9 +347,6 @@ function findCommResults(
         || norm(i.COUNTRY_NAME) === norm(countryLong)
       );
     });
-  if (!localRep.length) {
-    localRep = cleaned.filter((i) => i.TYPE === 'LOCAL REP');
-  }
 
   return { distributors, localRep };
 }
