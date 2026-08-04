@@ -19,7 +19,7 @@ export const ADMIN_URL = 'https://admin.da.live';
 export const AEM_ADMIN_URL = 'https://admin.hlx.page';
 
 // Translation service endpoint
-export const TRANSLATION_SERVICE_URL = 'https://translate.da.live/google';
+export const TRANSLATION_SERVICE_URL = 'https://translate.da.live/translate/google';
 
 // Path to the translation config spreadsheet within the repository
 export const CONFIG_PATH = '/.da/translate.json';

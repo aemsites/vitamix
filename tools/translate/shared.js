@@ -509,7 +509,8 @@ const translate = async (
     body.append('tolang', language);
 
     const opts = { method: 'POST', body };
-    const resp = await fetch(TRANSLATION_SERVICE_URL, opts);
+    const url = `${TRANSLATION_SERVICE_URL}/${context.org}/${context.repo}`;
+    const resp = await daFetch(url, opts);
     if (!resp.ok) {
       throw new Error(`Translation failed: ${resp.status}`);
     }
