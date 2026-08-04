@@ -9,6 +9,7 @@ import {
   trackCartChange,
   trackCheckoutShipping,
   trackLogin,
+  trackSocialEvents,
 } from './consented/instrumentation/index.js';
 
 bootstrapEarlyTracking();
@@ -20,6 +21,7 @@ document.body.classList.add('consented');
 trackCartChange();
 trackCheckoutShipping();
 trackLogin();
+trackSocialEvents();
 
 // add delayed functionality here
 window.config = {
@@ -224,4 +226,3 @@ loadScript('https://cdn.datasteam.io/js/D26F66D1AD707A.js');
   i=d.getElementsByTagName(t)[0],i.parentNode.insertBefore(n,i)
 })
 (window,document,"script","//bat.bing.com/bat.js","uetq");
-
