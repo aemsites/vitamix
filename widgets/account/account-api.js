@@ -111,6 +111,22 @@ export async function getLoggedInCustomer(customerEmail) {
 }
 
 /**
+ * PUT update top-level customer profile fields (e.g. firstName, lastName, zipCode).
+ * @param {string} customerEmail
+ * @param {Record<string, unknown>} body
+ * @returns {Promise<unknown>}
+ */
+export async function updateCustomer(customerEmail, body) {
+  const url = getCustomerApiBase(customerEmail);
+  const resp = await authFetch(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return readResponse(resp, { throwIfNotOk: true });
+}
+
+/**
  * GET customer addresses list.
  * @param {string} customerEmail
  * @returns {Promise<unknown>}
@@ -229,7 +245,7 @@ function formatIsoForUi(iso) {
  * @param {unknown} payload
  * @returns {unknown}
  */
-function unwrapCustomerResponse(payload) {
+export function unwrapCustomerResponse(payload) {
   const afterData = (payload && typeof payload === 'object' && 'data' in payload
     && /** @type {Record<string, unknown>} */ (payload).data !== undefined)
     ? /** @type {Record<string, unknown>} */ (payload).data
