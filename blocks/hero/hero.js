@@ -33,24 +33,54 @@ function parseFocalPoint(title) {
 }
 
 /**
- * Sets the custom properties the CSS focal-point rule needs to keep the
- * focal point centered under object-fit: cover as the box resizes.
+ * object-position % that places `focalPct` of the rendered image as close to
+ * the container center as possible without exposing empty edges.
+ * @param {number} focalPct - Focal point along this axis (0–100)
+ * @param {number} container - Container size in px
+ * @param {number} rendered - Scaled image size in px (object-fit: cover)
+ * @returns {number}
+ */
+function focalObjectPosition(focalPct, container, rendered) {
+  const overflow = container - rendered;
+  if (Math.abs(overflow) < 0.5) return 50;
+  const pos = (((container / 2) - (rendered * (focalPct / 100))) / overflow) * 100;
+  return Math.max(0, Math.min(100, pos));
+}
+
+/**
+ * Keeps the image focal point centered under object-fit: cover as the box resizes.
+ * Uses rAF so ResizeObserver style writes don't trip Safari's
+ * "undelivered notifications" loop warning.
  * @param {HTMLImageElement} img
  * @param {{ x: number, y: number }} focal
  */
 function applyFocalPoint(img, focal) {
-  const setProps = () => {
+  img.dataset.focal = '';
+  let raf = 0;
+
+  const update = () => {
     const { naturalWidth: nw, naturalHeight: nh } = img;
     if (!nw || !nh) return;
-    img.style.setProperty('--fx', focal.x);
-    img.style.setProperty('--fy', focal.y);
-    img.style.setProperty('--iw', nw);
-    img.style.setProperty('--ih', nh);
-    img.dataset.focal = '';
+    const { width: cw, height: ch } = img.getBoundingClientRect();
+    if (!cw || !ch) return;
+
+    const scale = Math.max(cw / nw, ch / nh);
+    const x = focalObjectPosition(focal.x, cw, nw * scale);
+    const y = focalObjectPosition(focal.y, ch, nh * scale);
+    img.style.objectPosition = `${x}% ${y}%`;
   };
 
-  if (img.complete) setProps();
-  else img.addEventListener('load', setProps, { once: true });
+  const schedule = () => {
+    if (raf) return;
+    raf = requestAnimationFrame(() => {
+      raf = 0;
+      update();
+    });
+  };
+
+  if (img.complete) schedule();
+  else img.addEventListener('load', schedule, { once: true });
+  new ResizeObserver(schedule).observe(img);
 }
 
 /**

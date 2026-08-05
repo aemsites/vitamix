@@ -21,6 +21,7 @@ import {
   isErrorPage,
   isOrderSuccessPage,
   isPdpPage,
+  isSearchResultsPage,
 } from './shared.js';
 import { trackScView } from './cart.js';
 import { guardDigitalDataPageType } from './page-context.js';
@@ -33,6 +34,7 @@ export { getDeploymentEnv } from './shared.js';
 export { trackCartChange } from './cart.js';
 export { trackLogin } from './auth.js';
 export { initDigitalDataPage, syncDigitalDataPageContext } from './page-context.js';
+export { trackSocialEvents, resetSocialEventsState } from './social.js';
 
 /**
  * Load order-success tracking early on confirmation pages (before Launch loads).
@@ -65,10 +67,10 @@ export function trackCheckoutShipping() {
 let instrumentationInitialized = false;
 
 /**
- * Initialize page-level Adobe Analytics (prodView on PDP, scView on cart, scCheckout,
- * pageError on 404, purchase on order success) and Adobe Target
- * orderConfirmPage on order success. Cart mutation listeners are registered early via
- * trackCartChange() in consented.js.
+ * Initialize page-level Adobe Analytics (prodView on PDP, nullSearch/successfulSearch on
+ * search results, scView on cart, scCheckout, pageError on 404, purchase on order success)
+ * and Adobe Target orderConfirmPage on order success. Cart mutation listeners are
+ * registered early via trackCartChange() in consented.js.
  * @returns {void}
  */
 export async function initInstrumentation() {
@@ -84,6 +86,10 @@ export async function initInstrumentation() {
   if (isPdpPage()) {
     const { trackProdView } = await import('./page-events.js');
     trackProdView();
+  }
+  if (isSearchResultsPage()) {
+    const { trackSearchResults } = await import('./search.js');
+    trackSearchResults();
   }
   if (isCartPage()) {
     trackScView();

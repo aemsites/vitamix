@@ -1,3 +1,5 @@
+import { isValidPostalCode } from '../../scripts/address-validation.js';
+
 const MESSAGES = {
   en: {
     required: 'This field is required.',
@@ -29,10 +31,6 @@ const NAME_RE = /^[A-Za-zÀ-ÖØ-öø-ÿ''\- ]+$/;
 const STREET_RE = /^[A-Za-z0-9 .,\-/]+$/;
 // Letters (including accented), spaces, hyphens, periods, apostrophes
 const CITY_RE = /^[A-Za-zÀ-ÖØ-öø-ÿ''\-. ]+$/;
-// US ZIP: 5 digits, optional +4, not all zeros
-const ZIP_US_RE = /^\d{5}(-\d{4})?$/;
-// Canadian postal code
-const ZIP_CA_RE = /^[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV-Z][ -]?\d[ABCEGHJ-NPRSTV-Z]\d$/i;
 // Basic email
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -96,8 +94,8 @@ export function validateField(input) {
       return CITY_RE.test(trimmed) ? null : msgs.city;
 
     case 'zip': {
-      if (isCanada) return ZIP_CA_RE.test(trimmed) ? null : msgs.postalCode;
-      return ZIP_US_RE.test(trimmed) && trimmed.replace(/\D/g, '') !== '00000' ? null : msgs.zip;
+      if (isValidPostalCode(trimmed, isCanada)) return null;
+      return isCanada ? msgs.postalCode : msgs.zip;
     }
 
     case 'telephone': {
