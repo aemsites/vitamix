@@ -1,7 +1,5 @@
 import { loadScript } from './aem.js';
 import './consented/newsletter.js';
-/* eslint-disable-next-line import/no-cycle -- instrumentation/page-context.js reaches
-   scripts.js, which only reaches this file via a dynamic import() in loadDelayed() */
 import {
   configureAnalyticsTrackingServers,
   ensureAnalyticsTrackingConfigured,

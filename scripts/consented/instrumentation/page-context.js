@@ -1,5 +1,3 @@
-// eslint-disable-next-line import/no-cycle -- scripts.js loads consented dynamically
-import { getLocaleAndLanguage } from '../../scripts.js';
 import {
   debugLog,
   hasMarketingConsent,
@@ -45,19 +43,31 @@ const PAGE_TYPE_URL_PREFIX_EXCLUSIONS = {
 };
 
 /**
+ * Second path segment (language) from the URL (`/{locale}/{language}/...`).
+ * Duplicated locally rather than importing scripts.js's getLocaleAndLanguage —
+ * that import would create a cycle back through this file (scripts.js only
+ * reaches it via a dynamic import() in loadDelayed()). Mirrors getStoreLocaleKey's
+ * existing local-parsing approach in ./shared.js.
+ * @returns {string}
+ */
+function getUrlLanguageSegment() {
+  const pathSegments = window.location.pathname.split('/').filter(Boolean);
+  return pathSegments[1] || 'en_us';
+}
+
+/**
  * Active language locale from URL (`/{locale}/{language}/...`).
  * @returns {string}
  */
 export function getActiveLanguageLocale() {
-  return getLocaleAndLanguage().language;
+  return getUrlLanguageSegment();
 }
 
 /**
  * @returns {string}
  */
 function getLocalePathPrefix() {
-  const { locale, language } = getLocaleAndLanguage();
-  return `/${locale}/${language}`;
+  return `/${getStoreLocaleKey()}/${getUrlLanguageSegment()}`;
 }
 
 /**

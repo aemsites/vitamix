@@ -23,7 +23,6 @@ import {
   isPdpPage,
 } from './shared.js';
 import { trackScView } from './cart.js';
-// eslint-disable-next-line import/no-cycle -- cycles back via a dynamic import() only
 import { guardDigitalDataPageType } from './page-context.js';
 
 export {
