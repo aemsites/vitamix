@@ -17,6 +17,7 @@ import {
 
 const CONFIG_CONTENT_DNT_SHEET = 'dnt-content-rules';
 const CONFIG_METADATA_FIELDS_SHEET = 'dt-metadata-fields';
+const CONFIG_BLOCK_DNT_SHEET = 'dnt-block-rules';
 
 const EDITOR_FORMAT = 'table';
 const ADMIN_FORMAT = 'div';
@@ -84,6 +85,24 @@ const CONTENT_DNT_RULE = {
   },
 };
 
+/** Builds a map of block name (lowercase) -> Set of 1-based column numbers to protect. */
+const parseBlockDntConfig = (config) => {
+  const data = config[CONFIG_BLOCK_DNT_SHEET]?.data || [];
+  const map = new Map();
+  data.forEach((row) => {
+    const name = row['block name']?.toLowerCase().trim();
+    const column = parseInt(row.column, 10);
+    if (!name || Number.isNaN(column)) {
+      return;
+    }
+    if (!map.has(name)) {
+      map.set(name, new Set());
+    }
+    map.get(name).add(column);
+  });
+  return map;
+};
+
 /** Rules applied once in all cases (editor and admin format). */
 const GENERIC_RULES = [ICONS_RULE, CONTENT_DNT_RULE];
 
@@ -143,6 +162,36 @@ const RULES = {
       });
       return html;
     },
+  }, {
+    description: 'Columns of a block listed in the dnt-block-rules config sheet should be not translated',
+    apply: (html, config) => {
+      const blockRules = parseBlockDntConfig(config);
+      if (blockRules.size === 0) {
+        return html;
+      }
+      const tables = html.querySelectorAll('table');
+      tables.forEach((table) => {
+        const rows = table.querySelectorAll('tr');
+        if (rows.length === 0) {
+          return;
+        }
+        const blockName = rows[0].textContent.toLowerCase().trim().split('(')[0].trim().replace(/\s+/g, '-');
+        const columns = blockRules.get(blockName);
+        if (!columns) {
+          return;
+        }
+        for (let i = 1; i < rows.length; i += 1) {
+          const cells = rows[i].querySelectorAll('td, th');
+          columns.forEach((column) => {
+            const cell = cells[column - 1];
+            if (cell) {
+              cell.setAttribute('translate', 'no');
+            }
+          });
+        }
+      });
+      return html;
+    },
   }],
   [ADMIN_FORMAT]: [{
     description: 'First column of all rows in "metadata" block should be not translated',
@@ -175,6 +224,33 @@ const RULES = {
       const divs = html.querySelectorAll('div[class=section-metadata]');
       divs.forEach((div) => {
         div.setAttribute('translate', 'no');
+      });
+      return html;
+    },
+  }, {
+    description: 'Columns of a block listed in the dnt-block-rules config sheet should be not translated',
+    apply: (html, config) => {
+      const blockRules = parseBlockDntConfig(config);
+      if (blockRules.size === 0) {
+        return html;
+      }
+      const divs = html.querySelectorAll('div[class]');
+      divs.forEach((div) => {
+        const blockName = div.classList[0]?.toLowerCase();
+        const columns = blockName && blockRules.get(blockName);
+        if (!columns) {
+          return;
+        }
+        const rows = div.querySelectorAll(':scope > div');
+        rows.forEach((row) => {
+          const cells = row.querySelectorAll(':scope > div');
+          columns.forEach((column) => {
+            const cell = cells[column - 1];
+            if (cell) {
+              cell.setAttribute('translate', 'no');
+            }
+          });
+        });
       });
       return html;
     },
