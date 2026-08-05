@@ -43,7 +43,7 @@ const chatbot = document.createElement('div');
 chatbot.id = 'chatbot-container';
 document.body.appendChild(chatbot);
 
-let metaPixelId = 1026941270048701;
+let metaPixelId = 2138559226702249;
 
 loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-chatbot.lc-dd65664b07118365206104c205ccc20e-lc.min.js');
 loadScript('https://www.vitamix.com/etc.clientlibs/core/wcm/components/commons/site/clientlibs/container.lc-0a6aff292f5cc42142779cde92054524-lc.min.js');
@@ -68,7 +68,7 @@ const launchConfigByEnv = {
     scriptUrl: 'https://assets.adobedtm.com/8639b8ee2552/0f7a35c4f04b/launch-EN10955306e5aa4722aaabcdd1910448ad-development.min.js',
   },
   localhost: {
-    pixelId: 1026941270048701,
+    pixelId: 2138559226702249,
     scriptUrl: 'https://assets.adobedtm.com/8639b8ee2552/0f7a35c4f04b/launch-EN10955306e5aa4722aaabcdd1910448ad-development.min.js',
   },
 };
