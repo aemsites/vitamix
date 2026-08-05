@@ -50,8 +50,17 @@
 }
 
 .add-to-compare-toast-link {
-  color: var(--color-white, #fff);
+  display: inline-block;
+  padding: var(--spacing-60, 8px) var(--spacing-200, 20px);
+  border-radius: var(--rounding-s, 4px);
+  background-color: var(--color-white, #fff);
+  color: var(--color-charcoal, #333f48);
   font-size: var(--body-size-xs, 0.75rem);
   font-weight: var(--weight-medium, 500);
-  text-decoration: underline;
+  text-decoration: none;
+}
+
+.add-to-compare-toast-link:hover,
+.add-to-compare-toast-link:focus-visible {
+  background-color: var(--color-gray-200, #f3f1eb);
 }
