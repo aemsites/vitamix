@@ -204,6 +204,19 @@ a.button.pdp-find-locally-button {
   text-transform: none;
 }
 
+a.button.pdp-find-dealer-button {
+  width: 100%;
+  max-width: 350px;
+  font-weight: var(--weight-light);
+  border-radius: 4px;
+  text-transform: none;
+}
+
+a.button.pdp-find-dealer-button.emphasis {
+  background-color: var(--color-charcoal);
+  border: none;
+}
+
 .details {
   grid-area: details;
   gap: var(--spacing-xl);

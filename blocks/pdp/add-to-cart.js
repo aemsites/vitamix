@@ -19,22 +19,40 @@ function renderFindLocally(ph, block) {
 }
 
 /**
- * Renders a "Find Dealer" button container.
+ * Appends the commercial dealer and expert consultation links to a PDP CTA container.
+ * @param {Object} ph - Placeholders object
+ * @param {HTMLElement} container - Container receiving the dealer CTA content
+ * @param {boolean} isSecondary - Whether the dealer button follows Add to Cart
+ */
+function appendFindDealerCta(ph, container, isSecondary = false) {
+  const { locale, language } = getLocaleAndLanguage();
+  const findDealerButton = document.createElement('a');
+  findDealerButton.classList.add('button', 'pdp-find-dealer-button');
+  if (!isSecondary) findDealerButton.classList.add('emphasis');
+  findDealerButton.href = `https://www.vitamix.com/${locale}/${language}/where-to-buy?`
+    + 'productFamily=2205202&productType=COMM';
+  findDealerButton.textContent = ph.findDealer || 'Find Dealer';
+
+  const expertQuestion = document.createElement('p');
+  const expertLink = document.createElement('a');
+  expertLink.href = `https://www.vitamix.com/${locale}/${language}/commercial/resources/`
+    + 'consult-an-expert';
+  expertLink.textContent = ph.consultAnExpert || 'Have a question? Consult an expert.';
+  expertQuestion.append(expertLink);
+
+  container.append(findDealerButton, expertQuestion);
+}
+
+/**
+ * Renders a "Find Dealer" button container for an unavailable product.
  * @param {Object} ph - Placeholders object
  * @param {HTMLElement} block - PDP block element
  * @returns {HTMLElement} Container div with "Find Dealer" button and expert consultation link
  */
 function renderFindDealer(ph, block) {
-  const { locale, language } = getLocaleAndLanguage();
   const findDealerContainer = document.createElement('div');
   findDealerContainer.classList.add('add-to-cart');
-  findDealerContainer.innerHTML = `<a
-    class="button emphasis pdp-find-locally-button"
-    href="https://www.vitamix.com/${locale}/${language}/where-to-buy?productFamily=2205202&productType=COMM">${ph.findDealer || 'Find Dealer'}</a>
-  <p>
-    <a
-      href="https://www.vitamix.com/${locale}/${language}/commercial/resources/consult-an-expert">${ph.consultAnExpert || 'Have a question? Consult an expert.'}</a>
-  </p>`;
+  appendFindDealerCta(ph, findDealerContainer);
   block.classList.add('pdp-find-dealer');
   return findDealerContainer;
 }
@@ -265,6 +283,11 @@ export default function renderAddToCart(ph, block, parent) {
 
   // add quantity container to main add to cart container
   addToCartContainer.appendChild(quantityContainer);
+
+  // Saleable commercial products keep the dealer CTA as a secondary action.
+  if (findDealer === 'Yes') {
+    appendFindDealerCta(ph, addToCartContainer, true);
+  }
 
   return addToCartContainer;
 }
