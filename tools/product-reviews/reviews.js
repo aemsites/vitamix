@@ -22,7 +22,8 @@ let loadedBvLang = null;
 
 /**
  * Fetch an aem.network URL via the fcors proxy (avoids CORS on localhost / .aem.page / .aem.live).
- * @param {string} pathOrUrl - Absolute aem.network URL or site path (e.g. /us/en_us/products/index.json)
+ * @param {string} pathOrUrl - Absolute aem.network URL or site path
+ *   (e.g. /us/en_us/products/index.json)
  * @returns {Promise<Response>}
  */
 function corsProxyFetch(pathOrUrl) {
@@ -47,6 +48,15 @@ function toClassName(name) {
 }
 
 /**
+ * @param {string} locale - e.g. en_us
+ * @returns {string} e.g. en_US
+ */
+function toBvLanguage(locale) {
+  const [lang, region] = String(locale).split('_');
+  return region ? `${lang}_${region.toUpperCase()}` : 'en_US';
+}
+
+/**
  * @param {string} localePath - e.g. us/en_us
  * @returns {{ country: string, locale: string, bvLang: string }}
  */
@@ -58,15 +68,6 @@ function parseLocalePath(localePath) {
     locale: locale || 'en_us',
     bvLang: match?.bvLang || toBvLanguage(locale || 'en_us'),
   };
-}
-
-/**
- * @param {string} locale - e.g. en_us
- * @returns {string} e.g. en_US
- */
-function toBvLanguage(locale) {
-  const [lang, region] = String(locale).split('_');
-  return region ? `${lang}_${region.toUpperCase()}` : 'en_US';
 }
 
 /**
@@ -124,6 +125,9 @@ async function mapPool(items, concurrency, fn, onProgress) {
     while (nextIndex < items.length) {
       const index = nextIndex;
       nextIndex += 1;
+      // Sequential within a single worker is intentional - concurrency comes from running
+      // multiple workers in parallel (see `workers` below), not from overlapping awaits here.
+      // eslint-disable-next-line no-await-in-loop
       results[index] = await fn(items[index], index);
       completed += 1;
       if (onProgress) onProgress(completed, items.length);
@@ -142,7 +146,9 @@ async function mapPool(items, concurrency, fn, onProgress) {
  * Loads parent rows from a products index sheet.
  * @param {string} indexPath - Path under aem.network (may include query)
  * @param {string} productsBase - products or products/commercial
- * @returns {Promise<Array<{urlKey: string, title: string, sku: string, image: string, url: string, productsBase: string}>>}
+ * @returns {Promise<Array<{
+ *   urlKey: string, title: string, sku: string, image: string, url: string, productsBase: string
+ * }>>}
  */
 async function fetchIndexParents(indexPath, productsBase) {
   const response = await corsProxyFetch(indexPath);

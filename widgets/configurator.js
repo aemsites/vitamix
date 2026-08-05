@@ -54,6 +54,8 @@ async function waitForWidgetBlock() {
     const hasSource = !!target?.dataset?.source;
     const hasMarkup = !!target?.querySelector('.product-list-widget, .product-list-results');
     if (target && (hasSource || hasMarkup)) return target;
+    // Intentional: polling until the widget block finishes decorating, one frame at a time.
+    // eslint-disable-next-line no-await-in-loop
     await new Promise((resolve) => { requestAnimationFrame(resolve); });
   }
   return null;

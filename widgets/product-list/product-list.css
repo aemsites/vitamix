@@ -444,6 +444,12 @@ body.product-list-widget-drawer-open {
   cursor: pointer;
 }
 
+/* Toggled on once a product is already in the compare-products widget's list (localStorage) */
+.product-list-widget .product-list-widget-compare-btn.product-list-widget-compare-btn-active {
+  background-color: var(--color-charcoal);
+  color: var(--color-white);
+}
+
 .product-list-widget .product-list-widget-product-card h4 {
   margin: 0;
   font-family: var(--heading-font-family);
@@ -556,6 +562,7 @@ body.product-list-widget-drawer-open {
   color: var(--color-gray-700, #555);
 }
 
+/* stylelint-disable-next-line no-descending-specificity */
 .product-list-widget .product-list-widget-bullets li {
   margin: 0.15rem 0;
 }

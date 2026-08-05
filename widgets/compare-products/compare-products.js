@@ -2,10 +2,13 @@ import {
   fetchPlaceholders, loadCSS, toClassName,
 } from '../../scripts/aem.js';
 import { formatPrice } from '../../scripts/scripts.js';
+import {
+  getStoredComparePaths, setStoredCompareItems, MAX_COMPARE_ITEMS,
+} from '../../scripts/add-to-compare.js';
 import lookupProductListProducts, { getWidgetLocaleAndLanguage } from '../product-list/products.js';
 
 /** Show "add a product" grid until this many products are in the comparison */
-const MAX_COMPARISON_PRODUCTS = 4;
+const MAX_COMPARISON_PRODUCTS = MAX_COMPARE_ITEMS;
 
 /** Query param carrying the comma-separated product paths being compared. */
 const COMPARE_PARAM = 'compare-products';
@@ -58,14 +61,43 @@ function getComparePaths() {
 }
 
 /**
- * Navigates to the current page with an updated `compare-products` param.
- * @param {string[]} paths - Product paths to compare (pathnames or URLs)
+ * Builds a `{ url, title, image }` entry for localStorage from a full product object.
+ * @param {Object} product
+ * @returns {{url: string, title: string, image: string}}
  */
-function goToComparePaths(paths) {
+function toStoredItem(product) {
+  return {
+    url: product.url,
+    title: product.title || '',
+    image: product.variants?.[0]?.image || product.image || '',
+  };
+}
+
+/**
+ * Navigates to the current page with an updated `compare-products` param, persisting the same
+ * products (with title/image, for the compare toast's thumbnails) to localStorage so they're
+ * picked up as a fallback on future visits without the param.
+ * @param {Object[]} products - Full product objects to compare (order matters)
+ */
+function goToComparePaths(products) {
+  const stored = setStoredCompareItems(products.map(toStoredItem));
+  const paths = stored.map((item) => item.url);
   const url = new URL(window.location.href);
   if (paths.length) url.searchParams.set(COMPARE_PARAM, paths.join(','));
   else url.searchParams.delete(COMPARE_PARAM);
   window.location.href = url.toString();
+}
+
+/**
+ * Writes the given paths into the `compare-products` query param via pushState (no reload),
+ * used to reflect a localStorage fallback into the URL on initial load.
+ * @param {string[]} paths
+ */
+function pushComparePathsToUrl(paths) {
+  const url = new URL(window.location.href);
+  if (paths.length) url.searchParams.set(COMPARE_PARAM, paths.join(','));
+  else url.searchParams.delete(COMPARE_PARAM);
+  window.history.pushState(null, '', url.toString());
 }
 
 function findProductByPath(products, path) {
@@ -535,9 +567,9 @@ function filterCandidates(candidates, query) {
  * @param {Object[]} candidates - Products not already in the comparison
  * @param {Object} ph - Price/locale placeholders
  * @param {Object} copy - Widget copy
- * @param {string[]} currentPaths - Currently selected paths (for adding on top of)
+ * @param {Object[]} currentProducts - Currently selected products (for adding on top of)
  */
-function openAddProductModal(candidates, ph, copy, currentPaths) {
+function openAddProductModal(candidates, ph, copy, currentProducts) {
   const dialog = document.createElement('dialog');
   dialog.className = 'compare-products-widget-modal';
 
@@ -576,7 +608,7 @@ function openAddProductModal(candidates, ph, copy, currentPaths) {
     }
     results.forEach((product) => {
       list.appendChild(buildModalResultRow(product, ph, query, (picked) => {
-        goToComparePaths([...currentPaths, picked.url]);
+        goToComparePaths([...currentProducts, picked]);
       }));
     });
   };
@@ -606,11 +638,11 @@ function openAddProductModal(candidates, ph, copy, currentPaths) {
  * product), which opens the quick-search modal.
  * @param {HTMLElement} container
  * @param {Object[]} candidates - Products not already in the comparison
- * @param {string[]} selectedPaths
+ * @param {Object[]} currentProducts - Currently selected products
  * @param {Object} ph
  * @param {Object} copy
  */
-function renderAddTrigger(container, candidates, selectedPaths, ph, copy) {
+function renderAddTrigger(container, candidates, currentProducts, ph, copy) {
   container.innerHTML = '';
 
   const trigger = document.createElement('button');
@@ -619,7 +651,7 @@ function renderAddTrigger(container, candidates, selectedPaths, ph, copy) {
   trigger.textContent = copy.addAProductToCompare;
   trigger.disabled = candidates.length === 0;
   if (trigger.disabled) trigger.title = copy.allSelected;
-  trigger.addEventListener('click', () => openAddProductModal(candidates, ph, copy, selectedPaths));
+  trigger.addEventListener('click', () => openAddProductModal(candidates, ph, copy, currentProducts));
   container.appendChild(trigger);
 }
 
@@ -646,15 +678,26 @@ export default async function decorate(widget) {
   const dataset = widget.dataset.dataset || 'blenders';
   const allProducts = await lookupProductListProducts({}, {}, dataset);
 
-  const selectedPaths = getComparePaths();
-  const onRemove = (path) => {
-    goToComparePaths(selectedPaths.filter((p) => normalizePath(p) !== normalizePath(path)));
-  };
-
+  let selectedPaths = getComparePaths();
+  if (selectedPaths.length === 0) {
+    // No products selected via the URL - fall back to the localStorage-persisted list (if any)
+    // and reflect it into the URL so the page is shareable/bookmarkable from here on.
+    const storedPaths = getStoredComparePaths().map(normalizePath);
+    if (storedPaths.length) {
+      selectedPaths = storedPaths;
+      pushComparePathsToUrl(selectedPaths);
+    }
+  }
   const slots = selectedPaths.map((path) => ({
     path,
     product: findProductByPath(allProducts, path),
   }));
+  const currentProducts = slots.filter((slot) => slot.product).map((slot) => slot.product);
+
+  const onRemove = (path) => {
+    const key = normalizePath(path);
+    goToComparePaths(currentProducts.filter((product) => normalizePath(product.url) !== key));
+  };
 
   const excludeSet = new Set(selectedPaths.map(normalizePath));
   const candidates = allProducts.filter((product) => !excludeSet.has(normalizePath(product.url)));
@@ -663,7 +706,7 @@ export default async function decorate(widget) {
   // column instead of the below-grid trigger; otherwise (0, or 2+) use the compact trigger.
   const showGhost = slots.length === 1 && candidates.length > 0;
   const ghost = showGhost
-    ? { onAdd: () => openAddProductModal(candidates, ph, copy, selectedPaths) }
+    ? { onAdd: () => openAddProductModal(candidates, ph, copy, currentProducts) }
     : null;
 
   renderComparisonGrid(gridEl, slots, ph, copy, onRemove, ghost);
@@ -671,6 +714,6 @@ export default async function decorate(widget) {
   if (showGhost || slots.length >= MAX_COMPARISON_PRODUCTS) {
     addSectionEl.innerHTML = '';
   } else {
-    renderAddTrigger(addSectionEl, candidates, selectedPaths, ph, copy);
+    renderAddTrigger(addSectionEl, candidates, currentProducts, ph, copy);
   }
 }

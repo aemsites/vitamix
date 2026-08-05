@@ -520,6 +520,12 @@ a.button.pdp-find-locally-button {
   margin-right: var(--spacing-s);
 }
 
+/* Toggled on once this product is already in the compare-products widget's list (localStorage) */
+.pdp-compare-button.pdp-compare-button-active {
+  background-color: var(--color-charcoal);
+  color: var(--color-white);
+}
+
 .pdp-compare-container a:any-link {
   text-decoration: none;
 }

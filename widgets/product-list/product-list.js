@@ -4,10 +4,8 @@ import {
 } from '../../scripts/aem.js';
 import { formatPrice } from '../../scripts/scripts.js';
 import { loadFragment } from '../../blocks/fragment/fragment.js';
-import { openModal } from '../../blocks/modal/modal.js';
+import addToCompare, { useWidgetCompare, isInStoredCompare, removeFromCompare } from '../../scripts/add-to-compare.js';
 import lookupProductListProducts, { getWidgetLocaleAndLanguage, getFacetDefinitions } from './products.js';
-
-const AEM_NETWORK_ORIGIN = 'https://main--vitamix--aemsites.aem.network';
 
 const LIFESTYLE_TILE_SELECTOR = '.block > div, .block > ul > li';
 const LIFESTYLE_TILE_SELECTED_SELECTOR = '.block > div.selected, .block > ul > li.selected';
@@ -67,59 +65,6 @@ async function loadWidgetCopy(lang) {
   const data = await resp.json();
   const key = data[lang] ? lang : 'en';
   return data[key] || {};
-}
-
-/**
- * Whether to route product-page fetches through the fcors proxy (localhost, .aem.page, .aem.live).
- * @returns {boolean}
- */
-function useFcors() {
-  const { hostname } = window.location;
-  return hostname === 'localhost'
-    || hostname.endsWith('.aem.page')
-    || hostname.endsWith('.aem.live');
-}
-
-/**
- * Fetches a product page's HTML so its JSON-LD (and Magento entityId) can be read.
- * @param {string} path - Product path (e.g. /us/en_us/products/ascent-x2)
- * @returns {Promise<string|null>}
- */
-async function fetchProductPageHtml(path) {
-  const pathOnly = path.startsWith('http') ? new URL(path).pathname : path;
-  let resp;
-  if (useFcors()) {
-    const corsProxy = 'https://fcors.org/?url=';
-    const corsKey = '&key=Mg23N96GgR8O3NjU';
-    const fullUrl = `${AEM_NETWORK_ORIGIN}${pathOnly}`;
-    resp = await fetch(`${corsProxy}${encodeURIComponent(fullUrl)}${corsKey}`);
-  } else {
-    resp = await fetch(pathOnly);
-  }
-  return resp.ok ? resp.text() : null;
-}
-
-/**
- * Resolves the Magento entityId for a product, fetching and parsing its page's JSON-LD
- * on first use (the product-list index has no entityId of its own). Caches on the product.
- * @param {Object} product
- * @returns {Promise<string|null>}
- */
-async function getProductEntityId(product) {
-  if (product.entityId) return product.entityId;
-  if (!product.url) return null;
-  try {
-    const html = await fetchProductPageHtml(product.url);
-    if (!html) return null;
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    const jsonLdScript = doc.querySelector('script[type="application/ld+json"]');
-    if (!jsonLdScript?.textContent) return null;
-    const jsonLd = JSON.parse(jsonLdScript.textContent);
-    product.entityId = jsonLd?.custom?.entityId || null;
-    return product.entityId;
-  } catch {
-    return null;
-  }
 }
 
 function hasVariants(product) {
@@ -238,32 +183,32 @@ function createCompareButton(product, copy) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'product-list-widget-compare-btn pdp-compare-button';
-  btn.textContent = copy.compare || 'Compare';
-  btn.addEventListener('click', async (e) => {
+
+  // Only the compare-products widget path tracks membership client-side (Magento's server-side
+  // compare list has no easy client-side "is this already in it?" check), so the toggle-to-
+  // "Remove from Compare" state only applies there.
+  const widgetMode = useWidgetCompare();
+  const updateLabel = () => {
+    const inCompare = widgetMode && isInStoredCompare(product.url);
+    btn.textContent = inCompare ? (copy.removeFromCompare || 'Remove from Compare') : (copy.compare || 'Compare');
+    btn.classList.toggle('product-list-widget-compare-btn-active', inCompare);
+  };
+  updateLabel();
+
+  btn.addEventListener('click', (e) => {
     e.stopPropagation();
-    const { locale, language } = getWidgetLocaleAndLanguage();
-    const entityId = await getProductEntityId(product);
-    if (!entityId) return;
-    const resp = await fetch(`/${locale}/${language}/catalog/product_compare/add/`, {
-      headers: {
-        'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        'x-requested-with': 'XMLHttpRequest',
-      },
-      body: `product=${entityId}&uenc=${encodeURIComponent(window.location.href)}`,
-      method: 'POST',
-      credentials: 'include',
-    });
-    if (resp.ok) {
-      const modal = await openModal(`/${locale}/${language}/products/modals/compare`);
-      if (modal) {
-        const content = modal.querySelector('.default-content-wrapper');
-        const productEl = document.createElement('p');
-        productEl.className = 'product';
-        productEl.textContent = product.title || '';
-        content.prepend(productEl);
-      }
+    if (widgetMode && isInStoredCompare(product.url)) {
+      removeFromCompare(product.url, { viewComparisonLabel: copy.viewComparison });
+    } else {
+      addToCompare(product, {
+        addedMessage: copy.addedToComparison,
+        limitMessage: copy.compareLimitReached,
+        viewComparisonLabel: copy.viewComparison,
+      });
     }
+    updateLabel();
   });
+
   return btn;
 }
 
@@ -473,7 +418,14 @@ function clearLifestyleFragmentSelection(widget) {
   });
 }
 
-function applyFacetFilter(match, widget, runSearch, setFilterConfig, setDrawerInputsFromConfig, tile) {
+function setDrawerInputsFromConfig(widget, filterConfig) {
+  widget.querySelectorAll('.product-list-facet-drawer input[type="checkbox"]').forEach((input) => {
+    const selected = (filterConfig[input.name] || '').split(',').map((t) => t.trim());
+    input.checked = selected.includes(input.value);
+  });
+}
+
+function applyFacetFilter(match, widget, runSearch, setFilterConfig, tile) {
   const next = { ...widget.productListBaseConfig };
   next[match.key] = match.value;
   clearLifestyleFragmentSelection(widget);
@@ -483,7 +435,7 @@ function applyFacetFilter(match, widget, runSearch, setFilterConfig, setDrawerIn
   runSearch(next);
 }
 
-function wireLifestyleFragment(widget, runSearch, setFilterConfig, setDrawerInputsFromConfig, getAllFacets) {
+function wireLifestyleFragment(widget, runSearch, setFilterConfig, getAllFacets) {
   const section = widget.querySelector('.product-list-lifestyle');
   if (!section || section.dataset.lifestyleWired === 'true') return;
   section.dataset.lifestyleWired = 'true';
@@ -499,7 +451,7 @@ function wireLifestyleFragment(widget, runSearch, setFilterConfig, setDrawerInpu
     if (!match) return;
 
     e.preventDefault();
-    applyFacetFilter(match, widget, runSearch, setFilterConfig, setDrawerInputsFromConfig, tile);
+    applyFacetFilter(match, widget, runSearch, setFilterConfig, tile);
   });
 }
 
@@ -627,13 +579,6 @@ function getFilterConfigFromInputs(widget) {
     else config[name] = value;
   });
   return config;
-}
-
-function setDrawerInputsFromConfig(widget, filterConfig) {
-  widget.querySelectorAll('.product-list-facet-drawer input[type="checkbox"]').forEach((input) => {
-    const selected = (filterConfig[input.name] || '').split(',').map((t) => t.trim());
-    input.checked = selected.includes(input.value);
-  });
 }
 
 /**
@@ -824,7 +769,6 @@ export default async function decorate(widget) {
     widget,
     runSearch,
     setFilterConfig,
-    setDrawerInputsFromConfig,
     () => widget.productListAllFacets || {},
   );
 
