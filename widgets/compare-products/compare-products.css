@@ -1,198 +1,87 @@
+@import url('../../styles/color-swatches.css');
+
 /* Compare Products Widget – layout only; typography, buttons, colors inherit from site */
 
-/* Swatch colors aligned with blocks/pdp/color-swatches.css */
-.compare-products-product-color {
-  width: 24px;
-  height: 24px;
-  border: var(--border-s) solid var(--color-gray-400);
-  border-radius: 50%;
-  padding: 0;
-  cursor: pointer;
-  transition: transform 0.15s, box-shadow 0.15s;
-}
-
-.compare-products-product-color:hover {
-  transform: scale(1.1);
-}
-
-.compare-products-product-color.selected {
-  border-width: 2px;
-  border-color: var(--color-charcoal);
-  box-shadow: 0 0 0 2px var(--color-background);
-}
-
-.compare-products .compare-products-product-color {
-  /* blacks */
-  --color-black: #000;
-  --color-shadow-black: #000;
-  --color-1100001: #100;
-  --color-1100002: #100;
-  --color-black-stainless-metal-finish: #161616;
-
-  /* grays */
-  --color-onyx: #353935;
-  --color-abalone-grey: #3b363b;
-  --color-graphite: #414141;
-  --color-nano-gray: #5b6770;
-  --color-graphite-metal-finish: #606060;
-  --color-slate: #666;
-  --color-pearl-gray: #858583;
-  --color-black-diamond: #928b8b;
-  --color-brushed-stainless: #b0b3b7;
-  --color-grey: #e5e4e2;
-  --color-platinum: #e5e4e2;
-
-  /* whites */
-  --color-white: #fff;
-  --color-polar-white: #fff;
-
-  /* browns */
-  --color-espresso: #67564e;
-  --color-copper-metal-finish: #f2a57e;
-  --color-reflection: #f2a57e;
-  --color-brushed-stainless-metal-finish: #b5aa9d;
-  --color-brushed-gold: #ccba78;
-  --color-cream: #fffdd0;
-
-  /* reds */
-  --color-red: #c03;
-  --color-candy-apple: #c00310;
-  --color-candy-apple-red: #c00310;
-  --color-ruby: #e01160;
-
-  /* oranges */
-  --color-orange: #ffa600;
-  --color-cinnamon: #d2691e;
-
-  /* yellows */
-  --color-yellow: #f7f700;
-
-  /* greens */
-  --color-sour-apple-green: #e3edb5;
-  --color-turquoise: #30d5c7;
-
-  /* blues */
-  --color-cobalt: #0047ab;
-  --color-blue: #1131d4;
-  --color-matte-navy: #00263e;
-  --color-midnight-blue: #00263e;
-
-  /* purples */
-  --color-purple: #800080;
-
-  /* undefined */
-  --color-color-not-available: ;
-}
-
-.compare-products {
+.compare-products-widget {
   max-width: var(--site-width);
   margin: 0 auto;
   padding: var(--spacing-400) var(--spacing-600);
+}
+
+/* Single continuous grid: a "corner" spacer + one column per product, so the header row
+   (image/price/CTA) and every feature row below it stay pixel-aligned. */
+.compare-products-widget-grid {
+  display: grid;
+  grid-template-columns: minmax(140px, 200px) repeat(var(--compare-products-widget-cols, 2), minmax(220px, 1fr));
   overflow-x: auto;
-  position: relative;
-  -webkit-overflow-scrolling: touch;
+  border: var(--border-s) solid var(--color-gray-200);
+  border-radius: var(--rounding-m, 8px);
+  margin-bottom: var(--spacing-400);
 }
 
-.compare-products::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 48px;
-  background: linear-gradient(to right, transparent, var(--color-background));
-  pointer-events: none;
-  z-index: 1;
+.compare-products-widget-row {
+  display: contents;
 }
 
-@media (width >= 900px) {
-  .compare-products::after {
-    display: none;
-  }
+.compare-products-widget-cell {
+  padding: var(--spacing-200);
+  border-bottom: var(--border-s) solid var(--color-gray-200);
+  border-left: var(--border-s) solid var(--color-gray-200);
 }
 
-.compare-products-scroll {
-  min-width: 900px;
-  display: grid;
-  grid-template-columns: minmax(120px, auto) repeat(var(--compare-cols, 2), 1fr);
-  gap: 0;
+.compare-products-widget-cell:nth-child(2) {
+  border-left: none;
 }
 
-.compare-products-empty {
-  margin: var(--spacing-200) 0;
+/* Header row: product cards */
+.compare-products-widget-corner-cell {
+  background-color: var(--color-background);
+  border-left: none;
 }
 
-/* Add-a-product grid (Full Size Blenders from index.json) */
-.compare-products-products {
-  grid-column: 2 / -1;
-  display: grid;
-  grid-template-columns: repeat(var(--compare-cols, 2), 1fr);
-  gap: var(--spacing-400);
-  border-bottom: var(--border-m) solid var(--color-gray-300);
-  padding-bottom: var(--spacing-400);
-  margin-bottom: var(--spacing-300);
-}
-
-.compare-products-products:has(.compare-products-add-heading) {
-  display: block;
-  grid-column: 1 / -1;
-}
-
-.compare-products-add-heading {
-  margin: 0 0 var(--spacing-300);
-  font-size: var(--heading-font-size-m);
-}
-
-.compare-products-add-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: var(--spacing-400);
-}
-
-.compare-products-add-card .compare-products-add-to-comparison {
-  margin-top: var(--spacing-200);
-  margin-bottom: var(--spacing-200);
-}
-
-.compare-products-add-empty {
-  margin: var(--spacing-200) 0;
-}
-
-.compare-products-add-section {
-  margin-top: var(--spacing-400);
-  padding-top: var(--spacing-400);
-  border-top: var(--border-m) solid var(--color-gray-300);
-}
-
-.compare-products-product {
+.compare-products-widget-product-cell {
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: var(--spacing-200);
+  text-align: center;
+  background-color: var(--color-background);
 }
 
-.compare-products-product-remove {
+.compare-products-widget-remove {
   position: absolute;
   top: var(--spacing-80);
-  right: var(--spacing-80);
+  left: var(--spacing-80);
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-gray-600);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
 }
 
-.compare-products-product-image-wrap {
+.compare-products-widget-remove:hover {
+  color: var(--color-charcoal);
+}
+
+.compare-products-widget-image-wrap {
   width: 100%;
-  max-width: 280px;
-  margin-bottom: 0;
+  max-width: 260px;
   aspect-ratio: 1;
+  margin-bottom: var(--spacing-200);
 }
 
-.compare-products-product-image-wrap img {
+.compare-products-widget-image-wrap img {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: contain;
 }
 
-.compare-products-product-colors {
+.compare-products-widget-colors {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
@@ -200,108 +89,250 @@
   margin-bottom: var(--spacing-200);
 }
 
-.compare-products-product-name {
-  margin: 0 0 var(--spacing-100);
-  text-align: center;
+.compare-products-widget-colors .color-swatch {
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
 }
 
-.compare-products-product-price {
-  margin-bottom: var(--spacing-100);
-  text-align: center;
-}
-
-.compare-products-product-price-now {
+.compare-products-widget-color-inner {
   display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: var(--border-s) solid var(--color-gray-400);
 }
 
-.compare-products-product-placeholder {
-  justify-content: center;
-  min-height: 200px;
+.compare-products-widget-colors .color-swatch.selected .compare-products-widget-color-inner {
+  border-width: 2px;
+  border-color: var(--color-charcoal);
 }
 
-.compare-products-product-placeholder-msg {
-  margin: var(--spacing-200) 0;
-  text-align: center;
+.compare-products-widget-color-swatch-oos {
+  opacity: 0.4;
 }
 
-/* Features section */
-.compare-products-features {
-  grid-column: 1 / -1;
+.compare-products-widget-title {
+  margin: 0 0 var(--spacing-100);
 }
 
-.compare-products-features-table {
-  display: grid;
-  grid-template-columns: minmax(120px, auto) repeat(var(--compare-cols, 2), minmax(0, 1fr));
-  gap: 0;
-  min-width: 0;
+.compare-products-widget-reviews {
+  margin-bottom: var(--spacing-100);
 }
 
-.compare-products-features-row {
-  display: contents;
-}
-
-.compare-products-features-cell {
-  padding: var(--spacing-100) var(--spacing-200);
-  border: var(--border-s) solid var(--color-gray-200);
-  border-top: 0;
-  border-left: 0;
-}
-
-.compare-products-features-row:first-of-type .compare-products-features-cell {
-  border-top: var(--border-s) solid var(--color-gray-200);
-}
-
-.compare-products-features-cell.row-even {
-  background-color: var(--color-background);
-}
-
-.compare-products-features-cell.row-odd {
-  background-color: var(--color-gray-200);
-}
-
-.compare-products-features-cell.feature-name {
-  border-left: var(--border-s) solid var(--color-gray-200);
+.compare-products-widget-price {
+  margin: 0 0 var(--spacing-200);
   font-weight: var(--weight-medium);
 }
 
-.compare-products-features-cell-check {
+.compare-products-widget-cta {
+  margin: 0;
+}
+
+.compare-products-widget-product-cell-placeholder {
+  justify-content: center;
+  min-height: 200px;
+  gap: var(--spacing-100);
+}
+
+.compare-products-widget-placeholder-msg {
+  margin: 0;
+}
+
+/* Feature comparison rows */
+.compare-products-widget-feature-label {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  font-weight: var(--weight-medium);
+  background-color: inherit;
+}
+
+.compare-products-widget-feature-row.row-even .compare-products-widget-cell {
+  background-color: var(--color-background);
+}
+
+.compare-products-widget-feature-row.row-odd .compare-products-widget-cell {
+  background-color: var(--color-gray-100, #f7f7f7);
+}
+
+.compare-products-widget-feature-value {
+  text-align: center;
+}
+
+/* Called out when this cell's value differs from the row's most common value, so shoppers
+   can spot at a glance where products diverge. Same muted yellow as the search highlight. */
+.compare-products-widget-feature-value-diff {
+  position: relative;
+  font-weight: var(--weight-medium);
+  color: var(--color-charcoal);
+  background-color: color-mix(in srgb, var(--color-yellow, #fc0) 35%, transparent) !important;
+}
+
+.compare-products-widget-feature-check {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.25em;
-  height: 1.25em;
+  width: 1.1em;
+  height: 1.1em;
+  margin-right: var(--spacing-60);
   border-radius: 50%;
   background-color: var(--color-charcoal);
   color: var(--color-white);
-  font-size: 0.75em;
+  font-size: 0.7em;
   line-height: 1;
   font-weight: bold;
 }
 
-/* When compare-products param filtered columns: table reflows so visible columns share width */
-.widget-container.compare-products-columns-filtered .table.comparison .table-comparison-scroll table {
-  table-layout: auto;
+/* Ghost "add a product" column, shown instead of the trigger when only one product
+   is selected, so the empty slot itself invites filling it in. */
+.compare-products-widget-ghost-cell {
+  justify-content: flex-start;
+}
+
+.compare-products-widget-ghost-silhouette {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   width: 100%;
+  opacity: 0.5;
 }
 
-.widget-container.compare-products-columns-filtered .table.comparison .table-comparison-scroll th.compare-products-column-visible,
-.widget-container.compare-products-columns-filtered .table.comparison .table-comparison-scroll td.compare-products-column-visible {
-  min-width: 120px;
+.compare-products-widget-ghost-image {
+  width: 100%;
+  max-width: 260px;
+  aspect-ratio: 1;
+  margin-bottom: var(--spacing-200);
+  border-radius: var(--rounding-m, 8px);
+  background-color: var(--color-gray-200);
 }
 
-/* Remove-from-comparison button on each product column (compare-products param flow) */
-.table.comparison .table-comparison-scroll thead th.compare-products-column-with-remove {
-  position: relative;
+.compare-products-widget-ghost-bar {
+  height: 12px;
+  margin-bottom: var(--spacing-100);
+  border-radius: var(--rounding-s, 4px);
+  background-color: var(--color-gray-200);
 }
 
-.table.comparison .table-comparison-scroll .compare-products-remove-from-comparison {
+.compare-products-widget-ghost-bar-title {
+  width: 65%;
+}
+
+.compare-products-widget-ghost-bar-price {
+  width: 40%;
+}
+
+.compare-products-widget-ghost-bar-cta {
+  width: 80%;
+  height: 36px;
+  margin-top: var(--spacing-100);
+  border-radius: var(--rounding-m, 8px);
+}
+
+.compare-products-widget-ghost-overlay {
   position: absolute;
-  top: var(--spacing-80);
-  right: var(--spacing-80);
-  z-index: 1;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-100);
+  border: var(--border-m) dashed var(--color-gray-400);
+  background-color: color-mix(in srgb, var(--color-background) 70%, transparent);
+  cursor: pointer;
+}
+
+.compare-products-widget-ghost-overlay:hover,
+.compare-products-widget-ghost-overlay:focus-visible {
+  border-color: var(--color-charcoal);
+  background-color: color-mix(in srgb, var(--color-background) 85%, transparent);
+}
+
+.compare-products-widget-ghost-plus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: var(--color-charcoal);
+  color: var(--color-white);
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.compare-products-widget-ghost-label {
+  font-weight: var(--weight-medium);
+  color: var(--color-charcoal);
+}
+
+.compare-products-widget-ghost-feature-cell {
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 8px,
+    color-mix(in srgb, var(--color-gray-300) 60%, transparent) 8px,
+    color-mix(in srgb, var(--color-gray-300) 60%, transparent) 9px
+  );
+}
+
+/* Add-a-product trigger */
+.compare-products-widget-add-section {
+  padding-top: var(--spacing-400);
+  text-align: center;
+}
+
+.compare-products-widget-add-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-100);
+  padding: var(--spacing-100) var(--spacing-300);
+  border: var(--border-s) dashed var(--color-gray-400);
+  border-radius: var(--rounding-m, 8px);
+  background: transparent;
+  color: var(--color-charcoal);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+}
+
+.compare-products-widget-add-trigger::before {
+  content: '+';
+  font-size: 1.2em;
+}
+
+.compare-products-widget-add-trigger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.compare-products-widget-add-trigger:hover:not(:disabled) {
+  border-color: var(--color-charcoal);
+  background-color: var(--color-gray-100, #f7f7f7);
+}
+
+/* Add-a-product modal: quick-search over a compact thumbnail/name/price result list */
+.compare-products-widget-modal {
+  width: calc(100vw - 48px);
+  max-width: 420px;
+  max-height: min(600px, calc(100dvh - 48px));
+  padding: var(--spacing-300);
+  border: none;
+  border-radius: var(--rounding-m, 8px);
+  background-color: var(--color-background);
+  box-shadow: var(--shadow-default, 0 8px 24px rgb(0 0 0 / 20%));
+}
+
+.compare-products-widget-modal::backdrop {
+  background-color: rgb(19 19 19 / 60%);
+}
+
+.compare-products-widget-modal-close {
+  position: absolute;
+  top: var(--spacing-200);
+  right: var(--spacing-200);
   width: 32px;
   height: 32px;
-  padding: 0;
   border: none;
   border-radius: 50%;
   background: var(--color-gray-200);
@@ -309,12 +340,107 @@
   font-size: 1.25rem;
   line-height: 1;
   cursor: pointer;
+}
+
+.compare-products-widget-modal-heading {
+  margin: 0 var(--spacing-500) var(--spacing-200) 0;
+  font-size: var(--heading-font-size-m);
+}
+
+.compare-products-widget-modal-search {
+  margin-bottom: var(--spacing-200);
+}
+
+.compare-products-widget-modal-search input {
+  /* type="search" renders with native OS chrome (and its own box model) unless reset */
+  appearance: none;
+  box-sizing: border-box;
+  width: 100%;
+  padding: var(--spacing-150) var(--spacing-250);
+  border: var(--border-s) solid var(--color-gray-300);
+  border-radius: var(--rounding-l, 10px);
+  background-color: var(--color-gray-100, #f7f7f7);
+  font-size: var(--body-size-m, 1rem);
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.compare-products-widget-modal-search input::-webkit-search-decoration,
+.compare-products-widget-modal-search input::-webkit-search-cancel-button,
+.compare-products-widget-modal-search input::-webkit-search-results-button,
+.compare-products-widget-modal-search input::-webkit-search-results-decoration {
+  appearance: none;
+}
+
+.compare-products-widget-modal-search input:hover {
+  border-color: var(--color-gray-400);
+}
+
+.compare-products-widget-modal-search input:focus {
+  border-color: var(--color-charcoal);
+  background-color: var(--color-background);
+  outline: none;
+}
+
+.compare-products-widget-modal-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-60);
+  max-height: 380px;
+  overflow-y: auto;
+}
+
+.compare-products-widget-modal-item {
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: var(--spacing-150);
+  width: 100%;
+  padding: var(--spacing-100);
+  border: none;
+  border-radius: var(--rounding-s, 4px);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
 }
 
-.table.comparison .table-comparison-scroll .compare-products-remove-from-comparison:hover {
-  background: var(--color-gray-300);
+.compare-products-widget-modal-item:hover,
+.compare-products-widget-modal-item:focus-visible {
+  background-color: var(--color-gray-100, #f7f7f7);
 }
 
+.compare-products-widget-modal-item-thumb {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+}
+
+.compare-products-widget-modal-item-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compare-products-widget-modal-item-name mark {
+  /* Same yellow as the site search highlight, muted down so it doesn't compete with the thumbnail/price */
+  background-color: color-mix(in srgb, var(--color-yellow, #fc0) 45%, white);
+  color: inherit;
+}
+
+.compare-products-widget-modal-item-price {
+  flex: none;
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+
+.compare-products-widget-modal-empty {
+  margin: var(--spacing-200) 0;
+  color: var(--color-gray-600);
+}
+
+@media (width < 700px) {
+  .compare-products-widget-grid {
+    grid-template-columns: minmax(120px, 160px) repeat(var(--compare-products-widget-cols, 2), minmax(180px, 1fr));
+  }
+}
