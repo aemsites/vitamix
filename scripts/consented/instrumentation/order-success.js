@@ -367,9 +367,18 @@ export async function firePurchase(transaction = getPurchaseTransactionData()) {
 }
 
 /**
+ * @typedef {Object} MetaPurchasePayload
+ * @property {string} orderId - The unique identifier for the order.
+ * @property {string[]} contentIds - Array of purchased product IDs.
+ * @property {number} numItems - Total number of items in the purchase.
+ * @property {number} value - The total monetary value of the order.
+ * @property {string} currency - The currency code (e.g., 'USD').
+ */
+
+/**
  * Build Meta Purchase payload from the same order-success snapshot used for Adobe.
  * @param {ReturnType<typeof readOrderSuccessContext>} [context]
- * @returns {{ orderId: string, content_ids: string[], num_items: number, value: number, currency: string }|null}
+ * @returns {MetaPurchasePayload|null}
  */
 function buildMetaPurchasePayload(context = readOrderSuccessContext()) {
   const summary = getOrderSuccessOrderSummary(context);
@@ -378,19 +387,23 @@ function buildMetaPurchasePayload(context = readOrderSuccessContext()) {
   }
 
   const items = (summary.displayItems || [])
-    .map((item) => ({
-      sku: String(item?.sku || '').trim(),
-      quantity: Number(item?.quantity || item?.qty || 0) || 0,
-      price: Number(parseFloat(item?.price?.final || item?.price || item?.unitPrice || 0).toFixed(2)) || 0,
-    }))
+    .map((item) => {
+      const rawPrice = item?.price?.final || item?.price || item?.unitPrice || 0;
+      const formattedPrice = Number(parseFloat(rawPrice).toFixed(2)) || 0;
+      return {
+        sku: String(item?.sku || '').trim(),
+        quantity: Number(item?.quantity || item?.qty || 0) || 0,
+        price: formattedPrice,
+      };
+    })
     .filter((item) => item.sku && item.quantity > 0);
 
   if (!items.length) {
     return null;
   }
 
-  const content_ids = items.map((item) => item.sku);
-  const num_items = items.reduce((sum, item) => sum + item.quantity, 0);
+  const contentIds = items.map((item) => item.sku);
+  const numItems = items.reduce((sum, item) => sum + item.quantity, 0);
   const value = Number(items
     .reduce((sum, item) => sum + (item.price * item.quantity), 0)
     .toFixed(2));
@@ -405,8 +418,8 @@ function buildMetaPurchasePayload(context = readOrderSuccessContext()) {
 
   return {
     orderId: summary.orderId,
-    content_ids,
-    num_items,
+    contentIds,
+    numItems,
     value,
     currency,
   };
@@ -436,8 +449,8 @@ export function fireMetaPurchase(context = readOrderSuccessContext()) {
   /* global fbq */
   fbq('track', 'Purchase', {
     content_type: 'product',
-    content_ids: payload.content_ids,
-    num_items: payload.num_items,
+    content_ids: payload.contentIds,
+    num_items: payload.numItems,
     value: payload.value,
     currency: payload.currency,
   }, {
