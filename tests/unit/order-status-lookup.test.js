@@ -2,6 +2,13 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import deriveOrderStatusKey from '../../widgets/forms/order-status-state.js';
 
+test('uses the normalized status returned by the forms action', () => {
+  assert.equal(
+    deriveOrderStatusKey({ succeeded: true, order: { key: 'ocuat3941245310', status: 'processed' } }),
+    'processed',
+  );
+});
+
 test('derives processed for a booked EBS order without deliveries', () => {
   assert.equal(
     deriveOrderStatusKey({ succeeded: true, order: { state: 'Booked' } }),

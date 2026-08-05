@@ -6,6 +6,15 @@
  */
 export default function deriveOrderStatusKey(result) {
   if (!result?.succeeded) return 'unavailable';
+
+  // The forms action is the source of truth for EBS line-item status. It
+  // calculates the Magento-compatible result before removing line items from
+  // the public response.
+  const normalizedStatus = result.order?.status;
+  if (['received', 'processed', 'partiallyShipped', 'shipped', 'cancelled', 'unavailable'].includes(normalizedStatus)) {
+    return normalizedStatus;
+  }
+
   if (result.outcome === 'Cancelled') return 'cancelled';
   if (result.outcome === 'Partially Cancelled') return 'partiallyShipped';
 
