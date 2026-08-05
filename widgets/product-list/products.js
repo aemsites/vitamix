@@ -121,6 +121,38 @@ async function fetchPlpData(locale, language, dataset) {
 }
 
 /**
+ * Fetches reviews.json, the source of truth for each product's review count/average rating
+ * (replaces the previous per-product Bazaarvoice inline widget lookup).
+ * @param {string} locale
+ * @param {string} language
+ * @returns {Promise<Array<Object>>}
+ */
+async function fetchReviewsData(locale, language) {
+  const resp = await fetch(`/${locale}/${language}/products/config/reviews.json`);
+  if (!resp.ok) return [];
+  const json = await resp.json();
+  return Array.isArray(json.data) ? json.data : [];
+}
+
+/**
+ * Builds a slug -> { reviewCount, reviewAverage } lookup from reviews.json rows.
+ * @param {Array<Object>} reviewsRows - Raw reviews.json rows (Path, Number of Reviews, Average Rating)
+ * @returns {Object.<string, {reviewCount: number, reviewAverage: number}>}
+ */
+function getReviewsBySlug(reviewsRows) {
+  const bySlug = {};
+  reviewsRows.forEach((row) => {
+    const slug = slugFromUrl((row.Path || '').trim());
+    if (!slug) return;
+    bySlug[slug] = {
+      reviewCount: parseInt(row['Number of Reviews'], 10) || 0,
+      reviewAverage: parseFloat(row['Average Rating']) || 0,
+    };
+  });
+  return bySlug;
+}
+
+/**
  * Fetches and filters products for the product-list widget.
  * Self-contained: does not depend on blocks/plp/plp.js.
  *
@@ -137,8 +169,12 @@ export default async function lookupProductListProducts(config = {}, facets = {}
 
   window.productListWidgetIndexByDataset = window.productListWidgetIndexByDataset || {};
   if (!window.productListWidgetIndexByDataset[plpDataset]) {
-    const plpRows = await fetchPlpData(locale, language, plpDataset);
+    const [plpRows, reviewsRows] = await Promise.all([
+      fetchPlpData(locale, language, plpDataset),
+      fetchReviewsData(locale, language),
+    ]);
     const facetDefs = getFacetDefsFromRows(plpRows);
+    const reviewsBySlug = getReviewsBySlug(reviewsRows);
 
     const corsProxyFetch = async (url) => {
       const corsProxy = 'https://fcors.org/?url=';
@@ -200,6 +236,9 @@ export default async function lookupProductListProducts(config = {}, facets = {}
         if (!product.title) product.title = titleFromUrl(urlPathname);
         product.bullets = (row.Bullets || '').split(';').map((s) => s.trim()).filter(Boolean);
         product.comparisonFeatures = (row['Comparison Features'] || '').split(';').map((s) => s.trim()).filter(Boolean);
+        const reviews = reviewsBySlug[slugFromUrl(rowUrl)];
+        product.reviewCount = reviews?.reviewCount ?? 0;
+        product.reviewAverage = reviews?.reviewAverage ?? 0;
         facetDefs.forEach(({ rawKey, key }) => {
           product[key] = parseFacetValues(row[rawKey]);
         });

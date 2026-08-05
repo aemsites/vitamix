@@ -1,6 +1,6 @@
 /* eslint-disable max-len */
 import {
-  fetchPlaceholders, loadCSS, loadScript, toClassName,
+  fetchPlaceholders, loadCSS, toClassName,
 } from '../../scripts/aem.js';
 import { formatPrice } from '../../scripts/scripts.js';
 import { loadFragment } from '../../blocks/fragment/fragment.js';
@@ -151,9 +151,36 @@ function getProductCallouts(product, copy) {
   return callouts.slice(0, 2);
 }
 
-function getReviewsId(product) {
-  const sku = product.sku || product.urlKey || product.title || '';
-  return toClassName(String(sku)).replace(/-/g, '');
+/**
+ * Builds a compact star-rating element from reviews.json data (reviewAverage/reviewCount),
+ * replacing the previous per-product Bazaarvoice inline_rating widget.
+ * @param {Object} product - Product with reviewAverage (0-5) and reviewCount
+ * @returns {HTMLElement}
+ */
+function createStarRating(product) {
+  const wrap = document.createElement('div');
+  wrap.className = 'product-list-widget-reviews';
+  const count = product.reviewCount || 0;
+  if (!count) return wrap;
+
+  const average = product.reviewAverage || 0;
+  const fillPercent = Math.max(0, Math.min(100, (average / 5) * 100));
+
+  const stars = document.createElement('span');
+  stars.className = 'product-list-widget-stars';
+  stars.setAttribute('role', 'img');
+  stars.setAttribute('aria-label', `${average} out of 5 stars`);
+  stars.innerHTML = `
+    <span class="product-list-widget-stars-track" aria-hidden="true">★★★★★</span>
+    <span class="product-list-widget-stars-fill" aria-hidden="true" style="width: ${fillPercent}%">★★★★★</span>
+  `;
+
+  const countEl = document.createElement('span');
+  countEl.className = 'product-list-widget-reviews-count';
+  countEl.textContent = `(${count})`;
+
+  wrap.append(stars, countEl);
+  return wrap;
 }
 
 function createProductImage() {
@@ -279,13 +306,6 @@ function createProductColors(product, onSelect) {
   return colors;
 }
 
-function createProductReviews(product) {
-  const wrap = document.createElement('div');
-  wrap.className = 'product-list-widget-reviews';
-  wrap.innerHTML = `<div data-bv-show="inline_rating" data-bv-product-id="${getReviewsId(product)}"></div>`;
-  return wrap;
-}
-
 function createProductBullets(product) {
   const bullets = product.bullets || [];
   if (!bullets.length) return document.createElement('div');
@@ -336,7 +356,7 @@ function createProductListCard(product, ph, copy, activeColorSlug) {
     updateCardImage(img, product, variant);
     setSelectedSwatch(colors, swatch.dataset.color);
   });
-  const reviews = createProductReviews(product);
+  const reviews = createStarRating(product);
   const bullets = createProductBullets(product);
   const price = createProductPrice(product, ph);
   const cta = createProductCta(product, copy);
@@ -616,13 +636,6 @@ function setDrawerInputsFromConfig(widget, filterConfig) {
   });
 }
 
-async function loadBazaarvoice(ph) {
-  if (window.bvCallback) return;
-  window.bvCallback = () => {};
-  const lang = ph.languageCode || 'en_US';
-  await loadScript(`https://apps.bazaarvoice.com/deployments/vitamix/main_site/production/${lang}/bv.js`);
-}
-
 /**
  * Decorates the product-list widget with lifestyle filters, facet UI, and enhanced product cards.
  * @param {HTMLElement} widget - Widget root element
@@ -682,6 +695,7 @@ export default async function decorate(widget) {
     featured: copy.featured,
     'price-desc': copy.priceHighToLow,
     'price-asc': copy.priceLowToHigh,
+    'reviews-desc': copy.reviewsHighToLow,
   };
   sortButtons.forEach((btn) => {
     btn.textContent = sortLabels[btn.dataset.sort] || btn.dataset.sort;
@@ -741,7 +755,6 @@ export default async function decorate(widget) {
     results.forEach((product) => {
       resultsEl.appendChild(createProductListCard(product, ph, copy, activeColorSlug));
     });
-    loadBazaarvoice(ph);
   };
 
   runSearch = async (filterConfig = getFilterConfig()) => {
@@ -752,6 +765,7 @@ export default async function decorate(widget) {
     const sorts = {
       'price-asc': (a, b) => Number(a.price) - Number(b.price),
       'price-desc': (a, b) => Number(b.price) - Number(a.price),
+      'reviews-desc': (a, b) => Number(b.reviewCount) - Number(a.reviewCount),
     };
     // 'featured' (Most Popular) keeps the row order from plp-data-{dataset}.json as-is.
     if (sorts[sortKey]) results.sort(sorts[sortKey]);

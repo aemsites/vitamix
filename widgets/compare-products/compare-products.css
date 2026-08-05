@@ -118,7 +118,42 @@
 }
 
 .compare-products-widget-reviews {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-60);
   margin-bottom: var(--spacing-100);
+  font-size: var(--body-size-xs, 0.75rem);
+}
+
+/* Fractional-fill star rating (from reviews.json), replacing the previous Bazaarvoice widget */
+.compare-products-widget-stars {
+  position: relative;
+  display: inline-block;
+  font-size: 0.9rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.compare-products-widget-stars-track,
+.compare-products-widget-stars-fill {
+  display: block;
+  letter-spacing: 1px;
+}
+
+.compare-products-widget-stars-track {
+  color: var(--color-gray-400);
+}
+
+.compare-products-widget-stars-fill {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  color: var(--color-blue, #1b64b4);
+}
+
+.compare-products-widget-reviews-count {
+  color: var(--color-gray-600);
 }
 
 .compare-products-widget-price {

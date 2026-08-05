@@ -1,5 +1,5 @@
 import {
-  fetchPlaceholders, loadCSS, loadScript, toClassName,
+  fetchPlaceholders, loadCSS, toClassName,
 } from '../../scripts/aem.js';
 import { formatPrice } from '../../scripts/scripts.js';
 import lookupProductListProducts, { getWidgetLocaleAndLanguage } from '../product-list/products.js';
@@ -71,11 +71,6 @@ function goToComparePaths(paths) {
 function findProductByPath(products, path) {
   const key = normalizePath(path);
   return products.find((product) => normalizePath(product.url) === key) || null;
-}
-
-function getReviewsId(product) {
-  const sku = product.sku || product.urlKey || product.title || '';
-  return toClassName(String(sku)).replace(/-/g, '');
 }
 
 function hasVariants(product) {
@@ -180,10 +175,35 @@ function createProductColors(product, onSelect) {
   return colors;
 }
 
-function createProductReviews(product) {
+/**
+ * Builds a compact star-rating element from reviews.json data (reviewAverage/reviewCount),
+ * replacing the previous per-product Bazaarvoice inline_rating widget.
+ * @param {Object} product - Product with reviewAverage (0-5) and reviewCount
+ * @returns {HTMLElement}
+ */
+function createStarRating(product) {
   const wrap = document.createElement('div');
   wrap.className = 'compare-products-widget-reviews';
-  wrap.innerHTML = `<div data-bv-show="inline_rating" data-bv-product-id="${getReviewsId(product)}"></div>`;
+  const count = product.reviewCount || 0;
+  if (!count) return wrap;
+
+  const average = product.reviewAverage || 0;
+  const fillPercent = Math.max(0, Math.min(100, (average / 5) * 100));
+
+  const stars = document.createElement('span');
+  stars.className = 'compare-products-widget-stars';
+  stars.setAttribute('role', 'img');
+  stars.setAttribute('aria-label', `${average} out of 5 stars`);
+  stars.innerHTML = `
+    <span class="compare-products-widget-stars-track" aria-hidden="true">★★★★★</span>
+    <span class="compare-products-widget-stars-fill" aria-hidden="true" style="width: ${fillPercent}%">★★★★★</span>
+  `;
+
+  const countEl = document.createElement('span');
+  countEl.className = 'compare-products-widget-reviews-count';
+  countEl.textContent = `(${count})`;
+
+  wrap.append(stars, countEl);
   return wrap;
 }
 
@@ -258,7 +278,7 @@ function buildProductCell(product, path, ph, copy, onRemove) {
   title.className = 'compare-products-widget-title';
   title.textContent = product.title || '';
 
-  const reviews = createProductReviews(product);
+  const reviews = createStarRating(product);
   const price = createProductPrice(product, ph);
   const cta = createProductCta(product, copy);
 
@@ -603,13 +623,6 @@ function renderAddTrigger(container, candidates, selectedPaths, ph, copy) {
   container.appendChild(trigger);
 }
 
-async function loadBazaarvoice(ph) {
-  if (window.bvCallback) return;
-  window.bvCallback = () => {};
-  const lang = ph.languageCode || 'en_US';
-  await loadScript(`https://apps.bazaarvoice.com/deployments/vitamix/main_site/production/${lang}/bv.js`);
-}
-
 /**
  * Decorates the compare-products widget: reads the `compare-products` query param, renders an
  * aligned comparison grid (sourced from the same plp-data-{dataset}.json + products index the
@@ -659,9 +672,5 @@ export default async function decorate(widget) {
     addSectionEl.innerHTML = '';
   } else {
     renderAddTrigger(addSectionEl, candidates, selectedPaths, ph, copy);
-  }
-
-  if (slots.some((slot) => slot.product)) {
-    loadBazaarvoice(ph);
   }
 }

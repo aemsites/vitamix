@@ -512,8 +512,41 @@ body.product-list-widget-drawer-open {
 }
 
 .product-list-widget .product-list-widget-reviews {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-60);
   min-height: 1.25rem;
   font-size: var(--body-size-xs, 0.75rem);
+}
+
+/* Fractional-fill star rating (from reviews.json), replacing the previous Bazaarvoice widget */
+.product-list-widget .product-list-widget-stars {
+  position: relative;
+  display: inline-block;
+  font-size: 0.9rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.product-list-widget .product-list-widget-stars-track,
+.product-list-widget .product-list-widget-stars-fill {
+  display: block;
+  letter-spacing: 1px;
+}
+
+.product-list-widget .product-list-widget-stars-track {
+  color: var(--color-gray-400);
+}
+
+.product-list-widget .product-list-widget-stars-fill {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  color: var(--color-blue, #1b64b4);
+}
+
+.product-list-widget .product-list-widget-reviews-count {
+  color: var(--color-blue, #1b64b4);
 }
 
 .product-list-widget .product-list-widget-bullets {
