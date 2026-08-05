@@ -344,7 +344,7 @@
 
 .compare-products-widget-modal-heading {
   margin: 0 var(--spacing-500) var(--spacing-200) 0;
-  font-size: var(--heading-font-size-m);
+  font-size: var(--heading-size-m);
 }
 
 .compare-products-widget-modal-search {
@@ -352,16 +352,28 @@
 }
 
 .compare-products-widget-modal-search input {
-  /* type="search" renders with native OS chrome (and its own box model) unless reset */
+  /* type="search" renders with native OS chrome (its own box model, pill shape, icons)
+     unless explicitly reset — the standard `appearance` alone isn't enough in Safari/Chrome. */
+  /* stylelint-disable-next-line property-no-vendor-prefix */
+  -webkit-appearance: none;
   appearance: none;
+  display: block;
   box-sizing: border-box;
   width: 100%;
-  padding: var(--spacing-150) var(--spacing-250);
+  margin: 0;
+  padding: var(--spacing-100) var(--spacing-300);
   border: var(--border-s) solid var(--color-gray-300);
   border-radius: var(--rounding-l, 10px);
   background-color: var(--color-gray-100, #f7f7f7);
+  color: var(--color-charcoal);
+  font-family: inherit;
   font-size: var(--body-size-m, 1rem);
-  transition: border-color 0.15s, background-color 0.15s;
+  line-height: 1.4;
+  transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
+}
+
+.compare-products-widget-modal-search input::placeholder {
+  color: var(--color-gray-600);
 }
 
 .compare-products-widget-modal-search input::-webkit-search-decoration,
@@ -369,6 +381,7 @@
 .compare-products-widget-modal-search input::-webkit-search-results-button,
 .compare-products-widget-modal-search input::-webkit-search-results-decoration {
   appearance: none;
+  display: none;
 }
 
 .compare-products-widget-modal-search input:hover {
@@ -379,6 +392,7 @@
   border-color: var(--color-charcoal);
   background-color: var(--color-background);
   outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-charcoal) 12%, transparent);
 }
 
 .compare-products-widget-modal-list {
@@ -392,7 +406,7 @@
 .compare-products-widget-modal-item {
   display: flex;
   align-items: center;
-  gap: var(--spacing-150);
+  gap: var(--spacing-100);
   width: 100%;
   padding: var(--spacing-100);
   border: none;
