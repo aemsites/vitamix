@@ -1,4 +1,7 @@
 import { getLocaleAndLanguage, getFormSubmissionUrl } from '../../scripts/scripts.js';
+import deriveOrderStatusKey from './order-status-state.js';
+
+export { default as deriveOrderStatusKey } from './order-status-state.js';
 
 /**
  * Loads localized order-status copy from the sibling `order-status.json`.
@@ -13,22 +16,6 @@ export async function loadOrderStatusCopy(lang) {
   const data = await resp.json();
   const key = data[lang] ? lang : 'en';
   return data[key];
-}
-
-/**
- * Derives a status key from the order-status API response.
- *
- * @param {Record<string, any>|null} result - Parsed API response
- * @returns {string} Status key matching a key in `result.statuses`
- */
-export function deriveOrderStatusKey(result) {
-  if (!result?.succeeded) return 'unavailable';
-  if (result.outcome === 'Cancelled') return 'cancelled';
-  const deliveries = result.order?.delivery ?? [];
-  const shippedCount = deliveries.filter((d) => d.shipped).length;
-  if (shippedCount === 0) return deliveries.length ? 'processed' : 'received';
-  if (shippedCount < deliveries.length) return 'partiallyShipped';
-  return 'shipped';
 }
 
 /**
