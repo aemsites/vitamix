@@ -184,7 +184,10 @@ function showCompareToast(message, options = {}) {
 }
 
 /**
- * Best-effort product thumbnail: the first variant's image, falling back to the product's own.
+ * Best-effort product thumbnail: the first variant's first image - the same image PDP and
+ * product-list (PLP) show as the product's primary/default image - falling back to the
+ * product's own top-level image (e.g. for PDP callers, which pass one directly with no
+ * `variants` array of their own).
  * @param {Object} product
  * @returns {string}
  */
@@ -323,7 +326,7 @@ export default async function addToCompare(product, options = {}) {
     setStoredCompareItems([...current, {
       url: product.url,
       title: product.title || '',
-      image: product.image || getProductThumb(product),
+      image: getProductThumb(product),
     }]);
     showCompareToast(options.addedMessage || DEFAULT_ADDED_MESSAGE, options);
     return true;
