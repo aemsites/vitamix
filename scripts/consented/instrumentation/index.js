@@ -24,6 +24,7 @@ import {
   isSearchResultsPage,
 } from './shared.js';
 import { trackScView } from './cart.js';
+import { guardDigitalDataPageType } from './page-context.js';
 
 export {
   configureAnalyticsTrackingServers,
@@ -32,6 +33,7 @@ export {
 export { getDeploymentEnv } from './shared.js';
 export { trackCartChange } from './cart.js';
 export { trackLogin } from './auth.js';
+export { initDigitalDataPage, syncDigitalDataPageContext } from './page-context.js';
 export { trackSocialEvents, resetSocialEventsState } from './social.js';
 
 /**
@@ -79,6 +81,7 @@ export async function initInstrumentation() {
   window.vitamixEdsAnalytics.instrumentationInitialized = true;
 
   debugLog('Adobe Analytics instrumentation loaded');
+  guardDigitalDataPageType();
 
   if (isPdpPage()) {
     const { trackProdView } = await import('./page-events.js');
