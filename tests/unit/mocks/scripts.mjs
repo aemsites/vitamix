@@ -67,4 +67,8 @@ export async function loggedFetch(...args) {
 
 export const FORMS_ENDPOINT = 'https://forms.example.test';
 
+export function getFormSubmissionUrl() {
+  return FORMS_ENDPOINT;
+}
+
 export const isProdHost = false;
