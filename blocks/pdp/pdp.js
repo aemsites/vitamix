@@ -95,12 +95,16 @@ function renderFAQ(ph) {
 function renderCompare(ph, custom) {
   const { locale, language } = getLocaleAndLanguage();
   const { entityId } = custom;
+  const comparisonLabel = ph.viewComparisonList || 'View Comparison List';
+  const comparisonLinkText = comparisonLabel.endsWith('.')
+    ? comparisonLabel
+    : `${comparisonLabel}.`;
   const compareContainer = document.createElement('div');
   compareContainer.classList.add('pdp-compare-container');
   compareContainer.innerHTML = `
     <div>
       <button class="pdp-compare-button">${ph.compare || 'Compare'}</button>
-      <a href="/${locale}/${language}/catalog/product_compare/index/" title="${ph.viewComparisonList || 'View Comparison List'}" class="comparelistlink">${ph.viewComparisonList || 'View Comparison List'}.</a>
+      <a href="/${locale}/${language}/catalog/product_compare/index/" title="${comparisonLabel}" class="comparelistlink">${comparisonLinkText}</a>
     </div>`;
 
   const compareButton = compareContainer.querySelector('.pdp-compare-button');
