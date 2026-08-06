@@ -82,6 +82,14 @@ export class Cart {
     }
   }
 
+  /**
+   * Flush any debounced writes to localStorage immediately. Call before a
+   * page navigation to avoid the race where the next page reads stale state.
+   */
+  flush() {
+    this.#persistNow();
+  }
+
   get items() {
     return this.#items;
   }

@@ -13,7 +13,7 @@ import {
  * - Cart stored in localStorage under `cart:${locale}` (e.g. cart:us, cart:ca)
  * - Schema: { version: 1, items: [...] }
  * - On desktop (≥900px): opens minicart popover (#minicart) after add-to-cart
- * - On mobile (<900px): minicart does not open; cart icon href navigates to /order/cart
+ * - On mobile (<900px): redirects to /order/cart after successful add-to-cart
  * - Default max quantity per SKU: 3; blocked adds silently re-enable the button
  * - Paid warranty tier stored as a hidden linked item (custom.linkedTo, local.showInCart: false)
  * - visibleItemCount excludes hidden items; cart badge tracks visibleItemCount
@@ -255,19 +255,51 @@ test.describe('Edge Checkout', () => {
     });
   });
 
-  // ─── Quantity limits ─────────────────────────────────────────────────────────
+  // ─── Mobile add-to-cart redirect ─────────────────────────────────────────────
 
-  // Mobile viewport prevents minicart from opening between clicks,
-  // which would otherwise block subsequent interactions.
-  test.describe('Quantity Limits', () => {
+  test.describe('Mobile Add-to-cart Redirect', () => {
     const productPath = '/us/en_us/products/ascent-x2';
 
     test.use({ viewport: { width: 390, height: 844 } });
 
-    // Helper: click add-to-cart and wait for the async operation to finish.
+    test('redirects to cart page after add-to-cart on mobile', async ({ page }) => {
+      await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
+      await waitForAddToCartButton(page);
+
+      const btn = page.locator('.quantity-container button');
+      await btn.click();
+
+      await page.waitForURL('**/order/cart', { timeout: 15000 });
+      expect(page.url()).toContain('/order/cart');
+
+      // Verify the item was persisted before the redirect
+      const cart = await getCart(page);
+      expect(cart).not.toBeNull();
+      expect(cart.items.length).toBeGreaterThanOrEqual(1);
+      console.log('✓ Mobile add-to-cart redirected to cart page with item persisted');
+    });
+  });
+
+  // ─── Quantity limits ─────────────────────────────────────────────────────────
+
+  // Quantity-limit tests run at desktop width so add-to-cart stays on the PDP
+  // (mobile redirects to the cart page, making multi-click flows impractical).
+  // Cart is pre-seeded via localStorage where needed to avoid repeated clicks.
+  test.describe('Quantity Limits @desktop', () => {
+    const productPath = '/us/en_us/products/ascent-x2';
+
+    test.use({ viewport: { width: 1280, height: 720 } });
+
+    // Helper: click add-to-cart and wait for the button to re-enable (desktop).
+    // Dismisses the minicart dialog afterwards so the next click isn't blocked.
     async function clickAndWait(btn, page) {
       await btn.click();
-      await expect(btn).not.toHaveAttribute('aria-disabled', 'true', { timeout: 5000 });
+      await expect(btn).not.toHaveAttribute('aria-disabled', 'true', { timeout: 10000 });
+      // Close the minicart dialog so it doesn't intercept the next click
+      await page.evaluate(() => {
+        const d = document.querySelector('#minicart');
+        if (d && d.open) d.close();
+      });
       await page.waitForTimeout(300);
     }
 
@@ -294,7 +326,7 @@ test.describe('Edge Checkout', () => {
       await clickAndWait(btn, page);
       await clickAndWait(btn, page);
 
-      // 4th click — allowedQty = 0, should return early
+      // 4th click — allowedQty = 0, should return early (no minicart opens)
       await btn.click();
       await expect(btn).not.toHaveAttribute('aria-disabled', 'true', { timeout: 5000 });
 
@@ -632,22 +664,31 @@ test.describe('Edge Checkout', () => {
 
   // ─── Add-to-cart behaviour ────────────────────────────────────────────────────
 
-  test.describe('Add-to-cart Behaviour', () => {
+  test.describe('Add-to-cart Behaviour @desktop', () => {
     const productPath = '/us/en_us/products/ascent-x2';
 
-    // Mobile viewport so minicart does not open between clicks.
-    test.use({ viewport: { width: 390, height: 844 } });
+    // Desktop viewport so add-to-cart stays on the PDP between clicks
+    // (mobile redirects to the cart page after each add).
+    test.use({ viewport: { width: 1280, height: 720 } });
+
+    async function clickAndWait(btn, page) {
+      await btn.click();
+      await expect(btn).not.toHaveAttribute('aria-disabled', 'true', { timeout: 10000 });
+      // Close the minicart dialog so it doesn't intercept the next click
+      await page.evaluate(() => {
+        const d = document.querySelector('#minicart');
+        if (d && d.open) d.close();
+      });
+      await page.waitForTimeout(300);
+    }
 
     test('adding the same item twice increments quantity, not a separate entry', async ({ page }) => {
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
       await waitForAddToCartButton(page);
 
       const btn = page.locator('.quantity-container button');
-      await btn.click();
-      await expect(btn).not.toHaveAttribute('aria-disabled', 'true', { timeout: 5000 });
-      await page.waitForTimeout(300);
-      await btn.click();
-      await expect(btn).not.toHaveAttribute('aria-disabled', 'true', { timeout: 5000 });
+      await clickAndWait(btn, page);
+      await clickAndWait(btn, page);
 
       await expect.poll(
         () => getCart(page).then((c) => c?.items?.[0]?.quantity ?? 0),
@@ -795,30 +836,37 @@ test.describe('Edge Checkout', () => {
     });
 
     test('removing one of two items decrements badge but keeps minicart open', async ({ page }) => {
-      // Use mobile so we can add two different products without the minicart blocking
+      // Use mobile so we can add two different products without the minicart blocking.
+      // On mobile, add-to-cart redirects to the cart page, so we wait for the
+      // redirect and verify localStorage before navigating to the next product.
       await page.setViewportSize({ width: 390, height: 844 });
 
-      // Add Ascent X2 and confirm it's in localStorage before navigating away
+      // Add Ascent X2 — mobile redirects to cart page after add
       await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
       await waitForAddToCartButton(page);
       await page.locator('.quantity-container button').click();
+      await page.waitForURL('**/order/cart', { timeout: 15000 });
       await expect.poll(
         () => getCart(page).then((c) => c?.items?.length ?? 0),
         { timeout: 10000, message: 'First item (Ascent X2) not added to cart' },
       ).toBe(1);
 
-      // Add simple product to get a second item and confirm both are persisted
+      // Add simple product to get a second item — also redirects to cart
       const simplePath = '/us/en_us/products/20-ounce-travel-cup';
       await page.goto(buildProductUrl(simplePath, currentBranch, { cart: 'edge' }));
       await waitForAddToCartButton(page);
       await page.locator('.quantity-container button').click();
+      await page.waitForURL('**/order/cart', { timeout: 15000 });
       await expect.poll(
         () => getCart(page).then((c) => c?.items?.length ?? 0),
         { timeout: 10000, message: 'Second item (Travel Cup) not added to cart' },
       ).toBe(2);
 
-      // Switch to desktop and open minicart via cart icon
+      // Switch to desktop and open minicart via cart icon.
+      // Navigate to the PDP first so the header with minicart is available.
       await page.setViewportSize({ width: 1280, height: 720 });
+      await page.goto(buildProductUrl(productPath, currentBranch, { cart: 'edge' }));
+      await waitForAddToCartButton(page);
       await page.locator(CART_LINK_SELECTOR).click();
 
       const minicart = page.locator('#minicart');

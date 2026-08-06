@@ -51,6 +51,16 @@ export function getLocaleAndLanguage(forceEnCA = false, bcp47 = false) {
   return { locale: loc, language };
 }
 
+/**
+ * Mirrors the real getOrderPath helper.
+ * @param {'cart'|'checkout'|'complete'|'cancel'} page
+ * @returns {string}
+ */
+export function getOrderPath(page) {
+  const { locale: loc, language } = getLocaleAndLanguage();
+  return `/${loc}/${language}/order/${page}`;
+}
+
 export async function loggedFetch(...args) {
   return fetch(...args);
 }
