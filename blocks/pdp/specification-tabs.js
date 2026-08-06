@@ -103,9 +103,11 @@ function createWarrantyContent(warranty, customWarranty) {
  */
 function createResourcesContent(ph, custom, productName) {
   const { resources, isCommercial } = custom;
+  const supportEmail = isCommercial ? 'commercial@vitamix.com' : 'service@vitamix.com';
   const supportPhone = isCommercial
     ? { label: '1.800.886.5235', link: 'tel:18008865235' }
     : { label: '1.800.848.2649', link: 'tel:18008482649' };
+  const emailIconMarkup = '<img class="icon" src="/icons/email.svg" alt="Email">';
   const phoneIconMarkup = '<img class="icon" src="/icons/phone.svg" alt="Phone">';
   const container = document.createElement('div');
   container.classList.add('resources-container');
@@ -143,7 +145,7 @@ function createResourcesContent(ph, custom, productName) {
   questions.innerHTML = `
     <h3>${ph.haveAQuestion || 'Have a question?'}</h3>
     <p>${ph.contactCustomerService || 'Contact customer service!'}</p>
-    <a href="mailto:service@vitamix.com"><img class="icon" src="/icons/email.svg" alt="Email">service@vitamix.com</a>
+    <a href="mailto:${supportEmail}">${emailIconMarkup}${supportEmail}</a>
     <a href="${supportPhone.link}">${phoneIconMarkup}${supportPhone.label}</a>
   `;
 
