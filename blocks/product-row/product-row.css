@@ -1,0 +1,224 @@
+@import url('../../styles/color-swatches.css');
+@import url('../../styles/product-badges.css');
+
+.product-row h3 a {
+  text-decoration: none;
+}
+
+.product-row:not(.carousel) {
+  padding: 0 26px;
+}
+
+.product-row:not(.carousel) > ul {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--spacing-l);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.product-row:not(.carousel) > ul > li {
+  flex: 0 0 100%;
+}
+
+@media (width >= 600px) {
+  .product-row:not(.carousel) > ul > li {
+    flex: 0 0 calc((100% - var(--spacing-l)) / 2);
+  }
+}
+
+@media (width >= 1000px) {
+  .product-row:not(.carousel) > ul > li {
+    flex: 0 0 calc((100% - (3 * var(--spacing-l))) / 4);
+  }
+}
+
+.product-row.carousel > ul {
+  display: grid;
+  grid-template-columns: 1fr;
+  overflow: visible;
+  scroll-snap-type: none;
+}
+
+.product-row.carousel nav {
+  display: none;
+}
+
+.product-row.carousel nav button.nav-arrow {
+  top: calc((100dvw - (2 * var(--carousel-gap))) / 2);
+}
+
+@media (width >= 600px) {
+  .product-row.carousel > ul {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .product-row.carousel nav button.nav-arrow {
+    top: calc((100dvw - (2 * var(--carousel-gap))) / 4);
+  }
+}
+
+@media (width >= 800px) {
+  .product-row.carousel > ul {
+    display: flex;
+    justify-content: safe center;
+    overflow: scroll clip;
+    scroll-behavior: auto;
+    scroll-snap-type: x mandatory;
+  }
+
+  .product-row.carousel nav {
+    display: block;
+  }
+
+  .product-row.carousel nav button.nav-arrow {
+    top: calc((100dvw - (2 * var(--carousel-gap))) / 6);
+  }
+}
+
+.product-row li.carousel-slide {
+  cursor: pointer;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.product-row .price p {
+  margin: 0;
+}
+
+.product-row .slide-image {
+  position: relative;
+}
+
+.product-row .slide-image > p {
+  margin: 0;
+}
+
+.product-row .slide-image picture,
+.product-row .slide-image img {
+  display: block;
+  border-radius: var(--rounding-m);
+}
+
+.product-row .slide-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-s);
+}
+
+.product-row .slide-footer {
+  margin-top: auto;
+}
+
+.product-row .slide-footer .button {
+  text-transform: uppercase;
+}
+
+.product-row .description {
+  padding: 0;
+  color: var(--color-charcoal);
+  list-style: none;
+}
+
+.product-row .product-badges {
+  position: absolute;
+  top: var(--spacing-60);
+  left: var(--spacing-60);
+}
+
+.product-row .colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-s);
+}
+
+.product-row .color-swatch {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--color-charcoal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  cursor: pointer;
+  background-color: var(--color-white);
+}
+
+.product-row .color-swatch-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.product-row .color-swatch-inner.color-swatch-oos::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom right,
+    transparent 42%,
+    #fff 43%,
+    #fff 46%,
+    #ff5216 47%,
+    #ff5216 53%,
+    #fff 54%,
+    #fff 57%,
+    transparent 58%
+  );
+}
+
+.product-row .star-rating {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-60);
+  min-height: 1.25rem;
+  font-size: var(--body-size-s);
+}
+
+.product-row .star-rating-stars {
+  position: relative;
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.product-row .star-rating-track,
+.product-row .star-rating-fill {
+  display: block;
+  letter-spacing: 1px;
+}
+
+.product-row .star-rating-track {
+  color: var(--color-gray-400);
+}
+
+.product-row .star-rating-fill {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  color: var(--color-blue);
+}
+
+.product-row .star-rating-count {
+  color: var(--color-blue);
+}
+
+.product-row .price {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-60);
+  font-weight: bold;
+}
+
+.product-row .price del {
+  margin-left: 0.5ch;
+  font-weight: var(--weight-regular);
+}
+
+.product-row .save {
+  white-space: nowrap;
+}
