@@ -8,13 +8,14 @@ const specificationTabsPath = resolve('blocks/pdp/specification-tabs.js');
  * Renders the production PDP tabs module in a browser and opens its Resources tab.
  *
  * @param {import('@playwright/test').Page} page Browser page used for the module rendering.
+ * @param {boolean} isCommercial Whether the rendered PDP is commercial.
  * @returns {Promise<void>} Resolves after the Resources tab has become active.
  */
-async function renderResourcesTab(page) {
+async function renderResourcesTab(page, isCommercial) {
   const source = await readFile(specificationTabsPath, 'utf8');
 
   await page.setContent('<main></main>');
-  await page.evaluate(async (moduleSource) => {
+  await page.evaluate(async ({ moduleSource, commercial }) => {
     const moduleUrl = URL.createObjectURL(
       new Blob([moduleSource], { type: 'text/javascript' }),
     );
@@ -26,31 +27,50 @@ async function renderResourcesTab(page) {
       const tabs = renderSpecs(
         { specifications: 'Specifications', resources: 'Resources' },
         specifications,
-        { options: [], resources: [] },
+        { isCommercial: commercial, options: [], resources: [] },
         'Test Blender',
       );
       document.querySelector('main').append(tabs);
     } finally {
       URL.revokeObjectURL(moduleUrl);
     }
-  }, source);
+  }, { moduleSource: source, commercial: isCommercial });
 
   await page.locator('.tab[data-target="resources"]').click();
   await expect(page.locator('#resources')).toHaveClass(/active/);
 }
 
+/**
+ * Checks the rendered Resources support callout for its expected contact details.
+ *
+ * @param {import('@playwright/test').Page} page Browser page containing the callout.
+ * @param {string} phoneLabel Expected visible phone number.
+ * @param {string} phoneLink Expected telephone link target.
+ * @returns {Promise<void>} Resolves after all support-link assertions pass.
+ */
+async function expectSupportPhone(page, phoneLabel, phoneLink) {
+  const callout = page.locator('.pdp-questions-container');
+  const phone = callout.locator('a[href^="tel:"]');
+
+  await expect(phone).toHaveText(phoneLabel);
+  await expect(phone).toHaveAttribute('href', phoneLink);
+  await expect(callout.locator('a[href="mailto:service@vitamix.com"]')).toHaveText(
+    'service@vitamix.com',
+  );
+}
+
+test(
+  'Resources support callout retains the household customer-service phone number',
+  async ({ page }) => {
+    await renderResourcesTab(page, false);
+    await expectSupportPhone(page, '1.800.848.2649', 'tel:18008482649');
+  },
+);
+
 test(
   'Resources support callout uses the commercial customer-service phone number',
   async ({ page }) => {
-    await renderResourcesTab(page);
-
-    const callout = page.locator('.pdp-questions-container');
-    const phone = callout.locator('a[href^="tel:"]');
-
-    await expect(phone).toHaveText('1.800.886.5235');
-    await expect(phone).toHaveAttribute('href', 'tel:18008865235');
-    await expect(callout.locator('a[href="mailto:service@vitamix.com"]')).toHaveText(
-      'service@vitamix.com',
-    );
+    await renderResourcesTab(page, true);
+    await expectSupportPhone(page, '1.800.886.5235', 'tel:18008865235');
   },
 );

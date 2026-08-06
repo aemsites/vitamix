@@ -98,12 +98,14 @@ function createWarrantyContent(warranty, customWarranty) {
  */
 /**
  * Creates the content for the Resources tab using the provided resources data.
- * @param {Array<Object>} resources - The resources array containing name, content-type, and URL.
+ * @param {Object} custom - PDP custom data containing resources and commercial status.
  * @returns {HTMLDivElement} The resources content container.
  */
-function createResourcesContent(ph, resources, productName) {
-  const commercialSupportPhone = '1.800.886.5235';
-  const commercialSupportPhoneLink = 'tel:18008865235';
+function createResourcesContent(ph, custom, productName) {
+  const { resources, isCommercial } = custom;
+  const supportPhone = isCommercial
+    ? { label: '1.800.886.5235', link: 'tel:18008865235' }
+    : { label: '1.800.848.2649', link: 'tel:18008482649' };
   const phoneIconMarkup = '<img class="icon" src="/icons/phone.svg" alt="Phone">';
   const container = document.createElement('div');
   container.classList.add('resources-container');
@@ -142,7 +144,7 @@ function createResourcesContent(ph, resources, productName) {
     <h3>${ph.haveAQuestion || 'Have a question?'}</h3>
     <p>${ph.contactCustomerService || 'Contact customer service!'}</p>
     <a href="mailto:service@vitamix.com"><img class="icon" src="/icons/email.svg" alt="Email">service@vitamix.com</a>
-    <a href="${commercialSupportPhoneLink}">${phoneIconMarkup}${commercialSupportPhone}</a>
+    <a href="${supportPhone.link}">${phoneIconMarkup}${supportPhone.label}</a>
   `;
 
   container.append(questions);
@@ -175,7 +177,7 @@ function createTabContent(ph, tab, specifications, standardWarranty, custom, pro
       }
       break;
     case 'resources':
-      content.appendChild(createResourcesContent(ph, custom.resources, productName));
+      content.appendChild(createResourcesContent(ph, custom, productName));
       break;
     default:
       break;
