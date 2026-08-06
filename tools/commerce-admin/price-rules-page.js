@@ -1363,9 +1363,10 @@ function togglePromotionSubmitDisabled(dlg, invalidCount) {
 
 /**
  * Validate every sale-line product against the catalog index entirely client-side: the product
- * path must exist and any `?color=` must be a real variant. Invalid rows are highlighted with a
- * reason and the submit button is disabled until they are fixed. Best-effort on index-load failure
- * (rows are left unmarked so a transient outage never blocks a save; the save-time resolver still
+ * path must be non-empty, must exist in the catalog, and any `?color=` must be a real variant.
+ * Invalid rows (including empty product paths) are highlighted with a reason and the submit
+ * button is disabled until they are fixed. Best-effort on index-load failure (rows with a path
+ * are left unmarked so a transient outage never blocks a save; the save-time resolver still
  * guards variant colors).
  *
  * @param {HTMLDialogElement} dlg
@@ -1376,13 +1377,14 @@ async function validatePromotionRows(dlg) {
     /** @type {HTMLInputElement | null} */ (tr.querySelector('.pr-promo-h-product'))?.value ?? '',
   ).trim();
   const entries = [...dlg.querySelectorAll('tr[data-pr-promo-line]')]
-    .map((tr) => ({ tr, url: productValueOf(tr), loc: '' }))
-    .filter((e) => e.url);
-  entries.forEach((e) => { e.loc = catalogLocaleFromVitamixProductUrl(e.url) || 'us/en_us'; });
+    .map((tr) => ({ tr, url: productValueOf(tr), loc: '' }));
+  entries.forEach((e) => {
+    e.loc = e.url ? (catalogLocaleFromVitamixProductUrl(e.url) || 'us/en_us') : '';
+  });
 
   /** @type {Map<string, import('./commerce-variant-color.js').VariantColorMaps>} */
   const mapsByLocale = new Map();
-  await Promise.all([...new Set(entries.map((e) => e.loc))].map(async (loc) => {
+  await Promise.all([...new Set(entries.map((e) => e.loc).filter(Boolean))].map(async (loc) => {
     try {
       mapsByLocale.set(loc, await buildVariantColorMapsForLocale(loc));
     } catch {
@@ -1393,18 +1395,22 @@ async function validatePromotionRows(dlg) {
   const market = promotionDialogMarketSafe(dlg);
   let invalid = 0;
   entries.forEach((e) => {
-    const maps = mapsByLocale.get(e.loc);
     let reason = '';
-    // Country mismatch is path-based, so it is checked first and works even if the index failed.
-    const rowCountry = countryKeyFromCatalogPath(productUrlToCatalogPath(e.url));
-    if (rowCountry && rowCountry !== market) {
-      reason = `Product is in market ${rowCountry.toUpperCase()}, but this promotion is for ${market.toUpperCase()}.`;
-    } else if (maps) {
-      const color = colorFromProductUrl(e.url);
-      if (!maps.productExists(e.url)) {
-        reason = 'Product not found in the catalog.';
-      } else if (color && !maps.skuForColor(e.url, colorSlugFromValue(color))) {
-        reason = `“${color}” is not a color variant of this product.`;
+    if (!e.url) {
+      reason = 'Product path is required.';
+    } else {
+      const maps = mapsByLocale.get(e.loc);
+      // Country mismatch is path-based, so it is checked first and works even if the index failed.
+      const rowCountry = countryKeyFromCatalogPath(productUrlToCatalogPath(e.url));
+      if (rowCountry && rowCountry !== market) {
+        reason = `Product is in market ${rowCountry.toUpperCase()}, but this promotion is for ${market.toUpperCase()}.`;
+      } else if (maps) {
+        const color = colorFromProductUrl(e.url);
+        if (!maps.productExists(e.url)) {
+          reason = 'Product not found in the catalog.';
+        } else if (color && !maps.skuForColor(e.url, colorSlugFromValue(color))) {
+          reason = `“${color}” is not a color variant of this product.`;
+        }
       }
     }
     setPromotionRowValidity(e.tr, reason);
