@@ -286,7 +286,7 @@ async function renderFreeGift() {
       .toLowerCase();
 
     const findGift = (giftList) => giftList.find((gift) => {
-      const today = new Date();
+      const today = window.simulateDate || new Date();
       // Null start = open-ended past, null end = open-ended future
       const afterStart = !gift.startDate || today >= gift.startDate;
       const beforeEnd = !gift.endDate || today <= gift.endDate;
