@@ -241,7 +241,7 @@
   display: none;
   position: fixed;
   inset: 0;
-  z-index: 10;
+  z-index: 302;
   background: rgb(0 0 0 / 50%);
 }
 

@@ -15,6 +15,7 @@ const LOCALES = [
   { path: 'us/en_us', bvLang: 'en_US' },
   { path: 'ca/en_us', bvLang: 'en_US' },
   { path: 'ca/fr_ca', bvLang: 'fr_CA' },
+  { path: 'mx/en_us', bvLang: 'en_US' },
   { path: 'mx/es_mx', bvLang: 'es_MX' },
 ];
 
