@@ -374,6 +374,7 @@ test.describe('PDP Integration Tests', () => {
         await expect(saleable.locator('.add-to-cart > p a')).toHaveText(/consult an expert/i);
         await expect(saleable.locator('.add-to-cart > p a')).toHaveAttribute('href', expertUrl);
         await expect(saleable).not.toHaveClass(/pdp-find-dealer/);
+        await expect(saleable.locator('.add-to-cart')).toHaveClass(/pdp-add-to-cart-with-dealer/);
         await expect(saleableDealerButton).not.toHaveClass(/emphasis/);
         const saleableCtaOrder = await saleable.locator('.add-to-cart').evaluate((container) => (
           [...container.children].map(({ tagName }) => tagName)

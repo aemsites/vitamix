@@ -286,6 +286,7 @@ export default function renderAddToCart(ph, block, parent) {
 
   // Saleable commercial products keep the dealer CTA as a secondary action.
   if (findDealer === 'Yes') {
+    addToCartContainer.classList.add('pdp-add-to-cart-with-dealer');
     appendFindDealerCta(ph, addToCartContainer, true);
   }
 
