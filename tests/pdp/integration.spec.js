@@ -41,6 +41,15 @@ test.describe('PDP Integration Tests', () => {
       await assertOptionElements(page);
     });
 
+    test('should render one terminal period in the comparison link', async ({ page }) => {
+      const productUrl = buildProductUrl(productPath, currentBranch);
+      await page.goto(productUrl);
+
+      const comparisonLink = page.locator('.pdp-compare-container .comparelistlink');
+      await expect(comparisonLink).toHaveText(/[^.]\.$/);
+      await expect(comparisonLink).not.toHaveText(/\.\.$/);
+    });
+
     test('should deeplink to Ascent X2 variant', async ({ page }) => {
       const productUrl = buildProductUrl(productPath, currentBranch, {
         color: 'polar-white',
