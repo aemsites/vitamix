@@ -30,6 +30,8 @@
     "bestSeller": "Best Seller",
     "bundleSave": "Bundle + Save",
     "exclusive": "Exclusive",
+    "topRated": "Top Rated",
+    "limitedEdition": "Limited Edition",
     "new": "New!",
     "noResults": "No products match your filters. Try adjusting your selections.",
     "results": "results"
@@ -65,6 +67,8 @@
     "bestSeller": "Meilleur vendeur",
     "bundleSave": "Ensemble + Économies",
     "exclusive": "Exclusif",
+    "topRated": "Les mieux notés",
+    "limitedEdition": "Édition limitée",
     "new": "Nouveau!",
     "noResults": "Aucun produit ne correspond à vos filtres. Essayez d'ajuster vos sélections.",
     "results": "résultats"
@@ -100,6 +104,8 @@
     "bestSeller": "Más vendido",
     "bundleSave": "Paquete + Ahorro",
     "exclusive": "Exclusivo",
+    "topRated": "Mejor valorado",
+    "limitedEdition": "Edición limitada",
     "new": "¡Nuevo!",
     "noResults": "Ningún producto coincide con sus filtros. Intente ajustar sus selecciones.",
     "results": "resultados"
