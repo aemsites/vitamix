@@ -296,29 +296,51 @@ function notifySessionExpired(skipAuthRedirect, quiet) {
   window.dispatchEvent(new CustomEvent('commerce-admin:sign-out'));
 }
 
+/** API base for an explicit env; falls back to the active-env base when unspecified. */
+function apiBaseForEnv(env) {
+  if (env === 'prod') return PRODUCTION_API_BASE;
+  if (env === 'stage') return STAGE_API_BASE;
+  return getApiBase();
+}
+
+/**
+ * @param {string} org
+ * @param {string} site
+ * @param {string} path
+ * @param {RequestInit & { skipAuthRedirect?: boolean, quiet?: boolean, env?: 'stage'|'prod' }}
+ *   [options]
+ *   `env` targets a specific environment (its base URL + its stored token) regardless of the active
+ *   selection — used by "Promote to Production" to write prod while the UI stays on staging. A
+ *   cross-env call never triggers the global sign-out (a prod-permission failure must not sign the
+ *   user out of staging); it just throws so the caller can surface the error.
+ */
 export async function apiFetch(org, site, path, options = {}) {
-  const { skipAuthRedirect, quiet, ...fetchOptions } = options;
-  const base = getApiBase();
+  const {
+    skipAuthRedirect, quiet, env: envOverride, ...fetchOptions
+  } = options;
+  const activeEnv = getApiEnvironment();
+  const env = envOverride === 'prod' || envOverride === 'stage' ? envOverride : activeEnv;
+  const crossEnv = env !== activeEnv;
+  const base = apiBaseForEnv(env);
   const targetUrl = `${base}/${org}/sites/${site}/${path}`;
   const fetchUrl = `${CORS_PROXY}${encodeURIComponent(targetUrl)}${CORS_KEY}`;
 
-  const env = getApiEnvironment();
   const raw = readAuthRaw(org, site, env);
   if (raw) {
     try {
       const parsed = JSON.parse(raw);
       if (parsed?.token && isAuthTokenExpired(parsed.token)) {
-        clearAuthState(org, site);
-        notifySessionExpired(skipAuthRedirect, quiet);
+        clearAuthStateForEnv(org, site, env);
+        if (!crossEnv) notifySessionExpired(skipAuthRedirect, quiet);
         throw new Error('Session expired');
       }
     } catch (err) {
       if (err?.message === 'Session expired') throw err;
-      clearAuthState(org, site);
+      clearAuthStateForEnv(org, site, env);
     }
   }
 
-  const auth = getAuthState(org, site);
+  const auth = getAuthStateForEnv(org, site, env);
 
   const headers = {
     'Content-Type': 'application/json',
@@ -332,7 +354,7 @@ export async function apiFetch(org, site, path, options = {}) {
   const method = String(fetchOptions.method || 'GET');
   const roles = Array.isArray(auth?.roles) ? auth.roles.join(',') : String(auth?.roles ?? '');
   const htmlOk = document.documentElement.classList.contains('commerce-admin-auth-ok');
-  console.log(`[commerce-admin] apiFetch method=${method} path=${path} apiEnv=${getApiEnvironment()} hasBearer=${Boolean(auth?.token)} htmlAuthOk=${htmlOk} roles=${roles}`);
+  console.log(`[commerce-admin] apiFetch method=${method} path=${path} apiEnv=${env} hasBearer=${Boolean(auth?.token)} htmlAuthOk=${htmlOk} roles=${roles}`);
 
   const response = await fetch(fetchUrl, {
     ...fetchOptions,
@@ -340,7 +362,7 @@ export async function apiFetch(org, site, path, options = {}) {
     credentials: 'omit',
   });
 
-  if (response.status === 401 && !skipAuthRedirect && !quiet) {
+  if (response.status === 401 && !skipAuthRedirect && !quiet && !crossEnv) {
     clearAuthState(org, site);
     notifySessionExpired(skipAuthRedirect, quiet);
     throw new Error('Unauthorized');

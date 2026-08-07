@@ -20,7 +20,8 @@
   min-width: 0;
 }
 
-/* Staging-only: promote entity to production (see commerce-promote-production.js) */
+/* Cross-env copy button: green = promote to prod (staging), blue = copy to staging (production).
+   See commerce-promote-production.js */
 .commerce-promote-production-btn {
   box-sizing: border-box;
   padding: 8px 14px;
@@ -50,6 +51,18 @@
   background: #14532d;
   border-color: #052e16;
   color: #fff;
+}
+
+/* Copy-to-Staging button: amber, matching the staging environment gradient (the promote-to-prod
+   button stays green to match production). See commerce-admin-chrome.css env header gradients. */
+.commerce-promote-production-btn-stage {
+  background: #8a5a0a;
+  border-color: #6b470c;
+}
+
+.commerce-promote-production-btn-stage:hover:not(:disabled) {
+  background: #6b470c;
+  border-color: #4d3208;
 }
 
 .commerce-detail-modal-header-actions {
@@ -126,4 +139,106 @@
 
 .coupons-detail-dialog > .coupons-modal-footer {
   flex-shrink: 0;
+}
+
+/* Cross-env copy dialog + JSON diff (commerce-promote-production.js).
+   Pin to the viewport: the shared .coupons-dialog base is position:relative and loads AFTER this
+   file, so we need the compound selector (higher specificity) to win and stop the modal from
+   tracking the body scroll offset. */
+.coupons-dialog.commerce-promote-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+}
+
+.commerce-promote-lead {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #44474a;
+}
+
+.commerce-promote-lead code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+}
+
+/* Footer status bar: status text on the left, actions on the right (like the edit dialog footer). */
+.commerce-promote-statusbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 18px 16px;
+  border-top: 1px solid #e1e3e5;
+  background: #fff;
+}
+
+.commerce-promote-status {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #44474a;
+}
+
+.commerce-promote-status.is-error {
+  color: #b42318;
+}
+
+.commerce-promote-status.is-success {
+  color: #166534;
+}
+
+.commerce-promote-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.cjd-diff {
+  margin: 0;
+  border: 1px solid #e1e3e5;
+  border-radius: 6px;
+  overflow: auto;
+  max-height: 46vh;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  background: #fff;
+}
+
+.cjd-diff.cjd-empty {
+  padding: 12px 14px;
+  color: #6d7175;
+}
+
+.cjd-line {
+  display: flex;
+  gap: 8px;
+  padding: 0 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.cjd-sign {
+  flex-shrink: 0;
+  width: 1ch;
+  color: #8c9196;
+  user-select: none;
+}
+
+.cjd-line.cjd-add {
+  background: #e7f6ec;
+}
+
+.cjd-line.cjd-add .cjd-sign {
+  color: #166534;
+}
+
+.cjd-line.cjd-del {
+  background: #fdecea;
+}
+
+.cjd-line.cjd-del .cjd-sign {
+  color: #b42318;
 }

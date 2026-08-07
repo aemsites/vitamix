@@ -7,7 +7,7 @@ import waitForCommerceAuthReady from './commerce-wait-auth-ready.js';
 import { apiFetch } from './commerce-otp-api.js';
 import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
 import { createDetailModalHeaderCloseAndJson } from './commerce-detail-modal-json.js';
-import { mountPromoteProductionInToolbar } from './commerce-promote-production.js';
+import { mountCrossEnvCopyInToolbar } from './commerce-promote-production.js';
 import { PB_ORG, PB_SITE } from './commerce-pbus-config.js';
 import {
   catalogPathToProductUrl,
@@ -3155,7 +3155,7 @@ function openCartRuleDetailModal(countryKey, ruleIndex) {
   };
   const toolbarMain = document.createElement('div');
   toolbarMain.className = 'commerce-detail-modal-toolbar-main';
-  mountPromoteProductionInToolbar(toolbarMain, {
+  mountCrossEnvCopyInToolbar(toolbarMain, {
     org: PB_ORG,
     site: PB_SITE,
     entityKind: 'cart-rule',
@@ -3744,7 +3744,7 @@ async function openPromotionDetailModal(countryKey, promoId) {
   };
   const toolbarMain = document.createElement('div');
   toolbarMain.className = 'commerce-detail-modal-toolbar-main';
-  mountPromoteProductionInToolbar(toolbarMain, {
+  mountCrossEnvCopyInToolbar(toolbarMain, {
     org: PB_ORG,
     site: PB_SITE,
     entityKind: 'promotion',

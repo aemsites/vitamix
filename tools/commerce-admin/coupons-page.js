@@ -13,7 +13,7 @@ import { apiFetch, getApiEnvironment, getAuthState } from './commerce-otp-api.js
 import waitForCommerceAuthReady from './commerce-wait-auth-ready.js';
 import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
 import { createDetailModalHeaderShell } from './commerce-detail-modal-json.js';
-import { mountPromoteProductionInToolbar } from './commerce-promote-production.js';
+import { mountCrossEnvCopyInToolbar } from './commerce-promote-production.js';
 import { PB_ORG, PB_SITE } from './commerce-pbus-config.js';
 import {
   commerceGroupBadgeHtml,
@@ -728,7 +728,7 @@ async function openCouponDetailModal() {
   const toolbarMain = document.createElement('div');
   toolbarMain.className = 'commerce-detail-modal-toolbar-main';
 
-  mountPromoteProductionInToolbar(toolbarMain, {
+  mountCrossEnvCopyInToolbar(toolbarMain, {
     org: PB_ORG,
     site: PB_SITE,
     entityKind: 'coupon',

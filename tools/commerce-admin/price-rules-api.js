@@ -213,13 +213,14 @@ export async function fetchCatalogPriceRules(org, site, fetchOptions) {
  * @param {CatalogPriceRulesDocument} body — must be `{ promotions: [...] }` per helix
  *   (not a JSON array).
  */
-export async function putCatalogPriceRules(org, site, body) {
+export async function putCatalogPriceRules(org, site, body, options = {}) {
   if (!body || typeof body !== 'object' || Array.isArray(body) || !Array.isArray(body.promotions)) {
     throw new Error('Catalog price rules PUT expects an object { promotions: Promotion[] }');
   }
   const resp = await apiFetch(org, site, 'price-rules/catalog', {
     method: 'PUT',
     body: JSON.stringify(body),
+    ...options,
   });
   if (!resp.ok) throw new Error(await readRespError(resp));
 }
@@ -259,8 +260,8 @@ export function normalizeCartRulesGetResponse(data) {
  * @param {string} site
  * @returns {Promise<CartPriceRulesDocument>}
  */
-export async function fetchCartPriceRules(org, site) {
-  const resp = await apiFetch(org, site, 'price-rules/cart', { method: 'GET' });
+export async function fetchCartPriceRules(org, site, options = {}) {
+  const resp = await apiFetch(org, site, 'price-rules/cart', { method: 'GET', ...options });
   if (!resp.ok) throw new Error(await readRespError(resp));
   const data = await resp.json();
   return normalizeCartRulesGetResponse(data);
@@ -272,7 +273,7 @@ export async function fetchCartPriceRules(org, site) {
  * @param {HelixCartPriceRule[] | CartPriceRulesDocument} body — array on the wire,
  *   or `{ rules }` for convenience
  */
-export async function putCartPriceRules(org, site, body) {
+export async function putCartPriceRules(org, site, body, options = {}) {
   const rules = Array.isArray(body) ? body : body?.rules;
   if (!Array.isArray(rules)) {
     throw new Error('Cart price rules PUT expects a JSON array of rules (or { rules: [...] })');
@@ -280,6 +281,7 @@ export async function putCartPriceRules(org, site, body) {
   const resp = await apiFetch(org, site, 'price-rules/cart', {
     method: 'PUT',
     body: JSON.stringify(rules),
+    ...options,
   });
   if (!resp.ok) throw new Error(await readRespError(resp));
 }
