@@ -19,10 +19,13 @@ export const ADMIN_URL = 'https://admin.da.live';
 export const AEM_ADMIN_URL = 'https://admin.hlx.page';
 
 // Translation service endpoint
-export const TRANSLATION_SERVICE_URL = 'https://translate.da.live/google';
+export const TRANSLATION_SERVICE_URL = 'https://translate.da.live/translate/google';
 
 // Path to the translation config spreadsheet within the repository
 export const CONFIG_PATH = '/.da/translate.json';
+
+// Default folder suggested by "load from folder" in app.html and rollout-app.html.
+export const DEFAULT_FOLDER_PATH = '/us/en_us';
 
 // Metadata fields that should be translated by default.
 // Additional fields can be added via the dt-metadata-fields sheet in CONFIG_PATH.

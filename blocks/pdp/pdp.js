@@ -100,6 +100,10 @@ function renderCompare(ph, jsonLdData) {
   const { entityId } = custom;
   const path = window.location.pathname;
   const widgetMode = useWidgetCompare();
+  const comparisonLabel = ph.viewComparisonList || 'View Comparison List';
+  const comparisonLinkText = comparisonLabel.endsWith('.')
+    ? comparisonLabel
+    : `${comparisonLabel}.`;
   const compareContainer = document.createElement('div');
   compareContainer.classList.add('pdp-compare-container');
   // The Magento compare index page only makes sense for the Magento server-side compare list.
