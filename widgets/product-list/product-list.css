@@ -150,42 +150,50 @@
   justify-self: end;
 }
 
-.product-list-widget .product-list-sort summary {
+/* Shared plain div/button dropdown (per-facet filter dropdowns + sort) - a custom listbox-button
+   widget with explicit JS-driven open/close state (see DROPDOWN_OPEN_CLASS in product-list.js)
+   instead of <details>/<summary>/<menu>, which some Chrome versions handle unreliably. */
+.product-list-widget .product-list-widget-dropdown-trigger {
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-60, 0.4rem);
-  list-style: none;
   cursor: pointer;
-  padding: 0.5rem 0.9rem;
+  padding: 0.3rem 0.9rem;
   border: 1px solid var(--color-gray-300, #ddd);
-  border-radius: 999px;
+  border-radius: var(--rounding-l, 10px);
   font-size: var(--body-size-s, 0.875rem);
   font-weight: var(--weight-medium, 500);
   color: var(--color-text);
   background-color: var(--color-background);
-  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
-.product-list-widget .product-list-sort summary:hover {
+.product-list-widget .product-list-widget-dropdown-trigger:hover {
   border-color: var(--color-gray-500, #999);
   background-color: var(--color-gray-100, #f5f5f5);
 }
 
-.product-list-widget .product-list-sort summary:focus-visible {
+.product-list-widget .product-list-widget-dropdown-trigger:focus-visible {
   outline: none;
   border-color: var(--color-blue, #1b64b4);
 }
 
-.product-list-widget .product-list-sort[open] summary {
+.product-list-widget .product-list-widget-dropdown-open .product-list-widget-dropdown-trigger {
   border-color: var(--color-charcoal);
   background-color: var(--color-gray-100, #f5f5f5);
 }
 
-.product-list-widget .product-list-sort summary::-webkit-details-marker {
-  display: none;
+.product-list-widget .product-list-widget-dropdown-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
-.product-list-widget .product-list-sort .product-list-widget-filter-dropdown-chevron {
+.product-list-widget .product-list-widget-dropdown-trigger:disabled:hover {
+  border-color: var(--color-gray-300, #ddd);
+  background-color: var(--color-background);
+}
+
+.product-list-widget .product-list-widget-dropdown-chevron {
   width: 0.8rem;
   height: 0.8rem;
   flex: none;
@@ -193,31 +201,27 @@
   transition: transform 0.15s ease;
 }
 
-.product-list-widget .product-list-sort[open] .product-list-widget-filter-dropdown-chevron {
+.product-list-widget .product-list-widget-dropdown-open .product-list-widget-dropdown-chevron {
   transform: rotate(180deg);
 }
 
-.product-list-widget .product-list-sort menu {
+.product-list-widget .product-list-widget-dropdown-menu {
   position: absolute;
   top: calc(100% + 8px);
-  right: 0;
   z-index: 20;
   min-width: 210px;
   margin: 0;
   padding: 0.4rem;
-  list-style: none;
-  border: 1px solid var(--color-gray-200, #eee);
+  border: 1px solid var(--color-gray-400, #ccc);
   border-radius: 12px;
   background: var(--color-background);
-  box-shadow: var(--shadow-default, 0 12px 28px rgb(0 0 0 / 14%));
 }
 
-/* stylelint-disable-next-line no-descending-specificity */
-.product-list-widget .product-list-sort menu li {
-  list-style: none;
+.product-list-widget .product-list-sort .product-list-widget-dropdown-menu {
+  right: 0;
 }
 
-.product-list-widget .product-list-sort menu button {
+.product-list-widget .product-list-widget-dropdown-option {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -235,15 +239,15 @@
   cursor: pointer;
 }
 
-.product-list-widget .product-list-sort menu button:hover,
-.product-list-widget .product-list-sort menu button:focus-visible {
+.product-list-widget .product-list-widget-dropdown-option:hover,
+.product-list-widget .product-list-widget-dropdown-option:focus-visible {
   outline: none;
-  background: var(--color-gray-100, #f5f5f5);
+  background: var(--color-gray-200, #f3f1eb);
 }
 
-.product-list-widget .product-list-sort menu button[aria-selected='true'] {
+.product-list-widget .product-list-widget-dropdown-option[aria-selected='true'] {
   font-weight: var(--weight-medium, 500);
-  background: var(--color-gray-100, #f5f5f5);
+  background: var(--color-gray-200, #f3f1eb);
 }
 
 /* Active filter tags */
@@ -658,78 +662,12 @@ body.product-list-widget-drawer-open {
     position: relative;
   }
 
-  .product-list-widget .product-list-widget-filter-dropdown summary {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--spacing-60, 0.4rem);
-    list-style: none;
-    cursor: pointer;
-    padding: 0.5rem 0.9rem;
-    border: 1px solid var(--color-gray-300, #ddd);
-    border-radius: 999px;
-    font-size: var(--body-size-s, 0.875rem);
-    font-weight: var(--weight-medium, 500);
-    color: var(--color-text);
-    background-color: var(--color-background);
-    transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
-  }
-
-  .product-list-widget .product-list-widget-filter-dropdown-disabled summary {
-    cursor: not-allowed;
-    opacity: 0.45;
-  }
-
-  .product-list-widget .product-list-widget-filter-dropdown summary:hover {
-    border-color: var(--color-gray-500, #999);
-    background-color: var(--color-gray-100, #f5f5f5);
-  }
-
-  .product-list-widget .product-list-widget-filter-dropdown-disabled summary:hover {
-    border-color: var(--color-gray-300, #ddd);
-    background-color: var(--color-background);
-  }
-
-  .product-list-widget .product-list-widget-filter-dropdown summary:focus-visible {
-    outline: none;
-    border-color: var(--color-blue, #1b64b4);
-  }
-
-  .product-list-widget .product-list-widget-filter-dropdown[open] summary {
-    border-color: var(--color-charcoal);
-    background-color: var(--color-gray-100, #f5f5f5);
-  }
-
-  .product-list-widget .product-list-widget-filter-dropdown summary::-webkit-details-marker {
-    display: none;
-  }
-
-  .product-list-widget .product-list-widget-filter-dropdown-chevron {
-    width: 0.8rem;
-    height: 0.8rem;
-    flex: none;
-    background: url('/blocks/plp/chevron-down.svg') center / contain no-repeat;
-    transition: transform 0.15s ease;
-  }
-
-  .product-list-widget .product-list-widget-filter-dropdown[open] .product-list-widget-filter-dropdown-chevron {
-    transform: rotate(180deg);
-  }
-
-  .product-list-widget .product-list-widget-filter-dropdown menu {
-    position: absolute;
-    top: calc(100% + 8px);
+  /* Desktop-only overrides for the shared plain div/button dropdown (see the base rules above) -
+     the filter dropdowns row is hidden below this breakpoint (the facet drawer is used instead). */
+  .product-list-widget .product-list-widget-filter-dropdown .product-list-widget-dropdown-menu {
     left: 0;
-    z-index: 20;
-    min-width: 220px;
     max-height: 300px;
     overflow-y: auto;
-    margin: 0;
-    padding: 0.4rem;
-    list-style: none;
-    border: 1px solid var(--color-gray-200, #eee);
-    border-radius: 12px;
-    background: var(--color-background);
-    box-shadow: var(--shadow-default, 0 12px 28px rgb(0 0 0 / 14%));
     animation: product-list-widget-dropdown-in 0.15s ease;
   }
 
@@ -743,36 +681,6 @@ body.product-list-widget-drawer-open {
       opacity: 1;
       transform: translateY(0);
     }
-  }
-
-  .product-list-widget .product-list-widget-filter-dropdown menu button {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    width: 100%;
-    box-sizing: border-box;
-    padding: 0.55rem 0.7rem;
-    border: 0;
-    border-radius: 8px;
-    background: transparent;
-    text-align: left;
-    font-size: var(--body-size-s, 0.875rem);
-    font-weight: var(--weight-regular, 400);
-    line-height: 1.3;
-    color: var(--color-text);
-    cursor: pointer;
-  }
-
-  .product-list-widget .product-list-widget-filter-dropdown menu button:hover {
-    background: var(--color-gray-200);
-  }
-  
-  .product-list-widget .product-list-widget-filter-dropdown menu button:focus {
-    outline: 1px var(--color-gray-400) solid;
-  }
-
-  .product-list-widget .product-list-widget-filter-dropdown menu button[aria-selected='true'] {
-    background: var(--color-gray-200);
   }
 
   .product-list-widget .product-list-widget-filter-dropdown-option-label {
