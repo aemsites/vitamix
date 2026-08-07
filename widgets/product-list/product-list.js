@@ -324,11 +324,23 @@ function createProductListCard(product, ph, copy, activeColorSlug) {
   return card;
 }
 
+/**
+ * Builds the initial filter config from the widget's authored defaults (dataset, set from the
+ * block's own href query params), then layers the live page URL's matching query params on top
+ * so a shared/bookmarked/reloaded link's filters are honored instead of silently dropped.
+ * @param {HTMLElement} widget
+ * @returns {Object}
+ */
 function buildInitialConfig(widget) {
   const config = {};
   Object.entries(widget.dataset).forEach(([key, value]) => {
     if (key === 'source' || !FILTER_PARAM_KEYS.includes(key)) return;
     config[key] = value;
+  });
+  const urlParams = new URLSearchParams(window.location.search);
+  FILTER_PARAM_KEYS.forEach((key) => {
+    const value = urlParams.get(key);
+    if (value) config[key] = value;
   });
   return config;
 }
@@ -528,18 +540,58 @@ function renderDrawerFacets(listEl, facets, filterConfig, copy, onChange) {
   });
 }
 
+/** Matches both the per-facet filter dropdowns and the sort dropdown - they share the same
+ *  <details>/<summary>/<menu> disclosure pattern and interaction wiring (see wireDropdowns). */
+const DROPDOWN_SELECTOR = '.product-list-widget-filter-dropdown, .product-list-sort';
+
+/**
+ * Closes every open dropdown (filter or sort) in `container` except `keep` (pass null for all).
+ * @param {HTMLElement} container
+ * @param {HTMLElement|null} keep
+ */
+function closeSiblingDropdowns(container, keep) {
+  container.querySelectorAll(`${DROPDOWN_SELECTOR}[open]`).forEach((details) => {
+    if (details !== keep) details.open = false;
+  });
+}
+
+function createFilterDropdownChevron() {
+  const chevron = document.createElement('span');
+  chevron.className = 'product-list-widget-filter-dropdown-chevron';
+  chevron.setAttribute('aria-hidden', 'true');
+  return chevron;
+}
+
+/**
+ * Renders the desktop toolbar's per-facet single-select dropdowns (a custom listbox-button
+ * widget built on <details>/<summary> for its native disclosure semantics, layered with
+ * listbox roles/aria-selected, roving-arrow-key navigation, click-outside/Escape-to-close and
+ * focus-follows-open, all wired once in decorate() via wireDropdowns()).
+ * @param {HTMLElement} container
+ * @param {Object} facets
+ * @param {Object} filterConfig
+ * @param {Object} copy
+ * @param {Function} onSelect
+ */
 function renderDropdownFilters(container, facets, filterConfig, copy, onSelect) {
   container.innerHTML = '';
   FACET_KEYS.forEach((key) => {
     const facetValues = Object.keys(facets[key] || {}).sort((a, b) => a.localeCompare(b));
     const isEmpty = facetValues.length === 0;
+    const selectedValue = (filterConfig[key] || '').trim();
 
     const details = document.createElement('details');
     details.className = 'product-list-widget-filter-dropdown';
+    details.dataset.facetKey = key;
     details.classList.toggle('product-list-widget-filter-dropdown-disabled', isEmpty);
 
     const summary = document.createElement('summary');
-    summary.textContent = copy[key] || FACET_LABELS[key] || key;
+    summary.setAttribute('aria-haspopup', 'listbox');
+    summary.setAttribute('aria-expanded', 'false');
+    const label = document.createElement('span');
+    label.className = 'product-list-widget-filter-dropdown-label';
+    label.textContent = copy[key] || FACET_LABELS[key] || key;
+    summary.append(label, createFilterDropdownChevron());
     if (isEmpty) {
       summary.setAttribute('aria-disabled', 'true');
       summary.addEventListener('click', (e) => e.preventDefault());
@@ -548,26 +600,109 @@ function renderDropdownFilters(container, facets, filterConfig, copy, onSelect) 
 
     if (!isEmpty) {
       const menu = document.createElement('menu');
+      menu.setAttribute('role', 'listbox');
+      menu.setAttribute('aria-label', copy[key] || FACET_LABELS[key] || key);
 
       facetValues.forEach((facetValue) => {
+        const isSelected = facetValue === selectedValue;
         const btn = document.createElement('button');
         btn.type = 'button';
+        btn.setAttribute('role', 'option');
+        btn.setAttribute('aria-selected', String(isSelected));
         if (key === 'color') btn.appendChild(createFacetSwatch(facetValue));
-        btn.append(`${facetValue} (${facets[key][facetValue]})`);
-        btn.addEventListener('click', () => onSelect(key, facetValue));
+        const optionLabel = document.createElement('span');
+        optionLabel.className = 'product-list-widget-filter-dropdown-option-label';
+        optionLabel.textContent = `${facetValue} (${facets[key][facetValue]})`;
+        btn.appendChild(optionLabel);
+        if (isSelected) {
+          const check = document.createElement('span');
+          check.className = 'product-list-widget-filter-dropdown-check';
+          check.setAttribute('aria-hidden', 'true');
+          check.textContent = '✓';
+          btn.appendChild(check);
+        }
+        btn.addEventListener('click', () => {
+          details.open = false;
+          onSelect(key, facetValue);
+        });
         menu.appendChild(btn);
       });
 
       details.appendChild(menu);
+
       details.addEventListener('toggle', () => {
+        summary.setAttribute('aria-expanded', String(details.open));
         if (!details.open) return;
-        container.querySelectorAll('.product-list-widget-filter-dropdown[open]').forEach((openDetails) => {
-          if (openDetails !== details) openDetails.open = false;
-        });
+        closeSiblingDropdowns(details.closest('.product-list-toolbar') || container, details);
+        // Move focus into the menu (onto the current value, or the first option), matching the
+        // standard listbox-button pattern - this fires for both mouse and keyboard opens, which
+        // is harmless for mouse users and essential for keyboard ones.
+        (menu.querySelector('[aria-selected="true"]') || menu.querySelector('button'))?.focus();
       });
     }
 
     container.appendChild(details);
+  });
+}
+
+/**
+ * Wires the toolbar dropdowns' interaction affordances once (not re-run on every search/render,
+ * since the filter dropdowns themselves are rebuilt on every re-render; the sort dropdown is
+ * static markup): click-outside-to-close, focus-leaves-to-close, and roving keyboard navigation
+ * (Arrow Up/Down, Home, End, Escape) within an open dropdown's option list. Covers both the
+ * per-facet filter dropdowns and the sort dropdown, which share the same markup pattern.
+ * @param {HTMLElement} container - .product-list-toolbar
+ */
+function wireDropdowns(container) {
+  document.addEventListener('click', (e) => {
+    if (container.contains(e.target)) return;
+    closeSiblingDropdowns(container, null);
+  });
+
+  container.addEventListener('focusout', (e) => {
+    const details = e.target.closest(DROPDOWN_SELECTOR);
+    if (!details || details.contains(e.relatedTarget)) return;
+    details.open = false;
+  });
+
+  container.addEventListener('keydown', (e) => {
+    const details = e.target.closest(DROPDOWN_SELECTOR);
+    if (!details) return;
+    const summary = details.querySelector('summary');
+    const options = [...details.querySelectorAll('menu button')];
+
+    if (e.target === summary) {
+      if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && options.length) {
+        e.preventDefault();
+        details.open = true;
+        options[e.key === 'ArrowDown' ? 0 : options.length - 1].focus();
+      } else if (e.key === 'Escape' && details.open) {
+        e.preventDefault();
+        details.open = false;
+      }
+      return;
+    }
+
+    const index = options.indexOf(e.target);
+    if (index === -1) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      options[(index + 1) % options.length].focus();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      options[(index - 1 + options.length) % options.length].focus();
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      options[0].focus();
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      options[options.length - 1].focus();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      details.open = false;
+      summary.focus();
+    }
   });
 }
 
@@ -604,11 +739,14 @@ export default async function decorate(widget) {
   loadCSS(`${window.hlx?.codeBasePath || ''}/widgets/product-list/product-list.css`);
   loadCSS(`${window.hlx?.codeBasePath || ''}/styles/color-swatches.css`);
 
+  const toolbar = widget.querySelector('.product-list-toolbar');
   const filtersTrigger = widget.querySelector('.product-list-filters-trigger');
   const filtersCount = widget.querySelector('.product-list-filters-count');
   const filterDropdowns = widget.querySelector('.product-list-filter-dropdowns');
   const countEl = widget.querySelector('#product-list-widget-results-count');
   const countLabel = widget.querySelector('.product-list-item-count-label');
+  const sortDetails = widget.querySelector('.product-list-sort');
+  const sortSummary = widget.querySelector('.product-list-sort summary');
   const sortLabel = widget.querySelector('.product-list-sort-label');
   const sortByEl = widget.querySelector('#product-list-widget-sortby');
   const sortButtons = widget.querySelectorAll('.product-list-sort menu button');
@@ -625,6 +763,18 @@ export default async function decorate(widget) {
   const emptyEl = widget.querySelector('.product-list-empty');
 
   if (!resultsEl) return;
+
+  if (toolbar) wireDropdowns(toolbar);
+
+  if (sortDetails && sortSummary) {
+    sortDetails.addEventListener('toggle', () => {
+      sortSummary.setAttribute('aria-expanded', String(sortDetails.open));
+      if (!sortDetails.open) return;
+      closeSiblingDropdowns(toolbar || sortDetails.parentElement, sortDetails);
+      const menu = sortDetails.querySelector('menu');
+      (menu?.querySelector('[aria-selected="true"]') || menu?.querySelector('button'))?.focus();
+    });
+  }
 
   filtersTrigger.querySelector('.product-list-filters-trigger-label').textContent = copy.filters;
   countLabel.textContent = copy.items;
@@ -644,6 +794,7 @@ export default async function decorate(widget) {
   };
   sortButtons.forEach((btn) => {
     btn.textContent = sortLabels[btn.dataset.sort] || btn.dataset.sort;
+    btn.setAttribute('aria-selected', String(btn.dataset.sort === (sortByEl.dataset.sort || 'featured')));
   });
 
   const lifestyleSection = widget.querySelector('.product-list-lifestyle');
@@ -725,6 +876,8 @@ export default async function decorate(widget) {
     btn.addEventListener('click', () => {
       sortByEl.textContent = btn.textContent;
       sortByEl.dataset.sort = btn.dataset.sort;
+      sortButtons.forEach((b) => b.setAttribute('aria-selected', String(b === btn)));
+      if (sortDetails) sortDetails.open = false;
       runSearch(getFilterConfig());
     });
   });
