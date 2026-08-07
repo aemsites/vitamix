@@ -248,9 +248,14 @@ function sendPurchaseAppMeasurementBeacon(transaction) {
   tracker.pageName = transaction.pageName;
   tracker.purchaseID = transaction.purchaseID;
   tracker.products = transaction.productString;
-  tracker.events = transaction.orderTotal
-    ? `purchase,event32=${transaction.orderTotal}`
-    : 'purchase';
+
+  const events = ['purchase'];
+  if (parseFloat(transaction.shippingRevenue) > 0) events.push(`event48=${transaction.shippingRevenue}`);
+  if (parseFloat(transaction.tax) > 0) events.push(`event49=${transaction.tax}`);
+  if (parseFloat(transaction.discountAmount) > 0) events.push(`event50=${transaction.discountAmount}`);
+  if (parseFloat(transaction.orderTotal) > 0) events.push(`event51=${transaction.orderTotal}`);
+  tracker.events = events.join(',');
+
   tracker.t();
   return true;
 }
