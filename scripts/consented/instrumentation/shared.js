@@ -25,16 +25,27 @@ export function hasMarketingConsent() {
 }
 
 const PROD_HOSTS = new Set(['vitamix.com', 'www.vitamix.com']);
+const STAGE_HOSTS = new Set(['test.vitamix.com']);
+const UAT_HOSTS = new Set(['uat.vitamix.com']);
 
 window.vitamixEdsAnalytics = window.vitamixEdsAnalytics || {};
 
 /**
  * Adobe Analytics report suite suffix (vitamix{env}).
  * EDS preview/local hosts use dev; vitamix.com uses prod.
- * @returns {'dev' | 'prod'}
+ * @returns {string}
  */
 export function getDeploymentEnv() {
-  return PROD_HOSTS.has(window.location.hostname) ? 'prod' : 'dev';
+  if (PROD_HOSTS.has(window.location.hostname)) {
+    return 'prod';
+  }
+  if (STAGE_HOSTS.has(window.location.hostname)) {
+    return 'stage';
+  }
+  if (UAT_HOSTS.has(window.location.hostname)) {
+    return 'uat';
+  }
+  return 'localhost';
 }
 
 /**

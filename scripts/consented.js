@@ -47,6 +47,8 @@ const chatbot = document.createElement('div');
 chatbot.id = 'chatbot-container';
 document.body.appendChild(chatbot);
 
+let metaPixelId = 2138559226702249;
+
 loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-chatbot.lc-dd65664b07118365206104c205ccc20e-lc.min.js');
 loadScript('https://www.vitamix.com/etc.clientlibs/core/wcm/components/commons/site/clientlibs/container.lc-0a6aff292f5cc42142779cde92054524-lc.min.js');
 
@@ -56,12 +58,29 @@ await loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clie
 configureAnalyticsTrackingServers();
 loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-base.lc-daf5b8dac79e9cf7cb1c0b30d8372e7a-lc.min.js');
 
-if (currentEnvironment.dataset.deploymentEnv === 'prod') {
-  // for production, use the production launch script
-  await loadScript('https://assets.adobedtm.com/launch-EN40f2d69539754c3ea73511e70c65c801.min.js');
-} else {
-  // for development, use the development launch script
-  await loadScript('https://assets.adobedtm.com/8639b8ee2552/0f7a35c4f04b/launch-EN10955306e5aa4722aaabcdd1910448ad-development.min.js');
+const launchConfigByEnv = {
+  prod: {
+    pixelId: 1597403650511067,
+    scriptUrl: 'https://assets.adobedtm.com/launch-EN40f2d69539754c3ea73511e70c65c801.min.js',
+  },
+  stage: {
+    pixelId: 1241297614751799,
+    scriptUrl: 'https://assets.adobedtm.com/8639b8ee2552/0f7a35c4f04b/launch-EN10955306e5aa4722aaabcdd1910448ad-development.min.js',
+  },
+  uat: {
+    pixelId: 1026941270048701,
+    scriptUrl: 'https://assets.adobedtm.com/8639b8ee2552/0f7a35c4f04b/launch-EN10955306e5aa4722aaabcdd1910448ad-development.min.js',
+  },
+  localhost: {
+    pixelId: 2138559226702249,
+    scriptUrl: 'https://assets.adobedtm.com/8639b8ee2552/0f7a35c4f04b/launch-EN10955306e5aa4722aaabcdd1910448ad-development.min.js',
+  },
+};
+
+const launchConfig = launchConfigByEnv[currentEnvironment.dataset.deploymentEnv];
+if (launchConfig) {
+  metaPixelId = launchConfig.pixelId;
+  await loadScript(launchConfig.scriptUrl);
 }
 
 // Re-apply tracker config after Launch creates late AppMeasurement instances.
@@ -133,7 +152,7 @@ n.queue=[];t=b.createElement(e);t.async=!0;
 t.src=v;s=b.getElementsByTagName(e)[0];
 s.parentNode.insertBefore(t,s)}(window,document,'script',
 'https://connect.facebook.net/en_US/fbevents.js');
-fbq('init', '1597403650511067');
+fbq('init', metaPixelId);
 fbq('track', 'PageView');
 
 // End Facebook Pixel Code

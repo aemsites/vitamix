@@ -367,6 +367,101 @@ export async function firePurchase(transaction = getPurchaseTransactionData()) {
 }
 
 /**
+ * @typedef {Object} MetaPurchasePayload
+ * @property {string} orderId - The unique identifier for the order.
+ * @property {string[]} contentIds - Array of purchased product IDs.
+ * @property {number} numItems - Total number of items in the purchase.
+ * @property {number} value - The total monetary value of the order.
+ * @property {string} currency - The currency code (e.g., 'USD').
+ */
+
+/**
+ * Build Meta Purchase payload from the same order-success snapshot used for Adobe.
+ * @param {ReturnType<typeof readOrderSuccessContext>} [context]
+ * @returns {MetaPurchasePayload|null}
+ */
+function buildMetaPurchasePayload(context = readOrderSuccessContext()) {
+  const summary = getOrderSuccessOrderSummary(context);
+  if (!summary?.orderId) {
+    return null;
+  }
+
+  const items = (summary.displayItems || [])
+    .map((item) => {
+      const rawPrice = item?.price?.final || item?.price || item?.unitPrice || 0;
+      const formattedPrice = Number(parseFloat(rawPrice).toFixed(2)) || 0;
+      return {
+        sku: String(item?.sku || '').trim(),
+        quantity: Number(item?.quantity || item?.qty || 0) || 0,
+        price: formattedPrice,
+      };
+    })
+    .filter((item) => item.sku && item.quantity > 0);
+
+  if (!items.length) {
+    return null;
+  }
+
+  const contentIds = items.map((item) => item.sku);
+  const numItems = items.reduce((sum, item) => sum + item.quantity, 0);
+  const value = Number(items
+    .reduce((sum, item) => sum + (item.price * item.quantity), 0)
+    .toFixed(2));
+
+  const currency = String(
+    context?.order?.currencyCode
+    || context?.preview?.currencyCode
+    || context?.order?.currency
+    || context?.preview?.currency
+    || 'USD',
+  );
+
+  return {
+    orderId: summary.orderId,
+    contentIds,
+    numItems,
+    value,
+    currency,
+  };
+}
+
+/**
+ * Fire Meta Purchase once per order ID using the existing order success snapshot.
+ * @param {ReturnType<typeof readOrderSuccessContext>} [context]
+ * @returns {void}
+ */
+export function fireMetaPurchase(context = readOrderSuccessContext()) {
+  if (!hasMarketingConsent()) {
+    return;
+  }
+
+  const payload = buildMetaPurchasePayload(context);
+  if (!payload?.orderId) {
+    debugWarn('Meta Purchase skipped: order data not available');
+    return;
+  }
+
+  const orderTrackingKey = `meta_purchase_${payload.orderId}`;
+  if (sessionStorage.getItem(orderTrackingKey)) {
+    debugLog('Meta Purchase skipped: order already tracked', payload.orderId);
+    return;
+  }
+  /* global fbq */
+  fbq('track', 'Purchase', {
+    content_type: 'product',
+    content_ids: payload.contentIds,
+    num_items: payload.numItems,
+    value: payload.value,
+    currency: payload.currency,
+  }, {
+    eventID: payload.orderId,
+  });
+
+  sessionStorage.setItem(orderTrackingKey, 'true');
+  debugLog('Meta Purchase fired', payload);
+}
+
+/**
  * Fire purchase once order-complete has resolved the confirmed order payload.
  * @param {object} context Analytics context from order-complete
  * @param {number} [attempt]
@@ -481,6 +576,7 @@ export function fireOrderConfirmTarget(params = getOrderConfirmTargetParams()) {
   }
 
   orderConfirmTargetFired = true;
+  fireMetaPurchase();
 }
 
 /**
