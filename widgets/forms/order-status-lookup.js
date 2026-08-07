@@ -16,15 +16,24 @@ export async function loadOrderStatusCopy(lang) {
 }
 
 /**
- * Derives a status key from the order-status API response.
+ * Derives the display status from the Forms API response.
+ *
+ * The Forms API calculates the authoritative Magento-compatible status and
+ * returns it as order.status. Delivery data remains a fallback while older
+ * Forms deployments are still in use.
  *
  * @param {Record<string, any>|null} result - Parsed API response
- * @returns {string} Status key matching a key in `result.statuses`
+ * @returns {string} Status key matching a key in the localized copy
  */
 export function deriveOrderStatusKey(result) {
   if (!result?.succeeded) return 'unavailable';
-  if (result.outcome === 'Cancelled') return 'cancelled';
-  const deliveries = result.order?.delivery ?? [];
+
+  const normalizedStatus = result.order?.status;
+  if (['received', 'processed', 'partiallyShipped', 'shipped', 'cancelled', 'unavailable'].includes(normalizedStatus)) {
+    return normalizedStatus;
+  }
+
+  const deliveries = [].concat(result.order?.delivery ?? []);
   const shippedCount = deliveries.filter((d) => d.shipped).length;
   if (shippedCount === 0) return deliveries.length ? 'processed' : 'received';
   if (shippedCount < deliveries.length) return 'partiallyShipped';
