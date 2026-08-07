@@ -2,6 +2,7 @@ import { getConfig, formatPrice } from '../../scripts/commerce-config.js';
 import { getOrder } from '../../scripts/commerce-api.js';
 import { logOperation, getCheckoutId, clearCheckoutId } from '../../scripts/operations-log.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import resolvePaymentFailureMessage from '../../scripts/payment-failure.js';
 
 export function normalizeTotalsDiscounts(discounts = []) {
   return discounts.filter((discount) => Math.abs(parseFloat(discount?.amount)) > 0);
@@ -73,7 +74,7 @@ export function calculateConfirmationTotal({
  *
  * Success: Chase / PayPal → API → redirect here with ?orderId=...
  * Cancel:  Chase / PayPal → API → redirect here with ?orderId=...&reason=...
- *   reason values: customer_cancelled | payment_failed | declined
+ *   reason values: customer_cancelled | payment_failed | declined | fraud_declined
  *
  * Order display data is fetched from the API using the orderId (URL) and the
  * email proof held in sessionStorage. A successful lookup gates the success UI:
@@ -115,9 +116,12 @@ export default async function decorate(block) {
     container.appendChild(heading);
 
     const msg = document.createElement('p');
-    msg.textContent = params.reason === 'customer_cancelled'
-      ? s.orderPaymentCancelled
-      : s.orderPaymentFailed;
+    msg.textContent = resolvePaymentFailureMessage(params.reason, {
+      customerCancelled: s.orderPaymentCancelled,
+      fraudDeclined: s.cancelFraudDeclined,
+      declined: s.orderPaymentFailed,
+      paymentFailed: s.orderPaymentFailed,
+    });
     container.appendChild(msg);
 
     const link = document.createElement('p');
