@@ -1,6 +1,7 @@
 import { getConfig } from '../../scripts/commerce-config.js';
 import { logOperation, getCheckoutId } from '../../scripts/operations-log.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import resolvePaymentFailureMessage from '../../scripts/payment-failure.js';
 
 /**
  * Order cancellation page block.
@@ -9,12 +10,11 @@ import { getLocaleAndLanguage } from '../../scripts/scripts.js';
  * after a user-initiated cancellation or a payment failure.
  *
  * Expected URL parameters:
- *   reason  – one of: customer_cancelled | payment_failed | declined
- *   message – optional human-readable message from the payment processor
+ *   reason  – one of: customer_cancelled | payment_failed | declined | fraud_declined
  *   orderId – optional, for display / future use
  *
  * Payment processors and what they send on cancel:
- *   Chase (card)  → reason=declined | payment_failed
+ *   Chase (card)  → reason=fraud_declined | payment_failed
  *   PayPal        → reason=customer_cancelled (user dismissed sheet)
  *                   reason=payment_failed     (processor error)
  *   Apple Pay     → reason=customer_cancelled (user cancelled sheet)
@@ -28,8 +28,6 @@ export default async function decorate(block) {
   const params = Object.fromEntries(new URLSearchParams(window.location.search).entries());
 
   const reason = params.reason || '';
-  const processorMessage = params.message || '';
-
   // This page is only reached when a processor redirects back after a cancel or
   // failure — log the redirect return and the failure (keep the checkoutId so a
   // retry stays correlated; don't clear it).
@@ -44,14 +42,12 @@ export default async function decorate(block) {
     reason: reason || 'payment_failed',
   });
 
-  let bodyText;
-  if (reason === 'customer_cancelled') {
-    bodyText = strings.cancelCustomerCancelled;
-  } else if (reason === 'declined') {
-    bodyText = strings.cancelDeclined;
-  } else {
-    bodyText = strings.cancelPaymentFailed;
-  }
+  const bodyText = resolvePaymentFailureMessage(reason, {
+    customerCancelled: strings.cancelCustomerCancelled,
+    fraudDeclined: strings.cancelFraudDeclined,
+    declined: strings.cancelDeclined,
+    paymentFailed: strings.cancelPaymentFailed,
+  });
 
   const container = document.createElement('div');
   container.className = 'order-cancel-result';
@@ -69,14 +65,6 @@ export default async function decorate(block) {
   msg.className = 'order-cancel-reason';
   msg.textContent = bodyText;
   container.appendChild(msg);
-
-  // Show the processor's own message when present and different from our mapped text.
-  if (processorMessage && processorMessage !== bodyText) {
-    const detail = document.createElement('p');
-    detail.className = 'order-cancel-detail';
-    detail.textContent = processorMessage;
-    container.appendChild(detail);
-  }
 
   const actions = document.createElement('div');
   actions.className = 'order-cancel-actions';

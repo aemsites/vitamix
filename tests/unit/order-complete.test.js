@@ -6,9 +6,33 @@ import {
   cachedOrderMatches,
   resolveConfirmationOrder,
 } from '../../blocks/order-complete/order-complete.js';
+import resolvePaymentFailureMessage from '../../scripts/payment-failure.js';
 
 beforeEach(() => {
   globalThis.__resetTestState();
+});
+
+describe('resolvePaymentFailureMessage', () => {
+  const messages = {
+    customerCancelled: 'cancelled',
+    fraudDeclined: 'contact support',
+    declined: 'declined',
+    paymentFailed: 'payment failed',
+  };
+
+  test('maps fraud declines to neutral support copy', () => {
+    assert.equal(resolvePaymentFailureMessage('fraud_declined', messages), 'contact support');
+  });
+
+  test('preserves cancellation and legacy decline copy', () => {
+    assert.equal(resolvePaymentFailureMessage('customer_cancelled', messages), 'cancelled');
+    assert.equal(resolvePaymentFailureMessage('declined', messages), 'declined');
+  });
+
+  test('uses the safe payment fallback for payment failures and unknown reasons', () => {
+    assert.equal(resolvePaymentFailureMessage('payment_failed', messages), 'payment failed');
+    assert.equal(resolvePaymentFailureMessage('unexpected', messages), 'payment failed');
+  });
 });
 
 describe('calculateConfirmationTotal', () => {
