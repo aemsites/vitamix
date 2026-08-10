@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { isProfileIncomplete, buildProfileUpdate } from '../../blocks/header/auth-profile.js';
+import { isProfileIncomplete, buildProfileUpdate } from '../../scripts/customer-profile.js';
 
 // --- isProfileIncomplete -----------------------------------------------------
 
@@ -51,4 +51,12 @@ test('buildProfileUpdate: omits empty name fields so a partial PATCH cannot clea
   assert.equal('firstName' in body, false);
   assert.equal('lastName' in body, false);
   assert.deepEqual(body.custom, { plannedUse: 'business' });
+});
+
+test('buildProfileUpdate: includes phone only when the field is supplied', () => {
+  // profile step omits phone entirely
+  assert.equal('phone' in buildProfileUpdate({ firstName: 'Ada', lastName: 'Lovelace' }), false);
+  // account editor supplies phone (even empty, to allow clearing)
+  assert.equal(buildProfileUpdate({ firstName: 'Ada', lastName: 'Lovelace', phone: ' 555 ' }).phone, '555');
+  assert.equal(buildProfileUpdate({ firstName: 'Ada', lastName: 'Lovelace', phone: '' }).phone, '');
 });

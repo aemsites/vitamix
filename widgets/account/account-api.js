@@ -552,7 +552,7 @@ function buildInfoRowsFromCustomer(customer, fallbackEmail, labels = {}) {
  * @param {string} email
  * @param {Record<string, unknown>} copy
  */
-function applyCustomerToWidget(widget, customer, email, copy) {
+export function applyCustomerToWidget(widget, customer, email, copy) {
   const information = widget.querySelector('.account-panel[data-section="information"]');
   if (!information) return;
   const labels = /** @type {Record<string, string>} */ (copy.customerInfo || {});

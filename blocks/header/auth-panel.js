@@ -2,7 +2,7 @@ import createSlidePanel from '../../scripts/slide-panel.js';
 import { login, verifyCode } from '../../scripts/auth-api.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 import { getLoggedInCustomer, unwrapCustomerResponse, updateCustomer } from '../../widgets/account/account-api.js';
-import { isProfileIncomplete, buildProfileUpdate } from './auth-profile.js';
+import { isProfileIncomplete, buildProfileUpdate } from '../../scripts/customer-profile.js';
 
 // Kill-switch for the post-login "complete your profile" step. Set to false to
 // hide the step in production without reverting the code.
