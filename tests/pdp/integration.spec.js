@@ -698,7 +698,7 @@ test.describe('PDP Integration Tests', () => {
       {
         modal: false,
         smsOptin: true,
-        leadSource: 'sub-em-footer-us',
+        leadSource: 'sub-emsms-footer-us',
         pageUrl: '/us/en_us/products/20-ounce-travel-cup',
       },
       {
@@ -710,7 +710,7 @@ test.describe('PDP Integration Tests', () => {
       {
         modal: true,
         smsOptin: true,
-        leadSource: 'sub-em-modal-us',
+        leadSource: 'sub-emsms-modal-us',
         pageUrl: '/us/en_us/products/20-ounce-travel-cup',
       },
     ];

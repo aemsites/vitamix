@@ -7,7 +7,8 @@ import {
   renderAccountOrderList,
   unwrapPayload,
 } from './account-api.js';
-import { getFormSubmissionUrl, getLocaleAndLanguage, getLeadSource } from '../../scripts/scripts.js';
+import { getFormSubmissionUrl, getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { getLeadSource } from '../../scripts/lead-source.js';
 import { getUser, logout } from '../../scripts/auth-api.js';
 
 /** Select option value for sign out (not a content section). */
