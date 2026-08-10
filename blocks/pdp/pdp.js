@@ -107,7 +107,7 @@ function renderCompare(ph, jsonLdData) {
   const compareContainer = document.createElement('div');
   compareContainer.classList.add('pdp-compare-container');
   // The Magento compare index page only makes sense for the Magento server-side compare list.
-  const viewListLink = widgetMode ? '' : `<a href="/${locale}/${language}/catalog/product_compare/index/" title="${ph.viewComparisonList || 'View Comparison List'}" class="comparelistlink">${ph.viewComparisonList || 'View Comparison List'}.</a>`;
+  const viewListLink = widgetMode ? '' : `<a href="/${locale}/${language}/catalog/product_compare/index/" title="${comparisonLabel}" class="comparelistlink">${comparisonLinkText}</a>`;
   compareContainer.innerHTML = `
     <div>
       <button class="pdp-compare-button">${ph.compare || 'Compare'}</button>
