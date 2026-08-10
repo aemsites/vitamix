@@ -5,6 +5,7 @@ import {
 import { formatPrice } from '../../scripts/scripts.js';
 import { loadFragment } from '../../blocks/fragment/fragment.js';
 import addToCompare, { useWidgetCompare, isInStoredCompare, removeFromCompare } from '../../scripts/add-to-compare.js';
+import { createCallouts, createStarRating } from '../../scripts/product-badges.js';
 import lookupProductListProducts, { getWidgetLocaleAndLanguage, getFacetDefinitions } from './products.js';
 
 const LIFESTYLE_TILE_SELECTOR = '.block > div, .block > ul > li';
@@ -71,63 +72,6 @@ function hasVariants(product) {
   return product.variants && product.variants.length > 0;
 }
 
-function isOnSale(product) {
-  const regular = product.originalPrice || product.regularPrice;
-  return regular && product.price && Number(regular) > Number(product.price);
-}
-
-function getProductCallouts(product, copy) {
-  const callouts = [];
-  const collections = (product.collections || []).join(' ').toLowerCase();
-  const title = (product.title || '').toLowerCase();
-
-  if (isOnSale(product)) callouts.push({ type: 'sale', label: copy.sale });
-  if (collections.includes('new') || title.includes('new')) {
-    callouts.push({ type: 'new', label: copy.new });
-  }
-  if (collections.includes('bestseller') || title.includes('best seller')) {
-    callouts.push({ type: 'bestseller', label: copy.bestSeller });
-  }
-  if (title.includes('bundle') || collections.includes('bundle') || collections.includes('kitchen systems')) {
-    callouts.push({ type: 'bundle', label: copy.bundleSave });
-  }
-  if (collections.includes('exclusive')) callouts.push({ type: 'exclusive', label: copy.exclusive });
-
-  return callouts.slice(0, 2);
-}
-
-/**
- * Builds a compact star-rating element from reviews.json data (reviewAverage/reviewCount),
- * replacing the previous per-product Bazaarvoice inline_rating widget.
- * @param {Object} product - Product with reviewAverage (0-5) and reviewCount
- * @returns {HTMLElement}
- */
-function createStarRating(product) {
-  const wrap = document.createElement('div');
-  wrap.className = 'product-list-widget-reviews';
-  const count = product.reviewCount || 0;
-  if (!count) return wrap;
-
-  const average = product.reviewAverage || 0;
-  const fillPercent = Math.max(0, Math.min(100, (average / 5) * 100));
-
-  const stars = document.createElement('span');
-  stars.className = 'product-list-widget-stars';
-  stars.setAttribute('role', 'img');
-  stars.setAttribute('aria-label', `${average} out of 5 stars`);
-  stars.innerHTML = `
-    <span class="product-list-widget-stars-track" aria-hidden="true">★★★★★</span>
-    <span class="product-list-widget-stars-fill" aria-hidden="true" style="width: ${fillPercent}%">★★★★★</span>
-  `;
-
-  const countEl = document.createElement('span');
-  countEl.className = 'product-list-widget-reviews-count';
-  countEl.textContent = `(${count})`;
-
-  wrap.append(stars, countEl);
-  return wrap;
-}
-
 function createProductImage() {
   const wrap = document.createElement('div');
   wrap.className = 'product-list-widget-image-wrap';
@@ -165,18 +109,6 @@ function setSelectedSwatch(colorsEl, colorSlug) {
   colorsEl.querySelectorAll('.color-swatch').forEach((el) => {
     el.classList.toggle('selected', el.dataset.color === colorSlug);
   });
-}
-
-function createCallouts(product, copy) {
-  const wrap = document.createElement('div');
-  wrap.className = 'product-list-widget-callouts';
-  getProductCallouts(product, copy).forEach(({ type, label }) => {
-    const badge = document.createElement('span');
-    badge.className = `product-list-widget-callout product-list-widget-callout-${type}`;
-    badge.textContent = label;
-    wrap.appendChild(badge);
-  });
-  return wrap;
 }
 
 function createCompareButton(product, copy) {

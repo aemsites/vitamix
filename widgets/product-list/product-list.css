@@ -1,4 +1,5 @@
 @import url('../../styles/color-swatches.css');
+@import url('../../styles/product-badges.css');
 
 /* Product List Widget – enhanced product listing page */
 .product-list-widget {
@@ -469,36 +470,11 @@ body.product-list-widget-drawer-open {
   object-fit: contain;
 }
 
-.product-list-widget .product-list-widget-callouts {
+.product-list-widget .product-badges {
   position: absolute;
-  top: 0.5rem;
-  left: 0.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.product-list-widget .product-list-widget-callout {
-  display: inline-block;
-  padding: 0.25rem 0.5rem;
-  font-size: var(--detail-size-m, 0.75rem);
-  font-weight: var(--weight-medium, 600);
-  letter-spacing: var(--letter-spacing-s, 0.03em);
-  text-transform: uppercase;
-  color: var(--color-white);
-  background: var(--color-link);
-}
-
-.product-list-widget .product-list-widget-callout-sale {
-  background: var(--color-link);
-}
-
-.product-list-widget .product-list-widget-callout-new {
-  padding: var(--spacing-40) var(--spacing-60);
-  border-radius: 4px;
-  background-color: var(--color-red);
-  opacity: 0.9;
-  transition: opacity 0.2s;
+  top: var(--spacing-60);
+  left: var(--spacing-60);
+  width: 66%;
 }
 
 .product-list-widget .product-list-widget-compare-btn {
@@ -506,8 +482,9 @@ body.product-list-widget-drawer-open {
   top: 0.5rem;
   right: 0.5rem;
   border: 0;
-  padding: 0.35rem 0.5rem;
-  background: rgb(255 255 255 / 88%);
+  border-radius: 4px;
+  padding: var(--spacing-40) var(--spacing-60);
+  background-color: var(--color-gray-300);
   color: var(--color-text);
   font-size: var(--detail-size-m, 0.75rem);
   font-weight: var(--weight-regular, 400);
@@ -612,7 +589,7 @@ body.product-list-widget-drawer-open {
   );
 }
 
-.product-list-widget .product-list-widget-reviews {
+.product-list-widget .star-rating {
   display: flex;
   align-items: center;
   gap: var(--spacing-60);
@@ -621,7 +598,7 @@ body.product-list-widget-drawer-open {
 }
 
 /* Fractional-fill star rating (from reviews.json), replacing the previous per-product Bazaarvoice widget */
-.product-list-widget .product-list-widget-stars {
+.product-list-widget .star-rating-stars {
   position: relative;
   display: inline-block;
   font-size: 0.9rem;
@@ -629,24 +606,24 @@ body.product-list-widget-drawer-open {
   white-space: nowrap;
 }
 
-.product-list-widget .product-list-widget-stars-track,
-.product-list-widget .product-list-widget-stars-fill {
+.product-list-widget .star-rating-track,
+.product-list-widget .star-rating-fill {
   display: block;
   letter-spacing: 1px;
 }
 
-.product-list-widget .product-list-widget-stars-track {
+.product-list-widget .star-rating-track {
   color: var(--color-gray-400);
 }
 
-.product-list-widget .product-list-widget-stars-fill {
+.product-list-widget .star-rating-fill {
   position: absolute;
   inset: 0;
   overflow: hidden;
   color: var(--color-blue, #1b64b4);
 }
 
-.product-list-widget .product-list-widget-reviews-count {
+.product-list-widget .star-rating-count {
   color: var(--color-blue, #1b64b4);
 }
 

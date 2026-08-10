@@ -1,5 +1,6 @@
 /* eslint-disable max-len */
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { fetchReviewsData, getReviewsBySlug, slugFromUrl } from '../../scripts/product-badges.js';
 
 // Column-name overrides for the label derived from a "* Facet" column in plp-data.json.
 // Anything not listed here uses the column name with the trailing "Facet" stripped.
@@ -98,13 +99,6 @@ function pathnameFromUrl(rawUrl) {
   }
 }
 
-// Matching plp-data.json rows to products/index.json entries by full pathname is brittle:
-// plp-data.json Product URLs use a "/shop/" path while products/index.json rows may only carry
-// a "urlKey" that resolves to a "/products/" path. The trailing slug is stable across both.
-function slugFromUrl(rawUrl) {
-  return pathnameFromUrl(rawUrl).split('/').filter(Boolean).pop() || '';
-}
-
 /**
  * Fetches plp-data-{dataset}.json, the source of truth for which products are listed and
  * for every dynamically-discovered "* Facet" column.
@@ -118,38 +112,6 @@ async function fetchPlpData(locale, language, dataset) {
   if (!resp.ok) return [];
   const json = await resp.json();
   return Array.isArray(json.data) ? json.data : [];
-}
-
-/**
- * Fetches reviews.json, the source of truth for each product's review count/average rating
- * (replaces the previous per-product Bazaarvoice inline widget lookup).
- * @param {string} locale
- * @param {string} language
- * @returns {Promise<Array<Object>>}
- */
-async function fetchReviewsData(locale, language) {
-  const resp = await fetch(`/${locale}/${language}/products/config/reviews.json`);
-  if (!resp.ok) return [];
-  const json = await resp.json();
-  return Array.isArray(json.data) ? json.data : [];
-}
-
-/**
- * Builds a slug -> { reviewCount, reviewAverage } lookup from reviews.json rows.
- * @param {Array<Object>} reviewsRows - Raw reviews.json rows (Path, Number of Reviews, Average Rating)
- * @returns {Object.<string, {reviewCount: number, reviewAverage: number}>}
- */
-function getReviewsBySlug(reviewsRows) {
-  const bySlug = {};
-  reviewsRows.forEach((row) => {
-    const slug = slugFromUrl((row.Path || '').trim());
-    if (!slug) return;
-    bySlug[slug] = {
-      reviewCount: parseInt(row['Number of Reviews'], 10) || 0,
-      reviewAverage: parseFloat(row['Average Rating']) || 0,
-    };
-  });
-  return bySlug;
 }
 
 /**
