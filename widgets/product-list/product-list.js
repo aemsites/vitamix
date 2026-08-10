@@ -228,7 +228,7 @@ function createProductCta(product, copy) {
   wrap.className = 'product-list-widget-cta button-container';
   const link = document.createElement('a');
   link.href = product.url || '#';
-  link.className = 'button';
+  link.className = 'button link';
   link.textContent = copy.shopNow;
   wrap.appendChild(link);
   return wrap;
