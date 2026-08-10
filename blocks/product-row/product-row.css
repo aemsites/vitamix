@@ -81,6 +81,7 @@
 .product-row li.carousel-slide {
   cursor: pointer;
   height: auto;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   position: relative;
@@ -102,6 +103,12 @@
 .product-row .slide-image img {
   display: block;
   border-radius: var(--rounding-m);
+}
+
+.product-row .slide-image img {
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  width: 100%;
 }
 
 .product-row .slide-body {
@@ -221,4 +228,48 @@
 
 .product-row .save {
   white-space: nowrap;
+}
+
+/* marketing slide */
+.product-row .carousel-slide.marketing .slide-image picture,
+.product-row .carousel-slide.marketing .slide-image img {
+  border-radius: 0;
+}
+
+.product-row .carousel-slide.marketing .slide-image img {
+  aspect-ratio: 3 / 4;
+}
+
+.product-row .carousel-slide.marketing .slide-body {
+  justify-content: center;
+  padding: var(--spacing-l);
+  background-color: var(--marketing-color, var(--color-charcoal));
+}
+
+.product-row .carousel-slide.marketing .slide-body > :first-child {
+  margin-top: 0;
+}
+
+.product-row .carousel-slide.marketing .slide-body > :last-child {
+  margin-bottom: 0;
+}
+
+.product-row .carousel-slide.marketing .slide-body.dark {
+  color: var(--color-white);
+}
+
+.product-row .carousel-slide.marketing .slide-body.light {
+  color: var(--color-charcoal);
+}
+
+.product-row .carousel-slide.marketing .slide-body.dark .button {
+  border-color: var(--color-white);
+  background-color: transparent;
+  color: var(--color-white);
+}
+
+.product-row .carousel-slide.marketing .slide-body.light .button {
+  border-color: var(--color-charcoal);
+  background-color: transparent;
+  color: var(--color-charcoal);
 }

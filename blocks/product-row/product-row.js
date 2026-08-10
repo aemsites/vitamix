@@ -277,6 +277,33 @@ function createShopNowButton(product, ph) {
 }
 
 /**
+ * Resolves an authored row's link (if any) to a product, or null if the row is not a product
+ * @param {HTMLElement} row - Row element containing image and body cells
+ * @returns {Promise<Object|null>} Resolved product, or null
+ */
+async function resolveRowProduct(row) {
+  const [, body] = row.children;
+  if (!body) return null;
+
+  const link = body.querySelector('a[href]');
+  if (!link) return null;
+
+  let pathname;
+  try {
+    pathname = new URL(link.href, window.location.origin).pathname;
+  } catch {
+    return null;
+  }
+
+  const [product] = await lookupProducts([pathname]);
+  if (!product) {
+    link.classList.add('linkchecker-invalid-link');
+    return null;
+  }
+  return product;
+}
+
+/**
  * Transforms one authored row into a styled slide populated with the resolved product's data.
  * @param {HTMLElement} row - Row element containing image and body cells
  * @param {Object} ph - Placeholder object with localized text/badge labels
@@ -284,23 +311,14 @@ function createShopNowButton(product, ph) {
  */
 async function styleRowAsSlide(row, ph) {
   const [image, body] = row.children;
-  if (!body) return;
+
+  const product = await resolveRowProduct(row);
+  if (!product) {
+    row.classList.add('marketing');
+    return;
+  }
 
   const link = body.querySelector('a[href]');
-  if (!link) return;
-
-  let pathname;
-  try {
-    pathname = new URL(link.href, window.location.origin).pathname;
-  } catch {
-    return;
-  }
-
-  const [product] = await lookupProducts([pathname]);
-  if (!product) {
-    link.classList.add('linkchecker-invalid-link');
-    return;
-  }
   link.parentElement.remove();
 
   const description = body.firstElementChild;
@@ -359,12 +377,48 @@ function classifySlideCells(row) {
 }
 
 /**
+ * Returns the perceived luminance (0-255) of an element's computed background color.
+ * @param {Element} el - Element with a resolved background-color
+ * @returns {number}
+ */
+function getLuminance(el) {
+  const [r, g, b] = getComputedStyle(el).backgroundColor.match(/\d+/g).map(Number);
+  return (r * 299 + g * 587 + b * 114) / 1000;
+}
+
+/**
+ * Finds a block variant matching a defined `--color-*` custom property.
+ * @param {HTMLElement} block - product-row block element
+ * @returns {string|undefined} Matching color token, if any
+ */
+function getMarketingColor(block) {
+  return [...block.classList].find(
+    (c) => getComputedStyle(document.documentElement).getPropertyValue(`--color-${c}`).trim(),
+  );
+}
+
+/**
+ * Sets the marketing tile's background to the block's color variant (or charcoal by default),
+ * then adds a `light`/`dark` class to the slide body so text stays readable against it.
+ * @param {HTMLElement} li - Marketing slide element, already inserted into the document
+ * @param {string} colorOverride - Color token matching a --color-* custom property, or undefined
+ */
+function applyMarketingColor(li, colorOverride) {
+  const body = li.querySelector(':scope > .slide-body');
+  if (!body) return;
+  body.style.setProperty('--marketing-color', `var(--color-${colorOverride || 'charcoal'})`);
+  const luminance = getLuminance(body);
+  body.classList.add(luminance > 128 ? 'light' : 'dark');
+}
+
+/**
  * Transforms each row into a styled slide and wraps them in a generic carousel block.
  * @param {HTMLElement} block - product-row block element with product rows
  * @param {Object} ph - Placeholder object with localized text/badge labels
+ * @param {string} colorOverride - Color token for marketing tiles, or undefined
  * @returns {Promise<void>}
  */
-async function buildProductRowCarousel(block, ph) {
+async function buildProductRowCarousel(block, ph, colorOverride) {
   const rows = [...block.children];
   await Promise.all(rows.map((row) => styleRowAsSlide(row, ph)));
 
@@ -379,6 +433,15 @@ async function buildProductRowCarousel(block, ph) {
   block.replaceWith(carousel);
   decorateBlock(carousel);
   await loadBlock(carousel);
+
+  const slides = [...carousel.querySelectorAll(':scope > ul > li.carousel-slide')];
+  rows.forEach((row, i) => {
+    if (row.classList.contains('marketing') && slides[i]) {
+      slides[i].classList.add('marketing');
+      applyMarketingColor(slides[i], colorOverride);
+    }
+  });
+
   wireSlideClicks(carousel);
 }
 
@@ -386,30 +449,38 @@ async function buildProductRowCarousel(block, ph) {
  * Transforms each row into a styled slide and lays them out in a static, non-scrolling grid.
  * @param {HTMLElement} block - product-row block element with product rows
  * @param {Object} ph - Placeholder object with localized text/badge labels
+ * @param {string} colorOverride - Color token for marketing tiles, or undefined
  * @returns {Promise<void>}
  */
-async function buildProductRowGrid(block, ph) {
+async function buildProductRowGrid(block, ph, colorOverride) {
   const rows = [...block.children];
   await Promise.all(rows.map((row) => styleRowAsSlide(row, ph)));
   rows.forEach(classifySlideCells);
 
   const ul = document.createElement('ul');
+  const marketingSlides = [];
 
   rows.forEach((row) => {
     const li = document.createElement('li');
     li.className = 'carousel-slide';
+    if (row.classList.contains('marketing')) {
+      li.classList.add('marketing');
+      marketingSlides.push(li);
+    }
     li.append(...row.children);
     ul.append(li);
   });
 
   block.replaceChildren(ul);
+  marketingSlides.forEach((li) => applyMarketingColor(li, colorOverride));
   wireSlideClicks(block);
 }
 
 export default async function decorate(block) {
   const { locale, language } = getLocaleAndLanguage();
   const ph = await fetchPlaceholders(`/${locale}/${language}/products/config`);
+  const colorOverride = getMarketingColor(block);
   const isCarousel = block.classList.contains('carousel');
-  if (isCarousel) await buildProductRowCarousel(block, ph);
-  else await buildProductRowGrid(block, ph);
+  if (isCarousel) await buildProductRowCarousel(block, ph, colorOverride);
+  else await buildProductRowGrid(block, ph, colorOverride);
 }
