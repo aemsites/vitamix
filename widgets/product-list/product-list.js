@@ -221,10 +221,15 @@ function createProductTitle(product) {
   return title;
 }
 
-function createProductColors(product, onSelect) {
+function createProductColors(product, copy, onSelect) {
   const colors = document.createElement('div');
   colors.className = 'product-list-colors';
   if (!hasVariants(product)) return colors;
+
+  const label = document.createElement('span');
+  label.className = 'product-list-widget-colors-label';
+  label.textContent = copy.colorOptions;
+  colors.appendChild(label);
 
   getSortedVariants(product).forEach((variant) => {
     const { color, availability } = variant;
@@ -253,7 +258,7 @@ function createProductColors(product, onSelect) {
 
 function createProductBullets(product) {
   const bullets = product.bullets || [];
-  if (!bullets.length) return document.createElement('div');
+  if (!bullets.length) return null;
   const list = document.createElement('ul');
   list.className = 'product-list-widget-bullets';
   bullets.forEach((text) => {
@@ -264,15 +269,24 @@ function createProductBullets(product) {
   return list;
 }
 
-function createProductPrice(product, ph) {
+function createProductPrice(product, ph, copy) {
   const price = document.createElement('p');
   price.className = 'product-list-widget-price';
-  price.textContent = product.price ? formatPrice(product.price, ph) : '';
+  if (!product.price) return price;
+
+  const label = document.createElement('span');
+  label.className = 'product-list-widget-price-label';
+  label.textContent = copy.startingAt;
+  const amount = document.createElement('span');
+  amount.className = 'product-list-widget-price-amount';
+  amount.textContent = formatPrice(product.price, ph);
+  price.append(label, amount);
+
   const regular = product.originalPrice || product.regularPrice;
   if (regular && Number(regular) > Number(product.price)) {
     const regularPrice = document.createElement('del');
     regularPrice.textContent = formatPrice(regular, ph);
-    price.append(' ', regularPrice);
+    amount.append(' ', regularPrice);
   }
   return price;
 }
@@ -282,8 +296,8 @@ function createProductCta(product, copy) {
   wrap.className = 'product-list-widget-cta button-container';
   const link = document.createElement('a');
   link.href = product.url || '#';
-  link.className = 'button emphasis';
-  link.textContent = copy.viewDetails;
+  link.className = 'button';
+  link.textContent = copy.shopNow;
   wrap.appendChild(link);
   return wrap;
 }
@@ -297,13 +311,13 @@ function createProductListCard(product, ph, copy, activeColorSlug) {
   imageWrap.append(createCallouts(product, copy), createCompareButton(product, copy));
 
   const title = createProductTitle(product);
-  const colors = createProductColors(product, (variant, swatch) => {
+  const colors = createProductColors(product, copy, (variant, swatch) => {
     updateCardImage(img, product, variant);
     setSelectedSwatch(colors, swatch.dataset.color);
   });
   const reviews = createStarRating(product);
   const bullets = createProductBullets(product);
-  const price = createProductPrice(product, ph);
+  const price = createProductPrice(product, ph, copy);
   const cta = createProductCta(product, copy);
 
   const initialVariant = findVariantBySlug(product, activeColorSlug)
@@ -312,7 +326,9 @@ function createProductListCard(product, ph, copy, activeColorSlug) {
   updateCardImage(img, product, initialVariant);
   if (initialVariant) setSelectedSwatch(colors, toClassName(initialVariant.color));
 
-  card.append(imageWrap, title, colors, reviews, bullets, price, cta);
+  card.append(imageWrap, title, colors, reviews);
+  if (bullets) card.appendChild(bullets);
+  card.append(price, cta);
 
   card.addEventListener('click', (e) => {
     if (e.target.closest('button, a.button')) return;

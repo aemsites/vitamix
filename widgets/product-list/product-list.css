@@ -245,6 +245,15 @@
   background: var(--color-gray-200, #f3f1eb);
 }
 
+.product-list-widget .product-list-widget-dropdown-option:focus {
+  box-shadow: none;
+}
+
+.product-list-widget .product-list-widget-dropdown-option:focus-visible {
+  outline: 2px solid var(--color-charcoal);
+  outline-offset: -2px;
+}
+
 .product-list-widget .product-list-widget-dropdown-option[aria-selected='true'] {
   font-weight: var(--weight-medium, 500);
   background: var(--color-gray-200, #f3f1eb);
@@ -435,32 +444,29 @@ body.product-list-widget-drawer-open {
   display: none;
 }
 
-/* Product cards */
+/* Product cards - align the listing with the product-card treatment used on the VX Series page. */
 .product-list-widget .product-list-widget-product-card {
-  width: calc(50% - var(--product-list-widget-gap) / 2);
+  width: 100%;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-200, 0.5rem);
-  padding: var(--spacing-200, 0.5rem);
-  border: 2px solid transparent;
-  border-radius: 4px;
+  gap: var(--spacing-60, 0.5rem);
+  padding: 0;
+  border: 0;
+  background: transparent;
   cursor: pointer;
-}
-
-.product-list-widget .product-list-widget-product-card:hover {
-  background: var(--color-gray-400, #f5f5f5);
-  border-color: var(--color-gray-500, #ccc);
 }
 
 .product-list-widget .product-list-widget-image-wrap {
   position: relative;
+  aspect-ratio: 1;
 }
 
 .product-list-widget .product-list-widget-image-wrap img {
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: contain;
 }
 
 .product-list-widget .product-list-widget-callouts {
@@ -475,16 +481,16 @@ body.product-list-widget-drawer-open {
 .product-list-widget .product-list-widget-callout {
   display: inline-block;
   padding: 0.25rem 0.5rem;
-  font-size: var(--body-size-xs, 0.75rem);
+  font-size: var(--detail-size-m, 0.75rem);
   font-weight: var(--weight-medium, 600);
-  letter-spacing: 0.03em;
+  letter-spacing: var(--letter-spacing-s, 0.03em);
   text-transform: uppercase;
   color: var(--color-white);
-  background: var(--overlay-charcoal, #333);
+  background: var(--color-link);
 }
 
 .product-list-widget .product-list-widget-callout-sale {
-  background: var(--color-charcoal);
+  background: var(--color-link);
 }
 
 .product-list-widget .product-list-widget-compare-btn {
@@ -492,14 +498,24 @@ body.product-list-widget-drawer-open {
   top: 0.5rem;
   right: 0.5rem;
   border: 0;
-  border-radius: 4px;
-  padding: 0.35rem 0.75rem;
-  background-color: var(--color-gray-300);
+  padding: 0.35rem 0.5rem;
+  background: rgb(255 255 255 / 88%);
   color: var(--color-text);
-  font-size: var(--body-size-xs, 0.75rem);
-  font-weight: var(--weight-light, 300);
+  font-size: var(--detail-size-m, 0.75rem);
+  font-weight: var(--weight-regular, 400);
   line-height: 1.2;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
   cursor: pointer;
+}
+
+.product-list-widget .product-list-widget-product-card:hover .product-list-widget-compare-btn,
+.product-list-widget .product-list-widget-product-card:focus-within .product-list-widget-compare-btn {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 /* Toggled on once a product is already in the compare-products widget's list (localStorage) */
@@ -509,15 +525,21 @@ body.product-list-widget-drawer-open {
 }
 
 .product-list-widget .product-list-widget-product-card h4 {
-  margin: 0;
+  margin: var(--spacing-100, 0.25rem) 0 0;
   font-family: var(--heading-font-family);
-  font-size: var(--body-size-m, 1rem);
-  min-height: 2.5rem;
+  font-size: var(--heading-size-l, 1.375rem);
+  font-weight: var(--weight-light, 300);
+  line-height: var(--line-height-s, 1.2);
 }
 
 .product-list-widget .product-list-widget-product-card h4 a {
-  color: inherit;
+  color: var(--color-gray);
   text-decoration: none;
+}
+
+.product-list-widget .product-list-widget-product-card h4 a:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
 }
 
 .product-list-widget .product-list-colors {
@@ -526,9 +548,16 @@ body.product-list-widget-drawer-open {
   gap: var(--spacing-100, 0.25rem);
 }
 
+.product-list-widget .product-list-widget-colors-label {
+  flex-basis: 100%;
+  font-size: var(--detail-size-m, 0.75rem);
+  letter-spacing: var(--letter-spacing-s, 0.083em);
+  text-transform: uppercase;
+}
+
 .product-list-widget .color-swatch {
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 2.25rem;
+  height: 2.25rem;
   padding: 0;
   border: 1px solid var(--color-charcoal);
   display: flex;
@@ -540,7 +569,7 @@ body.product-list-widget-drawer-open {
 }
 
 .product-list-widget .color-swatch.selected {
-  box-shadow: 0 0 0 2px var(--color-background), 0 0 0 4px var(--color-charcoal);
+  box-shadow: inset 0 0 0 2px var(--color-background), inset 0 0 0 4px var(--color-charcoal);
 }
 
 .product-list-widget .color-swatch.product-list-widget-facet-swatch {
@@ -580,10 +609,10 @@ body.product-list-widget-drawer-open {
   align-items: center;
   gap: var(--spacing-60);
   min-height: 1.25rem;
-  font-size: var(--body-size-xs, 0.75rem);
+  font-size: var(--detail-size-m, 0.75rem);
 }
 
-/* Fractional-fill star rating (from reviews.json), replacing the previous Bazaarvoice widget */
+/* Fractional-fill star rating (from reviews.json), replacing the previous per-product Bazaarvoice widget */
 .product-list-widget .product-list-widget-stars {
   position: relative;
   display: inline-block;
@@ -616,8 +645,7 @@ body.product-list-widget-drawer-open {
 .product-list-widget .product-list-widget-bullets {
   margin: 0;
   padding-left: 1.1rem;
-  font-size: var(--body-size-xs, 0.75rem);
-  color: var(--color-gray-700, #555);
+  font-size: var(--body-size-m, 1rem);
 }
 
 /* stylelint-disable-next-line no-descending-specificity */
@@ -626,24 +654,45 @@ body.product-list-widget-drawer-open {
 }
 
 .product-list-widget .product-list-widget-price {
-  margin: 0;
-  font-weight: var(--weight-medium, 600);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-60, 0.25rem);
+  margin: var(--spacing-100, 0.5rem) 0 0;
+}
+
+.product-list-widget .product-list-widget-price-label {
+  font-size: var(--detail-size-m, 0.75rem);
+  letter-spacing: var(--letter-spacing-s, 0.083em);
+  text-transform: uppercase;
+}
+
+.product-list-widget .product-list-widget-price-amount {
   font-size: var(--body-size-m, 1rem);
+  font-weight: 700;
 }
 
 .product-list-widget .product-list-widget-price del {
   margin-left: 0.5ch;
-  color: var(--color-gray-600, #666);
+  color: var(--color-gray);
   font-weight: var(--weight-regular, 400);
 }
 
 .product-list-widget .product-list-widget-cta {
-  margin-top: auto;
+  margin: auto 0 0;
+  padding-top: var(--spacing-200, 0.5rem);
 }
 
 .product-list-widget .product-list-widget-cta .button {
-  width: 100%;
+  width: auto;
   box-sizing: border-box;
+  border-color: var(--color-charcoal);
+  background-color: var(--color-white);
+  color: var(--color-text);
+}
+
+.product-list-widget .product-list-widget-cta .button:hover {
+  border-color: var(--color-red);
+  background-color: var(--color-gray-100);
 }
 
 @media (width >= 900px) {
@@ -700,25 +749,29 @@ body.product-list-widget-drawer-open {
   }
 }
 
+@media (width >= 600px) {
+  .product-list-widget .product-list-widget-product-card {
+    width: calc(50% - var(--product-list-widget-gap) / 2);
+  }
+
+  .product-list-widget .product-list-widget-product-card h4 {
+    min-height: 2.6rem;
+  }
+
+  .product-list-widget .product-list-colors {
+    min-height: 3.5rem;
+  }
+}
+
 @media (width >= 1200px) {
   .product-list-widget .product-list-widget-product-card {
     width: calc(25% - var(--product-list-widget-gap) * 0.75);
   }
 }
 
-@media (width >= 600px) and (width < 1200px) {
-  .product-list-widget .product-list-widget-product-card {
-    width: calc(33.333% - var(--product-list-widget-gap) * 0.667);
-  }
-}
-
-@media (width < 600px) {
-  .product-list-widget {
-    --product-list-widget-gap: var(--spacing-100, 0.25rem);
-  }
-
-  .product-list-widget .product-list-widget-product-card {
-    padding: 0;
-    border-width: 1px;
+@media (hover: none) {
+  .product-list-widget .product-list-widget-compare-btn {
+    opacity: 1;
+    pointer-events: auto;
   }
 }
