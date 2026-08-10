@@ -240,6 +240,11 @@
   object-position: center;
 }
 
+.banner.inset.contain .img-wrapper img,
+.banner.inset.contain .vid-wrapper video {
+  object-fit: contain;
+}
+
 @media (width >= 800px) {
   .banner.inset.square .img-wrapper img,
   .banner.inset.square .vid-wrapper video {

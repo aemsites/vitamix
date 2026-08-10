@@ -151,48 +151,113 @@
   justify-self: end;
 }
 
-.product-list-widget .product-list-sort summary {
-  list-style: none;
+/* Shared plain div/button dropdown (per-facet filter dropdowns + sort) - a custom listbox-button
+   widget with explicit JS-driven open/close state (see DROPDOWN_OPEN_CLASS in product-list.js)
+   instead of <details>/<summary>/<menu>, which some Chrome versions handle unreliably. */
+.product-list-widget .product-list-widget-dropdown-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-60, 0.4rem);
   cursor: pointer;
-  font-size: var(--body-size-s, 0.875rem);
-  border: 1px solid var(--color-gray-500, #888);
-  border-radius: 4px;
-  padding: 0.4rem 2rem 0.4rem 0.75rem;
-  background: url('/blocks/plp/chevron-down.svg') center right 0.5rem no-repeat;
-}
-
-.product-list-widget .product-list-sort summary::-webkit-details-marker {
-  display: none;
-}
-
-.product-list-widget .product-list-sort menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
-  z-index: 2;
-  min-width: 190px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
+  padding: 0.3rem 0.9rem;
   border: 1px solid var(--color-gray-300, #ddd);
-  border-radius: 4px;
-  background: var(--color-background);
-  box-shadow: 0 2px 5px var(--overlay-light, rgb(0 0 0 / 10%));
+  border-radius: var(--rounding-l, 10px);
+  font-size: var(--body-size-s, 0.875rem);
+  font-weight: var(--weight-medium, 500);
+  color: var(--color-text);
+  background-color: var(--color-background);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
-.product-list-widget .product-list-sort menu button {
-  display: block;
+.product-list-widget .product-list-widget-dropdown-trigger:hover {
+  border-color: var(--color-gray-500, #999);
+  background-color: var(--color-gray-100, #f5f5f5);
+}
+
+.product-list-widget .product-list-widget-dropdown-trigger:focus-visible {
+  outline: none;
+  border-color: var(--color-blue, #1b64b4);
+}
+
+.product-list-widget .product-list-widget-dropdown-open .product-list-widget-dropdown-trigger {
+  border-color: var(--color-charcoal);
+  background-color: var(--color-gray-100, #f5f5f5);
+}
+
+.product-list-widget .product-list-widget-dropdown-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.product-list-widget .product-list-widget-dropdown-trigger:disabled:hover {
+  border-color: var(--color-gray-300, #ddd);
+  background-color: var(--color-background);
+}
+
+.product-list-widget .product-list-widget-dropdown-chevron {
+  width: 0.8rem;
+  height: 0.8rem;
+  flex: none;
+  background: url('/blocks/plp/chevron-down.svg') center / contain no-repeat;
+  transition: transform 0.15s ease;
+}
+
+.product-list-widget .product-list-widget-dropdown-open .product-list-widget-dropdown-chevron {
+  transform: rotate(180deg);
+}
+
+.product-list-widget .product-list-widget-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  z-index: 20;
+  min-width: 210px;
+  margin: 0;
+  padding: 0.4rem;
+  border: 1px solid var(--color-gray-400, #ccc);
+  border-radius: 12px;
+  background: var(--color-background);
+}
+
+.product-list-widget .product-list-sort .product-list-widget-dropdown-menu {
+  right: 0;
+}
+
+.product-list-widget .product-list-widget-dropdown-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   width: 100%;
-  padding: 0.5rem 0.75rem;
+  box-sizing: border-box;
+  padding: 0.55rem 0.7rem;
   border: 0;
-  border-bottom: 1px solid var(--color-gray-300, #ddd);
+  border-radius: 8px;
   background: transparent;
   text-align: left;
+  font-size: var(--body-size-s, 0.875rem);
+  font-weight: var(--weight-regular, 400);
+  line-height: 1.3;
+  color: var(--color-text);
   cursor: pointer;
 }
 
-.product-list-widget .product-list-sort menu button:hover {
-  background: var(--color-gray-200, #eee);
+.product-list-widget .product-list-widget-dropdown-option:hover,
+.product-list-widget .product-list-widget-dropdown-option:focus-visible {
+  outline: none;
+  background: var(--color-gray-200, #f3f1eb);
+}
+
+.product-list-widget .product-list-widget-dropdown-option:focus {
+  box-shadow: none;
+}
+
+.product-list-widget .product-list-widget-dropdown-option:focus-visible {
+  outline: 2px solid var(--color-charcoal);
+  outline-offset: -2px;
+}
+
+.product-list-widget .product-list-widget-dropdown-option[aria-selected='true'] {
+  font-weight: var(--weight-medium, 500);
+  background: var(--color-gray-200, #f3f1eb);
 }
 
 /* Active filter tags */
@@ -291,6 +356,7 @@
   border-top: 1px solid var(--color-gray-300, #ccc);
 }
 
+/* stylelint-disable-next-line no-descending-specificity */
 .product-list-widget .product-list-widget-facet-group summary {
   padding: 1rem 1.5rem 1rem 0;
   font-size: var(--body-size-s, 0.875rem);
@@ -302,6 +368,7 @@
   background: url('/blocks/plp/chevron-down.svg') center right / 1rem no-repeat;
 }
 
+/* stylelint-disable-next-line no-descending-specificity */
 .product-list-widget .product-list-widget-facet-group-disabled summary {
   color: var(--color-gray-400, #999);
   cursor: not-allowed;
@@ -378,32 +445,29 @@ body.product-list-widget-drawer-open {
   display: none;
 }
 
-/* Product cards */
+/* Product cards - align the listing with the product-card treatment used on the VX Series page. */
 .product-list-widget .product-list-widget-product-card {
-  width: calc(50% - var(--product-list-widget-gap) / 2);
+  width: 100%;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-200, 0.5rem);
-  padding: var(--spacing-200, 0.5rem);
-  border: 2px solid transparent;
-  border-radius: 4px;
+  gap: var(--spacing-60, 0.5rem);
+  padding: 0;
+  border: 0;
+  background: transparent;
   cursor: pointer;
-}
-
-.product-list-widget .product-list-widget-product-card:hover {
-  background: var(--color-gray-400, #f5f5f5);
-  border-color: var(--color-gray-500, #ccc);
 }
 
 .product-list-widget .product-list-widget-image-wrap {
   position: relative;
+  aspect-ratio: 1;
 }
 
 .product-list-widget .product-list-widget-image-wrap img {
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: contain;
 }
 
 .product-list-widget .product-badges {
@@ -422,10 +486,21 @@ body.product-list-widget-drawer-open {
   padding: var(--spacing-40) var(--spacing-60);
   background-color: var(--color-gray-300);
   color: var(--color-text);
-  font-size: var(--body-size-xs, 0.75rem);
-  font-weight: var(--weight-light, 300);
+  font-size: var(--detail-size-m, 0.75rem);
+  font-weight: var(--weight-regular, 400);
   line-height: 1.2;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
   cursor: pointer;
+}
+
+.product-list-widget .product-list-widget-product-card:hover .product-list-widget-compare-btn,
+.product-list-widget .product-list-widget-product-card:focus-within .product-list-widget-compare-btn {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 /* Toggled on once a product is already in the compare-products widget's list (localStorage) */
@@ -435,15 +510,21 @@ body.product-list-widget-drawer-open {
 }
 
 .product-list-widget .product-list-widget-product-card h4 {
-  margin: 0;
+  margin: var(--spacing-100, 0.25rem) 0 0;
   font-family: var(--heading-font-family);
-  font-size: var(--body-size-m, 1rem);
-  min-height: 2.5rem;
+  font-size: var(--heading-size-l, 1.375rem);
+  font-weight: var(--weight-light, 300);
+  line-height: var(--line-height-s, 1.2);
 }
 
 .product-list-widget .product-list-widget-product-card h4 a {
-  color: inherit;
+  color: var(--color-gray);
   text-decoration: none;
+}
+
+.product-list-widget .product-list-widget-product-card h4 a:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
 }
 
 .product-list-widget .product-list-colors {
@@ -452,9 +533,16 @@ body.product-list-widget-drawer-open {
   gap: var(--spacing-100, 0.25rem);
 }
 
+.product-list-widget .product-list-widget-colors-label {
+  flex-basis: 100%;
+  font-size: var(--detail-size-m, 0.75rem);
+  letter-spacing: var(--letter-spacing-s, 0.083em);
+  text-transform: uppercase;
+}
+
 .product-list-widget .color-swatch {
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 2.25rem;
+  height: 2.25rem;
   padding: 0;
   border: 1px solid var(--color-charcoal);
   display: flex;
@@ -466,7 +554,7 @@ body.product-list-widget-drawer-open {
 }
 
 .product-list-widget .color-swatch.selected {
-  box-shadow: 0 0 0 2px var(--color-background), 0 0 0 4px var(--color-charcoal);
+  box-shadow: inset 0 0 0 2px var(--color-background), inset 0 0 0 4px var(--color-charcoal);
 }
 
 .product-list-widget .color-swatch.product-list-widget-facet-swatch {
@@ -506,10 +594,10 @@ body.product-list-widget-drawer-open {
   align-items: center;
   gap: var(--spacing-60);
   min-height: 1.25rem;
-  font-size: var(--body-size-xs, 0.75rem);
+  font-size: var(--detail-size-m, 0.75rem);
 }
 
-/* Fractional-fill star rating (from reviews.json), replacing the previous Bazaarvoice widget */
+/* Fractional-fill star rating (from reviews.json), replacing the previous per-product Bazaarvoice widget */
 .product-list-widget .star-rating-stars {
   position: relative;
   display: inline-block;
@@ -542,8 +630,7 @@ body.product-list-widget-drawer-open {
 .product-list-widget .product-list-widget-bullets {
   margin: 0;
   padding-left: 1.1rem;
-  font-size: var(--body-size-xs, 0.75rem);
-  color: var(--color-gray-700, #555);
+  font-size: var(--body-size-m, 1rem);
 }
 
 /* stylelint-disable-next-line no-descending-specificity */
@@ -552,24 +639,45 @@ body.product-list-widget-drawer-open {
 }
 
 .product-list-widget .product-list-widget-price {
-  margin: 0;
-  font-weight: var(--weight-medium, 600);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-60, 0.25rem);
+  margin: var(--spacing-100, 0.5rem) 0 0;
+}
+
+.product-list-widget .product-list-widget-price-label {
+  font-size: var(--detail-size-m, 0.75rem);
+  letter-spacing: var(--letter-spacing-s, 0.083em);
+  text-transform: uppercase;
+}
+
+.product-list-widget .product-list-widget-price-amount {
   font-size: var(--body-size-m, 1rem);
+  font-weight: 700;
 }
 
 .product-list-widget .product-list-widget-price del {
   margin-left: 0.5ch;
-  color: var(--color-gray-600, #666);
+  color: var(--color-gray);
   font-weight: var(--weight-regular, 400);
 }
 
 .product-list-widget .product-list-widget-cta {
-  margin-top: auto;
+  margin: auto 0 0;
+  padding-top: var(--spacing-200, 0.5rem);
 }
 
 .product-list-widget .product-list-widget-cta .button {
-  width: 100%;
+  width: auto;
   box-sizing: border-box;
+  border-color: var(--color-charcoal);
+  background-color: var(--color-white);
+  color: var(--color-text);
+}
+
+.product-list-widget .product-list-widget-cta .button:hover {
+  border-color: var(--color-red);
+  background-color: var(--color-gray-100);
 }
 
 @media (width >= 900px) {
@@ -588,68 +696,55 @@ body.product-list-widget-drawer-open {
     position: relative;
   }
 
-  .product-list-widget .product-list-widget-filter-dropdown summary {
-    list-style: none;
-    cursor: pointer;
-    padding: 0.35rem 1.5rem 0.35rem 0;
-    font-size: var(--body-size-s, 0.875rem);
-    font-weight: var(--weight-regular, 400);
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--color-text);
-    background: url('/blocks/plp/chevron-down.svg') center right / 1rem no-repeat;
-  }
-
-  .product-list-widget .product-list-widget-filter-dropdown-disabled summary {
-    cursor: not-allowed;
-    opacity: 0.5;
-  }
-
-  .product-list-widget .product-list-widget-filter-dropdown[open] summary {
-    background-image: none;
-  }
-
-  .product-list-widget .product-list-widget-filter-dropdown summary::-webkit-details-marker {
-    display: none;
-  }
-
-  .product-list-widget .product-list-widget-filter-dropdown menu {
-    position: absolute;
-    top: calc(100% + 4px);
+  /* Desktop-only overrides for the shared plain div/button dropdown (see the base rules above) -
+     the filter dropdowns row is hidden below this breakpoint (the facet drawer is used instead). */
+  .product-list-widget .product-list-widget-filter-dropdown .product-list-widget-dropdown-menu {
     left: 0;
-    z-index: 2;
-    min-width: 200px;
-    max-height: 280px;
+    max-height: 300px;
     overflow-y: auto;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    border: 1px solid var(--color-gray-300, #ddd);
-    border-radius: 4px;
-    background: var(--color-background);
-    box-shadow: 0 2px 5px var(--overlay-light, rgb(0 0 0 / 10%));
+    animation: product-list-widget-dropdown-in 0.15s ease;
   }
 
-  .product-list-widget .product-list-widget-filter-dropdown menu button {
-    display: flex;
-    align-items: center;
-    width: 100%;
-    padding: 0.6rem 0.9rem;
-    border: 0;
-    border-bottom: 1px solid var(--color-gray-200, #eee);
-    background: transparent;
-    text-align: left;
-    font-size: var(--body-size-s, 0.875rem);
-    font-weight: var(--weight-light, 300);
-    cursor: pointer;
+  @keyframes product-list-widget-dropdown-in {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
-  .product-list-widget .product-list-widget-filter-dropdown menu button:hover {
-    background: var(--color-gray-100, #f5f5f5);
+  .product-list-widget .product-list-widget-filter-dropdown-option-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .product-list-widget .product-list-widget-filter-dropdown-check {
+    margin-left: auto;
+    color: var(--color-charcoal);
+    font-weight: var(--weight-medium, 500);
   }
 
   .product-list-widget .product-list-item-count {
     text-align: center;
+  }
+}
+
+@media (width >= 600px) {
+  .product-list-widget .product-list-widget-product-card {
+    width: calc(50% - var(--product-list-widget-gap) / 2);
+  }
+
+  .product-list-widget .product-list-widget-product-card h4 {
+    min-height: 2.6rem;
+  }
+
+  .product-list-widget .product-list-colors {
+    min-height: 3.5rem;
   }
 }
 
@@ -659,19 +754,9 @@ body.product-list-widget-drawer-open {
   }
 }
 
-@media (width >= 600px) and (width < 1200px) {
-  .product-list-widget .product-list-widget-product-card {
-    width: calc(33.333% - var(--product-list-widget-gap) * 0.667);
-  }
-}
-
-@media (width < 600px) {
-  .product-list-widget {
-    --product-list-widget-gap: var(--spacing-100, 0.25rem);
-  }
-
-  .product-list-widget .product-list-widget-product-card {
-    padding: 0;
-    border-width: 1px;
+@media (hover: none) {
+  .product-list-widget .product-list-widget-compare-btn {
+    opacity: 1;
+    pointer-events: auto;
   }
 }

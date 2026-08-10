@@ -34,6 +34,7 @@
 
   /* reds */
   --color-red: #c03;
+  --color-very-berry: #921944;
   --color-candy-apple: #c00310;
   --color-candy-apple-red: #c00310;
   --color-ruby: #e01160;
@@ -47,9 +48,11 @@
 
   /* greens */
   --color-sour-apple-green: #e3edb5;
+  --color-emerald: #017864;
   --color-turquoise: #30d5c7;
 
   /* blues */
+  --color-willow-blue: #073a6f;
   --color-cobalt: #0047ab;
   --color-blue: #1131d4;
   --color-matte-navy: #00263e;

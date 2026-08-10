@@ -100,10 +100,14 @@ function renderCompare(ph, jsonLdData) {
   const { entityId } = custom;
   const path = window.location.pathname;
   const widgetMode = useWidgetCompare();
+  const comparisonLabel = ph.viewComparisonList || 'View Comparison List';
+  const comparisonLinkText = comparisonLabel.endsWith('.')
+    ? comparisonLabel
+    : `${comparisonLabel}.`;
   const compareContainer = document.createElement('div');
   compareContainer.classList.add('pdp-compare-container');
   // The Magento compare index page only makes sense for the Magento server-side compare list.
-  const viewListLink = widgetMode ? '' : `<a href="/${locale}/${language}/catalog/product_compare/index/" title="${ph.viewComparisonList || 'View Comparison List'}" class="comparelistlink">${ph.viewComparisonList || 'View Comparison List'}.</a>`;
+  const viewListLink = widgetMode ? '' : `<a href="/${locale}/${language}/catalog/product_compare/index/" title="${comparisonLabel}" class="comparelistlink">${comparisonLinkText}</a>`;
   compareContainer.innerHTML = `
     <div>
       <button class="pdp-compare-button">${ph.compare || 'Compare'}</button>
@@ -263,13 +267,18 @@ async function renderFreeGift() {
       const doc = new DOMParser().parseFromString(text, 'text/html');
       const gifts = doc.querySelector('.free-gifts');
       return [...gifts.children].map((gift) => {
-        const [startDateEl, endDateEl, minPrice, label, body] = gift.children;
+        const [startDateEl, endDateEl, minPrice, label, body, productSlugsEl] = gift.children;
         try {
           const minPriceText = minPrice.textContent.startsWith('$')
             ? minPrice.textContent.slice(1)
             : minPrice.textContent;
           const labelText = label.textContent;
           const bodyText = body.innerHTML.replaceAll('./media_', './config/media_');
+          // Optional trailing column: comma-separated product slugs. Absent/empty = all products.
+          const productSlugs = (productSlugsEl?.textContent || '')
+            .split(',')
+            .map((slug) => slug.trim().toLowerCase())
+            .filter(Boolean);
           return {
             valid: true,
             startDate: parseDateOrNull(startDateEl.textContent),
@@ -277,6 +286,7 @@ async function renderFreeGift() {
             minPrice: minPriceText,
             label: labelText,
             body: bodyText,
+            productSlugs,
           };
         } catch {
           // Skip rows with malformed dates
@@ -286,13 +296,17 @@ async function renderFreeGift() {
     };
 
     const gifts = await fetchGifts();
+    const productSlug = (window.location.pathname.split('/').filter(Boolean).pop() || '')
+      .toLowerCase();
 
     const findGift = (giftList) => giftList.find((gift) => {
-      const today = new Date();
+      const today = window.simulateDate || new Date();
       // Null start = open-ended past, null end = open-ended future
       const afterStart = !gift.startDate || today >= gift.startDate;
       const beforeEnd = !gift.endDate || today <= gift.endDate;
-      return afterStart && beforeEnd;
+      const slugMatches = !gift.productSlugs.length
+        || gift.productSlugs.includes(productSlug);
+      return afterStart && beforeEnd && slugMatches;
     });
     const gift = findGift(gifts);
     if (gift) {

@@ -16,10 +16,10 @@ async function loadWidgetCopy(lang) {
   return data[key] || {};
 }
 
-const MAX_DISTANCE = 200;
 const EVENTS_MAX_DISTANCE = 100;
 const MAX_DISTANCE_COMM = 1000;
 const maxDistanceHhDistributors = 1500;
+const MAX_DISTANCE_HH_RET = 1000;
 
 const hhRetailersResults = document.querySelector('#locator-hh-retailers-tabpanel');
 const hhDistributorsResults = document.querySelector('#locator-hh-distributors-tabpanel');
@@ -326,30 +326,35 @@ function findCommResults(
       .sort((a, b) => normLower(a.CITY).localeCompare(normLower(b.CITY)));
   }
 
-  const hasState = !!(stateShort || stateLong);
+  const hasState = Boolean(stateShort || stateLong);
+  const searchedStateShort = normLower(stateShort);
+  const searchedStateLong = normLower(stateLong);
 
-  let localRep = cleaned
-    .filter((i) => i.TYPE === 'LOCAL REP')
-    .filter((i) => {
+  const localRep = cleaned
+    .filter((item) => normLower(item.TYPE) === 'local rep')
+    .filter((item) => {
       if (hasState) {
+        const itemStateProvince = normLower(item.STATE_PROVINCE);
+        const itemStateName = normLower(item.STATE_NAME);
+
         return (
-          norm(i.STATE_PROVINCE) === norm(stateShort)
-          || norm(i.STATE_NAME) === norm(stateLong)
-          || norm(i.CITY) === norm(stateShort)
-          || norm(i.CITY) === norm(stateLong)
+          itemStateProvince === searchedStateShort
+        || itemStateProvince === searchedStateLong
+        || itemStateName === searchedStateShort
+        || itemStateName === searchedStateLong
         );
       }
 
       return (
-        norm(i.COUNTRY) === norm(countryShort)
-        || norm(i.COUNTRY) === norm(countryLong)
-        || norm(i.COUNTRY_CODE) === norm(countryShort)
-        || norm(i.COUNTRY_NAME) === norm(countryLong)
+        normLower(item.COUNTRY) === normLower(countryShort)
+      || normLower(item.COUNTRY) === normLower(countryLong)
+      || normLower(item.COUNTRY_CODE) === normLower(countryShort)
+      || normLower(item.COUNTRY_NAME) === normLower(countryLong)
       );
-    });
-  if (!localRep.length) {
-    localRep = cleaned.filter((i) => i.TYPE === 'LOCAL REP');
-  }
+    })
+    .sort(
+      (a, b) => normLower(a.NAME).localeCompare(normLower(b.NAME)),
+    );
 
   return { distributors, localRep };
 }
@@ -366,7 +371,7 @@ function findHHResults(data, location, countryShort, countryLong) {
 
   const retailers = cleaned
     .filter((i) => i.TYPE === 'RETAILERS'
-      && haversineDistance(location.lat, location.lng, i.lat, i.lng) <= MAX_DISTANCE)
+      && haversineDistance(location.lat, location.lng, i.lat, i.lng) <= MAX_DISTANCE_HH_RET)
     .sort((a, b) => haversineDistance(location.lat, location.lng, a.lat, a.lng)
       - haversineDistance(location.lat, location.lng, b.lat, b.lng));
 
@@ -470,7 +475,6 @@ function displayCommResults(results, labels = {}) {
       emailWrapper.append(emailLink);
       li.append(emailWrapper);
     }
-
     return li;
   };
 
@@ -517,7 +521,24 @@ function displayCommResults(results, labels = {}) {
 
       li.append(webWrapper);
     }
+    // Email
+    if (result.EMAIL) {
+      const emailWrapper = document.createElement('span');
+      emailWrapper.classList.add('locator-email');
 
+      const emailLabel = document.createElement('strong');
+      emailLabel.textContent = labels.email ?? 'Email: ';
+      emailWrapper.append(emailLabel);
+
+      const emailLink = document.createElement('a');
+      emailLink.href = `mailto:${result.EMAIL}`;
+      emailLink.textContent = result.EMAIL;
+      emailLink.target = '_blank';
+      emailLink.rel = 'noopener noreferrer';
+
+      emailWrapper.append(emailLink);
+      li.append(emailWrapper);
+    }
     return li;
   };
 
