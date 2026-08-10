@@ -107,11 +107,18 @@ async function readResponse(resp, options = {}) {
 export async function getLoggedInCustomer(customerEmail) {
   const url = getCustomerApiBase(customerEmail);
   const resp = await authFetch(url, { method: 'GET' });
+  // A 404 means the customer has no profile record yet (e.g. first login before
+  // any checkout). Return null so callers can distinguish "no record" from an
+  // actual customer, rather than parsing the 404 error body as if it were data.
+  if (resp.status === 404) return null;
   return readResponse(resp);
 }
 
 /**
- * PUT update top-level customer profile fields (e.g. firstName, lastName, zipCode).
+ * PATCH the customer's own profile. Partial update: only the supplied first-class
+ * fields (firstName, lastName, phone) and `custom` attributes are changed; the
+ * email is taken from the path and must not be sent in the body. Creates the
+ * record if it does not exist yet.
  * @param {string} customerEmail
  * @param {Record<string, unknown>} body
  * @returns {Promise<unknown>}
@@ -119,7 +126,7 @@ export async function getLoggedInCustomer(customerEmail) {
 export async function updateCustomer(customerEmail, body) {
   const url = getCustomerApiBase(customerEmail);
   const resp = await authFetch(url, {
-    method: 'PUT',
+    method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
