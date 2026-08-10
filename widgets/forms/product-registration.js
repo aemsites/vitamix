@@ -1,4 +1,4 @@
-import { getFormSubmissionUrl, getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { getFormSubmissionUrl, getLocaleAndLanguage, getLeadSource } from '../../scripts/scripts.js';
 import getStatesProvincesOptions from './states-provinces.js';
 
 /**
@@ -166,6 +166,9 @@ export default async function decorate(widget) {
     const payload = Object.fromEntries(data.entries());
     payload.formId = `${locale}/${language}/product-registration`;
     payload.pageUrl = window.location.href;
+    // Registration doesn't offer an SMS-only path, so email is always treated as opted in.
+    const smsOptIn = payload.smsOptIn === 'yes';
+    payload.leadSource = getLeadSource('reg', (locale || 'us').toLowerCase(), { emailOptIn: true, smsOptIn });
 
     const submitButton = form.querySelector('button[type="submit"]');
     const buttonLabel = submitButton?.textContent;
