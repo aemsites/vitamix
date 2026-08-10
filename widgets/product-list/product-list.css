@@ -1,0 +1,791 @@
+@import url('../../styles/color-swatches.css');
+
+/* Product List Widget – enhanced product listing page */
+.product-list-widget {
+  --product-list-widget-gap: var(--spacing-400, 1rem);
+
+  padding: var(--spacing-400, 1rem) 0 var(--spacing-600, 2rem);
+}
+
+/* Shop by Lifestyle */
+.product-list-widget .product-list-lifestyle {
+  margin-bottom: var(--spacing-600, 2rem);
+}
+
+.product-list-widget .product-list-lifestyle-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--spacing-200, 0.5rem);
+  margin-bottom: var(--spacing-400, 1rem);
+}
+
+.product-list-widget .product-list-lifestyle-heading {
+  margin: 0;
+  font-family: var(--heading-font-family);
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-weight: var(--weight-regular, 400);
+}
+
+.product-list-widget .product-list-lifestyle-recommender {
+  color: var(--color-charcoal);
+  font-size: var(--body-size-s, 0.875rem);
+  text-decoration: none;
+}
+
+.product-list-widget .product-list-lifestyle-recommender:hover {
+  text-decoration: underline;
+}
+
+.product-list-widget .product-list-lifestyle-carousel {
+  position: relative;
+}
+
+.product-list-widget .product-list-lifestyle-carousel > ul {
+  display: flex;
+  gap: var(--product-list-widget-gap);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.product-list-widget .product-list-lifestyle-card {
+  flex: 0 0 min(72vw, 280px);
+  scroll-snap-align: start;
+  position: relative;
+  cursor: pointer;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  overflow: hidden;
+  transition: border-color 0.2s ease;
+}
+
+.product-list-widget .product-list-lifestyle-card:hover,
+.product-list-widget .product-list-lifestyle-card.selected {
+  border-color: var(--color-charcoal);
+}
+
+.product-list-widget .product-list-lifestyle-card img {
+  display: block;
+  width: 100%;
+  height: 360px;
+  object-fit: cover;
+}
+
+.product-list-widget .product-list-lifestyle-overlay {
+  position: absolute;
+  inset: auto 0 0;
+  padding: var(--spacing-300, 0.75rem);
+  background: linear-gradient(transparent, rgb(0 0 0 / 75%));
+  color: var(--color-white);
+}
+
+.product-list-widget .product-list-lifestyle-title {
+  margin: 0;
+  font-size: var(--body-size-m, 1rem);
+  font-weight: var(--weight-medium, 600);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.product-list-widget .product-list-lifestyle-desc {
+  margin: 0.25rem 0 0;
+  font-size: var(--body-size-s, 0.875rem);
+}
+
+.product-list-widget .product-list-lifestyle .block > div,
+.product-list-widget .product-list-lifestyle .block > ul > li {
+  cursor: pointer;
+}
+
+.product-list-widget .product-list-lifestyle .block > div.selected,
+.product-list-widget .product-list-lifestyle .block > ul > li.selected {
+  outline: 2px solid var(--color-charcoal);
+  outline-offset: 2px;
+}
+
+.product-list-widget .product-list-lifestyle-carousel nav {
+  display: none;
+}
+
+@media (width >= 800px) {
+  .product-list-widget .product-list-lifestyle-carousel nav {
+    display: block;
+  }
+}
+
+/* Toolbar */
+.product-list-widget .product-list-toolbar {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--spacing-200, 0.5rem);
+  align-items: center;
+  margin-bottom: var(--spacing-300, 0.75rem);
+}
+
+.product-list-widget .product-list-filters-trigger {
+  justify-self: start;
+  width: auto;
+}
+
+.product-list-widget .product-list-filters-count {
+  margin-left: 0.25ch;
+}
+
+.product-list-widget .product-list-filter-dropdowns {
+  display: none;
+}
+
+.product-list-widget .product-list-item-count {
+  margin: 0;
+  font-size: var(--body-size-s, 0.875rem);
+  text-align: right;
+}
+
+.product-list-widget .product-list-sort {
+  position: relative;
+  justify-self: end;
+}
+
+/* Shared plain div/button dropdown (per-facet filter dropdowns + sort) - a custom listbox-button
+   widget with explicit JS-driven open/close state (see DROPDOWN_OPEN_CLASS in product-list.js)
+   instead of <details>/<summary>/<menu>, which some Chrome versions handle unreliably. */
+.product-list-widget .product-list-widget-dropdown-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-60, 0.4rem);
+  cursor: pointer;
+  padding: 0.3rem 0.9rem;
+  border: 1px solid var(--color-gray-300, #ddd);
+  border-radius: var(--rounding-l, 10px);
+  font-size: var(--body-size-s, 0.875rem);
+  font-weight: var(--weight-medium, 500);
+  color: var(--color-text);
+  background-color: var(--color-background);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.product-list-widget .product-list-widget-dropdown-trigger:hover {
+  border-color: var(--color-gray-500, #999);
+  background-color: var(--color-gray-100, #f5f5f5);
+}
+
+.product-list-widget .product-list-widget-dropdown-trigger:focus-visible {
+  outline: none;
+  border-color: var(--color-blue, #1b64b4);
+}
+
+.product-list-widget .product-list-widget-dropdown-open .product-list-widget-dropdown-trigger {
+  border-color: var(--color-charcoal);
+  background-color: var(--color-gray-100, #f5f5f5);
+}
+
+.product-list-widget .product-list-widget-dropdown-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.product-list-widget .product-list-widget-dropdown-trigger:disabled:hover {
+  border-color: var(--color-gray-300, #ddd);
+  background-color: var(--color-background);
+}
+
+.product-list-widget .product-list-widget-dropdown-chevron {
+  width: 0.8rem;
+  height: 0.8rem;
+  flex: none;
+  background: url('/blocks/plp/chevron-down.svg') center / contain no-repeat;
+  transition: transform 0.15s ease;
+}
+
+.product-list-widget .product-list-widget-dropdown-open .product-list-widget-dropdown-chevron {
+  transform: rotate(180deg);
+}
+
+.product-list-widget .product-list-widget-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  z-index: 20;
+  min-width: 210px;
+  margin: 0;
+  padding: 0.4rem;
+  border: 1px solid var(--color-gray-400, #ccc);
+  border-radius: 12px;
+  background: var(--color-background);
+}
+
+.product-list-widget .product-list-sort .product-list-widget-dropdown-menu {
+  right: 0;
+}
+
+.product-list-widget .product-list-widget-dropdown-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.55rem 0.7rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  font-size: var(--body-size-s, 0.875rem);
+  font-weight: var(--weight-regular, 400);
+  line-height: 1.3;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.product-list-widget .product-list-widget-dropdown-option:hover,
+.product-list-widget .product-list-widget-dropdown-option:focus-visible {
+  outline: none;
+  background: var(--color-gray-200, #f3f1eb);
+}
+
+.product-list-widget .product-list-widget-dropdown-option:focus {
+  box-shadow: none;
+}
+
+.product-list-widget .product-list-widget-dropdown-option:focus-visible {
+  outline: 2px solid var(--color-charcoal);
+  outline-offset: -2px;
+}
+
+.product-list-widget .product-list-widget-dropdown-option[aria-selected='true'] {
+  font-weight: var(--weight-medium, 500);
+  background: var(--color-gray-200, #f3f1eb);
+}
+
+/* Active filter tags */
+.product-list-widget .product-list-active-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-200, 0.5rem);
+  margin-bottom: var(--spacing-400, 1rem);
+}
+
+.product-list-widget .product-list-active-filters[hidden] {
+  display: none;
+}
+
+.product-list-widget .product-list-clear-all {
+  border: 0;
+  background: transparent;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: var(--body-size-s, 0.875rem);
+}
+
+.product-list-widget .product-list-filter-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-200, 0.5rem);
+}
+
+.product-list-widget .product-list-widget-filter-tag {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--color-gray-300, #ccc);
+  border-radius: 4px;
+  padding: 0.4rem 0.75rem 0.4rem 1.75rem;
+  background: var(--color-background) url('/blocks/plp/close.svg') 0.5rem center / 1rem no-repeat;
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: var(--body-size-s, 0.875rem);
+  font-weight: var(--weight-light, 300);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Facet drawer */
+.product-list-widget .product-list-facet-drawer {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 302;
+  background: rgb(0 0 0 / 50%);
+}
+
+.product-list-widget .product-list-facet-drawer.visible {
+  display: block;
+}
+
+.product-list-widget .product-list-facet-drawer-panel {
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 360px);
+  height: 100%;
+  background: var(--color-background);
+  box-sizing: border-box;
+}
+
+.product-list-widget .product-list-facet-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.25rem 0.75rem;
+}
+
+.product-list-widget .product-list-facet-drawer-title {
+  margin: 0;
+  font-family: var(--heading-font-family);
+  font-size: var(--body-size-l, 1.125rem);
+  font-weight: var(--weight-regular, 400);
+}
+
+.product-list-widget .product-list-facet-drawer-close {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  background: url('/blocks/plp/close.svg') center / contain no-repeat;
+  cursor: pointer;
+}
+
+.product-list-widget .product-list-facet-drawer-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 1.25rem;
+}
+
+.product-list-widget .product-list-widget-facet-group {
+  border-top: 1px solid var(--color-gray-300, #ccc);
+}
+
+/* stylelint-disable-next-line no-descending-specificity */
+.product-list-widget .product-list-widget-facet-group summary {
+  padding: 1rem 1.5rem 1rem 0;
+  font-size: var(--body-size-s, 0.875rem);
+  font-weight: var(--weight-medium, 600);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  list-style: none;
+  background: url('/blocks/plp/chevron-down.svg') center right / 1rem no-repeat;
+}
+
+/* stylelint-disable-next-line no-descending-specificity */
+.product-list-widget .product-list-widget-facet-group-disabled summary {
+  color: var(--color-gray-400, #999);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.product-list-widget .product-list-widget-facet-group[open] summary {
+  background-image: none;
+}
+
+.product-list-widget .product-list-widget-facet-group summary::after {
+  content: '+';
+  float: right;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.product-list-widget .product-list-widget-facet-group[open] summary::after {
+  content: '−';
+}
+
+.product-list-widget .product-list-widget-facet-group summary::-webkit-details-marker {
+  display: none;
+}
+
+.product-list-widget .product-list-widget-facet-options input[type="checkbox"] {
+  display: none;
+}
+
+.product-list-widget .product-list-widget-facet-options label {
+  display: block;
+  margin: 0.75rem 0;
+  padding-left: 1.75rem;
+  background: url('/blocks/plp/checkbox.svg') center left / 1.25rem no-repeat;
+  cursor: pointer;
+}
+
+.product-list-widget .product-list-widget-facet-options :checked + label {
+  background-image: url('/blocks/plp/checked.svg');
+}
+
+.product-list-widget .product-list-facet-drawer-actions {
+  display: flex;
+  gap: var(--spacing-300, 0.75rem);
+  padding: 1rem 1.25rem 1.5rem;
+}
+
+.product-list-widget .product-list-facet-drawer-cancel {
+  flex: 1;
+}
+
+.product-list-widget .product-list-facet-drawer-apply {
+  flex: 2;
+}
+
+body.product-list-widget-drawer-open {
+  overflow: hidden;
+}
+
+/* Results grid – full scroll, no pagination */
+.product-list-widget .product-list-results {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--product-list-widget-gap);
+}
+
+.product-list-widget .product-list-empty {
+  text-align: center;
+  padding: var(--spacing-600, 2rem);
+  color: var(--color-gray-700, #374151);
+}
+
+.product-list-widget .product-list-empty[hidden] {
+  display: none;
+}
+
+/* Product cards - align the listing with the product-card treatment used on the VX Series page. */
+.product-list-widget .product-list-widget-product-card {
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-60, 0.5rem);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.product-list-widget .product-list-widget-image-wrap {
+  position: relative;
+  aspect-ratio: 1;
+}
+
+.product-list-widget .product-list-widget-image-wrap img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.product-list-widget .product-list-widget-callouts {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.product-list-widget .product-list-widget-callout {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  font-size: var(--detail-size-m, 0.75rem);
+  font-weight: var(--weight-medium, 600);
+  letter-spacing: var(--letter-spacing-s, 0.03em);
+  text-transform: uppercase;
+  color: var(--color-white);
+  background: var(--color-link);
+}
+
+.product-list-widget .product-list-widget-callout-sale {
+  background: var(--color-link);
+}
+
+.product-list-widget .product-list-widget-callout-new {
+  padding: var(--spacing-40) var(--spacing-60);
+  border-radius: 4px;
+  background-color: var(--color-red);
+  opacity: 0.9;
+  transition: opacity 0.2s;
+}
+
+.product-list-widget .product-list-widget-compare-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  border: 0;
+  padding: 0.35rem 0.5rem;
+  background: rgb(255 255 255 / 88%);
+  color: var(--color-text);
+  font-size: var(--detail-size-m, 0.75rem);
+  font-weight: var(--weight-regular, 400);
+  line-height: 1.2;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  cursor: pointer;
+}
+
+.product-list-widget .product-list-widget-product-card:hover .product-list-widget-compare-btn,
+.product-list-widget .product-list-widget-product-card:focus-within .product-list-widget-compare-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Toggled on once a product is already in the compare-products widget's list (localStorage) */
+.product-list-widget .product-list-widget-compare-btn.product-list-widget-compare-btn-active {
+  background-color: var(--color-charcoal);
+  color: var(--color-white);
+}
+
+.product-list-widget .product-list-widget-product-card h4 {
+  margin: var(--spacing-100, 0.25rem) 0 0;
+  font-family: var(--heading-font-family);
+  font-size: var(--heading-size-l, 1.375rem);
+  font-weight: var(--weight-light, 300);
+  line-height: var(--line-height-s, 1.2);
+}
+
+.product-list-widget .product-list-widget-product-card h4 a {
+  color: var(--color-gray);
+  text-decoration: none;
+}
+
+.product-list-widget .product-list-widget-product-card h4 a:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.product-list-widget .product-list-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-100, 0.25rem);
+}
+
+.product-list-widget .product-list-widget-colors-label {
+  flex-basis: 100%;
+  font-size: var(--detail-size-m, 0.75rem);
+  letter-spacing: var(--letter-spacing-s, 0.083em);
+  text-transform: uppercase;
+}
+
+.product-list-widget .color-swatch {
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 1px solid var(--color-charcoal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  cursor: pointer;
+  background-color: var(--color-white);
+}
+
+.product-list-widget .color-swatch.selected {
+  box-shadow: inset 0 0 0 2px var(--color-background), inset 0 0 0 4px var(--color-charcoal);
+}
+
+.product-list-widget .color-swatch.product-list-widget-facet-swatch {
+  display: inline-flex;
+  margin-right: 0.5rem;
+  cursor: default;
+  vertical-align: middle;
+  flex: none;
+}
+
+.product-list-widget .product-list-color-inner {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.product-list-widget .product-list-color-swatch-oos.product-list-color-inner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom right,
+    transparent 42%,
+    #fff 43%,
+    #fff 46%,
+    #ff5216 47%,
+    #ff5216 53%,
+    #fff 54%,
+    #fff 57%,
+    transparent 58%
+  );
+}
+
+.product-list-widget .product-list-widget-reviews {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-60);
+  min-height: 1.25rem;
+  font-size: var(--detail-size-m, 0.75rem);
+}
+
+/* Fractional-fill star rating (from reviews.json), replacing the previous per-product Bazaarvoice widget */
+.product-list-widget .product-list-widget-stars {
+  position: relative;
+  display: inline-block;
+  font-size: 0.9rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.product-list-widget .product-list-widget-stars-track,
+.product-list-widget .product-list-widget-stars-fill {
+  display: block;
+  letter-spacing: 1px;
+}
+
+.product-list-widget .product-list-widget-stars-track {
+  color: var(--color-gray-400);
+}
+
+.product-list-widget .product-list-widget-stars-fill {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  color: var(--color-blue, #1b64b4);
+}
+
+.product-list-widget .product-list-widget-reviews-count {
+  color: var(--color-blue, #1b64b4);
+}
+
+.product-list-widget .product-list-widget-bullets {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: var(--body-size-m, 1rem);
+}
+
+/* stylelint-disable-next-line no-descending-specificity */
+.product-list-widget .product-list-widget-bullets li {
+  margin: 0.15rem 0;
+}
+
+.product-list-widget .product-list-widget-price {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-60, 0.25rem);
+  margin: var(--spacing-100, 0.5rem) 0 0;
+}
+
+.product-list-widget .product-list-widget-price-label {
+  font-size: var(--detail-size-m, 0.75rem);
+  letter-spacing: var(--letter-spacing-s, 0.083em);
+  text-transform: uppercase;
+}
+
+.product-list-widget .product-list-widget-price-amount {
+  font-size: var(--body-size-m, 1rem);
+  font-weight: 700;
+}
+
+.product-list-widget .product-list-widget-price del {
+  margin-left: 0.5ch;
+  color: var(--color-gray);
+  font-weight: var(--weight-regular, 400);
+}
+
+.product-list-widget .product-list-widget-cta {
+  margin: var(--spacing-100, 0.5rem) 0 0;
+  padding-top: 0;
+}
+
+.product-list-widget .product-list-widget-cta .button {
+  width: auto;
+  box-sizing: border-box;
+  padding-inline: 0;
+  border-color: transparent;
+  background-color: transparent;
+  color: var(--color-link);
+  font-size: 0.875em;
+  text-decoration: underline;
+  text-underline-offset: var(--spacing-60);
+  text-transform: uppercase;
+}
+
+.product-list-widget .product-list-widget-cta .button:hover {
+  border-color: transparent;
+  background-color: transparent;
+  color: var(--color-link-hover);
+}
+
+@media (width >= 900px) {
+  .product-list-widget .product-list-toolbar {
+    grid-template-columns: auto 1fr auto auto;
+    align-items: center;
+  }
+
+  .product-list-widget .product-list-filter-dropdowns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-200, 0.5rem);
+  }
+
+  .product-list-widget .product-list-widget-filter-dropdown {
+    position: relative;
+  }
+
+  /* Desktop-only overrides for the shared plain div/button dropdown (see the base rules above) -
+     the filter dropdowns row is hidden below this breakpoint (the facet drawer is used instead). */
+  .product-list-widget .product-list-widget-filter-dropdown .product-list-widget-dropdown-menu {
+    left: 0;
+    max-height: 300px;
+    overflow-y: auto;
+    animation: product-list-widget-dropdown-in 0.15s ease;
+  }
+
+  @keyframes product-list-widget-dropdown-in {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .product-list-widget .product-list-widget-filter-dropdown-option-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .product-list-widget .product-list-widget-filter-dropdown-check {
+    margin-left: auto;
+    color: var(--color-charcoal);
+    font-weight: var(--weight-medium, 500);
+  }
+
+  .product-list-widget .product-list-item-count {
+    text-align: center;
+  }
+}
+
+@media (width >= 600px) {
+  .product-list-widget .product-list-widget-product-card {
+    width: calc(50% - var(--product-list-widget-gap) / 2);
+  }
+
+  .product-list-widget .product-list-widget-product-card h4 {
+    min-height: 2.6rem;
+  }
+
+  .product-list-widget .product-list-colors {
+    min-height: 3.5rem;
+  }
+}
+
+@media (width >= 1200px) {
+  .product-list-widget .product-list-widget-product-card {
+    width: calc(25% - var(--product-list-widget-gap) * 0.75);
+  }
+}
+
+@media (hover: none) {
+  .product-list-widget .product-list-widget-compare-btn {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}

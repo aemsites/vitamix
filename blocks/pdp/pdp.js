@@ -15,7 +15,9 @@ import {
   getLocaleAndLanguage,
   formatPrice,
 } from '../../scripts/scripts.js';
-import { openModal } from '../modal/modal.js';
+import addToCompare, {
+  useWidgetCompare, isInStoredCompare, removeFromCompare,
+} from '../../scripts/add-to-compare.js';
 
 /**
  * Renders the title section of the PDP block.
@@ -92,44 +94,56 @@ function renderFAQ(ph) {
   return faqContainer;
 }
 
-function renderCompare(ph, custom) {
+function renderCompare(ph, jsonLdData) {
   const { locale, language } = getLocaleAndLanguage();
+  const { custom, image } = jsonLdData;
   const { entityId } = custom;
+  const path = window.location.pathname;
+  const widgetMode = useWidgetCompare();
   const comparisonLabel = ph.viewComparisonList || 'View Comparison List';
   const comparisonLinkText = comparisonLabel.endsWith('.')
     ? comparisonLabel
     : `${comparisonLabel}.`;
   const compareContainer = document.createElement('div');
   compareContainer.classList.add('pdp-compare-container');
+  // The Magento compare index page only makes sense for the Magento server-side compare list.
+  const viewListLink = widgetMode ? '' : `<a href="/${locale}/${language}/catalog/product_compare/index/" title="${comparisonLabel}" class="comparelistlink">${comparisonLinkText}</a>`;
   compareContainer.innerHTML = `
     <div>
       <button class="pdp-compare-button">${ph.compare || 'Compare'}</button>
-      <a href="/${locale}/${language}/catalog/product_compare/index/" title="${comparisonLabel}" class="comparelistlink">${comparisonLinkText}</a>
+      ${viewListLink}
     </div>`;
 
   const compareButton = compareContainer.querySelector('.pdp-compare-button');
+
+  // Only the compare-products widget path tracks membership client-side (Magento's server-side
+  // compare list has no easy client-side "is this already in it?" check), so the toggle-to-
+  // "Remove from Compare" state only applies there.
+  const updateLabel = () => {
+    const inCompare = widgetMode && isInStoredCompare(path);
+    compareButton.textContent = inCompare
+      ? (ph.removeFromCompare || 'Remove from Compare')
+      : (ph.compare || 'Compare');
+    compareButton.classList.toggle('pdp-compare-button-active', inCompare);
+  };
+  updateLabel();
+
   compareButton.addEventListener('click', () => {
-    fetch(`/${locale}/${language}/catalog/product_compare/add/`, {
-      headers: {
-        'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        'x-requested-with': 'XMLHttpRequest',
-      },
-      body: `product=${entityId}&uenc=${encodeURIComponent(window.location.href)}`,
-      method: 'POST',
-      credentials: 'include',
-    }).then((resp) => {
-      if (resp.ok) {
-        openModal(`/${locale}/${language}/products/modals/compare`).then((modal) => {
-          if (modal) {
-            const content = modal.querySelector('.default-content-wrapper');
-            const product = document.createElement('p');
-            product.className = 'product';
-            product.textContent = document.querySelector('h1').textContent;
-            content.prepend(product);
-          }
-        });
-      }
-    });
+    if (widgetMode && isInStoredCompare(path)) {
+      removeFromCompare(path, { viewComparisonLabel: ph.viewComparison });
+    } else {
+      addToCompare({
+        url: path,
+        title: document.querySelector('h1')?.textContent || '',
+        image: Array.isArray(image) ? image[0] : image,
+        entityId,
+      }, {
+        addedMessage: ph.addedToComparison,
+        limitMessage: ph.compareLimitReached,
+        viewComparisonLabel: ph.viewComparison,
+      });
+    }
+    updateLabel();
   });
 
   return compareContainer;
@@ -339,7 +353,7 @@ export default async function decorate(block) {
   const pricingContainer = renderPricing(ph, block);
   const optionsContainer = renderOptions(ph, block, variants, custom, isParentOutOfStock);
   const addToCartContainer = renderAddToCart(ph, block, jsonLdData);
-  const compareContainer = renderCompare(ph, custom);
+  const compareContainer = renderCompare(ph, jsonLdData);
   const freeGiftContainer = await renderFreeGift();
   const freeShippingContainer = renderFreeShipping(ph, offers);
   const shareContainer = renderShare(ph);

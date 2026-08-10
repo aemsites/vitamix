@@ -1,6 +1,7 @@
 import { getMetadata, toClassName } from '../../scripts/aem.js';
 import { swapIcons, getCookies } from '../../scripts/scripts.js';
 import { loadFragment } from '../fragment/fragment.js';
+import { getStoredComparePaths, COMPARE_STORAGE_EVENT } from '../../scripts/add-to-compare.js';
 
 // media query match that indicates desktop width
 const isDesktop = window.matchMedia('(width >= 1000px)');
@@ -597,18 +598,37 @@ export default async function decorate(block) {
 
   swapIcons(block);
 
+  // The compare nav link is authored with an absolute URL (e.g. https://www.vitamix.com/...);
+  // reduce it to a path so it always resolves against the current origin (localhost, .aem.page,
+  // .aem.live, or production) instead of possibly pointing at a different one.
+  const compareLink = block.querySelector('li .icon-compare')?.closest('li')?.querySelector('a[href]');
+  if (compareLink) {
+    try {
+      const url = new URL(compareLink.getAttribute('href'), window.location.origin);
+      compareLink.setAttribute('href', `${url.pathname}${url.search}${url.hash}`);
+    } catch {
+      // leave href as-is if it can't be parsed
+    }
+  }
+
   /* cookie logic */
   const cookies = getCookies();
 
-  const compareProducts = cookies.compare_products_count;
-  if (!compareProducts || compareProducts === '0') {
+  // The compare nav item can come from either compare implementation (see
+  // scripts/add-to-compare.js): Magento's server-side compare list (compare_products_count
+  // cookie) or the compare-products widget's localStorage-backed list. Toggle (rather than
+  // destroy) so it can react live to the widget adding/removing without a page reload.
+  const updateCompareVisibility = () => {
+    const hasMagentoCompare = Boolean(getCookies().compare_products_count)
+      && getCookies().compare_products_count !== '0';
+    const hasWidgetCompare = getStoredComparePaths().length > 0;
     const compare = block.querySelector('li .icon-compare');
-    if (compare) {
-      const li = compare.closest('li');
-      li.setAttribute('aria-hidden', true);
-      li.replaceChildren();
-    }
-  }
+    if (!compare) return;
+    compare.closest('li').setAttribute('aria-hidden', String(!(hasMagentoCompare || hasWidgetCompare)));
+  };
+  updateCompareVisibility();
+  window.addEventListener(COMPARE_STORAGE_EVENT, updateCompareVisibility);
+  window.addEventListener('storage', updateCompareVisibility);
 
   const customer = cookies.vitamix_customer;
   if (customer) {
