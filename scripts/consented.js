@@ -12,6 +12,7 @@ import {
   trackCheckoutShipping,
   trackLogin,
   trackSocialEvents,
+  trackFormEvents,
 } from './consented/instrumentation/index.js';
 
 bootstrapEarlyTracking();
@@ -26,6 +27,7 @@ trackCartChange();
 trackCheckoutShipping();
 trackLogin();
 trackSocialEvents();
+trackFormEvents();
 
 // add delayed functionality here
 window.config = {
