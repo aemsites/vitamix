@@ -238,22 +238,6 @@ export function getFormSubmissionUrl() {
 }
 
 /**
- * Builds the leadSource identifier sent with marketing subscription forms.
- * CA sites don't offer SMS enrollment, so CA always resolves to the email-only variant.
- * US resolves to email-only, email+SMS, or SMS-only depending on the channels opted into.
- * @param {string} page - form identifier, e.g. 'acc', 'reg', 'footer', 'modal'
- * @param {string} country - 'us' | 'ca'
- * @param {{ emailOptIn?: boolean, smsOptIn?: boolean }} [channels] - opted-in channels
- * @returns {string} lead source, e.g. 'sub-emsms-acc-us'
- */
-export function getLeadSource(page, country, { emailOptIn = true, smsOptIn = false } = {}) {
-  if (country !== 'us') return `sub-em-${page}-${country}`;
-  if (smsOptIn && emailOptIn) return `sub-emsms-${page}-us`;
-  if (smsOptIn && !emailOptIn) return `sub-sms-${page}-us`;
-  return `sub-em-${page}-us`;
-}
-
-/**
  * Parses `document.cookie` into key-value map.
  * @returns {Object} Object representing all cookies as key-value pairs
  */
