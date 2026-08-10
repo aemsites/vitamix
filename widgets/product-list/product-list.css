@@ -493,6 +493,14 @@ body.product-list-widget-drawer-open {
   background: var(--color-link);
 }
 
+.product-list-widget .product-list-widget-callout-new {
+  padding: var(--spacing-40) var(--spacing-60);
+  border-radius: 4px;
+  background-color: var(--color-red);
+  opacity: 0.9;
+  transition: opacity 0.2s;
+}
+
 .product-list-widget .product-list-widget-compare-btn {
   position: absolute;
   top: 0.5rem;
@@ -685,14 +693,20 @@ body.product-list-widget-drawer-open {
 .product-list-widget .product-list-widget-cta .button {
   width: auto;
   box-sizing: border-box;
-  border-color: var(--color-charcoal);
-  background-color: var(--color-white);
-  color: var(--color-text);
+  padding-inline: 0;
+  border-color: transparent;
+  background-color: transparent;
+  color: var(--color-link);
+  font-size: 0.875em;
+  text-decoration: underline;
+  text-underline-offset: var(--spacing-60);
+  text-transform: uppercase;
 }
 
 .product-list-widget .product-list-widget-cta .button:hover {
-  border-color: var(--color-red);
-  background-color: var(--color-gray-100);
+  border-color: transparent;
+  background-color: transparent;
+  color: var(--color-link-hover);
 }
 
 @media (width >= 900px) {
