@@ -686,8 +686,8 @@ body.product-list-widget-drawer-open {
 }
 
 .product-list-widget .product-list-widget-cta {
-  margin: auto 0 0;
-  padding-top: var(--spacing-200, 0.5rem);
+  margin: var(--spacing-100, 0.5rem) 0 0;
+  padding-top: 0;
 }
 
 .product-list-widget .product-list-widget-cta .button {
