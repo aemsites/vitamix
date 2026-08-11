@@ -100,12 +100,14 @@
 }
 
 .product-row .slide-image picture,
-.product-row .slide-image img {
+.product-row .slide-image img,
+.product-row .slide-image video {
   display: block;
   border-radius: var(--rounding-m);
 }
 
-.product-row .slide-image img {
+.product-row .slide-image img,
+.product-row .slide-image video {
   aspect-ratio: 1 / 1;
   object-fit: cover;
   width: 100%;
@@ -232,11 +234,13 @@
 
 /* marketing slide */
 .product-row .carousel-slide.marketing .slide-image picture,
-.product-row .carousel-slide.marketing .slide-image img {
+.product-row .carousel-slide.marketing .slide-image img,
+.product-row .carousel-slide.marketing .slide-image video {
   border-radius: 0;
 }
 
-.product-row .carousel-slide.marketing .slide-image img {
+.product-row .carousel-slide.marketing .slide-image img,
+.product-row .carousel-slide.marketing .slide-image video {
   aspect-ratio: 3 / 4;
 }
 

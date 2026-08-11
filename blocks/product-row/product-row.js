@@ -2,7 +2,7 @@
 import {
   fetchPlaceholders, toClassName, buildBlock, decorateBlock, loadBlock,
 } from '../../scripts/aem.js';
-import { getLocaleAndLanguage, formatPrice } from '../../scripts/scripts.js';
+import { getLocaleAndLanguage, formatPrice, buildVideo } from '../../scripts/scripts.js';
 import {
   createCallouts, createStarRating, fetchReviewsData, getReviewsBySlug, slugFromUrl,
 } from '../../scripts/product-badges.js';
@@ -304,6 +304,23 @@ async function resolveRowProduct(row) {
 }
 
 /**
+ * Converts an authored `.mp4` link in the image cell into a video.
+ * @param {HTMLElement} image - Row's image cell
+ * @returns {HTMLVideoElement|null} Created video, or null if no video link was found
+ */
+function buildRowVideo(image) {
+  const picture = image.querySelector('picture');
+  const video = buildVideo(image);
+  if (!video) return null;
+  if (picture) {
+    const img = picture.querySelector('img');
+    if (img) video.poster = img.src;
+    picture.remove();
+  }
+  return video;
+}
+
+/**
  * Transforms one authored row into a styled slide populated with the resolved product's data.
  * @param {HTMLElement} row - Row element containing image and body cells
  * @param {Object} ph - Placeholder object with localized text/badge labels
@@ -311,6 +328,7 @@ async function resolveRowProduct(row) {
  */
 async function styleRowAsSlide(row, ph) {
   const [image, body] = row.children;
+  const video = buildRowVideo(image);
 
   const product = await resolveRowProduct(row);
   if (!product) {
@@ -324,8 +342,10 @@ async function styleRowAsSlide(row, ph) {
   const description = body.firstElementChild;
   if (description) description.classList.add('description');
 
-  const img = image.querySelector('picture') || createProductImage(product);
-  image.replaceChildren(img);
+  if (!video) {
+    const img = image.querySelector('picture') || createProductImage(product);
+    image.replaceChildren(img);
+  }
   const badges = createCallouts(product, ph);
   if (badges.children.length > 0) image.append(badges);
 
