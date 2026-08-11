@@ -69,6 +69,33 @@ test('addItem with different SKUs creates separate entries', () => {
   assert.deepEqual(cart.items.map((i) => i.sku), ['foo', 'bar']);
 });
 
+test('addItem rebases a stale tab before persisting', () => {
+  const firstTab = new Cart();
+  const secondTab = new Cart();
+
+  firstTab.addItem(sampleItem({ sku: 'foo' }));
+  firstTab.flush();
+  secondTab.addItem(sampleItem({ sku: 'bar' }));
+  secondTab.flush();
+
+  const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
+  assert.deepEqual(stored.items.map((item) => item.sku), ['foo', 'bar']);
+});
+
+test('addItem caps a stale tab against the shared SKU quantity limit', () => {
+  const firstTab = new Cart();
+  const secondTab = new Cart();
+
+  firstTab.addItem(sampleItem({ sku: 'foo', quantity: 2 }));
+  const partiallyAdded = secondTab.addItem(sampleItem({ sku: 'foo', quantity: 2 }), { maxQuantity: 3 });
+  const rejected = secondTab.addItem(sampleItem({ sku: 'foo' }), { maxQuantity: 3 });
+
+  assert.equal(partiallyAdded.quantity, 1);
+  assert.equal(rejected, null);
+  const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
+  assert.equal(stored.items[0].quantity, 3);
+});
+
 test('addItem preserves insertion order across many entries', () => {
   const cart = new Cart();
   ['a', 'b', 'c', 'd'].forEach((sku) => cart.addItem(sampleItem({ sku })));
@@ -137,12 +164,9 @@ test('clear persists the empty state to localStorage immediately', () => {
 
 // --- flush ------------------------------------------------------------------
 
-test('flush persists a debounced addItem to localStorage immediately', () => {
+test('addItem persists to localStorage immediately', () => {
   const cart = new Cart();
   cart.addItem(sampleItem({ sku: 'pending' }));
-  // addItem uses a debounced persist — localStorage may still be stale.
-  // flush() forces the write so a subsequent page load sees the item.
-  cart.flush();
   const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
   assert.equal(stored.items.length, 1);
   assert.equal(stored.items[0].sku, 'pending');
