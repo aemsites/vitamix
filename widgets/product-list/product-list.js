@@ -5,7 +5,7 @@ import {
 import { formatPrice } from '../../scripts/scripts.js';
 import { loadFragment } from '../../blocks/fragment/fragment.js';
 import addToCompare, { useWidgetCompare, isInStoredCompare, removeFromCompare } from '../../scripts/add-to-compare.js';
-import { createCallouts, createStarRating } from '../../scripts/product-badges.js';
+import { createCallouts, createStarRating } from '../../scripts/plp-data.js';
 import lookupProductListProducts, { getWidgetLocaleAndLanguage, getFacetDefinitions } from './products.js';
 
 const LIFESTYLE_TILE_SELECTOR = '.block > div, .block > ul > li';
