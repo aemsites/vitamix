@@ -40,6 +40,23 @@
       "created": "Member since",
       "updated": "Last updated"
     },
+    "informationEdit": {
+      "edit": "Edit",
+      "firstName": "First name",
+      "lastName": "Last name",
+      "phone": "Phone",
+      "plannedUseLabel": "What do you plan on using this account for?",
+      "plannedUseHome": "For home products",
+      "plannedUseBusiness": "For business products",
+      "ownsVitamixLabel": "Do you currently own a Vitamix?",
+      "yes": "Yes",
+      "no": "No",
+      "save": "Save",
+      "cancel": "Cancel",
+      "saving": "Saving…",
+      "nameRequired": "Please enter your first and last name.",
+      "saveError": "Could not save your details. Please try again."
+    },
     "countries": {
       "us": "United States",
       "ca": "Canada",
@@ -175,6 +192,23 @@
       "accountStatus": "Statut du compte",
       "created": "Membre depuis",
       "updated": "Dernière mise à jour"
+    },
+    "informationEdit": {
+      "edit": "Modifier",
+      "firstName": "Prénom",
+      "lastName": "Nom de famille",
+      "phone": "Téléphone",
+      "plannedUseLabel": "Pour quoi comptez-vous utiliser ce compte ?",
+      "plannedUseHome": "Pour les produits domestiques",
+      "plannedUseBusiness": "Pour les produits professionnels",
+      "ownsVitamixLabel": "Possédez-vous déjà un Vitamix ?",
+      "yes": "Oui",
+      "no": "Non",
+      "save": "Enregistrer",
+      "cancel": "Annuler",
+      "saving": "Enregistrement…",
+      "nameRequired": "Veuillez entrer votre prénom et votre nom de famille.",
+      "saveError": "Impossible d'enregistrer vos informations. Veuillez réessayer."
     },
     "countries": {
       "us": "États-Unis",

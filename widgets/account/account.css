@@ -256,6 +256,73 @@
   color: var(--commerce-color-text);
 }
 
+.account-info-edit {
+  margin-top: 16px;
+}
+
+.account-info-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 40rem;
+  margin-top: 8px;
+}
+
+.account-info-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--commerce-font-size-xs);
+  color: var(--commerce-color-text-muted);
+}
+
+.account-info-field input {
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--commerce-color-border);
+  border-radius: 4px;
+  font: inherit;
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-text);
+  background: var(--color-white, #fff);
+}
+
+.account-info-fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.account-info-fieldset legend {
+  padding: 0;
+  margin-bottom: 4px;
+  font-size: var(--commerce-font-size-xs);
+  color: var(--commerce-color-text-muted);
+}
+
+.account-info-radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-text);
+  cursor: pointer;
+}
+
+.account-info-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.account-info-error {
+  margin: 0;
+  color: var(--commerce-color-error, #b00020);
+  font-size: var(--commerce-font-size-sm);
+}
+
 .account-communications {
   margin-top: 28px;
   padding-top: 20px;
