@@ -1,6 +1,9 @@
 /* eslint-disable max-len */
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
-import { fetchReviewsData, getReviewsBySlug, slugFromUrl } from '../../scripts/product-badges.js';
+import {
+  fetchReviewsData, getReviewsBySlug, slugFromUrl, fetchPlpData, getBadgesBySlug, PLP_DATASETS,
+  fetchProductIndex, buildProductIndexBySlug,
+} from '../../scripts/plp-data.js';
 
 // Column-name overrides for the label derived from a "* Facet" column in plp-data.json.
 // Anything not listed here uses the column name with the trailing "Facet" stripped.
@@ -8,11 +11,7 @@ const FACET_LABEL_OVERRIDES = {
   'Type Facet': 'Product Type',
 };
 
-function buildProductsUrl(locale, language, path) {
-  return `/${locale}/${language}/products/${path}`;
-}
-
-export const PLP_DATASETS = ['blenders', 'accessories', 'commercial'];
+export { PLP_DATASETS };
 const DEFAULT_PLP_DATASET = 'blenders';
 
 function normalizePlpDataset(dataset) {
@@ -62,30 +61,6 @@ function parseFacetValues(value) {
   return value ? String(value).split(',').map((s) => s.trim()).filter(Boolean) : [];
 }
 
-function parseIndexProduct(data, locale, language) {
-  const parsed = {};
-  Object.entries(data).forEach(([key, value]) => {
-    switch (key) {
-      case 'image':
-        parsed[key] = value.startsWith('./') ? buildProductsUrl(locale, language, value.substring(2)) : value;
-        break;
-      case 'price':
-      case 'regularPrice':
-      case 'originalPrice':
-        parsed[key] = parseFloat(value, 10);
-        break;
-      case 'variantSkus':
-      case 'visibility':
-        parsed[key] = value ? value.split(',').map((s) => s.trim()) : [];
-        break;
-      default:
-        parsed[key] = typeof value === 'string' ? value.trim() : value;
-        break;
-    }
-  });
-  return parsed;
-}
-
 function titleFromUrl(pathname) {
   const slug = pathname.split('/').filter(Boolean).pop() || '';
   return slug.split('-').map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w)).join(' ');
@@ -97,21 +72,6 @@ function pathnameFromUrl(rawUrl) {
   } catch {
     return rawUrl;
   }
-}
-
-/**
- * Fetches plp-data-{dataset}.json, the source of truth for which products are listed and
- * for every dynamically-discovered "* Facet" column.
- * @param {string} locale
- * @param {string} language
- * @param {string} dataset - One of PLP_DATASETS
- * @returns {Promise<Array<Object>>}
- */
-async function fetchPlpData(locale, language, dataset) {
-  const resp = await fetch(`/${locale}/${language}/products/config/plp-data-${dataset}.json`);
-  if (!resp.ok) return [];
-  const json = await resp.json();
-  return Array.isArray(json.data) ? json.data : [];
 }
 
 /**
@@ -137,55 +97,10 @@ export default async function lookupProductListProducts(config = {}, facets = {}
     ]);
     const facetDefs = getFacetDefsFromRows(plpRows);
     const reviewsBySlug = getReviewsBySlug(reviewsRows);
+    const badgesBySlug = getBadgesBySlug(plpRows);
 
-    const corsProxyFetch = async (url) => {
-      const corsProxy = 'https://fcors.org/?url=';
-      const corsKey = '&key=Mg23N96GgR8O3NjU';
-      const fullUrl = `https://main--vitamix--aemsites.aem.network${url}`;
-      return fetch(`${corsProxy}${encodeURIComponent(fullUrl)}${corsKey}`);
-    };
-
-    const isProd = window.location.hostname.includes('vitamix.com')
-      || window.location.hostname.includes('.aem.network');
-    const indexPath = plpDataset === 'commercial' ? 'products/commercial' : 'products';
-    const pathname = `/${locale}/${language}/${indexPath}/index.json?include=all`;
-    const resp = await (isProd ? fetch(pathname) : corsProxyFetch(pathname));
-    const { data } = await resp.json();
-    if (!isProd && resp.ok) {
-      data.forEach((product) => {
-        if (product.image) {
-          product.image = `https://main--vitamix--aemsites.aem.network/${locale}/${language}/products/${product.image.substring(2)}`;
-        }
-      });
-    }
-
-    const parentsBySku = {};
-    const variants = [];
-    data.forEach((d) => {
-      const product = parseIndexProduct(d, locale, language);
-      if (product.sku && !product.parentSku) {
-        parentsBySku[product.sku] = product;
-      } else {
-        variants.push(product);
-      }
-    });
-
-    variants.forEach((variant) => {
-      const parent = parentsBySku[variant.parentSku];
-      if (parent) {
-        parent.variants = parent.variants || [];
-        parent.variants.push(variant);
-        parent.colors = parent.colors || [];
-        parent.colors.push(variant.color);
-      }
-    });
-
-    const indexBySlug = {};
-    Object.values(parentsBySku).forEach((product) => {
-      const rawUrl = product.url || (product.urlKey ? buildProductsUrl(locale, language, product.urlKey) : '');
-      const slug = rawUrl ? slugFromUrl(rawUrl) : '';
-      if (slug) indexBySlug[slug] = product;
-    });
+    const data = await fetchProductIndex(locale, language, { commercial: plpDataset === 'commercial' });
+    const indexBySlug = buildProductIndexBySlug(data, locale, language);
 
     const parents = plpRows
       .filter((row) => slugFromUrl((row.Product || '').trim()) in indexBySlug)
@@ -199,8 +114,9 @@ export default async function lookupProductListProducts(config = {}, facets = {}
         product.bullets = (row.Bullets || '').split(';').map((s) => s.trim()).filter(Boolean);
         product.comparisonFeatures = (row['Comparison Features'] || '').split(';').map((s) => s.trim()).filter(Boolean);
         const reviews = reviewsBySlug[slugFromUrl(rowUrl)];
-        product.reviewCount = reviews?.reviewCount ?? 0;
-        product.reviewAverage = reviews?.reviewAverage ?? 0;
+        product.reviewCount = reviews ? reviews.reviewCount : 0;
+        product.reviewAverage = reviews ? reviews.reviewAverage : 0;
+        product.badge = badgesBySlug[slugFromUrl(rowUrl)] || '';
         facetDefs.forEach(({ rawKey, key }) => {
           product[key] = parseFacetValues(row[rawKey]);
         });
@@ -257,7 +173,7 @@ export default async function lookupProductListProducts(config = {}, facets = {}
  */
 export async function getFacetDefinitions(dataset) {
   const plpDataset = normalizePlpDataset(dataset);
-  if (!window.productListWidgetIndexByDataset?.[plpDataset]) {
+  if (!window.productListWidgetIndexByDataset || !window.productListWidgetIndexByDataset[plpDataset]) {
     await lookupProductListProducts({}, {}, plpDataset);
   }
   return window.productListWidgetIndexByDataset[plpDataset].facetDefs;
