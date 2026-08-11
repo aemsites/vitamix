@@ -71,15 +71,19 @@ function applyFocalPoint(media, focal) {
   let raf = 0;
 
   const update = () => {
-    const { width: nw, height: nh } = mediaIntrinsicSize(media);
-    if (!nw || !nh) return;
-    const { width: cw, height: ch } = media.getBoundingClientRect();
-    if (!cw || !ch) return;
+    if (window.innerWidth < 900 || !media.closest('.block').classList.contains('center')) {
+      const { width: nw, height: nh } = mediaIntrinsicSize(media);
+      if (!nw || !nh) return;
+      const { width: cw, height: ch } = media.getBoundingClientRect();
+      if (!cw || !ch) return;
 
-    const scale = Math.max(cw / nw, ch / nh);
-    const x = focalObjectPosition(focal.x, cw, nw * scale);
-    const y = focalObjectPosition(focal.y, ch, nh * scale);
-    media.style.objectPosition = `${x}% ${y}%`;
+      const scale = Math.max(cw / nw, ch / nh);
+      const x = focalObjectPosition(focal.x, cw, nw * scale);
+      const y = focalObjectPosition(focal.y, ch, nh * scale);
+      media.style.objectPosition = `${x}% ${y}%`;
+    } else {
+      media.style.objectPosition = '';
+    }
   };
 
   const schedule = () => {
