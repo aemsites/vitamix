@@ -5,7 +5,8 @@ import {
 import { getLocaleAndLanguage, formatPrice, buildVideo } from '../../scripts/scripts.js';
 import {
   createCallouts, createStarRating, fetchReviewsData, getReviewsBySlug, slugFromUrl,
-} from '../../scripts/product-badges.js';
+  fetchPlpData, getBadgesBySlug, PLP_DATASETS, fetchProductIndex, buildProductIndexBySlug,
+} from '../../scripts/plp-data.js';
 
 const COLOR_ORDER = {
   /* black */
@@ -44,50 +45,7 @@ const COLOR_ORDER = {
 };
 
 /**
- * Constructs a localized product URL path.
- * @param {string} locale - Locale code
- * @param {string} language - Language code
- * @param {string} path - Product-specific path or URL key
- * @returns {string} Fully constructed product URL path
- */
-function buildProductsUrl(locale, language, path) {
-  return `/${locale}/${language}/products/${path}`;
-}
-
-/**
- * Parses a raw product-index row, transforming price/array fields.
- * @param {Object} data - Raw product data object from the product index
- * @param {string} locale - Locale code
- * @param {string} language - Language code
- * @returns {Object} Parsed product object with transformed values
- */
-function parseProduct(data, locale, language) {
-  const parsed = {};
-  Object.entries(data).forEach(([key, value]) => {
-    switch (key) {
-      case 'image':
-        parsed[key] = value.startsWith('./') ? buildProductsUrl(locale, language, value.substring(2)) : value;
-        break;
-      case 'price':
-      case 'regularPrice':
-      case 'originalPrice':
-        parsed[key] = parseFloat(value, 10);
-        break;
-      case 'collections':
-      case 'variantSkus':
-      case 'visibility':
-        parsed[key] = value ? value.split(',').map((s) => s.trim()) : [];
-        break;
-      default:
-        parsed[key] = typeof value === 'string' ? value.trim() : value;
-        break;
-    }
-  });
-  return parsed;
-}
-
-/**
- * Resolves authored product links to full product objects, lazily building and caching a URL-keyed product index.
+ * Resolves authored product links to full product objects, lazily building and caching a slug-keyed product index.
  * @param {Array<string>} pathnames - Product pathnames to resolve
  * @returns {Promise<Array<Object>>} Matching parent product objects
  */
@@ -95,64 +53,27 @@ async function lookupProducts(pathnames) {
   const { locale, language } = getLocaleAndLanguage();
 
   if (!window.productRowIndex) {
-    const corsProxyFetch = async (url) => {
-      const corsProxy = 'https://fcors.org/?url=';
-      const corsKey = '&key=Mg23N96GgR8O3NjU';
-      const fullUrl = `https://main--vitamix--aemsites.aem.network${url}`;
-      return fetch(`${corsProxy}${encodeURIComponent(fullUrl)}${corsKey}`);
-    };
+    const commercial = window.location.pathname.includes('/commercial/');
+    const [data, reviewsRows, plpRowsByDataset] = await Promise.all([
+      fetchProductIndex(locale, language, { commercial }),
+      fetchReviewsData(locale, language),
+      Promise.all(PLP_DATASETS.map((dataset) => fetchPlpData(locale, language, dataset))),
+    ]);
+    const reviewsBySlug = getReviewsBySlug(reviewsRows);
+    const badgesBySlug = getBadgesBySlug(plpRowsByDataset.flat());
+    const bySlug = buildProductIndexBySlug(data, locale, language);
 
-    const isProd = window.location.hostname.includes('vitamix.com') || window.location.hostname.includes('.aem.network');
-    const indexPath = window.location.pathname.includes('/commercial/') ? 'commercial/products' : 'products';
-    const indexUrl = `/${locale}/${language}/${indexPath}/index.json?include=all`;
-    const resp = await (isProd ? fetch(indexUrl) : corsProxyFetch(indexUrl));
-    const { data } = await resp.json();
-    if (!isProd && resp.ok) {
-      data.forEach((product) => {
-        if (product.image) product.image = `https://main--vitamix--aemsites.aem.network/${locale}/${language}/products/${product.image.substring(2)}`;
-      });
-    }
-
-    const reviewsBySlug = getReviewsBySlug(await fetchReviewsData(locale, language));
-
-    const parentsBySku = {};
-    const variants = [];
-    data.forEach((d) => {
-      const product = parseProduct(d, locale, language);
-      if (product.sku && !product.parentSku) parentsBySku[product.sku] = product;
-      else variants.push(product);
+    Object.entries(bySlug).forEach(([slug, product]) => {
+      const reviews = reviewsBySlug[slug];
+      product.reviewCount = reviews ? reviews.reviewCount : 0;
+      product.reviewAverage = reviews ? reviews.reviewAverage : 0;
+      product.badge = badgesBySlug[slug] || '';
     });
 
-    variants.forEach((variant) => {
-      const parent = parentsBySku[variant.parentSku];
-      if (!parent) return;
-      parent.variants = parent.variants || [];
-      parent.variants.push(variant);
-      parent.colors = parent.colors || [];
-      parent.colors.push(variant.color);
-    });
-
-    const urlLookup = {};
-    Object.values(parentsBySku).forEach((product) => {
-      let url;
-      if (product.url) url = new URL(product.url, window.location.origin).pathname;
-      else if (product.urlKey) url = buildProductsUrl(locale, language, product.urlKey);
-      if (!url) {
-        // eslint-disable-next-line no-console
-        console.warn(product.sku, 'has no URL key');
-        return;
-      }
-      product.url = url;
-      const reviews = reviewsBySlug[slugFromUrl(url)];
-      product.reviewCount = reviews?.reviewCount ?? 0;
-      product.reviewAverage = reviews?.reviewAverage ?? 0;
-      urlLookup[url] = product;
-    });
-
-    window.productRowIndex = urlLookup;
+    window.productRowIndex = bySlug;
   }
 
-  return pathnames.map((path) => window.productRowIndex[path]).filter((e) => e);
+  return pathnames.map((path) => window.productRowIndex[slugFromUrl(path)]).filter((e) => e);
 }
 
 /**
