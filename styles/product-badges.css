@@ -30,3 +30,8 @@
   background-color: var(--color-charcoal);
   color: var(--color-white);
 }
+
+.product-badge-tier-info {
+  background-color: var(--color-gray-300);
+  color: var(--color-charcoal);
+}
