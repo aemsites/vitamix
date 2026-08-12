@@ -6,7 +6,13 @@
 }
 
 .product-row:not(.carousel) {
-  padding: 0 26px;
+  padding: 0;
+}
+
+@media (width >= 600px) {
+  .product-row:not(.carousel) {
+    padding: 0 26px;
+  }
 }
 
 .product-row:not(.carousel) > ul {
