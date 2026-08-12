@@ -12,8 +12,16 @@
   align-items: center;
   display: flex;
   position: relative;
-  min-height: 575px;
+  min-height: 650px;
   width: 100%;
+}
+
+@media (width >= 800px) {
+  .hero,
+  .hero > div {
+    align-items: center;
+    min-height: 575px;
+  }
 }
 
 .hero {
@@ -73,9 +81,16 @@
   position: absolute;
   inset: 0;
   z-index: -1;
-  height: 100%;
+  height: 85%;
   width: 100%;
   object-fit: cover;
+}
+
+@media (width >= 800px) {
+  .hero picture[data-bg] img,
+  .hero video {
+    height: 100%;
+  }
 }
 
 .hero .icon svg {
@@ -109,6 +124,10 @@
     font-size: var(--font-size-950);
   }
 
+  .hero > div > div {
+    padding-top: 55px;
+  }
+
   .hero:not(.sub) .eyebrow,
   .hero:not(.sub) p {
     font-size: 18px;
@@ -120,8 +139,7 @@
   max-width: 600px;
   width: 100%;
   padding: var(--horizontal-spacing);
-  padding-top: 55px;
-  color: var(--color-gray-100);
+  padding-top: 25px;
 }
 
 .hero:not(.split) > div > div {
