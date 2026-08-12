@@ -476,7 +476,8 @@ function enableNavSearch(form) {
  * @param {HTMLFormElement} form - Footer sign-up form
  */
 function enableFooterSignUp(form) {
-  form.classList.add('footer-sign-up');
+  const formName = 'footer-sign-up';
+  form.classList.add(formName);
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const data = new FormData(form);
@@ -537,7 +538,7 @@ function enableFooterSignUp(form) {
 
     document.dispatchEvent(new CustomEvent(
       success ? 'form:submit-success' : 'form:submit-error',
-      { detail: { formName: 'footer-sign-up' } },
+      { detail: { formName } },
     ));
   });
 }
