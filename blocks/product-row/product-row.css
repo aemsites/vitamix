@@ -2,7 +2,7 @@
 @import url('../../styles/product-badges.css');
 
 .product-row h3 {
-  font-size: var(--heading-size-xs);
+  font-size: var(--heading-size-s);
 }
 
 .product-row h3 a {
