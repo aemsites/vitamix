@@ -139,7 +139,7 @@
   max-width: 600px;
   width: 100%;
   padding: var(--horizontal-spacing);
-  padding-top: 25px;
+  padding-top: 55px;
 }
 
 .hero:not(.split) > div > div {
