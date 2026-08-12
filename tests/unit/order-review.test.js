@@ -216,6 +216,41 @@ describe('createConfirmHandler', () => {
     assert.equal(errored, 'Your card was declined.');
     assert.deepEqual(busy, [true, false]);
   });
+
+  test('routes a fraud_declined result to the fraud handler, not the cart or a generic error', async () => {
+    let errored = null;
+    let notConfirmable = false;
+    let fraudDeclined = false;
+    const handler = createConfirmHandler({
+      orderId: 'o',
+      // The confirm endpoint returns a 200 with reason=fraud_declined and
+      // cancelled:true when Forter declines the capture.
+      confirm: async () => ({ status: 'failed', reason: 'fraud_declined', cancelled: true }),
+      routeTo: () => {},
+      onError: (msg) => { errored = msg; },
+      onNotConfirmable: () => { notConfirmable = true; },
+      onFraudDeclined: () => { fraudDeclined = true; },
+      errorMessage: 'fallback message',
+    });
+    await handler();
+    assert.equal(fraudDeclined, true); // routed to the order-cancelled page
+    assert.equal(notConfirmable, false); // NOT the generic cart bounce
+    assert.equal(errored, null); // terminal: no stay-and-retry error
+  });
+
+  test('falls back to the cancelled path for fraud_declined when no fraud handler is wired', async () => {
+    let notConfirmable = false;
+    const handler = createConfirmHandler({
+      orderId: 'o',
+      confirm: async () => ({ status: 'failed', reason: 'fraud_declined', cancelled: true }),
+      routeTo: () => {},
+      onError: () => {},
+      onNotConfirmable: () => { notConfirmable = true; },
+      errorMessage: 'fallback message',
+    });
+    await handler();
+    assert.equal(notConfirmable, true); // still terminal, just without the tailored copy
+  });
 });
 
 describe('isOrderNotConfirmable', () => {
