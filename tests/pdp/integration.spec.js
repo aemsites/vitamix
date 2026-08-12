@@ -346,6 +346,7 @@ test.describe('PDP Integration Tests', () => {
               findLocally: 'No',
               findDealer: 'Yes',
               comingSoon: 'No',
+              isCommercial: true,
             },
           };
           saleableHost.append(renderAddToCart(ph, saleableHost, saleableProduct));
@@ -362,11 +363,31 @@ test.describe('PDP Integration Tests', () => {
               findLocally: 'No',
               findDealer: 'Yes',
               comingSoon: 'No',
+              isCommercial: true,
             },
           };
           unavailableHost.append(renderAddToCart(ph, unavailableHost, unavailableProduct));
 
-          document.querySelector('main').append(saleableHost, unavailableHost);
+          // A saleable, non-commercial product (e.g. a bundle) that carries
+          // findDealer=Yes in the product bus must NOT show the dealer CTA
+          // because it is not flagged commercial.
+          const nonCommercialHost = document.createElement('div');
+          nonCommercialHost.classList.add('pdp', 'noncommercial-saleable');
+          const nonCommercialProduct = {
+            offers: [{
+              sku: 'noncommercial-saleable',
+              custom: { managedStock: '0', addToCart: 'Yes', comingSoon: 'No' },
+            }],
+            custom: {
+              type: 'bundle',
+              findLocally: 'No',
+              findDealer: 'Yes',
+              comingSoon: 'No',
+            },
+          };
+          nonCommercialHost.append(renderAddToCart(ph, nonCommercialHost, nonCommercialProduct));
+
+          document.querySelector('main').append(saleableHost, unavailableHost, nonCommercialHost);
           window.selectedVariant = selectedVariant;
         });
 
@@ -396,6 +417,13 @@ test.describe('PDP Integration Tests', () => {
         await expect(unavailable.locator('.quantity-container')).toHaveCount(0);
         await expect(unavailableDealerButton).toHaveClass(/emphasis/);
         await expect(unavailableDealerButton).toHaveAttribute('href', dealerUrl);
+
+        // Non-commercial saleable product: Add to Cart shows, but no dealer CTA.
+        const nonCommercial = page.locator('.noncommercial-saleable');
+        await expect(nonCommercial.locator('.quantity-container button')).toBeVisible();
+        await expect(nonCommercial.locator('.pdp-find-dealer-button')).toHaveCount(0);
+        await expect(nonCommercial.locator('.add-to-cart')).not.toHaveClass(/pdp-add-to-cart-with-dealer/);
+        await expect(nonCommercial).not.toHaveClass(/pdp-find-dealer/);
       },
     );
   });
