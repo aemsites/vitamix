@@ -358,7 +358,7 @@ main .plp-product-card p {
   height: 100%;
 }
 
-.plp .color-swatch-oos.plp-color-inner::after {
+..plp .plp-color-inner.plp-color-swatch-oos::after {
   content: '';
   position: absolute;
   top: 0;
