@@ -135,6 +135,9 @@ export default function renderAddToCart(ph, block, parent) {
   // Authored overrides win over the product bus custom values.
   const findLocally = getPdpOverride('findLocally') || parent.custom.findLocally;
   const findDealer = getPdpOverride('findDealer') || parent.custom.findDealer;
+  // The commercial flag comes from the product bus (same signal used by the
+  // resources tab) and scopes the secondary dealer CTA to commercial products.
+  const { isCommercial } = parent.custom;
   block.classList.remove('pdp-find-locally');
   block.classList.remove('pdp-find-dealer');
 
@@ -285,7 +288,10 @@ export default function renderAddToCart(ph, block, parent) {
   addToCartContainer.appendChild(quantityContainer);
 
   // Saleable commercial products keep the dealer CTA as a secondary action.
-  if (findDealer === 'Yes') {
+  // Gate on isCommercial so non-commercial products (e.g. bundles) that carry
+  // findDealer=Yes in the product bus don't surface the dealer button alongside
+  // Add to Cart when they are in stock.
+  if (findDealer === 'Yes' && isCommercial) {
     addToCartContainer.classList.add('pdp-add-to-cart-with-dealer');
     appendFindDealerCta(ph, addToCartContainer, true);
   }
