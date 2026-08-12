@@ -1,12 +1,22 @@
 @import url('../../styles/color-swatches.css');
 @import url('../../styles/product-badges.css');
 
+.product-row h3 {
+  font-size: var(--heading-size-s);
+}
+
 .product-row h3 a {
   text-decoration: none;
 }
 
 .product-row:not(.carousel) {
-  padding: 0 26px;
+  padding: 0;
+}
+
+@media (width >= 600px) {
+  .product-row:not(.carousel) {
+    padding: 0 26px;
+  }
 }
 
 .product-row:not(.carousel) > ul {
@@ -20,7 +30,7 @@
 }
 
 .product-row:not(.carousel) > ul > li {
-  flex: 0 0 100%;
+  flex: 0 0 calc((100% - var(--spacing-l)) / 2);
 }
 
 @media (width >= 600px) {
