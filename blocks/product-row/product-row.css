@@ -266,14 +266,34 @@
   color: var(--color-charcoal);
 }
 
-.product-row .carousel-slide.marketing .slide-body.dark .button {
+.product-row .carousel-slide.marketing .slide-body.dark .button:not(.emphasis, .link) {
   border-color: var(--color-white);
   background-color: transparent;
   color: var(--color-white);
 }
 
-.product-row .carousel-slide.marketing .slide-body.light .button {
+.product-row .carousel-slide.marketing .slide-body.light .button:not(.emphasis, .link) {
   border-color: var(--color-charcoal);
   background-color: transparent;
+  color: var(--color-charcoal);
+}
+
+.product-row .carousel-slide.marketing .slide-body.dark .button.emphasis {
+  border-color: var(--color-white);
+  background-color: var(--color-white);
+  color: var(--color-charcoal);
+}
+
+.product-row .carousel-slide.marketing .slide-body.light .button.emphasis {
+  border-color: var(--color-charcoal);
+  background-color: var(--color-charcoal);
+  color: var(--color-white);
+}
+
+.product-row .carousel-slide.marketing .slide-body.dark .button.link {
+  color: var(--color-white);
+}
+
+.product-row .carousel-slide.marketing .slide-body.light .button.link {
   color: var(--color-charcoal);
 }
