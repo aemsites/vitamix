@@ -112,6 +112,9 @@ async function setupReviewMocks(page, overrides = {}) {
   await page.route('**/us/en_us/order/cart*', (route) => route.fulfill({
     status: 200, contentType: 'text/html', body: '<!doctype html><html><body><h1>Cart (stub)</h1></body></html>',
   }));
+  await page.route('**/us/en_us/order/cancel*', (route) => route.fulfill({
+    status: 200, contentType: 'text/html', body: '<!doctype html><html><body><h1>Order cancelled (stub)</h1></body></html>',
+  }));
 }
 
 async function gotoReview(page, baseUrl, orderId = MOCK_ORDER_ID) {
@@ -286,6 +289,31 @@ test.describe('Order review page (display-only)', () => {
       await expect(page.locator('.order-review-error')).toContainText(/expired or been cancelled/i, { timeout: 10000 });
       await expect.poll(() => page.url(), { timeout: 15000 }).toMatch(/\/order\/cart/);
       console.log('✓ Failed + cancelled:true → clear message → cart');
+    });
+
+    test('a fraud_declined confirm routes to the order-cancelled page (Customer Care copy)', async ({ page }) => {
+      await setupReviewMocks(page, {
+        confirm: async (route) => {
+          // Forter decline: the confirm endpoint returns 200 with
+          // reason=fraud_declined and cancelled:true (order moved to
+          // payment_cancelled server-side).
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ status: 'failed', reason: 'fraud_declined', cancelled: true }),
+          });
+        },
+      });
+      await gotoReview(page, baseUrl);
+
+      await expect(page.locator('.order-review-complete')).toBeVisible({ timeout: 15000 });
+      await page.locator('.order-review-complete').click();
+
+      // Routed to the order-cancelled page with reason=fraud_declined (matching
+      // the redirect-based card/wallet flows) rather than bounced to the cart.
+      await expect.poll(() => page.url(), { timeout: 15000 })
+        .toMatch(/\/order\/cancel\?.*reason=fraud_declined/);
+      console.log('✓ Fraud decline → /order/cancel?reason=fraud_declined');
     });
 
     test('a cancelled/expired order shows a clear message and returns to the cart', async ({ page }) => {
