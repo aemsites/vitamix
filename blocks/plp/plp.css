@@ -367,14 +367,12 @@ main .plp-product-card p {
   height: 100%;
   background: -webkit-gradient(linear, left top, right bottom,
       color-stop(0%, #fff0),
-      color-stop(42%, #fff0),
-      color-stop(43%, #fff),
-      color-stop(46%, #fff),
-      color-stop(47%, #ff5216),
-      color-stop(53%, #ff5216),
-      color-stop(54%, #fff),
-      color-stop(57%, #fff),
-      color-stop(58%, #fff0),
+      color-stop(47%, #fff0),
+      color-stop(48%, #fff),
+      color-stop(49.5%, #ff5216),
+      color-stop(50.5%, #ff5216),
+      color-stop(52%, #fff),
+      color-stop(53%, #fff0),
       color-stop(100%, #fff0));
 }
 
