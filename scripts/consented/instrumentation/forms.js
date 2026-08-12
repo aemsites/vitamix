@@ -6,73 +6,49 @@ import {
 } from './adobe-runtime.js';
 
 /**
- * Launch direct-call rule fired on every tracked form.block submission
- * (Adobe Analytics, Vitamix.com property — see Launch rule "form-submit").
+ * Launch direct-call rule fired once a form.block submission is confirmed successful
+ * (Adobe Analytics, Vitamix.com property — see Launch rule "form-submit"). Never fire
+ * this on the raw DOM submit event — only after the backend has actually responded ok.
  */
 const FORM_SUBMIT_EVENT = 'form-submit';
 
-/**
- * digitalData.component.form.formName by the identifying CSS class blocks/form/form.js's
- * enableSubmission() adds to the built <form> (see buildForm() →
- * enableFooterSignUp/enableNavSearch). Add an entry here whenever a new form.block
- * submission handler is wired up there.
- * @type {Record<string, string>}
- */
-const FORM_NAME_BY_CLASS = {
-  'footer-sign-up': 'footer-sign-up',
-  'nav-search': 'nav-search',
-};
+/** Launch direct-call rule fired when a form.block submission fails (non-2xx response
+ *  or a thrown error), instead of form-submit. */
+const FORM_ERROR_EVENT = 'formError';
 
 /**
- * Resolve digitalData.component.form.formName for a submitted form.block <form>.
- * Falls back to a data-form-name override or the form id when no known class matches
- * (e.g. locator, or a future form type not yet added to FORM_NAME_BY_CLASS).
- * @param {HTMLFormElement} form
- * @returns {string}
- */
-function resolveFormName(form) {
-  const matchedClass = Object.keys(FORM_NAME_BY_CLASS)
-    .find((className) => form.classList.contains(className));
-  if (matchedClass) return FORM_NAME_BY_CLASS[matchedClass];
-  return form.dataset.formName || form.id || 'form';
-}
-
-/**
- * Set digitalData.component.form.formName and fire the form-submit Launch direct-call rule.
+ * Set digitalData.component.form.formName and fire a form Launch direct-call rule.
+ * @param {string} eventName Launch direct-call identifier (form-submit or formError)
  * @param {string} formName
  * @returns {void}
  */
-export function fireFormSubmit(formName) {
+function fireFormEvent(eventName, formName) {
   if (!hasMarketingConsent()) {
     return;
   }
 
   assignDigitalDataComponent({ form: { formName } });
-
-  // triggerLaunchEvent() already logs the fired event + payload — no need to log again here.
   whenSatelliteReady(() => {
-    triggerLaunchEvent(FORM_SUBMIT_EVENT, window.digitalData.component);
-  }, FORM_SUBMIT_EVENT);
+    triggerLaunchEvent(eventName, window.digitalData.component);
+  }, eventName);
 }
 
 /**
- * Attach a submit-tracking listener to a form.block <form>, guarded against double-attach.
- * Runs alongside (not in place of) the block's own submit handler in blocks/form/form.js.
- * @param {HTMLFormElement} form
+ * Fire form-submit for a successful form.block submission.
+ * @param {string} formName
+ * @returns {void}
  */
-function attachFormSubmitTracking(form) {
-  if (form.dataset.formAnalyticsAttached) return;
-  form.dataset.formAnalyticsAttached = 'true';
-
-  form.addEventListener('submit', () => {
-    fireFormSubmit(resolveFormName(form));
-  });
+export function fireFormSubmit(formName) {
+  fireFormEvent(FORM_SUBMIT_EVENT, formName);
 }
 
-/** Scan the page for loaded form.block forms and wire up any that aren't attached yet. */
-function attachFormTargets() {
-  document.querySelectorAll('.form-wrapper .form.block[data-form="loaded"] form')
-    .forEach((form) => attachFormSubmitTracking(form));
+/**
+ * Fire formError for a failed form.block submission.
+ * @param {string} formName
+ * @returns {void}
+ */
+export function fireFormError(formName) {
+  fireFormEvent(FORM_ERROR_EVENT, formName);
 }
 
 let formEventsRegistered = false;
@@ -83,26 +59,23 @@ export function resetFormEventsState() {
 }
 
 /**
- * Register form-submit analytics on every form.block on the page (footer sign-up,
- * nav search, etc). form.block builds its <form> asynchronously (fetch + buildForm in
- * blocks/form/form.js) and flips data-form to "loaded" when done, so an initial scan is
- * followed by a MutationObserver watching for that flip — the same lazily-loaded-content
- * pattern trackSocialEvents() uses for the footer.
+ * Listen for the form:submit-success / form:submit-error CustomEvents that
+ * blocks/form/form.js dispatches once it knows the actual backend outcome (never on the
+ * raw submit DOM event, which fires before that outcome is known), and fire the matching
+ * Launch direct-call rule. Kept decoupled from block code — mirrors trackCartChange()'s
+ * cart:change listener so blocks never import this instrumentation module directly.
  * @returns {void}
  */
 export function trackFormEvents() {
   if (formEventsRegistered) return;
   formEventsRegistered = true;
 
-  attachFormTargets();
-
-  const observer = new MutationObserver(() => attachFormTargets());
-  observer.observe(document.body, {
-    subtree: true,
-    childList: true,
-    attributes: true,
-    attributeFilter: ['data-form'],
+  document.addEventListener('form:submit-success', (ev) => {
+    fireFormSubmit(ev.detail?.formName || 'form');
+  });
+  document.addEventListener('form:submit-error', (ev) => {
+    fireFormError(ev.detail?.formName || 'form');
   });
 
-  debugLog('Adobe Analytics form-submit tracking registered');
+  debugLog('Adobe Analytics form-submit/formError tracking registered');
 }
