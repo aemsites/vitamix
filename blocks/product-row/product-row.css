@@ -1,6 +1,10 @@
 @import url('../../styles/color-swatches.css');
 @import url('../../styles/product-badges.css');
 
+.product-row h3 {
+  font-size: var(--heading-size-xs);
+}
+
 .product-row h3 a {
   text-decoration: none;
 }
