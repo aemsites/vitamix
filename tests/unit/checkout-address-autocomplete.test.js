@@ -4,6 +4,7 @@ import {
   buildPlacesAutocompleteInput,
   setAddressFieldValue,
   fillAddressFields,
+  nextActiveIndex,
 } from '../../blocks/checkout/checkout-address.js';
 
 // Minimal field mock compatible with setAddressFieldValue/clearFieldError:
@@ -174,4 +175,43 @@ test('fillAddressFields populates an empty street from a route-only result', () 
   ]);
 
   assert.equal(addressInput.value, 'Dufferin Street');
+});
+
+// nextActiveIndex drives keyboard navigation of the Places suggestion dropdown
+// (issue #801: ArrowDown/ArrowUp must move a highlight through the suggestions).
+
+test('nextActiveIndex: ArrowDown from nothing highlighted selects the first option', () => {
+  assert.equal(nextActiveIndex(-1, 5, 'ArrowDown'), 0);
+});
+
+test('nextActiveIndex: ArrowDown advances to the next option', () => {
+  assert.equal(nextActiveIndex(0, 5, 'ArrowDown'), 1);
+  assert.equal(nextActiveIndex(3, 5, 'ArrowDown'), 4);
+});
+
+test('nextActiveIndex: ArrowDown wraps from the last option back to the first', () => {
+  assert.equal(nextActiveIndex(4, 5, 'ArrowDown'), 0);
+});
+
+test('nextActiveIndex: ArrowUp from nothing highlighted selects the last option', () => {
+  assert.equal(nextActiveIndex(-1, 5, 'ArrowUp'), 4);
+});
+
+test('nextActiveIndex: ArrowUp moves to the previous option', () => {
+  assert.equal(nextActiveIndex(4, 5, 'ArrowUp'), 3);
+  assert.equal(nextActiveIndex(1, 5, 'ArrowUp'), 0);
+});
+
+test('nextActiveIndex: ArrowUp wraps from the first option to the last', () => {
+  assert.equal(nextActiveIndex(0, 5, 'ArrowUp'), 4);
+});
+
+test('nextActiveIndex: returns -1 when there are no options', () => {
+  assert.equal(nextActiveIndex(-1, 0, 'ArrowDown'), -1);
+  assert.equal(nextActiveIndex(2, 0, 'ArrowUp'), -1);
+});
+
+test('nextActiveIndex: leaves the index unchanged for unrelated keys', () => {
+  assert.equal(nextActiveIndex(2, 5, 'Enter'), 2);
+  assert.equal(nextActiveIndex(-1, 5, 'Escape'), -1);
 });

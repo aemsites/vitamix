@@ -1022,6 +1022,24 @@ export const validateAndCollapseShipping = (...args) => validateAndCollapseAddre
   'shipping-',
 );
 
+/**
+ * Computes the next highlighted option index for keyboard navigation within the
+ * Places suggestion dropdown. Wraps around at both ends: ArrowDown from the last
+ * option (or from nothing highlighted) moves to the first, and ArrowUp from the
+ * first option (or from nothing highlighted) moves to the last.
+ *
+ * @param {number} current - currently highlighted index, or -1 when none
+ * @param {number} count - number of suggestions in the dropdown
+ * @param {string} key - the KeyboardEvent.key ('ArrowDown' | 'ArrowUp')
+ * @returns {number} the index to highlight next (unchanged for other keys)
+ */
+export function nextActiveIndex(current, count, key) {
+  if (count <= 0) return -1;
+  if (key === 'ArrowDown') return current < 0 ? 0 : (current + 1) % count;
+  if (key === 'ArrowUp') return current <= 0 ? count - 1 : current - 1;
+  return current;
+}
+
 function initPlacesAutocomplete(section, config) {
   const addressInput = section.querySelector('[autocomplete="address-line1"]');
   if (!addressInput) return null;
@@ -1040,23 +1058,89 @@ function initPlacesAutocomplete(section, config) {
   addressInput.type = 'search';
   addressInput.setAttribute('autocomplete', 'off');
 
+  // Expose the field as an ARIA combobox that owns the suggestion listbox so
+  // assistive tech announces the highlighted option during keyboard navigation.
+  const listboxId = `${addressInput.name}-places-listbox`;
+  addressInput.setAttribute('role', 'combobox');
+  addressInput.setAttribute('aria-autocomplete', 'list');
+  addressInput.setAttribute('aria-expanded', 'false');
+  addressInput.setAttribute('aria-controls', listboxId);
+
   let sessionToken = crypto.randomUUID();
   let debounceTimer;
   let dropdown;
+  // Predictions backing the currently rendered options, and the index of the
+  // keyboard-highlighted option (-1 when none is active).
+  let predictions = [];
+  let activeIndex = -1;
 
   function removeDropdown() {
     if (dropdown) { dropdown.remove(); dropdown = null; }
+    predictions = [];
+    activeIndex = -1;
+    addressInput.setAttribute('aria-expanded', 'false');
+    addressInput.removeAttribute('aria-activedescendant');
+  }
+
+  // Highlights the option at `index` (or clears the highlight when -1) and keeps
+  // aria-activedescendant pointing at the active option for screen readers.
+  function setActive(index) {
+    if (!dropdown) return;
+    const options = [...dropdown.children];
+    activeIndex = index;
+    options.forEach((li, i) => {
+      const isActive = i === index;
+      li.classList.toggle('is-active', isActive);
+      li.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+    if (index >= 0) {
+      const activeOption = options[index];
+      addressInput.setAttribute('aria-activedescendant', activeOption.id);
+      activeOption.scrollIntoView({ block: 'nearest' });
+    } else {
+      addressInput.removeAttribute('aria-activedescendant');
+    }
+  }
+
+  // Applies a chosen prediction: fills the visible field, closes the dropdown,
+  // then fetches full place details to populate the remaining address fields.
+  async function selectSuggestion(prediction) {
+    if (!prediction) return;
+    addressInput.value = prediction.structuredFormat.mainText.text;
+    removeDropdown();
+
+    try {
+      const params = new URLSearchParams({
+        place_id: prediction.placeId, sessiontoken: sessionToken,
+      });
+      const resp = await fetch(`${config.apiOrigin}/places/details?${params}`);
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.addressComponents) {
+          fillAddressFields(section, addressInput, data.addressComponents);
+        }
+      }
+    } catch { /* silent */ }
+
+    sessionToken = crypto.randomUUID();
   }
 
   function showDropdown(suggestions) {
     removeDropdown();
     if (!suggestions.length) return;
 
+    predictions = suggestions.map(({ placePrediction: p }) => p);
+
     dropdown = document.createElement('ul');
     dropdown.className = 'places-autocomplete-dropdown';
+    dropdown.id = listboxId;
+    dropdown.setAttribute('role', 'listbox');
 
-    suggestions.forEach(({ placePrediction: p }) => {
+    predictions.forEach((p, i) => {
       const li = document.createElement('li');
+      li.id = `${listboxId}-option-${i}`;
+      li.setAttribute('role', 'option');
+      li.setAttribute('aria-selected', 'false');
       const main = document.createElement('span');
       main.className = 'places-main';
       main.textContent = p.structuredFormat.mainText.text;
@@ -1065,30 +1149,43 @@ function initPlacesAutocomplete(section, config) {
       secondary.textContent = p.structuredFormat.secondaryText.text;
       li.append(main, secondary);
 
-      li.addEventListener('mousedown', async (e) => {
+      li.addEventListener('mousedown', (e) => {
         e.preventDefault();
-        addressInput.value = p.structuredFormat.mainText.text;
-        removeDropdown();
-
-        try {
-          const params = new URLSearchParams({ place_id: p.placeId, sessiontoken: sessionToken });
-          const resp = await fetch(`${config.apiOrigin}/places/details?${params}`);
-          if (resp.ok) {
-            const data = await resp.json();
-            if (data.addressComponents) {
-              fillAddressFields(section, addressInput, data.addressComponents);
-            }
-          }
-        } catch { /* silent */ }
-
-        sessionToken = crypto.randomUUID();
+        selectSuggestion(p);
+      });
+      // Sync the keyboard highlight with the pointer so alternating between mouse
+      // and keyboard never leaves two options highlighted at once.
+      li.addEventListener('mousemove', () => {
+        if (activeIndex !== i) setActive(i);
       });
 
       dropdown.append(li);
     });
 
     wrapper.append(dropdown);
+    addressInput.setAttribute('aria-expanded', 'true');
   }
+
+  // Keyboard navigation: ArrowDown/ArrowUp move the highlight (wrapping at the
+  // ends), Enter selects the highlighted suggestion, and Escape closes the list.
+  addressInput.addEventListener('keydown', (e) => {
+    if (!dropdown || !predictions.length) return;
+
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActive(nextActiveIndex(activeIndex, predictions.length, e.key));
+    } else if (e.key === 'Enter') {
+      if (activeIndex >= 0) {
+        e.preventDefault();
+        selectSuggestion(predictions[activeIndex]);
+      }
+    } else if (e.key === 'Escape') {
+      // Prevent type="search" inputs from clearing the field on Escape; we only
+      // want to dismiss the suggestion list.
+      e.preventDefault();
+      removeDropdown();
+    }
+  });
 
   addressInput.addEventListener('input', () => {
     clearTimeout(debounceTimer);
