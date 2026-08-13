@@ -1,0 +1,37 @@
+.product-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--spacing-40);
+}
+
+.product-badge {
+  display: inline-block;
+  padding: var(--spacing-40) var(--spacing-60);
+  border-radius: 4px;
+  font-size: var(--body-size-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  opacity: 0.9;
+  transition: opacity 0.2s;
+}
+
+.product-badges:hover .product-badge {
+  opacity: 1;
+}
+
+.product-badge-tier-alert {
+  background-color: var(--color-red);
+  color: var(--color-white);
+}
+
+.product-badge-tier-merch {
+  background-color: var(--color-charcoal);
+  color: var(--color-white);
+}
+
+.product-badge-tier-info {
+  background-color: var(--color-gray-300);
+  color: var(--color-charcoal);
+}

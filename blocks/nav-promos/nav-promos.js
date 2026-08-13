@@ -123,7 +123,7 @@ function renderPreview(block, promos) {
     listItems = [...promosContainer.querySelectorAll('li')];
   };
 
-  updateViews(new Date());
+  updateViews(window.simulateDate || new Date());
 
   dtl.addEventListener('input', (e) => {
     updateViews(new Date(e.target.value));

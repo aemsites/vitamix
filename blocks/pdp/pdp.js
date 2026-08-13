@@ -15,7 +15,9 @@ import {
   getLocaleAndLanguage,
   formatPrice,
 } from '../../scripts/scripts.js';
-import { openModal } from '../modal/modal.js';
+import addToCompare, {
+  useWidgetCompare, isInStoredCompare, removeFromCompare,
+} from '../../scripts/add-to-compare.js';
 
 /**
  * Renders the title section of the PDP block.
@@ -92,40 +94,56 @@ function renderFAQ(ph) {
   return faqContainer;
 }
 
-function renderCompare(ph, custom) {
+function renderCompare(ph, jsonLdData) {
   const { locale, language } = getLocaleAndLanguage();
+  const { custom, image } = jsonLdData;
   const { entityId } = custom;
+  const path = window.location.pathname;
+  const widgetMode = useWidgetCompare();
+  const comparisonLabel = ph.viewComparisonList || 'View Comparison List';
+  const comparisonLinkText = comparisonLabel.endsWith('.')
+    ? comparisonLabel
+    : `${comparisonLabel}.`;
   const compareContainer = document.createElement('div');
   compareContainer.classList.add('pdp-compare-container');
+  // The Magento compare index page only makes sense for the Magento server-side compare list.
+  const viewListLink = widgetMode ? '' : `<a href="/${locale}/${language}/catalog/product_compare/index/" title="${comparisonLabel}" class="comparelistlink">${comparisonLinkText}</a>`;
   compareContainer.innerHTML = `
     <div>
       <button class="pdp-compare-button">${ph.compare || 'Compare'}</button>
-      <a href="/${locale}/${language}/catalog/product_compare/index/" title="${ph.viewComparisonList || 'View Comparison List'}" class="comparelistlink">${ph.viewComparisonList || 'View Comparison List'}.</a>
+      ${viewListLink}
     </div>`;
 
   const compareButton = compareContainer.querySelector('.pdp-compare-button');
+
+  // Only the compare-products widget path tracks membership client-side (Magento's server-side
+  // compare list has no easy client-side "is this already in it?" check), so the toggle-to-
+  // "Remove from Compare" state only applies there.
+  const updateLabel = () => {
+    const inCompare = widgetMode && isInStoredCompare(path);
+    compareButton.textContent = inCompare
+      ? (ph.removeFromCompare || 'Remove from Compare')
+      : (ph.compare || 'Compare');
+    compareButton.classList.toggle('pdp-compare-button-active', inCompare);
+  };
+  updateLabel();
+
   compareButton.addEventListener('click', () => {
-    fetch(`/${locale}/${language}/catalog/product_compare/add/`, {
-      headers: {
-        'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        'x-requested-with': 'XMLHttpRequest',
-      },
-      body: `product=${entityId}&uenc=${encodeURIComponent(window.location.href)}`,
-      method: 'POST',
-      credentials: 'include',
-    }).then((resp) => {
-      if (resp.ok) {
-        openModal(`/${locale}/${language}/products/modals/compare`).then((modal) => {
-          if (modal) {
-            const content = modal.querySelector('.default-content-wrapper');
-            const product = document.createElement('p');
-            product.className = 'product';
-            product.textContent = document.querySelector('h1').textContent;
-            content.prepend(product);
-          }
-        });
-      }
-    });
+    if (widgetMode && isInStoredCompare(path)) {
+      removeFromCompare(path, { viewComparisonLabel: ph.viewComparison });
+    } else {
+      addToCompare({
+        url: path,
+        title: document.querySelector('h1')?.textContent || '',
+        image: Array.isArray(image) ? image[0] : image,
+        entityId,
+      }, {
+        addedMessage: ph.addedToComparison,
+        limitMessage: ph.compareLimitReached,
+        viewComparisonLabel: ph.viewComparison,
+      });
+    }
+    updateLabel();
   });
 
   return compareContainer;
@@ -249,13 +267,18 @@ async function renderFreeGift() {
       const doc = new DOMParser().parseFromString(text, 'text/html');
       const gifts = doc.querySelector('.free-gifts');
       return [...gifts.children].map((gift) => {
-        const [startDateEl, endDateEl, minPrice, label, body] = gift.children;
+        const [startDateEl, endDateEl, minPrice, label, body, productSlugsEl] = gift.children;
         try {
           const minPriceText = minPrice.textContent.startsWith('$')
             ? minPrice.textContent.slice(1)
             : minPrice.textContent;
           const labelText = label.textContent;
           const bodyText = body.innerHTML.replaceAll('./media_', './config/media_');
+          // Optional trailing column: comma-separated product slugs. Absent/empty = all products.
+          const productSlugs = (productSlugsEl?.textContent || '')
+            .split(',')
+            .map((slug) => slug.trim().toLowerCase())
+            .filter(Boolean);
           return {
             valid: true,
             startDate: parseDateOrNull(startDateEl.textContent),
@@ -263,6 +286,7 @@ async function renderFreeGift() {
             minPrice: minPriceText,
             label: labelText,
             body: bodyText,
+            productSlugs,
           };
         } catch {
           // Skip rows with malformed dates
@@ -272,13 +296,17 @@ async function renderFreeGift() {
     };
 
     const gifts = await fetchGifts();
+    const productSlug = (window.location.pathname.split('/').filter(Boolean).pop() || '')
+      .toLowerCase();
 
     const findGift = (giftList) => giftList.find((gift) => {
-      const today = new Date();
+      const today = window.simulateDate || new Date();
       // Null start = open-ended past, null end = open-ended future
       const afterStart = !gift.startDate || today >= gift.startDate;
       const beforeEnd = !gift.endDate || today <= gift.endDate;
-      return afterStart && beforeEnd;
+      const slugMatches = !gift.productSlugs.length
+        || gift.productSlugs.includes(productSlug);
+      return afterStart && beforeEnd && slugMatches;
     });
     const gift = findGift(gifts);
     if (gift) {
@@ -325,7 +353,7 @@ export default async function decorate(block) {
   const pricingContainer = renderPricing(ph, block);
   const optionsContainer = renderOptions(ph, block, variants, custom, isParentOutOfStock);
   const addToCartContainer = renderAddToCart(ph, block, jsonLdData);
-  const compareContainer = renderCompare(ph, custom);
+  const compareContainer = renderCompare(ph, jsonLdData);
   const freeGiftContainer = await renderFreeGift();
   const freeShippingContainer = renderFreeShipping(ph, offers);
   const shareContainer = renderShare(ph);

@@ -1,0 +1,66 @@
+/* Compare-list toast (compare-products widget path only - Magento's compare-add flow already has
+   its own confirmation modal). Shows the message, small round thumbnails of everything currently
+   in the comparison list, and a "View Comparison" link (reusing the header's compare link). */
+.add-to-compare-toast {
+  position: fixed;
+  z-index: 1000;
+  left: 50%;
+  bottom: var(--spacing-400, 32px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-100, 16px);
+  max-width: calc(100vw - var(--spacing-400, 32px) * 2);
+  padding: var(--spacing-200, 20px) var(--spacing-300, 24px);
+  border-radius: var(--rounding-m, 8px);
+  background-color: var(--color-charcoal, #333f48);
+  color: var(--color-white, #fff);
+  text-align: center;
+  box-shadow: var(--shadow-default, 0 8px 24px rgb(0 0 0 / 20%));
+  opacity: 0;
+  transform: translate(-50%, 8px);
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.add-to-compare-toast-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  pointer-events: auto;
+}
+
+.add-to-compare-toast-message {
+  margin: 0;
+  font-size: var(--body-size-s, 0.875rem);
+  font-weight: var(--weight-medium, 500);
+}
+
+.add-to-compare-toast-thumbs {
+  display: flex;
+  gap: var(--spacing-60, 8px);
+}
+
+.add-to-compare-toast-thumb {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: var(--border-s, 1px) solid var(--color-white, #fff);
+  background-color: var(--color-white, #fff);
+  object-fit: contain;
+}
+
+.add-to-compare-toast-link {
+  display: inline-block;
+  padding: var(--spacing-60, 8px) var(--spacing-200, 20px);
+  border-radius: var(--rounding-s, 4px);
+  background-color: var(--color-white, #fff);
+  color: var(--color-charcoal, #333f48);
+  font-size: var(--body-size-xs, 0.75rem);
+  font-weight: var(--weight-medium, 500);
+  text-decoration: none;
+}
+
+.add-to-compare-toast-link:hover,
+.add-to-compare-toast-link:focus-visible {
+  background-color: var(--color-gray-200, #f3f1eb);
+}

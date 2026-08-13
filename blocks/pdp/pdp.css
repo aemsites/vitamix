@@ -204,6 +204,36 @@ a.button.pdp-find-locally-button {
   text-transform: none;
 }
 
+a.button.pdp-find-dealer-button {
+  width: 100%;
+  max-width: 350px;
+  font-weight: var(--weight-light);
+  border-radius: 4px;
+  text-transform: none;
+}
+
+a.button.pdp-find-dealer-button.emphasis {
+  background-color: var(--color-charcoal);
+  border: none;
+}
+
+.add-to-cart.pdp-add-to-cart-with-dealer .quantity-container {
+  gap: 36px;
+}
+
+.add-to-cart.pdp-add-to-cart-with-dealer select {
+  height: 52px;
+}
+
+.add-to-cart.pdp-add-to-cart-with-dealer button {
+  padding: 11px 16px;
+}
+
+.add-to-cart.pdp-add-to-cart-with-dealer .pdp-find-dealer-button {
+  margin-top: 20px;
+  padding: 10px 24px;
+}
+
 .details {
   grid-area: details;
   gap: var(--spacing-xl);
@@ -518,6 +548,12 @@ a.button.pdp-find-locally-button {
   padding: 8px 16px;
   font-weight: var(--weight-light);
   margin-right: var(--spacing-s);
+}
+
+/* Toggled on once this product is already in the compare-products widget's list (localStorage) */
+.pdp-compare-button.pdp-compare-button-active {
+  background-color: var(--color-charcoal);
+  color: var(--color-white);
 }
 
 .pdp-compare-container a:any-link {
