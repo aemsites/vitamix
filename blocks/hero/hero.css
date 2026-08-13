@@ -81,14 +81,19 @@
   position: absolute;
   inset: 0;
   z-index: -1;
-  height: 85%;
+  height: 100%;
   width: 100%;
   object-fit: cover;
 }
 
+.hero.center picture[data-bg] img,
+.hero.center video {
+  height: 85%;
+}
+
 @media (width >= 800px) {
-  .hero picture[data-bg] img,
-  .hero video {
+  .hero.center picture[data-bg] img,
+  .hero.center video {
     height: 100%;
   }
 }
@@ -140,9 +145,6 @@
   width: 100%;
   padding: var(--horizontal-spacing);
   padding-top: 55px;
-}
-
-.hero:not(.split) > div > div {
   color: var(--color-white);
 }
 
