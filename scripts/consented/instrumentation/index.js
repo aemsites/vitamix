@@ -35,6 +35,7 @@ export { trackCartChange } from './cart.js';
 export { trackLogin } from './auth.js';
 export { initDigitalDataPage, syncDigitalDataPageContext } from './page-context.js';
 export { trackSocialEvents, resetSocialEventsState } from './social.js';
+export { trackFormEvents, resetFormEventsState } from './forms.js';
 
 /**
  * Load order-success tracking early on confirmation pages (before Launch loads).

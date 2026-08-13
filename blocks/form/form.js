@@ -476,7 +476,8 @@ function enableNavSearch(form) {
  * @param {HTMLFormElement} form - Footer sign-up form
  */
 function enableFooterSignUp(form) {
-  form.classList.add('footer-sign-up');
+  const formName = 'footer-sign-up';
+  form.classList.add(formName);
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const data = new FormData(form);
@@ -503,6 +504,9 @@ function enableFooterSignUp(form) {
       emailOptIn: true,
       leadSource,
     };
+
+    // Tracks the real backend outcome, used below to fire the right analytics event.
+    let success = false;
     try {
       const url = getFormSubmissionUrl();
       const resp = await fetch(url, {
@@ -512,7 +516,8 @@ function enableFooterSignUp(form) {
         },
         body: JSON.stringify(payload),
       });
-      if (!resp.ok) {
+      success = resp.ok;
+      if (!success) {
         // eslint-disable-next-line no-console
         console.error('Failed to submit newsletter subscription', resp);
       }
@@ -520,13 +525,21 @@ function enableFooterSignUp(form) {
       // eslint-disable-next-line no-console
       console.log(message);
     } catch (error) {
+      // resp.json() failed (error or malformed response) — not a successful submission.
+      success = false;
       // eslint-disable-next-line no-console
       console.error('Failed to submit newsletter subscription', error);
     }
+
     const thankYou = document.createElement('div');
     thankYou.className = 'form-thank-you';
     thankYou.innerHTML = `<p>${e.submitter.dataset.thankYou}</p>`;
     form.replaceWith(thankYou);
+
+    document.dispatchEvent(new CustomEvent(
+      success ? 'form:submit-success' : 'form:submit-error',
+      { detail: { formName } },
+    ));
   });
 }
 
