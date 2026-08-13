@@ -36,7 +36,7 @@
   color: var(--color-charcoal);
 }
 
-@media (max-width <= 767px) {
+@media (width <= 767px) {
   .product-badge.save {
     margin-top: var(--spacing-40);
   }
