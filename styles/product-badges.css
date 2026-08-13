@@ -36,10 +36,6 @@
   color: var(--color-charcoal);
 }
 @media (max-width: 767px) {
-  .product-badges {
-    margin-top: var(--spacing-40);
-  }
-
   .product-badge.save {
     margin-top: var(--spacing-40);
   }
