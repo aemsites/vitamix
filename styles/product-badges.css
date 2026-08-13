@@ -36,7 +36,7 @@
   color: var(--color-charcoal);
 }
 @media (max-width: 767px) {
-  .product-badges:has(.product-badge-bundle, .product-badge-limitedEdition)
+  .product-row .product-badges
   .product-badge-sale {
     display: none;
   }
