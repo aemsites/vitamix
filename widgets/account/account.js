@@ -8,6 +8,7 @@ import {
   unwrapPayload,
 } from './account-api.js';
 import { getFormSubmissionUrl, getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { getLeadSource } from '../../scripts/lead-source.js';
 import { getUser, logout } from '../../scripts/auth-api.js';
 
 /** Select option value for sign out (not a content section). */
@@ -208,7 +209,7 @@ export default async function decorate(widget) {
       const nextEmail = next.emailOptIn !== undefined ? next.emailOptIn : emailOptInStatus;
       const nextSms = next.smsOptIn !== undefined ? next.smsOptIn : smsOptInStatus;
       const country = window.location.pathname.split('/')[1] || 'us';
-      const leadSource = `sub-em-account-${country}`;
+      const leadSource = getLeadSource('acc', country, { emailOptIn: nextEmail, smsOptIn: nextSms });
       const payload = {
         formId: `${locale}/${language}/newsletter`,
         pageUrl: window.location.href,

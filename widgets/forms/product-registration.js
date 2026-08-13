@@ -1,4 +1,5 @@
 import { getFormSubmissionUrl, getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { getLeadSource } from '../../scripts/lead-source.js';
 import getStatesProvincesOptions from './states-provinces.js';
 
 /**
@@ -166,6 +167,15 @@ export default async function decorate(widget) {
     const payload = Object.fromEntries(data.entries());
     payload.formId = `${locale}/${language}/product-registration`;
     payload.pageUrl = window.location.href;
+    // Registration submits only to the new AEM Forms endpoint (no legacy Magento path),
+    // so the channel-suppression concern that applies to Magento-backed forms doesn't
+    // apply here — SMS opt-in is safe to encode in the leadSource. Registration has no
+    // SMS-only path (email is always part of registering a product), so email is
+    // always treated as opted in; only the SMS checkbox varies the channel.
+    payload.leadSource = getLeadSource('reg', (locale || 'us').toLowerCase(), {
+      emailOptIn: true,
+      smsOptIn: payload.smsOptIn === 'yes',
+    });
 
     const submitButton = form.querySelector('button[type="submit"]');
     const buttonLabel = submitButton?.textContent;

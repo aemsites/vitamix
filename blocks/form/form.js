@@ -1,5 +1,6 @@
 import { toCamelCase, toClassName } from '../../scripts/aem.js';
 import { getFormSubmissionUrl, getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { getLeadSource, getLegacyLeadSource } from '../../scripts/lead-source.js';
 
 /**
  * Creates an HTML element with an optional class name
@@ -486,39 +487,57 @@ function enableFooterSignUp(form) {
     const { email, mobile, optIn } = entries;
     const country = window.location.pathname.split('/')[1];
     const { locale, language } = getLocaleAndLanguage();
-    let leadSource = `sub-em-footer-${country}`;
-    if (form.closest('dialog')) {
-      leadSource = `sub-em-modal-${country}`;
-    }
-    if (window.leadSourceOverride) {
-      leadSource = `sub-em-${window.leadSourceOverride}-${country}`;
-    }
+    const smsOptIn = Boolean(optIn);
+    let page = 'footer';
+    if (form.closest('dialog')) page = 'modal';
+    if (window.leadSourceOverride) page = window.leadSourceOverride;
 
-    const payload = {
-      formId: `${locale}/${language}/newsletter`,
-      pageUrl: window.location.href,
-      email,
-      mobile,
-      smsOptIn: optIn,
-      emailOptIn: true,
-      leadSource,
-    };
     try {
-      const url = getFormSubmissionUrl();
-      const resp = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-      if (!resp.ok) {
+      if (window.useEdgeCheckout) {
+        // Edge locales submit to the new AEM Forms endpoint, not the legacy Magento REST
+        // API, so it's safe to encode the SMS channel in leadSource here.
+        const payload = {
+          formId: `${locale}/${language}/newsletter`,
+          pageUrl: window.location.href,
+          email,
+          mobile,
+          smsOptIn,
+          emailOptIn: true,
+          leadSource: getLeadSource(page, country, { emailOptIn: true, smsOptIn }),
+        };
+        const resp = await fetch(getFormSubmissionUrl(), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
+        if (!resp.ok) {
+          // eslint-disable-next-line no-console
+          console.error('Failed to submit newsletter subscription', resp);
+        }
+      } else {
+        // Non-edge locales still run on Magento: proxy through the AEM bin servlet,
+        // which forwards to the Magento REST newsletter-subscribe API server-side.
+        // Never encode channel in leadSource here — it previously caused duplicate SMS
+        // subscriptions on Magento's side (see getLegacyLeadSource doc comment).
+        const params = new URLSearchParams({
+          email,
+          mobile,
+          sms_optin: smsOptIn ? '1' : '0',
+          lead_source: getLegacyLeadSource(page, country),
+          pageUrl: window.location.href,
+          actionUrl: `/${locale}/${language}/rest/V1/vitamix-api/newslettersubscribe`,
+        });
+        const resp = await fetch(`https://www.vitamix.com/bin/vitamix/newslettersubscription?${params.toString()}`);
+        if (!resp.ok) {
+          // eslint-disable-next-line no-console
+          console.error('Failed to submit newsletter subscription', resp);
+        }
+        const { data: { message } } = await resp.json();
         // eslint-disable-next-line no-console
-        console.error('Failed to submit newsletter subscription', resp);
+        console.log(message);
       }
-      const { data: { message } } = await resp.json();
-      // eslint-disable-next-line no-console
-      console.log(message);
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to submit newsletter subscription', error);
