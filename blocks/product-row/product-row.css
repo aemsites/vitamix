@@ -228,8 +228,6 @@
 
 .product-row .price {
   display: block;
-  align-items: center;
-  gap: var(--spacing-60);
   font-weight: bold;
 }
 
