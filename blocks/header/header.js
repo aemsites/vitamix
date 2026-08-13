@@ -627,9 +627,6 @@ export default async function decorate(block) {
     }
   }
 
-  /* cookie logic */
-  const cookies = getCookies();
-
   // The compare nav item can come from either compare implementation (see
   // scripts/add-to-compare.js): Magento's server-side compare list (compare_products_count
   // cookie) or the compare-products widget's localStorage-backed list. Toggle (rather than

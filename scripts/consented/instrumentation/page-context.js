@@ -1,13 +1,22 @@
 import {
   debugLog,
+  debugWarn,
   hasMarketingConsent,
   getStoreLocaleKey,
+  getProductName,
+  buildProductId,
   isPdpPage,
   isCheckoutPage,
   isCartPage,
   isOrderSuccessPage,
   isErrorPage,
 } from './shared.js';
+import {
+  getSatellite,
+  configureAnalyticsTrackingServers,
+  waitForBeaconComplete,
+  whenSatelliteReady,
+} from './adobe-runtime.js';
 
 /**
  * Search-result page detection via .search-results container.
