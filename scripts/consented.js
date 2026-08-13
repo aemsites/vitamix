@@ -254,3 +254,13 @@ loadScript('https://cdn.datasteam.io/js/D26F66D1AD707A.js');
   i=d.getElementsByTagName(t)[0],i.parentNode.insertBefore(n,i)
 })
 (window,document,"script","//bat.bing.com/bat.js","uetq");
+
+/* eslint-enable */
+
+// Order confirmation page (EDS checkout parity with isOrderSuccessPage() in
+// instrumentation/shared.js): loads the purchase/conversion pixels below.
+const isOrderConfirmation = /\/order\/complete\/?$/.test(pathname);
+
+if (isOrderConfirmation) {
+  import('./consented/conversion.js');
+}
