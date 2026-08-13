@@ -35,3 +35,9 @@
   background-color: var(--color-gray-300);
   color: var(--color-charcoal);
 }
+@media (max-width: 767px) {
+  .product-row .product-badges
+  .product-badge-sale {
+    display: none;
+  }
+}
