@@ -1,0 +1,57 @@
+<script>
+  window.hlx = window.hlx || {};
+  if (/\/widgets\/[^/]+\/[^/]+\.html$/.test(window.location.pathname)) {
+    window.hlx.suppressLoadPage = true;
+  }
+</script>
+<div class="product-list-widget">
+  <section class="product-list-lifestyle" aria-label="Shop by lifestyle"></section>
+
+  <div class="product-list-toolbar">
+    <button type="button" class="product-list-filters-trigger secondary">
+      <span class="product-list-filters-trigger-label"></span>
+      <span class="product-list-filters-count"></span>
+    </button>
+    <div class="product-list-filter-dropdowns" aria-label="Product filters"></div>
+    <p class="product-list-item-count" aria-live="polite">
+      <span id="product-list-widget-results-count">0</span>
+      <span class="product-list-item-count-label"></span>
+    </p>
+    <div class="product-list-widget-dropdown product-list-sort">
+      <button type="button" class="product-list-widget-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false">
+        <span class="product-list-sort-label"></span> <span id="product-list-widget-sortby" data-sort="featured"></span>
+        <span class="product-list-widget-dropdown-chevron" aria-hidden="true"></span>
+      </button>
+      <div class="product-list-widget-dropdown-menu" role="listbox" hidden>
+        <button type="button" class="product-list-widget-dropdown-option" role="option" data-sort="featured"></button>
+        <button type="button" class="product-list-widget-dropdown-option" role="option" data-sort="price-desc"></button>
+        <button type="button" class="product-list-widget-dropdown-option" role="option" data-sort="price-asc"></button>
+        <button type="button" class="product-list-widget-dropdown-option" role="option" data-sort="reviews-desc"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="product-list-active-filters" hidden>
+    <button type="button" class="product-list-clear-all"></button>
+    <div class="product-list-filter-tags"></div>
+  </div>
+
+  <aside class="product-list-facet-drawer" aria-hidden="true" aria-label="Filters">
+    <div class="product-list-facet-drawer-panel">
+      <div class="product-list-facet-drawer-header">
+        <h2 class="product-list-facet-drawer-title"></h2>
+        <button type="button" class="product-list-facet-drawer-close" aria-label="Close filters"></button>
+      </div>
+      <div class="product-list-facet-drawer-selected"></div>
+      <div class="product-list-facet-drawer-list"></div>
+      <div class="product-list-facet-drawer-actions">
+        <button type="button" class="product-list-facet-drawer-cancel secondary"></button>
+        <button type="button" class="product-list-facet-drawer-apply"></button>
+      </div>
+    </div>
+  </aside>
+
+  <p class="product-list-empty" hidden></p>
+  <div class="product-list-results" role="list"></div>
+</div>
+<script type="module" src="../configurator.js"></script>
