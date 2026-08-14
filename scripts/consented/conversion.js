@@ -235,7 +235,9 @@ if (!summary) {
     currency,
     order_id: orderId,
     line_items: items.map((item) => ({
-      product_id: item.sku,
+      product_category: item.productCategory,
+      product_name: item.productName,
+      product_id: item.productId || item.sku,
       product_price: item.price,
       product_quantity: item.quantity,
     })),
