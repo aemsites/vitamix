@@ -399,9 +399,12 @@ export function initOrder(form, cart, state, config, strings) {
           status: err?.status,
           message: err?.body?.message || err?.message,
         });
-        const msg = err?.errorHeader?.toLowerCase().includes('recaptcha')
-          ? strings.errorRecaptcha
-          : err.body?.message || strings.errorGeneric;
+        let msg = err.body?.message || strings.errorGeneric;
+        if (err?.errorHeader?.toLowerCase().includes('recaptcha')) {
+          msg = strings.errorRecaptcha;
+        } else if (err?.body?.code === 'ADOBE_COMMERCE_CUSTOMER_EMAIL_MISMATCH') {
+          msg = strings.errorCustomerEmailMismatch;
+        }
         showError(form, msg);
         submitBtn.disabled = false;
         submitBtn.classList.remove('is-loading');
