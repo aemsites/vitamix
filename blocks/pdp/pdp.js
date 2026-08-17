@@ -209,8 +209,9 @@ function renderRelatedProducts(ph, custom) {
           const li = document.createElement('li');
           const title = product.name;
           const image = new URL(product.images[0].url, window.location.href);
-          const price = +product.price.final;
-          li.innerHTML = `<a href="${product.url}"><img src="${image}?width=750&#x26;format=webply&#x26;optimize=medium" alt="${title}" /><div><p>${title}</p><strong>${formatPrice(price, ph)}</strong></div></a>`;
+          const price = Number(product.price?.final);
+          const priceMarkup = price > 0 ? `<strong>${formatPrice(price, ph)}</strong>` : '';
+          li.innerHTML = `<a href="${product.url}"><img src="${image}?width=750&#x26;format=webply&#x26;optimize=medium" alt="${title}" /><div><p>${title}</p>${priceMarkup}</div></a>`;
           ul.appendChild(li);
         });
         relatedProductsContainer.appendChild(ul);
