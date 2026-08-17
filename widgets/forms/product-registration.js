@@ -2,6 +2,27 @@ import { getFormSubmissionUrl, getLocaleAndLanguage } from '../../scripts/script
 import getStatesProvincesOptions from './states-provinces.js';
 
 /**
+ * Builds the product-registration submission payload from raw form entries.
+ *
+ * The SFDC Lead integration reads the phone number from `mobile` (the key the
+ * newsletter/SMS opt-in lead flow already uses). The registration form field is
+ * named `phone`, so the value is mirrored into `mobile`; without it the Lead is
+ * created with no phone number ("phone number not being provided by web").
+ * See issue #783.
+ *
+ * @param {Record<string, string>} entries - Raw entries (Object.fromEntries(FormData)).
+ * @param {{ locale: string, language: string, pageUrl: string }} ctx - Submission context.
+ * @returns {Record<string, string>} Payload to POST to the forms endpoint.
+ */
+export function buildRegistrationPayload(entries, { locale, language, pageUrl }) {
+  const payload = { ...entries };
+  if (payload.phone) payload.mobile = payload.phone;
+  payload.formId = `${locale}/${language}/product-registration`;
+  payload.pageUrl = pageUrl;
+  return payload;
+}
+
+/**
  * Loads form copy from the widget's local JSON (same name as the script).
  * @param {string} lang - Language key (en, fr, es)
  * @returns {Promise<Object>} Form copy for that language
@@ -163,9 +184,10 @@ export default async function decorate(widget) {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const data = new FormData(form);
-    const payload = Object.fromEntries(data.entries());
-    payload.formId = `${locale}/${language}/product-registration`;
-    payload.pageUrl = window.location.href;
+    const payload = buildRegistrationPayload(
+      Object.fromEntries(data.entries()),
+      { locale, language, pageUrl: window.location.href },
+    );
 
     const submitButton = form.querySelector('button[type="submit"]');
     const buttonLabel = submitButton?.textContent;
