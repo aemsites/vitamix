@@ -1,9 +1,49 @@
 import {
   buildBlock, decorateBlock, loadBlock, loadCSS,
 } from '../../../scripts/aem.js';
-import { resolveSyncContext, withCategory } from './sync-utils.js';
 
 const SYNC_WORKER_URL = 'https://vitamix-catalog-sync.adobeaem.workers.dev/';
+
+/**
+ * Resolves the catalog context represented by a product page path.
+ * @param {string} pathname - Product page pathname
+ * @returns {{storeCode: string, storeViewCode: string, urlKey: string, category?: string}}
+ *   Catalog context
+ */
+function resolveSyncContext(pathname) {
+  const pathParts = pathname.split('/').filter(Boolean);
+  const storeCode = pathParts[0] || '';
+  let storeViewCode = pathParts[1] || '';
+  const category = pathParts[2] === 'products' && pathParts[3] === 'commercial'
+    ? 'commercial'
+    : undefined;
+  const urlKey = pathParts[category ? 4 : 3] || '';
+
+  if (storeCode === 'ca' && storeViewCode === 'en_us') {
+    storeViewCode = 'en_ca';
+  }
+
+  if (storeCode === 'mx' && storeViewCode === 'en_us') {
+    storeViewCode = 'en_mx';
+  }
+
+  return {
+    storeCode,
+    storeViewCode,
+    urlKey,
+    ...(category && { category }),
+  };
+}
+
+/**
+ * Adds an optional catalog category to a sync request.
+ * @param {object} data - Base sync request payload
+ * @param {string} [category] - Product catalog category
+ * @returns {object} sync request payload
+ */
+function withCategory(data, category) {
+  return category ? { ...data, category } : data;
+}
 
 /**
  * Creates a product sync modal dialog
