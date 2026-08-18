@@ -44,7 +44,7 @@ describe('resolveExpressOutcome', () => {
   });
 
   test('failed / unknown / empty → failed (never routes away)', () => {
-    assert.equal(resolveExpressOutcome({ status: 'failed', reason: 'declined' }), 'failed');
+    assert.equal(resolveExpressOutcome({ status: 'failed' }), 'failed');
     assert.equal(resolveExpressOutcome({ status: 'pending' }), 'failed');
     assert.equal(resolveExpressOutcome({}), 'failed');
     assert.equal(resolveExpressOutcome(), 'failed');

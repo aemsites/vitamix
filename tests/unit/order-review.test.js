@@ -25,7 +25,7 @@ describe('resolveConfirmResult', () => {
   });
 
   test('failed → stay on the review page', () => {
-    assert.deepEqual(resolveConfirmResult({ status: 'failed', reason: 'declined' }), { action: 'failed' });
+    assert.deepEqual(resolveConfirmResult({ status: 'failed' }), { action: 'failed' });
   });
 
   test('unknown / missing status → treated as failed (never route away)', () => {

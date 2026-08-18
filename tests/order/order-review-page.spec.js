@@ -255,7 +255,7 @@ test.describe('Order review page (display-only)', () => {
           await route.fulfill({
             status: 200,
             contentType: 'application/json',
-            body: JSON.stringify({ status: 'failed', reason: 'Your card was declined.' }),
+            body: JSON.stringify({ status: 'failed', checkoutFailure: 'retry' }),
           });
         },
       });
@@ -265,7 +265,7 @@ test.describe('Order review page (display-only)', () => {
       await page.locator('.order-review-complete').click();
 
       await expect(page.locator('.order-review-error')).toBeVisible({ timeout: 10000 });
-      await expect(page.locator('.order-review-error')).toContainText('declined');
+      await expect(page.locator('.order-review-error')).toContainText(/could not complete your order/i);
       await page.waitForTimeout(500);
       expect(page.url()).toContain('/order/review');
       console.log('✓ Soft decline (failed, not cancelled) stays on review with an error');
@@ -277,7 +277,7 @@ test.describe('Order review page (display-only)', () => {
           await route.fulfill({
             status: 200,
             contentType: 'application/json',
-            body: JSON.stringify({ status: 'failed', reason: 'PayPal order expired', cancelled: true }),
+            body: JSON.stringify({ status: 'failed', checkoutFailure: 'retry', cancelled: true }),
           });
         },
       });
@@ -291,16 +291,16 @@ test.describe('Order review page (display-only)', () => {
       console.log('✓ Failed + cancelled:true → clear message → cart');
     });
 
-    test('a fraud_declined confirm routes to the order-cancelled page (Customer Care copy)', async ({ page }) => {
+    test('a contact_support confirm routes to the order-cancelled page (Customer Care copy)', async ({ page }) => {
       await setupReviewMocks(page, {
         confirm: async (route) => {
-          // Forter decline: the confirm endpoint returns 200 with
-          // reason=fraud_declined and cancelled:true (order moved to
+          // A terminal failure: the confirm endpoint returns 200 with
+          // checkoutFailure=contact_support and cancelled:true (order moved to
           // payment_cancelled server-side).
           await route.fulfill({
             status: 200,
             contentType: 'application/json',
-            body: JSON.stringify({ status: 'failed', reason: 'fraud_declined', cancelled: true }),
+            body: JSON.stringify({ status: 'failed', checkoutFailure: 'contact_support', cancelled: true }),
           });
         },
       });
@@ -309,11 +309,11 @@ test.describe('Order review page (display-only)', () => {
       await expect(page.locator('.order-review-complete')).toBeVisible({ timeout: 15000 });
       await page.locator('.order-review-complete').click();
 
-      // Routed to the order-cancelled page with reason=fraud_declined (matching
-      // the redirect-based card/wallet flows) rather than bounced to the cart.
+      // Routed to the order-cancelled page (orderId only; it reads the neutral
+      // checkoutFailure bucket off the order) rather than bounced to the cart.
       await expect.poll(() => page.url(), { timeout: 15000 })
-        .toMatch(/\/order\/cancel\?.*reason=fraud_declined/);
-      console.log('✓ Fraud decline → /order/cancel?reason=fraud_declined');
+        .toMatch(/\/order\/cancel\?.*orderId=/);
+      console.log('✓ contact_support → /order/cancel (orderId only)');
     });
 
     test('a cancelled/expired order shows a clear message and returns to the cart', async ({ page }) => {
