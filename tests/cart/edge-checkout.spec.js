@@ -295,12 +295,10 @@ test.describe('Edge Checkout', () => {
     async function clickAndWait(btn, page) {
       await btn.click();
       await expect(btn).not.toHaveAttribute('aria-disabled', 'true', { timeout: 10000 });
-      // Close the minicart dialog so it doesn't intercept the next click
-      await page.evaluate(() => {
-        const d = document.querySelector('#minicart');
-        if (d && d.open) d.close();
-      });
-      await page.waitForTimeout(300);
+      const minicart = page.locator('#minicart');
+      await expect(minicart).toHaveAttribute('aria-expanded', 'true', { timeout: 10000 });
+      await minicart.locator('.slide-panel-close').click();
+      await expect(minicart).not.toHaveAttribute('aria-expanded', 'true', { timeout: 10000 });
     }
 
     test('can add up to the max quantity of 3', async ({ page }) => {
@@ -326,7 +324,7 @@ test.describe('Edge Checkout', () => {
       await clickAndWait(btn, page);
       await clickAndWait(btn, page);
 
-      // 4th click — allowedQty = 0, should return early (no minicart opens)
+      // 4th click — Cart.addItem rejects the SKU at its limit, so no minicart opens.
       await btn.click();
       await expect(btn).not.toHaveAttribute('aria-disabled', 'true', { timeout: 5000 });
 
@@ -509,6 +507,40 @@ test.describe('Edge Checkout', () => {
       expect(cart.items).toHaveLength(1);
       expect(cart.items[0].quantity).toBe(1);
       console.log('✓ Cart persists after page reload');
+    });
+
+    test('separate product tabs share one cart', async ({ page, context }) => {
+      const secondPage = await context.newPage();
+      try {
+        await secondPage.addInitScript(() => {
+          window.IS_TEST_MODE = true;
+          localStorage.setItem('vitamix.priceRules.stub', JSON.stringify({ promotions: [] }));
+        });
+        await secondPage.route('**/us/en_us/products/operations-log', (route) => route.fulfill({ status: 204, body: '' }));
+
+        await Promise.all([
+          page.goto(buildProductUrl('/us/en_us/products/ascent-x2', currentBranch, { cart: 'edge' })),
+          secondPage.goto(buildProductUrl('/us/en_us/products/20-ounce-travel-cup', currentBranch, { cart: 'edge' })),
+        ]);
+        await Promise.all([waitForAddToCartButton(page), waitForAddToCartButton(secondPage)]);
+
+        await page.locator('.quantity-container button').click();
+        await expect.poll(
+          () => getCart(page).then((cart) => cart?.items?.length ?? 0),
+          { timeout: 10000, message: 'First tab did not persist its cart item' },
+        ).toBe(1);
+        await expect(secondPage.locator(CART_LINK_SELECTOR)).toHaveAttribute('data-cart-items', '1', { timeout: 10000 });
+
+        await secondPage.locator('.quantity-container button').click();
+        await expect.poll(
+          () => getCart(page).then((cart) => cart?.items?.length ?? 0),
+          { timeout: 10000, message: 'Second tab overwrote the first tab\'s cart item' },
+        ).toBe(2);
+        await expect(page.locator(CART_LINK_SELECTOR)).toHaveAttribute('data-cart-items', '2', { timeout: 10000 });
+        console.log('✓ Separate product tabs retain both cart items');
+      } finally {
+        await secondPage.close();
+      }
     });
 
     test('cart badge restored from localStorage on page load', async ({ page }) => {

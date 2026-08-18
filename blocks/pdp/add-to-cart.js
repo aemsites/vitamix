@@ -97,17 +97,6 @@ function toggleFixedAddToCart(container) {
 }
 
 /**
- * Returns how many units may be added given what is already in the cart.
- * @param {number} requested - Quantity the user selected
- * @param {number} existing - Quantity already in the cart for this SKU
- * @param {number} max - Per-product maximum allowed quantity
- * @returns {number}
- */
-export function computeAllowedQty(requested, existing, max) {
-  return Math.max(0, Math.min(requested, max - existing));
-}
-
-/**
  * Normalize a price into a number for the edge cart line item.
  * Offers expose a flat numeric price (string or number); simple products
  * without offers expose the Product Bus shape `{ currency, regular, final }`.
@@ -331,12 +320,7 @@ export default function renderAddToCart(ph, block, parent) {
 
         const { sku: variantSku } = selectedVariant;
         const targetSku = variantSku ?? sku;
-
-        // Clamp requested quantity so the cart line never exceeds maxQuantity.
-        const requestedQty = parseInt(quantity, 10);
-        const existingQty = cartApi.items.find((i) => i.sku === targetSku)?.quantity ?? 0;
-        const allowedQty = computeAllowedQty(requestedQty, existingQty, maxQuantity);
-        if (allowedQty <= 0) {
+        const notifyCartLimit = () => {
           window.cartQtyLimitAlerts ||= new Set();
           window.cartQtyLimitAlerts.add(targetSku);
           document.dispatchEvent(new CustomEvent('cart:limit', {
@@ -350,8 +334,11 @@ export default function renderAddToCart(ph, block, parent) {
           }));
           addToCartButton.textContent = ph.addToCart || 'Add to Cart';
           addToCartButton.removeAttribute('aria-disabled');
-          return;
-        }
+        };
+
+        // Cart.addItem enforces this after it has rebased on shared storage,
+        // so a second tab cannot use its stale snapshot to exceed the limit.
+        const requestedQty = parseInt(quantity, 10);
 
         // Prefer the selected variant's price so variant-specific pricing
         // wins; fall back to offers[0] for simple products, where
@@ -394,7 +381,7 @@ export default function renderAddToCart(ph, block, parent) {
         const item = {
           sku: targetSku,
           parentSku: variantSku ? sku : undefined,
-          quantity: allowedQty,
+          quantity: requestedQty,
           price,
           name: parent.name,
           url: selectedVariant.url,
@@ -417,7 +404,11 @@ export default function renderAddToCart(ph, block, parent) {
           } : {}),
           ...(shippingDimensions ? { shippingDimensions } : {}),
         };
-        await cartApi.addItem(item);
+        const addedItem = await cartApi.addItem(item, { maxQuantity });
+        if (!addedItem) {
+          notifyCartLimit();
+          return;
+        }
 
         // If the PDP warranty selector has a paid tier selected, commit it
         // as a paired line item. The cart-page selector reads this state.
@@ -427,7 +418,7 @@ export default function renderAddToCart(ph, block, parent) {
           await cartApi.addItem({
             sku: selectedTier.sku,
             path: selectedTier.path,
-            quantity: allowedQty,
+            quantity: addedItem.quantity,
             price: selectedTier.price,
             name: selectedTier.name,
             custom: {
@@ -440,13 +431,13 @@ export default function renderAddToCart(ph, block, parent) {
           });
         }
 
-        logOperation('added-to-cart', { sku: targetSku, quantity: allowedQty });
-        document.dispatchEvent(new CustomEvent('pdp:add-to-cart', { detail: { item } }));
+        logOperation('added-to-cart', { sku: targetSku, quantity: addedItem.quantity });
+        document.dispatchEvent(new CustomEvent('pdp:add-to-cart', { detail: { item: addedItem } }));
 
         // On mobile the header cart badge is too subtle — redirect to the
         // cart page so the user gets clear feedback that the item was added.
-        // Flush first: addItem uses a debounced persist (300 ms) so
-        // localStorage may not have the new item yet.
+        // Flush first so the cart page always receives the latest shared
+        // localStorage snapshot before navigation.
         if (window.innerWidth < 900) {
           cartApi.flush();
           window.location.href = getOrderPath('cart');

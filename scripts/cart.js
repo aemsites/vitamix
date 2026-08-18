@@ -1,13 +1,5 @@
 import { getConfig } from './commerce-config.js';
 
-const debounce = (func, wait) => {
-  let timeout;
-  return (...args) => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func(...args), wait);
-  };
-};
-
 function deepEqual(a, b) {
   if (a === b) return true;
   if (typeof a !== typeof b) return false;
@@ -37,26 +29,35 @@ export class Cart {
   constructor() {
     this.#restore();
     this.#persistNow();
+    window.addEventListener?.('storage', (event) => {
+      if (event.key === Cart.STORAGE_KEY) {
+        this.#restore('sync', true);
+      }
+    });
   }
 
-  #restore() {
-    const cart = localStorage.getItem(Cart.STORAGE_KEY);
-    if (cart) {
-      const parsed = JSON.parse(cart);
-      if (parsed.version !== Cart.STORAGE_VERSION) {
-        localStorage.removeItem(Cart.STORAGE_KEY);
-        return;
-      }
-      this.#items = parsed.items;
-      document.dispatchEvent(
-        new CustomEvent('cart:change', {
-          detail: {
-            cart: this,
-            action: 'restore',
-          },
-        }),
-      );
+  static #getStoredItems() {
+    const stored = localStorage.getItem(Cart.STORAGE_KEY);
+    if (!stored) return null;
+
+    const parsed = JSON.parse(stored);
+    if (parsed.version !== Cart.STORAGE_VERSION) {
+      localStorage.removeItem(Cart.STORAGE_KEY);
+      return null;
     }
+    return parsed.items;
+  }
+
+  #restore(action = 'restore', clearWhenAbsent = false) {
+    const items = Cart.#getStoredItems();
+    if (items === null && !clearWhenAbsent) return;
+
+    this.#items = items ?? [];
+    this.#dispatchChange(action);
+  }
+
+  #refresh() {
+    this.#items = Cart.#getStoredItems() ?? [];
   }
 
   #persistNow() {
@@ -65,28 +66,29 @@ export class Cart {
     localStorage.setItem(Cart.STORAGE_KEY, JSON.stringify(this));
   }
 
-  #persist = debounce(() => {
-    this.#persistNow();
-  }, 300);
+  #dispatchChange(action, item = undefined) {
+    document.dispatchEvent(
+      new CustomEvent('cart:change', {
+        detail: {
+          cart: this,
+          ...(item === undefined ? {} : { item }),
+          action,
+        },
+      }),
+    );
+  }
 
   #maybeSendEmptyEvent() {
     if (this.itemCount === 0) {
-      document.dispatchEvent(
-        new CustomEvent('cart:change', {
-          detail: {
-            cart: this,
-            action: 'empty',
-          },
-        }),
-      );
+      this.#dispatchChange('empty');
     }
   }
 
   /**
-   * Flush any debounced writes to localStorage immediately. Call before a
-   * page navigation to avoid the race where the next page reads stale state.
+   * Re-persist the latest shared cart before a page navigation.
    */
   flush() {
+    this.#refresh();
     this.#persistNow();
   }
 
@@ -124,16 +126,10 @@ export class Cart {
   }
 
   clear() {
+    this.#refresh();
     this.#items = [];
     this.#persistNow();
-    document.dispatchEvent(
-      new CustomEvent('cart:change', {
-        detail: {
-          cart: this,
-          action: 'clear',
-        },
-      }),
-    );
+    this.#dispatchChange('clear');
     this.#maybeSendEmptyEvent();
   }
 
@@ -148,33 +144,43 @@ export class Cart {
    * warranty SKU linked to two different parent products).
    *
    * @param {CartItem} item
-   * @param {{ allowSeparateEntry?: boolean }} [opts]
+   * @param {{ allowSeparateEntry?: boolean, maxQuantity?: number }} [opts]
+   * @returns {CartItem|null} The added item, capped to `maxQuantity` when supplied;
+   *   `null` when the SKU is already at its limit.
    */
-  addItem(item, { allowSeparateEntry = false } = {}) {
-    const existing = this.#items.find((i) => i.sku === item.sku);
+  addItem(item, { allowSeparateEntry = false, maxQuantity = undefined } = {}) {
+    // A second tab can have an old in-memory snapshot. Always rebase the
+    // mutation on localStorage and persist it in this same turn so its item is
+    // retained instead of being overwritten by the stale snapshot.
+    this.#refresh();
+
+    let itemToAdd = item;
+    if (maxQuantity !== undefined) {
+      const existingQuantity = this.#items
+        .filter((i) => i.sku === item.sku)
+        .reduce((total, existing) => total + existing.quantity, 0);
+      const quantity = Math.max(0, Math.min(item.quantity, maxQuantity - existingQuantity));
+      if (quantity === 0) return null;
+      if (quantity !== item.quantity) itemToAdd = { ...item, quantity };
+    }
+
+    const existing = this.#items.find((i) => i.sku === itemToAdd.sku);
     if (existing) {
-      if (!deepEqual(existing.custom, item.custom)) {
+      if (!deepEqual(existing.custom, itemToAdd.custom)) {
         if (allowSeparateEntry) {
-          this.#items.push(item);
+          this.#items.push(itemToAdd);
         } else {
-          throw new Error(`Cannot merge cart item ${item.sku}: incompatible custom payloads`);
+          throw new Error(`Cannot merge cart item ${itemToAdd.sku}: incompatible custom payloads`);
         }
       } else {
-        existing.quantity += item.quantity;
+        existing.quantity += itemToAdd.quantity;
       }
     } else {
-      this.#items.push(item);
+      this.#items.push(itemToAdd);
     }
-    document.dispatchEvent(
-      new CustomEvent('cart:change', {
-        detail: {
-          cart: this,
-          item,
-          action: 'add',
-        },
-      }),
-    );
-    this.#persist();
+    this.#persistNow();
+    this.#dispatchChange('add', itemToAdd);
+    return itemToAdd;
   }
 
   /**
@@ -182,22 +188,15 @@ export class Cart {
    * @param {number} quantity
    */
   updateItem(sku, quantity) {
+    this.#refresh();
     const existing = this.#items.find((i) => i.sku === sku);
     if (!existing) {
       throw new Error(`Item with sku ${sku} not found`);
     }
     existing.quantity = quantity;
-    document.dispatchEvent(
-      new CustomEvent('cart:change', {
-        detail: {
-          cart: this,
-          item: existing,
-          action: 'update',
-        },
-      }),
-    );
+    this.#persistNow();
+    this.#dispatchChange('update', existing);
     this.#maybeSendEmptyEvent();
-    this.#persist();
   }
 
   /**
@@ -208,6 +207,7 @@ export class Cart {
    *   evaluated against each candidate item.
    */
   removeItem(sku, matcher = undefined) {
+    this.#refresh();
     const predicate = typeof matcher === 'function'
       ? matcher
       : (item) => matcher === undefined || item.custom?.linkedTo === matcher;
@@ -218,23 +218,9 @@ export class Cart {
     if (index !== -1) {
       this.#items.splice(index, 1);
     }
-    // Persist synchronously when the cart becomes empty so that any immediate
-    // page reload (e.g. from the checkout empty-cart listener) sees the correct
-    // state rather than restoring the stale pre-removal localStorage snapshot.
-    if (this.#items.length === 0) {
-      this.#persistNow();
-    }
-    document.dispatchEvent(
-      new CustomEvent('cart:change', {
-        detail: {
-          cart: this,
-          item,
-          action: 'remove',
-        },
-      }),
-    );
+    this.#persistNow();
+    this.#dispatchChange('remove', item);
     this.#maybeSendEmptyEvent();
-    this.#persist();
   }
 
   /**
