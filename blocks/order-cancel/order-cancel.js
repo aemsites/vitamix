@@ -2,7 +2,7 @@ import { getConfig } from '../../scripts/commerce-config.js';
 import { getOrder } from '../../scripts/commerce-api.js';
 import { logOperation, getCheckoutId } from '../../scripts/operations-log.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
-import resolvePaymentFailureMessage from '../../scripts/payment-failure.js';
+import resolvePaymentFailureMessage, { resolveCheckoutFailure } from '../../scripts/payment-failure.js';
 
 /**
  * Order cancellation page block.
@@ -31,19 +31,12 @@ export default async function decorate(block) {
   // other failure arrives with only orderId; the neutral failure bucket lives on
   // the order (order.payment.checkoutFailure) and is read via the customer order
   // lookup using the email captured at checkout.
-  let checkoutFailure = '';
-  if (reason !== 'customer_cancelled' && orderId) {
-    const email = sessionStorage.getItem('checkout_email') || '';
-    if (email) {
-      try {
-        const { order } = await getOrder(email, orderId);
-        checkoutFailure = order?.payment?.checkoutFailure || '';
-      } catch {
-        // Leave checkoutFailure empty — the resolver falls back to the safe
-        // contact-support default.
-      }
-    }
-  }
+  const checkoutFailure = await resolveCheckoutFailure({
+    reason,
+    orderId,
+    email: sessionStorage.getItem('checkout_email') || '',
+    getOrder,
+  });
 
   // This page is only reached when a processor redirects back after a cancel or
   // failure — log the redirect return and the failure (keep the checkoutId so a

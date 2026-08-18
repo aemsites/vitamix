@@ -22,4 +22,28 @@ function resolvePaymentFailureMessage(outcome, messages) {
   return messages.contactSupport;
 }
 
+/**
+ * Resolve the neutral checkoutFailure bucket for a cancelled or failed order.
+ *
+ * A buyer cancellation (reason=customer_cancelled) or missing context (no orderId or
+ * no email) skips the order lookup and returns ''. Any lookup failure also falls
+ * through to '' so the caller applies the safe contact_support default. `getOrder` is
+ * injected so this stays dependency-free and unit-testable.
+ *
+ * @param {{ reason?: string, orderId?: string, email?: string,
+ *   getOrder: (email: string, orderId: string) => Promise<{ order?: any }> }} opts
+ * @returns {Promise<string>} the checkoutFailure bucket, or '' when unavailable
+ */
+export async function resolveCheckoutFailure({
+  reason, orderId, email, getOrder,
+}) {
+  if (reason === 'customer_cancelled' || !orderId || !email) return '';
+  try {
+    const { order } = await getOrder(email, orderId);
+    return order?.payment?.checkoutFailure || '';
+  } catch {
+    return '';
+  }
+}
+
 export default resolvePaymentFailureMessage;
