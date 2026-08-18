@@ -148,6 +148,15 @@ export default function renderGallery(block, variants) {
   const carousel = buildCarousel(gallery);
   buildThumbnails(carousel);
 
+  // Mark the first (visible) slide image as the LCP candidate so the browser fetches
+  // it at high priority and never lazy-loads it. Done after buildThumbnails so the
+  // cloned thumbnail images don't inherit these hints.
+  const lcpImg = carousel?.querySelector(':scope > ul > li img');
+  if (lcpImg) {
+    lcpImg.setAttribute('fetchpriority', 'high');
+    lcpImg.setAttribute('loading', 'eager');
+  }
+
   // Add click-to-zoom on non-video slides (desktop only)
   const desktopQuery = window.matchMedia('(min-width: 900px)');
   carousel.querySelectorAll(':scope > ul > li').forEach((li) => {

@@ -337,11 +337,21 @@ export default async function decorate(block) {
   const { jsonLdData, variants } = window;
   const { custom, offers } = jsonLdData;
   const { locale, language } = getLocaleAndLanguage();
-  const ph = await fetchPlaceholders(`/${locale}/${language}/products/config`);
 
   const reviewsId = custom.reviewsId || toClassName(getMetadata('sku')).replace(/-/g, '');
+
+  // Render the LCP hero (gallery + title) and attach it before any network awaits.
+  // The largest contentful element is the gallery image; previously it was only
+  // inserted after fetchPlaceholders() and renderFreeGift() resolved and the whole
+  // block was assembled, so the image downloaded early but painted late (large LCP
+  // element-render-delay). The PDP uses CSS grid-template-areas, so DOM order does
+  // not affect the visual layout.
   const galleryContainer = renderGallery(block, variants);
   const titleContainer = renderTitle(block, custom, reviewsId);
+  block.prepend(galleryContainer, titleContainer);
+
+  const ph = await fetchPlaceholders(`/${locale}/${language}/products/config`);
+
   const alertContainer = renderAlert(ph, block, custom, variants[0]?.custom);
   const relatedProductsContainer = renderRelatedProducts(ph, custom);
 
@@ -378,10 +388,9 @@ export default async function decorate(block) {
 
   renderReviews(ph, block, reviewsId);
 
+  // titleContainer and galleryContainer were already attached above (LCP hero).
   block.append(
     alertContainer || '',
-    titleContainer,
-    galleryContainer,
     buyBox,
     faqContainer,
     relatedProductsContainer || '',
