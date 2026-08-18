@@ -149,6 +149,14 @@ function isCommercialPath() {
 }
 
 /**
+ * eVar9 — Customer Segment. Determined from the URL only (isCommercialPath).
+ * @returns {string} 'Household' | 'Commercial'
+ */
+function getCustomerSegment() {
+  return isCommercialPath() ? 'Commercial' : 'Household';
+}
+
+/**
  * Magento parity: eVar19 time-parting (`Friday|12:30pm`).
  * @returns {string}
  */
@@ -456,6 +464,7 @@ function applyDigitalDataPageContext(categories) {
   };
   window.digitalData.user = {
     ...(window.digitalData.user || {}),
+    segment: getCustomerSegment(),
     profile: {
       ...(window.digitalData.user?.profile || {}),
       profileInfo: {
