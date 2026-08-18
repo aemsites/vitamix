@@ -69,17 +69,21 @@ export function isOrderNotConfirmable(err) {
  * @param {(message: string) => void} deps.onError
  * @param {() => void} [deps.onNotConfirmable] - called when the order can no
  *   longer be confirmed (cancelled/expired) so retrying is futile
- * @param {() => void} [deps.onFraudDeclined] - called when the confirm was
- *   declined by post-authorization fraud review (reason=fraud_declined) so the
- *   buyer is routed to the order-cancelled page with the Customer Care copy
- *   rather than bounced to the cart
+ * @param {() => void} [deps.onContactSupport] - called when the confirm returns
+ *   checkoutFailure='contact_support' (a terminal failure the buyer cannot resolve
+ *   here) so the buyer is routed to the order-cancelled page with the Customer Care
+ *   copy rather than bounced to the cart
+ * @param {() => void} [deps.onRetryable] - called when the confirm returns
+ *   checkoutFailure='retry' (a terminal but retryable decline) so the buyer sees the
+ *   retry copy and is routed to a fresh start rather than the expired/cancelled copy
  * @param {(busy: boolean) => void} [deps.setBusy]
  * @param {string} deps.errorMessage
  * @param {() => string} [deps.newKey]
  * @returns {() => Promise<void>}
  */
 export function createConfirmHandler({
-  orderId, confirm, routeTo, onError, onNotConfirmable, onFraudDeclined, setBusy, errorMessage,
+  orderId, confirm, routeTo, onError, onNotConfirmable, onContactSupport, onRetryable, setBusy,
+  errorMessage,
   newKey = newIdempotencyKey,
 }) {
   return async () => {
@@ -89,27 +93,34 @@ export function createConfirmHandler({
       const result = await confirm(orderId, idempotencyKey);
       const { action } = resolveConfirmResult(result);
       if (action === 'failed') {
-        // A post-authorization fraud decline (Forter) is terminal: the order was
-        // moved to payment_cancelled server-side. Route to the order-cancelled
-        // page with reason=fraud_declined so the buyer sees the neutral Customer
-        // Care copy — matching the redirect-based card/wallet flows — instead of
-        // being bounced to the cart with a generic "expired" message. Checked
-        // before the generic `cancelled` branch because fraud declines also carry
-        // `cancelled: true`.
-        if (result?.reason === 'fraud_declined' && onFraudDeclined) {
-          onFraudDeclined();
+        // A terminal failure the buyer cannot resolve here comes back with
+        // checkoutFailure='contact_support' and the order was moved to
+        // payment_cancelled server-side. Route to the order-cancelled page for the
+        // neutral Customer Care copy (matching the redirect-based card/wallet flows)
+        // instead of bouncing to the cart. Checked before the generic `cancelled`
+        // branch because these also carry `cancelled: true`.
+        if (result?.checkoutFailure === 'contact_support' && onContactSupport) {
+          onContactSupport();
           return;
         }
-        // Any other `cancelled` failure is terminal — the order was moved to
-        // payment_cancelled server-side, so retrying is futile. Route back to
-        // the cart (same as the 422 order_not_confirmable path) instead of a
-        // stay-and-retry error. A failure without `cancelled` is a soft decline
-        // the buyer can retry on this page.
+        // A retryable decline (checkoutFailure='retry') is also terminal on this
+        // order (cancelled server-side), but the buyer should be told they can try
+        // again rather than shown the expired/cancelled copy. Route to a fresh start
+        // with the retry copy. Checked before the generic `cancelled` branch because
+        // these also carry `cancelled: true`.
+        if (result?.checkoutFailure === 'retry' && onRetryable) {
+          onRetryable();
+          return;
+        }
+        // Any other `cancelled` failure is terminal (order moved to payment_cancelled
+        // server-side), so retrying is futile. Route back to the cart (same as the
+        // 422 order_not_confirmable path) instead of a stay-and-retry error. A failure
+        // without `cancelled` is a soft decline the buyer can retry on this page.
         if (result?.cancelled && onNotConfirmable) {
           onNotConfirmable();
           return;
         }
-        onError(result?.reason || errorMessage);
+        onError(errorMessage);
         setBusy?.(false);
         return;
       }
@@ -620,15 +631,30 @@ export default async function decorate(block) {
       window.location.href = config.getOrderPath('cart');
     }, 3000);
   };
-  // A post-authorization fraud decline is terminal. Route to the order-cancelled
-  // page with reason=fraud_declined so the buyer gets the neutral Customer Care
-  // copy (matching Chase / Apple Pay), instead of a generic cart bounce.
-  const onFraudDeclined = () => {
+  // A terminal contact_support failure is unrecoverable here. Route to the
+  // order-cancelled page (orderId only — it reads the neutral checkoutFailure
+  // bucket off the order) so the buyer gets the Customer Care copy matching
+  // Chase / Apple Pay, instead of a generic cart bounce.
+  const onContactSupport = () => {
     finalized = true;
     logOperation('checkout-failed', {
-      checkoutId: getCheckoutId(), orderId, reason: 'fraud_declined',
+      checkoutId: getCheckoutId(), orderId, checkoutFailure: 'contact_support',
     });
-    window.location.href = `${config.getOrderPath('cancel')}?orderId=${encodeURIComponent(orderId)}&reason=fraud_declined`;
+    window.location.href = `${config.getOrderPath('cancel')}?orderId=${encodeURIComponent(orderId)}`;
+  };
+  // A retryable terminal failure: the order is cancelled server-side, but the
+  // outcome is one the buyer can retry with a fresh order. Show the retry copy and
+  // route to the cart to start over.
+  const onRetryable = () => {
+    finalized = true;
+    showError(s.cancelRetry);
+    completeBtn.disabled = true;
+    logOperation('checkout-failed', {
+      checkoutId: getCheckoutId(), orderId, checkoutFailure: 'retry',
+    });
+    window.setTimeout(() => {
+      window.location.href = config.getOrderPath('cart');
+    }, 3000);
   };
 
   completeBtn.addEventListener('click', createConfirmHandler({
@@ -637,7 +663,8 @@ export default async function decorate(block) {
     routeTo: routeToComplete,
     onError: showError,
     onNotConfirmable,
-    onFraudDeclined,
+    onContactSupport,
+    onRetryable,
     setBusy,
     errorMessage: s.reviewCompleteError,
   }));
