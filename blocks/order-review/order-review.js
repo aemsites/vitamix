@@ -69,10 +69,10 @@ export function isOrderNotConfirmable(err) {
  * @param {(message: string) => void} deps.onError
  * @param {() => void} [deps.onNotConfirmable] - called when the order can no
  *   longer be confirmed (cancelled/expired) so retrying is futile
- * @param {() => void} [deps.onContactSupport] - called when the confirm failed
- *   terminally with checkoutFailure='contact_support' (fraud decline, gateway or
- *   config error) so the buyer is routed to the order-cancelled page with the
- *   Customer Care copy rather than bounced to the cart
+ * @param {() => void} [deps.onContactSupport] - called when the confirm returns
+ *   checkoutFailure='contact_support' (a terminal failure the buyer cannot resolve
+ *   here) so the buyer is routed to the order-cancelled page with the Customer Care
+ *   copy rather than bounced to the cart
  * @param {(busy: boolean) => void} [deps.setBusy]
  * @param {string} deps.errorMessage
  * @param {() => string} [deps.newKey]
@@ -89,13 +89,12 @@ export function createConfirmHandler({
       const result = await confirm(orderId, idempotencyKey);
       const { action } = resolveConfirmResult(result);
       if (action === 'failed') {
-        // A terminal failure the buyer cannot fix here (fraud decline, gateway or
-        // config error) comes back with checkoutFailure='contact_support' and the
-        // order was moved to payment_cancelled server-side. Route to the
-        // order-cancelled page for the neutral Customer Care copy — matching the
-        // redirect-based card/wallet flows — instead of bouncing to the cart.
-        // Checked before the generic `cancelled` branch because these also carry
-        // `cancelled: true`.
+        // A terminal failure the buyer cannot resolve here comes back with
+        // checkoutFailure='contact_support' and the order was moved to
+        // payment_cancelled server-side. Route to the order-cancelled page for the
+        // neutral Customer Care copy (matching the redirect-based card/wallet flows)
+        // instead of bouncing to the cart. Checked before the generic `cancelled`
+        // branch because these also carry `cancelled: true`.
         if (result?.checkoutFailure === 'contact_support' && onContactSupport) {
           onContactSupport();
           return;
