@@ -73,13 +73,17 @@ export function isOrderNotConfirmable(err) {
  *   checkoutFailure='contact_support' (a terminal failure the buyer cannot resolve
  *   here) so the buyer is routed to the order-cancelled page with the Customer Care
  *   copy rather than bounced to the cart
+ * @param {() => void} [deps.onRetryable] - called when the confirm returns
+ *   checkoutFailure='retry' (a terminal but retryable decline) so the buyer sees the
+ *   retry copy and is routed to a fresh start rather than the expired/cancelled copy
  * @param {(busy: boolean) => void} [deps.setBusy]
  * @param {string} deps.errorMessage
  * @param {() => string} [deps.newKey]
  * @returns {() => Promise<void>}
  */
 export function createConfirmHandler({
-  orderId, confirm, routeTo, onError, onNotConfirmable, onContactSupport, setBusy, errorMessage,
+  orderId, confirm, routeTo, onError, onNotConfirmable, onContactSupport, onRetryable, setBusy,
+  errorMessage,
   newKey = newIdempotencyKey,
 }) {
   return async () => {
@@ -99,11 +103,19 @@ export function createConfirmHandler({
           onContactSupport();
           return;
         }
-        // Any other `cancelled` failure is terminal — the order was moved to
-        // payment_cancelled server-side, so retrying is futile. Route back to
-        // the cart (same as the 422 order_not_confirmable path) instead of a
-        // stay-and-retry error. A failure without `cancelled` is a soft decline
-        // the buyer can retry on this page.
+        // A retryable decline (checkoutFailure='retry') is also terminal on this
+        // order (cancelled server-side), but the buyer should be told they can try
+        // again rather than shown the expired/cancelled copy. Route to a fresh start
+        // with the retry copy. Checked before the generic `cancelled` branch because
+        // these also carry `cancelled: true`.
+        if (result?.checkoutFailure === 'retry' && onRetryable) {
+          onRetryable();
+          return;
+        }
+        // Any other `cancelled` failure is terminal (order moved to payment_cancelled
+        // server-side), so retrying is futile. Route back to the cart (same as the
+        // 422 order_not_confirmable path) instead of a stay-and-retry error. A failure
+        // without `cancelled` is a soft decline the buyer can retry on this page.
         if (result?.cancelled && onNotConfirmable) {
           onNotConfirmable();
           return;
@@ -630,6 +642,20 @@ export default async function decorate(block) {
     });
     window.location.href = `${config.getOrderPath('cancel')}?orderId=${encodeURIComponent(orderId)}`;
   };
+  // A retryable terminal failure: the order is cancelled server-side, but the
+  // outcome is one the buyer can retry with a fresh order. Show the retry copy and
+  // route to the cart to start over.
+  const onRetryable = () => {
+    finalized = true;
+    showError(s.cancelRetry);
+    completeBtn.disabled = true;
+    logOperation('checkout-failed', {
+      checkoutId: getCheckoutId(), orderId, checkoutFailure: 'retry',
+    });
+    window.setTimeout(() => {
+      window.location.href = config.getOrderPath('cart');
+    }, 3000);
+  };
 
   completeBtn.addEventListener('click', createConfirmHandler({
     orderId,
@@ -638,6 +664,7 @@ export default async function decorate(block) {
     onError: showError,
     onNotConfirmable,
     onContactSupport,
+    onRetryable,
     setBusy,
     errorMessage: s.reviewCompleteError,
   }));

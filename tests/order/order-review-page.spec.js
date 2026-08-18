@@ -255,7 +255,7 @@ test.describe('Order review page (display-only)', () => {
           await route.fulfill({
             status: 200,
             contentType: 'application/json',
-            body: JSON.stringify({ status: 'failed', checkoutFailure: 'retry' }),
+            body: JSON.stringify({ status: 'failed' }),
           });
         },
       });
@@ -271,9 +271,11 @@ test.describe('Order review page (display-only)', () => {
       console.log('✓ Soft decline (failed, not cancelled) stays on review with an error');
     });
 
-    test('a failed confirm flagged cancelled routes to the cart (terminal)', async ({ page }) => {
+    test('a retry confirm shows the retry copy and returns to the cart (terminal)', async ({ page }) => {
       await setupReviewMocks(page, {
         confirm: async (route) => {
+          // Retryable authorization-stage decline: terminal on this order
+          // (cancelled server-side) but the buyer can start over.
           await route.fulfill({
             status: 200,
             contentType: 'application/json',
@@ -286,9 +288,9 @@ test.describe('Order review page (display-only)', () => {
       await expect(page.locator('.order-review-complete')).toBeVisible({ timeout: 15000 });
       await page.locator('.order-review-complete').click();
 
-      await expect(page.locator('.order-review-error')).toContainText(/expired or been cancelled/i, { timeout: 10000 });
+      await expect(page.locator('.order-review-error')).toContainText(/try again later/i, { timeout: 10000 });
       await expect.poll(() => page.url(), { timeout: 15000 }).toMatch(/\/order\/cart/);
-      console.log('✓ Failed + cancelled:true → clear message → cart');
+      console.log('✓ retry → retry copy → cart');
     });
 
     test('a contact_support confirm routes to the order-cancelled page (Customer Care copy)', async ({ page }) => {
