@@ -69,17 +69,17 @@ export function isOrderNotConfirmable(err) {
  * @param {(message: string) => void} deps.onError
  * @param {() => void} [deps.onNotConfirmable] - called when the order can no
  *   longer be confirmed (cancelled/expired) so retrying is futile
- * @param {() => void} [deps.onFraudDeclined] - called when the confirm was
- *   declined by post-authorization fraud review (reason=fraud_declined) so the
- *   buyer is routed to the order-cancelled page with the Customer Care copy
- *   rather than bounced to the cart
+ * @param {() => void} [deps.onContactSupport] - called when the confirm failed
+ *   terminally with checkoutFailure='contact_support' (fraud decline, gateway or
+ *   config error) so the buyer is routed to the order-cancelled page with the
+ *   Customer Care copy rather than bounced to the cart
  * @param {(busy: boolean) => void} [deps.setBusy]
  * @param {string} deps.errorMessage
  * @param {() => string} [deps.newKey]
  * @returns {() => Promise<void>}
  */
 export function createConfirmHandler({
-  orderId, confirm, routeTo, onError, onNotConfirmable, onFraudDeclined, setBusy, errorMessage,
+  orderId, confirm, routeTo, onError, onNotConfirmable, onContactSupport, setBusy, errorMessage,
   newKey = newIdempotencyKey,
 }) {
   return async () => {
@@ -89,15 +89,15 @@ export function createConfirmHandler({
       const result = await confirm(orderId, idempotencyKey);
       const { action } = resolveConfirmResult(result);
       if (action === 'failed') {
-        // A post-authorization fraud decline (Forter) is terminal: the order was
-        // moved to payment_cancelled server-side. Route to the order-cancelled
-        // page with reason=fraud_declined so the buyer sees the neutral Customer
-        // Care copy — matching the redirect-based card/wallet flows — instead of
-        // being bounced to the cart with a generic "expired" message. Checked
-        // before the generic `cancelled` branch because fraud declines also carry
+        // A terminal failure the buyer cannot fix here (fraud decline, gateway or
+        // config error) comes back with checkoutFailure='contact_support' and the
+        // order was moved to payment_cancelled server-side. Route to the
+        // order-cancelled page for the neutral Customer Care copy — matching the
+        // redirect-based card/wallet flows — instead of bouncing to the cart.
+        // Checked before the generic `cancelled` branch because these also carry
         // `cancelled: true`.
-        if (result?.reason === 'fraud_declined' && onFraudDeclined) {
-          onFraudDeclined();
+        if (result?.checkoutFailure === 'contact_support' && onContactSupport) {
+          onContactSupport();
           return;
         }
         // Any other `cancelled` failure is terminal — the order was moved to
@@ -109,7 +109,7 @@ export function createConfirmHandler({
           onNotConfirmable();
           return;
         }
-        onError(result?.reason || errorMessage);
+        onError(errorMessage);
         setBusy?.(false);
         return;
       }
@@ -620,15 +620,16 @@ export default async function decorate(block) {
       window.location.href = config.getOrderPath('cart');
     }, 3000);
   };
-  // A post-authorization fraud decline is terminal. Route to the order-cancelled
-  // page with reason=fraud_declined so the buyer gets the neutral Customer Care
-  // copy (matching Chase / Apple Pay), instead of a generic cart bounce.
-  const onFraudDeclined = () => {
+  // A terminal contact_support failure is unrecoverable here. Route to the
+  // order-cancelled page (orderId only — it reads the neutral checkoutFailure
+  // bucket off the order) so the buyer gets the Customer Care copy matching
+  // Chase / Apple Pay, instead of a generic cart bounce.
+  const onContactSupport = () => {
     finalized = true;
     logOperation('checkout-failed', {
-      checkoutId: getCheckoutId(), orderId, reason: 'fraud_declined',
+      checkoutId: getCheckoutId(), orderId, checkoutFailure: 'contact_support',
     });
-    window.location.href = `${config.getOrderPath('cancel')}?orderId=${encodeURIComponent(orderId)}&reason=fraud_declined`;
+    window.location.href = `${config.getOrderPath('cancel')}?orderId=${encodeURIComponent(orderId)}`;
   };
 
   completeBtn.addEventListener('click', createConfirmHandler({
@@ -637,7 +638,7 @@ export default async function decorate(block) {
     routeTo: routeToComplete,
     onError: showError,
     onNotConfirmable,
-    onFraudDeclined,
+    onContactSupport,
     setBusy,
     errorMessage: s.reviewCompleteError,
   }));

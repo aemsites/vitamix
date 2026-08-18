@@ -10,6 +10,7 @@ import { FORMS_ENDPOINT, getLocaleAndLanguage } from '../../scripts/scripts.js';
 import { validateLinkIntegrity } from './link-integrity.js';
 import { validateForm } from './checkout-validation.js';
 import { logOperation, getCheckoutId } from '../../scripts/operations-log.js';
+import resolvePaymentFailureMessage from '../../scripts/payment-failure.js';
 import { getStandardCheckoutContext } from '../../scripts/checkout-context.js';
 import { isEstimateExpiringSoon } from '../../scripts/estimate-token.js';
 
@@ -386,9 +387,15 @@ export function initOrder(form, cart, state, config, strings) {
           callbacks.onComplete(createdOrder);
         } else {
           logOperation('checkout-failed', {
-            checkoutId: getCheckoutId(), orderId, status: payment.status, reason: payment.reason,
+            checkoutId: getCheckoutId(),
+            orderId,
+            status: payment.status,
+            checkoutFailure: payment.checkoutFailure,
           });
-          showError(form, payment.reason || strings.errorGeneric);
+          showError(form, resolvePaymentFailureMessage(
+            { checkoutFailure: payment.checkoutFailure },
+            { contactSupport: strings.cancelContactSupport, retry: strings.cancelRetry },
+          ));
           submitBtn.disabled = false;
           submitBtn.classList.remove('is-loading');
           if (submitTextEl) submitTextEl.textContent = strings.continueToPayment;
