@@ -294,6 +294,12 @@ export function initOrder(form, cart, state, config, strings) {
           await callbacks.beginApplePay();
         } catch (err) {
           let msg = 'Apple Pay payment failed. Please try again.';
+          if (err.checkoutFailure) {
+            msg = resolvePaymentFailureMessage(
+              { checkoutFailure: err.checkoutFailure },
+              { contactSupport: strings.cancelContactSupport, retry: strings.cancelRetry },
+            );
+          }
           if (err.message === 'not-available') msg = 'Apple Pay is not available. Please try a different payment method.';
           if (err.message === 'no-preview') msg = 'Please complete your shipping information first.';
           if (err.message === 'recaptcha-blocked') msg = strings.errorRecaptcha;

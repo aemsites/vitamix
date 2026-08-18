@@ -323,7 +323,11 @@ export function beginCheckoutSession(config, callbacks) {
             status: result.status,
             checkoutFailure: result.checkoutFailure,
           });
-          reject(new Error('payment-failed'));
+          // Carry the neutral failure bucket out so the checkout error handler can
+          // show the matching copy (Customer Care vs retry) instead of a generic message.
+          const err = new Error('payment-failed');
+          err.checkoutFailure = result.checkoutFailure;
+          reject(err);
         }
       } catch (err) {
         session.completePayment(window.ApplePaySession.STATUS_FAILURE);
