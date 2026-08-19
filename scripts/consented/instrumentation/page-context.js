@@ -17,6 +17,7 @@ import {
   waitForBeaconComplete,
   whenSatelliteReady,
 } from './adobe-runtime.js';
+import { isLoggedIn } from '../../auth-api.js';
 
 /**
  * Search-result page detection via .search-results container.
@@ -154,6 +155,15 @@ function isCommercialPath() {
  */
 function getCustomerSegment() {
   return isCommercialPath() ? 'Commercial' : 'Household';
+}
+
+/**
+ * eVar13 — Login/Auth Status. Simple boolean from session (isLoggedIn checks
+ * for the edge OTP JWT in localStorage; see scripts/auth-api.js).
+ * @returns {string} 'Logged In' | 'Guest'
+ */
+function getLoginStatus() {
+  return isLoggedIn() ? 'Logged In' : 'Guest';
 }
 
 /**
@@ -465,6 +475,7 @@ function applyDigitalDataPageContext(categories) {
   window.digitalData.user = {
     ...(window.digitalData.user || {}),
     segment: getCustomerSegment(),
+    loginStatus: getLoginStatus(),
     profile: {
       ...(window.digitalData.user?.profile || {}),
       profileInfo: {

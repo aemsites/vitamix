@@ -9,6 +9,7 @@ import {
   triggerLaunchEvent,
   whenSatelliteReady,
 } from './adobe-runtime.js';
+import { syncDigitalDataPageContext } from './page-context.js';
 
 /**
  * SHA-256 hex digest of the given input, used to derive a pseudonymous user id
@@ -112,6 +113,10 @@ export async function fireLoggedOut() {
  */
 export function handleAuthStateChanged(detail) {
   const { loggedIn, email } = detail || {};
+  // Refresh digitalData.user.loginStatus (eVar13) immediately — a login/logout
+  // via edge OTP doesn't reload the page, so it would otherwise stay stale
+  // until the next initDigitalDataPage()/syncDigitalDataPageContext() call.
+  syncDigitalDataPageContext();
   if (!loggedIn) {
     loginStartFired = false;
     whenSatelliteReady(() => {
