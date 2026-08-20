@@ -426,9 +426,7 @@ function buildMetaPurchasePayload(context = readOrderSuccessContext()) {
 
   const contentIds = items.map((item) => item.sku);
   const numItems = items.reduce((sum, item) => sum + item.quantity, 0);
-  const value = Number(items
-    .reduce((sum, item) => sum + (item.price * item.quantity), 0)
-    .toFixed(2));
+  const value = summary.orderTotal;
 
   const currency = String(
     context?.order?.currencyCode
