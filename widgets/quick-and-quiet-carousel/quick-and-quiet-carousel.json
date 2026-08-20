@@ -1,0 +1,83 @@
+{
+  "en": {
+    "moreLabel": "More",
+    "lessLabel": "Less",
+    "detailsLabel": "Details",
+    "toggleAriaLabel": "Toggle Details",
+    "previous": "Previous Slide",
+    "next": "Next Slide",
+    "productDetails": "Product Details",
+    "slides": [
+      {
+        "title": "Optimized Programs",
+        "body": "10 program buttons with 40 optimized settings increase programming capability and ease of use for consistent results."
+      },
+      {
+        "title": "Powerful Motor",
+        "body": "The large-rotor motor is at least 30% more efficient than previous generations and quickly pulverizes ingredients and blends multiple servings with speed and ease."
+      },
+      {
+        "title": "Accelerate™ Container",
+        "body": "The improved spout design and innovative handle improves the pouring experience and nests while stacking. With the ergonomically designed lower handle, the Accelerate Container improves hand position and reduces stress on employees' wrists."
+      },
+      {
+        "title": "Patented Noise Reduction",
+        "body": "Air management, advanced vibration dampening technology, and an ultra-efficient large-rotor motor combine to reduce noise, improve reliability, and minimize downtime."
+      }
+    ]
+  },
+  "fr": {
+    "moreLabel": "Plus de",
+    "lessLabel": "Moins de",
+    "detailsLabel": "détails",
+    "toggleAriaLabel": "Afficher les détails",
+    "previous": "Diapositive précédente",
+    "next": "Diapositive suivante",
+    "productDetails": "Détails du produit",
+    "slides": [
+      {
+        "title": "Programmes optimisés",
+        "body": "10 boutons de programme avec 40 réglages optimisés augmentent la capacité de programmation et la facilité d'utilisation pour des résultats constants."
+      },
+      {
+        "title": "Moteur puissant",
+        "body": "Le moteur à grand rotor est au moins 30 % plus efficace que les générations précédentes et pulvérise rapidement les ingrédients tout en mélangeant plusieurs portions avec rapidité et facilité."
+      },
+      {
+        "title": "Récipient Accelerate™",
+        "body": "Le bec verseur amélioré et la poignée innovante améliorent l'expérience de versement et s'empilent facilement. Grâce à la poignée inférieure au design ergonomique, le récipient Accelerate améliore la position de la main et réduit le stress sur les poignets des employés."
+      },
+      {
+        "title": "Réduction du bruit brevetée",
+        "body": "La gestion de l'air, la technologie avancée d'amortissement des vibrations et un moteur à grand rotor ultra-efficace se combinent pour réduire le bruit, améliorer la fiabilité et minimiser les temps d'arrêt."
+      }
+    ]
+  },
+  "es": {
+    "moreLabel": "Más",
+    "lessLabel": "Menos",
+    "detailsLabel": "detalles",
+    "toggleAriaLabel": "Mostrar detalles",
+    "previous": "Diapositiva anterior",
+    "next": "Diapositiva siguiente",
+    "productDetails": "Detalles del producto",
+    "slides": [
+      {
+        "title": "Programas optimizados",
+        "body": "10 botones de programa con 40 configuraciones optimizadas aumentan la capacidad de programación y la facilidad de uso para obtener resultados consistentes."
+      },
+      {
+        "title": "Motor potente",
+        "body": "El motor de rotor grande es al menos un 30 % más eficiente que las generaciones anteriores y pulveriza rápidamente los ingredientes, mezclando varias porciones con rapidez y facilidad."
+      },
+      {
+        "title": "Recipiente Accelerate™",
+        "body": "El diseño mejorado del pico y el mango innovador mejoran la experiencia de vertido y se apilan con facilidad. Con el mango inferior de diseño ergonómico, el recipiente Accelerate mejora la posición de la mano y reduce el estrés en las muñecas de los empleados."
+      },
+      {
+        "title": "Reducción de ruido patentada",
+        "body": "La gestión del aire, la tecnología avanzada de amortiguación de vibraciones y un motor de rotor grande ultraeficiente se combinan para reducir el ruido, mejorar la confiabilidad y minimizar el tiempo de inactividad."
+      }
+    ]
+  }
+}
