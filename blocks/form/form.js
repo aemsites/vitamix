@@ -538,7 +538,7 @@ function enableFooterSignUp(form) {
 
     document.dispatchEvent(new CustomEvent(
       success ? 'form:submit-success' : 'form:submit-error',
-      { detail: { formName } },
+      { detail: { formName: leadSource } },
     ));
   });
 }
