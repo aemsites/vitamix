@@ -9,6 +9,20 @@
   border-radius: var(--rounding-m);
 }
 
+.carousel.block .slide-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.carousel.block .slide-image + .slide-body {
+  margin-top: var(--spacing-m);
+}
+
+.carousel.block .slide-body > .button-wrapper {
+  margin-top: auto;
+}
+
 .carousel.block .slide-body-price {
   color: var(--color-gray-900);
 }
@@ -139,6 +153,7 @@
   text-decoration: none;
 }
 
+/* stylelint-disable-next-line no-descending-specificity */
 .carousel.linked ul > li .slide-body {
   align-self: center;
   font-size: var(--body-size-s);
