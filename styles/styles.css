@@ -215,7 +215,8 @@ main .section[data-collapse='both'] {
 }
 
 main .section.light,
-main .section.dark {
+main .section.dark,
+main .section.black {
   margin: 0;
   padding-top: var(--spacing-80);
   padding-bottom: var(--spacing-20);
@@ -230,8 +231,15 @@ main .section.dark {
   color: var(--color-white);
 }
 
+main .section.black {
+  background-color: var(--color-black);
+  color: var(--color-white);
+}
+
 main .section.dark .eyebrow,
-main .section.dark a:any-link:not(.button) {
+main .section.black .eyebrow,
+main .section.dark a:any-link:not(.button),
+main .section.black a:any-link:not(.button) {
   color: var(--color-gray-500);
 }
 
