@@ -75,11 +75,48 @@ function pathnameFromUrl(rawUrl) {
 }
 
 /**
+ * Marketing cards in plp-data point at fragment pages (not commerce products).
+ * @param {string} pathname
+ * @returns {boolean}
+ */
+function isMarketingCardPath(pathname) {
+  return pathname.includes('/fragments/');
+}
+
+/**
+ * Builds a list item from a plp-data row that references a marketing fragment.
+ * Facet columns are preserved so filtering/sorting treat these like product cards.
+ * @param {Object} row - Raw plp-data row
+ * @param {Array<{rawKey: string, key: string}>} facetDefs
+ * @returns {Object}
+ */
+function buildMarketingCardItem(row, facetDefs) {
+  const rowUrl = (row.Product || '').trim();
+  const urlPathname = pathnameFromUrl(rowUrl);
+  const item = {
+    isMarketing: true,
+    url: urlPathname,
+    title: titleFromUrl(urlPathname),
+    price: 0,
+    reviewCount: 0,
+    reviewAverage: 0,
+    bullets: [],
+    comparisonFeatures: [],
+    badge: '',
+  };
+  facetDefs.forEach(({ rawKey, key }) => {
+    item[key] = parseFacetValues(row[rawKey]);
+  });
+  return item;
+}
+
+/**
  * Fetches and filters products for the product-list widget.
  * Self-contained: does not depend on blocks/plp/plp.js.
  *
  * The product list and its facets come from plp-data-{dataset}.json; each row is augmented
  * with image/price/variants/etc. from products/index.json when a matching product is found there.
+ * Rows that point at /fragments/ are kept as marketing cards (content loaded separately).
  * @param {Object} config - Filter criteria (only known facet keys are applied)
  * @param {Object} facets - Optional object to populate with facet counts
  * @param {string} [dataset] - Which plp-data-{dataset}.json to load; defaults to 'blenders'
@@ -103,26 +140,33 @@ export default async function lookupProductListProducts(config = {}, facets = {}
     const indexBySlug = buildProductIndexBySlug(data, locale, language);
 
     const parents = plpRows
-      .filter((row) => slugFromUrl((row.Product || '').trim()) in indexBySlug)
       .map((row) => {
         const rowUrl = (row.Product || '').trim();
+        if (!rowUrl) return null;
         const urlPathname = pathnameFromUrl(rowUrl);
-        const augmented = indexBySlug[slugFromUrl(rowUrl)];
+        if (isMarketingCardPath(urlPathname)) {
+          return buildMarketingCardItem(row, facetDefs);
+        }
+
+        const slug = slugFromUrl(rowUrl);
+        if (!(slug in indexBySlug)) return null;
+
+        const augmented = indexBySlug[slug];
         const product = { ...augmented };
         product.url = urlPathname;
         if (!product.title) product.title = titleFromUrl(urlPathname);
         product.bullets = (row.Bullets || '').split(';').map((s) => s.trim()).filter(Boolean);
         product.comparisonFeatures = (row['Comparison Features'] || '').split(';').map((s) => s.trim()).filter(Boolean);
-        const reviews = reviewsBySlug[slugFromUrl(rowUrl)];
+        const reviews = reviewsBySlug[slug];
         product.reviewCount = reviews ? reviews.reviewCount : 0;
         product.reviewAverage = reviews ? reviews.reviewAverage : 0;
-        product.badge = badgesBySlug[slugFromUrl(rowUrl)] || '';
+        product.badge = badgesBySlug[slug] || '';
         facetDefs.forEach(({ rawKey, key }) => {
           product[key] = parseFacetValues(row[rawKey]);
         });
         return product;
       })
-      .filter((product) => !!product.image);
+      .filter((product) => product && (product.isMarketing || !!product.image));
 
     window.productListWidgetIndexByDataset[plpDataset] = { parents, facetDefs };
   }
