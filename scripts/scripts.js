@@ -919,7 +919,7 @@ function decorateSectionBackgrounds(main) {
     }
   });
 
-  main.querySelectorAll('.section.light, .section.dark').forEach((section) => {
+  main.querySelectorAll('.section.light, .section.dark, .section.black').forEach((section) => {
     const prev = section.previousElementSibling;
     const next = section.nextElementSibling;
     if (prev) {
