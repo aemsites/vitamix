@@ -19,6 +19,16 @@ import {
 } from './adobe-runtime.js';
 
 /**
+ * localStorage key for the edge OTP session JWT. Duplicated from
+ * scripts/auth-api.js (AUTH_TOKEN_KEY) rather than imported — auth-api.js
+ * imports recaptcha.js -> scripts.js -> consented.js ->
+ * instrumentation/index.js -> this file, so importing it here would create
+ * an import/no-cycle error. Mirrors the existing getUrlLanguageSegment
+ * local-duplication approach below for the same reason.
+ */
+const AUTH_TOKEN_KEY = 'auth_token';
+
+/**
  * Search-result page detection via .search-results container.
  * @returns {boolean}
  */
@@ -154,6 +164,21 @@ function isCommercialPath() {
  */
 function getCustomerSegment() {
   return isCommercialPath() ? 'Commercial' : 'Household';
+}
+
+/**
+ * eVar13 — Login/Auth Status. Simple boolean from session: whether the edge
+ * OTP JWT is present in localStorage.
+ * @returns {string} 'Logged In' | 'Guest'
+ */
+function getLoginStatus() {
+  let token;
+  try {
+    token = localStorage.getItem(AUTH_TOKEN_KEY);
+  } catch {
+    return 'Guest';
+  }
+  return token ? 'Logged In' : 'Guest';
 }
 
 /**
@@ -465,6 +490,7 @@ function applyDigitalDataPageContext(categories) {
   window.digitalData.user = {
     ...(window.digitalData.user || {}),
     segment: getCustomerSegment(),
+    loginStatus: getLoginStatus(),
     profile: {
       ...(window.digitalData.user?.profile || {}),
       profileInfo: {
