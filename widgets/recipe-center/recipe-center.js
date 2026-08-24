@@ -533,6 +533,7 @@ function shouldIncludeInURL(key, value) {
 /**
  * Updates URL query parameters to reflect current filter state.
  * Omitted or empty values are removed from the query string.
+ * The existing hash fragment is always preserved.
  * @param {Object} filterConfig - Current filter configuration
  * @param {boolean} [replace=false] - Use replaceState instead of pushState
  * @returns {void}
@@ -547,7 +548,8 @@ function updateURL(filterConfig, replace = false) {
     }
   });
 
-  const newURL = params.toString() ? `${window.location.pathname}?${params.toString()}` : window.location.pathname;
+  const search = params.toString();
+  const newURL = `${window.location.pathname}${search ? `?${search}` : ''}${window.location.hash || ''}`;
   const historyFn = replace ? window.history.replaceState : window.history.pushState;
   historyFn.call(window.history, { filterConfig }, '', newURL);
 }
