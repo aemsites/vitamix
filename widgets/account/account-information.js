@@ -1,4 +1,6 @@
-import { updateCustomer, applyCustomerToWidget, unwrapCustomerResponse } from './account-api.js';
+import {
+  updateCustomer, applyCustomerToWidget, unwrapCustomerResponse, formatIsoForUi,
+} from './account-api.js';
 import { buildProfileUpdate } from '../../scripts/customer-profile.js';
 
 /**
@@ -15,15 +17,15 @@ function unwrap(raw) {
 /**
  * Wires the "Account Information" panel so the customer can edit their first
  * name, last name, phone, and the site-specific custom attributes (planned use,
- * Vitamix ownership). Saves through the self-service customer PATCH endpoint and
- * re-renders the read-only rows on success. Addresses are handled separately by
- * the address book.
+ * Vitamix ownership). Saves through the self-service customer PATCH endpoint.
+ * Addresses are handled separately by the address book.
+ *
+ * The panel is always editable: the read-only rows are hidden and a pre-filled
+ * form is shown directly, so there is no Edit/Cancel toggle — just Save.
  *
  * Flow:
- *   1. Inject an Edit button and a hidden edit form after the info rows.
- *   2. On Edit, pre-fill the form from the current customer and show it.
- *   3. On Save, require a name, PATCH the changed fields, re-render, and hide.
- *   4. On Cancel, restore the read-only view without saving.
+ *   1. Hide the read-only rows and inject a form pre-filled from the customer.
+ *   2. On Save, require a name, PATCH the changed fields, and re-fill the form.
  *
  * @param {HTMLElement} widget
  * @param {string} email
@@ -39,14 +41,8 @@ export function wireAccountInformation(widget, email, copy, rawCustomer) {
   const ie = /** @type {Record<string, string>} */ (copy.informationEdit || {});
   let current = unwrap(rawCustomer) || {};
 
-  const editBtn = document.createElement('button');
-  editBtn.type = 'button';
-  editBtn.className = 'button account-info-edit';
-  editBtn.textContent = ie.edit || 'Edit';
-
   const form = document.createElement('form');
   form.className = 'account-info-form';
-  form.hidden = true;
   form.innerHTML = `
     <label class="account-info-field">
       <span>${ie.firstName || 'First name'}</span>
@@ -81,11 +77,42 @@ export function wireAccountInformation(widget, email, copy, rawCustomer) {
     <p class="account-info-error" role="alert" hidden></p>
     <div class="account-info-actions">
       <button type="submit" class="button emphasis account-info-save">${ie.save || 'Save'}</button>
-      <button type="button" class="button link-style account-info-cancel">${ie.cancel || 'Cancel'}</button>
     </div>
   `;
 
-  rows.after(editBtn, form);
+  // The panel is always editable: hide the read-only rows and show the
+  // pre-filled form directly (no Edit/Cancel toggle).
+  rows.hidden = true;
+  rows.after(form);
+
+  // Read-only account metadata (non-editable) shown beneath the form.
+  const meta = document.createElement('div');
+  meta.className = 'account-info-meta';
+  form.after(meta);
+
+  const renderMeta = () => {
+    const ci = /** @type {Record<string, string>} */ (copy.customerInfo || {});
+    /** @type {Array<[string, unknown]>} */
+    const entries = [
+      [ci.created || 'Member since', current.createdAt],
+      [ci.updated || 'Last updated', current.updatedAt],
+    ];
+    meta.textContent = '';
+    const visible = entries.filter(([, v]) => v != null && String(v).length);
+    meta.hidden = visible.length === 0;
+    visible.forEach(([label, value]) => {
+      const row = document.createElement('div');
+      row.className = 'account-mock-row';
+      const lab = document.createElement('span');
+      lab.className = 'account-mock-label';
+      lab.textContent = label;
+      const val = document.createElement('span');
+      val.className = 'account-mock-value';
+      val.textContent = formatIsoForUi(value);
+      row.append(lab, val);
+      meta.append(row);
+    });
+  };
 
   const errEl = /** @type {HTMLElement} */ (form.querySelector('.account-info-error'));
   const saveBtn = /** @type {HTMLButtonElement} */ (form.querySelector('.account-info-save'));
@@ -113,18 +140,8 @@ export function wireAccountInformation(widget, email, copy, rawCustomer) {
     });
   };
 
-  const showForm = (show) => {
-    form.hidden = !show;
-    editBtn.hidden = show;
-    rows.hidden = show;
-    clearError();
-  };
-
-  editBtn.addEventListener('click', () => {
-    prefill();
-    showForm(true);
-  });
-  form.querySelector('.account-info-cancel').addEventListener('click', () => showForm(false));
+  prefill();
+  renderMeta();
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -148,7 +165,8 @@ export function wireAccountInformation(widget, email, copy, rawCustomer) {
       const updated = unwrap(await updateCustomer(email, buildProfileUpdate(fields)));
       if (updated) current = updated;
       applyCustomerToWidget(widget, current, email, copy);
-      showForm(false);
+      prefill();
+      renderMeta();
     } catch (err) {
       errEl.textContent = (err instanceof Error && err.message)
         || ie.saveError || 'Could not save. Please try again.';
@@ -158,8 +176,6 @@ export function wireAccountInformation(widget, email, copy, rawCustomer) {
       saveBtn.textContent = prevLabel;
     }
   });
-
-  editBtn.hidden = false;
 }
 
 export default wireAccountInformation;
