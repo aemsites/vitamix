@@ -1021,7 +1021,8 @@ button.checkout-submit-btn {
   font-size: var(--commerce-font-size-sm);
 }
 
-.places-autocomplete-dropdown li:hover {
+.places-autocomplete-dropdown li:hover,
+.places-autocomplete-dropdown li.is-active {
   background: var(--commerce-color-surface-alt, #f5f5f5);
 }
 

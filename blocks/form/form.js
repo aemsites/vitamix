@@ -477,7 +477,8 @@ function enableNavSearch(form) {
  * @param {HTMLFormElement} form - Footer sign-up form
  */
 function enableFooterSignUp(form) {
-  form.classList.add('footer-sign-up');
+  const formName = 'footer-sign-up';
+  form.classList.add(formName);
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const data = new FormData(form);
@@ -492,10 +493,14 @@ function enableFooterSignUp(form) {
     if (form.closest('dialog')) page = 'modal';
     if (window.leadSourceOverride) page = window.leadSourceOverride;
 
+    // Tracks the real backend outcome, used below to fire the right analytics event.
+    let success = false;
+    let leadSource;
     try {
       if (window.useEdgeCheckout) {
         // Edge locales submit to the new AEM Forms endpoint, not the legacy Magento REST
         // API, so it's safe to encode the SMS channel in leadSource here.
+        leadSource = getLeadSource(page, country, { emailOptIn: true, smsOptIn });
         const payload = {
           formId: `${locale}/${language}/newsletter`,
           pageUrl: window.location.href,
@@ -503,7 +508,7 @@ function enableFooterSignUp(form) {
           mobile,
           smsOptIn,
           emailOptIn: true,
-          leadSource: getLeadSource(page, country, { emailOptIn: true, smsOptIn }),
+          leadSource,
         };
         const resp = await fetch(getFormSubmissionUrl(), {
           method: 'POST',
@@ -512,7 +517,8 @@ function enableFooterSignUp(form) {
           },
           body: JSON.stringify(payload),
         });
-        if (!resp.ok) {
+        success = resp.ok;
+        if (!success) {
           // eslint-disable-next-line no-console
           console.error('Failed to submit newsletter subscription', resp);
         }
@@ -521,16 +527,18 @@ function enableFooterSignUp(form) {
         // which forwards to the Magento REST newsletter-subscribe API server-side.
         // Never encode channel in leadSource here — it previously caused duplicate SMS
         // subscriptions on Magento's side (see getLegacyLeadSource doc comment).
+        leadSource = getLegacyLeadSource(page, country);
         const params = new URLSearchParams({
           email,
           mobile,
           sms_optin: smsOptIn ? '1' : '0',
-          lead_source: getLegacyLeadSource(page, country),
+          lead_source: leadSource,
           pageUrl: window.location.href,
           actionUrl: `/${locale}/${language}/rest/V1/vitamix-api/newslettersubscribe`,
         });
         const resp = await fetch(`https://www.vitamix.com/bin/vitamix/newslettersubscription?${params.toString()}`);
-        if (!resp.ok) {
+        success = resp.ok;
+        if (!success) {
           // eslint-disable-next-line no-console
           console.error('Failed to submit newsletter subscription', resp);
         }
@@ -539,13 +547,21 @@ function enableFooterSignUp(form) {
         console.log(message);
       }
     } catch (error) {
+      // resp.json() failed (error or malformed response) — not a successful submission.
+      success = false;
       // eslint-disable-next-line no-console
       console.error('Failed to submit newsletter subscription', error);
     }
+
     const thankYou = document.createElement('div');
     thankYou.className = 'form-thank-you';
     thankYou.innerHTML = `<p>${e.submitter.dataset.thankYou}</p>`;
     form.replaceWith(thankYou);
+
+    document.dispatchEvent(new CustomEvent(
+      success ? 'form:submit-success' : 'form:submit-error',
+      { detail: { formName: leadSource } },
+    ));
   });
 }
 

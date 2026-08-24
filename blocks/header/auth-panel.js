@@ -2,13 +2,11 @@ import createSlidePanel from '../../scripts/slide-panel.js';
 import { login, verifyCode } from '../../scripts/auth-api.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 import { getLoggedInCustomer, unwrapCustomerResponse, updateCustomer } from '../../widgets/account/account-api.js';
-import { isValidPostalCode } from '../../scripts/address-validation.js';
+import { isProfileIncomplete, buildProfileUpdate } from '../../scripts/customer-profile.js';
 
-// Temporarily disabled: the post-login "complete your profile" step calls an
-// update endpoint the customer API does not support yet (PUT/PATCH
-// /customers/{email}), so saving fails for testers. Flip back to `true` once the
-// backend exposes a self-service customer update/create route.
-const PROFILE_STEP_ENABLED = false;
+// Kill-switch for the post-login "complete your profile" step. Set to false to
+// hide the step in production without reverting the code.
+const PROFILE_STEP_ENABLED = true;
 
 /**
  * Localized UI strings for the auth panel, keyed by BCP-47 language tag
@@ -41,15 +39,18 @@ const AUTH_STRINGS = {
     profileDesc: 'Add a few more details to personalize your account.',
     firstName: 'First name',
     lastName: 'Last name',
-    zip: 'ZIP code',
-    postalCode: 'Postal code',
+    plannedUseLabel: 'What do you plan on using this account for?',
+    plannedUseHome: 'For home products',
+    plannedUseBusiness: 'For business products',
+    ownsVitamixLabel: 'Do you currently own a Vitamix?',
+    yes: 'Yes',
+    no: 'No',
+    termsAgree: 'I agree to the Terms and Conditions',
     save: 'Save',
     saving: 'Saving\u2026',
     skip: 'Skip for now',
-    fillAllFields: 'Please fill out all fields.',
+    nameRequired: 'Please enter your first and last name.',
     saveFailed: 'Failed to save your details',
-    invalidZip: 'Please enter a valid 5-digit ZIP code.',
-    invalidPostalCode: 'Please enter a valid postal code (e.g. A1B 2C3).',
   },
   'fr-ca': {
     panelTitle: 'Se connecter ou créer un compte',
@@ -76,29 +77,30 @@ const AUTH_STRINGS = {
     profileDesc: 'Ajoutez quelques détails pour personnaliser votre compte.',
     firstName: 'Prénom',
     lastName: 'Nom de famille',
-    zip: 'Code ZIP',
-    postalCode: 'Code postal',
+    plannedUseLabel: 'Pour quoi comptez-vous utiliser ce compte ?',
+    plannedUseHome: 'Pour les produits domestiques',
+    plannedUseBusiness: 'Pour les produits professionnels',
+    ownsVitamixLabel: 'Possédez-vous déjà un Vitamix ?',
+    yes: 'Oui',
+    no: 'Non',
+    termsAgree: "J'accepte les conditions générales",
     save: 'Enregistrer',
     saving: 'Enregistrement\u2026',
     skip: "Passer pour l'instant",
-    fillAllFields: 'Veuillez remplir tous les champs.',
+    nameRequired: 'Veuillez entrer votre prénom et votre nom de famille.',
     saveFailed: "Échec de l'enregistrement de vos informations.",
-    invalidZip: 'Veuillez entrer un code ZIP à 5 chiffres valide.',
-    invalidPostalCode: 'Veuillez entrer un code postal valide (ex. A1B 2C3).',
   },
 };
 
 /**
- * Resolves the localized strings and the Canada flag for the current path.
- * Canada uses postal codes (not ZIP codes) and its own validation, while the
- * Canadian English store still uses the en-us copy.
+ * Resolves the localized strings for the current path, falling back to en-us.
  *
- * @returns {{ strings: Record<string, string>, isCanada: boolean }}
+ * @returns {{ strings: Record<string, string> }}
  */
 function getAuthContext() {
-  const { locale, language } = getLocaleAndLanguage(false, true);
+  const { language } = getLocaleAndLanguage(false, true);
   const strings = AUTH_STRINGS[language.toLowerCase()] || AUTH_STRINGS['en-us'];
-  return { strings, isCanada: locale === 'ca' };
+  return { strings };
 }
 
 /**
@@ -232,18 +234,19 @@ function buildSuccessStep(email, strings) {
 
 /**
  * Builds the profile-completion step shown after a successful OTP verification when the
- * customer record is missing a first name, last name, or ZIP code. Pre-fills any fields the
- * customer already has on file.
+ * customer record is missing a first or last name. Collects the name plus optional
+ * site-specific survey answers (planned use, Vitamix ownership) and terms agreement,
+ * pre-filling anything the customer already has on file.
  *
  * @param {Record<string, unknown>} customer - The customer record fetched after verification
  * @param {Record<string, string>} strings - Localized UI strings
- * @param {boolean} isCanada - Whether the current store uses postal codes
  * @returns {HTMLElement}
  */
-function buildProfileStep(customer, strings, isCanada) {
+function buildProfileStep(customer, strings) {
   const step = document.createElement('div');
   step.className = 'auth-step auth-step-profile';
-  const zipLabel = isCanada ? strings.postalCode : strings.zip;
+  const custom = (customer && typeof customer.custom === 'object' && customer.custom)
+    ? /** @type {Record<string, string>} */ (customer.custom) : {};
   step.innerHTML = `
     <h3>${strings.profileHeading}</h3>
     <p class="auth-step-desc">${strings.profileDesc}</p>
@@ -252,8 +255,17 @@ function buildProfileStep(customer, strings, isCanada) {
              placeholder="${strings.firstName}" autocomplete="given-name">
       <input type="text" class="auth-input" name="lastName"
              placeholder="${strings.lastName}" autocomplete="family-name">
-      <input type="text" class="auth-input" name="zipCode"
-             placeholder="${zipLabel}" autocomplete="postal-code"${isCanada ? '' : ' inputmode="numeric"'}>
+      <fieldset class="auth-fieldset">
+        <legend>${strings.plannedUseLabel}</legend>
+        <label class="auth-radio"><input type="radio" name="plannedUse" value="home"> ${strings.plannedUseHome}</label>
+        <label class="auth-radio"><input type="radio" name="plannedUse" value="business"> ${strings.plannedUseBusiness}</label>
+      </fieldset>
+      <fieldset class="auth-fieldset">
+        <legend>${strings.ownsVitamixLabel}</legend>
+        <label class="auth-radio"><input type="radio" name="ownsVitamix" value="yes"> ${strings.yes}</label>
+        <label class="auth-radio"><input type="radio" name="ownsVitamix" value="no"> ${strings.no}</label>
+      </fieldset>
+      <label class="auth-checkbox"><input type="checkbox" name="terms"> ${strings.termsAgree}</label>
       <button type="submit" class="auth-submit">${strings.save}</button>
       <p class="auth-error"></p>
     </form>
@@ -261,18 +273,16 @@ function buildProfileStep(customer, strings, isCanada) {
   `;
   step.querySelector('[name="firstName"]').value = String(customer.firstName ?? '');
   step.querySelector('[name="lastName"]').value = String(customer.lastName ?? '');
-  step.querySelector('[name="zipCode"]').value = String(customer.zipCode ?? '');
+  if (custom.plannedUse) {
+    const el = step.querySelector(`[name="plannedUse"][value="${custom.plannedUse}"]`);
+    if (el) el.checked = true;
+  }
+  if (custom.ownsVitamix) {
+    const el = step.querySelector(`[name="ownsVitamix"][value="${custom.ownsVitamix}"]`);
+    if (el) el.checked = true;
+  }
+  if (custom.termsAcceptedAt) step.querySelector('[name="terms"]').checked = true;
   return step;
-}
-
-/**
- * Whether the customer record is missing a first name, last name, or ZIP/postal code.
- *
- * @param {Record<string, unknown>} customer
- * @returns {boolean}
- */
-function isProfileIncomplete(customer) {
-  return !customer.firstName || !customer.lastName || !customer.zipCode;
 }
 
 /**
@@ -293,7 +303,7 @@ function isProfileIncomplete(customer) {
 export default function createAuthPanel() {
   let otpState = null;
 
-  const { strings, isCanada } = getAuthContext();
+  const { strings } = getAuthContext();
 
   const {
     dialog, content, open, close,
@@ -363,29 +373,32 @@ export default function createAuthPanel() {
    * @param {Record<string, unknown>} customer - The customer record fetched after verification
    */
   function showProfileStep(email, customer) {
-    const step = buildProfileStep(customer, strings, isCanada);
+    const step = buildProfileStep(customer, strings);
     step.querySelector('form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const btn = step.querySelector('.auth-submit');
       const errEl = step.querySelector('.auth-error');
       errEl.textContent = '';
 
-      const firstName = step.querySelector('[name="firstName"]').value.trim();
-      const lastName = step.querySelector('[name="lastName"]').value.trim();
-      const zipCode = step.querySelector('[name="zipCode"]').value.trim();
-      if (!firstName || !lastName || !zipCode) {
-        errEl.textContent = strings.fillAllFields;
-        return;
-      }
-      if (!isValidPostalCode(zipCode, isCanada)) {
-        errEl.textContent = isCanada ? strings.invalidPostalCode : strings.invalidZip;
+      const fields = {
+        firstName: step.querySelector('[name="firstName"]').value,
+        lastName: step.querySelector('[name="lastName"]').value,
+        plannedUse: step.querySelector('[name="plannedUse"]:checked')?.value,
+        ownsVitamix: step.querySelector('[name="ownsVitamix"]:checked')?.value,
+        termsAccepted: step.querySelector('[name="terms"]').checked,
+      };
+      // Name is required to save: the customer API needs first+last name to
+      // create the record, and it is the profile-completeness signal. The
+      // survey answers and terms are optional; "Skip for now" bypasses entirely.
+      if (!fields.firstName.trim() || !fields.lastName.trim()) {
+        errEl.textContent = strings.nameRequired;
         return;
       }
 
       btn.disabled = true;
       btn.textContent = strings.saving;
       try {
-        await updateCustomer(email, { firstName, lastName, zipCode });
+        await updateCustomer(email, buildProfileUpdate(fields));
         finishLogin(email);
       } catch (err) {
         errEl.textContent = err.message || strings.saveFailed;

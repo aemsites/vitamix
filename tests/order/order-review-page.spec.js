@@ -112,6 +112,9 @@ async function setupReviewMocks(page, overrides = {}) {
   await page.route('**/us/en_us/order/cart*', (route) => route.fulfill({
     status: 200, contentType: 'text/html', body: '<!doctype html><html><body><h1>Cart (stub)</h1></body></html>',
   }));
+  await page.route('**/us/en_us/order/cancel*', (route) => route.fulfill({
+    status: 200, contentType: 'text/html', body: '<!doctype html><html><body><h1>Order cancelled (stub)</h1></body></html>',
+  }));
 }
 
 async function gotoReview(page, baseUrl, orderId = MOCK_ORDER_ID) {
@@ -252,7 +255,7 @@ test.describe('Order review page (display-only)', () => {
           await route.fulfill({
             status: 200,
             contentType: 'application/json',
-            body: JSON.stringify({ status: 'failed', reason: 'Your card was declined.' }),
+            body: JSON.stringify({ status: 'failed' }),
           });
         },
       });
@@ -262,19 +265,21 @@ test.describe('Order review page (display-only)', () => {
       await page.locator('.order-review-complete').click();
 
       await expect(page.locator('.order-review-error')).toBeVisible({ timeout: 10000 });
-      await expect(page.locator('.order-review-error')).toContainText('declined');
+      await expect(page.locator('.order-review-error')).toContainText(/could not complete your order/i);
       await page.waitForTimeout(500);
       expect(page.url()).toContain('/order/review');
       console.log('✓ Soft decline (failed, not cancelled) stays on review with an error');
     });
 
-    test('a failed confirm flagged cancelled routes to the cart (terminal)', async ({ page }) => {
+    test('a retry confirm shows the retry copy and returns to the cart (terminal)', async ({ page }) => {
       await setupReviewMocks(page, {
         confirm: async (route) => {
+          // Retryable authorization-stage decline: terminal on this order
+          // (cancelled server-side) but the buyer can start over.
           await route.fulfill({
             status: 200,
             contentType: 'application/json',
-            body: JSON.stringify({ status: 'failed', reason: 'PayPal order expired', cancelled: true }),
+            body: JSON.stringify({ status: 'failed', checkoutFailure: 'retry', cancelled: true }),
           });
         },
       });
@@ -283,9 +288,34 @@ test.describe('Order review page (display-only)', () => {
       await expect(page.locator('.order-review-complete')).toBeVisible({ timeout: 15000 });
       await page.locator('.order-review-complete').click();
 
-      await expect(page.locator('.order-review-error')).toContainText(/expired or been cancelled/i, { timeout: 10000 });
+      await expect(page.locator('.order-review-error')).toContainText(/try again later/i, { timeout: 10000 });
       await expect.poll(() => page.url(), { timeout: 15000 }).toMatch(/\/order\/cart/);
-      console.log('✓ Failed + cancelled:true → clear message → cart');
+      console.log('✓ retry → retry copy → cart');
+    });
+
+    test('a contact_support confirm routes to the order-cancelled page (Customer Care copy)', async ({ page }) => {
+      await setupReviewMocks(page, {
+        confirm: async (route) => {
+          // A terminal failure: the confirm endpoint returns 200 with
+          // checkoutFailure=contact_support and cancelled:true (order moved to
+          // payment_cancelled server-side).
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ status: 'failed', checkoutFailure: 'contact_support', cancelled: true }),
+          });
+        },
+      });
+      await gotoReview(page, baseUrl);
+
+      await expect(page.locator('.order-review-complete')).toBeVisible({ timeout: 15000 });
+      await page.locator('.order-review-complete').click();
+
+      // Routed to the order-cancelled page (orderId only; it reads the neutral
+      // checkoutFailure bucket off the order) rather than bounced to the cart.
+      await expect.poll(() => page.url(), { timeout: 15000 })
+        .toMatch(/\/order\/cancel\?.*orderId=/);
+      console.log('✓ contact_support → /order/cancel (orderId only)');
     });
 
     test('a cancelled/expired order shows a clear message and returns to the cart', async ({ page }) => {

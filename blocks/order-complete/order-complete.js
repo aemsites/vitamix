@@ -73,8 +73,10 @@ export function calculateConfirmationTotal({
  * Order confirmation / cancellation page.
  *
  * Success: Chase / PayPal → API → redirect here with ?orderId=...
- * Cancel:  Chase / PayPal → API → redirect here with ?orderId=...&reason=...
- *   reason values: customer_cancelled | payment_failed | declined | fraud_declined
+ * Cancel:  payment failures redirect to the order-cancel page, not here. This
+ *   page only sees ?reason=customer_cancelled in the rare case a buyer cancel
+ *   lands on the confirmation route; any other reason falls back to the neutral
+ *   contact-support copy.
  *
  * Order display data is fetched from the API using the orderId (URL) and the
  * email proof held in sessionStorage. A successful lookup gates the success UI:
@@ -116,11 +118,10 @@ export default async function decorate(block) {
     container.appendChild(heading);
 
     const msg = document.createElement('p');
-    msg.textContent = resolvePaymentFailureMessage(params.reason, {
+    msg.textContent = resolvePaymentFailureMessage({ reason: params.reason }, {
       customerCancelled: s.orderPaymentCancelled,
-      fraudDeclined: s.cancelFraudDeclined,
-      declined: s.orderPaymentFailed,
-      paymentFailed: s.orderPaymentFailed,
+      contactSupport: s.cancelContactSupport,
+      retry: s.orderPaymentFailed,
     });
     container.appendChild(msg);
 

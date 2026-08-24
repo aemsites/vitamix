@@ -6,6 +6,7 @@ import {
 } from '../commerce-api.js';
 import { getUser, isLoggedIn } from '../auth-api.js';
 import { logOperation, getCheckoutId } from '../operations-log.js';
+import resolvePaymentFailureMessage from '../payment-failure.js';
 import {
   buildApplePayExpressOrderPayload,
   buildApplePayExpressPreviewPayload,
@@ -195,9 +196,15 @@ function startExpressSession(btn, config, callbacks) {
             orderId: createdOrder.order?.id ?? createdOrder.id,
             provider: 'apple-pay',
             status: result.status,
-            reason: result.reason,
+            checkoutFailure: result.checkoutFailure,
           });
-          callbacks.showError(result.reason || 'Apple Pay payment failed.');
+          callbacks.showError(resolvePaymentFailureMessage(
+            { checkoutFailure: result.checkoutFailure },
+            {
+              contactSupport: callbacks.strings?.cancelContactSupport,
+              retry: callbacks.strings?.cancelRetry,
+            },
+          ));
         }
       } catch (err) {
         session.completePayment(window.ApplePaySession.STATUS_FAILURE);
@@ -314,9 +321,13 @@ export function beginCheckoutSession(config, callbacks) {
             orderId: createdOrder.order?.id ?? createdOrder.id,
             provider: 'apple-pay',
             status: result.status,
-            reason: result.reason,
+            checkoutFailure: result.checkoutFailure,
           });
-          reject(new Error(result.reason || 'payment-failed'));
+          // Carry the neutral failure bucket out so the checkout error handler can
+          // show the matching copy (Customer Care vs retry) instead of a generic message.
+          const err = new Error('payment-failed');
+          err.checkoutFailure = result.checkoutFailure;
+          reject(err);
         }
       } catch (err) {
         session.completePayment(window.ApplePaySession.STATUS_FAILURE);

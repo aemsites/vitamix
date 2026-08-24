@@ -25,7 +25,7 @@ describe('resolveConfirmResult', () => {
   });
 
   test('failed → stay on the review page', () => {
-    assert.deepEqual(resolveConfirmResult({ status: 'failed', reason: 'declined' }), { action: 'failed' });
+    assert.deepEqual(resolveConfirmResult({ status: 'failed' }), { action: 'failed' });
   });
 
   test('unknown / missing status → treated as failed (never route away)', () => {
@@ -135,7 +135,7 @@ describe('createConfirmHandler', () => {
     const busy = [];
     const handler = createConfirmHandler({
       orderId: 'o',
-      confirm: async () => ({ status: 'failed', reason: 'card declined' }),
+      confirm: async () => ({ status: 'failed', checkoutFailure: 'retry' }),
       routeTo: (action) => { routedTo = action; },
       onError: (msg) => { errored = msg; },
       setBusy: (b) => busy.push(b),
@@ -143,7 +143,7 @@ describe('createConfirmHandler', () => {
     });
     await handler();
     assert.equal(routedTo, null);
-    assert.equal(errored, 'card declined');
+    assert.equal(errored, 'fallback message');
     assert.deepEqual(busy, [true, false]);
   });
 
@@ -187,7 +187,7 @@ describe('createConfirmHandler', () => {
     let notConfirmable = false;
     const handler = createConfirmHandler({
       orderId: 'o',
-      confirm: async () => ({ status: 'failed', reason: 'PayPal order expired', cancelled: true }),
+      confirm: async () => ({ status: 'failed', checkoutFailure: 'retry', cancelled: true }),
       routeTo: () => {},
       onError: (msg) => { errored = msg; },
       onNotConfirmable: () => { notConfirmable = true; },
@@ -204,7 +204,7 @@ describe('createConfirmHandler', () => {
     const busy = [];
     const handler = createConfirmHandler({
       orderId: 'o',
-      confirm: async () => ({ status: 'failed', reason: 'Your card was declined.' }),
+      confirm: async () => ({ status: 'failed', checkoutFailure: 'retry' }),
       routeTo: () => {},
       onError: (msg) => { errored = msg; },
       onNotConfirmable: () => { notConfirmable = true; },
@@ -213,8 +213,64 @@ describe('createConfirmHandler', () => {
     });
     await handler();
     assert.equal(notConfirmable, false);
-    assert.equal(errored, 'Your card was declined.');
+    assert.equal(errored, 'fallback message');
     assert.deepEqual(busy, [true, false]);
+  });
+
+  test('routes a contact_support result to the contact-support handler, not the cart or a generic error', async () => {
+    let errored = null;
+    let notConfirmable = false;
+    let contactSupport = false;
+    const handler = createConfirmHandler({
+      orderId: 'o',
+      // The confirm endpoint returns a 200 with checkoutFailure=contact_support
+      // and cancelled:true when Forter declines the capture.
+      confirm: async () => ({ status: 'failed', checkoutFailure: 'contact_support', cancelled: true }),
+      routeTo: () => {},
+      onError: (msg) => { errored = msg; },
+      onNotConfirmable: () => { notConfirmable = true; },
+      onContactSupport: () => { contactSupport = true; },
+      errorMessage: 'fallback message',
+    });
+    await handler();
+    assert.equal(contactSupport, true); // routed to the order-cancelled page
+    assert.equal(notConfirmable, false); // NOT the generic cart bounce
+    assert.equal(errored, null); // terminal: no stay-and-retry error
+  });
+
+  test('routes a retry result to the retryable handler, not the generic cancelled path', async () => {
+    let errored = null;
+    let notConfirmable = false;
+    let retryable = false;
+    const handler = createConfirmHandler({
+      orderId: 'o',
+      // The confirm endpoint returns a 200 with checkoutFailure=retry and
+      // cancelled:true for a retryable authorization-stage decline.
+      confirm: async () => ({ status: 'failed', checkoutFailure: 'retry', cancelled: true }),
+      routeTo: () => {},
+      onError: (msg) => { errored = msg; },
+      onNotConfirmable: () => { notConfirmable = true; },
+      onRetryable: () => { retryable = true; },
+      errorMessage: 'fallback message',
+    });
+    await handler();
+    assert.equal(retryable, true); // routed to the retry-copy restart
+    assert.equal(notConfirmable, false); // NOT the generic expired/cancelled path
+    assert.equal(errored, null); // terminal, handled before the cancelled branch
+  });
+
+  test('falls back to the cancelled path for contact_support when no handler is wired', async () => {
+    let notConfirmable = false;
+    const handler = createConfirmHandler({
+      orderId: 'o',
+      confirm: async () => ({ status: 'failed', checkoutFailure: 'contact_support', cancelled: true }),
+      routeTo: () => {},
+      onError: () => {},
+      onNotConfirmable: () => { notConfirmable = true; },
+      errorMessage: 'fallback message',
+    });
+    await handler();
+    assert.equal(notConfirmable, true); // still terminal, just without the tailored copy
   });
 });
 

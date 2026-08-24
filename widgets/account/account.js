@@ -464,17 +464,20 @@ export default async function decorate(widget) {
     wireOrderDetailInteractions,
   } = await import('./account-api.js');
   const { wireAccountAddressBook } = await import('./account-address-book.js');
+  const { wireAccountInformation } = await import('./account-information.js');
 
   const copyWithLocale = { ...copy, accountLocale: locale || 'us' };
 
   if (email) {
+    let bundle;
     try {
-      const data = await fetchAccountBundle(email);
-      await applyAccountDataToWidget(widget, data, copyWithLocale);
+      bundle = await fetchAccountBundle(email);
+      await applyAccountDataToWidget(widget, bundle, copyWithLocale);
     } catch {
       /* best-effort: overview/orders still render empty state */
     }
     wireAccountAddressBook(widget, email, lang, String(locale || 'us').toLowerCase(), copy);
+    wireAccountInformation(widget, email, copyWithLocale, bundle?.customer);
   }
 
   wireOrderDetailInteractions(widget, copy);

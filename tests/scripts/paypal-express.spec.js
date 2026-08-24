@@ -3,6 +3,7 @@ import {
   resolveExpressOutcome,
   withInitiateRetry,
 } from '../../scripts/payments/paypal-review.js';
+import resolvePaymentFailureMessage from '../../scripts/payment-failure.js';
 
 function withPayPalExpressContext(payload, entryPoint) {
   return {
@@ -195,7 +196,13 @@ async function handleApprove(callbacks, deps) {
     } else if (outcome === 'completed') {
       callbacks.onComplete(createdOrder);
     } else {
-      callbacks.showError(result.reason || 'PayPal payment failed. Please try again.');
+      callbacks.showError(resolvePaymentFailureMessage(
+        { checkoutFailure: result.checkoutFailure },
+        {
+          contactSupport: callbacks.strings?.cancelContactSupport,
+          retry: callbacks.strings?.cancelRetry,
+        },
+      ));
     }
   } catch {
     callbacks.showError('PayPal payment failed. Please try again.');
@@ -256,6 +263,7 @@ function makeCallbacks(state = makeState(), overrides = {}) {
     showError: () => {},
     saveCheckoutSession: () => {},
     previewOrderDirect: async () => ({ estimateToken: 'est-new-456' }),
+    strings: { cancelContactSupport: 'Contact Customer Care.', cancelRetry: 'Try again later.' },
     ...overrides,
   };
 }
@@ -593,19 +601,31 @@ test.describe('onApprove callback', () => {
     expect(completedOrder.order.id).toBe('ORD-001');
   });
 
-  test('calls showError with result.reason when payment status is not completed', async () => {
+  test('maps a retry failure bucket to the retry copy', async () => {
     const state = makeState();
     let errorMsg;
     const callbacks = makeCallbacks(state, {
       showError: (msg) => { errorMsg = msg; },
-      initiatePayment: async () => ({ status: 'failed', reason: 'payment_declined' }),
+      initiatePayment: async () => ({ status: 'failed', checkoutFailure: 'retry' }),
     });
     const deps = { getPayPalSessionFn: async () => SESSION };
     await handleApprove(callbacks, deps);
-    expect(errorMsg).toBe('payment_declined');
+    expect(errorMsg).toBe('Try again later.');
   });
 
-  test('calls showError with fallback message when result.reason is absent', async () => {
+  test('maps a contact_support failure bucket to the Customer Care copy', async () => {
+    const state = makeState();
+    let errorMsg;
+    const callbacks = makeCallbacks(state, {
+      showError: (msg) => { errorMsg = msg; },
+      initiatePayment: async () => ({ status: 'failed', checkoutFailure: 'contact_support' }),
+    });
+    const deps = { getPayPalSessionFn: async () => SESSION };
+    await handleApprove(callbacks, deps);
+    expect(errorMsg).toBe('Contact Customer Care.');
+  });
+
+  test('defaults to the Customer Care copy when no failure bucket is present', async () => {
     const state = makeState();
     let errorMsg;
     const callbacks = makeCallbacks(state, {
@@ -614,7 +634,7 @@ test.describe('onApprove callback', () => {
     });
     const deps = { getPayPalSessionFn: async () => SESSION };
     await handleApprove(callbacks, deps);
-    expect(errorMsg).toBe('PayPal payment failed. Please try again.');
+    expect(errorMsg).toBe('Contact Customer Care.');
   });
 
   test('calls showError when getPayPalSession throws', async () => {

@@ -120,6 +120,16 @@ Defines additional metadata fields that **should** be translated. By default onl
 | og:title |
 | og:description |
 
+### `dnt-block-rules` sheet
+
+Defines block columns that must **not** be translated. `block name` is the block's CSS name (e.g. `Alert Banners` header row → `alert-banners`); `column` is the 1-based column index within the block's data rows (header row excluded).
+
+| block name | column |
+|------------|--------|
+| alert-banners | 1 |
+| alert-banners | 2 |
+| alert-banners | 4 |
+
 ---
 
 ## Translation Rules
@@ -131,6 +141,7 @@ The following Do-Not-Translate (DNT) rules are applied automatically before send
 - **Block names**: first row of every table (block header) is marked `translate="no"`.
 - **Section metadata**: `section metadata` / `section-metadata` tables are fully protected.
 - **Metadata fields**: all metadata property values are protected except `title`, `description`, and any additional fields listed in `dt-metadata-fields`.
+- **Block columns**: columns listed in `dnt-block-rules` are protected for the matching block.
 
 ---
 

@@ -52,6 +52,15 @@ test.describe('PDP Integration Tests', () => {
       await assertOptionElements(page);
     });
 
+    test('should render one terminal period in the comparison link', async ({ page }) => {
+      const productUrl = buildProductUrl(productPath, currentBranch);
+      await page.goto(productUrl);
+
+      const comparisonLink = page.locator('.pdp-compare-container .comparelistlink');
+      await expect(comparisonLink).toHaveText(/[^.]\.$/);
+      await expect(comparisonLink).not.toHaveText(/\.\.$/);
+    });
+
     test('should deeplink to Ascent X2 variant', async ({ page }) => {
       const productUrl = buildProductUrl(productPath, currentBranch, {
         color: 'polar-white',
@@ -337,6 +346,122 @@ test.describe('PDP Integration Tests', () => {
       await expect(page.locator('.pdp')).not.toHaveClass(/pdp-coming-soon/);
       await expect(page.locator('.quantity-container button')).toBeVisible();
     });
+  });
+
+  test.describe('Commercial dealer CTA', () => {
+    const productPath = '/us/en_us/products/ascent-x2';
+
+    test(
+      'keeps dealer links beside Add to Cart and preserves the unavailable fallback',
+      async ({ page }) => {
+        const productUrl = buildProductUrl(productPath, currentBranch);
+        await page.goto(productUrl);
+        await page.waitForSelector('.pdp');
+
+        await page.evaluate(async () => {
+          // eslint-disable-next-line import/no-unresolved, import/no-absolute-path
+          const { default: renderAddToCart } = await import('/blocks/pdp/add-to-cart.js');
+          const ph = {
+            addToCart: 'Add to Cart',
+            quantity: 'Quantity',
+            findDealer: 'Find a Dealer',
+            consultAnExpert: 'Have a question? Consult an expert.',
+          };
+          const { selectedVariant } = window;
+          window.selectedVariant = undefined;
+
+          const saleableHost = document.createElement('div');
+          saleableHost.classList.add('pdp', 'commercial-saleable');
+          const saleableProduct = {
+            offers: [{
+              sku: 'commercial-saleable',
+              custom: { managedStock: '0', addToCart: 'Yes', comingSoon: 'No' },
+            }],
+            custom: {
+              type: 'simple',
+              findLocally: 'No',
+              findDealer: 'Yes',
+              comingSoon: 'No',
+              isCommercial: true,
+            },
+          };
+          saleableHost.append(renderAddToCart(ph, saleableHost, saleableProduct));
+
+          const unavailableHost = document.createElement('div');
+          unavailableHost.classList.add('pdp', 'commercial-unavailable');
+          const unavailableProduct = {
+            offers: [{
+              sku: 'commercial-unavailable',
+              custom: { managedStock: '0', addToCart: 'No', comingSoon: 'No' },
+            }],
+            custom: {
+              type: 'simple',
+              findLocally: 'No',
+              findDealer: 'Yes',
+              comingSoon: 'No',
+              isCommercial: true,
+            },
+          };
+          unavailableHost.append(renderAddToCart(ph, unavailableHost, unavailableProduct));
+
+          // A saleable, non-commercial product (e.g. a bundle) that carries
+          // findDealer=Yes in the product bus must NOT show the dealer CTA
+          // because it is not flagged commercial.
+          const nonCommercialHost = document.createElement('div');
+          nonCommercialHost.classList.add('pdp', 'noncommercial-saleable');
+          const nonCommercialProduct = {
+            offers: [{
+              sku: 'noncommercial-saleable',
+              custom: { managedStock: '0', addToCart: 'Yes', comingSoon: 'No' },
+            }],
+            custom: {
+              type: 'bundle',
+              findLocally: 'No',
+              findDealer: 'Yes',
+              comingSoon: 'No',
+            },
+          };
+          nonCommercialHost.append(renderAddToCart(ph, nonCommercialHost, nonCommercialProduct));
+
+          document.querySelector('main').append(saleableHost, unavailableHost, nonCommercialHost);
+          window.selectedVariant = selectedVariant;
+        });
+
+        const saleable = page.locator('.commercial-saleable');
+        const saleableDealerButton = saleable.locator('.pdp-find-dealer-button');
+        const dealerUrl = 'https://www.vitamix.com/us/en_us/where-to-buy?'
+          + 'productFamily=2205202&productType=COMM';
+        const expertUrl = 'https://www.vitamix.com/us/en_us/commercial/resources/'
+          + 'consult-an-expert';
+
+        await expect(saleable.locator('.quantity-container button')).toBeVisible();
+        await expect(saleableDealerButton).toHaveText('Find a Dealer');
+        await expect(saleableDealerButton).toHaveAttribute('href', dealerUrl);
+        await expect(saleable.locator('.add-to-cart > p a')).toHaveText(/consult an expert/i);
+        await expect(saleable.locator('.add-to-cart > p a')).toHaveAttribute('href', expertUrl);
+        await expect(saleable).not.toHaveClass(/pdp-find-dealer/);
+        await expect(saleable.locator('.add-to-cart')).toHaveClass(/pdp-add-to-cart-with-dealer/);
+        await expect(saleableDealerButton).not.toHaveClass(/emphasis/);
+        const saleableCtaOrder = await saleable.locator('.add-to-cart').evaluate((container) => (
+          [...container.children].map(({ tagName }) => tagName)
+        ));
+        expect(saleableCtaOrder).toEqual(['LABEL', 'DIV', 'A', 'P']);
+
+        const unavailable = page.locator('.commercial-unavailable');
+        const unavailableDealerButton = unavailable.locator('.pdp-find-dealer-button');
+        await expect(unavailable).toHaveClass(/pdp-find-dealer/);
+        await expect(unavailable.locator('.quantity-container')).toHaveCount(0);
+        await expect(unavailableDealerButton).toHaveClass(/emphasis/);
+        await expect(unavailableDealerButton).toHaveAttribute('href', dealerUrl);
+
+        // Non-commercial saleable product: Add to Cart shows, but no dealer CTA.
+        const nonCommercial = page.locator('.noncommercial-saleable');
+        await expect(nonCommercial.locator('.quantity-container button')).toBeVisible();
+        await expect(nonCommercial.locator('.pdp-find-dealer-button')).toHaveCount(0);
+        await expect(nonCommercial.locator('.add-to-cart')).not.toHaveClass(/pdp-add-to-cart-with-dealer/);
+        await expect(nonCommercial).not.toHaveClass(/pdp-find-dealer/);
+      },
+    );
   });
 
   test.describe('Bundle Product Page', () => {

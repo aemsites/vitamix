@@ -7,6 +7,7 @@ import {
 import { getLocaleAndLanguage } from '../scripts.js';
 import { getUser, isLoggedIn } from '../auth-api.js';
 import { logOperation, getCheckoutId } from '../operations-log.js';
+import resolvePaymentFailureMessage from '../payment-failure.js';
 import ensureCheckoutPreviewToken, { withPayPalExpressContext } from './paypal-context.js';
 import {
   isExpressReviewEnabled,
@@ -339,7 +340,13 @@ export default {
           } else if (outcome === 'completed') {
             callbacks.onComplete(createdOrder);
           } else {
-            callbacks.showError(result.reason || 'PayPal payment failed. Please try again.');
+            callbacks.showError(resolvePaymentFailureMessage(
+              { checkoutFailure: result.checkoutFailure },
+              {
+                contactSupport: callbacks.strings?.cancelContactSupport,
+                retry: callbacks.strings?.cancelRetry,
+              },
+            ));
           }
         } catch (err) {
           callbacks.showError(err?.errorHeader?.toLowerCase().includes('recaptcha')

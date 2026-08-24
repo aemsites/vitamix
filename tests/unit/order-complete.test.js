@@ -15,23 +15,32 @@ beforeEach(() => {
 describe('resolvePaymentFailureMessage', () => {
   const messages = {
     customerCancelled: 'cancelled',
-    fraudDeclined: 'contact support',
-    declined: 'declined',
-    paymentFailed: 'payment failed',
+    contactSupport: 'contact support',
+    retry: 'retry later',
   };
 
-  test('maps fraud declines to neutral support copy', () => {
-    assert.equal(resolvePaymentFailureMessage('fraud_declined', messages), 'contact support');
+  test('maps a buyer cancellation to the cancelled copy', () => {
+    assert.equal(resolvePaymentFailureMessage({ reason: 'customer_cancelled' }, messages), 'cancelled');
   });
 
-  test('preserves cancellation and legacy decline copy', () => {
-    assert.equal(resolvePaymentFailureMessage('customer_cancelled', messages), 'cancelled');
-    assert.equal(resolvePaymentFailureMessage('declined', messages), 'declined');
+  test('maps the retry bucket to the retry copy', () => {
+    assert.equal(resolvePaymentFailureMessage({ checkoutFailure: 'retry' }, messages), 'retry later');
   });
 
-  test('uses the safe payment fallback for payment failures and unknown reasons', () => {
-    assert.equal(resolvePaymentFailureMessage('payment_failed', messages), 'payment failed');
-    assert.equal(resolvePaymentFailureMessage('unexpected', messages), 'payment failed');
+  test('maps the contact_support bucket to the support copy', () => {
+    assert.equal(resolvePaymentFailureMessage({ checkoutFailure: 'contact_support' }, messages), 'contact support');
+  });
+
+  test('defaults an unknown or missing outcome to the contact_support copy', () => {
+    assert.equal(resolvePaymentFailureMessage({}, messages), 'contact support');
+    assert.equal(resolvePaymentFailureMessage({ checkoutFailure: 'weird' }, messages), 'contact support');
+  });
+
+  test('prioritizes a buyer cancellation over any bucket', () => {
+    assert.equal(
+      resolvePaymentFailureMessage({ reason: 'customer_cancelled', checkoutFailure: 'retry' }, messages),
+      'cancelled',
+    );
   });
 });
 

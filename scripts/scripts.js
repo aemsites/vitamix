@@ -1079,7 +1079,9 @@ function autolinkModals(doc) {
 async function decorateFragmentPreviews() {
   const path = window.location.pathname;
   if (path.includes('/nav/')) {
-    if (path.endsWith('/nav/nav') || path.endsWith('/nav/products')) {
+    const localeFreePath = path.substring(9);
+    const navPaths = ['/nav/nav', '/nav/products', '/nav/nav-promos'];
+    if (navPaths.includes(localeFreePath)) {
       document.body.classList.add('fragment-preview-nav');
     } else {
       document.body.classList.add('fragment-preview');
@@ -1411,10 +1413,10 @@ export function currentPastFuture(start, end, date = new Date()) {
  * Finds the "best" (currently active) item from an array of scheduled items.
  * Works for any array of `{ valid, start, end }` objects, e.g. banners or nav-promos.
  * @param {Array<Object>} items - Array of item objects from parseAlertBanners/parseNavPromos.
- * @param {Date} [date=new Date()] - The reference date/time to use (defaults to now).
+ * @param {Date} [date] - The reference date/time to use (defaults to window.simulateDate or now).
  * @returns {Object|null} The best item object, or null if none are current.
  */
-export function findCurrentScheduledItem(items, date = new Date()) {
+export function findCurrentScheduledItem(items, date = window.simulateDate || new Date()) {
   let bestItem = null;
   items.forEach((item) => {
     if (item.valid) {

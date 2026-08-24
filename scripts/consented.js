@@ -12,6 +12,7 @@ import {
   trackCheckoutShipping,
   trackLogin,
   trackSocialEvents,
+  trackFormEvents,
 } from './consented/instrumentation/index.js';
 
 bootstrapEarlyTracking();
@@ -26,6 +27,7 @@ trackCartChange();
 trackCheckoutShipping();
 trackLogin();
 trackSocialEvents();
+trackFormEvents();
 
 // add delayed functionality here
 window.config = {
@@ -68,7 +70,7 @@ const launchConfigByEnv = {
     scriptUrl: 'https://assets.adobedtm.com/8639b8ee2552/0f7a35c4f04b/launch-EN10955306e5aa4722aaabcdd1910448ad-development.min.js',
   },
   uat: {
-    pixelId: 1026941270048701,
+    pixelId: 1371926081780272,
     scriptUrl: 'https://assets.adobedtm.com/8639b8ee2552/0f7a35c4f04b/launch-EN10955306e5aa4722aaabcdd1910448ad-development.min.js',
   },
   localhost: {
@@ -134,7 +136,8 @@ if (isAscentXcategory) {
 
 //End Floodlight tag
 
-loadScript('https://arttrk.com/pixel/?ad_log=referer&action=content&pixid=82dc3545-14a0-41d8-9870-2156059087d9');
+// Arttrk pixel returns image/gif — load as Image, not script
+new Image().src = 'https://arttrk.com/pixel/?ad_log=referer&action=content&pixid=82dc3545-14a0-41d8-9870-2156059087d9';
 loadScript('https://cdn.evgnet.com/beacon/vitamixmgmtcorp/vitamix_us/scripts/evergage.min.js');
 
 loadScript('https://www.googletagmanager.com/gtag/js?id=DC-10418690');
@@ -251,3 +254,13 @@ loadScript('https://cdn.datasteam.io/js/D26F66D1AD707A.js');
   i=d.getElementsByTagName(t)[0],i.parentNode.insertBefore(n,i)
 })
 (window,document,"script","//bat.bing.com/bat.js","uetq");
+
+/* eslint-enable */
+
+// Order confirmation page (EDS checkout parity with isOrderSuccessPage() in
+// instrumentation/shared.js): loads the purchase/conversion pixels below.
+const isOrderConfirmation = /\/order\/complete\/?$/.test(pathname);
+
+if (isOrderConfirmation) {
+  import('./consented/conversion.js');
+}

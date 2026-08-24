@@ -248,6 +248,13 @@ function sendPurchaseAppMeasurementBeacon(transaction) {
   tracker.pageName = transaction.pageName;
   tracker.purchaseID = transaction.purchaseID;
   tracker.products = transaction.productString;
+  // eVar25/eVar41/eVar31/eVar60/eVar61 aren't populated by the Launch purchase rule —
+  // set directly so this data still lands in the beacon on this fallback path.
+  tracker.eVar25 = transaction.purchaseID;
+  tracker.eVar41 = transaction.paymentMethod;
+  tracker.eVar31 = transaction.discountCode;
+  tracker.eVar60 = transaction.giftOption;
+  tracker.eVar61 = transaction.productShippingMethod;
 
   const events = ['purchase'];
   if (parseFloat(transaction.shippingRevenue) > 0) events.push(`event48=${transaction.shippingRevenue}`);
@@ -279,6 +286,16 @@ async function pushPurchaseEvent(transaction, { waitForBeacon = false } = {}) {
   const tracker = getPrimaryAnalyticsTracker();
   let launchPurchaseSent = false;
   let restoreTrackerT = null;
+
+  if (tracker) {
+    // The Launch purchase rule doesn't set these eVars — set them directly so
+    // they're present regardless of the rule's own mapping.
+    tracker.eVar25 = transaction.purchaseID;
+    tracker.eVar41 = transaction.paymentMethod;
+    tracker.eVar31 = transaction.discountCode;
+    tracker.eVar60 = transaction.giftOption;
+    tracker.eVar61 = transaction.productShippingMethod;
+  }
 
   if (tracker && typeof tracker.t === 'function') {
     const originalT = tracker.t;
@@ -409,9 +426,7 @@ function buildMetaPurchasePayload(context = readOrderSuccessContext()) {
 
   const contentIds = items.map((item) => item.sku);
   const numItems = items.reduce((sum, item) => sum + item.quantity, 0);
-  const value = Number(items
-    .reduce((sum, item) => sum + (item.price * item.quantity), 0)
-    .toFixed(2));
+  const value = summary.orderTotal;
 
   const currency = String(
     context?.order?.currencyCode

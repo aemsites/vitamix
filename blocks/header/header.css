@@ -1026,6 +1026,39 @@ header .auth-panel::backdrop {
   border-color: var(--color-charcoal);
 }
 
+.auth-fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.auth-fieldset legend {
+  padding: 0;
+  margin-bottom: 2px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.auth-radio,
+.auth-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.auth-radio input,
+.auth-checkbox input {
+  width: auto;
+  margin: 0;
+}
+
 .auth-code-boxes {
   display: flex;
   gap: 10px;

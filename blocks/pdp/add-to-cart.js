@@ -23,22 +23,40 @@ function renderFindLocally(ph, block) {
 }
 
 /**
- * Renders a "Find Dealer" button container.
+ * Appends the commercial dealer and expert consultation links to a PDP CTA container.
+ * @param {Object} ph - Placeholders object
+ * @param {HTMLElement} container - Container receiving the dealer CTA content
+ * @param {boolean} isSecondary - Whether the dealer button follows Add to Cart
+ */
+function appendFindDealerCta(ph, container, isSecondary = false) {
+  const { locale, language } = getLocaleAndLanguage();
+  const findDealerButton = document.createElement('a');
+  findDealerButton.classList.add('button', 'pdp-find-dealer-button');
+  if (!isSecondary) findDealerButton.classList.add('emphasis');
+  findDealerButton.href = `https://www.vitamix.com/${locale}/${language}/where-to-buy?`
+    + 'productFamily=2205202&productType=COMM';
+  findDealerButton.textContent = ph.findDealer || 'Find Dealer';
+
+  const expertQuestion = document.createElement('p');
+  const expertLink = document.createElement('a');
+  expertLink.href = `https://www.vitamix.com/${locale}/${language}/commercial/resources/`
+    + 'consult-an-expert';
+  expertLink.textContent = ph.consultAnExpert || 'Have a question? Consult an expert.';
+  expertQuestion.append(expertLink);
+
+  container.append(findDealerButton, expertQuestion);
+}
+
+/**
+ * Renders a "Find Dealer" button container for an unavailable product.
  * @param {Object} ph - Placeholders object
  * @param {HTMLElement} block - PDP block element
  * @returns {HTMLElement} Container div with "Find Dealer" button and expert consultation link
  */
 function renderFindDealer(ph, block) {
-  const { locale, language } = getLocaleAndLanguage();
   const findDealerContainer = document.createElement('div');
   findDealerContainer.classList.add('add-to-cart');
-  findDealerContainer.innerHTML = `<a
-    class="button emphasis pdp-find-locally-button"
-    href="https://www.vitamix.com/${locale}/${language}/where-to-buy?productFamily=2205202&productType=COMM">${ph.findDealer || 'Find Dealer'}</a>
-  <p>
-    <a
-      href="https://www.vitamix.com/${locale}/${language}/commercial/resources/consult-an-expert">${ph.consultAnExpert || 'Have a question? Consult an expert.'}</a>
-  </p>`;
+  appendFindDealerCta(ph, findDealerContainer);
   block.classList.add('pdp-find-dealer');
   return findDealerContainer;
 }
@@ -76,17 +94,6 @@ function toggleFixedAddToCart(container) {
       container.removeAttribute('style');
     }
   });
-}
-
-/**
- * Returns how many units may be added given what is already in the cart.
- * @param {number} requested - Quantity the user selected
- * @param {number} existing - Quantity already in the cart for this SKU
- * @param {number} max - Per-product maximum allowed quantity
- * @returns {number}
- */
-export function computeAllowedQty(requested, existing, max) {
-  return Math.max(0, Math.min(requested, max - existing));
 }
 
 /**
@@ -192,6 +199,9 @@ export default function renderAddToCart(ph, block, parent) {
   // Authored overrides win over the product bus custom values.
   const findLocally = getPdpOverride('findLocally') || parent.custom.findLocally;
   const findDealer = getPdpOverride('findDealer') || parent.custom.findDealer;
+  // The commercial flag comes from the product bus (same signal used by the
+  // resources tab) and scopes the secondary dealer CTA to commercial products.
+  const { isCommercial } = parent.custom;
   block.classList.remove('pdp-find-locally');
   block.classList.remove('pdp-find-dealer');
 
@@ -310,12 +320,7 @@ export default function renderAddToCart(ph, block, parent) {
 
         const { sku: variantSku } = selectedVariant;
         const targetSku = variantSku ?? sku;
-
-        // Clamp requested quantity so the cart line never exceeds maxQuantity.
-        const requestedQty = parseInt(quantity, 10);
-        const existingQty = cartApi.items.find((i) => i.sku === targetSku)?.quantity ?? 0;
-        const allowedQty = computeAllowedQty(requestedQty, existingQty, maxQuantity);
-        if (allowedQty <= 0) {
+        const notifyCartLimit = () => {
           window.cartQtyLimitAlerts ||= new Set();
           window.cartQtyLimitAlerts.add(targetSku);
           document.dispatchEvent(new CustomEvent('cart:limit', {
@@ -329,8 +334,11 @@ export default function renderAddToCart(ph, block, parent) {
           }));
           addToCartButton.textContent = ph.addToCart || 'Add to Cart';
           addToCartButton.removeAttribute('aria-disabled');
-          return;
-        }
+        };
+
+        // Cart.addItem enforces this after it has rebased on shared storage,
+        // so a second tab cannot use its stale snapshot to exceed the limit.
+        const requestedQty = parseInt(quantity, 10);
 
         // Prefer the selected variant's price so variant-specific pricing
         // wins; fall back to offers[0] for simple products, where
@@ -373,7 +381,7 @@ export default function renderAddToCart(ph, block, parent) {
         const item = {
           sku: targetSku,
           parentSku: variantSku ? sku : undefined,
-          quantity: allowedQty,
+          quantity: requestedQty,
           price,
           name: parent.name,
           url: selectedVariant.url,
@@ -396,7 +404,11 @@ export default function renderAddToCart(ph, block, parent) {
           } : {}),
           ...(shippingDimensions ? { shippingDimensions } : {}),
         };
-        await cartApi.addItem(item);
+        const addedItem = await cartApi.addItem(item, { maxQuantity });
+        if (!addedItem) {
+          notifyCartLimit();
+          return;
+        }
 
         // If the PDP warranty selector has a paid tier selected, commit it
         // as a paired line item. The cart-page selector reads this state.
@@ -406,7 +418,7 @@ export default function renderAddToCart(ph, block, parent) {
           await cartApi.addItem({
             sku: selectedTier.sku,
             path: selectedTier.path,
-            quantity: allowedQty,
+            quantity: addedItem.quantity,
             price: selectedTier.price,
             name: selectedTier.name,
             custom: {
@@ -419,13 +431,13 @@ export default function renderAddToCart(ph, block, parent) {
           });
         }
 
-        logOperation('added-to-cart', { sku: targetSku, quantity: allowedQty });
-        document.dispatchEvent(new CustomEvent('pdp:add-to-cart', { detail: { item } }));
+        logOperation('added-to-cart', { sku: targetSku, quantity: addedItem.quantity });
+        document.dispatchEvent(new CustomEvent('pdp:add-to-cart', { detail: { item: addedItem } }));
 
         // On mobile the header cart badge is too subtle — redirect to the
         // cart page so the user gets clear feedback that the item was added.
-        // Flush first: addItem uses a debounced persist (300 ms) so
-        // localStorage may not have the new item yet.
+        // Flush first so the cart page always receives the latest shared
+        // localStorage snapshot before navigation.
         if (window.innerWidth < 900) {
           cartApi.flush();
           window.location.href = getOrderPath('cart');
@@ -478,6 +490,15 @@ export default function renderAddToCart(ph, block, parent) {
 
   // add quantity container to main add to cart container
   addToCartContainer.appendChild(quantityContainer);
+
+  // Saleable commercial products keep the dealer CTA as a secondary action.
+  // Gate on isCommercial so non-commercial products (e.g. bundles) that carry
+  // findDealer=Yes in the product bus don't surface the dealer button alongside
+  // Add to Cart when they are in stock.
+  if (findDealer === 'Yes' && isCommercial) {
+    addToCartContainer.classList.add('pdp-add-to-cart-with-dealer');
+    appendFindDealerCta(ph, addToCartContainer, true);
+  }
 
   return addToCartContainer;
 }
