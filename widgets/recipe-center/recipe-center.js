@@ -533,6 +533,7 @@ function shouldIncludeInURL(key, value) {
 /**
  * Updates URL query parameters to reflect current filter state.
  * Omitted or empty values are removed from the query string.
+ * The existing hash fragment is always preserved.
  * @param {Object} filterConfig - Current filter configuration
  * @param {boolean} [replace=false] - Use replaceState instead of pushState
  * @returns {void}
@@ -547,7 +548,8 @@ function updateURL(filterConfig, replace = false) {
     }
   });
 
-  const newURL = params.toString() ? `${window.location.pathname}?${params.toString()}` : window.location.pathname;
+  const search = params.toString();
+  const newURL = `${window.location.pathname}${search ? `?${search}` : ''}${window.location.hash || ''}`;
   const historyFn = replace ? window.history.replaceState : window.history.pushState;
   historyFn.call(window.history, { filterConfig }, '', newURL);
 }
@@ -630,6 +632,12 @@ function buildRecipeFiltering(container, config = {}, copy = {}, hiddenContainer
       : resultsElement;
     if (target) {
       target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const scrollToHashedResults = () => {
+    if (window.location.hash === '#recipe-results') {
+      scrollResultsToTop();
     }
   };
 
@@ -1140,7 +1148,9 @@ function buildRecipeFiltering(container, config = {}, copy = {}, hiddenContainer
     }
   }
 
-  runSearch(initialConfig);
+  runSearch(initialConfig).then(scrollToHashedResults);
+
+  window.addEventListener('hashchange', scrollToHashedResults);
 
   // Handle browser back/forward buttons (after runSearch is defined)
   window.addEventListener('popstate', (event) => {
