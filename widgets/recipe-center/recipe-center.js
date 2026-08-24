@@ -635,6 +635,12 @@ function buildRecipeFiltering(container, config = {}, copy = {}, hiddenContainer
     }
   };
 
+  const scrollToHashedResults = () => {
+    if (window.location.hash === '#recipe-results') {
+      scrollResultsToTop();
+    }
+  };
+
   // Sort dropdown uses native <details> element
   const sortDetails = container.querySelector('.sort');
   const sortMenu = container.querySelector('.sort menu');
@@ -1142,7 +1148,9 @@ function buildRecipeFiltering(container, config = {}, copy = {}, hiddenContainer
     }
   }
 
-  runSearch(initialConfig);
+  runSearch(initialConfig).then(scrollToHashedResults);
+
+  window.addEventListener('hashchange', scrollToHashedResults);
 
   // Handle browser back/forward buttons (after runSearch is defined)
   window.addEventListener('popstate', (event) => {
