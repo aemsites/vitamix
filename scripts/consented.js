@@ -70,7 +70,7 @@ const launchConfigByEnv = {
     scriptUrl: 'https://assets.adobedtm.com/8639b8ee2552/0f7a35c4f04b/launch-EN10955306e5aa4722aaabcdd1910448ad-development.min.js',
   },
   uat: {
-    pixelId: 1026941270048701,
+    pixelId: 1371926081780272,
     scriptUrl: 'https://assets.adobedtm.com/8639b8ee2552/0f7a35c4f04b/launch-EN10955306e5aa4722aaabcdd1910448ad-development.min.js',
   },
   localhost: {
