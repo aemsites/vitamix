@@ -9,6 +9,7 @@ import { getUser, isLoggedIn } from '../auth-api.js';
 import { logOperation, getCheckoutId } from '../operations-log.js';
 import resolvePaymentFailureMessage from '../payment-failure.js';
 import ensureCheckoutPreviewToken, { withPayPalExpressContext } from './paypal-context.js';
+import { buildExpressOrderPayload } from '../checkout-context.js';
 import {
   isExpressReviewEnabled,
   resolveExpressOutcome,
@@ -284,30 +285,28 @@ export default {
           // return a different payer email, which remains on billing/shipping.
           const accountEmail = isLoggedIn() ? getUser()?.email : '';
           const customerEmail = accountEmail || session.payer.email || '';
-          const orderBody = withPayPalExpressContext({
+          const fullName = `${session.payer.firstName} ${session.payer.lastName}`.trim();
+          const walletAddress = {
+            name: fullName,
+            ...session.shippingAddress,
+            email: session.payer.email,
+          };
+          // Replay the exact payload that minted the estimate token (items,
+          // selectedOptions, shippingMethod, coupon, checkout context) and
+          // overlay only the wallet-provided identity + token. This keeps the
+          // order body consistent with the token's payloadHash by construction.
+          const orderBody = buildExpressOrderPayload(state.currentEstimatePayload, {
             customer: {
               firstName: session.payer.firstName,
               lastName: session.payer.lastName,
               email: customerEmail,
               phone: '',
             },
-            shipping: {
-              name: `${session.payer.firstName} ${session.payer.lastName}`.trim(),
-              ...session.shippingAddress,
-              email: session.payer.email,
-            },
-            billing: {
-              name: `${session.payer.firstName} ${session.payer.lastName}`.trim(),
-              ...session.shippingAddress,
-              email: session.payer.email,
-            },
-            items: cart.getItemsForAPI(),
-            shippingMethod: { id: session.selectedOptionId },
+            shipping: walletAddress,
+            billing: walletAddress,
             estimateToken: state.currentEstimateToken,
-            country: session.shippingAddress.country,
-            locale: getLocaleAndLanguage(false, true).language,
-            ...(customerTimezone ? { customerTimezone } : {}),
-          }, callbacks.expressEntryPoint);
+            customerTimezone,
+          });
           const createdOrder = await callbacks.createOrder(orderBody);
           const fraudToken = (() => {
             try { return sessionStorage.getItem('forter_token') || undefined; } catch { return undefined; }

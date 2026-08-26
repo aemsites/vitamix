@@ -237,6 +237,7 @@ export default async function decorate(block) {
   const state = {
     selectedShippingMethodId: null,
     currentEstimateToken: null,
+    currentEstimatePayload: null,
     currentPreview: null,
     shippingAddressValidated: false,
     billingAddressValidated: false,

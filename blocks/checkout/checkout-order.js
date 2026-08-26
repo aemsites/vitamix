@@ -185,12 +185,18 @@ export function initOrder(form, cart, state, config, strings) {
     previewOrderDirect: async (body) => {
       const couponCode = sessionStorage.getItem('checkout_coupon_code') || undefined;
       const couponSource = sessionStorage.getItem('checkout_coupon_source') || undefined;
-      const result = await previewOrder({
+      const estimatePayload = {
         ...body,
         ...(couponCode && !body.couponCode ? { couponCode } : {}),
         ...(couponCode && couponSource && !body.couponSource ? { couponSource } : {}),
-      });
-      if (result.estimateToken) state.currentEstimateToken = result.estimateToken;
+      };
+      const result = await previewOrder(estimatePayload);
+      if (result.estimateToken) {
+        // Retain the exact payload that minted this token so a wallet express
+        // order body can replay it verbatim (see buildExpressOrderPayload).
+        state.currentEstimateToken = result.estimateToken;
+        state.currentEstimatePayload = estimatePayload;
+      }
       state.currentPreview = result;
       return result;
     },
