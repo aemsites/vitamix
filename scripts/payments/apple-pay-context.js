@@ -1,4 +1,4 @@
-import { getExpressCheckoutContext } from '../checkout-context.js';
+import { getExpressCheckoutContext, buildExpressOrderPayload } from '../checkout-context.js';
 
 export const APPLE_PAY_CART_CONTEXT = getExpressCheckoutContext('apple-pay', 'cart');
 
@@ -48,34 +48,26 @@ export function buildApplePayExpressPreviewPayload(
 }
 
 /**
- * Builds the Apple Pay express order payload from the authorized payment contact.
+ * Builds the Apple Pay express order payload from the authorized payment
+ * contact by replaying the previewed estimate payload and overlaying the
+ * wallet-provided identity + token (see `buildExpressOrderPayload`).
+ *
  * @param {Object} params
- * @param {Object} params.payment
- * @param {Object} params.cart
- * @param {string} params.shippingMethodId
+ * @param {Object} params.payment - the authorized ApplePayPayment
+ * @param {Object} params.estimatePayload - the payload sent to `/orders/preview`
  * @param {string} params.estimateToken
- * @param {string} params.country
- * @param {string} params.locale
  * @param {string} params.customerEmail
  * @param {string} [params.customerTimezone]
- * @param {Object} params.checkoutContext
  * @returns {Object}
  */
 export function buildApplePayExpressOrderPayload(params) {
   const {
     payment,
-    cart,
-    shippingMethodId,
+    estimatePayload,
     estimateToken,
-    country,
-    locale,
     customerEmail,
     customerTimezone,
-    checkoutContext,
   } = params;
-  if (!checkoutContext) {
-    throw new Error('Apple Pay express order requires checkout context');
-  }
   const contact = payment.shippingContact;
   const shippingAddr = {
     name: `${contact.givenName} ${contact.familyName}`.trim(),
@@ -84,13 +76,15 @@ export function buildApplePayExpressOrderPayload(params) {
     city: contact.locality,
     state: contact.administrativeArea,
     zip: contact.postalCode,
-    country: contact.countryCode?.toLowerCase() || country,
+    // Billing uses this object verbatim (shipping overrides country/state/zip
+    // from the previewed payload). Fall back to the previewed store country so
+    // billing.country is never missing (AddressSchema requires it).
+    country: contact.countryCode?.toLowerCase() || estimatePayload?.country,
     phone: contact.phoneNumber || '',
     email: contact.emailAddress || '',
   };
 
-  return {
-    ...checkoutContext,
+  return buildExpressOrderPayload(estimatePayload, {
     customer: {
       firstName: contact.givenName || '',
       lastName: contact.familyName || '',
@@ -99,11 +93,7 @@ export function buildApplePayExpressOrderPayload(params) {
     },
     shipping: shippingAddr,
     billing: shippingAddr,
-    items: cart.getItemsForAPI(),
-    shippingMethod: { id: shippingMethodId },
     estimateToken,
-    country,
-    locale,
-    ...(customerTimezone ? { customerTimezone } : {}),
-  };
+    customerTimezone,
+  });
 }

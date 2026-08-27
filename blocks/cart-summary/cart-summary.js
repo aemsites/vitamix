@@ -338,7 +338,19 @@ export default async function decorate(block) {
   });
 
   // 5. Build express-checkout callbacks, load SDKs, render available wallet buttons
-  const state = { currentEstimateToken: null, currentPreview: null };
+  const state = { currentEstimateToken: null, currentEstimatePayload: null, currentPreview: null };
+
+  // A cart or coupon change invalidates the wallet express estimate captured by
+  // previewOrderDirect. Clear the token/payload/preview so a wallet approval can
+  // never replay a stale snapshot (ordering the wrong items and clearing the
+  // newly changed cart on success); the next wallet interaction re-previews.
+  const invalidateExpressEstimate = () => {
+    state.currentEstimateToken = null;
+    state.currentEstimatePayload = null;
+    state.currentPreview = null;
+  };
+  document.addEventListener('cart:change', invalidateExpressEstimate);
+  document.addEventListener('checkout:coupon-apply', invalidateExpressEstimate);
 
   const callbacks = {
     expressEntryPoint: 'cart',
@@ -349,13 +361,20 @@ export default async function decorate(block) {
     previewOrderDirect: async (body) => {
       const couponCode = sessionStorage.getItem('checkout_coupon_code') || undefined;
       const couponSource = sessionStorage.getItem('checkout_coupon_source') || undefined;
+      const estimatePayload = {
+        ...body,
+        ...(couponCode ? { couponCode } : {}),
+        ...(couponCode && couponSource ? { couponSource } : {}),
+      };
       try {
-        const result = await previewOrder({
-          ...body,
-          ...(couponCode ? { couponCode } : {}),
-          ...(couponCode && couponSource ? { couponSource } : {}),
-        });
-        if (result.estimateToken) state.currentEstimateToken = result.estimateToken;
+        const result = await previewOrder(estimatePayload);
+        if (result.estimateToken) {
+          // Retain the exact payload that minted this token so the wallet order
+          // body can replay it verbatim (see buildExpressOrderPayload). Set as a
+          // matched pair with the token so the two can never drift.
+          state.currentEstimateToken = result.estimateToken;
+          state.currentEstimatePayload = estimatePayload;
+        }
         state.currentPreview = result;
         return result;
       } catch (err) {

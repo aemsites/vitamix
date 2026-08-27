@@ -237,6 +237,7 @@ export default async function decorate(block) {
   const state = {
     selectedShippingMethodId: null,
     currentEstimateToken: null,
+    currentEstimatePayload: null,
     currentPreview: null,
     shippingAddressValidated: false,
     billingAddressValidated: false,
@@ -470,6 +471,7 @@ export default async function decorate(block) {
   document.addEventListener('cart:change', () => {
     if (cart.itemCount === 0) return;
     state.currentEstimateToken = null;
+    state.currentEstimatePayload = null;
     state.currentPreview = null;
     if (state.selectedShippingMethodId) {
       refreshShipping();

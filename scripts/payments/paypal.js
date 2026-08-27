@@ -9,6 +9,7 @@ import { getUser, isLoggedIn } from '../auth-api.js';
 import { logOperation, getCheckoutId } from '../operations-log.js';
 import resolvePaymentFailureMessage from '../payment-failure.js';
 import ensureCheckoutPreviewToken, { withPayPalExpressContext } from './paypal-context.js';
+import { buildExpressOrderPayload, expressPayloadMatchesCart } from '../checkout-context.js';
 import {
   isExpressReviewEnabled,
   resolveExpressOutcome,
@@ -192,6 +193,11 @@ export default {
         const state = callbacks.getState();
         const cart = callbacks.getCart();
         const config = callbacks.getConfig();
+        // Forward the applied coupon so the server prices the PayPal amount with the
+        // discount (and persists it for the shipping-option re-estimate). Mirrors the
+        // coupon injection in the shared previewOrderDirect callback.
+        const couponCode = sessionStorage.getItem('checkout_coupon_code') || undefined;
+        const couponSource = sessionStorage.getItem('checkout_coupon_source') || undefined;
         try {
           const result = await patchPayPalSession(state.paypalSessionId, {
             type: 'address',
@@ -204,6 +210,8 @@ export default {
               zip: data.shippingAddress.postalCode,
             },
             items: cart.getItemsForAPI(),
+            ...(couponCode ? { couponCode } : {}),
+            ...(couponCode && couponSource ? { couponSource } : {}),
           });
           if (!result.shippingMethods?.length) {
             return actions.reject(data.errors.ADDRESS_ERROR);
@@ -274,6 +282,16 @@ export default {
           const state = callbacks.getState();
           const cart = callbacks.getCart();
           const config = callbacks.getConfig();
+          // Abort if the cart changed while the PayPal wallet was open (a
+          // cross-tab edit or async gift-with-purchase reconciliation): the
+          // captured estimate payload no longer matches what the shopper sees,
+          // and replaying it would order the stale snapshot while the success
+          // path clears the newly changed cart.
+          if (!expressPayloadMatchesCart(state.currentEstimatePayload, cart.getItemsForAPI())) {
+            callbacks.showError(callbacks.strings?.errorCartChanged
+              || 'Your cart changed during checkout. Please review your cart and try again.');
+            return;
+          }
           const session = await getPayPalSession(
             state.paypalSessionId,
             config.getLocale(),
@@ -284,30 +302,28 @@ export default {
           // return a different payer email, which remains on billing/shipping.
           const accountEmail = isLoggedIn() ? getUser()?.email : '';
           const customerEmail = accountEmail || session.payer.email || '';
-          const orderBody = withPayPalExpressContext({
+          const fullName = `${session.payer.firstName} ${session.payer.lastName}`.trim();
+          const walletAddress = {
+            name: fullName,
+            ...session.shippingAddress,
+            email: session.payer.email,
+          };
+          // Replay the exact payload that minted the estimate token (items,
+          // selectedOptions, shippingMethod, coupon, checkout context) and
+          // overlay only the wallet-provided identity + token. This keeps the
+          // order body consistent with the token's payloadHash by construction.
+          const orderBody = buildExpressOrderPayload(state.currentEstimatePayload, {
             customer: {
               firstName: session.payer.firstName,
               lastName: session.payer.lastName,
               email: customerEmail,
               phone: '',
             },
-            shipping: {
-              name: `${session.payer.firstName} ${session.payer.lastName}`.trim(),
-              ...session.shippingAddress,
-              email: session.payer.email,
-            },
-            billing: {
-              name: `${session.payer.firstName} ${session.payer.lastName}`.trim(),
-              ...session.shippingAddress,
-              email: session.payer.email,
-            },
-            items: cart.getItemsForAPI(),
-            shippingMethod: { id: session.selectedOptionId },
+            shipping: walletAddress,
+            billing: walletAddress,
             estimateToken: state.currentEstimateToken,
-            country: session.shippingAddress.country,
-            locale: getLocaleAndLanguage(false, true).language,
-            ...(customerTimezone ? { customerTimezone } : {}),
-          }, callbacks.expressEntryPoint);
+            customerTimezone,
+          });
           const createdOrder = await callbacks.createOrder(orderBody);
           const fraudToken = (() => {
             try { return sessionStorage.getItem('forter_token') || undefined; } catch { return undefined; }

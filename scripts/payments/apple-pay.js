@@ -12,6 +12,7 @@ import {
   buildApplePayExpressPreviewPayload,
   getApplePayExpressContext,
 } from './apple-pay-context.js';
+import { expressPayloadMatchesCart } from '../checkout-context.js';
 
 const APPLE_PAY_SDK_URL = 'https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js';
 
@@ -44,7 +45,6 @@ function startExpressSession(btn, config, callbacks) {
     const checkoutContext = getApplePayExpressContext(callbacks.expressEntryPoint);
 
     let lastShippingContact = null;
-    let lastShippingMethodId = null;
 
     const request = {
       countryCode: locale.toUpperCase(),
@@ -81,12 +81,22 @@ function startExpressSession(btn, config, callbacks) {
       }
 
       try {
+        // Estimate shipping methods with the applied coupon so the method
+        // amounts, the Shipping line, and the total agree (e.g. a free-shipping
+        // coupon must show 0 on the method, not the undiscounted rate). Mirrors
+        // the coupon injection in previewOrderDirect.
+        const couponCode = sessionStorage.getItem('checkout_coupon_code') || undefined;
+        const couponSource = sessionStorage.getItem('checkout_coupon_source') || undefined;
         const result = await estimateExpressCheckout(
           contact.countryCode,
           contact.administrativeArea,
           contact.postalCode,
           cart.getItemsForAPI(),
-          checkoutContext,
+          {
+            ...checkoutContext,
+            ...(couponCode ? { couponCode } : {}),
+            ...(couponCode && couponSource ? { couponSource } : {}),
+          },
         );
         const methods = result.shippingMethods || [];
         if (!methods.length) {
@@ -99,6 +109,24 @@ function startExpressSession(btn, config, callbacks) {
           return;
         }
         const defaultMethod = methods[0];
+        // Mint the estimate token + payload for the default method here, on the
+        // event that reliably fires. Apple Pay auto-selects the first method and
+        // does NOT fire onshippingmethodselected for it, so a shopper who pays
+        // with the default would otherwise reach onpaymentauthorized with no
+        // token/payload. Previewing here (and re-previewing in
+        // onshippingmethodselected when the shopper changes method) keeps
+        // state.currentEstimatePayload in sync with the selected address on every
+        // change. Mirrors the PayPal express flow's onShippingAddressChange.
+        const preview = await callbacks.previewOrderDirect(
+          buildApplePayExpressPreviewPayload(
+            cart,
+            String(defaultMethod.id),
+            bcp47,
+            contact,
+            checkoutContext,
+          ),
+        );
+        const { shippingRate } = parsePreview(preview, cart.subtotal);
         session.completeShippingContactSelection({
           newShippingMethods: methods.map((m) => ({
             identifier: String(m.id),
@@ -106,11 +134,11 @@ function startExpressSession(btn, config, callbacks) {
             detail: m.eta || '',
             amount: String(m.rate),
           })),
-          newTotal: { label: config.site || 'Store', amount: String(defaultMethod.total) },
+          newTotal: { label: config.site || 'Store', amount: String(preview.total) },
           newLineItems: [
-            { label: 'Subtotal', amount: String(result.subtotal) },
-            { label: 'Tax', amount: String(defaultMethod.taxAmount) },
-            { label: 'Shipping', amount: String(defaultMethod.rate) },
+            { label: 'Subtotal', amount: String(preview.subtotal) },
+            { label: 'Tax', amount: String(preview.taxAmount) },
+            { label: 'Shipping', amount: String(shippingRate) },
           ],
         });
       } catch {
@@ -134,8 +162,8 @@ function startExpressSession(btn, config, callbacks) {
             checkoutContext,
           ),
         );
-        lastShippingMethodId = e.shippingMethod.identifier;
-        callbacks.getState().currentEstimateToken = previewResult.estimateToken;
+        // previewOrderDirect already stored the token + payload as a matched
+        // pair on state; no manual assignment needed.
         const { shippingRate } = parsePreview(previewResult, cart.subtotal);
         session.completeShippingMethodSelection({
           newTotal: { label: config.site || 'Store', amount: String(previewResult.total) },
@@ -155,6 +183,19 @@ function startExpressSession(btn, config, callbacks) {
       const { payment } = e;
       const contact = payment.shippingContact;
       try {
+        // Abort if the cart changed while the Apple Pay sheet was open: the
+        // previewed snapshot no longer matches the live cart, so replaying it
+        // would order stale items and the success path would clear the newly
+        // changed cart.
+        if (!expressPayloadMatchesCart(
+          callbacks.getState().currentEstimatePayload,
+          cart.getItemsForAPI(),
+        )) {
+          session.completePayment(window.ApplePaySession.STATUS_FAILURE);
+          callbacks.showError(callbacks.strings?.errorCartChanged
+            || 'Your cart changed during checkout. Please review your cart and try again.');
+          return;
+        }
         // When the user is signed in, use their account email so the order is linked
         // to the right account. The Apple Pay contact email may differ from the
         // commerce account email, which causes assertEmail to reject the request.
@@ -162,14 +203,10 @@ function startExpressSession(btn, config, callbacks) {
         const customerTimezone = getCustomerTimezone();
         const orderBody = buildApplePayExpressOrderPayload({
           payment,
-          cart,
-          shippingMethodId: lastShippingMethodId || e.payment.shippingMethod?.identifier || '',
+          estimatePayload: callbacks.getState().currentEstimatePayload,
           estimateToken: callbacks.getState().currentEstimateToken,
-          country: locale,
-          locale: bcp47,
           customerEmail,
           customerTimezone,
-          checkoutContext,
         });
 
         const createdOrder = await callbacks.createOrder(orderBody);
