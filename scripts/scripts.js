@@ -238,6 +238,36 @@ export function getFormSubmissionUrl() {
 }
 
 /**
+ * HTTP status codes worth retrying — transient gateway/proxy failures (e.g. a
+ * 502 from the proxy in front of the forms service) where the same request may
+ * succeed on a subsequent attempt. Client (4xx) and other 5xx errors are not
+ * retried since they won't resolve by repeating the request.
+ */
+export const RETRIABLE_STATUS = new Set([502, 503, 504]);
+
+/**
+ * Fetch that retries on transient (retriable) HTTP failures with linear backoff.
+ * Only the status codes in RETRIABLE_STATUS trigger a retry; any other response
+ * (success or non-retriable error) is returned to the caller as-is.
+ * @param {string|URL} url - Request URL
+ * @param {RequestInit} [options] - Fetch options
+ * @param {number} [retries=2] - Additional attempts after the first
+ * @param {number} [backoff=500] - Base delay in ms, multiplied by the attempt number
+ * @returns {Promise<Response>} The final response
+ */
+export async function fetchWithRetry(url, options, retries = 2, backoff = 500) {
+  let resp;
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    resp = await fetch(url, options);
+    if (!RETRIABLE_STATUS.has(resp.status) || attempt === retries) break;
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((resolve) => { setTimeout(resolve, backoff * (attempt + 1)); });
+  }
+  return resp;
+}
+
+/**
  * Parses `document.cookie` into key-value map.
  * @returns {Object} Object representing all cookies as key-value pairs
  */

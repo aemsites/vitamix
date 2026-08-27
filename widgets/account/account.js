@@ -7,7 +7,7 @@ import {
   renderAccountOrderList,
   unwrapPayload,
 } from './account-api.js';
-import { getFormSubmissionUrl, getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { getFormSubmissionUrl, getLocaleAndLanguage, fetchWithRetry } from '../../scripts/scripts.js';
 import { getLeadSource } from '../../scripts/lead-source.js';
 import { getUser, logout } from '../../scripts/auth-api.js';
 
@@ -292,11 +292,13 @@ export default async function decorate(widget) {
       setCommBusy(true, { shimmer: false });
       try {
         const url = getFormSubmissionUrl();
-        const resp = await fetch(url, {
+        // The forms proxy frequently returns a transient 502 on the first call;
+        // retry once after a 2s wait (fetchWithRetry also covers 503/504).
+        const resp = await fetchWithRetry(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
-        });
+        }, 1, 2000);
         if (!resp.ok) {
           showCommError(comm.error || 'Something went wrong. Please try again.');
           setCommBusy(false, { shimmer: false });
