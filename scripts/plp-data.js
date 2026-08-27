@@ -48,21 +48,47 @@ const CALLOUT_COPY_KEYS = {
 };
 
 /**
- * Builds callouts from plp-data's Badges column only (no inference from title, collections, or price).
- * Known types use localized copy; anything else is shown as authored.
+ * @param {Object} product - Product data object
+ * @returns {boolean} `true` if the product's regular/original price is higher than its current price
+ */
+function isOnSale(product) {
+  const regular = product.originalPrice || product.regularPrice;
+  return regular && product.price && Number(regular) > Number(product.price);
+}
+
+/**
+ * @param {string} badge - Raw badge text from plp-data's Badges column
+ * @param {Object} copy - Localized copy object with badge labels
+ * @returns {{type: string, label: string, tier: string}|null}
+ */
+function calloutFromBadge(badge, copy) {
+  const type = classifyManualBadge(badge);
+  const label = type === 'manual' ? badge : (copy[CALLOUT_COPY_KEYS[type]] || badge);
+  if (!label) return null;
+  return { type, label, tier: CALLOUT_TIERS[type] };
+}
+
+/**
+ * Builds callouts from plp-data's Badges column, plus an automatic Sale badge when the
+ * product's current price is below its regular/original price. Title and collections
+ * are not used. Capped to 2.
  * @param {Object} product - Product data object with `badge` from plp-data
  * @param {Object} copy - Localized copy object with badge labels (sale, new, bestSeller, bundleSave, exclusive, topRated, limitedEdition)
  * @returns {Array<{type: string, label: string, tier: string}>}
  */
 export function getProductCallouts(product, copy) {
+  const callouts = [];
   const badge = (product.badge || '').trim();
-  if (!badge) return [];
+  const authored = badge ? calloutFromBadge(badge, copy) : null;
 
-  const type = classifyManualBadge(badge);
-  const label = type === 'manual' ? badge : (copy[CALLOUT_COPY_KEYS[type]] || badge);
-  if (!label) return [];
+  if ((authored?.type === 'sale' || isOnSale(product)) && copy.sale) {
+    callouts.push({ type: 'sale', label: copy.sale, tier: CALLOUT_TIERS.sale });
+  }
+  if (authored && authored.type !== 'sale') {
+    callouts.push(authored);
+  }
 
-  return [{ type, label, tier: CALLOUT_TIERS[type] }];
+  return callouts.slice(0, 2);
 }
 
 /**
