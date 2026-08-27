@@ -481,20 +481,29 @@ body.product-list-widget-drawer-open {
   position: absolute;
   top: 0.5rem;
   right: 0.5rem;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: 0;
-  border-radius: 4px;
-  padding: var(--spacing-40) var(--spacing-60);
+  border-radius: 50%;
+  padding: 0;
   background-color: var(--color-gray-300);
-  color: var(--color-text);
-  font-size: var(--detail-size-m, 0.75rem);
-  font-weight: var(--weight-regular, 400);
-  line-height: 1.2;
-  text-decoration: underline;
-  text-underline-offset: 0.15em;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.2s ease;
+  transition: opacity 0.2s ease, background-color 0.2s ease;
   cursor: pointer;
+}
+
+.product-list-widget .product-list-widget-compare-btn:hover {
+  background-color: var(--color-gray-400, #ccc);
+}
+
+.product-list-widget .product-list-widget-compare-icon {
+  width: 1rem;
+  height: 1rem;
+  background: url('/blocks/plp/plus.svg') center / contain no-repeat;
 }
 
 .product-list-widget .product-list-widget-product-card:hover .product-list-widget-compare-btn,
@@ -506,7 +515,17 @@ body.product-list-widget-drawer-open {
 /* Toggled on once a product is already in the compare-products widget's list (localStorage) */
 .product-list-widget .product-list-widget-compare-btn.product-list-widget-compare-btn-active {
   background-color: var(--color-charcoal);
-  color: var(--color-white);
+}
+
+.product-list-widget .product-list-widget-compare-btn.product-list-widget-compare-btn-active:hover {
+  background-color: var(--color-charcoal);
+}
+
+.product-list-widget .product-list-widget-compare-btn.product-list-widget-compare-btn-active .product-list-widget-compare-icon {
+  background-image: url('/blocks/plp/checkmark.svg');
+
+  /* checkmark.svg strokes dark (#182026); invert to white for contrast on the charcoal background */
+  filter: brightness(0) invert(1);
 }
 
 .product-list-widget .product-list-widget-product-card h4 {

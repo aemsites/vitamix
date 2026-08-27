@@ -4,7 +4,7 @@ import {
 } from '../../scripts/aem.js';
 import { formatPrice, buildVideo } from '../../scripts/scripts.js';
 import { loadFragment } from '../../blocks/fragment/fragment.js';
-import addToCompare, { useWidgetCompare, isInStoredCompare, removeFromCompare } from '../../scripts/add-to-compare.js';
+import addToCompare, { useWidgetCompare, isInStoredCompare, getHeaderCompareHref } from '../../scripts/add-to-compare.js';
 import { createCallouts, createStarRating } from '../../scripts/plp-data.js';
 import lookupProductListProducts, { getWidgetLocaleAndLanguage, getFacetDefinitions } from './products.js';
 
@@ -118,29 +118,40 @@ function createCompareButton(product, copy) {
   btn.type = 'button';
   btn.className = 'product-list-widget-compare-btn pdp-compare-button';
 
+  const icon = document.createElement('span');
+  icon.className = 'product-list-widget-compare-icon';
+  icon.setAttribute('aria-hidden', 'true');
+  btn.appendChild(icon);
+
   // Only the compare-products widget path tracks membership client-side (Magento's server-side
-  // compare list has no easy client-side "is this already in it?" check), so the toggle-to-
-  // "Remove from Compare" state only applies there.
+  // compare list has no easy client-side "is this already in it?" check), so the "already added"
+  // (checkmark) state only applies there.
   const widgetMode = useWidgetCompare();
-  const updateLabel = () => {
+  const updateState = () => {
     const inCompare = widgetMode && isInStoredCompare(product.url);
-    btn.textContent = inCompare ? (copy.removeFromCompare || 'Remove from Compare') : (copy.compare || 'Compare');
+    const label = inCompare
+      ? (copy.viewComparisonList || 'View Comparison List')
+      : (copy.addToComparisonList || 'Add to Comparison list');
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
     btn.classList.toggle('product-list-widget-compare-btn-active', inCompare);
   };
-  updateLabel();
+  updateState();
 
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
     if (widgetMode && isInStoredCompare(product.url)) {
-      removeFromCompare(product.url, { viewComparisonLabel: copy.viewComparison });
-    } else {
-      addToCompare(product, {
-        addedMessage: copy.addedToComparison,
-        limitMessage: copy.compareLimitReached,
-        viewComparisonLabel: copy.viewComparison,
-      });
+      // Already added: the checkmark navigates to the comparison list rather than removing it.
+      const viewHref = getHeaderCompareHref();
+      if (viewHref) window.location.href = viewHref;
+      return;
     }
-    updateLabel();
+    addToCompare(product, {
+      addedMessage: copy.addedToComparison,
+      limitMessage: copy.compareLimitReached,
+      viewComparisonLabel: copy.viewComparison,
+    });
+    updateState();
   });
 
   return btn;
@@ -203,18 +214,49 @@ function createProductBullets(product) {
   return list;
 }
 
+/**
+ * The variant (sale) prices available for a product, used to decide whether it has a single
+ * fixed price or a range of prices across its variants.
+ * @param {Object} product
+ * @returns {number[]}
+ */
+function getVariantPrices(product) {
+  if (!hasVariants(product)) return [];
+  return product.variants
+    .map((v) => Number(v.price))
+    .filter((p) => Number.isFinite(p) && p > 0);
+}
+
+/**
+ * Whether a product's variants actually have differing sale prices - only then should the card
+ * show "Starting At" instead of a single plain price.
+ * @param {Object} product
+ * @returns {boolean}
+ */
+function hasVaryingPrice(product) {
+  const prices = getVariantPrices(product);
+  return prices.length > 1 && Math.min(...prices) !== Math.max(...prices);
+}
+
 function createProductPrice(product, ph, copy) {
   const price = document.createElement('p');
   price.className = 'product-list-widget-price';
   if (!product.price) return price;
 
-  const label = document.createElement('span');
-  label.className = 'product-list-widget-price-label';
-  label.textContent = copy.startingAt;
+  const varyingPrice = hasVaryingPrice(product);
   const amount = document.createElement('span');
   amount.className = 'product-list-widget-price-amount';
-  amount.textContent = formatPrice(product.price, ph);
-  price.append(label, amount);
+
+  if (varyingPrice) {
+    const label = document.createElement('span');
+    label.className = 'product-list-widget-price-label';
+    label.textContent = copy.startingAt;
+    price.append(label);
+    amount.textContent = formatPrice(Math.min(...getVariantPrices(product)), ph);
+  } else {
+    amount.textContent = formatPrice(product.price, ph);
+  }
+  price.append(amount);
 
   const regular = product.originalPrice || product.regularPrice;
   if (regular && Number(regular) > Number(product.price)) {
@@ -540,6 +582,17 @@ function wireLifestyleFragment(widget, runSearch, setFilterConfig, getAllFacets)
   });
 }
 
+/**
+ * Sorts facet values by descending count (most products first), falling back to alphabetical
+ * order for ties, e.g. "Ascent X Series (7)" ranks above "Legacy Series (3)" in the Series filter.
+ * @param {string[]} values
+ * @param {Object.<string, number>} counts
+ * @returns {string[]}
+ */
+function sortFacetValuesByCount(values, counts) {
+  return [...values].sort((a, b) => (counts[b] - counts[a]) || a.localeCompare(b));
+}
+
 function createFacetSwatch(facetValue) {
   const swatch = document.createElement('span');
   swatch.className = 'color-swatch product-list-widget-facet-swatch';
@@ -568,7 +621,7 @@ function renderFilterTags(container, tags, copy, onRemove) {
 function renderDrawerFacets(listEl, facets, filterConfig, copy, onChange) {
   listEl.innerHTML = '';
   FACET_KEYS.forEach((key) => {
-    const facetValues = Object.keys(facets[key] || {}).sort((a, b) => a.localeCompare(b));
+    const facetValues = sortFacetValuesByCount(Object.keys(facets[key] || {}), facets[key] || {});
     const isEmpty = facetValues.length === 0;
 
     const details = document.createElement('details');
@@ -689,7 +742,7 @@ function createDropdownChevron() {
 function renderDropdownFilters(container, facets, filterConfig, copy, onSelect) {
   container.innerHTML = '';
   FACET_KEYS.forEach((key) => {
-    const facetValues = Object.keys(facets[key] || {}).sort((a, b) => a.localeCompare(b));
+    const facetValues = sortFacetValuesByCount(Object.keys(facets[key] || {}), facets[key] || {});
     const isEmpty = facetValues.length === 0;
     const selectedValue = (filterConfig[key] || '').trim();
 
