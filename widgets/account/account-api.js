@@ -239,7 +239,7 @@ export async function fetchAccountBundle(customerEmail) {
 }
 
 /** @param {unknown} iso */
-function formatIsoForUi(iso) {
+export function formatIsoForUi(iso) {
   if (iso == null || iso === '') return '—';
   const s = typeof iso === 'string' ? iso : String(iso);
   const d = new Date(s);

@@ -55,7 +55,9 @@
       "cancel": "Cancel",
       "saving": "Saving…",
       "nameRequired": "Please enter your first and last name.",
-      "saveError": "Could not save your details. Please try again."
+      "saveError": "Could not save your details. Please try again.",
+      "saved": "Profile updated.",
+      "phoneInvalid": "Please enter a valid 10-digit phone number."
     },
     "countries": {
       "us": "United States",
@@ -134,7 +136,19 @@
       "smsStatus": "Text messages",
       "smsStatusOptedIn": "Subscribed",
       "smsStatusOptedOut": "Not subscribed",
-      "smsOptInLabel": "Receive text notifications"
+      "smsOptInLabel": "Receive text notifications",
+      "smsConsent": "By checking this box, I am opting in to receive promotional SMS messages from Vitamix. Message frequency varies. Text HELP for help. Text STOP to end. Msg & data rates may apply. By leaving this box unchecked, I will not be opting in for SMS messages at this time.",
+      "smsLegalPrefix": "Click to view our ",
+      "smsPrivacyLinkText": "privacy policy",
+      "smsLegalAnd": " and ",
+      "smsTermsLinkText": "terms",
+      "smsSave": "Save",
+      "smsPhoneInvalid": "Enter a valid 10 digit mobile number",
+      "emailOptInLabel": "Send me periodic emails and newsletters from Vitamix",
+      "smsMasterLabel": "Send me text messages from Vitamix",
+      "smsConsentRequired": "Please check the box to confirm you agree to receive text messages.",
+      "updatePreferences": "Update preferences",
+      "saved": "Your preferences have been updated."
     },
     "orderDetail": {
       "back": "← All orders",
@@ -208,7 +222,9 @@
       "cancel": "Annuler",
       "saving": "Enregistrement…",
       "nameRequired": "Veuillez entrer votre prénom et votre nom de famille.",
-      "saveError": "Impossible d'enregistrer vos informations. Veuillez réessayer."
+      "saveError": "Impossible d'enregistrer vos informations. Veuillez réessayer.",
+      "saved": "Profil mis à jour.",
+      "phoneInvalid": "Veuillez entrer un numéro de téléphone à 10 chiffres valide."
     },
     "countries": {
       "us": "États-Unis",
@@ -287,7 +303,19 @@
       "smsStatus": "Messages texte",
       "smsStatusOptedIn": "Abonné",
       "smsStatusOptedOut": "Non abonné",
-      "smsOptInLabel": "Recevoir des notifications par texto"
+      "smsOptInLabel": "Recevoir des notifications par texto",
+      "smsConsent": "En cochant cette case, j'accepte de recevoir des messages SMS promotionnels de Vitamix. La fréquence des messages varie. Textez HELP pour de l'aide. Textez STOP pour mettre fin. Des frais de message et de données peuvent s'appliquer. En laissant cette case décochée, je n'accepte pas de recevoir de messages SMS pour le moment.",
+      "smsLegalPrefix": "Cliquez pour consulter notre ",
+      "smsPrivacyLinkText": "politique de confidentialité",
+      "smsLegalAnd": " et nos ",
+      "smsTermsLinkText": "conditions d'utilisation",
+      "smsSave": "Enregistrer",
+      "smsPhoneInvalid": "Entrez un numéro de mobile valide à 10 chiffres",
+      "emailOptInLabel": "Envoyez-moi des courriels et bulletins périodiques de Vitamix",
+      "smsMasterLabel": "Envoyez-moi des messages texte de Vitamix",
+      "smsConsentRequired": "Veuillez cocher la case pour confirmer votre accord à recevoir des messages texte.",
+      "updatePreferences": "Mettre à jour les préférences",
+      "saved": "Vos préférences ont été mises à jour."
     },
     "orderDetail": {
       "back": "← Toutes les commandes",
@@ -423,7 +451,19 @@
       "smsStatus": "Mensajes de texto",
       "smsStatusOptedIn": "Suscrito",
       "smsStatusOptedOut": "No suscrito",
-      "smsOptInLabel": "Recibir notificaciones por mensaje de texto"
+      "smsOptInLabel": "Recibir notificaciones por mensaje de texto",
+      "smsConsent": "Al marcar esta casilla, acepto recibir mensajes SMS promocionales de Vitamix. La frecuencia de los mensajes varía. Envíe HELP para obtener ayuda. Envíe STOP para cancelar. Pueden aplicarse tarifas de mensajes y datos. Al dejar esta casilla sin marcar, no aceptaré recibir mensajes SMS por el momento.",
+      "smsLegalPrefix": "Haga clic para consultar nuestra ",
+      "smsPrivacyLinkText": "política de privacidad",
+      "smsLegalAnd": " y nuestros ",
+      "smsTermsLinkText": "términos de uso",
+      "smsSave": "Guardar",
+      "smsPhoneInvalid": "Ingrese un número de móvil válido de 10 dígitos",
+      "emailOptInLabel": "Envíenme correos y boletines periódicos de Vitamix",
+      "smsMasterLabel": "Envíenme mensajes de texto de Vitamix",
+      "smsConsentRequired": "Marque la casilla para confirmar que acepta recibir mensajes de texto.",
+      "updatePreferences": "Actualizar preferencias",
+      "saved": "Sus preferencias se han actualizado."
     },
     "orderDetail": {
       "back": "← Todos los pedidos",

@@ -7,7 +7,8 @@ import {
   renderAccountOrderList,
   unwrapPayload,
 } from './account-api.js';
-import { getFormSubmissionUrl, getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { getFormSubmissionUrl, getLocaleAndLanguage, fetchWithRetry } from '../../scripts/scripts.js';
+import { isValidPhone } from '../../blocks/checkout/checkout-validation.js';
 import { getLeadSource } from '../../scripts/lead-source.js';
 import { getUser, logout } from '../../scripts/auth-api.js';
 
@@ -102,28 +103,64 @@ export default async function decorate(widget) {
     const comm = /** @type {Record<string, string>} */ (copy.communications || {});
     const commRoot = information.querySelector('.account-communications');
     const commTitle = information.querySelector('.account-communications-title');
-    const commQuestionCopy = information.querySelector('.account-communications-question-copy');
-    const commQuestionShimmer = information.querySelector('.account-communications-question-shimmer');
     const commBtnShimmer = information.querySelector('.account-communications-btn-shimmer');
-    const commSubscribe = information.querySelector('.account-communications-subscribe');
-    const commUnsubscribe = information.querySelector('.account-communications-unsubscribe');
     const commError = information.querySelector('.account-communications-error');
-    const commSmsRoot = information.querySelector('.account-communications-sms');
+    const commSuccess = information.querySelector('.account-communications-success');
+    const commSave = /** @type {HTMLButtonElement | null} */ (
+      information.querySelector('.account-communications-save')
+    );
+    const commEmailOptShimmer = information.querySelector('.account-communications-email-opt-shimmer');
+    const commEmailCheckbox = /** @type {HTMLInputElement | null} */ (
+      information.querySelector('.account-communications-email-checkbox')
+    );
+    const commEmailOptCopy = information.querySelector('.account-communications-email-opt-copy');
     const commSmsPhoneLabel = information.querySelector('.account-communications-sms-phone-label');
-    const commSmsPhoneValue = information.querySelector('.account-communications-sms-phone-value');
-    const commSmsStatusLabel = information.querySelector('.account-communications-sms-status-label');
-    const commSmsStatusValue = information.querySelector('.account-communications-sms-status-value');
+    const commSmsPhoneInput = /** @type {HTMLInputElement | null} */ (
+      information.querySelector('.account-communications-sms-phone-input')
+    );
+    const commSmsPhoneError = information.querySelector('.account-communications-sms-phone-error');
     const commSmsOptShimmer = information.querySelector('.account-communications-sms-opt-shimmer');
     const commSmsCheckbox = /** @type {HTMLInputElement | null} */ (
       information.querySelector('.account-communications-sms-checkbox')
     );
     const commSmsOptCopy = information.querySelector('.account-communications-sms-opt-copy');
+    const commSmsMasterShimmer = information.querySelector('.account-communications-sms-master-shimmer');
+    const commSmsMasterCheckbox = /** @type {HTMLInputElement | null} */ (
+      information.querySelector('.account-communications-sms-master-checkbox')
+    );
+    const commSmsMasterCopy = information.querySelector('.account-communications-sms-master-copy');
+    const commSmsLegalPrefix = information.querySelector('.account-communications-sms-legal-prefix');
+    const commSmsPrivacyLink = /** @type {HTMLAnchorElement | null} */ (
+      information.querySelector('.account-communications-sms-privacy-link')
+    );
+    const commSmsLegalAnd = information.querySelector('.account-communications-sms-legal-and');
+    const commSmsTermsLink = /** @type {HTMLAnchorElement | null} */ (
+      information.querySelector('.account-communications-sms-terms-link')
+    );
     if (commTitle) commTitle.textContent = comm.title || 'Communications';
-    if (commSubscribe) commSubscribe.textContent = comm.subscribe || 'Subscribe';
-    if (commUnsubscribe) commUnsubscribe.textContent = comm.unsubscribe || 'Unsubscribe';
+    if (commSave) commSave.textContent = comm.updatePreferences || 'Update preferences';
+    if (commEmailOptCopy) {
+      commEmailOptCopy.textContent = comm.emailOptInLabel
+        || 'Send me periodic emails and newsletters from Vitamix';
+    }
     if (commSmsPhoneLabel) commSmsPhoneLabel.textContent = comm.smsPhone || 'Mobile number';
-    if (commSmsStatusLabel) commSmsStatusLabel.textContent = comm.smsStatus || 'Text messages';
-    if (commSmsOptCopy) commSmsOptCopy.textContent = comm.smsOptInLabel || 'Receive text notifications';
+    if (commSmsMasterCopy) {
+      commSmsMasterCopy.textContent = comm.smsMasterLabel || 'Send me text messages from Vitamix';
+    }
+    if (commSmsOptCopy) {
+      commSmsOptCopy.textContent = comm.smsConsent
+        || 'By checking this box, I am opting in to receive promotional SMS messages from Vitamix.';
+    }
+    if (commSmsLegalPrefix) commSmsLegalPrefix.textContent = comm.smsLegalPrefix || 'Click to view our ';
+    if (commSmsPrivacyLink) {
+      commSmsPrivacyLink.textContent = comm.smsPrivacyLinkText || 'privacy policy';
+      commSmsPrivacyLink.href = `/${locale}/${language}/privacy-statement`;
+    }
+    if (commSmsLegalAnd) commSmsLegalAnd.textContent = comm.smsLegalAnd || ' and ';
+    if (commSmsTermsLink) {
+      commSmsTermsLink.textContent = comm.smsTermsLinkText || 'terms';
+      commSmsTermsLink.href = `/${locale}/${language}/legal-notice`;
+    }
 
     /** @type {boolean} */
     let emailOptInStatus = false;
@@ -138,28 +175,42 @@ export default async function decorate(widget) {
      */
     const COMM_VISIBLE = 'is-visible';
 
-    const applyCommCopy = () => {
-      if (!commQuestionCopy) return;
-      const subscribed = emailOptInStatus === true;
-      commQuestionCopy.textContent = subscribed
-        ? (comm.questionSubscribed
-          || 'You are currently subscribed to periodic emails and newsletters from Vitamix.')
-        : (comm.question
-          || 'Would you like us to send you periodic emails and newsletters from Vitamix?');
+    const setCommBusy = (busy, { shimmer = true } = {}) => {
+      // Initial load swaps in shimmer placeholders; saving just disables the
+      // controls in place so nothing disappears mid-submit.
+      if (shimmer) {
+        commBtnShimmer?.classList.toggle(COMM_VISIBLE, busy);
+        commEmailOptShimmer?.classList.toggle(COMM_VISIBLE, busy);
+        commEmailCheckbox?.closest('.account-communications-email-opt-label')
+          ?.classList.toggle(COMM_VISIBLE, !busy);
+        commSmsMasterShimmer?.classList.toggle(COMM_VISIBLE, busy);
+        commSmsMasterCheckbox?.closest('.account-communications-sms-master-label')
+          ?.classList.toggle(COMM_VISIBLE, !busy);
+        commSmsOptShimmer?.classList.toggle(COMM_VISIBLE, busy);
+        commSmsCheckbox?.closest('.account-communications-sms-opt-label')
+          ?.classList.toggle(COMM_VISIBLE, !busy);
+        commSave?.classList.toggle(COMM_VISIBLE, !busy);
+      }
+      if (commEmailCheckbox) commEmailCheckbox.disabled = busy;
+      if (commSmsMasterCheckbox) commSmsMasterCheckbox.disabled = busy;
+      if (commSmsCheckbox) commSmsCheckbox.disabled = busy;
+      if (commSmsPhoneInput) commSmsPhoneInput.disabled = busy;
+      if (commSave) {
+        commSave.disabled = busy;
+        commSave.classList.toggle('is-loading', busy);
+      }
     };
 
-    const setCommBusy = (busy) => {
-      commQuestionShimmer?.classList.toggle(COMM_VISIBLE, busy);
-      commBtnShimmer?.classList.toggle(COMM_VISIBLE, busy);
-      commQuestionCopy?.classList.toggle(COMM_VISIBLE, !busy);
-      commSmsOptShimmer?.classList.toggle(COMM_VISIBLE, busy);
-      commSmsCheckbox?.closest('.account-communications-sms-opt-label')
-        ?.classList.toggle(COMM_VISIBLE, !busy);
-      if (busy) {
-        commSubscribe?.classList.remove(COMM_VISIBLE);
-        commUnsubscribe?.classList.remove(COMM_VISIBLE);
+    let commSuccessTimer = null;
+    const hideCommSuccess = () => {
+      if (commSuccess) {
+        commSuccess.hidden = true;
+        commSuccess.textContent = '';
       }
-      if (commSmsCheckbox) commSmsCheckbox.disabled = busy;
+      if (commSuccessTimer) {
+        clearTimeout(commSuccessTimer);
+        commSuccessTimer = null;
+      }
     };
 
     const hideCommError = () => {
@@ -167,6 +218,7 @@ export default async function decorate(widget) {
         commError.hidden = true;
         commError.textContent = '';
       }
+      hideCommSuccess();
     };
 
     const showCommError = (message) => {
@@ -175,29 +227,62 @@ export default async function decorate(widget) {
       commError.hidden = false;
     };
 
+    const showCommSuccess = (message) => {
+      if (!commSuccess) return;
+      commSuccess.textContent = message;
+      commSuccess.hidden = false;
+      if (commSuccessTimer) clearTimeout(commSuccessTimer);
+      commSuccessTimer = setTimeout(() => {
+        commSuccess.hidden = true;
+        commSuccess.textContent = '';
+        commSuccessTimer = null;
+      }, 5000);
+    };
+
     const applyCommOptInUi = () => {
-      applyCommCopy();
-      const subscribed = emailOptInStatus === true;
-      commSubscribe?.classList.toggle(COMM_VISIBLE, !subscribed);
-      commUnsubscribe?.classList.toggle(COMM_VISIBLE, subscribed);
-      if (commSubscribe) commSubscribe.disabled = false;
-      if (commUnsubscribe) commUnsubscribe.disabled = false;
+      if (commEmailCheckbox) commEmailCheckbox.checked = emailOptInStatus === true;
+    };
+
+    const smsDigits = () => (commSmsPhoneInput?.value || '').replace(/\D/g, '');
+    // Strict phone validation shared with the checkout form.
+    const hasValidMobile = () => isValidPhone(commSmsPhoneInput?.value || '');
+    const hideMobileError = () => {
+      if (commSmsPhoneError) {
+        commSmsPhoneError.hidden = true;
+        commSmsPhoneError.textContent = '';
+      }
+      commSmsPhoneInput?.removeAttribute('aria-invalid');
+    };
+    const showMobileError = () => {
+      if (commSmsPhoneError) {
+        commSmsPhoneError.textContent = comm.smsPhoneInvalid || 'Enter a valid 10 digit mobile number';
+        commSmsPhoneError.hidden = false;
+      }
+      commSmsPhoneInput?.setAttribute('aria-invalid', 'true');
+    };
+
+    /**
+     * The master toggle gates the SMS fields: when it is off, the mobile input
+     * and the consent checkbox are disabled (and visually dimmed).
+     */
+    const applySmsEnabledState = () => {
+      const on = commSmsMasterCheckbox?.checked === true;
+      if (commSmsPhoneInput) commSmsPhoneInput.disabled = !on;
+      if (commSmsCheckbox) commSmsCheckbox.disabled = !on;
+      commSmsPhoneInput?.closest('.account-communications-sms-phone-field')
+        ?.classList.toggle('is-disabled', !on);
+      commSmsCheckbox?.closest('.account-communications-sms-opt-label')
+        ?.classList.toggle('is-disabled', !on);
     };
 
     const applySmsCommUi = () => {
-      const mobile = profileMobile.trim();
-      const showSms = Boolean(mobile) || smsOptInStatus === true;
-      if (commSmsRoot) commSmsRoot.hidden = !showSms;
-      if (commSmsPhoneValue) commSmsPhoneValue.textContent = mobile || '—';
-      if (commSmsStatusValue) {
-        commSmsStatusValue.textContent = smsOptInStatus === true
-          ? (comm.smsStatusOptedIn || 'Subscribed')
-          : (comm.smsStatusOptedOut || 'Not subscribed');
+      if (commSmsMasterCheckbox) commSmsMasterCheckbox.checked = smsOptInStatus === true;
+      if (commSmsCheckbox) commSmsCheckbox.checked = smsOptInStatus === true;
+      if (commSmsPhoneInput && document.activeElement !== commSmsPhoneInput) {
+        commSmsPhoneInput.value = profileMobile.trim();
       }
-      if (commSmsCheckbox) {
-        commSmsCheckbox.checked = smsOptInStatus === true;
-        commSmsCheckbox.disabled = !mobile;
-      }
+      hideMobileError();
+      applySmsEnabledState();
     };
 
     /**
@@ -220,29 +305,33 @@ export default async function decorate(widget) {
         leadSource,
       };
       hideCommError();
-      setCommBusy(true);
+      // Disable in place (no shimmer swap) while saving.
+      setCommBusy(true, { shimmer: false });
       try {
         const url = getFormSubmissionUrl();
-        const resp = await fetch(url, {
+        // The forms proxy frequently returns a transient 502 on the first call;
+        // retry once after a 2s wait (fetchWithRetry also covers 503/504).
+        const resp = await fetchWithRetry(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
-        });
+        }, 1, 2000);
         if (!resp.ok) {
           showCommError(comm.error || 'Something went wrong. Please try again.');
-          setCommBusy(false);
+          setCommBusy(false, { shimmer: false });
           applyCommOptInUi();
           applySmsCommUi();
           return;
         }
         emailOptInStatus = nextEmail;
         smsOptInStatus = nextSms;
-        setCommBusy(false);
+        setCommBusy(false, { shimmer: false });
         applyCommOptInUi();
         applySmsCommUi();
+        showCommSuccess(comm.saved || 'Your preferences have been updated.');
       } catch {
         showCommError(comm.error || 'Something went wrong. Please try again.');
-        setCommBusy(false);
+        setCommBusy(false, { shimmer: false });
         applyCommOptInUi();
         applySmsCommUi();
       }
@@ -270,21 +359,56 @@ export default async function decorate(widget) {
       }
     };
 
-    if (commRoot && email) {
-      commRoot.hidden = false;
-      commSubscribe?.addEventListener('click', () => {
-        submitCommunicationsPreference({ emailOptIn: true });
-      });
-      commUnsubscribe?.addEventListener('click', () => {
-        submitCommunicationsPreference({ emailOptIn: false });
-      });
-      commSmsCheckbox?.addEventListener('change', () => {
-        if (!profileMobile.trim()) {
-          applySmsCommUi();
+    // One button saves both email and SMS preferences. SMS opt-in still
+    // requires a valid mobile number; an email-only change is never blocked.
+    const updatePreferences = () => {
+      hideCommError();
+      const emailOptIn = commEmailCheckbox?.checked === true;
+      // Master toggle off => opt out of SMS. On => require a valid number AND
+      // an explicit consent checkbox tick before we can opt in.
+      const smsMaster = commSmsMasterCheckbox?.checked === true;
+      let smsOptIn = false;
+      if (smsMaster) {
+        if (!hasValidMobile()) {
+          showMobileError();
+          commSmsPhoneInput?.focus();
           return;
         }
-        submitCommunicationsPreference({ smsOptIn: commSmsCheckbox.checked });
+        if (commSmsCheckbox?.checked !== true) {
+          showCommError(comm.smsConsentRequired
+            || 'Please check the box to confirm you agree to receive text messages.');
+          return;
+        }
+        smsOptIn = true;
+        profileMobile = smsDigits();
+      }
+      submitCommunicationsPreference({ emailOptIn, smsOptIn });
+    };
+
+    if (commRoot && email) {
+      commRoot.hidden = false;
+      commEmailCheckbox?.addEventListener('change', hideCommError);
+      commSmsMasterCheckbox?.addEventListener('change', () => {
+        hideCommError();
+        // Turning the master toggle off clears the consent tick so re-enabling
+        // always requires a fresh, explicit opt-in.
+        if (commSmsMasterCheckbox.checked !== true && commSmsCheckbox) {
+          commSmsCheckbox.checked = false;
+        }
+        hideMobileError();
+        applySmsEnabledState();
       });
+      commSmsCheckbox?.addEventListener('change', hideCommError);
+      commSmsPhoneInput?.addEventListener('input', () => {
+        hideCommError();
+        hideMobileError();
+      });
+      commSmsPhoneInput?.addEventListener('blur', () => {
+        const value = commSmsPhoneInput.value.trim();
+        if (value && !isValidPhone(value)) showMobileError();
+        else hideMobileError();
+      });
+      commSave?.addEventListener('click', updatePreferences);
       loadCommunicationsProfile();
     }
   }

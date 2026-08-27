@@ -238,6 +238,44 @@ export function getFormSubmissionUrl() {
 }
 
 /**
+ * HTTP status codes worth retrying — transient gateway/proxy failures (e.g. a
+ * 502 from the proxy in front of the forms service) where the same request may
+ * succeed on a subsequent attempt. Client (4xx) and other 5xx errors are not
+ * retried since they won't resolve by repeating the request.
+ */
+export const RETRIABLE_STATUS = new Set([502, 503, 504]);
+
+/**
+ * Fetch that retries transient failures with linear backoff. A retry is triggered
+ * by either a retriable HTTP status (RETRIABLE_STATUS) or a rejected fetch — a
+ * network/gateway failure such as a 502 that the browser surfaces as a thrown
+ * TypeError rather than a Response. The final response is returned as-is; if the
+ * last attempt rejects, that error is rethrown for the caller to handle.
+ * @param {string|URL} url - Request URL
+ * @param {RequestInit} [options] - Fetch options
+ * @param {number} [retries=2] - Additional attempts after the first
+ * @param {number} [backoff=500] - Base delay in ms, multiplied by the attempt number
+ * @returns {Promise<Response>} The final response
+ */
+export async function fetchWithRetry(url, options, retries = 2, backoff = 500) {
+  for (let attempt = 0; ; attempt += 1) {
+    const isLastAttempt = attempt === retries;
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const resp = await fetch(url, options);
+      // Return on success, a non-retriable status, or once the budget is spent.
+      if (isLastAttempt || !RETRIABLE_STATUS.has(resp.status)) return resp;
+    } catch (err) {
+      // A rejected fetch (network/gateway error) is retriable too; only rethrow
+      // once the retry budget is exhausted.
+      if (isLastAttempt) throw err;
+    }
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((resolve) => { setTimeout(resolve, backoff * (attempt + 1)); });
+  }
+}
+
+/**
  * Parses `document.cookie` into key-value map.
  * @returns {Object} Object representing all cookies as key-value pairs
  */

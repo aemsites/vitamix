@@ -49,24 +49,26 @@
             <div class="account-mock-rows"></div>
             <div class="account-communications" hidden>
               <h5 class="account-communications-title"></h5>
-              <p class="account-communications-question">
-                <span class="account-communications-question-shimmer account-shimmer" aria-hidden="true"></span>
-                <span class="account-communications-question-copy"></span>
-              </p>
-              <div class="account-communications-actions">
-                <span class="account-communications-btn-shimmer account-shimmer" aria-hidden="true"></span>
-                <button type="button" class="button emphasis account-communications-subscribe"></button>
-                <button type="button" class="button account-communications-unsubscribe"></button>
+              <div class="account-communications-email-opt">
+                <span class="account-communications-email-opt-shimmer account-shimmer" aria-hidden="true"></span>
+                <label class="account-communications-email-opt-label">
+                  <input type="checkbox" class="account-communications-email-checkbox">
+                  <span class="account-communications-email-opt-copy"></span>
+                </label>
               </div>
-              <div class="account-communications-sms" hidden>
-                <div class="account-communications-sms-phone account-mock-row">
-                  <span class="account-mock-label account-communications-sms-phone-label"></span>
-                  <span class="account-mock-value account-communications-sms-phone-value"></span>
+              <div class="account-communications-sms">
+                <div class="account-communications-sms-master-opt">
+                  <span class="account-communications-sms-master-shimmer account-shimmer" aria-hidden="true"></span>
+                  <label class="account-communications-sms-master-label">
+                    <input type="checkbox" class="account-communications-sms-master-checkbox">
+                    <span class="account-communications-sms-master-copy"></span>
+                  </label>
                 </div>
-                <div class="account-communications-sms-status account-mock-row">
-                  <span class="account-mock-label account-communications-sms-status-label"></span>
-                  <span class="account-mock-value account-communications-sms-status-value"></span>
-                </div>
+                <label class="account-communications-sms-phone-field">
+                  <span class="account-communications-sms-phone-label"></span>
+                  <input type="tel" class="account-communications-sms-phone-input" autocomplete="tel" inputmode="tel" maxlength="14">
+                  <span class="account-communications-sms-phone-error" role="alert" hidden></span>
+                </label>
                 <div class="account-communications-sms-opt">
                   <span class="account-communications-sms-opt-shimmer account-shimmer" aria-hidden="true"></span>
                   <label class="account-communications-sms-opt-label">
@@ -74,8 +76,19 @@
                     <span class="account-communications-sms-opt-copy"></span>
                   </label>
                 </div>
+                <p class="account-communications-sms-legal">
+                  <span class="account-communications-sms-legal-prefix"></span>
+                  <a class="account-communications-sms-privacy-link" href="#" target="_blank" rel="noopener"></a>
+                  <span class="account-communications-sms-legal-and"></span>
+                  <a class="account-communications-sms-terms-link" href="#" target="_blank" rel="noopener"></a>
+                </p>
               </div>
               <p class="account-communications-error" role="alert" hidden></p>
+              <p class="account-communications-success" role="status" hidden></p>
+              <div class="account-communications-actions">
+                <span class="account-communications-btn-shimmer account-shimmer" aria-hidden="true"></span>
+                <button type="button" class="button emphasis account-communications-save"></button>
+              </div>
             </div>
           </div>
         </section>
