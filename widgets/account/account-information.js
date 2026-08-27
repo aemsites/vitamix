@@ -85,10 +85,12 @@ export function wireAccountInformation(widget, email, copy, rawCustomer) {
   rows.hidden = true;
   rows.after(form);
 
-  // Read-only account metadata (non-editable) shown beneath the form.
+  // Read-only account metadata (non-editable) shown just above the Save button.
   const meta = document.createElement('div');
   meta.className = 'account-info-meta';
-  form.after(meta);
+  const infoActions = form.querySelector('.account-info-actions');
+  if (infoActions) infoActions.before(meta);
+  else form.append(meta);
 
   const renderMeta = () => {
     const ci = /** @type {Record<string, string>} */ (copy.customerInfo || {});
