@@ -9,7 +9,7 @@ import { getUser, isLoggedIn } from '../auth-api.js';
 import { logOperation, getCheckoutId } from '../operations-log.js';
 import resolvePaymentFailureMessage from '../payment-failure.js';
 import ensureCheckoutPreviewToken, { withPayPalExpressContext } from './paypal-context.js';
-import { buildExpressOrderPayload } from '../checkout-context.js';
+import { buildExpressOrderPayload, expressPayloadMatchesCart } from '../checkout-context.js';
 import {
   isExpressReviewEnabled,
   resolveExpressOutcome,
@@ -282,6 +282,16 @@ export default {
           const state = callbacks.getState();
           const cart = callbacks.getCart();
           const config = callbacks.getConfig();
+          // Abort if the cart changed while the PayPal wallet was open (a
+          // cross-tab edit or async gift-with-purchase reconciliation): the
+          // captured estimate payload no longer matches what the shopper sees,
+          // and replaying it would order the stale snapshot while the success
+          // path clears the newly changed cart.
+          if (!expressPayloadMatchesCart(state.currentEstimatePayload, cart.getItemsForAPI())) {
+            callbacks.showError(callbacks.strings?.errorCartChanged
+              || 'Your cart changed during checkout. Please review your cart and try again.');
+            return;
+          }
           const session = await getPayPalSession(
             state.paypalSessionId,
             config.getLocale(),

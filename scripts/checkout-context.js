@@ -91,3 +91,32 @@ export function buildExpressOrderPayload(estimatePayload, identity) {
     ...(customerTimezone ? { customerTimezone } : {}),
   };
 }
+
+/**
+ * Returns true when the previewed express payload still matches the live cart:
+ * identical SKUs, quantities, and selected options (order-independent).
+ *
+ * Wallet express replays the payload captured when the estimate token was
+ * minted. If the cart changed while the wallet sheet was open (a cross-tab edit
+ * via the cart's storage-event sync, or async gift-with-purchase
+ * reconciliation), that snapshot no longer reflects what the shopper sees.
+ * Replaying it would order the stale items, and the success path clears the
+ * cart afterward, silently dropping anything added after the preview. Call this
+ * immediately before replay and abort the wallet flow on a mismatch. A missing
+ * payload also fails, since there is nothing valid to replay.
+ *
+ * @param {Object} estimatePayload - the payload that minted the estimate token
+ * @param {Array} currentItems - `cart.getItemsForAPI()` at authorization time
+ * @returns {boolean}
+ */
+export function expressPayloadMatchesCart(estimatePayload, currentItems) {
+  const canonical = (items) => (items || [])
+    .map((item) => JSON.stringify({
+      sku: item.sku,
+      quantity: item.quantity,
+      selectedOptions: item.selectedOptions || [],
+    }))
+    .sort()
+    .join('|');
+  return canonical(estimatePayload?.items) === canonical(currentItems);
+}

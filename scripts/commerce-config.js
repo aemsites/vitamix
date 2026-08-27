@@ -103,6 +103,7 @@ const defaults = {
       errorApplePayCountry: 'Shipping is not available to this country.',
       errorApplePayGeneric: 'Unable to process your order. Please try a different address or payment method.',
       errorRecaptcha: 'Unable to complete checkout. Please refresh the page and try again.',
+      errorCartChanged: 'Your cart changed during checkout. Please review your cart and try again.',
     },
     'fr-ca': {
       stepCart: 'Panier',
@@ -172,6 +173,7 @@ const defaults = {
       errorApplePayCountry: 'La livraison n\'est pas disponible dans ce pays.',
       errorApplePayGeneric: 'Impossible de traiter votre commande. Veuillez essayer une autre adresse ou un autre mode de paiement.',
       errorRecaptcha: 'Impossible de finaliser la commande. Veuillez actualiser la page et réessayer.',
+      errorCartChanged: 'Votre panier a changé pendant le paiement. Veuillez vérifier votre panier et réessayer.',
     },
   },
   getStrings() {

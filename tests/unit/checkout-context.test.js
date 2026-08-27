@@ -5,6 +5,7 @@ import {
   getExpressCheckoutContext,
   getStandardCheckoutContext,
   buildExpressOrderPayload,
+  expressPayloadMatchesCart,
 } from '../../scripts/checkout-context.js';
 
 test('getStandardCheckoutContext describes form-based checkout', () => {
@@ -142,5 +143,61 @@ describe('buildExpressOrderPayload', () => {
       () => buildExpressOrderPayload(undefined, identity),
       /previewed estimate payload/,
     );
+  });
+});
+
+describe('expressPayloadMatchesCart', () => {
+  const items = [
+    { sku: 'A3500', quantity: 1, selectedOptions: [{ id: 'color', value: 'black' }] },
+    { sku: 'E310', quantity: 2 },
+  ];
+
+  test('matches identical items regardless of order', () => {
+    assert.equal(expressPayloadMatchesCart({ items }, [items[1], items[0]]), true);
+  });
+
+  test('ignores non-order fields like name, price, and image', () => {
+    const previewed = { items: [{ sku: 'A3500', quantity: 1, name: 'Old', price: { final: '529.95' } }] };
+    const live = [{
+      sku: 'A3500', quantity: 1, name: 'New', price: { final: '499.00' }, imageUrl: '/x.png',
+    }];
+    assert.equal(expressPayloadMatchesCart(previewed, live), true);
+  });
+
+  test('treats missing and empty selectedOptions as equal', () => {
+    assert.equal(
+      expressPayloadMatchesCart(
+        { items: [{ sku: 'E310', quantity: 2 }] },
+        [{ sku: 'E310', quantity: 2, selectedOptions: [] }],
+      ),
+      true,
+    );
+  });
+
+  test('detects a quantity change', () => {
+    const live = [items[0], { ...items[1], quantity: 3 }];
+    assert.equal(expressPayloadMatchesCart({ items }, live), false);
+  });
+
+  test('detects an added item', () => {
+    const live = [...items, { sku: 'NEW', quantity: 1 }];
+    assert.equal(expressPayloadMatchesCart({ items }, live), false);
+  });
+
+  test('detects a removed item', () => {
+    assert.equal(expressPayloadMatchesCart({ items }, [items[0]]), false);
+  });
+
+  test('detects a selectedOptions change', () => {
+    const live = [
+      { sku: 'A3500', quantity: 1, selectedOptions: [{ id: 'color', value: 'red' }] },
+      { sku: 'E310', quantity: 2 },
+    ];
+    assert.equal(expressPayloadMatchesCart({ items }, live), false);
+  });
+
+  test('fails when the previewed payload is missing (nothing to replay)', () => {
+    assert.equal(expressPayloadMatchesCart(undefined, items), false);
+    assert.equal(expressPayloadMatchesCart(null, items), false);
   });
 });

@@ -471,6 +471,7 @@ export default async function decorate(block) {
   document.addEventListener('cart:change', () => {
     if (cart.itemCount === 0) return;
     state.currentEstimateToken = null;
+    state.currentEstimatePayload = null;
     state.currentPreview = null;
     if (state.selectedShippingMethodId) {
       refreshShipping();

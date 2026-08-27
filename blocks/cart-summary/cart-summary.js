@@ -340,6 +340,18 @@ export default async function decorate(block) {
   // 5. Build express-checkout callbacks, load SDKs, render available wallet buttons
   const state = { currentEstimateToken: null, currentEstimatePayload: null, currentPreview: null };
 
+  // A cart or coupon change invalidates the wallet express estimate captured by
+  // previewOrderDirect. Clear the token/payload/preview so a wallet approval can
+  // never replay a stale snapshot (ordering the wrong items and clearing the
+  // newly changed cart on success); the next wallet interaction re-previews.
+  const invalidateExpressEstimate = () => {
+    state.currentEstimateToken = null;
+    state.currentEstimatePayload = null;
+    state.currentPreview = null;
+  };
+  document.addEventListener('cart:change', invalidateExpressEstimate);
+  document.addEventListener('checkout:coupon-apply', invalidateExpressEstimate);
+
   const callbacks = {
     expressEntryPoint: 'cart',
     getCart: () => cart,

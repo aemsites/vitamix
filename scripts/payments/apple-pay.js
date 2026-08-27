@@ -12,6 +12,7 @@ import {
   buildApplePayExpressPreviewPayload,
   getApplePayExpressContext,
 } from './apple-pay-context.js';
+import { expressPayloadMatchesCart } from '../checkout-context.js';
 
 const APPLE_PAY_SDK_URL = 'https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js';
 
@@ -80,12 +81,22 @@ function startExpressSession(btn, config, callbacks) {
       }
 
       try {
+        // Estimate shipping methods with the applied coupon so the method
+        // amounts, the Shipping line, and the total agree (e.g. a free-shipping
+        // coupon must show 0 on the method, not the undiscounted rate). Mirrors
+        // the coupon injection in previewOrderDirect.
+        const couponCode = sessionStorage.getItem('checkout_coupon_code') || undefined;
+        const couponSource = sessionStorage.getItem('checkout_coupon_source') || undefined;
         const result = await estimateExpressCheckout(
           contact.countryCode,
           contact.administrativeArea,
           contact.postalCode,
           cart.getItemsForAPI(),
-          checkoutContext,
+          {
+            ...checkoutContext,
+            ...(couponCode ? { couponCode } : {}),
+            ...(couponCode && couponSource ? { couponSource } : {}),
+          },
         );
         const methods = result.shippingMethods || [];
         if (!methods.length) {
@@ -172,6 +183,19 @@ function startExpressSession(btn, config, callbacks) {
       const { payment } = e;
       const contact = payment.shippingContact;
       try {
+        // Abort if the cart changed while the Apple Pay sheet was open: the
+        // previewed snapshot no longer matches the live cart, so replaying it
+        // would order stale items and the success path would clear the newly
+        // changed cart.
+        if (!expressPayloadMatchesCart(
+          callbacks.getState().currentEstimatePayload,
+          cart.getItemsForAPI(),
+        )) {
+          session.completePayment(window.ApplePaySession.STATUS_FAILURE);
+          callbacks.showError(callbacks.strings?.errorCartChanged
+            || 'Your cart changed during checkout. Please review your cart and try again.');
+          return;
+        }
         // When the user is signed in, use their account email so the order is linked
         // to the right account. The Apple Pay contact email may differ from the
         // commerce account email, which causes assertEmail to reject the request.
