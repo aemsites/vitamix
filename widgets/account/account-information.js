@@ -75,6 +75,7 @@ export function wireAccountInformation(widget, email, copy, rawCustomer) {
       </label>
     </fieldset>
     <p class="account-info-error" role="alert" hidden></p>
+    <p class="account-info-success" role="status" hidden></p>
     <div class="account-info-actions">
       <button type="submit" class="button emphasis account-info-save">${ie.save || 'Save'}</button>
     </div>
@@ -128,6 +129,32 @@ export function wireAccountInformation(widget, email, copy, rawCustomer) {
     errEl.textContent = '';
   };
 
+  const successEl = /** @type {HTMLElement} */ (form.querySelector('.account-info-success'));
+  /** @type {ReturnType<typeof setTimeout> | null} */
+  let successTimer = null;
+  const hideSuccess = () => {
+    if (successEl) {
+      successEl.hidden = true;
+      successEl.textContent = '';
+    }
+    if (successTimer) {
+      clearTimeout(successTimer);
+      successTimer = null;
+    }
+  };
+  const showSuccess = (message) => {
+    if (!successEl) return;
+    clearError();
+    successEl.textContent = message;
+    successEl.hidden = false;
+    if (successTimer) clearTimeout(successTimer);
+    successTimer = setTimeout(() => {
+      successEl.hidden = true;
+      successEl.textContent = '';
+      successTimer = null;
+    }, 5000);
+  };
+
   const prefill = () => {
     const custom = (current && typeof current.custom === 'object' && current.custom)
       ? /** @type {Record<string, string>} */ (current.custom) : {};
@@ -148,6 +175,7 @@ export function wireAccountInformation(widget, email, copy, rawCustomer) {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     clearError();
+    hideSuccess();
     const fields = {
       firstName: field('firstName').value,
       lastName: field('lastName').value,
@@ -161,21 +189,21 @@ export function wireAccountInformation(widget, email, copy, rawCustomer) {
       return;
     }
     saveBtn.disabled = true;
-    const prevLabel = saveBtn.textContent;
-    saveBtn.textContent = ie.saving || 'Saving\u2026';
+    saveBtn.classList.add('is-loading');
     try {
       const updated = unwrap(await updateCustomer(email, buildProfileUpdate(fields)));
       if (updated) current = updated;
       applyCustomerToWidget(widget, current, email, copy);
       prefill();
       renderMeta();
+      showSuccess(ie.saved || 'Profile updated.');
     } catch (err) {
       errEl.textContent = (err instanceof Error && err.message)
         || ie.saveError || 'Could not save. Please try again.';
       errEl.hidden = false;
     } finally {
       saveBtn.disabled = false;
-      saveBtn.textContent = prevLabel;
+      saveBtn.classList.remove('is-loading');
     }
   });
 }

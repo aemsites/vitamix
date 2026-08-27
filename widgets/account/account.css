@@ -333,6 +333,12 @@
   font-size: var(--commerce-font-size-sm);
 }
 
+.account-info-success {
+  margin: 0;
+  color: var(--commerce-color-success, #2f7a4c);
+  font-size: var(--commerce-font-size-sm);
+}
+
 .account-info-meta {
   display: flex;
   flex-direction: column;
@@ -425,14 +431,18 @@
  */
 .account-communications-actions .account-communications-save.is-loading,
 .account-communications-actions .account-communications-save.is-loading:hover,
-.account-communications-actions .account-communications-save.is-loading:focus {
+.account-communications-actions .account-communications-save.is-loading:focus,
+.account-info-actions .account-info-save.is-loading,
+.account-info-actions .account-info-save.is-loading:hover,
+.account-info-actions .account-info-save.is-loading:focus {
   position: relative;
   color: transparent;
   border-color: var(--color-link);
   background-color: var(--color-link);
 }
 
-.account-communications-actions .account-communications-save.is-loading::after {
+.account-communications-actions .account-communications-save.is-loading::after,
+.account-info-actions .account-info-save.is-loading::after {
   content: '';
   position: absolute;
   top: 50%;

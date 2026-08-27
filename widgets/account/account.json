@@ -55,7 +55,8 @@
       "cancel": "Cancel",
       "saving": "Saving…",
       "nameRequired": "Please enter your first and last name.",
-      "saveError": "Could not save your details. Please try again."
+      "saveError": "Could not save your details. Please try again.",
+      "saved": "Profile updated."
     },
     "countries": {
       "us": "United States",
@@ -220,7 +221,8 @@
       "cancel": "Annuler",
       "saving": "Enregistrement…",
       "nameRequired": "Veuillez entrer votre prénom et votre nom de famille.",
-      "saveError": "Impossible d'enregistrer vos informations. Veuillez réessayer."
+      "saveError": "Impossible d'enregistrer vos informations. Veuillez réessayer.",
+      "saved": "Profil mis à jour."
     },
     "countries": {
       "us": "États-Unis",
