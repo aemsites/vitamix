@@ -8,6 +8,7 @@ import {
   unwrapPayload,
 } from './account-api.js';
 import { getFormSubmissionUrl, getLocaleAndLanguage, fetchWithRetry } from '../../scripts/scripts.js';
+import { isValidPhone } from '../../blocks/checkout/checkout-validation.js';
 import { getLeadSource } from '../../scripts/lead-source.js';
 import { getUser, logout } from '../../scripts/auth-api.js';
 
@@ -117,6 +118,7 @@ export default async function decorate(widget) {
     const commSmsPhoneInput = /** @type {HTMLInputElement | null} */ (
       information.querySelector('.account-communications-sms-phone-input')
     );
+    const commSmsPhoneError = information.querySelector('.account-communications-sms-phone-error');
     const commSmsOptShimmer = information.querySelector('.account-communications-sms-opt-shimmer');
     const commSmsCheckbox = /** @type {HTMLInputElement | null} */ (
       information.querySelector('.account-communications-sms-checkbox')
@@ -241,9 +243,23 @@ export default async function decorate(widget) {
       if (commEmailCheckbox) commEmailCheckbox.checked = emailOptInStatus === true;
     };
 
-    const SMS_REQUIRED_DIGITS = 10;
     const smsDigits = () => (commSmsPhoneInput?.value || '').replace(/\D/g, '');
-    const hasValidMobile = () => smsDigits().length === SMS_REQUIRED_DIGITS;
+    // Strict phone validation shared with the checkout form.
+    const hasValidMobile = () => isValidPhone(commSmsPhoneInput?.value || '');
+    const hideMobileError = () => {
+      if (commSmsPhoneError) {
+        commSmsPhoneError.hidden = true;
+        commSmsPhoneError.textContent = '';
+      }
+      commSmsPhoneInput?.removeAttribute('aria-invalid');
+    };
+    const showMobileError = () => {
+      if (commSmsPhoneError) {
+        commSmsPhoneError.textContent = comm.smsPhoneInvalid || 'Enter a valid 10 digit mobile number';
+        commSmsPhoneError.hidden = false;
+      }
+      commSmsPhoneInput?.setAttribute('aria-invalid', 'true');
+    };
 
     /**
      * The master toggle gates the SMS fields: when it is off, the mobile input
@@ -265,6 +281,7 @@ export default async function decorate(widget) {
       if (commSmsPhoneInput && document.activeElement !== commSmsPhoneInput) {
         commSmsPhoneInput.value = profileMobile.trim();
       }
+      hideMobileError();
       applySmsEnabledState();
     };
 
@@ -353,7 +370,8 @@ export default async function decorate(widget) {
       let smsOptIn = false;
       if (smsMaster) {
         if (!hasValidMobile()) {
-          showCommError(comm.smsPhoneInvalid || 'Enter a valid 10 digit mobile number');
+          showMobileError();
+          commSmsPhoneInput?.focus();
           return;
         }
         if (commSmsCheckbox?.checked !== true) {
@@ -377,12 +395,18 @@ export default async function decorate(widget) {
         if (commSmsMasterCheckbox.checked !== true && commSmsCheckbox) {
           commSmsCheckbox.checked = false;
         }
+        hideMobileError();
         applySmsEnabledState();
       });
       commSmsCheckbox?.addEventListener('change', hideCommError);
       commSmsPhoneInput?.addEventListener('input', () => {
-        commSmsPhoneInput.value = commSmsPhoneInput.value.replace(/[^0-9()\-\s]/g, '');
         hideCommError();
+        hideMobileError();
+      });
+      commSmsPhoneInput?.addEventListener('blur', () => {
+        const value = commSmsPhoneInput.value.trim();
+        if (value && !isValidPhone(value)) showMobileError();
+        else hideMobileError();
       });
       commSave?.addEventListener('click', updatePreferences);
       loadCommunicationsProfile();

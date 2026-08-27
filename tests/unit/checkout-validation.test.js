@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateField, validateForm } from '../../blocks/checkout/checkout-validation.js';
+import { validateField, validateForm, isValidPhone } from '../../blocks/checkout/checkout-validation.js';
 
 // ---------------------------------------------------------------------------
 // validateField — zip code
@@ -214,4 +214,33 @@ test('validateForm: returns true when all fields are valid', () => {
     dataset: { lang: 'en' },
   };
   assert.equal(validateForm(form), true);
+});
+
+// isValidPhone — shared NANP phone check
+test('isValidPhone: 10 digits is valid', () => {
+  assert.equal(isValidPhone('2165550142'), true);
+});
+
+test('isValidPhone: formatted 10 digits is valid', () => {
+  assert.equal(isValidPhone('(216) 555-0142'), true);
+});
+
+test('isValidPhone: 11 digits with leading 1 is valid', () => {
+  assert.equal(isValidPhone('1 216 555 0142'), true);
+});
+
+test('isValidPhone: 9 digits is invalid', () => {
+  assert.equal(isValidPhone('216555014'), false);
+});
+
+test('isValidPhone: 11 digits not starting with 1 is invalid', () => {
+  assert.equal(isValidPhone('22165550142'), false);
+});
+
+test('isValidPhone: letters are invalid', () => {
+  assert.equal(isValidPhone('phone number'), false);
+});
+
+test('isValidPhone: empty is invalid', () => {
+  assert.equal(isValidPhone(''), false);
 });

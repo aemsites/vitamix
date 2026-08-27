@@ -56,7 +56,8 @@
       "saving": "Saving…",
       "nameRequired": "Please enter your first and last name.",
       "saveError": "Could not save your details. Please try again.",
-      "saved": "Profile updated."
+      "saved": "Profile updated.",
+      "phoneInvalid": "Please enter a valid 10-digit phone number."
     },
     "countries": {
       "us": "United States",
@@ -222,7 +223,8 @@
       "saving": "Enregistrement…",
       "nameRequired": "Veuillez entrer votre prénom et votre nom de famille.",
       "saveError": "Impossible d'enregistrer vos informations. Veuillez réessayer.",
-      "saved": "Profil mis à jour."
+      "saved": "Profil mis à jour.",
+      "phoneInvalid": "Veuillez entrer un numéro de téléphone à 10 chiffres valide."
     },
     "countries": {
       "us": "États-Unis",

@@ -339,6 +339,20 @@
   font-size: var(--commerce-font-size-sm);
 }
 
+/* Inline field-level validation error (mirrors the checkout .field-error). */
+.account-info-field-error,
+.account-communications-sms-phone-error {
+  display: block;
+  margin-top: 4px;
+  color: var(--commerce-color-error, #c00);
+  font-size: 0.7rem;
+}
+
+.account-info-field-error[hidden],
+.account-communications-sms-phone-error[hidden] {
+  display: none;
+}
+
 .account-info-meta {
   display: flex;
   flex-direction: column;

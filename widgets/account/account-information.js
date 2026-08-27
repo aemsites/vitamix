@@ -2,6 +2,7 @@ import {
   updateCustomer, applyCustomerToWidget, unwrapCustomerResponse, formatIsoForUi,
 } from './account-api.js';
 import { buildProfileUpdate } from '../../scripts/customer-profile.js';
+import { isValidPhone } from '../../blocks/checkout/checkout-validation.js';
 
 /**
  * Normalize a customer GET/PATCH payload to a plain record (or null).
@@ -55,6 +56,7 @@ export function wireAccountInformation(widget, email, copy, rawCustomer) {
     <label class="account-info-field">
       <span>${ie.phone || 'Phone'}</span>
       <input type="tel" name="phone" autocomplete="tel">
+      <span class="account-info-field-error" role="alert" hidden></span>
     </label>
     <fieldset class="account-info-fieldset">
       <legend>${ie.plannedUseLabel || 'What do you plan on using this account for?'}</legend>
@@ -155,6 +157,38 @@ export function wireAccountInformation(widget, email, copy, rawCustomer) {
     }, 5000);
   };
 
+  // Strict phone validation (shared with checkout): only flag a non-empty,
+  // invalid value — the phone field itself is optional.
+  const phoneInput = field('phone');
+  const phoneErrEl = /** @type {HTMLElement | null} */ (form.querySelector('.account-info-field-error'));
+  const clearPhoneError = () => {
+    if (phoneErrEl) {
+      phoneErrEl.hidden = true;
+      phoneErrEl.textContent = '';
+    }
+    phoneInput.removeAttribute('aria-invalid');
+  };
+  const showPhoneError = () => {
+    if (phoneErrEl) {
+      phoneErrEl.textContent = ie.phoneInvalid || 'Please enter a valid 10-digit phone number.';
+      phoneErrEl.hidden = false;
+    }
+    phoneInput.setAttribute('aria-invalid', 'true');
+  };
+  const validatePhoneField = () => {
+    const value = phoneInput.value.trim();
+    if (value && !isValidPhone(value)) {
+      showPhoneError();
+      return false;
+    }
+    clearPhoneError();
+    return true;
+  };
+  phoneInput.addEventListener('blur', validatePhoneField);
+  phoneInput.addEventListener('input', () => {
+    if (phoneErrEl && !phoneErrEl.hidden) clearPhoneError();
+  });
+
   const prefill = () => {
     const custom = (current && typeof current.custom === 'object' && current.custom)
       ? /** @type {Record<string, string>} */ (current.custom) : {};
@@ -186,6 +220,10 @@ export function wireAccountInformation(widget, email, copy, rawCustomer) {
     if (!fields.firstName.trim() || !fields.lastName.trim()) {
       errEl.textContent = ie.nameRequired || 'Please enter your first and last name.';
       errEl.hidden = false;
+      return;
+    }
+    if (!validatePhoneField()) {
+      phoneInput.focus();
       return;
     }
     saveBtn.disabled = true;

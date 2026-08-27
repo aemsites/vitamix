@@ -34,6 +34,18 @@ const CITY_RE = /^[A-Za-zÀ-ÖØ-öø-ÿ''\-. ]+$/;
 // Basic email
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/**
+ * Strict NANP phone check (shared with the account forms): strip non-digits,
+ * allow an optional leading country code (1), and require exactly 10 digits.
+ * @param {string} value
+ * @returns {boolean}
+ */
+export function isValidPhone(value) {
+  const digits = String(value ?? '').replace(/\D/g, '');
+  const nanp = digits.length === 11 && digits[0] === '1' ? digits.slice(1) : digits;
+  return nanp.length === 10;
+}
+
 function getMessages(form) {
   const lang = form?.dataset.lang || 'en';
   return MESSAGES[lang] || MESSAGES.en;
@@ -98,11 +110,8 @@ export function validateField(input) {
       return isCanada ? msgs.postalCode : msgs.zip;
     }
 
-    case 'telephone': {
-      const digits = trimmed.replace(/\D/g, '');
-      const nanp = digits.length === 11 && digits[0] === '1' ? digits.slice(1) : digits;
-      return nanp.length === 10 ? null : msgs.phone;
-    }
+    case 'telephone':
+      return isValidPhone(trimmed) ? null : msgs.phone;
 
     case 'email':
       return EMAIL_RE.test(trimmed) ? null : msgs.email;

@@ -246,9 +246,11 @@ export function getFormSubmissionUrl() {
 export const RETRIABLE_STATUS = new Set([502, 503, 504]);
 
 /**
- * Fetch that retries on transient (retriable) HTTP failures with linear backoff.
- * Only the status codes in RETRIABLE_STATUS trigger a retry; any other response
- * (success or non-retriable error) is returned to the caller as-is.
+ * Fetch that retries transient failures with linear backoff. A retry is triggered
+ * by either a retriable HTTP status (RETRIABLE_STATUS) or a rejected fetch — a
+ * network/gateway failure such as a 502 that the browser surfaces as a thrown
+ * TypeError rather than a Response. The final response is returned as-is; if the
+ * last attempt rejects, that error is rethrown for the caller to handle.
  * @param {string|URL} url - Request URL
  * @param {RequestInit} [options] - Fetch options
  * @param {number} [retries=2] - Additional attempts after the first
@@ -256,15 +258,21 @@ export const RETRIABLE_STATUS = new Set([502, 503, 504]);
  * @returns {Promise<Response>} The final response
  */
 export async function fetchWithRetry(url, options, retries = 2, backoff = 500) {
-  let resp;
-  for (let attempt = 0; attempt <= retries; attempt += 1) {
-    // eslint-disable-next-line no-await-in-loop
-    resp = await fetch(url, options);
-    if (!RETRIABLE_STATUS.has(resp.status) || attempt === retries) break;
+  for (let attempt = 0; ; attempt += 1) {
+    const isLastAttempt = attempt === retries;
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const resp = await fetch(url, options);
+      // Return on success, a non-retriable status, or once the budget is spent.
+      if (isLastAttempt || !RETRIABLE_STATUS.has(resp.status)) return resp;
+    } catch (err) {
+      // A rejected fetch (network/gateway error) is retriable too; only rethrow
+      // once the retry budget is exhausted.
+      if (isLastAttempt) throw err;
+    }
     // eslint-disable-next-line no-await-in-loop
     await new Promise((resolve) => { setTimeout(resolve, backoff * (attempt + 1)); });
   }
-  return resp;
 }
 
 /**
