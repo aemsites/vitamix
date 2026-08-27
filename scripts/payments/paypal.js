@@ -192,6 +192,11 @@ export default {
         const state = callbacks.getState();
         const cart = callbacks.getCart();
         const config = callbacks.getConfig();
+        // Forward the applied coupon so the server prices the PayPal amount with the
+        // discount (and persists it for the shipping-option re-estimate). Mirrors the
+        // coupon injection in the shared previewOrderDirect callback.
+        const couponCode = sessionStorage.getItem('checkout_coupon_code') || undefined;
+        const couponSource = sessionStorage.getItem('checkout_coupon_source') || undefined;
         try {
           const result = await patchPayPalSession(state.paypalSessionId, {
             type: 'address',
@@ -204,6 +209,8 @@ export default {
               zip: data.shippingAddress.postalCode,
             },
             items: cart.getItemsForAPI(),
+            ...(couponCode ? { couponCode } : {}),
+            ...(couponCode && couponSource ? { couponSource } : {}),
           });
           if (!result.shippingMethods?.length) {
             return actions.reject(data.errors.ADDRESS_ERROR);
