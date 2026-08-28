@@ -424,7 +424,7 @@ function buildMetaPurchasePayload(context = readOrderSuccessContext()) {
     return null;
   }
 
-  const contentIds = items.map((item) => item.sku);
+  const contentIds = items.map((item) => item.parentSku);
   const numItems = items.reduce((sum, item) => sum + item.quantity, 0);
   const value = summary.orderTotal;
 

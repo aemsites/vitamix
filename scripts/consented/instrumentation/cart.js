@@ -258,7 +258,9 @@ export function fireMetaAddToCart(
     }
 
     const productPriceAndCurrency = jsonLdDataOffers[0] || {};
-    const value = Number(product.productPrice || productPriceAndCurrency?.price || 0);
+    const selectedQuantity = Number(quantity) || 1;
+    const value = Number(product.productPrice || productPriceAndCurrency?.price || 0)
+      * selectedQuantity;
     const currency = productPriceAndCurrency?.priceCurrency || 'USD';
     const contentCategory = jsonLdProductCustom?.categories
       ? jsonLdProductCustom.categories.map((category) => category.name).join(' > ')
@@ -271,7 +273,7 @@ export function fireMetaAddToCart(
       content_category: contentCategory,
       value,
       currency,
-      num_items: Number(quantity) || 1,
+      num_items: selectedQuantity,
     });
 
     debugLog('Meta AddToCart fired', {
