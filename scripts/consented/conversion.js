@@ -67,6 +67,7 @@ function getOrderSummary(context) {
       const price = Number(parseFloat(rawPrice).toFixed(2)) || 0;
       return {
         sku: String(item?.sku || '').trim(),
+        productName: String(item?.name || '').trim(),
         quantity: Number(item?.quantity || item?.qty || 0) || 0,
         price,
       };
@@ -235,6 +236,7 @@ if (!summary) {
     currency,
     order_id: orderId,
     line_items: items.map((item) => ({
+      product_name: item.productName,
       product_id: item.sku,
       product_price: item.price,
       product_quantity: item.quantity,
