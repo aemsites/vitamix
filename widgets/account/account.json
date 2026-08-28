@@ -145,8 +145,6 @@
       "smsSave": "Save",
       "smsPhoneInvalid": "Enter a valid 10 digit mobile number",
       "emailOptInLabel": "Send me periodic emails and newsletters from Vitamix",
-      "smsMasterLabel": "Send me text messages from Vitamix",
-      "smsConsentRequired": "Please check the box to confirm you agree to receive text messages.",
       "updatePreferences": "Update preferences",
       "saved": "Your preferences have been updated."
     },
@@ -312,8 +310,6 @@
       "smsSave": "Enregistrer",
       "smsPhoneInvalid": "Entrez un numéro de mobile valide à 10 chiffres",
       "emailOptInLabel": "Envoyez-moi des courriels et bulletins périodiques de Vitamix",
-      "smsMasterLabel": "Envoyez-moi des messages texte de Vitamix",
-      "smsConsentRequired": "Veuillez cocher la case pour confirmer votre accord à recevoir des messages texte.",
       "updatePreferences": "Mettre à jour les préférences",
       "saved": "Vos préférences ont été mises à jour."
     },
@@ -460,8 +456,6 @@
       "smsSave": "Guardar",
       "smsPhoneInvalid": "Ingrese un número de móvil válido de 10 dígitos",
       "emailOptInLabel": "Envíenme correos y boletines periódicos de Vitamix",
-      "smsMasterLabel": "Envíenme mensajes de texto de Vitamix",
-      "smsConsentRequired": "Marque la casilla para confirmar que acepta recibir mensajes de texto.",
       "updatePreferences": "Actualizar preferencias",
       "saved": "Sus preferencias se han actualizado."
     },
