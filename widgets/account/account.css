@@ -514,31 +514,6 @@
   margin-top: 16px;
 }
 
-.account-communications-sms-master-opt {
-  min-height: 1.5rem;
-}
-
-.account-communications-sms-master-label {
-  display: none;
-  flex-flow: row nowrap;
-  align-items: flex-start;
-  gap: 10px;
-  margin: 0;
-  cursor: pointer;
-  color: var(--commerce-color-text);
-  font-size: var(--commerce-font-size-sm);
-  line-height: 1.35;
-}
-
-.account-communications-sms-master-label.is-visible {
-  display: flex;
-}
-
-.account-communications-sms-master-shimmer {
-  width: min(100%, 22rem);
-  height: 1.25rem;
-}
-
 .account-communications-sms .account-mock-row {
   margin-bottom: 10px;
 }
@@ -566,7 +541,6 @@
 }
 
 .account-communications-sms-checkbox,
-.account-communications-sms-master-checkbox,
 .account-communications-email-checkbox {
   width: auto;
   min-width: 1rem;
@@ -577,26 +551,15 @@
 }
 
 .account-communications-sms-checkbox:disabled,
-.account-communications-sms-master-checkbox:disabled,
 .account-communications-email-checkbox:disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }
 
 .account-communications-sms-opt-copy,
-.account-communications-sms-master-copy,
 .account-communications-email-opt-copy {
   flex: 1 1 auto;
   min-width: 0;
-}
-
-.account-communications-sms-phone-field.is-disabled .account-communications-sms-phone-label,
-.account-communications-sms-opt-label.is-disabled .account-communications-sms-opt-copy {
-  opacity: 0.55;
-}
-
-.account-communications-sms-opt-label.is-disabled {
-  cursor: not-allowed;
 }
 
 .account-communications-sms-opt-shimmer {

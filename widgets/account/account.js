@@ -124,11 +124,6 @@ export default async function decorate(widget) {
       information.querySelector('.account-communications-sms-checkbox')
     );
     const commSmsOptCopy = information.querySelector('.account-communications-sms-opt-copy');
-    const commSmsMasterShimmer = information.querySelector('.account-communications-sms-master-shimmer');
-    const commSmsMasterCheckbox = /** @type {HTMLInputElement | null} */ (
-      information.querySelector('.account-communications-sms-master-checkbox')
-    );
-    const commSmsMasterCopy = information.querySelector('.account-communications-sms-master-copy');
     const commSmsLegalPrefix = information.querySelector('.account-communications-sms-legal-prefix');
     const commSmsPrivacyLink = /** @type {HTMLAnchorElement | null} */ (
       information.querySelector('.account-communications-sms-privacy-link')
@@ -144,9 +139,6 @@ export default async function decorate(widget) {
         || 'Send me periodic emails and newsletters from Vitamix';
     }
     if (commSmsPhoneLabel) commSmsPhoneLabel.textContent = comm.smsPhone || 'Mobile number';
-    if (commSmsMasterCopy) {
-      commSmsMasterCopy.textContent = comm.smsMasterLabel || 'Send me text messages from Vitamix';
-    }
     if (commSmsOptCopy) {
       commSmsOptCopy.textContent = comm.smsConsent
         || 'By checking this box, I am opting in to receive promotional SMS messages from Vitamix.';
@@ -183,16 +175,12 @@ export default async function decorate(widget) {
         commEmailOptShimmer?.classList.toggle(COMM_VISIBLE, busy);
         commEmailCheckbox?.closest('.account-communications-email-opt-label')
           ?.classList.toggle(COMM_VISIBLE, !busy);
-        commSmsMasterShimmer?.classList.toggle(COMM_VISIBLE, busy);
-        commSmsMasterCheckbox?.closest('.account-communications-sms-master-label')
-          ?.classList.toggle(COMM_VISIBLE, !busy);
         commSmsOptShimmer?.classList.toggle(COMM_VISIBLE, busy);
         commSmsCheckbox?.closest('.account-communications-sms-opt-label')
           ?.classList.toggle(COMM_VISIBLE, !busy);
         commSave?.classList.toggle(COMM_VISIBLE, !busy);
       }
       if (commEmailCheckbox) commEmailCheckbox.disabled = busy;
-      if (commSmsMasterCheckbox) commSmsMasterCheckbox.disabled = busy;
       if (commSmsCheckbox) commSmsCheckbox.disabled = busy;
       if (commSmsPhoneInput) commSmsPhoneInput.disabled = busy;
       if (commSave) {
@@ -261,28 +249,12 @@ export default async function decorate(widget) {
       commSmsPhoneInput?.setAttribute('aria-invalid', 'true');
     };
 
-    /**
-     * The master toggle gates the SMS fields: when it is off, the mobile input
-     * and the consent checkbox are disabled (and visually dimmed).
-     */
-    const applySmsEnabledState = () => {
-      const on = commSmsMasterCheckbox?.checked === true;
-      if (commSmsPhoneInput) commSmsPhoneInput.disabled = !on;
-      if (commSmsCheckbox) commSmsCheckbox.disabled = !on;
-      commSmsPhoneInput?.closest('.account-communications-sms-phone-field')
-        ?.classList.toggle('is-disabled', !on);
-      commSmsCheckbox?.closest('.account-communications-sms-opt-label')
-        ?.classList.toggle('is-disabled', !on);
-    };
-
     const applySmsCommUi = () => {
-      if (commSmsMasterCheckbox) commSmsMasterCheckbox.checked = smsOptInStatus === true;
       if (commSmsCheckbox) commSmsCheckbox.checked = smsOptInStatus === true;
       if (commSmsPhoneInput && document.activeElement !== commSmsPhoneInput) {
         commSmsPhoneInput.value = profileMobile.trim();
       }
       hideMobileError();
-      applySmsEnabledState();
     };
 
     /**
@@ -364,22 +336,15 @@ export default async function decorate(widget) {
     const updatePreferences = () => {
       hideCommError();
       const emailOptIn = commEmailCheckbox?.checked === true;
-      // Master toggle off => opt out of SMS. On => require a valid number AND
-      // an explicit consent checkbox tick before we can opt in.
-      const smsMaster = commSmsMasterCheckbox?.checked === true;
-      let smsOptIn = false;
-      if (smsMaster) {
+      // The consent checkbox is the SMS opt-in: checked (with a valid mobile
+      // number) opts in; unchecked opts out.
+      const smsOptIn = commSmsCheckbox?.checked === true;
+      if (smsOptIn) {
         if (!hasValidMobile()) {
           showMobileError();
           commSmsPhoneInput?.focus();
           return;
         }
-        if (commSmsCheckbox?.checked !== true) {
-          showCommError(comm.smsConsentRequired
-            || 'Please check the box to confirm you agree to receive text messages.');
-          return;
-        }
-        smsOptIn = true;
         profileMobile = smsDigits();
       }
       submitCommunicationsPreference({ emailOptIn, smsOptIn });
@@ -388,17 +353,14 @@ export default async function decorate(widget) {
     if (commRoot && email) {
       commRoot.hidden = false;
       commEmailCheckbox?.addEventListener('change', hideCommError);
-      commSmsMasterCheckbox?.addEventListener('change', () => {
+      commSmsCheckbox?.addEventListener('change', () => {
         hideCommError();
-        // Turning the master toggle off clears the consent tick so re-enabling
-        // always requires a fresh, explicit opt-in.
-        if (commSmsMasterCheckbox.checked !== true && commSmsCheckbox) {
-          commSmsCheckbox.checked = false;
+        if (commSmsCheckbox.checked !== true) {
+          profileMobile = '';
+          if (commSmsPhoneInput) commSmsPhoneInput.value = '';
+          hideMobileError();
         }
-        hideMobileError();
-        applySmsEnabledState();
       });
-      commSmsCheckbox?.addEventListener('change', hideCommError);
       commSmsPhoneInput?.addEventListener('input', () => {
         hideCommError();
         hideMobileError();
