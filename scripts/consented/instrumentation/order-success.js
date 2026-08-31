@@ -414,6 +414,7 @@ function buildMetaPurchasePayload(context = readOrderSuccessContext()) {
       const formattedPrice = Number(parseFloat(rawPrice).toFixed(2)) || 0;
       return {
         sku: String(item?.sku || '').trim(),
+        parentSku: String(item?.parentSku || item?.sku || '').trim(),
         quantity: Number(item?.quantity || item?.qty || 0) || 0,
         price: formattedPrice,
       };
