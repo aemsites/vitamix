@@ -37,22 +37,7 @@ export function saveCheckoutSession(email, cart, preview, order) {
     sessionStorage.setItem('checkout_email', email);
     sessionStorage.setItem('checkout_cart_items', JSON.stringify(cart.items));
     if (preview) sessionStorage.setItem('checkout_preview', JSON.stringify(preview));
-    if (order) {
-      // Enrich order.items with parentSku from cart.items so analytics
-      // (e.g. Meta Purchase contentIds) can read it from checkout_order.
-      let orderWithParentSku = order;
-      if (order.items?.length && cart.items?.length) {
-        const cartBySkU = new Map(cart.items.map((i) => [i.sku, i]));
-        orderWithParentSku = {
-          ...order,
-          items: order.items.map((item) => {
-            const cartItem = cartBySkU.get(item.sku);
-            return cartItem?.parentSku ? { ...item, parentSku: cartItem.parentSku } : item;
-          }),
-        };
-      }
-      sessionStorage.setItem('checkout_order', JSON.stringify(orderWithParentSku));
-    }
+    if (order) sessionStorage.setItem('checkout_order', JSON.stringify(order));
   } catch { /* ignore */ }
 }
 
