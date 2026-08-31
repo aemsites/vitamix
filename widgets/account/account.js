@@ -252,7 +252,9 @@ export default async function decorate(widget) {
     const applySmsCommUi = () => {
       if (commSmsCheckbox) commSmsCheckbox.checked = smsOptInStatus === true;
       if (commSmsPhoneInput && document.activeElement !== commSmsPhoneInput) {
-        commSmsPhoneInput.value = profileMobile.trim();
+        // Retain the loaded mobile internally for an SMS opt-out submission,
+        // but only show it while SMS is actively opted in.
+        commSmsPhoneInput.value = smsOptInStatus === true ? profileMobile.trim() : '';
       }
       hideMobileError();
     };
@@ -356,7 +358,6 @@ export default async function decorate(widget) {
       commSmsCheckbox?.addEventListener('change', () => {
         hideCommError();
         if (commSmsCheckbox.checked !== true) {
-          profileMobile = '';
           if (commSmsPhoneInput) commSmsPhoneInput.value = '';
           hideMobileError();
         }
