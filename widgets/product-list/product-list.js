@@ -904,14 +904,17 @@ export default async function decorate(widget) {
   const filtersTrigger = widget.querySelector('.product-list-filters-trigger');
   const filtersCount = widget.querySelector('.product-list-filters-count');
   const filterDropdowns = widget.querySelector('.product-list-filter-dropdowns');
-  const countEl = widget.querySelector('#product-list-widget-results-count');
-  const countLabel = widget.querySelector('.product-list-item-count-label');
+  // Two copies exist (one in the toolbar for desktop, one in the active-filters row for
+  // mobile - see product-list.html/css), so update both from a shared class instead of an id.
+  const countEls = widget.querySelectorAll('.product-list-widget-results-count');
+  const countLabels = widget.querySelectorAll('.product-list-item-count-label');
   const sortDropdown = widget.querySelector('.product-list-sort');
   const sortTrigger = widget.querySelector('.product-list-sort .product-list-widget-dropdown-trigger');
   const sortLabel = widget.querySelector('.product-list-sort-label');
   const sortByEl = widget.querySelector('#product-list-widget-sortby');
   const sortButtons = widget.querySelectorAll('.product-list-sort .product-list-widget-dropdown-option');
   const activeFilters = widget.querySelector('.product-list-active-filters');
+  const activeFiltersTags = widget.querySelector('.product-list-active-filters-tags');
   const clearAllBtn = widget.querySelector('.product-list-clear-all');
   const filterTags = widget.querySelector('.product-list-filter-tags');
   const drawer = widget.querySelector('.product-list-facet-drawer');
@@ -932,7 +935,7 @@ export default async function decorate(widget) {
   }
 
   filtersTrigger.querySelector('.product-list-filters-trigger-label').textContent = copy.filters;
-  countLabel.textContent = copy.items;
+  countLabels.forEach((label) => { label.textContent = copy.items; });
   sortLabel.textContent = copy.sortBy;
   sortByEl.textContent = copy.featured;
   drawerTitle.textContent = copy.filters;
@@ -978,7 +981,10 @@ export default async function decorate(widget) {
     const activeCount = countActiveFilters(filterConfig);
     filtersCount.textContent = activeCount ? `(${activeCount})` : '';
     const tags = getSelectedFilterTags(filterConfig);
-    activeFilters.hidden = tags.length === 0;
+    // On mobile the item count always shows in this row; only the tags/clear-all portion
+    // (and, on desktop, the whole row) hides when there's nothing selected - see product-list.css.
+    activeFilters.classList.toggle('product-list-active-filters-empty', tags.length === 0);
+    activeFiltersTags.hidden = tags.length === 0;
     renderFilterTags(filterTags, tags, copy, (key, value) => {
       const next = removeFilterValue(getFilterConfig(), key, value);
       setFilterConfig(next);
@@ -1040,7 +1046,7 @@ export default async function decorate(widget) {
     };
     // 'featured' (Most Popular) keeps the row order from plp-data-{dataset}.json as-is.
     if (sorts[sortKey]) results.sort(sorts[sortKey]);
-    countEl.textContent = String(results.length);
+    countEls.forEach((el) => { el.textContent = String(results.length); });
     const activeColor = (filterConfig.color || '').split(',')[0].trim();
     await displayResults(results, activeColor ? toClassName(activeColor) : null);
     updateFilterUi(filterConfig, facets);
