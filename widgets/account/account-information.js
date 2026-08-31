@@ -2,7 +2,6 @@ import {
   updateCustomer, applyCustomerToWidget, unwrapCustomerResponse, formatIsoForUi,
 } from './account-api.js';
 import { buildProfileUpdate } from '../../scripts/customer-profile.js';
-import { isValidPhone } from '../../blocks/checkout/checkout-validation.js';
 
 /**
  * Normalize a customer GET/PATCH payload to a plain record (or null).
@@ -17,8 +16,8 @@ function unwrap(raw) {
 
 /**
  * Wires the "Account Information" panel so the customer can edit their first
- * name, last name, phone, and the site-specific custom attributes (planned use,
- * Vitamix ownership). Saves through the self-service customer PATCH endpoint.
+ * name, last name, and site-specific custom attributes (planned use, Vitamix
+ * ownership). Saves through the self-service customer PATCH endpoint.
  * Addresses are handled separately by the address book.
  *
  * The panel is always editable: the read-only rows are hidden and a pre-filled
@@ -52,11 +51,6 @@ export function wireAccountInformation(widget, email, copy, rawCustomer) {
     <label class="account-info-field">
       <span>${ie.lastName || 'Last name'}</span>
       <input type="text" name="lastName" autocomplete="family-name">
-    </label>
-    <label class="account-info-field">
-      <span>${ie.phone || 'Phone'}</span>
-      <input type="tel" name="phone" autocomplete="tel">
-      <span class="account-info-field-error" role="alert" hidden></span>
     </label>
     <fieldset class="account-info-fieldset">
       <legend>${ie.plannedUseLabel || 'What do you plan on using this account for?'}</legend>
@@ -157,44 +151,11 @@ export function wireAccountInformation(widget, email, copy, rawCustomer) {
     }, 5000);
   };
 
-  // Strict phone validation (shared with checkout): only flag a non-empty,
-  // invalid value — the phone field itself is optional.
-  const phoneInput = field('phone');
-  const phoneErrEl = /** @type {HTMLElement | null} */ (form.querySelector('.account-info-field-error'));
-  const clearPhoneError = () => {
-    if (phoneErrEl) {
-      phoneErrEl.hidden = true;
-      phoneErrEl.textContent = '';
-    }
-    phoneInput.removeAttribute('aria-invalid');
-  };
-  const showPhoneError = () => {
-    if (phoneErrEl) {
-      phoneErrEl.textContent = ie.phoneInvalid || 'Please enter a valid 10-digit phone number.';
-      phoneErrEl.hidden = false;
-    }
-    phoneInput.setAttribute('aria-invalid', 'true');
-  };
-  const validatePhoneField = () => {
-    const value = phoneInput.value.trim();
-    if (value && !isValidPhone(value)) {
-      showPhoneError();
-      return false;
-    }
-    clearPhoneError();
-    return true;
-  };
-  phoneInput.addEventListener('blur', validatePhoneField);
-  phoneInput.addEventListener('input', () => {
-    if (phoneErrEl && !phoneErrEl.hidden) clearPhoneError();
-  });
-
   const prefill = () => {
     const custom = (current && typeof current.custom === 'object' && current.custom)
       ? /** @type {Record<string, string>} */ (current.custom) : {};
     field('firstName').value = String(current.firstName ?? '');
     field('lastName').value = String(current.lastName ?? '');
-    field('phone').value = String(current.phone ?? '');
     form.querySelectorAll('[name="plannedUse"]').forEach((r) => {
       /** @type {HTMLInputElement} */ (r).checked = r.value === custom.plannedUse;
     });
@@ -213,17 +174,12 @@ export function wireAccountInformation(widget, email, copy, rawCustomer) {
     const fields = {
       firstName: field('firstName').value,
       lastName: field('lastName').value,
-      phone: field('phone').value,
       plannedUse: checkedValue('plannedUse'),
       ownsVitamix: checkedValue('ownsVitamix'),
     };
     if (!fields.firstName.trim() || !fields.lastName.trim()) {
       errEl.textContent = ie.nameRequired || 'Please enter your first and last name.';
       errEl.hidden = false;
-      return;
-    }
-    if (!validatePhoneField()) {
-      phoneInput.focus();
       return;
     }
     saveBtn.disabled = true;

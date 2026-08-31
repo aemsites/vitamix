@@ -340,7 +340,6 @@
 }
 
 /* Inline field-level validation error (mirrors the checkout .field-error). */
-.account-info-field-error,
 .account-communications-sms-phone-error {
   display: block;
   margin-top: 4px;
@@ -348,7 +347,6 @@
   font-size: 0.7rem;
 }
 
-.account-info-field-error[hidden],
 .account-communications-sms-phone-error[hidden] {
   display: none;
 }

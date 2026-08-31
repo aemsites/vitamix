@@ -44,7 +44,6 @@
       "edit": "Edit",
       "firstName": "First name",
       "lastName": "Last name",
-      "phone": "Phone",
       "plannedUseLabel": "What do you plan on using this account for?",
       "plannedUseHome": "For home products",
       "plannedUseBusiness": "For business products",
@@ -56,8 +55,7 @@
       "saving": "Saving…",
       "nameRequired": "Please enter your first and last name.",
       "saveError": "Could not save your details. Please try again.",
-      "saved": "Profile updated.",
-      "phoneInvalid": "Please enter a valid 10-digit phone number."
+      "saved": "Profile updated."
     },
     "countries": {
       "us": "United States",
@@ -209,7 +207,6 @@
       "edit": "Modifier",
       "firstName": "Prénom",
       "lastName": "Nom de famille",
-      "phone": "Téléphone",
       "plannedUseLabel": "Pour quoi comptez-vous utiliser ce compte ?",
       "plannedUseHome": "Pour les produits domestiques",
       "plannedUseBusiness": "Pour les produits professionnels",
@@ -221,8 +218,7 @@
       "saving": "Enregistrement…",
       "nameRequired": "Veuillez entrer votre prénom et votre nom de famille.",
       "saveError": "Impossible d'enregistrer vos informations. Veuillez réessayer.",
-      "saved": "Profil mis à jour.",
-      "phoneInvalid": "Veuillez entrer un numéro de téléphone à 10 chiffres valide."
+      "saved": "Profil mis à jour."
     },
     "countries": {
       "us": "États-Unis",
