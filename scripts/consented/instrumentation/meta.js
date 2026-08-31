@@ -20,7 +20,7 @@ export function getCartItemsForFbq() {
 
   try {
     const cartData = JSON.parse(rawcartData);
-    const contentIds = cartData.items.map((item) => item.parentSku);
+    const contentIds = cartData.items.map((item) => item.sku);
     const numItems = cartData.items.reduce((sum, item) => sum + item.quantity, 0);
     const total = Number(cartData.items.reduce(
       (sum, item) => sum + (parseFloat(item.price) * item.quantity),

@@ -414,7 +414,6 @@ function buildMetaPurchasePayload(context = readOrderSuccessContext()) {
       const formattedPrice = Number(parseFloat(rawPrice).toFixed(2)) || 0;
       return {
         sku: String(item?.sku || '').trim(),
-        parentSku: String(item?.parentSku || item?.sku || '').trim(),
         quantity: Number(item?.quantity || item?.qty || 0) || 0,
         price: formattedPrice,
       };
@@ -425,7 +424,7 @@ function buildMetaPurchasePayload(context = readOrderSuccessContext()) {
     return null;
   }
 
-  const contentIds = items.map((item) => item.parentSku);
+  const contentIds = items.map((item) => item.sku);
   const numItems = items.reduce((sum, item) => sum + item.quantity, 0);
   const value = summary.orderTotal;
 
