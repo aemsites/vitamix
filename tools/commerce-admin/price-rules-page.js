@@ -118,6 +118,50 @@ function marketLabel(ck) {
   }
   return k ? k.toUpperCase() : '';
 }
+
+const QS_MARKET = 'market';
+const QS_PROMO_ID = 'id';
+
+function promotionsUrlSyncEnabled() {
+  return PR_APP_MODE === 'promotions';
+}
+
+/** @param {string | null | undefined} raw */
+function parseMarketParam(raw) {
+  const k = String(raw || '').trim().toLowerCase();
+  return COUNTRIES.includes(/** @type {(typeof COUNTRIES)[number]} */ (k))
+    ? /** @type {(typeof COUNTRIES)[number]} */ (k)
+    : '';
+}
+
+/**
+ * @param {string} [search]
+ * @returns {{ market: '' | (typeof COUNTRIES)[number], id: string }}
+ */
+function readPromotionsUrlState(search = typeof window !== 'undefined' ? window.location.search : '') {
+  const params = new URLSearchParams(search);
+  return {
+    market: parseMarketParam(params.get(QS_MARKET)),
+    id: String(params.get(QS_PROMO_ID) || '').trim(),
+  };
+}
+
+/**
+ * @param {URL} url
+ * @param {{ market?: string, id?: string }} next
+ */
+function writePromotionsUrlState(url, next) {
+  const market = parseMarketParam(next.market);
+  if (market) url.searchParams.set(QS_MARKET, market);
+  else url.searchParams.delete(QS_MARKET);
+  const id = String(next.id || '').trim();
+  if (id) url.searchParams.set(QS_PROMO_ID, id);
+  else url.searchParams.delete(QS_PROMO_ID);
+}
+
+let promotionsUrlSyncMuted = false;
+let promotionsModalApplySeq = 0;
+
 const AREAS = /** @type {const} */ (['rules', 'promotions']);
 
 /** @typedef {'all' | (typeof COUNTRIES)[number]} CartRuleCountryFilter */
@@ -172,6 +216,62 @@ const state = {
   cartDataSource: 'unavailable',
   cartLoadError: '',
 };
+
+/**
+ * @param {{ market?: string, id?: string }} next
+ * @param {{ push?: boolean }} [opts]
+ */
+function syncPromotionsUrl(next, opts = {}) {
+  if (!promotionsUrlSyncEnabled() || promotionsUrlSyncMuted || typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  writePromotionsUrlState(url, {
+    market: next.market ?? state.country,
+    id: next.id ?? '',
+  });
+  const same = url.pathname === window.location.pathname && url.search === window.location.search;
+  if (same) return;
+  if (opts.push) window.history.pushState({ promotions: true }, '', url);
+  else window.history.replaceState({ promotions: true }, '', url);
+}
+
+function hydratePromotionsMarketFromUrl() {
+  if (!promotionsUrlSyncEnabled()) return;
+  const { market } = readPromotionsUrlState();
+  if (market) state.country = market;
+}
+
+/**
+ * @param {string} promoId
+ * @returns {'' | (typeof COUNTRIES)[number]}
+ */
+function countryKeyForPromotionId(promoId) {
+  const p = promotionsListSource().find((x) => String(x.id) === String(promoId));
+  if (!p) return '';
+  const found = COUNTRIES.find((ck) => catalogRulesForCountryTab(p, ck).length > 0);
+  return found || '';
+}
+
+async function applyPromotionModalFromUrl() {
+  if (!promotionsUrlSyncEnabled()) return;
+  promotionsModalApplySeq += 1;
+  const seq = promotionsModalApplySeq;
+  const { id, market } = readPromotionsUrlState();
+  if (!id) {
+    closePromotionDetailDialog();
+    return;
+  }
+  const openDlg = document.querySelector('dialog.pr-promo-detail-dialog');
+  if (openDlg?.getAttribute('data-pr-promo-id') === id) return;
+  const ck = countryKeyForPromotionId(id) || market || state.country;
+  if (ck && ck !== state.country) {
+    state.country = /** @type {(typeof COUNTRIES)[number]} */ (ck);
+    render();
+  }
+  await openPromotionDetailModal(ck, id, { fromUrl: true });
+  if (seq !== promotionsModalApplySeq) closePromotionDetailDialog();
+}
+
+hydratePromotionsMarketFromUrl();
 
 /**
  * Market tab from helix `country` on the cart rule (defaults to US when missing or unknown).
@@ -3704,8 +3804,9 @@ function wirePromotionDetailDialog(dialog, shut) {
 /**
  * @param {string} countryKey
  * @param {string} promoId
+ * @param {{ fromUrl?: boolean }} [options]
  */
-async function openPromotionDetailModal(countryKey, promoId) {
+async function openPromotionDetailModal(countryKey, promoId, options = {}) {
   const catalogPromo = promotionsListSource().find((p) => p.id === promoId);
   if (!catalogPromo) return;
   const rulesForCo = catalogRulesForCountryTab(catalogPromo, countryKey);
@@ -3731,6 +3832,8 @@ async function openPromotionDetailModal(countryKey, promoId) {
   );
   const dialog = document.createElement('dialog');
   dialog.className = 'pr-promo-detail-dialog coupons-detail-dialog';
+  dialog.setAttribute('data-pr-promo-id', promoId);
+  dialog.setAttribute('data-pr-promo-market', countryKey);
 
   const toolbar = document.createElement('div');
   toolbar.className = 'commerce-detail-modal-toolbar';
@@ -3741,6 +3844,9 @@ async function openPromotionDetailModal(countryKey, promoId) {
   const shut = () => {
     dialog.close();
     dialog.remove();
+    if (readPromotionsUrlState().id === promoId) {
+      syncPromotionsUrl({ market: state.country, id: '' });
+    }
   };
   const toolbarMain = document.createElement('div');
   toolbarMain.className = 'commerce-detail-modal-toolbar-main';
@@ -3801,6 +3907,9 @@ async function openPromotionDetailModal(countryKey, promoId) {
     });
   });
   dialog.showModal();
+  if (!options.fromUrl) {
+    syncPromotionsUrl({ market: countryKey, id: promoId }, { push: true });
+  }
 }
 
 function renderPromotionsListPanel() {
@@ -3985,6 +4094,9 @@ function render() {
       state.cartRuleSortKey = 'title';
       state.cartRuleSortDir = 'asc';
       closeAllPricingDetailDialogs();
+      if (promotionsUrlSyncEnabled()) {
+        syncPromotionsUrl({ market: state.country, id: '' }, { push: true });
+      }
       render();
     });
   });
@@ -4135,8 +4247,31 @@ function render() {
   }
 }
 
+if (promotionsUrlSyncEnabled()) {
+  window.addEventListener('popstate', () => {
+    promotionsUrlSyncMuted = true;
+    const { market } = readPromotionsUrlState();
+    const nextMarket = market || 'us';
+    if (nextMarket !== state.country) {
+      state.country = nextMarket;
+      state.promoListSearch = '';
+      state.promoListGroupFilter = '';
+      state.promoListSortKey = 'title';
+      state.promoListSortDir = 'asc';
+      closeAllPricingDetailDialogs();
+      render();
+    }
+    applyPromotionModalFromUrl().finally(() => {
+      promotionsUrlSyncMuted = false;
+    });
+  });
+}
+
 initPricingSources()
-  .then(() => render())
+  .then(async () => {
+    render();
+    await applyPromotionModalFromUrl();
+  })
   .catch((err) => {
     /* eslint-disable-next-line no-console -- boot fallback */
     console.warn('[commerce-admin/price-rules] init failed', err);
