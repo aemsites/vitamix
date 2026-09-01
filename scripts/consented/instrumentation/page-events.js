@@ -9,7 +9,9 @@ import {
 import {
   assignDigitalDataPageInfo,
   flushLaunchTrackers,
+  pushProductColorEvent,
   pushProductEvent,
+  setDigitalDataProductColor,
   triggerLaunchEvent,
   whenSatelliteReady,
 } from './adobe-runtime.js';
@@ -34,6 +36,11 @@ export async function fireProdView() {
     debugWarn('Adobe Analytics prodView skipped: product name not found on PDP');
     return;
   }
+
+  // window.selectedVariant is set synchronously during PDP decoration (default
+  // variant, or the ?color= deep-linked one) — read it now since prodView fires
+  // later, after Launch is ready, well after that assignment has happened.
+  setDigitalDataProductColor(window.selectedVariant?.options?.color);
 
   if (!(await pushProductEvent('prodView', buildProductId(productName)))) {
     debugWarn('Adobe Analytics prodView skipped: Adobe Launch (_satellite) not available');
@@ -68,6 +75,29 @@ export function trackProdView(attempt = 0) {
   }
   prodViewTrackScheduled = true;
   whenSatelliteReady(tryTrack, 'prodView');
+}
+
+let variantChangeTrackingInstalled = false;
+
+/**
+ * Listen for PDP color swatch clicks and fire a variantSelect beacon with the
+ * chosen color merged into digitalData.product[0].productInfo.color (Adobe
+ * Launch eVar15 data source). The page-load default/deep-linked color is
+ * covered separately by fireProdView() reading window.selectedVariant.
+ * @returns {void}
+ */
+export function trackVariantChange() {
+  if (variantChangeTrackingInstalled) {
+    return;
+  }
+  variantChangeTrackingInstalled = true;
+
+  document.addEventListener('variant:change', (ev) => {
+    if (!hasMarketingConsent()) {
+      return;
+    }
+    pushProductColorEvent('variantSelect', ev.detail?.color);
+  });
 }
 
 /**

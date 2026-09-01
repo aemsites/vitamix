@@ -495,10 +495,47 @@ export async function triggerLaunchEvent(eventName, payload, { waitForBeacon = f
 export async function pushProductEvent(eventName, productID, { waitForBeacon = false } = {}) {
   window.digitalData = window.digitalData || {};
   delete window.digitalData.cart;
+  const [existingProduct] = window.digitalData.product || [];
   window.digitalData.product = [{
-    productInfo: { productID },
+    productInfo: { ...existingProduct?.productInfo, productID },
   }];
 
+  return triggerLaunchEvent(eventName, window.digitalData.product, { waitForBeacon });
+}
+
+/**
+ * Merge the selected variant color into digitalData.product[0].productInfo (Adobe
+ * Launch eVar15 data source), preserving any other productInfo fields already set
+ * (e.g. productID). Does not trigger a Launch event.
+ * @param {string} color Human-readable selected color (e.g. "Polar White")
+ * @returns {void}
+ */
+export function setDigitalDataProductColor(color) {
+  if (!color) {
+    return;
+  }
+  window.digitalData = window.digitalData || {};
+  const [existingProduct] = window.digitalData.product || [];
+  window.digitalData.product = [{
+    ...existingProduct,
+    productInfo: { ...existingProduct?.productInfo, color },
+  }];
+}
+
+/**
+ * Merge the selected variant color into digitalData.product[0].productInfo and
+ * trigger a Launch direct-call rule so the color is sent on its own beacon
+ * (Adobe eVar15 data source). Used for explicit color swatch selection.
+ * @param {string} eventName Launch direct-call identifier (e.g. variantSelect)
+ * @param {string} color Human-readable selected color (e.g. "Polar White")
+ * @param {{ waitForBeacon?: boolean }} [options]
+ * @returns {Promise<boolean>} Whether the Launch rule was triggered
+ */
+export async function pushProductColorEvent(eventName, color, { waitForBeacon = false } = {}) {
+  if (!color) {
+    return false;
+  }
+  setDigitalDataProductColor(color);
   return triggerLaunchEvent(eventName, window.digitalData.product, { waitForBeacon });
 }
 

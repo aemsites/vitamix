@@ -135,6 +135,10 @@ export function onOptionChange(ph, block, variants, color, isParentOutOfStock = 
 
   window.selectedVariant = variant;
 
+  document.dispatchEvent(new CustomEvent('variant:change', {
+    detail: { color: variantColor, sku },
+  }));
+
   updateAlert(ph, block, window.jsonLdData.custom, variant.custom);
 
   // update add to cart, preserving the user's current quantity selection

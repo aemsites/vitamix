@@ -39,12 +39,17 @@ export { trackFormEvents, resetFormEventsState } from './forms.js';
 
 /**
  * Load order-success tracking early on confirmation pages (before Launch loads).
+ * Also registers the PDP variant:change listener early so a fast color-swatch
+ * click right after page load is never missed while Launch is still loading.
  * Called from consented.js at module load time.
  * @returns {void}
  */
 export function bootstrapEarlyTracking() {
   if (typeof window !== 'undefined' && isOrderSuccessPage()) {
     import('./order-success.js');
+  }
+  if (typeof window !== 'undefined' && isPdpPage()) {
+    import('./page-events.js').then((m) => m.trackVariantChange());
   }
 }
 
