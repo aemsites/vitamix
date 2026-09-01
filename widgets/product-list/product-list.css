@@ -175,6 +175,12 @@
   text-align: left;
 }
 
+@media (width >= 900px) {
+  .product-list-widget .product-list-item-count-mobile {
+    display: none;
+  }
+}
+
 @media (width < 900px) {
   .product-list-widget .product-list-toolbar .product-list-item-count {
     display: none;
@@ -357,6 +363,14 @@
 
 .product-list-widget .product-list-active-filters-divider {
   color: var(--color-gray-400, #999);
+}
+
+/* Only needed to separate the mobile item count from the tags; there's no item count on this
+   row on desktop (see product-list-item-count-mobile above), so the divider has nothing to do. */
+@media (width >= 900px) {
+  .product-list-widget .product-list-active-filters-divider {
+    display: none;
+  }
 }
 
 .product-list-widget .product-list-clear-all {
