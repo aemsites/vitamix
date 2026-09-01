@@ -66,6 +66,19 @@ function titleFromUrl(pathname) {
   return slug.split('-').map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w)).join(' ');
 }
 
+/**
+ * Whether every sku (color variant, or the product itself when it has none) is out of stock,
+ * so the product should be dropped from the listing entirely rather than just flagged on its
+ * swatches. A sku with no availability data is treated as in stock (nothing explicitly says
+ * otherwise), so this only excludes products where every sku is confirmed unavailable.
+ * @param {Object} product
+ * @returns {boolean}
+ */
+function isFullyOutOfStock(product) {
+  const skus = (product.variants && product.variants.length) ? product.variants : [product];
+  return skus.every((sku) => sku.availability && sku.availability !== 'InStock');
+}
+
 function pathnameFromUrl(rawUrl) {
   try {
     return new URL(rawUrl, window.location.origin).pathname;
@@ -166,7 +179,8 @@ export default async function lookupProductListProducts(config = {}, facets = {}
         });
         return product;
       })
-      .filter((product) => product && (product.isMarketing || !!product.image));
+      .filter((product) => product
+        && (product.isMarketing || (!!product.image && !isFullyOutOfStock(product))));
 
     window.productListWidgetIndexByDataset[plpDataset] = { parents, facetDefs };
   }

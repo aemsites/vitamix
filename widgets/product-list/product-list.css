@@ -127,9 +127,31 @@
   margin-bottom: var(--spacing-300, 0.75rem);
 }
 
+/* Matches the sort dropdown trigger's bordered-pill treatment (see
+   product-list-widget-dropdown-trigger below) so the two toolbar controls look consistent. */
 .product-list-widget .product-list-filters-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-60, 0.4rem);
   justify-self: start;
   width: auto;
+  padding: 0.3rem 0.9rem;
+  border: 1px solid var(--color-gray-300, #ddd);
+  border-radius: var(--rounding-l, 10px);
+  background-color: var(--color-background);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.product-list-widget .product-list-filters-trigger:hover {
+  border-color: var(--color-gray-500, #999);
+  background-color: var(--color-gray-100, #f5f5f5);
+}
+
+.product-list-widget .product-list-filters-trigger-icon {
+  width: 1rem;
+  height: 1rem;
+  flex: none;
+  background: url('/widgets/product-list/filter.svg') center / contain no-repeat;
 }
 
 .product-list-widget .product-list-filters-count {
@@ -144,6 +166,57 @@
   margin: 0;
   font-size: var(--body-size-s, 0.875rem);
   text-align: right;
+  white-space: nowrap;
+}
+
+/* Two copies exist - one in the toolbar (desktop), one in the active-filters row (mobile) -
+   so only one shows at a time; see the >=900px override below and product-list.js. */
+.product-list-widget .product-list-item-count-mobile {
+  text-align: left;
+}
+
+@media (width >= 900px) {
+  .product-list-widget .product-list-item-count-mobile {
+    display: none;
+  }
+}
+
+@media (width < 900px) {
+  .product-list-widget .product-list-toolbar .product-list-item-count {
+    display: none;
+  }
+
+  /* "Sort By" is redundant next to the chevron/menu and was wrapping the trigger onto two
+     lines at narrow widths - just show the selected option (e.g. "Most Popular"). */
+  .product-list-widget .product-list-sort-label {
+    display: none;
+  }
+
+  /* Filters and Sort fill the whole toolbar row, split evenly, instead of sizing to content. */
+  .product-list-widget .product-list-toolbar {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .product-list-widget .product-list-filters-trigger {
+    justify-self: stretch;
+    width: 100%;
+    padding-left: 0;
+    padding-right: 0;
+    justify-content: center;
+  }
+
+  .product-list-widget .product-list-sort {
+    justify-self: stretch;
+    width: 100%;
+  }
+
+  .product-list-widget .product-list-sort .product-list-widget-dropdown-trigger {
+    display: flex;
+    width: 100%;
+    padding-left: 0;
+    padding-right: 0;
+    justify-content: center;
+  }
 }
 
 .product-list-widget .product-list-sort {
@@ -260,7 +333,9 @@
   background: var(--color-gray-200, #f3f1eb);
 }
 
-/* Active filter tags */
+/* Active filter tags - also carries the mobile item-count copy (see product-list-item-count-mobile
+   above), so unlike before this row itself is never fully hidden on mobile; only the desktop
+   copy hides the whole row when nothing's selected (product-list-active-filters-empty below). */
 .product-list-widget .product-list-active-filters {
   display: flex;
   flex-wrap: wrap;
@@ -269,8 +344,33 @@
   margin-bottom: var(--spacing-400, 1rem);
 }
 
-.product-list-widget .product-list-active-filters[hidden] {
+@media (width >= 900px) {
+  .product-list-widget .product-list-active-filters.product-list-active-filters-empty {
+    display: none;
+  }
+}
+
+/* display: contents unwraps this element so its children (divider/clear-all/tags) become direct
+   flex items of .product-list-active-filters, wrapping individually rather than as one block -
+   that's what lets the item count and the first tag share a line instead of always splitting. */
+.product-list-widget .product-list-active-filters-tags {
+  display: contents;
+}
+
+.product-list-widget .product-list-active-filters-tags[hidden] {
   display: none;
+}
+
+.product-list-widget .product-list-active-filters-divider {
+  color: var(--color-gray-400, #999);
+}
+
+/* Only needed to separate the mobile item count from the tags; there's no item count on this
+   row on desktop (see product-list-item-count-mobile above), so the divider has nothing to do. */
+@media (width >= 900px) {
+  .product-list-widget .product-list-active-filters-divider {
+    display: none;
+  }
 }
 
 .product-list-widget .product-list-clear-all {
@@ -285,6 +385,18 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--spacing-200, 0.5rem);
+}
+
+/* Mobile matches the target design's order (tags, then Clear All); desktop keeps the
+   original source order (Clear All first). */
+@media (width < 900px) {
+  .product-list-widget .product-list-filter-tags {
+    order: 1;
+  }
+
+  .product-list-widget .product-list-clear-all {
+    order: 2;
+  }
 }
 
 .product-list-widget .product-list-widget-filter-tag {
@@ -432,6 +544,7 @@ body.product-list-widget-drawer-open {
 .product-list-widget .product-list-results {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: var(--product-list-widget-gap);
 }
 
@@ -445,9 +558,11 @@ body.product-list-widget-drawer-open {
   display: none;
 }
 
-/* Product cards - align the listing with the product-card treatment used on the VX Series page. */
+/* Product cards - align the listing with the product-card treatment used on the VX Series page.
+   Two per row from mobile up (four from 1200px), so width defaults to the 50% split instead of
+   the traditional single-column mobile stack. */
 .product-list-widget .product-list-widget-product-card {
-  width: 100%;
+  flex: 0 0 calc((100% - var(--product-list-widget-gap)) / 2);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -477,24 +592,40 @@ body.product-list-widget-drawer-open {
   width: 66%;
 }
 
+/* Two cards per row leaves little room for badges on mobile, so only show the first. */
+@media (width <= 767px) {
+  .product-list-widget .product-badges .product-badge:nth-child(n + 2) {
+    display: none;
+  }
+}
+
 .product-list-widget .product-list-widget-compare-btn {
   position: absolute;
   top: 0.5rem;
   right: 0.5rem;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: 0;
-  border-radius: 4px;
-  padding: var(--spacing-40) var(--spacing-60);
+  border-radius: 50%;
+  padding: 0;
   background-color: var(--color-gray-300);
-  color: var(--color-text);
-  font-size: var(--detail-size-m, 0.75rem);
-  font-weight: var(--weight-regular, 400);
-  line-height: 1.2;
-  text-decoration: underline;
-  text-underline-offset: 0.15em;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.2s ease;
+  transition: opacity 0.2s ease, background-color 0.2s ease;
   cursor: pointer;
+}
+
+.product-list-widget .product-list-widget-compare-btn:hover {
+  background-color: var(--color-gray-400, #ccc);
+}
+
+.product-list-widget .product-list-widget-compare-icon {
+  width: 1rem;
+  height: 1rem;
+  background: url('/blocks/plp/plus.svg') center / contain no-repeat;
 }
 
 .product-list-widget .product-list-widget-product-card:hover .product-list-widget-compare-btn,
@@ -506,13 +637,24 @@ body.product-list-widget-drawer-open {
 /* Toggled on once a product is already in the compare-products widget's list (localStorage) */
 .product-list-widget .product-list-widget-compare-btn.product-list-widget-compare-btn-active {
   background-color: var(--color-charcoal);
-  color: var(--color-white);
+}
+
+.product-list-widget .product-list-widget-compare-btn.product-list-widget-compare-btn-active:hover {
+  background-color: var(--color-charcoal);
+}
+
+.product-list-widget .product-list-widget-compare-btn.product-list-widget-compare-btn-active .product-list-widget-compare-icon {
+  background-image: url('/blocks/plp/checkmark.svg');
+
+  /* checkmark.svg strokes dark (#182026); invert to white for contrast on the charcoal background */
+  filter: brightness(0) invert(1);
 }
 
 .product-list-widget .product-list-widget-product-card h4 {
   margin: var(--spacing-100, 0.25rem) 0 0;
+  min-height: 2.2rem;
   font-family: var(--heading-font-family);
-  font-size: var(--heading-size-l, 1.375rem);
+  font-size: var(--heading-size-s, 1.125rem);
   font-weight: var(--weight-light, 300);
   line-height: var(--line-height-s, 1.2);
 }
@@ -530,7 +672,8 @@ body.product-list-widget-drawer-open {
 .product-list-widget .product-list-colors {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--spacing-100, 0.25rem);
+  gap: var(--spacing-60, 0.5rem);
+  min-height: 3rem;
 }
 
 .product-list-widget .product-list-widget-colors-label {
@@ -541,8 +684,8 @@ body.product-list-widget-drawer-open {
 }
 
 .product-list-widget .color-swatch {
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 28px;
+  height: 28px;
   padding: 0;
   border: 1px solid var(--color-charcoal);
   display: flex;
@@ -594,14 +737,13 @@ body.product-list-widget-drawer-open {
   align-items: center;
   gap: var(--spacing-60);
   min-height: 1.25rem;
-  font-size: var(--detail-size-m, 0.75rem);
+  font-size: var(--body-size-s, 0.875rem);
 }
 
 /* Fractional-fill star rating (from reviews.json), replacing the previous per-product Bazaarvoice widget */
 .product-list-widget .star-rating-stars {
   position: relative;
   display: inline-block;
-  font-size: 0.9rem;
   line-height: 1;
   white-space: nowrap;
 }
@@ -740,23 +882,9 @@ body.product-list-widget-drawer-open {
   }
 }
 
-@media (width >= 600px) {
-  .product-list-widget .product-list-widget-product-card {
-    width: calc(50% - var(--product-list-widget-gap) / 2);
-  }
-
-  .product-list-widget .product-list-widget-product-card h4 {
-    min-height: 2.6rem;
-  }
-
-  .product-list-widget .product-list-colors {
-    min-height: 3.5rem;
-  }
-}
-
 @media (width >= 1200px) {
   .product-list-widget .product-list-widget-product-card {
-    width: calc(25% - var(--product-list-widget-gap) * 0.75);
+    flex: 0 0 calc((100% - (3 * var(--product-list-widget-gap))) / 4);
   }
 }
 
