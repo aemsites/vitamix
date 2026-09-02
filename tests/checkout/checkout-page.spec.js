@@ -112,7 +112,7 @@ async function seedCart(page, items = [MOCK_CART_ITEM]) {
         version: 1,
         items: cartItems,
       }));
-      document.cookie = `cart_items_count=${visibleItemCount}; expires=${expires}; path=/`;
+      document.cookie = `edge_cart_items_count=${visibleItemCount}; expires=${expires}; path=/`;
       sessionStorage.setItem('checkout-test-cart-seeded', 'true');
     }
 

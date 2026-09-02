@@ -411,11 +411,12 @@ test('cart:change restore event fires when constructor loads from localStorage',
 
 // --- cookie -----------------------------------------------------------------
 
-test('cart_items_count cookie is updated on persist', () => {
+test('edge cart count cookie is updated without changing Magento cart count', () => {
   const cart = new Cart();
   cart.addItem(sampleItem({ quantity: 2 }));
   cart.clear(); // forces immediate persist; resets count to 0
-  assert.match(document.cookie, /cart_items_count=0/);
+  assert.match(document.cookie, /edge_cart_items_count=0/);
+  assert.doesNotMatch(document.cookie, /(?:^|;\s*)cart_items_count=/);
 });
 
 // --- addItem: custom merge --------------------------------------------------
