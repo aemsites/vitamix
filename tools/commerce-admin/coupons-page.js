@@ -53,6 +53,7 @@ import {
   readCouponDiscountedProductsFromDom,
   wireCouponProductListRows,
 } from './coupons-product-list.js';
+import { jsonDiffLines, jsonEqual, renderJsonDiffHtml } from './commerce-json-diff.js';
 
 /**
  * ProductBus coupon type (`…/coupons/types`). Shapes match **helix-commerce-api**.
@@ -1125,7 +1126,25 @@ function couponSortableTh(key, label, extraClass = '') {
   return `<th scope="col"${classAttr} aria-sort="${aria}"><button type="button" class="pim-th-sort-btn" data-cp-sort="${escapeHtml(key)}">${escapeHtml(label)}${escapeHtml(ind)}</button></th>`;
 }
 
-function couponOverviewRowHtml(row, { interactive = true, query = '' } = {}) {
+function couponImportStatusBadge(kind) {
+  if (kind === 'new') {
+    return '<span class="coupons-import-badge coupons-import-badge-new">New</span>';
+  }
+  if (kind === 'update') {
+    return '<span class="coupons-import-badge coupons-import-badge-update">Update</span>';
+  }
+  if (kind === 'same') {
+    return '<span class="coupons-import-badge coupons-import-badge-same">Unchanged</span>';
+  }
+  return '';
+}
+
+function couponOverviewRowHtml(row, {
+  interactive = true,
+  query = '',
+  importKind = '',
+  changedKeys = null,
+} = {}) {
   const id = couponIdFromRow(row);
   const name = row.name || '—';
   const pathSeg = parseCouponTypePath(id);
@@ -1145,26 +1164,42 @@ function couponOverviewRowHtml(row, { interactive = true, query = '' } = {}) {
   const modifiedHtml = rel
     ? `<time class="coupons-grid-modified" datetime="${escapeHtml(updatedRaw)}" title="${escapeHtml(absEt)}">${escapeHtml(rel)}</time>`
     : '—';
+  const tdAttr = (key, extra = '') => {
+    const parts = [
+      extra,
+      changedKeys && changedKeys.has(key) ? 'coupons-import-cell-changed' : '',
+    ].filter(Boolean);
+    return parts.length ? ` class="${parts.join(' ')}"` : '';
+  };
+  const kindClass = importKind ? ` coupons-import-row-${escapeHtml(importKind)}` : '';
   const openAttrs = interactive
-    ? ` class="coupons-grid-row coupons-row-open" data-cp-coupon-id="${escapeHtml(id)}" tabindex="0" role="button" aria-label="${escapeHtml(`Open coupon ${String(name)}`)}"`
-    : ' class="coupons-grid-row"';
+    ? ` class="coupons-grid-row coupons-row-open${kindClass}" data-cp-coupon-id="${escapeHtml(id)}" tabindex="0" role="button" aria-label="${escapeHtml(`Open coupon ${String(name)}`)}"`
+    : ` class="coupons-grid-row${kindClass}"`;
+  const statusCell = importKind
+    ? `<td class="coupons-grid-col-status">${couponImportStatusBadge(importKind)}</td>`
+    : '';
   return `<tr${openAttrs}>
-      <td class="coupons-grid-lead coupons-grid-name">${highlightMatch(String(name), query)}</td>
-      <td><code class="coupons-grid-id">${highlightMatch(id || '—', query)}</code></td>
-      <td>${disc}</td>
-      <td>${escapeHtml(min)}</td>
-      <td>${escapeHtml(cap)}</td>
-      <td>${escapeHtml(ship)}</td>
-      <td>${escapeHtml(stack)}</td>
-      <td class="coupons-grid-col-year">${commerceGroupBadgeHtml(year)}</td>
-      <td class="coupons-grid-col-market">${mHtml}</td>
+      ${statusCell}
+      <td${tdAttr('title', 'coupons-grid-lead coupons-grid-name')}>${highlightMatch(String(name), query)}</td>
+      <td${tdAttr('id')}><code class="coupons-grid-id">${highlightMatch(id || '—', query)}</code></td>
+      <td${tdAttr('discount')}>${disc}</td>
+      <td${tdAttr('min')}>${escapeHtml(min)}</td>
+      <td${tdAttr('cap')}>${escapeHtml(cap)}</td>
+      <td${tdAttr('freeship')}>${escapeHtml(ship)}</td>
+      <td${tdAttr('stack')}>${escapeHtml(stack)}</td>
+      <td${tdAttr('year', 'coupons-grid-col-year')}>${commerceGroupBadgeHtml(year)}</td>
+      <td${tdAttr('market', 'coupons-grid-col-market')}>${mHtml}</td>
       <td class="coupons-grid-col-modified">${modifiedHtml}</td>
     </tr>`;
 }
 
-function couponOverviewHeadHtml({ sortable = true } = {}) {
+function couponOverviewHeadHtml({ sortable = true, importPreview = false } = {}) {
+  const status = importPreview
+    ? '<th scope="col" class="coupons-grid-col-status">Status</th>'
+    : '';
   if (sortable) {
     return `<tr>
+              ${status}
               ${couponSortableTh('title', 'Title')}
               ${couponSortableTh('id', 'Id')}
               ${couponSortableTh('discount', 'Discount')}
@@ -1178,6 +1213,7 @@ function couponOverviewHeadHtml({ sortable = true } = {}) {
             </tr>`;
   }
   return `<tr>
+              ${status}
               <th scope="col">Title</th>
               <th scope="col">Id</th>
               <th scope="col">Discount</th>
@@ -2341,8 +2377,62 @@ function validateCouponTypeForImport(raw, index) {
 }
 
 /**
+ * Overview columns that differ between an imported coupon and the one already on this env.
+ * @param {object} incoming
+ * @param {object} existing
+ * @returns {Set<string>}
+ */
+function couponImportOverviewChangedKeys(incoming, existing) {
+  const keys = new Set();
+  if (!existing) return keys;
+  if (String(incoming?.name ?? '') !== String(existing?.name ?? '')) keys.add('title');
+  if (couponIdFromRow(incoming) !== couponIdFromRow(existing)) keys.add('id');
+  const incDisc = {
+    discountType: incoming.discountType ?? incoming.discount_type,
+    discountValue: incoming.discountValue ?? incoming.discount_value,
+    discountedProducts: incoming.discountedProducts ?? incoming.discounted_products,
+  };
+  const exDisc = {
+    discountType: existing.discountType ?? existing.discount_type,
+    discountValue: existing.discountValue ?? existing.discount_value,
+    discountedProducts: existing.discountedProducts ?? existing.discounted_products,
+  };
+  if (!jsonEqual(incDisc, exDisc)) keys.add('discount');
+  if (overviewMinOrder(incoming) !== overviewMinOrder(existing)) keys.add('min');
+  if (overviewCap(incoming) !== overviewCap(existing)) keys.add('cap');
+  if (couponShippingModeFromRow(incoming) !== couponShippingModeFromRow(existing)) {
+    keys.add('freeship');
+  }
+  if ((incoming.stackable !== false) !== (existing.stackable !== false)) keys.add('stack');
+  const incYear = parseCouponTypePath(couponIdFromRow(incoming))?.year || '';
+  const exYear = parseCouponTypePath(couponIdFromRow(existing))?.year || '';
+  if (incYear !== exYear) keys.add('year');
+  if (normalizeCouponCountries(incoming).join(',') !== normalizeCouponCountries(existing).join(',')) {
+    keys.add('market');
+  }
+  return keys;
+}
+
+function couponImportComparePair(incoming, existing) {
+  const next = sanitizeCouponTypeForExport(incoming);
+  const prevFull = sanitizeCouponTypeForExport(existing);
+  if (!next) return { equal: false, prev: prevFull, next };
+  if (!prevFull) return { equal: false, prev: {}, next };
+  /** @type {Record<string, unknown>} */
+  const prev = {};
+  Object.keys(next).forEach((k) => {
+    prev[k] = prevFull[k];
+  });
+  return { equal: jsonEqual(prev, next), prev, next };
+}
+
+function couponImportBodiesEqual(incoming, existing) {
+  return couponImportComparePair(incoming, existing).equal;
+}
+
+/**
  * @param {string} text
- * @returns {{ bodies: object[], toAdd: object[], skipped: object[] }}
+ * @returns {{ bodies: object[], toAdd: object[], toUpdate: object[], skipped: object[] }}
  */
 function parseCouponImportJson(text) {
   let data;
@@ -2363,30 +2453,107 @@ function parseCouponImportJson(text) {
     }
     seen.add(id);
   });
-  const existing = new Set(state.coupons.map((row) => couponIdFromRow(row)).filter(Boolean));
-  const toAdd = bodies.filter((body) => !existing.has(couponIdFromRow(body)));
-  const skipped = bodies.filter((body) => existing.has(couponIdFromRow(body)));
-  return { bodies, toAdd, skipped };
+  const existingById = new Map(
+    state.coupons.map((row) => [couponIdFromRow(row), row]).filter(([id]) => id),
+  );
+  const toAdd = [];
+  const toUpdate = [];
+  const skipped = [];
+  bodies.forEach((body) => {
+    const existing = existingById.get(couponIdFromRow(body));
+    if (!existing) {
+      toAdd.push(body);
+      return;
+    }
+    if (couponImportBodiesEqual(body, existing)) skipped.push(body);
+    else toUpdate.push(body);
+  });
+  return {
+    bodies, toAdd, toUpdate, skipped,
+  };
 }
 
-async function postImportedCouponTypes(bodies, onProgress) {
+function couponImportPreviewLead(toAdd, toUpdate, skipped) {
+  if (!toAdd.length && !toUpdate.length) {
+    return skipped.length
+      ? 'Nothing to import. Every coupon in this JSON already matches this environment.'
+      : 'Nothing to import.';
+  }
+  const bits = [];
+  if (toAdd.length) {
+    bits.push(`${toAdd.length} will be created`);
+  }
+  if (toUpdate.length) {
+    bits.push(`${toUpdate.length} will be updated`);
+  }
+  if (skipped.length) {
+    bits.push(`${skipped.length} unchanged and skipped`);
+  }
+  return `${bits.join('. ')}.`;
+}
+
+function couponImportPreviewTableHtml(parsed) {
+  const existingById = new Map(
+    state.coupons.map((row) => [couponIdFromRow(row), row]).filter(([id]) => id),
+  );
+  const toAddSet = new Set(parsed.toAdd);
+  const toUpdateSet = new Set(parsed.toUpdate);
+  const skippedSet = new Set(parsed.skipped);
+  const rows = parsed.bodies.map((row) => {
+    const existing = existingById.get(couponIdFromRow(row));
+    let importKind = 'new';
+    if (toUpdateSet.has(row)) importKind = 'update';
+    else if (skippedSet.has(row) || (existing && !toAddSet.has(row))) importKind = 'same';
+    const changedKeys = importKind === 'update' && existing
+      ? couponImportOverviewChangedKeys(row, existing)
+      : null;
+    let html = couponOverviewRowHtml(row, { interactive: false, importKind, changedKeys });
+    if (importKind === 'update' && existing) {
+      const { prev, next } = couponImportComparePair(row, existing);
+      const lines = jsonDiffLines(prev, next).filter((l) => l.type !== 'same');
+      const n = lines.length;
+      const summary = n === 1 ? 'Show 1 changed line' : `Show ${n} changed lines`;
+      html += `<tr class="coupons-import-diff-row"><td colspan="11">
+        <details class="coupons-import-diff">
+          <summary>${escapeHtml(summary)}</summary>
+          ${renderJsonDiffHtml(lines)}
+        </details>
+      </td></tr>`;
+    }
+    return html;
+  });
+  return rows.join('');
+}
+
+/**
+ * @param {{ body: object, existed: boolean }[]} items
+ */
+async function applyImportedCouponTypes(items, onProgress) {
   const ok = [];
   const failed = [];
   /* Sequential so a single failing id does not abort the rest. */
-  /* eslint-disable no-await-in-loop -- one POST per coupon type; progress is per row */
-  for (let i = 0; i < bodies.length; i += 1) {
-    const body = bodies[i];
+  /* eslint-disable no-await-in-loop -- one POST/PUT per coupon type; progress is per row */
+  for (let i = 0; i < items.length; i += 1) {
+    const { body, existed } = items[i];
     const id = couponIdFromRow(body);
     try {
-      await couponsApiFetch('coupons/types', {
-        method: 'POST',
-        body: JSON.stringify(body),
-      });
-      ok.push(id);
+      if (existed) {
+        await couponsApiFetch(`coupons/types/${encodeURIComponent(id)}`, {
+          method: 'PUT',
+          body: JSON.stringify(body),
+        });
+        ok.push({ id, action: 'update' });
+      } else {
+        await couponsApiFetch('coupons/types', {
+          method: 'POST',
+          body: JSON.stringify(body),
+        });
+        ok.push({ id, action: 'create' });
+      }
     } catch (err) {
       failed.push({ id, message: err?.message || String(err) });
     }
-    onProgress?.(i + 1, bodies.length);
+    onProgress?.(i + 1, items.length);
   }
   /* eslint-enable no-await-in-loop */
   return { ok, failed };
@@ -2420,7 +2587,8 @@ function openCouponExportImportDialog() {
           <h2 class="coupons-dialog-title">Export / import coupons</h2>
           <p class="coupons-field-hint">JSON array of the <strong>${escapeHtml(String(shown.length))}</strong>
             coupon program${shown.length === 1 ? '' : 's'} currently shown (${escapeHtml(couponExportMarketHint())}).
-            Codes are omitted. Save downloads this file; Preview import validates the array and lists programs that will be created.</p>
+            Codes are omitted. Save downloads this file; Preview import validates the array and lists
+            programs that will be created or updated. Unchanged ids are skipped.</p>
           <label class="pim-sr-only" for="cp-export-json">Coupon types JSON</label>
           <textarea id="cp-export-json" class="coupons-json-input" spellcheck="false" rows="16">${escapeHtml(initialJson)}</textarea>
           <div class="coupons-export-status" data-cp-export-status hidden></div>
@@ -2453,7 +2621,7 @@ function openCouponExportImportDialog() {
   const btnSave = dialog.querySelector('[data-cp-export-save]');
   const btnImport = dialog.querySelector('[data-cp-export-import]');
 
-  /** @type {object[]} */
+  /** @type {{ body: object, existed: boolean }[]} */
   let pendingImport = [];
 
   const setStatus = (msg, tone = 'error') => {
@@ -2480,37 +2648,42 @@ function openCouponExportImportDialog() {
     pendingImport = [];
   };
 
-  const showPreviewPane = (allRows, toAdd, skipped) => {
-    pendingImport = toAdd;
+  const showPreviewPane = (parsed) => {
+    const {
+      bodies, toAdd, toUpdate, skipped,
+    } = parsed;
+    const toAddSet = new Set(toAdd);
+    const toUpdateSet = new Set(toUpdate);
+    pendingImport = bodies
+      .filter((body) => toAddSet.has(body) || toUpdateSet.has(body))
+      .map((body) => ({ body, existed: toUpdateSet.has(body) }));
     if (jsonPane instanceof HTMLElement) jsonPane.hidden = true;
     if (previewPane instanceof HTMLElement) previewPane.hidden = false;
     btnBack?.removeAttribute('hidden');
     btnPreview?.setAttribute('hidden', '');
     btnSave?.setAttribute('hidden', '');
-    if (toAdd.length) btnImport?.removeAttribute('hidden');
+    if (pendingImport.length) btnImport?.removeAttribute('hidden');
     else btnImport?.setAttribute('hidden', '');
     if (btnImport instanceof HTMLButtonElement) {
-      btnImport.disabled = !toAdd.length;
-      btnImport.textContent = toAdd.length === 1 ? 'Import 1 coupon' : `Import ${toAdd.length} coupons`;
+      btnImport.disabled = !pendingImport.length;
+      const n = pendingImport.length;
+      const bits = [];
+      if (toAdd.length) bits.push(`${toAdd.length} new`);
+      if (toUpdate.length) bits.push(`${toUpdate.length} update${toUpdate.length === 1 ? '' : 's'}`);
+      const detail = bits.length ? ` (${bits.join(', ')})` : '';
+      btnImport.textContent = n === 1 ? `Import 1 coupon${detail}` : `Import ${n} coupons${detail}`;
     }
-    const skipNote = skipped.length
-      ? ` ${skipped.length} already exist in this environment and will be skipped.`
-      : '';
-    if (leadEl) {
-      leadEl.textContent = toAdd.length
-        ? `${toAdd.length} coupon program${toAdd.length === 1 ? '' : 's'} will be added.${skipNote}`
-        : `Nothing new to add.${skipNote || ' Every id in this JSON already exists.'}`;
-    }
+    if (leadEl) leadEl.textContent = couponImportPreviewLead(toAdd, toUpdate, skipped);
     if (tableHost) {
-      const body = allRows.length
-        ? allRows.map((row) => couponOverviewRowHtml(row, { interactive: false })).join('')
-        : '<tr><td colspan="10" class="coupons-empty-cell">No coupon programs in this JSON.</td></tr>';
+      const body = bodies.length
+        ? couponImportPreviewTableHtml(parsed)
+        : '<tr><td colspan="11" class="coupons-empty-cell">No coupon programs in this JSON.</td></tr>';
       tableHost.innerHTML = `<table class="coupons-grid-table" aria-label="Imported coupon programs">
-          <thead>${couponOverviewHeadHtml({ sortable: false })}</thead>
+          <thead>${couponOverviewHeadHtml({ sortable: false, importPreview: true })}</thead>
           <tbody>${body}</tbody>
         </table>`;
       hydrateCouponOverviewProductListThumbs(tableHost, (couponId) => {
-        const row = allRows.find((r) => couponIdFromRow(r) === couponId);
+        const row = bodies.find((r) => couponIdFromRow(r) === couponId);
         return row ? couponCountryKeyForThumbLookup(row) : 'us';
       }).catch(() => {});
     }
@@ -2550,7 +2723,7 @@ function openCouponExportImportDialog() {
     try {
       const parsed = parseCouponImportJson(textarea?.value ?? '');
       setStatus('');
-      showPreviewPane(parsed.bodies, parsed.toAdd, parsed.skipped);
+      showPreviewPane(parsed);
     } catch (err) {
       setStatus(err?.message || 'Import is not valid');
       showToast(err?.message || 'Import is not valid', 'error');
@@ -2564,7 +2737,7 @@ function openCouponExportImportDialog() {
       btnImport.textContent = 'Importing…';
     }
     try {
-      const { ok, failed } = await postImportedCouponTypes(pendingImport, (n, total) => {
+      const { ok, failed } = await applyImportedCouponTypes(pendingImport, (n, total) => {
         if (btnImport instanceof HTMLButtonElement) {
           btnImport.textContent = `Importing… (${n}/${total})`;
         }
@@ -2577,10 +2750,12 @@ function openCouponExportImportDialog() {
         setStatus(failed.map((f) => `${f.id}: ${f.message}`).join('\n'));
         showJsonPane();
       } else {
-        showToast(
-          ok.length === 1 ? 'Imported 1 coupon' : `Imported ${ok.length} coupons`,
-          'success',
-        );
+        const nNew = ok.filter((x) => x.action === 'create').length;
+        const nUp = ok.filter((x) => x.action === 'update').length;
+        const bits = [];
+        if (nNew) bits.push(nNew === 1 ? 'created 1' : `created ${nNew}`);
+        if (nUp) bits.push(nUp === 1 ? 'updated 1' : `updated ${nUp}`);
+        showToast(bits.join(', ') || 'Imported', 'success');
         dismiss();
       }
       await refreshCouponList();
