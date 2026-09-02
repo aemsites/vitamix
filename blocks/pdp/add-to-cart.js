@@ -146,6 +146,22 @@ export function resolveLineItemCustom(parent) {
   return parent?.custom?.isCommercial ? { custom: { isCommercial: true } } : {};
 }
 
+/**
+ * Builds non-PII context for PDP add-to-cart operation logs. The complete page
+ * URL is reserved for the browser console so query parameters are not sent to
+ * telemetry.
+ * @param {boolean} useEdgeCheckout - Whether the Edge cart handled the request
+ * @param {Location} location - The current browser location
+ * @returns {{flow: 'edge'|'magento', origin: string, pagePath: string}}
+ */
+function getCartLogContext(useEdgeCheckout, location) {
+  return {
+    flow: useEdgeCheckout ? 'edge' : 'magento',
+    origin: location.origin,
+    pagePath: location.pathname,
+  };
+}
+
 function getCartCompatibility(parent) {
   const { type, compatibleWith, compatibilityGroup } = parent.custom || {};
   if (!compatibleWith && !compatibilityGroup) return null;
@@ -314,6 +330,8 @@ export default function renderAddToCart(ph, block, parent) {
       selectedOptions.push(...parent.custom.requiredBundleOptions);
     }
 
+    const cartLogContext = getCartLogContext(window.useEdgeCheckout, window.location);
+
     try {
       if (window.useEdgeCheckout) {
         const cartApi = (await import('../../scripts/cart.js')).default;
@@ -431,7 +449,11 @@ export default function renderAddToCart(ph, block, parent) {
           });
         }
 
-        logOperation('added-to-cart', { sku: targetSku, quantity: addedItem.quantity });
+        logOperation('added-to-cart', {
+          ...cartLogContext,
+          sku: targetSku,
+          quantity: addedItem.quantity,
+        });
         document.dispatchEvent(new CustomEvent('pdp:add-to-cart', { detail: { item: addedItem } }));
 
         // On mobile the header cart badge is too subtle — redirect to the
@@ -462,22 +484,27 @@ export default function renderAddToCart(ph, block, parent) {
 
       // add product to cart with selected options and quantity
       await cartApi.addToCart(sku, selectedOptions, quantity);
-      logOperation('added-to-cart', { sku, quantity });
+      logOperation('added-to-cart', {
+        ...cartLogContext,
+        sku,
+        quantity,
+      });
 
       // redirect to cart page after successful addition
       const { locale, language } = getLocaleAndLanguage();
       window.location.href = `/${locale}/${language}/checkout/cart/`;
     } catch (error) {
-      // `flow` distinguishes the edge vs. Magento cart stack so Magento
-      // add-to-cart errors can be filtered out of analysis if needed. `sku` is
-      // the PDP's product SKU (variant SKU isn't in scope here).
+      // The PDP SKU, checkout stack, and page route identify the failed
+      // operation in telemetry without sending the URL's query parameters.
       logError('pdp.add-to-cart', error, {
-        flow: window.useEdgeCheckout ? 'edge' : 'magento',
+        ...cartLogContext,
         sku,
         quantity,
       });
+      // The complete URL is useful for local debugging; unlike telemetry it
+      // stays in the browser console, so it may safely retain query parameters.
       // eslint-disable-next-line no-console
-      console.error('Failed to add item to cart', error);
+      console.error(`[${window.location.href}] [${cartLogContext.flow}] [sku:${sku}] Failed to add item to cart`, error);
     } finally {
       // update button state to show ATC
       addToCartButton.textContent = ph.addToCart || 'Add to Cart';
