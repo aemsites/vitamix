@@ -811,23 +811,32 @@ export default async function decorate(block) {
     }
   };
 
-  const initialCount = getStoredCartCount();
-  if (initialCount > 0) {
-    cartLink.dataset.cartItems = initialCount;
-    cartLink.lastChild.textContent = `Cart (${initialCount})`;
-  }
-
-  // update cart qty bubble on change
-  document.addEventListener('cart:change', (e) => {
-    const count = e.detail.cart.visibleItemCount;
-    if (count > 0) {
-      cartLink.dataset.cartItems = count;
-      cartLink.lastChild.textContent = `Cart (${count})`;
-    } else {
-      delete cartLink.dataset.cartItems;
-      cartLink.lastChild.textContent = 'Cart';
+  if (window.useEdgeCheckout) {
+    const initialCount = getStoredCartCount();
+    if (initialCount > 0) {
+      cartLink.dataset.cartItems = initialCount;
+      cartLink.lastChild.textContent = `Cart (${initialCount})`;
     }
-  });
+
+    // Edge cart mutations happen in-place, so keep the badge in sync.
+    document.addEventListener('cart:change', (e) => {
+      const count = e.detail.cart.visibleItemCount;
+      if (count > 0) {
+        cartLink.dataset.cartItems = count;
+        cartLink.lastChild.textContent = `Cart (${count})`;
+      } else {
+        delete cartLink.dataset.cartItems;
+        cartLink.lastChild.textContent = 'Cart';
+      }
+    });
+  } else {
+    // Preserve Magento's existing server-side cart-count behavior.
+    const cartItems = getCookies().cart_items_count;
+    if (cartItems && +cartItems > 0) {
+      cartLink.dataset.cartItems = cartItems;
+      cartLink.lastChild.textContent = `Cart (${cartItems})`;
+    }
+  }
 
   // change to edge cart link
   if (window.useEdgeCheckout) {

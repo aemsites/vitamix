@@ -51,11 +51,35 @@ function registerErrorLogging() {
   });
 }
 
-// Locale+language pairs enabled for edge checkout on production.
+// Locale+language pairs enabled for edge checkout.
 // Format: '<locale>/<language>' (e.g., 'ca/fr_ca'). Add pairs as each region goes live.
-const EDGE_CHECKOUT_LOCALES = ['ca/fr_ca', 'ca/en_us', 'us/en_us'];
+// Keep this empty to use Adobe Commerce by default in every environment.
+const EDGE_CHECKOUT_LOCALES = [];
+export const EDGE_CHECKOUT_OVERRIDE_STORAGE_KEY = 'edgeCheckout';
 
-export const isEdgeHost = hostname.includes('localhost') || hostname.includes('edge-accounts') || hostname.includes('edge-orders') || hostname.includes('integration.vitamix.com') || hostname.includes('uat.vitamix.com');
+/**
+ * Returns the locale+language pairs explicitly enabled for Edge checkout by a tester.
+ * The value is a comma-separated list, for example: `ca/fr_ca,ca/en_us`.
+ *
+ * @returns {string[]}
+ */
+export function getEdgeCheckoutOverrideLocales() {
+  return (localStorage.getItem(EDGE_CHECKOUT_OVERRIDE_STORAGE_KEY) || '')
+    .split(',')
+    .map((locale) => locale.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+/**
+ * Determines whether a tester explicitly enabled Edge checkout for a locale.
+ *
+ * @param {string} localeKey Locale and language in `<locale>/<language>` format
+ * @returns {boolean}
+ */
+export function isEdgeCheckoutOverrideEnabled(localeKey) {
+  return getEdgeCheckoutOverrideLocales().includes(localeKey.toLowerCase());
+}
+
 export const isProdHost = hostname.includes('vitamix.com');
 
 // Affirm public API key — safe to expose client-side (used for PDP promo widgets).
@@ -306,8 +330,8 @@ function setAffiliateCoupon() {
 
     // TODO: remove once all locales migrate off Magento — applies the coupon to the PHP cart
     const { locale, language } = getLocaleAndLanguage();
-    if (!EDGE_CHECKOUT_LOCALES.includes(`${locale}/${language}`)) {
-      const cartUrl = new URL(`https://www.vitamix.com/${locale}/${language}/checkout/cart`);
+    if (!window.useEdgeCheckout) {
+      const cartUrl = new URL(`/${locale}/${language}/checkout/cart`, window.location.origin);
       if (cjdata) cartUrl.searchParams.set('cjdata', cjdata);
       if (cjevent) cartUrl.searchParams.set('cjevent', cjevent);
       cartUrl.searchParams.set('COUPON', COUPON);
@@ -2030,12 +2054,12 @@ async function loadEager(doc) {
   const { locale, language } = getLocaleAndLanguage();
   document.documentElement.lang = language ? language.split('_')[0] : 'en';
 
-  // Dev/staging hosts: edge checkout enabled for all locales.
-  // Production: edge checkout enabled only for locale+language pairs in EDGE_CHECKOUT_LOCALES.
-  window.useEdgeCheckout = isEdgeHost || EDGE_CHECKOUT_LOCALES.includes(`${locale}/${language}`);
-  if (localStorage.getItem('useEdgeCheckout') !== null) {
-    window.useEdgeCheckout = localStorage.getItem('useEdgeCheckout') === 'true';
-  }
+  const localeKey = `${locale}/${language}`;
+  // Edge checkout is enabled only for locale+language pairs in EDGE_CHECKOUT_LOCALES.
+  // Testers can persistently opt in to one or more locales with localStorage.edgeCheckout,
+  // for example: `ca/fr_ca,ca/en_us`.
+  window.useEdgeCheckout = EDGE_CHECKOUT_LOCALES.includes(localeKey)
+    || isEdgeCheckoutOverrideEnabled(localeKey);
   // ?cart=magento or ?cart=edge overrides all other settings (useful for testing)
   const cartModeParam = new URLSearchParams(window.location.search).get('cart');
   if (cartModeParam !== null) {
@@ -2138,10 +2162,12 @@ async function loadLazy(doc) {
   loadHeader(doc.querySelector('header'));
   await loadSections(main);
 
-  // Gift-with-purchase: kick off once the cart (initialised in eager phase)
-  // is known. The module wires its own cart:change listener and handles
-  // the pageload-cart-has-items case internally.
-  import('./gift-with-purchase.js').then(({ initGWP }) => initGWP());
+  // Gift-with-purchase operates on the Edge localStorage cart. Do not load it
+  // for Magento pages: importing it initializes that cart and can overwrite
+  // Magento's shared cart-count cookie.
+  if (window.useEdgeCheckout) {
+    import('./gift-with-purchase.js').then(({ initGWP }) => initGWP());
+  }
 
   const { hash } = window.location;
   const element = hash ? doc.getElementById(hash.substring(1)) : false;

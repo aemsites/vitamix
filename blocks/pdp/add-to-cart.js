@@ -468,16 +468,18 @@ export default function renderAddToCart(ph, block, parent) {
       const { locale, language } = getLocaleAndLanguage();
       window.location.href = `/${locale}/${language}/checkout/cart/`;
     } catch (error) {
-      // `flow` distinguishes the edge vs. Magento cart stack so Magento
-      // add-to-cart errors can be filtered out of analysis if needed. `sku` is
-      // the PDP's product SKU (variant SKU isn't in scope here).
+      const flow = window.useEdgeCheckout ? 'edge' : 'magento';
+      // Slack displays `message`, so include the checkout stack and canonical
+      // product URL there. The query string stays out of telemetry.
+      const errorMessage = `[${flow}] ${window.location.origin}${window.location.pathname} [sku:${sku}] ${error?.message || String(error)}`;
       logError('pdp.add-to-cart', error, {
-        flow: window.useEdgeCheckout ? 'edge' : 'magento',
+        flow,
         sku,
         quantity,
+        message: errorMessage,
       });
       // eslint-disable-next-line no-console
-      console.error('Failed to add item to cart', error);
+      console.error(errorMessage, error);
     } finally {
       // update button state to show ATC
       addToCartButton.textContent = ph.addToCart || 'Add to Cart';

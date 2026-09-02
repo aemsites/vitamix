@@ -23,6 +23,10 @@ export class Cart {
 
   static STORAGE_VERSION = 1;
 
+  // Kept distinct from Magento's cart_items_count cookie so Edge cart activity
+  // cannot appear as a Magento cart badge when a tester changes checkout mode.
+  static COUNT_COOKIE = 'edge_cart_items_count';
+
   /** @type {CartItem[]} */
   #items = [];
 
@@ -62,7 +66,7 @@ export class Cart {
 
   #persistNow() {
     const expires = new Date(Date.now() + 30 * 864e5).toUTCString();
-    document.cookie = `cart_items_count=${this.visibleItemCount}; expires=${expires}; path=/`;
+    document.cookie = `${Cart.COUNT_COOKIE}=${this.visibleItemCount}; expires=${expires}; path=/`;
     localStorage.setItem(Cart.STORAGE_KEY, JSON.stringify(this));
   }
 
