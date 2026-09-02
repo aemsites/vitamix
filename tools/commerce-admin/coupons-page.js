@@ -26,6 +26,7 @@ import {
   escapeHtml,
   showToast,
 } from './commerce-otp-ui.js';
+import { highlightMatch } from './search-highlight.js';
 import {
   couponShippingModeFromRow,
   normalizeShippingBenefitMode,
@@ -83,6 +84,8 @@ import {
  * @property {string} [notes]
  * @property {string} [country]
  * @property {string[]} [countries]
+ * @property {string} [createdAt]
+ * @property {string} [updatedAt]
  * @property {{ group?: string }} [custom]
  */
 
@@ -232,6 +235,17 @@ const COUPON_MARKETS = /** @type {const} */ ([
   { key: 'mx', label: 'Mexico' },
 ]);
 
+const COUPON_OVERVIEW_SORT_KEYS = /** @type {const} */ ([
+  'title', 'id', 'discount', 'min', 'cap', 'freeship', 'stack', 'year', 'market', 'modified',
+]);
+const COUPON_OVERVIEW_SORT_DEFAULT_KEY = 'title';
+const COUPON_OVERVIEW_SORT_DEFAULT_DIR = 'asc';
+
+/** @param {string} raw */
+function isCouponOverviewSortKey(raw) {
+  return COUPON_OVERVIEW_SORT_KEYS.some((k) => k === raw);
+}
+
 /** API / id segment order — single `country` or multi `countries` (mutually exclusive). */
 const COUPON_API_COUNTRIES = /** @type {const} */ (['us', 'ca', 'mx']);
 
@@ -372,6 +386,21 @@ function couponsVisibleForMarket() {
     const prefix = couponMarketPrefixFromId(couponIdFromRow(row));
     return prefix === state.marketFilter;
   });
+}
+
+/** Case-insensitive match on coupon title (`name`) or id. */
+function couponMatchesOverviewSearch(row, q) {
+  const needle = String(q || '').trim().toLowerCase();
+  if (!needle) return true;
+  const id = couponIdFromRow(row).toLowerCase();
+  const name = String(row?.name ?? '').toLowerCase();
+  return name.includes(needle) || id.includes(needle);
+}
+
+function couponsVisibleForOverview() {
+  return couponsVisibleForMarket().filter((row) => (
+    couponMatchesOverviewSearch(row, state.overviewSearch)
+  ));
 }
 
 /**
@@ -868,9 +897,81 @@ const state = {
   /** Cursor from the last list response; used for “Next page” requests. */
   codesNextCursor: '',
   /** Overview grid sort (default: title A–Z). */
-  overviewSortKey: /** @type {'title'|'id'|'discount'|'min'|'cap'|'freeship'|'stack'|'year'|'market'} */ ('title'),
+  overviewSortKey: /** @type {(typeof COUPON_OVERVIEW_SORT_KEYS)[number]} */ ('title'),
   overviewSortDir: /** @type {'asc'|'desc'} */ ('asc'),
+  /** Text filter on name / id (orders-style search). */
+  overviewSearch: '',
 };
+
+const QS_COUPON_SEARCH = 'q';
+const QS_COUPON_SORT = 'sort';
+const QS_COUPON_DIR = 'dir';
+
+let couponsListUrlSyncMuted = false;
+let couponsListUrlTimer = 0;
+
+/**
+ * @param {string} [search]
+ * @returns {{ q: string, sort: string, dir: ''|'asc'|'desc' }}
+ */
+function readCouponsListUrlState(search = window.location.search) {
+  const params = new URLSearchParams(search);
+  const q = String(params.get(QS_COUPON_SEARCH) || '');
+  const sortRaw = String(params.get(QS_COUPON_SORT) || '').trim();
+  const dirRaw = String(params.get(QS_COUPON_DIR) || '').trim().toLowerCase();
+  const sort = isCouponOverviewSortKey(sortRaw) ? sortRaw : '';
+  const dir = dirRaw === 'asc' || dirRaw === 'desc' ? dirRaw : '';
+  return { q, sort, dir };
+}
+
+function applyCouponsListUrlToState() {
+  const { q, sort, dir } = readCouponsListUrlState();
+  state.overviewSearch = q;
+  if (sort) {
+    state.overviewSortKey = /** @type {typeof state.overviewSortKey} */ (sort);
+    state.overviewSortDir = dir || (sort === 'modified' ? 'desc' : 'asc');
+  } else {
+    state.overviewSortKey = COUPON_OVERVIEW_SORT_DEFAULT_KEY;
+    state.overviewSortDir = COUPON_OVERVIEW_SORT_DEFAULT_DIR;
+  }
+}
+
+/**
+ * @param {{ push?: boolean }} [opts]
+ */
+function syncCouponsListUrl(opts = {}) {
+  if (couponsListUrlSyncMuted || typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  const q = state.overviewSearch.trim();
+  if (q) url.searchParams.set(QS_COUPON_SEARCH, q);
+  else url.searchParams.delete(QS_COUPON_SEARCH);
+  const isDefault = state.overviewSortKey === COUPON_OVERVIEW_SORT_DEFAULT_KEY
+    && state.overviewSortDir === COUPON_OVERVIEW_SORT_DEFAULT_DIR;
+  if (isDefault) {
+    url.searchParams.delete(QS_COUPON_SORT);
+    url.searchParams.delete(QS_COUPON_DIR);
+  } else {
+    url.searchParams.set(QS_COUPON_SORT, state.overviewSortKey);
+    url.searchParams.set(QS_COUPON_DIR, state.overviewSortDir);
+  }
+  const same = url.pathname === window.location.pathname && url.search === window.location.search;
+  if (same) return;
+  if (opts.push) window.history.pushState({ coupons: true }, '', url);
+  else window.history.replaceState({ coupons: true }, '', url);
+}
+
+function scheduleCouponsListUrlPush() {
+  if (couponsListUrlSyncMuted) return;
+  window.clearTimeout(couponsListUrlTimer);
+  couponsListUrlTimer = window.setTimeout(() => {
+    syncCouponsListUrl({ push: true });
+  }, 300);
+}
+
+function flushCouponsListUrlPush() {
+  window.clearTimeout(couponsListUrlTimer);
+  syncCouponsListUrl({ push: true });
+}
 
 /** @param {'error'|'info'} tone */
 function setError(msg, tone = 'error') {
@@ -890,6 +991,42 @@ function yn(v) {
   if (v === true || v === 'true' || v === 1) return 'Yes';
   if (v === false || v === 'false' || v === 0) return 'No';
   return '—';
+}
+
+/** Last-modified instant from a coupon type row (`updatedAt`, else `createdAt`). */
+function couponUpdatedAtRaw(row) {
+  if (!row || typeof row !== 'object') return '';
+  const v = row.updatedAt ?? row.updated_at ?? row.createdAt ?? row.created_at;
+  if (v == null || String(v).trim() === '') return '';
+  return String(v).trim();
+}
+
+/** @returns {number} epoch ms, or 0 if missing/invalid */
+function couponUpdatedAtMs(row) {
+  const raw = couponUpdatedAtRaw(row);
+  if (!raw) return 0;
+  const t = new Date(raw).getTime();
+  return Number.isFinite(t) ? t : 0;
+}
+
+/**
+ * Human relative time, e.g. "10 minutes ago".
+ * @param {string} iso
+ */
+function formatRelativeTimeAgo(iso) {
+  const s = String(iso || '').trim();
+  if (!s) return '';
+  const t = new Date(s).getTime();
+  if (!Number.isFinite(t)) return '';
+  const sec = Math.round((Date.now() - t) / 1000);
+  const abs = Math.abs(sec);
+  if (abs < 45) return 'just now';
+  const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'always' });
+  if (abs < 3600) return rtf.format(-Math.round(sec / 60), 'minute');
+  if (abs < 86400) return rtf.format(-Math.round(sec / 3600), 'hour');
+  if (abs < 86400 * 30) return rtf.format(-Math.round(sec / 86400), 'day');
+  if (abs < 86400 * 365) return rtf.format(-Math.round(sec / (86400 * 30)), 'month');
+  return rtf.format(-Math.round(sec / (86400 * 365)), 'year');
 }
 
 /** Single-line discount summary for overview grid (list row). */
@@ -944,6 +1081,7 @@ function couponOverviewSortValue(row, key) {
     case 'stack': return row.stackable !== false ? 1 : 0;
     case 'year': return pathSeg && pathSeg.year ? Number(pathSeg.year) || 0 : 0;
     case 'market': return normalizeCouponCountries(row).join(',');
+    case 'modified': return couponUpdatedAtMs(row);
     default: return '';
   }
 }
@@ -954,7 +1092,7 @@ function couponOverviewSortValue(row, key) {
  * @param {'asc'|'desc'} dir
  */
 function sortCouponOverviewRows(rows, key, dir) {
-  const numeric = new Set(['discount', 'min', 'cap', 'freeship', 'stack', 'year']);
+  const numeric = new Set(['discount', 'min', 'cap', 'freeship', 'stack', 'year', 'modified']);
   const m = dir === 'desc' ? -1 : 1;
   return rows.slice().sort((a, b) => {
     const va = couponOverviewSortValue(a, key);
@@ -987,7 +1125,7 @@ function couponSortableTh(key, label, extraClass = '') {
   return `<th scope="col"${classAttr} aria-sort="${aria}"><button type="button" class="pim-th-sort-btn" data-cp-sort="${escapeHtml(key)}">${escapeHtml(label)}${escapeHtml(ind)}</button></th>`;
 }
 
-function couponOverviewRowHtml(row, { interactive = true } = {}) {
+function couponOverviewRowHtml(row, { interactive = true, query = '' } = {}) {
   const id = couponIdFromRow(row);
   const name = row.name || '—';
   const pathSeg = parseCouponTypePath(id);
@@ -1001,12 +1139,18 @@ function couponOverviewRowHtml(row, { interactive = true } = {}) {
   const mHtml = countries.length
     ? countries.map((k) => commerceMarketEmojiHtml(k)).join('')
     : commerceMarketEmojiHtml(couponMarketPrefixFromId(id));
+  const updatedRaw = couponUpdatedAtRaw(row);
+  const rel = formatRelativeTimeAgo(updatedRaw);
+  const absEt = updatedRaw ? formatInstantInEastern(updatedRaw) : '';
+  const modifiedHtml = rel
+    ? `<time class="coupons-grid-modified" datetime="${escapeHtml(updatedRaw)}" title="${escapeHtml(absEt)}">${escapeHtml(rel)}</time>`
+    : '—';
   const openAttrs = interactive
     ? ` class="coupons-grid-row coupons-row-open" data-cp-coupon-id="${escapeHtml(id)}" tabindex="0" role="button" aria-label="${escapeHtml(`Open coupon ${String(name)}`)}"`
     : ' class="coupons-grid-row"';
   return `<tr${openAttrs}>
-      <td class="coupons-grid-lead coupons-grid-name">${escapeHtml(String(name))}</td>
-      <td><code class="coupons-grid-id">${escapeHtml(id || '—')}</code></td>
+      <td class="coupons-grid-lead coupons-grid-name">${highlightMatch(String(name), query)}</td>
+      <td><code class="coupons-grid-id">${highlightMatch(id || '—', query)}</code></td>
       <td>${disc}</td>
       <td>${escapeHtml(min)}</td>
       <td>${escapeHtml(cap)}</td>
@@ -1014,6 +1158,7 @@ function couponOverviewRowHtml(row, { interactive = true } = {}) {
       <td>${escapeHtml(stack)}</td>
       <td class="coupons-grid-col-year">${commerceGroupBadgeHtml(year)}</td>
       <td class="coupons-grid-col-market">${mHtml}</td>
+      <td class="coupons-grid-col-modified">${modifiedHtml}</td>
     </tr>`;
 }
 
@@ -1029,6 +1174,7 @@ function couponOverviewHeadHtml({ sortable = true } = {}) {
               ${couponSortableTh('stack', 'Stack')}
               ${couponSortableTh('year', 'Year', 'coupons-grid-col-year')}
               ${couponSortableTh('market', 'Market', 'coupons-grid-col-market')}
+              ${couponSortableTh('modified', 'Modified', 'coupons-grid-col-modified')}
             </tr>`;
   }
   return `<tr>
@@ -1041,18 +1187,23 @@ function couponOverviewHeadHtml({ sortable = true } = {}) {
               <th scope="col">Stack</th>
               <th scope="col" class="coupons-grid-col-year">Year</th>
               <th scope="col" class="coupons-grid-col-market">Market</th>
+              <th scope="col" class="coupons-grid-col-modified">Modified</th>
             </tr>`;
 }
 
 function renderCouponsOverviewBody(filtered) {
-  const emptyCell = (msg) => `<tr><td colspan="9" class="coupons-empty-cell">${msg}</td></tr>`;
+  const emptyCell = (msg) => `<tr><td colspan="10" class="coupons-empty-cell">${msg}</td></tr>`;
   if (!state.coupons.length) {
     return emptyCell('No coupons yet (empty list or missing <code>coupons:read</code>).');
   }
   if (!filtered.length) {
+    if (state.overviewSearch.trim()) {
+      return emptyCell('No coupons match your search. Try a different name or id, or clear the search.');
+    }
     return emptyCell('No coupons for this market. Try <strong>All</strong> or another country tab.');
   }
-  return filtered.map((row) => couponOverviewRowHtml(row)).join('');
+  const query = state.overviewSearch;
+  return filtered.map((row) => couponOverviewRowHtml(row, { query })).join('');
 }
 
 async function fetchCouponList() {
@@ -1927,16 +2078,24 @@ function render() {
   const mount = document.getElementById('coupons-mount');
   if (!mount) return;
 
-  const filtered = couponsVisibleForMarket();
+  const filtered = couponsVisibleForOverview();
   const sorted = sortCouponOverviewRows(filtered, state.overviewSortKey, state.overviewSortDir);
   const overviewBody = renderCouponsOverviewBody(sorted);
+  const searchVal = escapeHtml(state.overviewSearch);
+  const shown = sorted.length;
+  const total = state.coupons.length;
+  const countText = shown === total
+    ? `${total} coupon${total === 1 ? '' : 's'}`
+    : `${shown} of ${total} coupons`;
 
   mount.innerHTML = `
     <div class="coupons-toolbar pim-toolbar">
+      <input type="search" id="coupons-search" class="pim-search coupons-search-wide" placeholder="Search by name or id…" aria-label="Search coupons" value="${searchVal}" />
       <div class="coupons-toolbar-left">
         <div class="coupons-market-tabs" role="tablist" aria-label="Market">${renderMarketTabs()}</div>
       </div>
       <div class="coupons-toolbar-right">
+        <span class="pim-count" id="coupons-count">${escapeHtml(countText)}</span>
         <button type="button" class="coupons-btn" data-cp-export-import>Export / import…</button>
         <button type="button" class="coupons-btn coupons-btn-primary" data-cp-new>New coupon…</button>
       </div>
@@ -1954,6 +2113,24 @@ function render() {
         </table>
       </div>
     </section>`;
+
+  const search = mount.querySelector('#coupons-search');
+  if (search instanceof HTMLInputElement) {
+    search.addEventListener('input', () => {
+      state.overviewSearch = search.value;
+      const start = search.selectionStart;
+      const end = search.selectionEnd;
+      render();
+      scheduleCouponsListUrlPush();
+      const next = document.getElementById('coupons-search');
+      if (next instanceof HTMLInputElement) {
+        next.focus();
+        if (typeof start === 'number' && typeof end === 'number') {
+          next.setSelectionRange(start, end);
+        }
+      }
+    });
+  }
 
   mount.querySelectorAll('[data-cp-market]').forEach((btn) => {
     btn.addEventListener('click', async () => {
@@ -1982,16 +2159,15 @@ function render() {
     e.preventDefault();
     e.stopPropagation();
     const key = btn.getAttribute('data-cp-sort');
-    if (!key) return;
-    const allowed = ['title', 'id', 'discount', 'min', 'cap', 'freeship', 'stack', 'year', 'market'];
-    if (!allowed.includes(key)) return;
+    if (!key || !isCouponOverviewSortKey(key)) return;
     if (state.overviewSortKey === key) {
       state.overviewSortDir = state.overviewSortDir === 'asc' ? 'desc' : 'asc';
     } else {
       state.overviewSortKey = /** @type {typeof state.overviewSortKey} */ (key);
-      state.overviewSortDir = 'asc';
+      state.overviewSortDir = key === 'modified' ? 'desc' : 'asc';
     }
     render();
+    flushCouponsListUrlPush();
   });
 
   mount.querySelectorAll('tr.coupons-grid-row[data-cp-coupon-id]').forEach((rowEl) => {
@@ -2217,14 +2393,20 @@ async function postImportedCouponTypes(bodies, onProgress) {
 }
 
 function couponExportMarketHint() {
-  if (state.marketFilter === 'all') return 'all markets';
-  const hit = COUPON_MARKETS.find((m) => m.key === state.marketFilter);
-  return hit ? hit.label : state.marketFilter.toUpperCase();
+  const bits = [];
+  if (state.marketFilter === 'all') bits.push('all markets');
+  else {
+    const hit = COUPON_MARKETS.find((m) => m.key === state.marketFilter);
+    bits.push(hit ? hit.label : state.marketFilter.toUpperCase());
+  }
+  const q = state.overviewSearch.trim();
+  if (q) bits.push(`matching "${q}"`);
+  return bits.join(', ');
 }
 
 function openCouponExportImportDialog() {
   const shown = sortCouponOverviewRows(
-    couponsVisibleForMarket(),
+    couponsVisibleForOverview(),
     state.overviewSortKey,
     state.overviewSortDir,
   );
@@ -2322,7 +2504,7 @@ function openCouponExportImportDialog() {
     if (tableHost) {
       const body = allRows.length
         ? allRows.map((row) => couponOverviewRowHtml(row, { interactive: false })).join('')
-        : '<tr><td colspan="9" class="coupons-empty-cell">No coupon programs in this JSON.</td></tr>';
+        : '<tr><td colspan="10" class="coupons-empty-cell">No coupon programs in this JSON.</td></tr>';
       tableHost.innerHTML = `<table class="coupons-grid-table" aria-label="Imported coupon programs">
           <thead>${couponOverviewHeadHtml({ sortable: false })}</thead>
           <tbody>${body}</tbody>
@@ -3041,8 +3223,16 @@ async function init() {
     } catch {
       /* sessionStorage unavailable */
     }
+    applyCouponsListUrlToState();
     await refreshCouponList();
     render();
+    window.addEventListener('popstate', () => {
+      couponsListUrlSyncMuted = true;
+      window.clearTimeout(couponsListUrlTimer);
+      applyCouponsListUrlToState();
+      render();
+      couponsListUrlSyncMuted = false;
+    });
   } catch (err) {
     console.warn('[commerce-admin/coupons] initial load failed', { message: err?.message || String(err) });
     setError(err.message || 'Failed to load coupons');

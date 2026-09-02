@@ -132,13 +132,23 @@
   margin-bottom: 4px;
 }
 
+.pim-search.coupons-search-wide {
+  flex: 1 1 280px;
+  max-width: none;
+  min-width: 200px;
+}
+
 .coupons-toolbar-left {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
+}
+
+.coupons-toolbar .coupons-market-tabs {
+  margin-bottom: 0;
 }
 
 .coupons-toolbar-right {
@@ -169,10 +179,6 @@
 
 .coupons-overview {
   min-width: 0;
-}
-
-.coupons-overview-table-wrap {
-  max-height: min(58vh, 640px);
 }
 
 .coupons-detail-meta {
@@ -464,6 +470,13 @@
   text-align: right;
   width: 1%;
   white-space: nowrap;
+}
+
+.coupons-grid-table th.coupons-grid-col-modified,
+.coupons-grid-table td.coupons-grid-col-modified {
+  width: 1%;
+  white-space: nowrap;
+  color: #6d7175;
 }
 
 .coupons-grid-table tbody tr.coupons-row-open {
