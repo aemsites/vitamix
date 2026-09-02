@@ -2162,10 +2162,12 @@ async function loadLazy(doc) {
   loadHeader(doc.querySelector('header'));
   await loadSections(main);
 
-  // Gift-with-purchase: kick off once the cart (initialised in eager phase)
-  // is known. The module wires its own cart:change listener and handles
-  // the pageload-cart-has-items case internally.
-  import('./gift-with-purchase.js').then(({ initGWP }) => initGWP());
+  // Gift-with-purchase operates on the Edge localStorage cart. Do not load it
+  // for Magento pages: importing it initializes that cart and can overwrite
+  // Magento's shared cart-count cookie.
+  if (window.useEdgeCheckout) {
+    import('./gift-with-purchase.js').then(({ initGWP }) => initGWP());
+  }
 
   const { hash } = window.location;
   const element = hash ? doc.getElementById(hash.substring(1)) : false;
