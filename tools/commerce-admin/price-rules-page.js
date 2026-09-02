@@ -10,6 +10,13 @@ import { createDetailModalHeaderCloseAndJson } from './commerce-detail-modal-jso
 import { mountCrossEnvCopyInToolbar } from './commerce-promote-production.js';
 import { PB_ORG, PB_SITE } from './commerce-pbus-config.js';
 import {
+  easternCivilToUtc,
+  easternDatetimeLocalToIso,
+  ET_TIMEZONE,
+  formatInstantInEastern,
+  isoToEasternDatetimeLocal,
+} from './commerce-eastern-time.js';
+import {
   catalogPathToProductUrl,
   catalogPriceStringForApi,
   catalogRulesForCountryTab,
@@ -68,9 +75,6 @@ function getPrAppMode() {
 }
 
 const PR_APP_MODE = getPrAppMode();
-
-/** IANA timezone used for all date display and date-picker values. */
-const ET_TIMEZONE = 'America/New_York';
 
 /** @typedef {object} RuleRow
  * @property {string} name
@@ -666,8 +670,10 @@ function uniquePromotionId(slug, promotions) {
 }
 
 /**
- * US-style spreadsheet datetimes (e.g. <code>4/9/2026 12am</code>) → ISO 8601 for helix.
- * Passes through values that already look like ISO datetimes.
+ * User-facing datetimes → UTC ISO for helix.
+ * Timezone-less values (date-only, datetime-local, spreadsheet, ISO without offset) are
+ * **US Eastern** civil time. Strings that already include `Z` or a numeric offset are
+ * absolute instants and are not re-interpreted.
  *
  * @param {string} raw
  * @returns {string}
@@ -675,125 +681,40 @@ function uniquePromotionId(slug, promotions) {
 function normalizeDateForCatalogApi(raw) {
   const s = String(raw || '').trim();
   if (!s) return '';
-  /** @type {string} */
-  let candidate = s;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-    candidate = `${s}T00:00:00Z`;
-  } else if (!/^\d{4}-\d{2}-\d{2}T/.test(s)) {
-    const us = parseUsSpreadsheetDateTime(s);
-    candidate = us || s;
+  if (/^\d{4}-\d{2}-\d{2}T/i.test(s) && /(?:[zZ]|[+-]\d{2}:\d{2})$/.test(s)) {
+    return catalogTimestampStringForApi(s);
   }
-  const out = catalogTimestampStringForApi(candidate);
-  return out;
+  const dayOnly = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dayOnly) {
+    return catalogTimestampStringForApi(
+      easternCivilToUtc(Number(dayOnly[1]), Number(dayOnly[2]), Number(dayOnly[3]), 0, 0, 0),
+    );
+  }
+  const isoLocal = s.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?$/);
+  if (isoLocal) {
+    return catalogTimestampStringForApi(easternCivilToUtc(
+      Number(isoLocal[1]),
+      Number(isoLocal[2]),
+      Number(isoLocal[3]),
+      Number(isoLocal[4]),
+      Number(isoLocal[5]),
+      isoLocal[6] !== undefined ? Number(isoLocal[6]) : 0,
+    ));
+  }
+  return parseUsSpreadsheetDateTime(s) || '';
 }
 
-/**
- * Convert Eastern civil time components → UTC `Date`.
- * Tries both EST (−05:00) and EDT (−04:00) offsets and picks the one whose round-trip
- * through `America/New_York` matches the original components (handles DST transitions correctly).
- *
- * @param {number} year
- * @param {number} mo   1-based month
- * @param {number} day
- * @param {number} h
- * @param {number} mi
- * @param {number} sec
- * @returns {Date}
- */
-function easternCivilToUtc(year, mo, day, h, mi, sec) {
-  const pad = (n, w = 2) => String(n).padStart(w, '0');
-  const base = `${pad(year, 4)}-${pad(mo)}-${pad(day)}T${pad(h)}:${pad(mi)}:${pad(sec)}`;
-  const etFmt = new Intl.DateTimeFormat('en-CA', {
-    timeZone: ET_TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  });
-  const get = (parts, type) => parseInt(parts.find((p) => p.type === type)?.value ?? '0', 10);
-  const match = ['-04:00', '-05:00'].map((offset) => {
-    const candidate = new Date(`${base}${offset}`);
-    if (Number.isNaN(candidate.getTime())) return null;
-    const parts = etFmt.formatToParts(candidate);
-    if (
-      get(parts, 'year') === year && get(parts, 'month') === mo && get(parts, 'day') === day
-      && get(parts, 'hour') === h && get(parts, 'minute') === mi && get(parts, 'second') === sec
-    ) return candidate;
-    return null;
-  }).find(Boolean);
-  if (match) return match;
-  return new Date(`${base}-05:00`); // fallback EST
-}
-
-/**
- * Convert a UTC ISO string to the `YYYY-MM-DDTHH:mm` format expected by
- * `<input type="datetime-local">`, expressed in US Eastern time (ET_TIMEZONE).
- *
- * @param {string} iso
- * @returns {string}
- */
 function isoToDatetimeLocalValue(iso) {
-  const s = String(iso || '').trim();
-  if (!s) return '';
-  const d = new Date(s);
-  if (Number.isNaN(d.getTime())) return '';
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: ET_TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(d);
-  const get = (type) => parts.find((p) => p.type === type)?.value ?? '00';
-  const hour = get('hour') === '24' ? '00' : get('hour');
-  return `${get('year')}-${get('month')}-${get('day')}T${hour}:${get('minute')}`;
+  return isoToEasternDatetimeLocal(iso);
 }
 
-/**
- * Parse `<input type="datetime-local">` value as **US Eastern** civil time → UTC ISO for the API.
- *
- * The datetime-local picker shows Eastern time (set via `isoToDatetimeLocalValue`), so we
- * must interpret the `YYYY-MM-DDTHH:mm` value in `America/New_York`, not browser-local time.
- *
- * @param {string} localValue
- * @returns {string}
- */
 function datetimeLocalValueToIso(localValue) {
-  const v = String(localValue || '').trim();
-  if (!v) return '';
-  const m = v.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/);
-  if (m) {
-    const year = Number(m[1]);
-    const mo = Number(m[2]);
-    const day = Number(m[3]);
-    const h = Number(m[4]);
-    const mi = Number(m[5]);
-    const sec = m[6] !== undefined ? Number(m[6]) : 0;
-    const dt = easternCivilToUtc(year, mo, day, h, mi, sec);
-    if (Number.isNaN(dt.getTime())) return '';
-    return catalogTimestampStringForApi(dt);
-  }
-  const d = new Date(v);
-  if (Number.isNaN(d.getTime())) return '';
-  return catalogTimestampStringForApi(d);
+  return easternDatetimeLocalToIso(localValue);
 }
 
-/** Display a UTC ISO instant in US Eastern time (ET_TIMEZONE). @param {string} iso */
+/** Display a UTC ISO instant in US Eastern time. @param {string} iso */
 function formatIsoForSaleLineView(iso) {
-  const s = String(iso || '').trim();
-  if (!s) return '—';
-  const d = new Date(s);
-  if (Number.isNaN(d.getTime())) return s;
-  return d.toLocaleString('en-US', {
-    timeZone: ET_TIMEZONE,
-    dateStyle: 'short',
-    timeStyle: 'short',
-  });
+  return formatInstantInEastern(iso);
 }
 
 /** Numeric string for hidden fields / display (no currency symbol). */
@@ -816,8 +737,8 @@ function resolveProductUrlForRow(raw) {
 }
 
 /**
- * US spreadsheet `M/D/YYYY` (optional time + am/pm). Interpreted as **US Eastern** civil time,
- * then converted to UTC for the API.
+ * US spreadsheet `M/D/YYYY` or `M/D/YY` (optional time + am/pm). Interpreted as
+ * **US Eastern** civil time, then converted to UTC for the API.
  *
  * @param {string} text
  * @returns {string|null} canonical UTC string or null if not parseable
@@ -825,12 +746,16 @@ function resolveProductUrlForRow(raw) {
 function parseUsSpreadsheetDateTime(text) {
   const t = String(text || '').trim();
   if (!t) return null;
-  const m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s*(.*)$/i);
+  const m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4}|\d{2})\s*(.*)$/i);
   if (!m) return null;
   const month = parseInt(m[1], 10) - 1;
   const day = parseInt(m[2], 10);
-  const year = parseInt(m[3], 10);
-  const restRaw = String(m[4] || '').trim();
+  let year = parseInt(m[3], 10);
+  if (year < 100) year += 2000;
+  const restRaw = String(m[4] || '')
+    .replace(/,/g, ' ')
+    .replace(/\b(edt|est|et|eastern)\b/gi, '')
+    .trim();
   const restLower = restRaw.toLowerCase();
   const isPm = /pm/.test(restLower);
   const isAm = /am/.test(restLower);
@@ -1579,7 +1504,7 @@ function commitPromotionSaleLineFieldsBeforeSave(dlg) {
     if (inpS && hS) {
       if (startClosed) {
         /** Inputs inside `[hidden]` editors often don’t round-trip in Chrome — keep hidden ISO. */
-        const t = hS.value.trim();
+        const t = hS.value.trim() || String(line.getAttribute('data-pr-start-paste') || '').trim();
         const norm = t ? normalizeDateForCatalogApi(t) : '';
         hS.value = norm;
       } else {
@@ -1598,7 +1523,7 @@ function commitPromotionSaleLineFieldsBeforeSave(dlg) {
     }
     if (inpE && hE) {
       if (endClosed) {
-        const t = hE.value.trim();
+        const t = hE.value.trim() || String(line.getAttribute('data-pr-end-paste') || '').trim();
         const norm = t ? normalizeDateForCatalogApi(t) : '';
         hE.value = norm;
       } else {
@@ -1852,8 +1777,8 @@ function promotionSaleLinesTableWrapHtml(linesHtml) {
           <tr>
             <th scope="col" class="pr-promo-sale-col-del"><span class="pim-sr-only">Remove</span></th>
             <th scope="col" class="pr-promo-sale-col-num">#</th>
-            <th scope="col">Start</th>
-            <th scope="col">End</th>
+            <th scope="col">Start (ET)</th>
+            <th scope="col">End (ET)</th>
             <th scope="col">Product path</th>
             <th scope="col">Regular</th>
             <th scope="col">Sale</th>
@@ -1867,8 +1792,8 @@ function promotionSaleLinesTableWrapHtml(linesHtml) {
       <p class="coupons-field-hint" style="margin-top:8px">Paste tab-separated columns in order:
         <strong>Start</strong>, <strong>End</strong>, <strong>Product</strong>, <strong>Regular Price</strong>, <strong>Sale Price</strong>.
         Include the header row from Excel if you like — it is ignored automatically.
-        Dates use <strong>US</strong> <code>M/D/YYYY</code> with optional <code>12am</code>/<code>11:59pm</code>-style times: they are read as <strong>US Eastern time (ET)</strong>, converted to <strong>UTC</strong> for the API, and the pasted text stays visible in the grid until you edit that cell. <code>11:59pm</code> is treated as the last second of that minute (ET). Prices may include <code>$</code>; values are normalized to plain numbers for the API.</p>
-      <textarea id="pr-promo-tsv-paste" class="pr-promo-tsv-textarea" rows="7" spellcheck="false" placeholder="Start&#9;End&#9;Product&#9;Regular Price&#9;Sale Price"></textarea>
+        Dates use <strong>US</strong> <code>M/D/YYYY</code> or <code>M/D/YY</code> with optional <code>12:00 AM</code>/<code>11:59 PM</code> (Excel’s comma is fine), or timezone-less ISO (<code>2026-08-28T00:00</code>). All of those are <strong>US Eastern (ET)</strong> — not the browser timezone — then saved as UTC. ISO values that already include <code>Z</code> are kept as UTC. The pasted text stays visible in the grid until you edit that cell. <code>11:59pm</code> is treated as the last second of that minute (ET). Prices may include <code>$</code>; values are normalized to plain numbers for the API.</p>
+        <textarea id="pr-promo-tsv-paste" class="pr-promo-tsv-textarea" rows="7" spellcheck="false" placeholder="Start&#9;End&#9;Product&#9;Regular Price&#9;Sale Price"></textarea>
       <div class="pr-promo-tsv-actions">
         <button type="button" class="coupons-btn coupons-btn-primary" data-pr-promo-tsv-replace>Replace rows from paste</button>
         <button type="button" class="coupons-btn" data-pr-promo-tsv-append>Append rows from paste</button>
@@ -2891,7 +2816,7 @@ function promotionTableHtml(rows, thumbByProductUrl) {
     return '<p class="pr-empty">No rows in this promotion.</p>';
   }
   const thumbs = thumbByProductUrl && thumbByProductUrl.size ? thumbByProductUrl : null;
-  const labelTh = ['Start', 'End', 'Product', 'Regular Price', 'Sale Price']
+  const labelTh = ['Start (ET)', 'End (ET)', 'Product', 'Regular Price', 'Sale Price']
     .map((h) => `<th scope="col">${escapeHtml(h)}</th>`)
     .join('');
   const th = `<th class="pim-col-thumb" scope="col"><span class="pim-sr-only">Image</span></th>${labelTh}`;

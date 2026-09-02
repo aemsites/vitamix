@@ -9,6 +9,11 @@
 /* eslint-disable no-use-before-define, no-console */
 // render, bindCodesEvents, and open* dialogs reference each other.
 // console: intentional debug logs for ProductBus coupon API failures.
+import {
+  easternDatetimeLocalToIso,
+  formatInstantInEastern,
+  isoToEasternDatetimeLocal,
+} from './commerce-eastern-time.js';
 import { apiFetch, getApiEnvironment, getAuthState } from './commerce-otp-api.js';
 import waitForCommerceAuthReady from './commerce-wait-auth-ready.js';
 import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
@@ -1734,7 +1739,7 @@ function renderCodesSection() {
       const isUsed = Number.isFinite(usedCount) && usedCount > 0;
       const usage = `${used ?? '—'} / ${limit ?? '∞'}`;
       const expRaw = pickCouponExpires(raw);
-      const exp = expRaw ? escapeHtml(expRaw) : '—';
+      const exp = expRaw ? escapeHtml(formatInstantInEastern(expRaw)) : '—';
       const cbDisabled = codeStr ? '' : ' disabled';
       return `<tr>
         <td class="coupons-code-select-cell"><input type="checkbox" class="cp-code-cb" value="${escapeHtml(codeStr)}" data-cp-code-used="${isUsed ? '1' : '0'}" aria-label="Select code ${code}"${cbDisabled} /></td>
@@ -1756,7 +1761,7 @@ function renderCodesSection() {
       <table class="coupons-data-table">
         <thead><tr>
           <th class="coupons-code-select-cell"><input type="checkbox" class="cp-code-cb-all" aria-label="Select all loaded codes"${state.codes.length ? '' : ' disabled'} /></th>
-          <th>Code</th><th>Active</th><th>Usage</th><th>Expires</th>
+          <th>Code</th><th>Active</th><th>Usage</th><th>Expires (ET)</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
@@ -2510,18 +2515,13 @@ function openEditCouponDialog() {
   );
 }
 
-function toDatetimeLocalValue(d) {
-  if (!(d instanceof Date) || Number.isNaN(d.getTime())) return '';
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
 function parseExpiresCellToLocal(raw) {
   const s = String(raw || '').trim();
   if (!s) return '';
-  const d = new Date(s);
-  if (!Number.isNaN(d.getTime())) return toDatetimeLocalValue(d);
-  return '';
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s) && !/(?:[zZ]|[+-]\d{2}:\d{2})$/.test(s)) {
+    return s.slice(0, 16);
+  }
+  return isoToEasternDatetimeLocal(s);
 }
 
 function isCouponCodesTsvHeaderLine(parts) {
@@ -2614,8 +2614,8 @@ function readCouponCodeBodiesFromAddGrid(dlg) {
     const body = { code, typeId };
     const expLocal = tr.querySelector('[data-cp-add-code-exp]')?.value ?? '';
     if (expLocal) {
-      const iso = new Date(expLocal).toISOString();
-      if (!Number.isNaN(Date.parse(iso))) body.expiresAt = iso;
+      const iso = easternDatetimeLocalToIso(expLocal);
+      if (iso) body.expiresAt = iso;
     }
     const lim = readOptionalInt(tr.querySelector('[data-cp-add-code-limit]')?.value ?? '');
     if (lim != null) body.usageLimit = lim;
@@ -2846,7 +2846,7 @@ function openAddCodesDialog() {
   ].join('');
   const tsvHint = '<p class="coupons-field-hint" style="margin-top:8px">Paste one code per line '
     + '(from a single spreadsheet column), or tab-separated columns: '
-    + '<strong>Code</strong> (required); optional <strong>Expires</strong> (parseable date); '
+    + '<strong>Code</strong> (required); optional <strong>Expires</strong> (US Eastern time); '
     + '<strong>Total use limit</strong>; <strong>Uses per customer</strong>. '
     + 'A header row whose first cell is <code>Code</code> is skipped.</p>';
   const inner = `${intro}
@@ -2862,7 +2862,7 @@ function openAddCodesDialog() {
               <th scope="col" class="cp-add-codes-col-del"><span class="pim-sr-only">Remove</span></th>
               <th scope="col" class="cp-add-codes-num-col">#</th>
               <th scope="col">Code</th>
-              <th scope="col">Expires</th>
+              <th scope="col">Expires (ET)</th>
               <th scope="col">Usage limit</th>
               <th scope="col">Uses / customer</th>
             </tr>
@@ -2946,7 +2946,7 @@ function openBatchDialog() {
          <input type="text" id="cp-b-prefix" placeholder="AFF" maxlength="32" required />
        </div>
        <div class="coupons-field">
-         <label for="cp-b-exp">Expires</label>
+         <label for="cp-b-exp">Expires (ET)</label>
          <input type="datetime-local" id="cp-b-exp" />
        </div>
        <div class="coupons-field">
@@ -2981,8 +2981,8 @@ function openBatchDialog() {
       };
       const expLocal = dlg.querySelector('#cp-b-exp')?.value;
       if (expLocal) {
-        const iso = new Date(expLocal).toISOString();
-        if (!Number.isNaN(Date.parse(iso))) body.expiresAt = iso;
+        const iso = easternDatetimeLocalToIso(expLocal);
+        if (iso) body.expiresAt = iso;
       }
       const lim = readOptionalInt(dlg.querySelector('#cp-b-limit')?.value);
       if (lim != null) body.usageLimit = lim;
