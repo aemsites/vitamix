@@ -982,30 +982,24 @@ function couponSortableTh(key, label, extraClass = '') {
   return `<th scope="col"${classAttr} aria-sort="${aria}"><button type="button" class="pim-th-sort-btn" data-cp-sort="${escapeHtml(key)}">${escapeHtml(label)}${escapeHtml(ind)}</button></th>`;
 }
 
-function renderCouponsOverviewBody(filtered) {
-  const emptyCell = (msg) => `<tr><td colspan="9" class="coupons-empty-cell">${msg}</td></tr>`;
-  if (!state.coupons.length) {
-    return emptyCell('No coupons yet (empty list or missing <code>coupons:read</code>).');
-  }
-  if (!filtered.length) {
-    return emptyCell('No coupons for this market. Try <strong>All</strong> or another country tab.');
-  }
-  return filtered.map((row) => {
-    const id = couponIdFromRow(row);
-    const name = row.name || '—';
-    const pathSeg = parseCouponTypePath(id);
-    const year = pathSeg ? pathSeg.year : '—';
-    const disc = overviewDiscountText(row);
-    const min = overviewMinOrder(row);
-    const cap = overviewCap(row);
-    const ship = shippingBenefitModeLabel(couponShippingModeFromRow(row));
-    const stack = yn(row.stackable !== false);
-    const label = `Open coupon ${String(name)}`;
-    const countries = normalizeCouponCountries(row);
-    const mHtml = countries.length
-      ? countries.map((k) => commerceMarketEmojiHtml(k)).join('')
-      : commerceMarketEmojiHtml(couponMarketPrefixFromId(id));
-    return `<tr class="coupons-grid-row coupons-row-open" data-cp-coupon-id="${escapeHtml(id)}" tabindex="0" role="button" aria-label="${escapeHtml(label)}">
+function couponOverviewRowHtml(row, { interactive = true } = {}) {
+  const id = couponIdFromRow(row);
+  const name = row.name || '—';
+  const pathSeg = parseCouponTypePath(id);
+  const year = pathSeg ? pathSeg.year : '—';
+  const disc = overviewDiscountText(row);
+  const min = overviewMinOrder(row);
+  const cap = overviewCap(row);
+  const ship = shippingBenefitModeLabel(couponShippingModeFromRow(row));
+  const stack = yn(row.stackable !== false);
+  const countries = normalizeCouponCountries(row);
+  const mHtml = countries.length
+    ? countries.map((k) => commerceMarketEmojiHtml(k)).join('')
+    : commerceMarketEmojiHtml(couponMarketPrefixFromId(id));
+  const openAttrs = interactive
+    ? ` class="coupons-grid-row coupons-row-open" data-cp-coupon-id="${escapeHtml(id)}" tabindex="0" role="button" aria-label="${escapeHtml(`Open coupon ${String(name)}`)}"`
+    : ' class="coupons-grid-row"';
+  return `<tr${openAttrs}>
       <td class="coupons-grid-lead coupons-grid-name">${escapeHtml(String(name))}</td>
       <td><code class="coupons-grid-id">${escapeHtml(id || '—')}</code></td>
       <td>${disc}</td>
@@ -1016,7 +1010,44 @@ function renderCouponsOverviewBody(filtered) {
       <td class="coupons-grid-col-year">${commerceGroupBadgeHtml(year)}</td>
       <td class="coupons-grid-col-market">${mHtml}</td>
     </tr>`;
-  }).join('');
+}
+
+function couponOverviewHeadHtml({ sortable = true } = {}) {
+  if (sortable) {
+    return `<tr>
+              ${couponSortableTh('title', 'Title')}
+              ${couponSortableTh('id', 'Id')}
+              ${couponSortableTh('discount', 'Discount')}
+              ${couponSortableTh('min', 'Min order')}
+              ${couponSortableTh('cap', 'Cap')}
+              ${couponSortableTh('freeship', 'Shipping')}
+              ${couponSortableTh('stack', 'Stack')}
+              ${couponSortableTh('year', 'Year', 'coupons-grid-col-year')}
+              ${couponSortableTh('market', 'Market', 'coupons-grid-col-market')}
+            </tr>`;
+  }
+  return `<tr>
+              <th scope="col">Title</th>
+              <th scope="col">Id</th>
+              <th scope="col">Discount</th>
+              <th scope="col">Min order</th>
+              <th scope="col">Cap</th>
+              <th scope="col">Shipping</th>
+              <th scope="col">Stack</th>
+              <th scope="col" class="coupons-grid-col-year">Year</th>
+              <th scope="col" class="coupons-grid-col-market">Market</th>
+            </tr>`;
+}
+
+function renderCouponsOverviewBody(filtered) {
+  const emptyCell = (msg) => `<tr><td colspan="9" class="coupons-empty-cell">${msg}</td></tr>`;
+  if (!state.coupons.length) {
+    return emptyCell('No coupons yet (empty list or missing <code>coupons:read</code>).');
+  }
+  if (!filtered.length) {
+    return emptyCell('No coupons for this market. Try <strong>All</strong> or another country tab.');
+  }
+  return filtered.map((row) => couponOverviewRowHtml(row)).join('');
 }
 
 async function fetchCouponList() {
@@ -1901,6 +1932,7 @@ function render() {
         <div class="coupons-market-tabs" role="tablist" aria-label="Market">${renderMarketTabs()}</div>
       </div>
       <div class="coupons-toolbar-right">
+        <button type="button" class="coupons-btn" data-cp-export-import>Export / import…</button>
         <button type="button" class="coupons-btn coupons-btn-primary" data-cp-new>New coupon…</button>
       </div>
     </div>
@@ -1911,17 +1943,7 @@ function render() {
       <div class="coupons-table-wrap coupons-overview-table-wrap pim-list-wrapper">
         <table class="coupons-grid-table">
           <thead>
-            <tr>
-              ${couponSortableTh('title', 'Title')}
-              ${couponSortableTh('id', 'Id')}
-              ${couponSortableTh('discount', 'Discount')}
-              ${couponSortableTh('min', 'Min order')}
-              ${couponSortableTh('cap', 'Cap')}
-              ${couponSortableTh('freeship', 'Shipping')}
-              ${couponSortableTh('stack', 'Stack')}
-              ${couponSortableTh('year', 'Year', 'coupons-grid-col-year')}
-              ${couponSortableTh('market', 'Market', 'coupons-grid-col-market')}
-            </tr>
+            ${couponOverviewHeadHtml({ sortable: true })}
           </thead>
           <tbody>${overviewBody}</tbody>
         </table>
@@ -1944,6 +1966,9 @@ function render() {
     });
   });
 
+  mount.querySelector('[data-cp-export-import]')?.addEventListener('click', () => {
+    openCouponExportImportDialog();
+  });
   mount.querySelector('[data-cp-new]')?.addEventListener('click', () => openNewCouponDialog());
 
   mount.querySelector('table.coupons-grid-table')?.addEventListener('click', (e) => {
@@ -2002,6 +2027,390 @@ function render() {
     const row = sorted.find((r) => couponIdFromRow(r) === couponId);
     return row ? couponCountryKeyForThumbLookup(row) : 'us';
   }).catch(() => {});
+}
+
+const COUPON_EXPORT_OMIT_KEYS = [
+  'codes',
+  'couponCodes',
+  'coupon_codes',
+  'generated',
+  'generatedCodes',
+  'generated_codes',
+  'codeList',
+  'code_list',
+  'createdAt',
+  'updatedAt',
+  'created_at',
+  'updated_at',
+];
+
+function sanitizeCouponTypeForExport(row) {
+  if (!row || typeof row !== 'object') return null;
+  let copy;
+  try {
+    copy = JSON.parse(JSON.stringify(row));
+  } catch {
+    return null;
+  }
+  if (!copy || typeof copy !== 'object' || Array.isArray(copy)) return null;
+  COUPON_EXPORT_OMIT_KEYS.forEach((k) => {
+    delete copy[k];
+  });
+  return copy;
+}
+
+function couponsJsonForExport(rows) {
+  const list = (Array.isArray(rows) ? rows : [])
+    .map((row) => sanitizeCouponTypeForExport(row))
+    .filter(Boolean);
+  return `${JSON.stringify(list, null, 2)}\n`;
+}
+
+function downloadCouponExportJson(text) {
+  const raw = String(text || '');
+  if (!raw.trim()) throw new Error('Nothing to save — the JSON array is empty.');
+  const stamp = new Date().toISOString().slice(0, 10);
+  const market = state.marketFilter === 'all' ? 'all' : state.marketFilter;
+  const filename = `coupons-${market}-${stamp}.json`;
+  const blob = new Blob([raw], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  return filename;
+}
+
+function couponImportLabel(index, id) {
+  const n = index + 1;
+  return id ? `Coupon ${n} (${id})` : `Coupon ${n}`;
+}
+
+function validateImportedDiscountedProducts(raw, label) {
+  if (!Array.isArray(raw) || !raw.length) {
+    throw new Error(`${label}: discountedProducts must be a non-empty array.`);
+  }
+  raw.forEach((entry, i) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      throw new Error(`${label}: discounted product ${i + 1} must be an object.`);
+    }
+    const path = String(entry.path || '').trim();
+    if (!path) throw new Error(`${label}: discounted product ${i + 1} needs a path.`);
+    if (entry.price == null || String(entry.price).trim() === '') {
+      throw new Error(`${label}: discounted product ${i + 1} needs a price.`);
+    }
+    if (!(parseFloat(String(entry.price)) >= 0)) {
+      throw new Error(`${label}: discounted product ${i + 1} price must be a number ≥ 0.`);
+    }
+  });
+}
+
+function validateCouponTypeForImport(raw, index) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new Error(`${couponImportLabel(index)} must be a JSON object.`);
+  }
+  const id = String(raw.id ?? raw.typeId ?? '').trim();
+  const label = couponImportLabel(index, id);
+  try {
+    assertCouponIdMarketPath(id);
+  } catch (err) {
+    throw new Error(`${label}: ${err.message}`);
+  }
+  const name = String(raw.name ?? '').trim();
+  if (!name) throw new Error(`${label}: display name is required.`);
+
+  const discounted = raw.discountedProducts ?? raw.discounted_products;
+  const isProductList = Array.isArray(discounted) && discounted.length > 0;
+  if (isProductList) {
+    validateImportedDiscountedProducts(discounted, label);
+  } else {
+    const discountType = raw.discountType ?? raw.discount_type;
+    if (discountType !== 'percentage' && discountType !== 'fixed') {
+      throw new Error(`${label}: discountType must be "percentage" or "fixed", or provide discountedProducts.`);
+    }
+    const discountValue = Number(raw.discountValue ?? raw.discount_value);
+    if (!Number.isFinite(discountValue) || discountValue < 0) {
+      throw new Error(`${label}: discountValue must be a number ≥ 0.`);
+    }
+    const incP = raw.includedProducts ?? raw.included_products;
+    const excP = raw.excludedProducts ?? raw.excluded_products;
+    if (Array.isArray(incP) && incP.length && Array.isArray(excP) && excP.length) {
+      throw new Error(`${label}: included and excluded product paths cannot both be set.`);
+    }
+  }
+
+  const countries = normalizeCouponCountries(raw);
+  if (raw.country != null && String(raw.country).trim() !== '' && !countries.length
+    && !COUPON_API_COUNTRIES.includes(String(raw.country).trim().toLowerCase())) {
+    throw new Error(`${label}: country must be us, ca, or mx.`);
+  }
+  if (Array.isArray(raw.countries) && raw.countries.length && !countries.length) {
+    throw new Error(`${label}: countries must be a list of us, ca, and/or mx.`);
+  }
+
+  const body = sanitizeCouponTypeForExport(raw);
+  if (!body) throw new Error(`${label}: could not normalize this coupon.`);
+  body.id = id;
+  body.name = name;
+  return body;
+}
+
+/**
+ * @param {string} text
+ * @returns {{ bodies: object[], toAdd: object[], skipped: object[] }}
+ */
+function parseCouponImportJson(text) {
+  let data;
+  try {
+    data = JSON.parse(String(text || ''));
+  } catch {
+    throw new Error('JSON is not valid. Fix the textarea and try again.');
+  }
+  if (!Array.isArray(data)) {
+    throw new Error('Import must be a JSON array of coupon objects.');
+  }
+  const bodies = data.map((row, i) => validateCouponTypeForImport(row, i));
+  const seen = new Set();
+  bodies.forEach((body, i) => {
+    const id = couponIdFromRow(body);
+    if (seen.has(id)) {
+      throw new Error(`${couponImportLabel(i, id)}: duplicate id in this JSON array.`);
+    }
+    seen.add(id);
+  });
+  const existing = new Set(state.coupons.map((row) => couponIdFromRow(row)).filter(Boolean));
+  const toAdd = bodies.filter((body) => !existing.has(couponIdFromRow(body)));
+  const skipped = bodies.filter((body) => existing.has(couponIdFromRow(body)));
+  return { bodies, toAdd, skipped };
+}
+
+async function postImportedCouponTypes(bodies, onProgress) {
+  const ok = [];
+  const failed = [];
+  /* Sequential so a single failing id does not abort the rest. */
+  /* eslint-disable no-await-in-loop -- one POST per coupon type; progress is per row */
+  for (let i = 0; i < bodies.length; i += 1) {
+    const body = bodies[i];
+    const id = couponIdFromRow(body);
+    try {
+      await couponsApiFetch('coupons/types', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+      ok.push(id);
+    } catch (err) {
+      failed.push({ id, message: err?.message || String(err) });
+    }
+    onProgress?.(i + 1, bodies.length);
+  }
+  /* eslint-enable no-await-in-loop */
+  return { ok, failed };
+}
+
+function couponExportMarketHint() {
+  if (state.marketFilter === 'all') return 'all markets';
+  const hit = COUPON_MARKETS.find((m) => m.key === state.marketFilter);
+  return hit ? hit.label : state.marketFilter.toUpperCase();
+}
+
+function openCouponExportImportDialog() {
+  const shown = sortCouponOverviewRows(
+    couponsVisibleForMarket(),
+    state.overviewSortKey,
+    state.overviewSortDir,
+  );
+  const initialJson = couponsJsonForExport(shown);
+  const dialog = document.createElement('dialog');
+  dialog.className = 'coupons-dialog coupons-dialog-export';
+  dialog.innerHTML = `
+    <div class="coupons-dialog-inner">
+      <div class="coupons-dialog-scroll" tabindex="-1">
+        <div data-cp-export-pane="json">
+          <h2 class="coupons-dialog-title">Export / import coupons</h2>
+          <p class="coupons-field-hint">JSON array of the <strong>${escapeHtml(String(shown.length))}</strong>
+            coupon program${shown.length === 1 ? '' : 's'} currently shown (${escapeHtml(couponExportMarketHint())}).
+            Codes are omitted. Save downloads this file; Preview import validates the array and lists programs that will be created.</p>
+          <label class="pim-sr-only" for="cp-export-json">Coupon types JSON</label>
+          <textarea id="cp-export-json" class="coupons-json-input" spellcheck="false" rows="16">${escapeHtml(initialJson)}</textarea>
+          <div class="coupons-export-status" data-cp-export-status hidden></div>
+        </div>
+        <div data-cp-export-pane="preview" hidden>
+          <h2 class="coupons-dialog-title">Import preview</h2>
+          <p class="coupons-field-hint" data-cp-export-preview-lead></p>
+          <div class="coupons-table-wrap coupons-overview-table-wrap pim-list-wrapper" data-cp-export-preview-table></div>
+        </div>
+      </div>
+      <div class="coupons-dialog-actions">
+        <button type="button" class="coupons-btn" data-cp-cancel>Cancel</button>
+        <button type="button" class="coupons-btn" data-cp-export-back hidden>Back</button>
+        <button type="button" class="coupons-btn" data-cp-export-preview>Preview import</button>
+        <button type="button" class="coupons-btn coupons-btn-primary" data-cp-export-save>Save</button>
+        <button type="button" class="coupons-btn coupons-btn-primary" data-cp-export-import hidden>Import</button>
+      </div>
+    </div>`;
+  document.body.appendChild(dialog);
+
+  const jsonPane = dialog.querySelector('[data-cp-export-pane="json"]');
+  const previewPane = dialog.querySelector('[data-cp-export-pane="preview"]');
+  const statusEl = dialog.querySelector('[data-cp-export-status]');
+  const textarea = /** @type {HTMLTextAreaElement | null} */ (dialog.querySelector('#cp-export-json'));
+  const leadEl = dialog.querySelector('[data-cp-export-preview-lead]');
+  const tableHost = dialog.querySelector('[data-cp-export-preview-table]');
+  const btnCancel = dialog.querySelector('[data-cp-cancel]');
+  const btnBack = dialog.querySelector('[data-cp-export-back]');
+  const btnPreview = dialog.querySelector('[data-cp-export-preview]');
+  const btnSave = dialog.querySelector('[data-cp-export-save]');
+  const btnImport = dialog.querySelector('[data-cp-export-import]');
+
+  /** @type {object[]} */
+  let pendingImport = [];
+
+  const setStatus = (msg, tone = 'error') => {
+    if (!(statusEl instanceof HTMLElement)) return;
+    if (!msg) {
+      statusEl.hidden = true;
+      statusEl.textContent = '';
+      statusEl.classList.remove('coupons-export-status-error', 'coupons-export-status-ok');
+      return;
+    }
+    statusEl.hidden = false;
+    statusEl.textContent = msg;
+    statusEl.classList.toggle('coupons-export-status-error', tone === 'error');
+    statusEl.classList.toggle('coupons-export-status-ok', tone !== 'error');
+  };
+
+  const showJsonPane = () => {
+    if (jsonPane instanceof HTMLElement) jsonPane.hidden = false;
+    if (previewPane instanceof HTMLElement) previewPane.hidden = true;
+    btnBack?.setAttribute('hidden', '');
+    btnPreview?.removeAttribute('hidden');
+    btnSave?.removeAttribute('hidden');
+    btnImport?.setAttribute('hidden', '');
+    pendingImport = [];
+  };
+
+  const showPreviewPane = (allRows, toAdd, skipped) => {
+    pendingImport = toAdd;
+    if (jsonPane instanceof HTMLElement) jsonPane.hidden = true;
+    if (previewPane instanceof HTMLElement) previewPane.hidden = false;
+    btnBack?.removeAttribute('hidden');
+    btnPreview?.setAttribute('hidden', '');
+    btnSave?.setAttribute('hidden', '');
+    if (toAdd.length) btnImport?.removeAttribute('hidden');
+    else btnImport?.setAttribute('hidden', '');
+    if (btnImport instanceof HTMLButtonElement) {
+      btnImport.disabled = !toAdd.length;
+      btnImport.textContent = toAdd.length === 1 ? 'Import 1 coupon' : `Import ${toAdd.length} coupons`;
+    }
+    const skipNote = skipped.length
+      ? ` ${skipped.length} already exist in this environment and will be skipped.`
+      : '';
+    if (leadEl) {
+      leadEl.textContent = toAdd.length
+        ? `${toAdd.length} coupon program${toAdd.length === 1 ? '' : 's'} will be added.${skipNote}`
+        : `Nothing new to add.${skipNote || ' Every id in this JSON already exists.'}`;
+    }
+    if (tableHost) {
+      const body = allRows.length
+        ? allRows.map((row) => couponOverviewRowHtml(row, { interactive: false })).join('')
+        : '<tr><td colspan="9" class="coupons-empty-cell">No coupon programs in this JSON.</td></tr>';
+      tableHost.innerHTML = `<table class="coupons-grid-table" aria-label="Imported coupon programs">
+          <thead>${couponOverviewHeadHtml({ sortable: false })}</thead>
+          <tbody>${body}</tbody>
+        </table>`;
+      hydrateCouponOverviewProductListThumbs(tableHost, (couponId) => {
+        const row = allRows.find((r) => couponIdFromRow(r) === couponId);
+        return row ? couponCountryKeyForThumbLookup(row) : 'us';
+      }).catch(() => {});
+    }
+  };
+
+  const dismiss = () => {
+    dialog.close();
+    dialog.remove();
+  };
+
+  const prevBodyOverflow = document.body.style.overflow;
+  dialog.addEventListener('close', () => {
+    document.body.style.overflow = prevBodyOverflow;
+  }, { once: true });
+
+  btnCancel?.addEventListener('click', dismiss);
+  btnBack?.addEventListener('click', () => {
+    showJsonPane();
+    setStatus('');
+  });
+  dialog.addEventListener('click', (e) => {
+    if (e.target === dialog) dismiss();
+  });
+  wireDialogEscapeDismiss(dialog, dismiss);
+
+  btnSave?.addEventListener('click', () => {
+    try {
+      const filename = downloadCouponExportJson(textarea?.value ?? '');
+      showToast(`Saved ${filename}`, 'success');
+    } catch (err) {
+      setStatus(err?.message || 'Could not save JSON');
+      showToast(err?.message || 'Could not save JSON', 'error');
+    }
+  });
+
+  btnPreview?.addEventListener('click', () => {
+    try {
+      const parsed = parseCouponImportJson(textarea?.value ?? '');
+      setStatus('');
+      showPreviewPane(parsed.bodies, parsed.toAdd, parsed.skipped);
+    } catch (err) {
+      setStatus(err?.message || 'Import is not valid');
+      showToast(err?.message || 'Import is not valid', 'error');
+    }
+  });
+
+  btnImport?.addEventListener('click', async () => {
+    if (!pendingImport.length) return;
+    if (btnImport instanceof HTMLButtonElement) {
+      btnImport.disabled = true;
+      btnImport.textContent = 'Importing…';
+    }
+    try {
+      const { ok, failed } = await postImportedCouponTypes(pendingImport, (n, total) => {
+        if (btnImport instanceof HTMLButtonElement) {
+          btnImport.textContent = `Importing… (${n}/${total})`;
+        }
+      });
+      if (failed.length) {
+        showToast(
+          `Imported ${ok.length} of ${pendingImport.length} — ${failed.length} failed.`,
+          'error',
+        );
+        setStatus(failed.map((f) => `${f.id}: ${f.message}`).join('\n'));
+        showJsonPane();
+      } else {
+        showToast(
+          ok.length === 1 ? 'Imported 1 coupon' : `Imported ${ok.length} coupons`,
+          'success',
+        );
+        dismiss();
+      }
+      await refreshCouponList();
+      render();
+    } catch (err) {
+      showToast(err?.message || 'Import failed', 'error');
+      if (btnImport instanceof HTMLButtonElement) {
+        btnImport.disabled = false;
+        btnImport.textContent = pendingImport.length === 1
+          ? 'Import 1 coupon'
+          : `Import ${pendingImport.length} coupons`;
+      }
+    }
+  });
+
+  document.body.style.overflow = 'hidden';
+  dialog.showModal();
 }
 
 function openNewCouponDialog() {

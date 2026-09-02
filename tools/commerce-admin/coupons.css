@@ -1152,6 +1152,40 @@
   max-width: min(720px, 96vw);
 }
 
+.coupons-dialog-export {
+  max-width: min(1100px, 96vw);
+}
+
+.coupons-dialog-export textarea.coupons-json-input {
+  min-height: min(50vh, 420px);
+  resize: vertical;
+}
+
+.coupons-export-status {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.coupons-export-status-error {
+  background: #fbeae5;
+  border: 1px solid #edc0b4;
+  color: #6b2d1a;
+}
+
+.coupons-export-status-ok {
+  background: #eaf3de;
+  border: 1px solid #c4d9a0;
+  color: #2d4016;
+}
+
+.coupons-dialog-export .coupons-overview-table-wrap {
+  max-height: min(50vh, 480px);
+}
+
 .coupons-dialog .coupons-form-grid input[type='text'],
 .coupons-dialog .coupons-form-grid input[type='number'],
 .coupons-dialog .coupons-form-grid select,
