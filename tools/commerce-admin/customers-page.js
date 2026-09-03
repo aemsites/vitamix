@@ -778,15 +778,30 @@ async function init() {
 
   let allCustomers = [];
 
-  async function refreshCustomers() {
-    const resp = await apiFetch(PB_ORG, PB_SITE, 'customers', { method: 'GET' });
+  /** One page of `GET customers`; `cursor` param must be URL-encoded (R2 cursors carry `+ / =`). */
+  async function fetchCustomersPage(cursor) {
+    const path = cursor ? `customers?cursor=${encodeURIComponent(cursor)}` : 'customers';
+    const resp = await apiFetch(PB_ORG, PB_SITE, path, { method: 'GET' });
     if (!resp.ok) throw new Error(await readRespError(resp));
     const data = await resp.json();
     const list = data.customers || data || [];
     if (!Array.isArray(list)) {
       throw new Error('Unexpected customers response shape');
     }
-    allCustomers = list;
+    return { list, nextCursor: data && typeof data === 'object' ? data.cursor : undefined };
+  }
+
+  /** Page size is fixed at 100 server-side; a missing `cursor` (not `null`) marks the last page. */
+  async function refreshCustomers() {
+    const all = [];
+    let cursor;
+    do {
+      // eslint-disable-next-line no-await-in-loop -- cursor-chained, must fetch sequentially
+      const page = await fetchCustomersPage(cursor);
+      all.push(...page.list);
+      cursor = page.nextCursor;
+    } while (cursor);
+    allCustomers = all;
   }
 
   function applyFilters() {
