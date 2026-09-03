@@ -778,10 +778,14 @@ async function init() {
 
   let allCustomers = [];
 
-  /** One page of `GET customers`; `cursor` param must be URL-encoded (R2 cursors carry `+ / =`). */
+  /**
+   * One page of `GET customers`; `cursor` must be URL-encoded (R2 cursors carry `+ / =`).
+   * `limit=1000` is the largest page size the API accepts (default is 100) — fewer round trips.
+   */
   async function fetchCustomersPage(cursor) {
-    const path = cursor ? `customers?cursor=${encodeURIComponent(cursor)}` : 'customers';
-    const resp = await apiFetch(PB_ORG, PB_SITE, path, { method: 'GET' });
+    const qs = new URLSearchParams({ limit: '1000' });
+    if (cursor) qs.set('cursor', cursor);
+    const resp = await apiFetch(PB_ORG, PB_SITE, `customers?${qs}`, { method: 'GET' });
     if (!resp.ok) throw new Error(await readRespError(resp));
     const data = await resp.json();
     const list = data.customers || data || [];
@@ -791,7 +795,7 @@ async function init() {
     return { list, nextCursor: data && typeof data === 'object' ? data.cursor : undefined };
   }
 
-  /** Page size is fixed at 100 server-side; a missing `cursor` (not `null`) marks the last page. */
+  /** A missing `cursor` (not `null`) on the response marks the last page. */
   async function refreshCustomers() {
     const all = [];
     let cursor;

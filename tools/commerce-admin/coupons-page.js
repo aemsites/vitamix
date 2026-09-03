@@ -1285,7 +1285,7 @@ async function fetchCodesForCoupon({ append } = {}) {
   if (append && !cursorParam) return;
   const qs = new URLSearchParams();
   qs.set('type', state.selectedCouponId);
-  qs.set('limit', '100');
+  qs.set('limit', '1000');
   if (cursorParam) qs.set('cursor', cursorParam);
   const path = `coupons?${qs.toString()}`;
   const resp = await couponsApiFetch(path, { method: 'GET' });
