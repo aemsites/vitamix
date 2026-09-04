@@ -14,6 +14,11 @@ import { escapeHtml, showToast, commerceMarketEmojiHtml } from './commerce-otp-u
 import { highlightMatch } from './search-highlight.js';
 import { openOrderById, orderStateBadgeClass } from './orders-page.js';
 
+/** Page size for the initial load and Next/Previous clicks — keeps single-page fetches snappy. */
+const PAGE_LIMIT = 100;
+/** Page size for the full-dataset load (search/sort) — the API max, so fewer round trips. */
+const FULL_LOAD_LIMIT = 1000;
+
 function getUrlParam(key) {
   return new URLSearchParams(window.location.search).get(key) || '';
 }
@@ -789,12 +794,9 @@ async function init() {
   /** Single-flight guard so a background prefetch and an explicit "Next" click share one fetch. */
   let growthInFlight = null;
 
-  /**
-   * One page of `GET customers`; `cursor` must be URL-encoded (R2 cursors carry `+ / =`).
-   * `limit=1000` is the largest page size the API accepts (default is 100) — fewer round trips.
-   */
-  async function fetchCustomersPage(cursor) {
-    const qs = new URLSearchParams({ limit: '1000' });
+  /** One page of `GET customers`; `cursor` must be URL-encoded (R2 cursors carry `+ / =`). */
+  async function fetchCustomersPage(cursor, limit) {
+    const qs = new URLSearchParams({ limit: String(limit) });
     if (cursor) qs.set('cursor', cursor);
     const resp = await apiFetch(PB_ORG, PB_SITE, `customers?${qs}`, { method: 'GET' });
     if (!resp.ok) throw new Error(await readRespError(resp));
@@ -807,18 +809,18 @@ async function init() {
   }
 
   /** Fetch the page after `last` (or the first page, when `last` is undefined) and cache it. */
-  function fetchNextPage(last) {
-    return fetchCustomersPage(last ? last.nextCursor : undefined)
+  function fetchNextPage(last, limit) {
+    return fetchCustomersPage(last ? last.nextCursor : undefined, limit)
       .then((page) => { pages.push(page); })
       .finally(() => { growthInFlight = null; });
   }
 
   /** Fetch pages sequentially (cursor-chained) until `pages` has `targetLength` entries. */
-  async function growPagesTo(targetLength) {
+  async function growPagesTo(targetLength, limit) {
     while (pages.length < targetLength) {
       const last = pages[pages.length - 1];
       if (last && !last.nextCursor) break;
-      if (!growthInFlight) growthInFlight = fetchNextPage(last);
+      if (!growthInFlight) growthInFlight = fetchNextPage(last, limit);
       // eslint-disable-next-line no-await-in-loop -- cursor-chained, must fetch sequentially
       await growthInFlight;
     }
@@ -827,7 +829,7 @@ async function init() {
   /** Background full-dataset load, shared across triggers (hover, search, sort). Idempotent. */
   function ensureFullLoad() {
     if (!fullLoadPromise) {
-      fullLoadPromise = growPagesTo(Infinity)
+      fullLoadPromise = growPagesTo(Infinity, FULL_LOAD_LIMIT)
         .then(() => { fullCustomers = pages.flatMap((p) => p.list); })
         .catch((err) => {
           fullLoadPromise = null;
@@ -861,22 +863,23 @@ async function init() {
   }) {
     const bar = document.createElement('div');
     bar.className = 'customers-pagination';
-    if (hasPrev) {
-      const prevBtn = document.createElement('button');
-      prevBtn.type = 'button';
-      prevBtn.className = 'coupons-btn';
-      prevBtn.textContent = 'Previous';
-      prevBtn.addEventListener('click', onPrev);
-      bar.appendChild(prevBtn);
-    }
-    if (hasNext) {
-      const nextBtn = document.createElement('button');
-      nextBtn.type = 'button';
-      nextBtn.className = 'coupons-btn';
-      nextBtn.textContent = 'Next';
-      nextBtn.addEventListener('click', onNext);
-      bar.appendChild(nextBtn);
-    }
+
+    const prevBtn = document.createElement('button');
+    prevBtn.type = 'button';
+    prevBtn.className = 'coupons-btn';
+    prevBtn.textContent = 'Previous';
+    prevBtn.disabled = !hasPrev;
+    prevBtn.addEventListener('click', onPrev);
+    bar.appendChild(prevBtn);
+
+    const nextBtn = document.createElement('button');
+    nextBtn.type = 'button';
+    nextBtn.className = 'coupons-btn';
+    nextBtn.textContent = 'Next';
+    nextBtn.disabled = !hasNext;
+    nextBtn.addEventListener('click', onNext);
+    bar.appendChild(nextBtn);
+
     return bar;
   }
 
@@ -885,16 +888,12 @@ async function init() {
     const total = page.list.length;
     countEl.textContent = `${total} customer${total === 1 ? '' : 's'} (page ${pageIndex + 1})`;
     renderTable(wrap, page.list, '', handleEditSaved);
-    const hasPrev = pageIndex > 0;
-    const hasNext = Boolean(page.nextCursor) || pageIndex < pages.length - 1;
-    if (hasPrev || hasNext) {
-      wrap.appendChild(buildPaginationBar({
-        hasPrev,
-        hasNext,
-        onPrev: () => goToPage(pageIndex - 1),
-        onNext: () => goToPage(pageIndex + 1),
-      }));
-    }
+    wrap.appendChild(buildPaginationBar({
+      hasPrev: pageIndex > 0,
+      hasNext: Boolean(page.nextCursor) || pageIndex < pages.length - 1,
+      onPrev: () => goToPage(pageIndex - 1),
+      onNext: () => goToPage(pageIndex + 1),
+    }));
   }
 
   async function goToPage(targetIndex) {
@@ -902,7 +901,7 @@ async function init() {
     if (targetIndex >= pages.length) {
       renderLoadingView();
       try {
-        await growPagesTo(targetIndex + 1);
+        await growPagesTo(targetIndex + 1, PAGE_LIMIT);
       } catch (err) {
         showLoadError(err);
         return;
@@ -952,7 +951,7 @@ async function init() {
     fullCustomers = null;
     renderLoadingView();
     try {
-      const page0 = await fetchCustomersPage();
+      const page0 = await fetchCustomersPage(undefined, PAGE_LIMIT);
       pages = [page0];
       pageIndex = 0;
     } catch (err) {
@@ -967,7 +966,7 @@ async function init() {
   }
 
   try {
-    const page0 = await fetchCustomersPage();
+    const page0 = await fetchCustomersPage(undefined, PAGE_LIMIT);
     pages = [page0];
 
     if (initialQ.trim() !== '' || initialSort === 'oldest') {
