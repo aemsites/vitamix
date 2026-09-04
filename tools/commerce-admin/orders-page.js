@@ -1536,6 +1536,20 @@ async function init() {
     return list;
   }
 
+  /**
+   * `GET customers/{email}/orders` ignores `since`/`until` and always returns the customer's full
+   * history, so an active email search is narrowed to the selected range client-side instead.
+   */
+  function filterOrdersByCurrentRange(orders) {
+    const { since, until } = currentSinceUntil();
+    const sinceMs = new Date(since).getTime();
+    const untilMs = new Date(until).getTime();
+    return orders.filter((o) => {
+      const t = o?.createdAt ? new Date(o.createdAt).getTime() : NaN;
+      return !Number.isNaN(t) && t >= sinceMs && t < untilMs;
+    });
+  }
+
   async function fetchOrderByIdLookup(id) {
     const resp = await apiFetch(PB_ORG, PB_SITE, `orders/${encodeURIComponent(id)}`, { method: 'GET' });
     if (!resp.ok) throw new Error(await readRespError(resp));
@@ -1571,7 +1585,10 @@ async function init() {
   function applyView() {
     const q = search.value;
     const usingSearch = mode === 'search' && Array.isArray(searchOrders);
-    const base = usingSearch ? searchOrders : rangeOrders;
+    let base = usingSearch ? searchOrders : rangeOrders;
+    if (usingSearch && looksLikeEmail(lastSearchQuery)) {
+      base = filterOrdersByCurrentRange(base);
+    }
 
     persistUrlParams();
 
@@ -1605,9 +1622,13 @@ async function init() {
     applyView();
   }
 
-  /** Reload the range-scoped order list; leaves an active search result untouched. */
+  /**
+   * Reload the range-scoped order list. An active order-id search is left untouched (it's an exact
+   * match, not range-bound); an active email search stays but is re-rendered against the new range.
+   */
   async function reloadRangeOrders() {
     const wasSearchMode = mode === 'search';
+    const emailSearchActive = wasSearchMode && looksLikeEmail(lastSearchQuery);
     if (!wasSearchMode) renderLoadingView();
     try {
       rangeOrders = await fetchOrdersForRange();
@@ -1621,6 +1642,8 @@ async function init() {
     }
     if (!wasSearchMode) {
       fillStateSelect(stateSel, uniqueStates(rangeOrders), stateSel.value);
+      applyView();
+    } else if (emailSearchActive) {
       applyView();
     }
   }
