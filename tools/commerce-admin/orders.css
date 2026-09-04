@@ -58,6 +58,17 @@
   min-width: 9.5rem;
 }
 
+.orders-state-select {
+  min-width: 0;
+  max-width: 4.5rem;
+}
+
+/* `.orders-filter-field` sets `display: flex` at equal specificity to the UA `[hidden]` rule and
+   would otherwise win by source order, so pin `display: none` explicitly while hidden. */
+.orders-range-dates[hidden] {
+  display: none;
+}
+
 .orders-date-input {
   padding: 6px 10px;
   font-size: 14px;
