@@ -152,6 +152,80 @@ function uniqueStates(orders) {
   return [...set].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 }
 
+/** The API has no free-text search — full email addresses route to the customer-orders endpoint. */
+function looksLikeEmail(s) {
+  return /^\S+@\S+\.\S+$/.test(s);
+}
+
+/** Market-prefixed order/friendly ids: om/oc (US/Canada), omuat/ocuat (their UAT stores). */
+const ORDER_ID_PREFIXES = ['omuat', 'ocuat', 'om', 'oc'];
+
+/**
+ * True for a bare friendlyId (`omuat8282037655`) or a full order id
+ * (`2026-08-05T10-06-51.529Z-omuat8282037655`) — the friendlyId is always the
+ * last `-`-separated segment of the full id, so checking it covers both shapes.
+ */
+function looksLikeOrderId(s) {
+  if (!s || /\s/.test(s)) return false;
+  const lastSegment = s.split('-').pop();
+  const compact = normalizeOrderIdKey(lastSegment);
+  return ORDER_ID_PREFIXES.some((prefix) => compact.startsWith(prefix));
+}
+
+/** Local midnight `Date` for "today" — date math stays local until the final UTC convert. */
+function todayLocalMidnight() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
+function addMonthsLocal(date, delta) {
+  const d = new Date(date.getTime());
+  d.setMonth(d.getMonth() + delta);
+  return d;
+}
+
+function addDaysLocal(date, delta) {
+  const d = new Date(date.getTime());
+  d.setDate(d.getDate() + delta);
+  return d;
+}
+
+/** `<input type="date">` value (`YYYY-MM-DD`) from a local-midnight `Date`. */
+function toDateInputValue(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/** Local-midnight `Date` for a `YYYY-MM-DD` `<input type="date">` value. */
+function fromDateInputValue(value) {
+  const [y, m, d] = value.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+/**
+ * Swap `from`/`to` when reversed, then clamp the span to 12 months by pulling `from` forward.
+ * @param {Date} from
+ * @param {Date} to
+ * @returns {{ from: Date, to: Date }}
+ */
+function normalizeDateRange(from, to) {
+  let lo = from;
+  let hi = to;
+  if (lo > hi) {
+    [lo, hi] = [hi, lo];
+  }
+  const earliestAllowed = addMonthsLocal(hi, -12);
+  if (lo < earliestAllowed) lo = earliestAllowed;
+  return { from: lo, to: hi };
+}
+
+/** Local-midnight `from`/`to` dates → UTC ISO `since`/`until` instants (`until` is exclusive). */
+function dateRangeToUtcQuery(from, to) {
+  return { since: from.toISOString(), until: addDaysLocal(to, 1).toISOString() };
+}
+
 /** Deep clone JSON-like value and drop keys whose names start with `card` (API removes these). */
 function omitCardStarKeys(value) {
   if (Array.isArray(value)) return value.map(omitCardStarKeys);
@@ -1260,7 +1334,7 @@ function renderTable(wrap, orders, query, onEditSaved) {
     wrap.innerHTML = `
       <div class="orders-empty">
         <h2 class="orders-empty-title">No orders match</h2>
-        <p class="orders-empty-text">Try changing search or state filter.</p>
+        <p class="orders-empty-text">Try changing search, range, or state filter.</p>
       </div>`;
     return;
   }
@@ -1358,14 +1432,21 @@ function renderTable(wrap, orders, query, onEditSaved) {
   });
 }
 
+/** Debounce (ms) before a detected order-id/email in the search box triggers a lookup. */
+const SEARCH_LOOKUP_DEBOUNCE_MS = 350;
+
 async function init() {
   const wrap = document.getElementById('orders-table');
   const search = document.getElementById('orders-search');
+  const rangeSel = document.getElementById('orders-range');
+  const rangeDatesEl = document.getElementById('orders-range-dates');
+  const rangeFromInput = document.getElementById('orders-range-from');
+  const rangeToInput = document.getElementById('orders-range-to');
   const stateSel = document.getElementById('orders-state');
   const sortSel = document.getElementById('orders-sort');
   const countEl = document.getElementById('orders-count');
   const errEl = document.getElementById('orders-error');
-  if (!wrap || !search || !stateSel || !sortSel) return;
+  if (!wrap || !search || !rangeSel || !stateSel || !sortSel) return;
 
   const authed = await waitForCommerceAuthReady(PB_ORG, PB_SITE);
   if (!authed) {
@@ -1377,64 +1458,238 @@ async function init() {
   const initialQ = getUrlParam('q');
   const initialState = getUrlParam('state') || '';
   const initialSort = getUrlParam('sort') === 'oldest' ? 'oldest' : 'newest';
+  const initialRange = getUrlParam('range');
+  const initialFrom = getUrlParam('from');
+  const initialTo = getUrlParam('to');
 
   search.value = initialQ;
   sortSel.value = initialSort;
+  rangeSel.value = ['1m', '3m', 'custom'].includes(initialRange) ? initialRange : '1m';
 
-  let allOrders = [];
+  const todayStr = toDateInputValue(todayLocalMidnight());
+  rangeFromInput.max = todayStr;
+  rangeToInput.max = todayStr;
 
-  async function refreshOrders() {
-    const resp = await apiFetch(PB_ORG, PB_SITE, 'orders', { method: 'GET' });
-    if (!resp.ok) throw new Error(await readRespError(resp));
-    const data = await resp.json();
-    const list = data.orders || data || [];
-    if (!Array.isArray(list)) {
-      throw new Error('Unexpected orders response shape');
-    }
-    allOrders = list;
-    const states = uniqueStates(allOrders);
-    fillStateSelect(stateSel, states, stateSel.value);
+  /** `'range'` browses the selected date range; `'search'` shows an exact id/email match. */
+  let mode = 'range';
+  let rangeOrders = [];
+  let searchOrders = null;
+  let lastSearchQuery = '';
+  let searchDebounceTimer = null;
+  let searchRequestToken = 0;
+
+  function syncCustomFieldsVisibility() {
+    rangeDatesEl.hidden = rangeSel.value !== 'custom';
   }
 
-  function applyFilters() {
-    const q = search.value;
-    const state = stateSel.value;
-    const sort = sortSel.value;
+  function seedCustomRangeDefaultsIfEmpty() {
+    if (rangeFromInput.value && rangeToInput.value) return;
+    const to = todayLocalMidnight();
+    rangeFromInput.value = toDateInputValue(addMonthsLocal(to, -3));
+    rangeToInput.value = toDateInputValue(to);
+  }
 
-    setUrlParams({ q, state, sort: sort === 'newest' ? '' : sort });
+  /** Swap/clamp whatever is currently in the from/to inputs and write the result back. */
+  function normalizeCustomRangeInputs() {
+    if (!rangeFromInput.value || !rangeToInput.value) return;
+    const { from, to } = normalizeDateRange(
+      fromDateInputValue(rangeFromInput.value),
+      fromDateInputValue(rangeToInput.value),
+    );
+    rangeFromInput.value = toDateInputValue(from);
+    rangeToInput.value = toDateInputValue(to);
+  }
 
-    let list = filterByQuery(allOrders, q);
-    list = filterByState(list, state);
-    list = sortByCreated(list, sort);
-
-    const total = allOrders.length;
-    countEl.textContent = list.length === total
-      ? `${total} order${total === 1 ? '' : 's'}`
-      : `${list.length} of ${total} orders`;
-    renderTable(wrap, list, q, async () => {
-      await refreshOrders();
-      applyFilters();
+  function persistUrlParams() {
+    const isCustom = rangeSel.value === 'custom';
+    setUrlParams({
+      q: search.value,
+      state: stateSel.value,
+      sort: sortSel.value === 'newest' ? '' : sortSel.value,
+      range: rangeSel.value === '1m' ? '' : rangeSel.value,
+      from: isCustom ? rangeFromInput.value : '',
+      to: isCustom ? rangeToInput.value : '',
     });
   }
 
-  try {
-    await refreshOrders();
-    if (initialState) {
-      const match = [...stateSel.options].find(
-        (o) => o.value && o.value.toLowerCase() === initialState.toLowerCase(),
+  /** since/until for the currently selected range control, as UTC ISO instants. */
+  function currentSinceUntil() {
+    const today = todayLocalMidnight();
+    if (rangeSel.value === '3m') return dateRangeToUtcQuery(addMonthsLocal(today, -3), today);
+    if (rangeSel.value === 'custom' && rangeFromInput.value && rangeToInput.value) {
+      return dateRangeToUtcQuery(
+        fromDateInputValue(rangeFromInput.value),
+        fromDateInputValue(rangeToInput.value),
       );
-      if (match) stateSel.value = match.value;
     }
-    applyFilters();
+    return dateRangeToUtcQuery(addMonthsLocal(today, -1), today);
+  }
 
-    search.addEventListener('input', applyFilters);
-    stateSel.addEventListener('change', applyFilters);
-    sortSel.addEventListener('change', applyFilters);
-  } catch (err) {
+  async function fetchOrdersForRange() {
+    const { since, until } = currentSinceUntil();
+    const qs = new URLSearchParams({ since, until });
+    const resp = await apiFetch(PB_ORG, PB_SITE, `orders?${qs}`, { method: 'GET' });
+    if (!resp.ok) throw new Error(await readRespError(resp));
+    const data = await resp.json();
+    const list = data.orders || data || [];
+    if (!Array.isArray(list)) throw new Error('Unexpected orders response shape');
+    return list;
+  }
+
+  async function fetchOrderByIdLookup(id) {
+    const resp = await apiFetch(PB_ORG, PB_SITE, `orders/${encodeURIComponent(id)}`, { method: 'GET' });
+    if (!resp.ok) throw new Error(await readRespError(resp));
+    const node = getOrderNodeForDisplay(await resp.json());
+    return node ? [node] : [];
+  }
+
+  async function fetchOrdersByEmailLookup(email) {
+    const path = `customers/${encodeURIComponent(email)}/orders`;
+    const resp = await apiFetch(PB_ORG, PB_SITE, path, { method: 'GET' });
+    if (!resp.ok) throw new Error(await readRespError(resp));
+    const data = await resp.json();
+    const list = data.orders || data || [];
+    return Array.isArray(list) ? list : [];
+  }
+
+  function runSearchLookup(q) {
+    return looksLikeEmail(q) ? fetchOrdersByEmailLookup(q) : fetchOrderByIdLookup(q);
+  }
+
+  function renderLoadingView() {
+    wrap.innerHTML = '<p class="commerce-admin-auth-placeholder orders-loading-msg">'
+      + 'Loading orders…</p>';
+  }
+
+  function showLoadError(err) {
     errEl.hidden = false;
-    errEl.textContent = err.message || 'Failed to load orders';
+    errEl.textContent = err?.message || 'Failed to load orders';
     wrap.innerHTML = '';
     countEl.textContent = '';
+  }
+
+  function applyView() {
+    const q = search.value;
+    const usingSearch = mode === 'search' && Array.isArray(searchOrders);
+    const base = usingSearch ? searchOrders : rangeOrders;
+
+    persistUrlParams();
+
+    let list = usingSearch ? base : filterByQuery(base, q);
+    list = filterByState(list, stateSel.value);
+    list = sortByCreated(list, sortSel.value);
+
+    const total = base.length;
+    countEl.textContent = list.length === total
+      ? `${total} order${total === 1 ? '' : 's'}`
+      : `${list.length} of ${total} orders`;
+    renderTable(wrap, list, q, handleEditSaved);
+  }
+
+  /** After a detail-modal edit, refresh whichever data source is currently displayed. */
+  async function handleEditSaved() {
+    try {
+      rangeOrders = await fetchOrdersForRange();
+    } catch (err) {
+      showToast(err.message || 'Failed to refresh orders', 'error');
+    }
+    if (mode === 'search' && lastSearchQuery) {
+      try {
+        searchOrders = await runSearchLookup(lastSearchQuery);
+      } catch (err) {
+        showToast(err.message || 'Failed to refresh search results', 'error');
+      }
+    }
+    const states = uniqueStates((mode === 'search' && searchOrders) || rangeOrders);
+    fillStateSelect(stateSel, states, stateSel.value);
+    applyView();
+  }
+
+  /** Reload the range-scoped order list; leaves an active search result untouched. */
+  async function reloadRangeOrders() {
+    const wasSearchMode = mode === 'search';
+    if (!wasSearchMode) renderLoadingView();
+    try {
+      rangeOrders = await fetchOrdersForRange();
+    } catch (err) {
+      if (wasSearchMode) {
+        showToast(err.message || 'Failed to reload orders for the selected range', 'error');
+      } else {
+        showLoadError(err);
+      }
+      return;
+    }
+    if (!wasSearchMode) {
+      fillStateSelect(stateSel, uniqueStates(rangeOrders), stateSel.value);
+      applyView();
+    }
+  }
+
+  async function runTargetedSearch(q) {
+    searchRequestToken += 1;
+    const myToken = searchRequestToken;
+    try {
+      const results = await runSearchLookup(q);
+      if (myToken !== searchRequestToken || search.value.trim() !== q) return;
+      mode = 'search';
+      lastSearchQuery = q;
+      searchOrders = results;
+      const states = uniqueStates(results.length ? results : rangeOrders);
+      fillStateSelect(stateSel, states, stateSel.value);
+      applyView();
+    } catch {
+      /* not found or lookup failed — keep showing the locally filtered range results */
+    }
+  }
+
+  function scheduleTargetedSearch() {
+    clearTimeout(searchDebounceTimer);
+    const q = search.value.trim();
+    if (!looksLikeEmail(q) && !looksLikeOrderId(q)) return;
+    searchDebounceTimer = setTimeout(() => runTargetedSearch(q), SEARCH_LOOKUP_DEBOUNCE_MS);
+  }
+
+  try {
+    if (rangeSel.value === 'custom') {
+      rangeFromInput.value = initialFrom || '';
+      rangeToInput.value = initialTo || '';
+      seedCustomRangeDefaultsIfEmpty();
+      normalizeCustomRangeInputs();
+    }
+    syncCustomFieldsVisibility();
+
+    rangeOrders = await fetchOrdersForRange();
+    fillStateSelect(stateSel, uniqueStates(rangeOrders), initialState);
+    applyView();
+
+    const trimmedInitialQ = initialQ.trim();
+    if (trimmedInitialQ && (looksLikeEmail(trimmedInitialQ) || looksLikeOrderId(trimmedInitialQ))) {
+      await runTargetedSearch(trimmedInitialQ);
+    }
+
+    search.addEventListener('input', () => {
+      mode = 'range';
+      searchOrders = null;
+      applyView();
+      scheduleTargetedSearch();
+    });
+    stateSel.addEventListener('change', applyView);
+    sortSel.addEventListener('change', applyView);
+    rangeSel.addEventListener('change', () => {
+      syncCustomFieldsVisibility();
+      if (rangeSel.value === 'custom') seedCustomRangeDefaultsIfEmpty();
+      reloadRangeOrders();
+    });
+    rangeFromInput.addEventListener('change', () => {
+      normalizeCustomRangeInputs();
+      reloadRangeOrders();
+    });
+    rangeToInput.addEventListener('change', () => {
+      normalizeCustomRangeInputs();
+      reloadRangeOrders();
+    });
+  } catch (err) {
+    showLoadError(err);
   }
 }
 
