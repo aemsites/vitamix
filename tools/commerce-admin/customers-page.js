@@ -1,7 +1,6 @@
 /**
- * Customers list — ProductBus API (helix productbus-admin/customers.js pattern).
- * Row opens detail (coupon-style header, account extras, addresses, order numbers).
- * Edit opens JSON.
+ * Customers — look up one ProductBus customer by email (the storage key).
+ * Does not list or page the customer index.
  */
 import { apiFetch } from './commerce-otp-api.js';
 import waitForCommerceAuthReady from './commerce-wait-auth-ready.js';
@@ -11,7 +10,6 @@ import { createDetailModalHeaderCloseAndJson } from './commerce-detail-modal-jso
 import { openJsonEditDialog } from './commerce-json-edit-dialog.js';
 import { PB_ORG, PB_SITE } from './commerce-pbus-config.js';
 import { escapeHtml, showToast, commerceMarketEmojiHtml } from './commerce-otp-ui.js';
-import { highlightMatch } from './search-highlight.js';
 import { openOrderById, orderStateBadgeClass } from './orders-page.js';
 
 function getUrlParam(key) {
@@ -41,6 +39,16 @@ function unwrapCustomerRecord(raw) {
     return inner;
   }
   return raw;
+}
+
+/** Match helix-commerce-api `normalizeEmail`: trim + lowercase. */
+function normalizeCustomerEmail(raw) {
+  return String(raw || '').trim().toLowerCase();
+}
+
+function isCustomerEmail(raw) {
+  const email = normalizeCustomerEmail(raw);
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 /** Lowercase a-z0-9 only — matches order id search behavior in orders admin. */
@@ -304,26 +312,6 @@ function buildAccountExtrasRows(data) {
     take('Email subscription', truthyAttr(data.isSubscribed) || truthyAttr(data.is_subscribed) ? 'Subscribed' : 'Not subscribed');
   }
   return rows;
-}
-
-/** Same idea as productbus filterCustomers. */
-function filterByQuery(customers, q) {
-  if (!q) return customers;
-  const needle = q.toLowerCase();
-  return customers.filter((c) => (c.email || '').toLowerCase().includes(needle)
-    || (c.firstName || '').toLowerCase().includes(needle)
-    || (c.lastName || '').toLowerCase().includes(needle)
-    || (c.phone || '').toLowerCase().includes(needle));
-}
-
-function sortByCreated(customers, sort) {
-  const arr = [...customers];
-  arr.sort((a, b) => {
-    const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-    const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-    return sort === 'oldest' ? ta - tb : tb - ta;
-  });
-  return arr;
 }
 
 function appendPill(container, label, on) {
@@ -683,16 +671,23 @@ async function viewCustomer(email, rowFallback, onRefresh) {
   });
 }
 
-function renderTable(wrap, displayed, query, onEditSaved) {
-  if (displayed.length === 0) {
-    wrap.innerHTML = `
-      <div class="customers-empty">
-        <h2 class="customers-empty-title">No customers match</h2>
-        <p class="customers-empty-text">Try changing search or sort.</p>
-      </div>`;
-    return;
-  }
+function renderIdle(wrap) {
+  wrap.innerHTML = `
+    <div class="customers-empty">
+      <h2 class="customers-empty-title">Look up a customer</h2>
+      <p class="customers-empty-text">Enter the account email and choose Look up. Customers are loaded by email, not as a list.</p>
+    </div>`;
+}
 
+function renderNotFound(wrap, email) {
+  wrap.innerHTML = `
+    <div class="customers-empty">
+      <h2 class="customers-empty-title">No customer for that email</h2>
+      <p class="customers-empty-text">Nothing at <code>${escapeHtml(email)}</code>. Check the address and try again.</p>
+    </div>`;
+}
+
+function renderTable(wrap, displayed, onEditSaved) {
   wrap.innerHTML = `
     <table class="customers-data-table">
       <thead>
@@ -718,11 +713,11 @@ function renderTable(wrap, displayed, query, onEditSaved) {
     const roleBtn = email ? 'role="button"' : '';
     return `
           <tr class="${rowClass}" data-email="${safeAttr}" tabindex="${tabIdx}" ${roleBtn} aria-label="Open customer ${escapeHtml(labelName)}">
-            <td class="customers-email-cell">${highlightMatch(email, query)}</td>
-            <td>${highlightMatch(first, query)}</td>
-            <td>${highlightMatch(last, query)}</td>
-            <td>${highlightMatch(phone, query)}</td>
-            <td>${highlightMatch(createdStr, query)}</td>
+            <td class="customers-email-cell">${escapeHtml(email)}</td>
+            <td>${escapeHtml(first)}</td>
+            <td>${escapeHtml(last)}</td>
+            <td>${escapeHtml(phone)}</td>
+            <td>${escapeHtml(createdStr)}</td>
           </tr>`;
   }).join('')}
       </tbody>
@@ -755,13 +750,26 @@ function renderTable(wrap, displayed, query, onEditSaved) {
   });
 }
 
+async function fetchCustomerByEmail(email) {
+  const resp = await apiFetch(
+    PB_ORG,
+    PB_SITE,
+    `customers/${encodeURIComponent(email)}`,
+    { method: 'GET' },
+  );
+  if (resp.status === 404) return { notFound: true, customer: null };
+  if (!resp.ok) throw new Error(await readRespError(resp));
+  return { notFound: false, customer: unwrapCustomerRecord(await resp.json()) };
+}
+
 async function init() {
   const wrap = document.getElementById('customers-table');
-  const search = document.getElementById('customers-search');
-  const sortSel = document.getElementById('customers-sort');
+  const form = document.getElementById('customers-lookup');
+  const emailInput = document.getElementById('customers-email');
+  const lookupBtn = document.getElementById('customers-lookup-btn');
   const countEl = document.getElementById('customers-count');
   const errEl = document.getElementById('customers-error');
-  if (!wrap || !search || !sortSel) return;
+  if (!wrap || !form || !emailInput) return;
 
   const authed = await waitForCommerceAuthReady(PB_ORG, PB_SITE);
   if (!authed) {
@@ -770,218 +778,58 @@ async function init() {
     return;
   }
 
-  const initialQ = getUrlParam('q');
-  const initialSort = getUrlParam('sort') === 'oldest' ? 'oldest' : 'newest';
+  const setBusy = (busy) => {
+    if (lookupBtn instanceof HTMLButtonElement) lookupBtn.disabled = busy;
+    emailInput.disabled = busy;
+  };
 
-  search.value = initialQ;
-  sortSel.value = initialSort;
-
-  /**
-   * Fetched pages so far, in order: `pages[i] = { list, nextCursor }`. `nextCursor` is the cursor
-   * that was used to fetch `pages[i + 1]`; a page with no `nextCursor` is the last one available.
-   */
-  let pages = [];
-  let pageIndex = 0;
-  /** Complete customer list — populated once the background full load finishes. */
-  let fullCustomers = null;
-  let fullLoadPromise = null;
-  let mode = 'paged';
-  /** Single-flight guard so a background prefetch and an explicit "Next" click share one fetch. */
-  let growthInFlight = null;
-
-  /**
-   * One page of `GET customers`; `cursor` must be URL-encoded (R2 cursors carry `+ / =`).
-   * `limit=1000` is the largest page size the API accepts (default is 100) — fewer round trips.
-   */
-  async function fetchCustomersPage(cursor) {
-    const qs = new URLSearchParams({ limit: '1000' });
-    if (cursor) qs.set('cursor', cursor);
-    const resp = await apiFetch(PB_ORG, PB_SITE, `customers?${qs}`, { method: 'GET' });
-    if (!resp.ok) throw new Error(await readRespError(resp));
-    const data = await resp.json();
-    const list = data.customers || data || [];
-    if (!Array.isArray(list)) {
-      throw new Error('Unexpected customers response shape');
+  const lookup = async (raw, { openDetail = true } = {}) => {
+    const email = normalizeCustomerEmail(raw);
+    errEl.hidden = true;
+    errEl.textContent = '';
+    if (!isCustomerEmail(email)) {
+      errEl.hidden = false;
+      errEl.textContent = 'Enter a valid email address.';
+      countEl.textContent = '';
+      renderIdle(wrap);
+      return;
     }
-    return { list, nextCursor: data && typeof data === 'object' ? data.cursor : undefined };
-  }
-
-  /** Fetch the page after `last` (or the first page, when `last` is undefined) and cache it. */
-  function fetchNextPage(last) {
-    return fetchCustomersPage(last ? last.nextCursor : undefined)
-      .then((page) => { pages.push(page); })
-      .finally(() => { growthInFlight = null; });
-  }
-
-  /** Fetch pages sequentially (cursor-chained) until `pages` has `targetLength` entries. */
-  async function growPagesTo(targetLength) {
-    while (pages.length < targetLength) {
-      const last = pages[pages.length - 1];
-      if (last && !last.nextCursor) break;
-      if (!growthInFlight) growthInFlight = fetchNextPage(last);
-      // eslint-disable-next-line no-await-in-loop -- cursor-chained, must fetch sequentially
-      await growthInFlight;
-    }
-  }
-
-  /** Background full-dataset load, shared across triggers (hover, search, sort). Idempotent. */
-  function ensureFullLoad() {
-    if (!fullLoadPromise) {
-      fullLoadPromise = growPagesTo(Infinity)
-        .then(() => { fullCustomers = pages.flatMap((p) => p.list); })
-        .catch((err) => {
-          fullLoadPromise = null;
-          throw err;
-        });
-    }
-    return fullLoadPromise;
-  }
-
-  /** Kick off the full-dataset load in the background without blocking or surfacing errors yet. */
-  function prefetchFull() {
-    ensureFullLoad().catch(() => {
-      /* surfaced later if/when the user actually triggers full mode */
-    });
-  }
-
-  function renderLoadingView() {
-    wrap.innerHTML = '<p class="commerce-admin-auth-placeholder customers-loading-msg">'
-      + 'Loading customers…</p>';
-  }
-
-  function showLoadError(err) {
-    errEl.hidden = false;
-    errEl.textContent = err?.message || 'Failed to load customers';
-    wrap.innerHTML = '';
-    countEl.textContent = '';
-  }
-
-  function buildPaginationBar({
-    hasPrev, hasNext, onPrev, onNext,
-  }) {
-    const bar = document.createElement('div');
-    bar.className = 'customers-pagination';
-    if (hasPrev) {
-      const prevBtn = document.createElement('button');
-      prevBtn.type = 'button';
-      prevBtn.className = 'coupons-btn';
-      prevBtn.textContent = 'Previous';
-      prevBtn.addEventListener('click', onPrev);
-      bar.appendChild(prevBtn);
-    }
-    if (hasNext) {
-      const nextBtn = document.createElement('button');
-      nextBtn.type = 'button';
-      nextBtn.className = 'coupons-btn';
-      nextBtn.textContent = 'Next';
-      nextBtn.addEventListener('click', onNext);
-      bar.appendChild(nextBtn);
-    }
-    return bar;
-  }
-
-  function renderPagedView() {
-    const page = pages[pageIndex];
-    const total = page.list.length;
-    countEl.textContent = `${total} customer${total === 1 ? '' : 's'} (page ${pageIndex + 1})`;
-    renderTable(wrap, page.list, '', handleEditSaved);
-    const hasPrev = pageIndex > 0;
-    const hasNext = Boolean(page.nextCursor) || pageIndex < pages.length - 1;
-    if (hasPrev || hasNext) {
-      wrap.appendChild(buildPaginationBar({
-        hasPrev,
-        hasNext,
-        onPrev: () => goToPage(pageIndex - 1),
-        onNext: () => goToPage(pageIndex + 1),
-      }));
-    }
-  }
-
-  async function goToPage(targetIndex) {
-    if (targetIndex < 0) return;
-    if (targetIndex >= pages.length) {
-      renderLoadingView();
-      try {
-        await growPagesTo(targetIndex + 1);
-      } catch (err) {
-        showLoadError(err);
+    emailInput.value = email;
+    setUrlParams({ email, q: '', sort: '' });
+    setBusy(true);
+    countEl.textContent = 'Looking up…';
+    wrap.innerHTML = '<p class="commerce-admin-auth-placeholder customers-loading-msg">Looking up customer…</p>';
+    try {
+      const { notFound, customer } = await fetchCustomerByEmail(email);
+      if (notFound || !customer) {
+        countEl.textContent = '';
+        renderNotFound(wrap, email);
         return;
       }
-    }
-    if (targetIndex >= pages.length) return;
-    pageIndex = targetIndex;
-    renderPagedView();
-  }
-
-  function applyFull() {
-    const q = search.value;
-    const sort = sortSel.value;
-
-    setUrlParams({ q, sort: sort === 'newest' ? '' : sort });
-
-    let list = filterByQuery(fullCustomers, q);
-    list = sortByCreated(list, sort);
-
-    const total = fullCustomers.length;
-    countEl.textContent = list.length === total
-      ? `${total} customer${total === 1 ? '' : 's'}`
-      : `${list.length} of ${total} customers`;
-    renderTable(wrap, list, q, handleEditSaved);
-  }
-
-  async function enterFullMode() {
-    mode = 'full';
-    if (fullCustomers) {
-      applyFull();
-      return;
-    }
-    renderLoadingView();
-    try {
-      await ensureFullLoad();
+      const row = { ...customer, email: customer.email || email };
+      countEl.textContent = '1 customer';
+      const refresh = () => lookup(email, { openDetail: false });
+      renderTable(wrap, [row], refresh);
+      if (openDetail) await viewCustomer(row.email || email, row, refresh);
     } catch (err) {
-      showLoadError(err);
-      return;
+      countEl.textContent = '';
+      errEl.hidden = false;
+      errEl.textContent = err.message || 'Failed to look up customer';
+      wrap.innerHTML = '';
+    } finally {
+      setBusy(false);
     }
-    applyFull();
-  }
+  };
 
-  /** After a detail-modal edit is saved, drop cached pages/full data and start over. */
-  async function handleEditSaved() {
-    const wasFullMode = mode === 'full';
-    fullLoadPromise = null;
-    fullCustomers = null;
-    renderLoadingView();
-    try {
-      const page0 = await fetchCustomersPage();
-      pages = [page0];
-      pageIndex = 0;
-    } catch (err) {
-      showLoadError(err);
-      return;
-    }
-    if (wasFullMode) {
-      await enterFullMode();
-    } else {
-      renderPagedView();
-    }
-  }
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    lookup(emailInput.value, { openDetail: true }).catch(() => {});
+  });
 
-  try {
-    const page0 = await fetchCustomersPage();
-    pages = [page0];
-
-    if (initialQ.trim() !== '' || initialSort === 'oldest') {
-      await enterFullMode();
-    } else {
-      renderPagedView();
-    }
-
-    search.addEventListener('mouseenter', prefetchFull);
-    sortSel.addEventListener('mouseenter', prefetchFull);
-    search.addEventListener('input', () => { enterFullMode(); });
-    sortSel.addEventListener('change', () => { enterFullMode(); });
-  } catch (err) {
-    showLoadError(err);
+  const initialEmail = normalizeCustomerEmail(getUrlParam('email') || getUrlParam('q'));
+  if (isCustomerEmail(initialEmail)) {
+    emailInput.value = initialEmail;
+    await lookup(initialEmail, { openDetail: true });
   }
 }
 

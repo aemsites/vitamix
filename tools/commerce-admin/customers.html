@@ -23,31 +23,30 @@
       <h1 class="customers-page-title">Customers</h1>
 
       <div class="customers-toolbar pim-toolbar">
-        <input
-          type="search"
-          id="customers-search"
-          class="pim-search customers-search-wide"
-          placeholder="Search email, name, phone…"
-          aria-label="Search customers"
-        />
-        <div class="customers-toolbar-right">
-          <div class="customers-toolbar-filters" role="group" aria-label="Sort">
-            <div class="customers-filter-field">
-              <label class="customers-filter-label" for="customers-sort">Sort</label>
-              <select id="customers-sort" class="pim-index-select customers-filter-select" aria-label="Sort by date">
-                <option value="newest">Newest first</option>
-                <option value="oldest">Oldest first</option>
-              </select>
-            </div>
-          </div>
-          <span class="pim-count" id="customers-count"></span>
-        </div>
+        <form class="customers-lookup" id="customers-lookup">
+          <label class="customers-filter-label" for="customers-email">Email</label>
+          <input
+            type="email"
+            id="customers-email"
+            class="pim-search customers-search-wide"
+            placeholder="customer@example.com"
+            autocomplete="off"
+            spellcheck="false"
+            required
+            aria-label="Customer email"
+          />
+          <button type="submit" class="coupons-btn coupons-btn-primary" id="customers-lookup-btn">Look up</button>
+        </form>
+        <span class="pim-count" id="customers-count"></span>
       </div>
 
       <p id="customers-error" class="customers-error" hidden></p>
 
       <div id="customers-table" class="customers-table-wrap pim-list-wrapper">
-        <p class="commerce-admin-auth-placeholder customers-loading-msg">Loading customers…</p>
+        <div class="customers-empty">
+          <h2 class="customers-empty-title">Look up a customer</h2>
+          <p class="customers-empty-text">Enter the account email and choose Look up. Customers are loaded by email, not as a list.</p>
+        </div>
       </div>
     </main>
     <script type="module" src="auth-page-boot.js"></script>

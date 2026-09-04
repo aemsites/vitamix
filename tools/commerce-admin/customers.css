@@ -20,41 +20,25 @@
   margin-bottom: 14px;
 }
 
-.pim-search.customers-search-wide {
+.customers-lookup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
   flex: 1 1 280px;
-  max-width: none;
+  min-width: 0;
+}
+
+.pim-search.customers-search-wide {
+  flex: 1 1 220px;
+  max-width: 28rem;
   min-width: 200px;
-}
-
-.customers-toolbar-right {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px 20px;
-  margin-left: auto;
-}
-
-.customers-toolbar-filters {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px 20px;
-}
-
-.customers-filter-field {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .customers-filter-label {
   font-size: 14px;
   color: #6d7175;
   white-space: nowrap;
-}
-
-.customers-filter-select {
-  min-width: 9.5rem;
 }
 
 .customers-error {
@@ -126,13 +110,6 @@
   text-align: center;
 }
 
-.customers-pagination {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  padding: 16px 0 4px;
-}
-
 .customers-empty-title {
   margin: 0 0 8px;
   font-size: 1.1rem;
@@ -143,6 +120,13 @@
   margin: 0;
   color: #6d7175;
   font-size: 14px;
+}
+
+.customers-empty-text code {
+  font-size: 13px;
+  background: #f0f0f1;
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
 /* Wider than the shared coupons dialog to give the orders table room to breathe. */
