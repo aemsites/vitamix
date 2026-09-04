@@ -55,12 +55,12 @@
 }
 
 .orders-filter-select {
-  min-width: 9.5rem;
+  width: 9.5rem;
 }
 
-.orders-state-select {
-  min-width: 0;
-  max-width: 4.5rem;
+.orders-state-select,
+.orders-sort-select {
+  width: 7.5rem;
 }
 
 /* `.orders-filter-field` sets `display: flex` at equal specificity to the UA `[hidden]` rule and
