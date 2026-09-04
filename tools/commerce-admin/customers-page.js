@@ -776,7 +776,18 @@ async function init() {
   search.value = initialQ;
   sortSel.value = initialSort;
 
-  let allCustomers = [];
+  /**
+   * Fetched pages so far, in order: `pages[i] = { list, nextCursor }`. `nextCursor` is the cursor
+   * that was used to fetch `pages[i + 1]`; a page with no `nextCursor` is the last one available.
+   */
+  let pages = [];
+  let pageIndex = 0;
+  /** Complete customer list — populated once the background full load finishes. */
+  let fullCustomers = null;
+  let fullLoadPromise = null;
+  let mode = 'paged';
+  /** Single-flight guard so a background prefetch and an explicit "Next" click share one fetch. */
+  let growthInFlight = null;
 
   /**
    * One page of `GET customers`; `cursor` must be URL-encoded (R2 cursors carry `+ / =`).
@@ -795,49 +806,182 @@ async function init() {
     return { list, nextCursor: data && typeof data === 'object' ? data.cursor : undefined };
   }
 
-  /** A missing `cursor` (not `null`) on the response marks the last page. */
-  async function refreshCustomers() {
-    const all = [];
-    let cursor;
-    do {
-      // eslint-disable-next-line no-await-in-loop -- cursor-chained, must fetch sequentially
-      const page = await fetchCustomersPage(cursor);
-      all.push(...page.list);
-      cursor = page.nextCursor;
-    } while (cursor);
-    allCustomers = all;
+  /** Fetch the page after `last` (or the first page, when `last` is undefined) and cache it. */
+  function fetchNextPage(last) {
+    return fetchCustomersPage(last ? last.nextCursor : undefined)
+      .then((page) => { pages.push(page); })
+      .finally(() => { growthInFlight = null; });
   }
 
-  function applyFilters() {
+  /** Fetch pages sequentially (cursor-chained) until `pages` has `targetLength` entries. */
+  async function growPagesTo(targetLength) {
+    while (pages.length < targetLength) {
+      const last = pages[pages.length - 1];
+      if (last && !last.nextCursor) break;
+      if (!growthInFlight) growthInFlight = fetchNextPage(last);
+      // eslint-disable-next-line no-await-in-loop -- cursor-chained, must fetch sequentially
+      await growthInFlight;
+    }
+  }
+
+  /** Background full-dataset load, shared across triggers (hover, search, sort). Idempotent. */
+  function ensureFullLoad() {
+    if (!fullLoadPromise) {
+      fullLoadPromise = growPagesTo(Infinity)
+        .then(() => { fullCustomers = pages.flatMap((p) => p.list); })
+        .catch((err) => {
+          fullLoadPromise = null;
+          throw err;
+        });
+    }
+    return fullLoadPromise;
+  }
+
+  /** Kick off the full-dataset load in the background without blocking or surfacing errors yet. */
+  function prefetchFull() {
+    ensureFullLoad().catch(() => {
+      /* surfaced later if/when the user actually triggers full mode */
+    });
+  }
+
+  function renderLoadingView() {
+    wrap.innerHTML = '<p class="commerce-admin-auth-placeholder customers-loading-msg">'
+      + 'Loading customers…</p>';
+  }
+
+  function showLoadError(err) {
+    errEl.hidden = false;
+    errEl.textContent = err?.message || 'Failed to load customers';
+    wrap.innerHTML = '';
+    countEl.textContent = '';
+  }
+
+  function buildPaginationBar({
+    hasPrev, hasNext, onPrev, onNext,
+  }) {
+    const bar = document.createElement('div');
+    bar.className = 'customers-pagination';
+    if (hasPrev) {
+      const prevBtn = document.createElement('button');
+      prevBtn.type = 'button';
+      prevBtn.className = 'coupons-btn';
+      prevBtn.textContent = 'Previous';
+      prevBtn.addEventListener('click', onPrev);
+      bar.appendChild(prevBtn);
+    }
+    if (hasNext) {
+      const nextBtn = document.createElement('button');
+      nextBtn.type = 'button';
+      nextBtn.className = 'coupons-btn';
+      nextBtn.textContent = 'Next';
+      nextBtn.addEventListener('click', onNext);
+      bar.appendChild(nextBtn);
+    }
+    return bar;
+  }
+
+  function renderPagedView() {
+    const page = pages[pageIndex];
+    const total = page.list.length;
+    countEl.textContent = `${total} customer${total === 1 ? '' : 's'} (page ${pageIndex + 1})`;
+    renderTable(wrap, page.list, '', handleEditSaved);
+    const hasPrev = pageIndex > 0;
+    const hasNext = Boolean(page.nextCursor) || pageIndex < pages.length - 1;
+    if (hasPrev || hasNext) {
+      wrap.appendChild(buildPaginationBar({
+        hasPrev,
+        hasNext,
+        onPrev: () => goToPage(pageIndex - 1),
+        onNext: () => goToPage(pageIndex + 1),
+      }));
+    }
+  }
+
+  async function goToPage(targetIndex) {
+    if (targetIndex < 0) return;
+    if (targetIndex >= pages.length) {
+      renderLoadingView();
+      try {
+        await growPagesTo(targetIndex + 1);
+      } catch (err) {
+        showLoadError(err);
+        return;
+      }
+    }
+    if (targetIndex >= pages.length) return;
+    pageIndex = targetIndex;
+    renderPagedView();
+  }
+
+  function applyFull() {
     const q = search.value;
     const sort = sortSel.value;
 
     setUrlParams({ q, sort: sort === 'newest' ? '' : sort });
 
-    let list = filterByQuery(allCustomers, q);
+    let list = filterByQuery(fullCustomers, q);
     list = sortByCreated(list, sort);
 
-    const total = allCustomers.length;
+    const total = fullCustomers.length;
     countEl.textContent = list.length === total
       ? `${total} customer${total === 1 ? '' : 's'}`
       : `${list.length} of ${total} customers`;
-    renderTable(wrap, list, q, async () => {
-      await refreshCustomers();
-      applyFilters();
-    });
+    renderTable(wrap, list, q, handleEditSaved);
+  }
+
+  async function enterFullMode() {
+    mode = 'full';
+    if (fullCustomers) {
+      applyFull();
+      return;
+    }
+    renderLoadingView();
+    try {
+      await ensureFullLoad();
+    } catch (err) {
+      showLoadError(err);
+      return;
+    }
+    applyFull();
+  }
+
+  /** After a detail-modal edit is saved, drop cached pages/full data and start over. */
+  async function handleEditSaved() {
+    const wasFullMode = mode === 'full';
+    fullLoadPromise = null;
+    fullCustomers = null;
+    renderLoadingView();
+    try {
+      const page0 = await fetchCustomersPage();
+      pages = [page0];
+      pageIndex = 0;
+    } catch (err) {
+      showLoadError(err);
+      return;
+    }
+    if (wasFullMode) {
+      await enterFullMode();
+    } else {
+      renderPagedView();
+    }
   }
 
   try {
-    await refreshCustomers();
-    applyFilters();
+    const page0 = await fetchCustomersPage();
+    pages = [page0];
 
-    search.addEventListener('input', applyFilters);
-    sortSel.addEventListener('change', applyFilters);
+    if (initialQ.trim() !== '' || initialSort === 'oldest') {
+      await enterFullMode();
+    } else {
+      renderPagedView();
+    }
+
+    search.addEventListener('mouseenter', prefetchFull);
+    sortSel.addEventListener('mouseenter', prefetchFull);
+    search.addEventListener('input', () => { enterFullMode(); });
+    sortSel.addEventListener('change', () => { enterFullMode(); });
   } catch (err) {
-    errEl.hidden = false;
-    errEl.textContent = err.message || 'Failed to load customers';
-    wrap.innerHTML = '';
-    countEl.textContent = '';
+    showLoadError(err);
   }
 }
 
