@@ -837,7 +837,7 @@ function buildAutoBlocks(main) {
     }
 
     // setup articles pages
-    if (getMetadata('template') === 'article') {
+    if (document.querySelector('main') === main && getMetadata('template') === 'article') {
       let hero = main.querySelector('.hero');
       if (!hero) {
         const picture = main.querySelector('picture');
@@ -849,9 +849,13 @@ function buildAutoBlocks(main) {
           main.prepend(section);
         }
       }
-      // add article-info block after hero
-      if (hero) {
-        hero.after(buildBlock('article-info', { elems: [] }));
+      const articleInfo = buildBlock('article-info', { elems: [] });
+      if (hero) { // add article-info block after hero
+        hero.after(articleInfo);
+      } else { // or at the top of main if there is no hero
+        const section = document.createElement('div');
+        section.append(articleInfo);
+        main.prepend(section);
       }
     }
 
@@ -1080,7 +1084,7 @@ function decorateSectionBackgrounds(main) {
     }
   });
 
-  main.querySelectorAll('.section.light, .section.dark').forEach((section) => {
+  main.querySelectorAll('.section.light, .section.dark, .section.black').forEach((section) => {
     const prev = section.previousElementSibling;
     const next = section.nextElementSibling;
     if (prev) {

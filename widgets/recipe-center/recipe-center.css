@@ -2,7 +2,6 @@
 .recipe-center {
   max-width: var(--site-width);
   margin: 0 auto;
-  margin-top: calc(-1 * var(--spacing-700));
 }
 
 @media (width >= 800px) {

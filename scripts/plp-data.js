@@ -21,16 +21,7 @@ const CALLOUT_TIERS = {
 export const PLP_DATASETS = ['blenders', 'accessories', 'commercial'];
 
 /**
- * @param {Object} product - Product data object
- * @returns {boolean} `true` if the product's regular/original price is higher than its current price
- */
-export function isOnSale(product) {
-  const regular = product.originalPrice || product.regularPrice;
-  return regular && product.price && Number(regular) > Number(product.price);
-}
-
-/**
- * Classifies manually-authored badge text into an existing callout type (and its tier).
+ * Classifies authored badge text into an existing callout type (and its tier).
  * @param {string} badge - Raw badge text from plp-data's Badges column
  * @returns {string}
  */
@@ -46,48 +37,58 @@ function classifyManualBadge(badge) {
   return 'manual';
 }
 
+const CALLOUT_COPY_KEYS = {
+  sale: 'sale',
+  new: 'new',
+  bestseller: 'bestSeller',
+  bundle: 'bundleSave',
+  exclusive: 'exclusive',
+  topRated: 'topRated',
+  limitedEdition: 'limitedEdition',
+};
+
 /**
- * Detects which promotional badges apply to a product, capped to 2.
  * @param {Object} product - Product data object
+ * @returns {boolean} `true` if the product's regular/original price is higher than its current price
+ */
+function isOnSale(product) {
+  const regular = product.originalPrice || product.regularPrice;
+  return regular && product.price && Number(regular) > Number(product.price);
+}
+
+/**
+ * @param {string} badge - Raw badge text from plp-data's Badges column
+ * @param {Object} copy - Localized copy object with badge labels
+ * @returns {{type: string, label: string, tier: string}|null}
+ */
+function calloutFromBadge(badge, copy) {
+  const type = classifyManualBadge(badge);
+  const label = type === 'manual' ? badge : (copy[CALLOUT_COPY_KEYS[type]] || badge);
+  if (!label) return null;
+  return { type, label, tier: CALLOUT_TIERS[type] };
+}
+
+/**
+ * Builds callouts from plp-data's Badges column, plus an automatic Sale badge when the
+ * product's current price is below its regular/original price. Title and collections
+ * are not used. Capped to 2.
+ * @param {Object} product - Product data object with `badge` from plp-data
  * @param {Object} copy - Localized copy object with badge labels (sale, new, bestSeller, bundleSave, exclusive, topRated, limitedEdition)
  * @returns {Array<{type: string, label: string, tier: string}>}
  */
 export function getProductCallouts(product, copy) {
   const callouts = [];
-  const collections = (product.collections || []).join(' ').toLowerCase();
-  const title = (product.title || '').toLowerCase();
-  const manualType = product.badge ? classifyManualBadge(product.badge) : null;
+  const badge = (product.badge || '').trim();
+  const authored = badge ? calloutFromBadge(badge, copy) : null;
 
-  if (manualType === 'manual') {
-    callouts.push({ type: 'manual', label: product.badge });
+  if ((authored?.type === 'sale' || isOnSale(product)) && copy.sale) {
+    callouts.push({ type: 'sale', label: copy.sale, tier: CALLOUT_TIERS.sale });
   }
-  if (manualType === 'sale' || isOnSale(product)) {
-    callouts.push({ type: 'sale', label: copy.sale });
-  }
-  if (manualType === 'new' || collections.includes('new') || title.includes('new')) {
-    callouts.push({ type: 'new', label: copy.new });
-  }
-  if (manualType === 'bestseller' || collections.includes('bestseller') || title.includes('best seller')) {
-    callouts.push({ type: 'bestseller', label: copy.bestSeller });
-  }
-  if (manualType === 'topRated' || collections.includes('top rated') || title.includes('top rated')) {
-    callouts.push({ type: 'topRated', label: copy.topRated });
-  }
-  if (manualType === 'bundle'
-    || title.includes('bundle') || collections.includes('bundle') || collections.includes('kitchen systems')) {
-    callouts.push({ type: 'bundle', label: copy.bundleSave });
-  }
-  if (manualType === 'exclusive' || collections.includes('exclusive')) {
-    callouts.push({ type: 'exclusive', label: copy.exclusive });
-  }
-  if (manualType === 'limitedEdition' || title.includes('limited edition') || collections.includes('limited edition')) {
-    callouts.push({ type: 'limitedEdition', label: copy.limitedEdition });
+  if (authored && authored.type !== 'sale') {
+    callouts.push(authored);
   }
 
-  return callouts
-    .filter((callout) => callout.label)
-    .slice(0, 2)
-    .map((callout) => ({ ...callout, tier: CALLOUT_TIERS[callout.type] }));
+  return callouts.slice(0, 2);
 }
 
 /**

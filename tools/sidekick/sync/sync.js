@@ -5,11 +5,53 @@ import {
 const SYNC_WORKER_URL = 'https://vitamix-catalog-sync.adobeaem.workers.dev/';
 
 /**
+ * Resolves the catalog context represented by a product page path.
+ * @param {string} pathname - Product page pathname
+ * @returns {{storeCode: string, storeViewCode: string, urlKey: string, category?: string}}
+ *   Catalog context
+ */
+function resolveSyncContext(pathname) {
+  const pathParts = pathname.split('/').filter(Boolean);
+  const storeCode = pathParts[0] || '';
+  let storeViewCode = pathParts[1] || '';
+  const category = pathParts[2] === 'products' && pathParts[3] === 'commercial'
+    ? 'commercial'
+    : undefined;
+  const urlKey = pathParts[category ? 4 : 3] || '';
+
+  if (storeCode === 'ca' && storeViewCode === 'en_us') {
+    storeViewCode = 'en_ca';
+  }
+
+  if (storeCode === 'mx' && storeViewCode === 'en_us') {
+    storeViewCode = 'en_mx';
+  }
+
+  return {
+    storeCode,
+    storeViewCode,
+    urlKey,
+    ...(category && { category }),
+  };
+}
+
+/**
+ * Adds an optional catalog category to a sync request.
+ * @param {object} data - Base sync request payload
+ * @param {string} [category] - Product catalog category
+ * @returns {object} sync request payload
+ */
+function withCategory(data, category) {
+  return category ? { ...data, category } : data;
+}
+
+/**
  * Creates a product sync modal dialog
  *
+ * @param {string} [pathname] Product page pathname to use for catalog context
  * @returns {Promise<{dialog: HTMLDialogElement, showModal: () => Promise<void>}>}
  */
-export async function createSyncModal() {
+export async function createSyncModal(pathname = window.location.pathname) {
   await loadCSS(`${window.hlx.codeBasePath}/blocks/modal/modal.css`);
   await loadCSS('https://main--vitamix--aemsites.aem.page/tools/sidekick/sync/sync.css');
 
@@ -17,28 +59,19 @@ export async function createSyncModal() {
   const dialogContent = document.createElement('div');
   dialogContent.classList.add('modal-content');
 
-  const urlPath = window.location.pathname;
-  const pathParts = urlPath.split('/').filter((part) => part); // Remove empty strings
-
-  // Expected format: /ca/en_us/products/ascent-x5
-  const defaultStoreCode = pathParts[0] || '';
-  let defaultStoreViewCode = pathParts[1] || '';
-  const defaultUrlKey = pathParts[3] || '';
-
-  if (defaultStoreCode === 'ca' && defaultStoreViewCode === 'en_us') {
-    defaultStoreViewCode = 'en_ca';
-  }
-
-  if (defaultStoreCode === 'mx' && defaultStoreViewCode === 'en_us') {
-    defaultStoreViewCode = 'en_mx';
-  }
+  const {
+    storeCode: defaultStoreCode,
+    storeViewCode: defaultStoreViewCode,
+    urlKey: defaultUrlKey,
+    category,
+  } = resolveSyncContext(pathname);
 
   // pull the sku from the sku meta tag
   const skuMeta = document.querySelector('meta[name="sku"]');
   const defaultSku = skuMeta ? skuMeta.content : '';
 
   const h3 = document.createElement('h3');
-  h3.textContent = 'Product Sync';
+  h3.textContent = category ? 'Commercial Product Sync' : 'Product Sync';
   dialogContent.append(h3);
 
   // Create mode selector (tabs)
@@ -81,13 +114,13 @@ export async function createSyncModal() {
     <div class="form-group">
       <label>
         <input type="radio" name="syncAllMode" value="all-stores" checked>
-        Sync All Stores
+        ${category ? 'Sync All Commercial Stores' : 'Sync All Stores'}
       </label>
     </div>
     <div class="form-group">
       <label>
         <input type="radio" name="syncAllMode" value="single-store">
-        Sync Single Store
+        ${category ? 'Sync Single Commercial Store' : 'Sync Single Store'}
       </label>
     </div>
     <div class="single-store-inputs" style="display: none;">
@@ -232,12 +265,12 @@ export async function createSyncModal() {
   syncSkuForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const formData = new FormData(syncSkuForm);
-    const data = {
+    const data = withCategory({
       storeCode: formData.get('storeCode'),
       storeViewCode: formData.get('storeViewCode'),
       sku: formData.get('sku') || undefined,
       urlKey: formData.get('urlKey') || undefined,
-    };
+    }, category);
 
     // Validate that at least sku or urlKey is provided
     if (!data.sku && !data.urlKey) {
@@ -267,7 +300,7 @@ export async function createSyncModal() {
 
     let data;
     if (syncAllMode === 'all-stores') {
-      data = { syncAll: true };
+      data = withCategory({ syncAll: true }, category);
     } else {
       const storeCode = formData.get('storeCode');
       const storeViewCode = formData.get('storeViewCode');
@@ -283,11 +316,11 @@ export async function createSyncModal() {
         return;
       }
 
-      data = {
+      data = withCategory({
         syncAll: true,
         storeCode,
         storeViewCode,
-      };
+      }, category);
     }
 
     const success = await performSync(data, 'sync-all');
