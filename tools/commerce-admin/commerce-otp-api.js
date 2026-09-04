@@ -235,8 +235,18 @@ export function hasCommerceAdminRole(roles) {
   return list.includes('admin') || list.includes('superuser');
 }
 
+/** Email from stored auth or JWT (`email` / `sub`), lowercased like helix-commerce-api. */
+function adminEmailFromAuth(auth) {
+  const fromState = String(auth?.email || '').trim();
+  if (fromState) return fromState.toLowerCase();
+  const payload = decodeJwtPayload(auth?.token);
+  return String(payload?.email || payload?.sub || '').trim().toLowerCase();
+}
+
 /**
- * Confirm the stored JWT can call admin-scoped ProductBus APIs for this org/site.
+ * Confirm the stored JWT is still an admin for this org/site.
+ * Uses `GET auth/admins/{email}` (R2 HEAD of the admin roster), not `GET customers`.
+ * Superusers may not be on the site roster, so they hit `GET auth/admins` instead.
  *
  * @param {string} org
  * @param {string} site
@@ -251,8 +261,14 @@ export async function verifyCommerceApiAccess(org, site) {
     return { ok: false, message: 'not authorized' };
   }
 
+  const roles = Array.isArray(auth.roles) ? auth.roles : [];
+  const email = adminEmailFromAuth(auth);
+  const path = roles.includes('superuser') || !email
+    ? 'auth/admins'
+    : `auth/admins/${encodeURIComponent(email)}`;
+
   try {
-    const resp = await apiFetch(org, site, 'customers', {
+    const resp = await apiFetch(org, site, path, {
       method: 'GET',
       skipAuthRedirect: true,
       quiet: true,
