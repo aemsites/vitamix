@@ -617,6 +617,7 @@
 
 .cards.overlay > ul {
   gap: var(--spacing-60);
+  align-items: stretch;
 }
 
 .cards.overlay > ul > li {

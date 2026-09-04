@@ -35,3 +35,14 @@
   background-color: var(--color-gray-300);
   color: var(--color-charcoal);
 }
+
+@media (width <= 767px) {
+  .product-badge.save {
+    margin-top: var(--spacing-40);
+  }
+
+  .product-row .product-badges
+  .product-badge-sale {
+    display: none;
+  }
+}

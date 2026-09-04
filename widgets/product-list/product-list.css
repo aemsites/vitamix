@@ -760,6 +760,93 @@ body.product-list-widget-drawer-open {
   }
 }
 
+/* Marketing cards – same visual treatment as product-row marketing slides */
+.product-list-widget .product-list-widget-marketing-card {
+  cursor: pointer;
+  gap: 0;
+}
+
+.product-list-widget .product-list-widget-marketing-card h3 {
+  font-size: var(--heading-size-s);
+  margin: 0;
+}
+
+.product-list-widget .product-list-widget-marketing-card .slide-image picture,
+.product-list-widget .product-list-widget-marketing-card .slide-image img,
+.product-list-widget .product-list-widget-marketing-card .slide-image video {
+  display: block;
+  border-radius: 0;
+  width: 100%;
+}
+
+.product-list-widget .product-list-widget-marketing-card .slide-image img,
+.product-list-widget .product-list-widget-marketing-card .slide-image video {
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+}
+
+.product-list-widget .product-list-widget-marketing-card .slide-image > p {
+  margin: 0;
+}
+
+.product-list-widget .product-list-widget-marketing-card .slide-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--spacing-s);
+  padding: var(--spacing-l);
+  background-color: var(--marketing-color, var(--color-charcoal));
+}
+
+.product-list-widget .product-list-widget-marketing-card .slide-body > :first-child {
+  margin-top: 0;
+}
+
+.product-list-widget .product-list-widget-marketing-card .slide-body > :last-child {
+  margin-bottom: 0;
+}
+
+.product-list-widget .product-list-widget-marketing-card .slide-body.dark {
+  color: var(--color-white);
+}
+
+.product-list-widget .product-list-widget-marketing-card .slide-body.light {
+  color: var(--color-charcoal);
+}
+
+.product-list-widget .product-list-widget-marketing-card .slide-body.dark .button:not(.emphasis, .link) {
+  border-color: var(--color-white);
+  background-color: transparent;
+  color: var(--color-white);
+}
+
+.product-list-widget .product-list-widget-marketing-card .slide-body.light .button:not(.emphasis, .link) {
+  border-color: var(--color-charcoal);
+  background-color: transparent;
+  color: var(--color-charcoal);
+}
+
+.product-list-widget .product-list-widget-marketing-card .slide-body.dark .button.emphasis {
+  border-color: var(--color-white);
+  background-color: var(--color-white);
+  color: var(--color-charcoal);
+}
+
+.product-list-widget .product-list-widget-marketing-card .slide-body.light .button.emphasis {
+  border-color: var(--color-charcoal);
+  background-color: var(--color-charcoal);
+  color: var(--color-white);
+}
+
+.product-list-widget .product-list-widget-marketing-card .slide-body.dark .button.link {
+  color: var(--color-white);
+}
+
+.product-list-widget .product-list-widget-marketing-card .slide-body.light .button.link {
+  color: var(--color-charcoal);
+}
+
 @media (hover: none) {
   .product-list-widget .product-list-widget-compare-btn {
     opacity: 1;

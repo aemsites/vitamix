@@ -30,7 +30,9 @@ function renderTitle(block, custom, reviewsId) {
 
   const reviewsPlaceholder = document.createElement('div');
   reviewsPlaceholder.classList.add('pdp-reviews-summary-placeholder');
-  reviewsPlaceholder.innerHTML = `<div data-bv-show="rating_summary" data-bv-product-id="${reviewsId}">`;
+  // data-bv-seo="false": suppress Bazaarvoice's own structured-data markup; the
+  // product JSON-LD (with aggregateRating) is rendered server-side by the pipeline.
+  reviewsPlaceholder.innerHTML = `<div data-bv-show="rating_summary" data-bv-product-id="${reviewsId}" data-bv-seo="false">`;
 
   const { collection } = custom;
   const collectionContainer = document.createElement('p');
@@ -70,7 +72,7 @@ async function renderReviews(ph, block, reviewsId) {
   // TODO: Add Bazaarvoice reviews
   const bazaarvoiceContainer = document.createElement('div');
   bazaarvoiceContainer.classList.add('pdp-reviews-container');
-  bazaarvoiceContainer.innerHTML = `<div data-bv-show="reviews" data-bv-product-id="${reviewsId}"></div>`;
+  bazaarvoiceContainer.innerHTML = `<div data-bv-show="reviews" data-bv-product-id="${reviewsId}" data-bv-seo="false"></div>`;
 
   setTimeout(async () => {
     await loadScript(`https://apps.bazaarvoice.com/deployments/vitamix/main_site/production/${ph.languageCode || 'en_US'}/bv.js`);
@@ -209,8 +211,9 @@ function renderRelatedProducts(ph, custom) {
           const li = document.createElement('li');
           const title = product.name;
           const image = new URL(product.images[0].url, window.location.href);
-          const price = +product.price.final;
-          li.innerHTML = `<a href="${product.url}"><img src="${image}?width=750&#x26;format=webply&#x26;optimize=medium" alt="${title}" /><div><p>${title}</p><strong>${formatPrice(price, ph)}</strong></div></a>`;
+          const price = Number(product.price?.final);
+          const priceMarkup = price > 0 ? `<strong>${formatPrice(price, ph)}</strong>` : '';
+          li.innerHTML = `<a href="${product.url}"><img src="${image}?width=750&#x26;format=webply&#x26;optimize=medium" alt="${title}" /><div><p>${title}</p>${priceMarkup}</div></a>`;
           ul.appendChild(li);
         });
         relatedProductsContainer.appendChild(ul);

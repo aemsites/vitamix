@@ -676,7 +676,8 @@ export default async function decorate(widget) {
   if (!gridEl || !addSectionEl) return;
 
   const dataset = widget.dataset.dataset || 'blenders';
-  const allProducts = await lookupProductListProducts({}, {}, dataset);
+  const allProducts = (await lookupProductListProducts({}, {}, dataset))
+    .filter((product) => !product.isMarketing);
 
   let selectedPaths = getComparePaths();
   if (selectedPaths.length === 0) {

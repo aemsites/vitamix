@@ -71,7 +71,6 @@
 @media (width >= 1000px) {
   .related-articles ul {
     gap: var(--spacing-300);
-    max-width: 900px;
     margin: 0 auto;
     padding: 0 var(--spacing-300);
   }
@@ -98,5 +97,9 @@
 @media (width >= 1200px) {
   .related-articles.rows-3 ul {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .related-articles.rows-4 ul {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }

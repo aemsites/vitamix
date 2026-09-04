@@ -227,10 +227,16 @@
 }
 
 .product-row .price {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-60);
+  display: block;
   font-weight: bold;
+}
+
+@media (width >= 600px) {
+  .product-row .price {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-60);
+  }
 }
 
 .product-row .price del {

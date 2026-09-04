@@ -2,11 +2,13 @@
 import {
   fetchPlaceholders, loadCSS, toClassName,
 } from '../../scripts/aem.js';
-import { formatPrice } from '../../scripts/scripts.js';
+import { formatPrice, buildVideo } from '../../scripts/scripts.js';
 import { loadFragment } from '../../blocks/fragment/fragment.js';
 import addToCompare, { useWidgetCompare, isInStoredCompare, removeFromCompare } from '../../scripts/add-to-compare.js';
 import { createCallouts, createStarRating } from '../../scripts/plp-data.js';
 import lookupProductListProducts, { getWidgetLocaleAndLanguage, getFacetDefinitions } from './products.js';
+
+const marketingFragmentCache = new Map();
 
 const LIFESTYLE_TILE_SELECTOR = '.block > div, .block > ul > li';
 const LIFESTYLE_TILE_SELECTED_SELECTOR = '.block > div.selected, .block > ul > li.selected';
@@ -267,6 +269,129 @@ function createProductListCard(product, ph, copy, activeColorSlug) {
     const detailsLink = cta.querySelector('a');
     if (detailsLink) detailsLink.click();
     else if (title.querySelector('a')) title.querySelector('a').click();
+  });
+
+  return card;
+}
+
+/**
+ * Fetches a marketing fragment's .plain.html and rewrites relative media URLs.
+ * @param {string} pathname - Same-origin fragment pathname
+ * @returns {Promise<HTMLElement|null>} Root content element, or null on failure
+ */
+async function fetchMarketingFragment(pathname) {
+  if (marketingFragmentCache.has(pathname)) {
+    return marketingFragmentCache.get(pathname).cloneNode(true);
+  }
+  const resp = await fetch(`${pathname}.plain.html`);
+  if (!resp.ok) return null;
+  const main = document.createElement('div');
+  main.innerHTML = await resp.text();
+  const resetAttributeBase = (tag, attr) => {
+    main.querySelectorAll(`${tag}[${attr}^="./media_"]`).forEach((elem) => {
+      elem[attr] = new URL(elem.getAttribute(attr), new URL(pathname, window.location)).href;
+    });
+  };
+  resetAttributeBase('img', 'src');
+  resetAttributeBase('source', 'srcset');
+  resetAttributeBase('a', 'href');
+  const root = main.firstElementChild || main;
+  marketingFragmentCache.set(pathname, root.cloneNode(true));
+  return root;
+}
+
+/**
+ * Turns standalone paragraph links into buttons (mirrors decorateButtons for fragment CTAs).
+ * @param {HTMLElement} root
+ */
+function decorateMarketingButtons(root) {
+  root.querySelectorAll('p a[href]').forEach((a) => {
+    a.title = a.title || a.textContent;
+    const p = a.closest('p');
+    const text = a.textContent.trim();
+    if (a.href === text || p.textContent.trim() !== text) return;
+    a.className = 'button';
+    const strong = a.closest('strong');
+    const em = a.closest('em');
+    if (strong && em) {
+      a.classList.add('accent');
+      (strong.contains(em) ? strong : em).replaceWith(a);
+    } else if (strong) {
+      a.classList.add('emphasis');
+      strong.replaceWith(a);
+    } else if (em) {
+      a.classList.add('link');
+      em.replaceWith(a);
+    }
+    p.className = 'button-container';
+  });
+}
+
+/**
+ * Converts an authored `.mp4` link into a video, using a sibling picture as poster.
+ * @param {HTMLElement} image
+ * @returns {HTMLVideoElement|null}
+ */
+function buildMarketingVideo(image) {
+  const picture = image.querySelector('picture');
+  const video = buildVideo(image);
+  if (!video) return null;
+  if (picture) {
+    const img = picture.querySelector('img');
+    if (img) video.poster = img.src;
+    picture.remove();
+  }
+  return video;
+}
+
+/**
+ * Sets marketing body background (charcoal by default) and light/dark text contrast.
+ * @param {HTMLElement} body
+ */
+function applyMarketingColor(body) {
+  body.style.setProperty('--marketing-color', 'var(--color-charcoal)');
+  const [r, g, b] = getComputedStyle(body).backgroundColor.match(/\d+/g).map(Number);
+  const luminance = (r * 299 + g * 587 + b * 114) / 1000;
+  body.classList.add(luminance > 128 ? 'light' : 'dark');
+}
+
+/**
+ * Builds a product-list marketing card from a plp-data fragment row, matching product-row
+ * marketing slide visuals (image/video + titled body with CTA).
+ * @param {Object} item - Marketing list item ({ isMarketing, url, title, ... })
+ * @returns {Promise<HTMLElement|null>}
+ */
+async function createMarketingCard(item) {
+  const fragment = await fetchMarketingFragment(item.url);
+  if (!fragment) return null;
+
+  const card = document.createElement('div');
+  card.className = 'product-list-widget-product-card product-list-widget-marketing-card';
+  card.setAttribute('role', 'listitem');
+
+  const image = document.createElement('div');
+  image.className = 'slide-image';
+  const body = document.createElement('div');
+  body.className = 'slide-body';
+
+  [...fragment.children].forEach((child) => {
+    const hasMedia = child.querySelector?.('picture, a[href*=".mp4"]')
+      || child.matches?.('picture, a[href*=".mp4"]');
+    if (hasMedia) image.append(child);
+    else body.append(child);
+  });
+
+  buildMarketingVideo(image);
+  decorateMarketingButtons(body);
+  card.append(image, body);
+
+  const heading = body.querySelector('h1, h2, h3, h4, h5, h6');
+  if (heading) item.title = heading.textContent.trim() || item.title;
+
+  card.addEventListener('click', (e) => {
+    if (e.target.closest('a, button, video')) return;
+    const link = card.querySelector('a[href]');
+    if (link) link.click();
   });
 
   return card;
@@ -818,33 +943,53 @@ export default async function decorate(widget) {
     });
   };
 
-  const displayResults = (results, activeColorSlug) => {
+  let searchGeneration = 0;
+
+  const displayResults = async (results, activeColorSlug) => {
+    const generation = searchGeneration;
     resultsEl.innerHTML = '';
     if (!results.length) {
       emptyEl.hidden = false;
       return;
     }
     emptyEl.hidden = true;
-    results.forEach((product) => {
-      resultsEl.appendChild(createProductListCard(product, ph, copy, activeColorSlug));
+    const cards = await Promise.all(results.map((item) => (
+      item.isMarketing
+        ? createMarketingCard(item)
+        : createProductListCard(item, ph, copy, activeColorSlug)
+    )));
+    if (generation !== searchGeneration) return;
+    cards.filter(Boolean).forEach((card) => {
+      resultsEl.appendChild(card);
+      if (card.classList.contains('product-list-widget-marketing-card')) {
+        const body = card.querySelector('.slide-body');
+        if (body) applyMarketingColor(body);
+      }
     });
   };
 
   runSearch = async (filterConfig = getFilterConfig()) => {
+    searchGeneration += 1;
     const facets = FACET_KEYS.reduce((acc, key) => ({ ...acc, [key]: {} }), {});
     const results = await lookupProductListProducts(filterConfig, facets, widget.productListDataset);
     widget.productListLastFacets = facets;
     const sortKey = sortByEl.dataset.sort || 'featured';
+    const byMarketingLast = (a, b, cmp) => {
+      if (a.isMarketing && b.isMarketing) return 0;
+      if (a.isMarketing) return 1;
+      if (b.isMarketing) return -1;
+      return cmp(a, b);
+    };
     const sorts = {
-      'price-asc': (a, b) => Number(a.price) - Number(b.price),
-      'price-desc': (a, b) => Number(b.price) - Number(a.price),
-      'reviews-desc': (a, b) => Number(b.reviewCount) - Number(a.reviewCount),
+      'price-asc': (a, b) => byMarketingLast(a, b, (x, y) => Number(x.price) - Number(y.price)),
+      'price-desc': (a, b) => byMarketingLast(a, b, (x, y) => Number(y.price) - Number(x.price)),
+      'reviews-desc': (a, b) => byMarketingLast(a, b, (x, y) => Number(y.reviewCount) - Number(x.reviewCount)),
     };
     // 'featured' (Most Popular) keeps the row order from plp-data-{dataset}.json as-is.
     if (sorts[sortKey]) results.sort(sorts[sortKey]);
     countEl.textContent = String(results.length);
     const activeColor = (filterConfig.color || '').split(',')[0].trim();
-    displayResults(results, activeColor ? toClassName(activeColor) : null);
+    await displayResults(results, activeColor ? toClassName(activeColor) : null);
     updateFilterUi(filterConfig, facets);
     syncFilterConfigToUrl(filterConfig, widget);
   };
