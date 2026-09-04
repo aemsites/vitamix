@@ -27,6 +27,54 @@ function buildSaveHref(recipeId) {
   return `https://www.vitamix.com/${locale}/${language}/customer/account/login/referer/${encodeURIComponent(encodedReturn)}/`;
 }
 
+function syncEdgeSaveButton(saveButton, placeholders) {
+  const labelEl = saveButton.querySelector('.recipe-save-label');
+  const saveLabel = placeholders.save || 'Save';
+  const removeLabel = placeholders.removeFromSaved || 'Remove from saved';
+  return import('../../scripts/recipe-storage.js').then(({ isRecipeSaved }) => {
+    const saved = isRecipeSaved(window.location.pathname);
+    if (labelEl) labelEl.textContent = saved ? removeLabel : saveLabel;
+    saveButton.classList.toggle('is-saved', saved);
+    saveButton.setAttribute('aria-pressed', saved ? 'true' : 'false');
+  });
+}
+
+async function initEdgeRecipeSave(saveButton, placeholders) {
+  const { recordRecipeView } = await import('../../scripts/recipe-storage.js');
+  const { toggleEdgeRecipeFavorite, wireRecipeFavoritesAuthSync } = await import(
+    '../../scripts/recipe-favorites.js'
+  );
+  const { AUTH_EVENT } = await import('../../scripts/auth-api.js');
+  wireRecipeFavoritesAuthSync();
+  recordRecipeView(window.location.pathname);
+  await syncEdgeSaveButton(saveButton, placeholders);
+  saveButton.addEventListener('click', async () => {
+    saveButton.disabled = true;
+    try {
+      await toggleEdgeRecipeFavorite(window.location.pathname);
+      await syncEdgeSaveButton(saveButton, placeholders);
+    } finally {
+      saveButton.disabled = false;
+    }
+  });
+  document.addEventListener(AUTH_EVENT, () => {
+    syncEdgeSaveButton(saveButton, placeholders);
+  });
+}
+
+function wireMagentoRecipeSave(saveLink) {
+  setTimeout(async () => {
+    const payload = await loadRecipeIds();
+    const rows = Array.isArray(payload?.data) ? payload.data : [];
+    const recipeId = resolveRecipeId(window.location.pathname, rows);
+    if (!recipeId) {
+      saveLink.remove();
+      return;
+    }
+    saveLink.href = buildSaveHref(recipeId);
+  }, 500);
+}
+
 function wrapInDiv(element, className) {
   if (!element) return;
   const { previousSibling, parentElement } = element;
@@ -55,8 +103,16 @@ function buildToolbar(placeholders = {}) {
   const sharePinterestLabel = placeholders.shareOnPinterest || 'Share on Pinterest';
   const shareEmailLabel = placeholders.shareViaEmail || 'Share via Email';
 
+  const useEdgeCookbook = Boolean(window.useEdgeCheckout);
+  const saveIcon = '<img src="/blocks/recipe/save.svg" alt="">';
+  let saveControl = `<a class="recipe-save">${saveIcon} ${saveLabel}</a>`;
+  if (useEdgeCookbook) {
+    saveControl = `<button type="button" class="recipe-save" aria-pressed="false">${
+      saveIcon} <span class="recipe-save-label">${saveLabel}</span></button>`;
+  }
+
   toolbar.innerHTML = `
-    <a class="recipe-save"><img src="/blocks/recipe/save.svg" alt=""> ${saveLabel}</a>
+    ${saveControl}
     <button type="button" class="recipe-print"><img src="/blocks/recipe/print.svg" alt=""> ${printLabel}</button>
     <div class="recipe-share-wrapper">
       <button type="button" class="recipe-share"><img src="/blocks/recipe/share.svg" alt=""> ${shareLabel}</button>
@@ -77,17 +133,12 @@ function buildToolbar(placeholders = {}) {
     </div>
   `;
 
-  const saveLink = toolbar.querySelector('.recipe-save');
-  setTimeout(async () => {
-    const payload = await loadRecipeIds();
-    const rows = Array.isArray(payload?.data) ? payload.data : [];
-    const recipeId = resolveRecipeId(window.location.pathname, rows);
-    if (!recipeId) {
-      saveLink.remove();
-      return;
-    }
-    saveLink.href = buildSaveHref(recipeId);
-  }, 500);
+  const saveControlEl = toolbar.querySelector('.recipe-save');
+  if (useEdgeCookbook) {
+    initEdgeRecipeSave(saveControlEl, placeholders);
+  } else {
+    wireMagentoRecipeSave(saveControlEl);
+  }
 
   // Print button
   const printButton = toolbar.querySelector('.recipe-print');
