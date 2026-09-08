@@ -142,11 +142,12 @@ test('buildApplePayExpressOrderPayload replays the previewed payload and overlay
   assert.equal(payload.estimateToken, 'estimate-token');
   assert.equal(payload.customerTimezone, 'America/New_York');
 
-  // Shipping keeps the previewed hash-relevant fields (us/MN/55441), NOT the
-  // payment contact's OH/44101, while layering the descriptive fields.
+  // Shipping keeps the previewed country/state (us/MN, hash-relevant and never
+  // redacted by Apple), but restores the wallet's FULL postal (44101) over the
+  // redacted preview zip, while layering the descriptive fields.
   assert.equal(payload.shipping.country, 'us');
   assert.equal(payload.shipping.state, 'MN');
-  assert.equal(payload.shipping.zip, '55441');
+  assert.equal(payload.shipping.zip, '44101');
   assert.equal(payload.shipping.name, 'Jane Doe');
   assert.equal(payload.shipping.address1, '123 Main St');
   assert.equal(payload.shipping.address2, 'Suite 4');
