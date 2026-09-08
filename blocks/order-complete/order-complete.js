@@ -21,6 +21,20 @@ export function parseJson(raw) {
 }
 
 /**
+ * Clears the tab-scoped coupon values after a successful order confirmation.
+ *
+ * @returns {void}
+ */
+export function clearCheckoutCouponState() {
+  try {
+    sessionStorage.removeItem('checkout_coupon_code');
+    sessionStorage.removeItem('checkout_coupon_source');
+  } catch {
+    // Confirmation remains usable when session storage is unavailable.
+  }
+}
+
+/**
  * Returns true when cached confirmation data belongs to the order currently
  * being displayed. Cached display data (cart items, preview totals) is scoped
  * to the matching order so a stale cache from a previous order in the same tab
@@ -446,17 +460,19 @@ export default async function decorate(block) {
 
   block.replaceChildren(container);
 
+  const couponCode = sessionStorage.getItem('checkout_coupon_code') || '';
   const analyticsContext = {
     orderId,
     order,
     preview: cacheMatches ? preview : null,
     cartItems: cacheMatches ? cartItems : null,
     displayItems,
-    couponCode: sessionStorage.getItem('checkout_coupon_code') || '',
+    couponCode,
   };
   window.vitamixEdsAnalytics = window.vitamixEdsAnalytics || {};
   window.vitamixEdsAnalytics.orderConfirmedContext = analyticsContext;
   document.dispatchEvent(new CustomEvent('order:confirmed', { detail: analyticsContext }));
+  clearCheckoutCouponState();
 
   logOperation('checkout-complete', {
     checkoutId: getCheckoutId(),
