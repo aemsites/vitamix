@@ -85,7 +85,7 @@ export const isProdHost = hostname.includes('vitamix.com');
 // Affirm public API key — safe to expose client-side (used for PDP promo widgets).
 // Checkout gets its key from the server's checkout object so it always matches the
 // environment of the merchant config.
-export const AFFIRM_PUBLIC_KEY = isProdHost ? 'LIVE_PUBLIC_KEY' : 'GH4VQBRG3LHDS5CM';
+export const AFFIRM_PUBLIC_KEY = isProdHost ? '6PJNMXGC9XLXNFHX' : 'GH4VQBRG3LHDS5CM';
 export const FORMS_ENDPOINT = isProdHost
   ? ''
   : 'https://main--vitamix--aemsites.aem.network';

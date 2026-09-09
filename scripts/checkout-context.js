@@ -83,9 +83,20 @@ export function buildExpressOrderPayload(estimatePayload, identity) {
   return {
     ...orderFields,
     customer,
-    // Keep the hash-relevant shipping fields (country/state/zip) exactly as
-    // previewed; layer the wallet's descriptive fields underneath.
-    shipping: { ...shipping, ...orderFields.shipping },
+    // Keep the previewed country/state (hash-relevant, and Apple never redacts
+    // them), but restore the wallet's FULL postal code. Apple Pay redacts the
+    // shipping postal to a prefix before authorization (Canada returns the
+    // 3-char FSA, e.g. `L4G `; the UK a partial code), so the previewed zip is
+    // truncated and would otherwise be persisted and fulfilled as-is. The
+    // estimate token hashes only the postal prefix
+    // (`zip.split(' ')[0].split('-')[0]`), so the full wallet postal still
+    // matches the token. Falls back to the previewed zip when the wallet has
+    // none.
+    shipping: {
+      ...shipping,
+      ...orderFields.shipping,
+      ...(shipping?.zip ? { zip: shipping.zip } : {}),
+    },
     billing,
     estimateToken,
     ...(customerTimezone ? { customerTimezone } : {}),

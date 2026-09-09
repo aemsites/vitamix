@@ -1,5 +1,5 @@
 import { getMetadata, toClassName } from '../../scripts/aem.js';
-import { swapIcons, getCookies, getOrderPath } from '../../scripts/scripts.js';
+import { swapIcons, getCookies, getLocaleAndLanguage } from '../../scripts/scripts.js';
 import { loadFragment } from '../fragment/fragment.js';
 import { AUTH_EVENT, getUser, isLoggedIn } from '../../scripts/auth-api.js';
 import {
@@ -17,7 +17,10 @@ function isHeaderAuthSessionActive() {
   }
 }
 
-const EDGE_CART_PATH = () => getOrderPath('cart');
+const EDGE_CART_PATH = () => {
+  const { locale, language } = getLocaleAndLanguage();
+  return `/${locale}/${language}/order/cart`;
+};
 
 // media query match that indicates desktop width
 const isDesktop = window.matchMedia('(width >= 1000px)');

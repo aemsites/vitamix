@@ -54,7 +54,9 @@ describe('buildExpressOrderPayload', () => {
   const estimatePayload = {
     items: [{ sku: '075861-04', selectedOptions: [{ id: 'color', value: 'Black' }] }],
     shippingMethod: { id: '267' },
-    shipping: { country: 'ca', state: 'ON', zip: 'M5A 1E1' },
+    // Apple Pay redacts the postal to the FSA before authorization, so the
+    // previewed shipping zip is the 3-char prefix, not the full postal.
+    shipping: { country: 'ca', state: 'ON', zip: 'M5A' },
     country: 'ca',
     locale: 'en-US',
     paymentMethod: 'paypal',
@@ -63,9 +65,10 @@ describe('buildExpressOrderPayload', () => {
     couponCode: 'FFVITAMIXMAY26',
     couponSource: 'manual',
   };
-  // The wallet-provided identity. Its shipping deliberately carries different
-  // country/state/zip than the previewed payload to prove the hash-relevant
-  // fields are taken from the preview, not the wallet.
+  // The wallet-provided identity. Its shipping deliberately carries a different
+  // country/state than the previewed payload to prove those hash-relevant fields
+  // come from the preview; its zip is the FULL authorized postal that the fix
+  // restores over the redacted preview zip.
   const identity = {
     customer: {
       firstName: 'Jane', lastName: 'Doe', email: 'account@example.com', phone: '',
@@ -75,7 +78,7 @@ describe('buildExpressOrderPayload', () => {
       address1: '123 Main St',
       city: 'Toronto',
       state: 'XX',
-      zip: '99999',
+      zip: 'M5A 1E1',
       country: 'zz',
       email: 'wallet@example.com',
     },
@@ -102,16 +105,26 @@ describe('buildExpressOrderPayload', () => {
     assert.equal(body.estimateToken, 'tok-abc');
   });
 
-  test('keeps previewed shipping country/state/zip but layers descriptive fields', () => {
+  test('keeps previewed country/state but restores the wallet full postal', () => {
     const body = buildExpressOrderPayload(estimatePayload, identity);
-    // hash-relevant fields come from the previewed payload...
+    // country/state are hash-relevant and never redacted -> from the preview
     assert.equal(body.shipping.country, 'ca');
     assert.equal(body.shipping.state, 'ON');
+    // Apple redacts the postal to the FSA before auth (preview zip 'M5A'); the
+    // full wallet postal is restored for fulfillment. The server hashes only the
+    // 'M5A' prefix, so the full postal still matches the estimate token.
     assert.equal(body.shipping.zip, 'M5A 1E1');
-    // ...descriptive fields come from the wallet
+    // descriptive fields come from the wallet
     assert.equal(body.shipping.name, 'Jane Doe');
     assert.equal(body.shipping.address1, '123 Main St');
     assert.equal(body.shipping.email, 'wallet@example.com');
+  });
+
+  test('falls back to the previewed zip when the wallet has no postal', () => {
+    const walletNoZip = { ...identity, shipping: { ...identity.shipping } };
+    delete walletNoZip.shipping.zip;
+    const body = buildExpressOrderPayload(estimatePayload, walletNoZip);
+    assert.equal(body.shipping.zip, 'M5A');
   });
 
   test('drops couponSource — preview-only, not hashed, rejected by the order schema', () => {
