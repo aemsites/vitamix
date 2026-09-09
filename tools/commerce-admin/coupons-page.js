@@ -3278,6 +3278,7 @@ function openAddCodesDialog() {
       await fetchCodesForCoupon();
       afterCodesRefresh();
       showToast(`Created ${total} code(s)`, 'success');
+      return undefined;
     },
     async (dlg) => {
       wireAddCodesDialog(dlg);
