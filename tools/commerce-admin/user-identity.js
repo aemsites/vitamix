@@ -1,5 +1,5 @@
 /**
- * User label for Commerce Admin (e.g. first name on review / sheet-logger events).
+ * User label for Commerce Admin.
  * Uses browser localStorage only. Call setStoredFirstName() from a future settings flow,
  * or set key `pim_userFirstName` manually for development.
  */
