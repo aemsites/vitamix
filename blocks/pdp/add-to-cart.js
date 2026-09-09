@@ -1,6 +1,6 @@
 import { getMetadata } from '../../scripts/aem.js';
 import {
-  checkVariantOutOfStock, getLocaleAndLanguage, getOrderPath, getPdpOverride,
+  checkVariantOutOfStock, getLocaleAndLanguage, getPdpOverride,
 } from '../../scripts/scripts.js';
 import { getConfig } from '../../scripts/commerce-config.js';
 import { logOperation, logError } from '../../scripts/operations-log.js';
@@ -440,7 +440,8 @@ export default function renderAddToCart(ph, block, parent) {
         // localStorage snapshot before navigation.
         if (window.innerWidth < 900) {
           cartApi.flush();
-          window.location.href = getOrderPath('cart');
+          const { locale, language } = getLocaleAndLanguage();
+          window.location.href = `/${locale}/${language}/order/cart`;
           return;
         }
 

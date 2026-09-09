@@ -51,15 +51,9 @@ export function getLocaleAndLanguage(forceEnCA = false, bcp47 = false) {
   return { locale: loc, language };
 }
 
-/**
- * Mirrors the real getOrderPath helper.
- * @param {'cart'|'checkout'|'complete'|'cancel'} page
- * @returns {string}
- */
-export function getOrderPath(page) {
-  const { locale: loc, language } = getLocaleAndLanguage();
-  return `/${loc}/${language}/order/${page}`;
-}
+// Deliberately omit Edge Checkout-only exports such as `getOrderPath`. Tests
+// importing existing Magento blocks through this mock verify that their static
+// dependency graph stays compatible with a browser-cached base `scripts.js`.
 
 export async function loggedFetch(...args) {
   return fetch(...args);
