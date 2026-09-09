@@ -1,6 +1,33 @@
 import { toCamelCase, toClassName } from '../../scripts/aem.js';
-import { getFormSubmissionUrl, getLocaleAndLanguage, fetchWithRetry } from '../../scripts/scripts.js';
+import { getFormSubmissionUrl, getLocaleAndLanguage } from '../../scripts/scripts.js';
 import { getLeadSource, getLegacyLeadSource } from '../../scripts/lead-source.js';
+
+const RETRIABLE_STATUS = new Set([502, 503, 504]);
+
+/**
+ * Fetch that retries transient gateway and network failures. It stays local to
+ * this existing block so a browser-cached base `scripts.js` can still link the
+ * form module during a deployment transition.
+ * @param {string|URL} url - Request URL
+ * @param {RequestInit} [options] - Fetch options
+ * @param {number} [retries=2] - Additional attempts after the first
+ * @param {number} [backoff=500] - Base delay in ms, multiplied by the attempt number
+ * @returns {Promise<Response>} The final response
+ */
+async function fetchWithRetry(url, options, retries = 2, backoff = 500) {
+  for (let attempt = 0; ; attempt += 1) {
+    const isLastAttempt = attempt === retries;
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const resp = await fetch(url, options);
+      if (isLastAttempt || !RETRIABLE_STATUS.has(resp.status)) return resp;
+    } catch (err) {
+      if (isLastAttempt) throw err;
+    }
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((resolve) => { setTimeout(resolve, backoff * (attempt + 1)); });
+  }
+}
 
 /**
  * Extracts a status message from a submission response body. The forms service
