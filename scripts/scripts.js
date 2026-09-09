@@ -17,11 +17,98 @@ import {
   loadScript,
   getMetadata,
 } from './aem.js';
+import { logError } from './operations-log.js';
 
-const isProdHost = window.location.hostname.includes('vitamix.com');
+const { hostname } = window.location;
+
+// Files considered "AEM scope" for error logging — only errors originating from
+// our own JS are logged, not third-party/payment-SDK noise.
+const AEM_SCOPE = /\/(scripts|blocks|tools|widgets)\//;
+const isInAemScope = (str) => typeof str === 'string' && AEM_SCOPE.test(str);
+
+/**
+ * Registers global listeners that log uncaught errors and unhandled promise
+ * rejections originating from AEM-scope JS to the operations-log endpoint.
+ * Independent of aem.js's RUM error handler. Idempotent.
+ */
+let errorLoggingRegistered = false;
+function registerErrorLogging() {
+  if (errorLoggingRegistered) return;
+  errorLoggingRegistered = true;
+  window.addEventListener('error', (event) => {
+    const stack = event.error?.stack || '';
+    if (!isInAemScope(event.filename) && !isInAemScope(stack)) return;
+    logError('window.error', event.error || { message: event.message }, {
+      filename: event.filename,
+      lineno: event.lineno,
+      colno: event.colno,
+    });
+  });
+  window.addEventListener('unhandledrejection', (event) => {
+    const { reason } = event;
+    if (!isInAemScope(reason?.stack || '')) return;
+    logError('unhandledrejection', reason instanceof Error ? reason : { message: String(reason) });
+  });
+}
+
+// Locale+language pairs enabled for edge checkout.
+// Format: '<locale>/<language>' (e.g., 'ca/fr_ca'). Add pairs as each region goes live.
+// Keep this empty to use Adobe Commerce by default in every environment.
+const EDGE_CHECKOUT_LOCALES = [];
+export const EDGE_CHECKOUT_OVERRIDE_STORAGE_KEY = 'edgeCheckout';
+
+/**
+ * Returns the locale+language pairs explicitly enabled for Edge checkout by a tester.
+ * The value is a comma-separated list, for example: `ca/fr_ca,ca/en_us`.
+ *
+ * @returns {string[]}
+ */
+export function getEdgeCheckoutOverrideLocales() {
+  return (localStorage.getItem(EDGE_CHECKOUT_OVERRIDE_STORAGE_KEY) || '')
+    .split(',')
+    .map((locale) => locale.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+/**
+ * Determines whether a tester explicitly enabled Edge checkout for a locale.
+ *
+ * @param {string} localeKey Locale and language in `<locale>/<language>` format
+ * @returns {boolean}
+ */
+export function isEdgeCheckoutOverrideEnabled(localeKey) {
+  return getEdgeCheckoutOverrideLocales().includes(localeKey.toLowerCase());
+}
+
+export const isProdHost = hostname.includes('vitamix.com');
+
+// Affirm public API key — safe to expose client-side (used for PDP promo widgets).
+// Checkout gets its key from the server's checkout object so it always matches the
+// environment of the merchant config.
+export const AFFIRM_PUBLIC_KEY = isProdHost ? '6PJNMXGC9XLXNFHX' : 'GH4VQBRG3LHDS5CM';
 export const FORMS_ENDPOINT = isProdHost
   ? ''
   : 'https://main--vitamix--aemsites.aem.network';
+
+const PAYPAL_CLIENT_IDS = {
+  us: 'AaBQdCVqIp15uFQaHrJmTUDBZ-xJrOYPs99NtZ-iLN5oij-ustZq304ikTHJKwqqSL4yN0v9GLireQLN',
+  ca: 'AVlGkhsI0_EFNFx8jnRsv0dSROcLzzLYtTdMoNieyjZeAWlIXdFpocB6eyhHvuDOZ3F2YFmQDkLE03Rp',
+};
+const siteLocale = window.location.pathname.split('/').filter(Boolean)[0] || 'us';
+
+window.CommerceConfig = {
+  org: 'aemsites',
+  site: 'vitamix',
+  cartItemExtensionModules: [
+    '/blocks/cart/warranty-selector-extension.js',
+    '/scripts/cart-compatibility.js',
+  ],
+  paypal: {
+    clientId: PAYPAL_CLIENT_IDS[siteLocale] ?? PAYPAL_CLIENT_IDS.us,
+    intent: 'authorize',
+    orderReview: { express: true, checkout: true },
+  },
+};
 
 /**
  * Load fonts.css and set a session storage flag.
@@ -121,20 +208,48 @@ export function formatServings(servingsString) {
 
 /**
  * Gets the locale and language from the window.location.pathname.
+ * @param {boolean} [forceEnCA] - Remap en_us → en_ca for Canadian English paths.
+ * @param {boolean} [bcp47] - Return language as a BCP-47 tag (e.g. 'en-US') instead of
+ *   the underscore form used in URL paths (e.g. 'en_us').
  * @returns {Object} Object with locale and language.
  */
-export function getLocaleAndLanguage(forceEnCA = false) {
+export function getLocaleAndLanguage(forceEnCA = false, bcp47 = false) {
   const pathSegments = window.location.pathname.split('/').filter(Boolean);
   const locale = pathSegments[0] || 'us'; // fallback to 'us' if not found
-  const language = pathSegments[1] || 'en_us'; // fallback to 'en_us' if not found
+  let language = pathSegments[1] || 'en_us'; // fallback to 'en_us' if not found
 
   // Commerce backend uses the language code en_ca for the Canada english store view.
   // On the frontend they are incorrectly using the en_us language code.
   if (forceEnCA && locale === 'ca' && language === 'en_us') {
-    return { locale, language: 'en_ca' };
+    language = 'en_ca';
+  }
+
+  if (bcp47) {
+    language = language.replace('_', '-').replace(/-([a-z]{2})$/, (_, r) => `-${r.toUpperCase()}`);
   }
 
   return { locale, language };
+}
+
+/**
+ * Returns the path for an order-flow page (cart, checkout, complete, cancel)
+ * scoped to the current locale and language.
+ * @param {'cart'|'checkout'|'complete'|'cancel'} page
+ * @returns {string}
+ */
+export function getOrderPath(page) {
+  const { locale, language } = getLocaleAndLanguage();
+  return `/${locale}/${language}/order/${page}`;
+}
+
+/**
+ * Returns the path for an account page scoped to the current locale and language.
+ * @param {string} [page] - Optional sub-page (e.g., 'orders', 'order-detail')
+ * @returns {string}
+ */
+export function getAccountPath(page) {
+  const { locale, language } = getLocaleAndLanguage();
+  return page ? `/${locale}/${language}/account/${page}` : `/${locale}/${language}/account`;
 }
 
 /**
@@ -144,6 +259,44 @@ export function getLocaleAndLanguage(forceEnCA = false) {
 export function getFormSubmissionUrl() {
   const { locale, language } = getLocaleAndLanguage();
   return `${FORMS_ENDPOINT}/${locale}/${language}/forms`;
+}
+
+/**
+ * HTTP status codes worth retrying — transient gateway/proxy failures (e.g. a
+ * 502 from the proxy in front of the forms service) where the same request may
+ * succeed on a subsequent attempt. Client (4xx) and other 5xx errors are not
+ * retried since they won't resolve by repeating the request.
+ */
+export const RETRIABLE_STATUS = new Set([502, 503, 504]);
+
+/**
+ * Fetch that retries transient failures with linear backoff. A retry is triggered
+ * by either a retriable HTTP status (RETRIABLE_STATUS) or a rejected fetch — a
+ * network/gateway failure such as a 502 that the browser surfaces as a thrown
+ * TypeError rather than a Response. The final response is returned as-is; if the
+ * last attempt rejects, that error is rethrown for the caller to handle.
+ * @param {string|URL} url - Request URL
+ * @param {RequestInit} [options] - Fetch options
+ * @param {number} [retries=2] - Additional attempts after the first
+ * @param {number} [backoff=500] - Base delay in ms, multiplied by the attempt number
+ * @returns {Promise<Response>} The final response
+ */
+export async function fetchWithRetry(url, options, retries = 2, backoff = 500) {
+  for (let attempt = 0; ; attempt += 1) {
+    const isLastAttempt = attempt === retries;
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const resp = await fetch(url, options);
+      // Return on success, a non-retriable status, or once the budget is spent.
+      if (isLastAttempt || !RETRIABLE_STATUS.has(resp.status)) return resp;
+    } catch (err) {
+      // A rejected fetch (network/gateway error) is retriable too; only rethrow
+      // once the retry budget is exhausted.
+      if (isLastAttempt) throw err;
+    }
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((resolve) => { setTimeout(resolve, backoff * (attempt + 1)); });
+  }
 }
 
 /**
@@ -164,15 +317,27 @@ function setAffiliateCoupon() {
   const urlParams = new URLSearchParams(window.location.search);
   const { cjdata, cjevent, COUPON } = Object.fromEntries(urlParams);
 
-  if (!cjdata || !cjevent || !COUPON) return;
+  if (cjevent) {
+    localStorage.setItem('cjevent', JSON.stringify({ value: cjevent, ts: Date.now() }));
+  }
 
-  const { locale, language } = getLocaleAndLanguage();
-  const loginUrl = new URL(`https://www.vitamix.com/${locale}/${language}/checkout/cart`);
-  Object.entries({ cjdata, cjevent, COUPON }).forEach(([key, value]) => {
-    loginUrl.searchParams.set(key, value);
-  });
+  if (COUPON) {
+    sessionStorage.setItem('checkout_coupon_code', COUPON);
+    // Affiliate URL coupons are applied programmatically, not typed by the
+    // customer, so they must validate as 'auto' — otherwise auto-apply-only
+    // types (allowManualEntry: false) are rejected as manual entries.
+    sessionStorage.setItem('checkout_coupon_source', 'auto');
 
-  fetch(loginUrl.toString());
+    // TODO: remove once all locales migrate off Magento — applies the coupon to the PHP cart
+    const { locale, language } = getLocaleAndLanguage();
+    if (!window.useEdgeCheckout) {
+      const cartUrl = new URL(`/${locale}/${language}/checkout/cart`, window.location.origin);
+      if (cjdata) cartUrl.searchParams.set('cjdata', cjdata);
+      if (cjevent) cartUrl.searchParams.set('cjevent', cjevent);
+      cartUrl.searchParams.set('COUPON', COUPON);
+      fetch(cartUrl.toString());
+    }
+  }
 }
 
 /**
@@ -1060,6 +1225,51 @@ export function applyImgColor(block) {
 }
 
 /**
+ * Logs error to the console
+ * @param {RequestInfo|URL} input
+ * @param {RequestInit} [init]
+ * @returns {Promise<Response>}
+ */
+export async function loggedFetch(input, init) {
+  if (hostname.includes('www.vitamix.com')) return fetch(input, init);
+  const response = await fetch(input, init);
+  if (!response.ok) {
+    const xError = response.headers.get('x-error');
+    const xErrorCode = response.headers.get('x-error-code');
+    try {
+      response.clone().text().then((text) => {
+        let data = text;
+        try {
+          data = JSON.parse(text);
+        } catch { /* noop */ }
+        let requestBody = init?.body;
+        try {
+          requestBody = JSON.parse(requestBody);
+        } catch { /* noop */ }
+
+        /* eslint-disable no-console */
+        console.group(`Error response from: ${input.toString()}`);
+        console.error(JSON.stringify({
+          status: response.status,
+          method: init?.method ?? 'GET',
+          requestHeaders: init?.headers,
+          requestBody,
+          responseBody: data,
+          xError,
+          xErrorCode,
+        }, null, 2));
+        console.groupEnd();
+      });
+    } catch (e) {
+      console.error('Error logging response for:', input.toString(), e, xError, xErrorCode);
+      console.warn(response);
+      /* eslint-enable no-console */
+    }
+  }
+  return response;
+}
+
+/**
  * Determines if a given date falls within US Eastern Daylight Saving Time.
  * DST starts: 2nd Sunday of March at 2:00 AM
  * DST ends: 1st Sunday of November at 2:00 AM
@@ -1844,9 +2054,21 @@ async function checkSchedule() {
  * @param {Element} doc The container element
  */
 async function loadEager(doc) {
-  const locale = window.location.pathname.split('/')[2];
-  const language = locale ? locale.split('_')[0] : 'en';
-  document.documentElement.lang = language;
+  registerErrorLogging();
+  const { locale, language } = getLocaleAndLanguage();
+  document.documentElement.lang = language ? language.split('_')[0] : 'en';
+
+  const localeKey = `${locale}/${language}`;
+  // Edge checkout is enabled only for locale+language pairs in EDGE_CHECKOUT_LOCALES.
+  // Testers can persistently opt in to one or more locales with localStorage.edgeCheckout,
+  // for example: `ca/fr_ca,ca/en_us`.
+  window.useEdgeCheckout = EDGE_CHECKOUT_LOCALES.includes(localeKey)
+    || isEdgeCheckoutOverrideEnabled(localeKey);
+  // ?cart=magento or ?cart=edge overrides all other settings (useful for testing)
+  const cartModeParam = new URLSearchParams(window.location.search).get('cart');
+  if (cartModeParam !== null) {
+    window.useEdgeCheckout = cartModeParam !== 'magento';
+  }
 
   /* simulation date */
   const params = new URLSearchParams(window.location.search);
@@ -1898,6 +2120,7 @@ async function loadEager(doc) {
   const main = doc.querySelector('main');
   if (main) {
     decorateMain(main);
+
     /* adjust shop images to locale root path, util all of shop is mapped */
     if ((window.location.pathname.includes('/shop/')
       || window.location.pathname.includes('/foundation/')
@@ -1943,6 +2166,13 @@ async function loadLazy(doc) {
   loadHeader(doc.querySelector('header'));
   await loadSections(main);
 
+  // Gift-with-purchase operates on the Edge localStorage cart. Do not load it
+  // for Magento pages: importing it initializes that cart and can overwrite
+  // Magento's shared cart-count cookie.
+  if (window.useEdgeCheckout) {
+    import('./gift-with-purchase.js').then(({ initGWP }) => initGWP());
+  }
+
   const { hash } = window.location;
   const element = hash ? doc.getElementById(hash.substring(1)) : false;
   if (hash && element) element.scrollIntoView();
@@ -1983,11 +2213,18 @@ async function loadLazy(doc) {
   }
 }
 
+function decorateInternalLinks() {
+  const internalLinks = document.querySelectorAll('a[href^="https://www.vitamix.com/"]');
+  internalLinks.forEach((link) => {
+    link.href = link.href.replace('https://www.vitamix.com', window.location.origin);
+  });
+}
+
 function decorateExternalLinks() {
   const externalLinks = document.querySelectorAll('a[href^="https://"]');
   externalLinks.forEach((link) => {
-    const { hostname } = new URL(link.href);
-    if (!link.href.includes('vitamix') || hostname === 'localhost') {
+    const { hostname: linkHostname } = new URL(link.href);
+    if (!link.href.includes('vitamix') || linkHostname === 'localhost') {
       link.setAttribute('target', '_blank');
       link.setAttribute('rel', 'noopener');
     }
@@ -2038,6 +2275,16 @@ async function loadDelayed() {
     console.error('Error loading link checker', e);
   }
 
+  const { default: injectForterSnippet } = await import('./forter-snippet.js');
+  injectForterSnippet();
+
+  document.addEventListener('ftr:tokenReady', (evt) => {
+    const token = evt.detail;
+    try {
+      sessionStorage.setItem('forter_token', token);
+    } catch { /* ignore */ }
+  });
+
   const initContentScore = async () => {
     const CONTENT_SCORE = 'https://tools.aem.live/tools/content-score/src/scripts.js';
     const { init } = await import(CONTENT_SCORE);
@@ -2049,6 +2296,13 @@ async function loadDelayed() {
   if (sk) initContentScore();
   else {
     document.addEventListener('sidekick-ready', initContentScore, { once: true });
+  }
+
+  if (
+    window.location.hostname === 'localhost'
+    || (window.location.hostname.endsWith('.vitamix.com') && window.location.hostname !== 'www.vitamix.com')
+  ) {
+    setTimeout(decorateInternalLinks, 1000);
   }
 
   setTimeout(decorateExternalLinks, 1000);

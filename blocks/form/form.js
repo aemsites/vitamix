@@ -1,5 +1,44 @@
 import { toCamelCase, toClassName } from '../../scripts/aem.js';
-import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { getFormSubmissionUrl, getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { getLeadSource, getLegacyLeadSource } from '../../scripts/lead-source.js';
+
+const RETRIABLE_STATUS = new Set([502, 503, 504]);
+
+/**
+ * Fetch that retries transient gateway and network failures. It stays local to
+ * this existing block so a browser-cached base `scripts.js` can still link the
+ * form module during a deployment transition.
+ * @param {string|URL} url - Request URL
+ * @param {RequestInit} [options] - Fetch options
+ * @param {number} [retries=2] - Additional attempts after the first
+ * @param {number} [backoff=500] - Base delay in ms, multiplied by the attempt number
+ * @returns {Promise<Response>} The final response
+ */
+async function fetchWithRetry(url, options, retries = 2, backoff = 500) {
+  for (let attempt = 0; ; attempt += 1) {
+    const isLastAttempt = attempt === retries;
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const resp = await fetch(url, options);
+      if (isLastAttempt || !RETRIABLE_STATUS.has(resp.status)) return resp;
+    } catch (err) {
+      if (isLastAttempt) throw err;
+    }
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((resolve) => { setTimeout(resolve, backoff * (attempt + 1)); });
+  }
+}
+
+/**
+ * Extracts a status message from a submission response body. The forms service
+ * returns the upstream payload unwrapped, so the message can live either under a
+ * `data` envelope or at the root of the object, e.g. `{ statusCode, message }`.
+ * @param {any} body - Parsed JSON response body
+ * @returns {string|undefined} The message, if present
+ */
+function getResponseMessage(body) {
+  return body?.data?.message ?? body?.message;
+}
 
 /**
  * Creates an HTML element with an optional class name
@@ -52,6 +91,25 @@ function buildLabel(text, type = 'label', id = null) {
 }
 
 /**
+ * @param {Object} field
+ * @returns {HTMLDivElement} Section element
+ */
+function buildSection(field) {
+  const {
+    label, field: fieldName, autocomplete,
+  } = field;
+  const section = createElement('fieldset', `form-section section-${fieldName}`);
+  // section.append(buildLabel(label, 'legend'));
+  if (label) {
+    const h3 = createElement('h3');
+    h3.textContent = label;
+    section.append(h3);
+  }
+  if (autocomplete) section.autocomplete = `section-${autocomplete}`;
+  return section;
+}
+
+/**
  * Creates an input element with specified attributes
  * @param {Object} field - Field configuration object
  * @returns {HTMLInputElement} Input element
@@ -64,6 +122,7 @@ function buildInput(field) {
     default: defaultValue,
     placeholder,
     pattern,
+    autocomplete,
   } = field;
 
   const input = createElement('input');
@@ -74,6 +133,7 @@ function buildInput(field) {
 
   if (defaultValue) input.value = defaultValue;
   if (placeholder) input.placeholder = placeholder;
+  if (autocomplete) input.autocomplete = autocomplete;
   if (pattern) input.pattern = pattern;
 
   if (fieldName === 'mobile') {
@@ -104,7 +164,7 @@ function buildInput(field) {
  */
 function buildTextArea(field) {
   const {
-    field: fieldName, required, default: defaultValue, placeholder,
+    field: fieldName, required, default: defaultValue, placeholder, autocomplete,
   } = field;
 
   const textarea = createElement('textarea');
@@ -114,7 +174,40 @@ function buildTextArea(field) {
   textarea.rows = 5;
   if (defaultValue) textarea.value = defaultValue;
   if (placeholder) textarea.placeholder = placeholder;
+  if (autocomplete) textarea.autocomplete = autocomplete;
   return textarea;
+}
+
+async function appendSelectOptions(select, url) {
+  try {
+    // fetch options as JSON sheet
+    const { pathname } = new URL(url);
+    const resp = await fetch(pathname);
+    if (!resp.ok) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to fetch select options', resp.status);
+      return select;
+    }
+    const { data } = await resp.json();
+    if (!data || !Array.isArray(data)) {
+      // eslint-disable-next-line no-console
+      console.error('Invalid select options JSON', data);
+      return select;
+    }
+
+    if (select.dataset.optionsOverridden) return select;
+    data.forEach((option) => {
+      const optionEl = createElement('option');
+      optionEl.value = option.Value || option.value;
+      optionEl.textContent = option.Label || option.label;
+      select.append(optionEl);
+    });
+    return select;
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Failed to parse select options', error);
+    return select;
+  }
 }
 
 /**
@@ -133,7 +226,7 @@ function decodeOption(option) {
  */
 function buildSelect(field) {
   const {
-    field: fieldName, required, default: defaultValue, options,
+    field: fieldName, required, default: defaultValue, placeholder, options,
   } = field;
 
   const select = createElement('select');
@@ -141,7 +234,20 @@ function buildSelect(field) {
   select.name = select.id;
   select.required = required === 'true';
 
-  if (options) {
+  if (options && /^https?:\/\//.test(options)) {
+    // URL-based options: fetch from JSON sheet
+    if (placeholder) {
+      const optionEl = createElement('option');
+      if (defaultValue != null) {
+        optionEl.value = defaultValue;
+      }
+      optionEl.textContent = placeholder;
+      optionEl.setAttribute('disabled', 'true');
+      select.append(optionEl);
+    }
+    appendSelectOptions(select, options);
+  } else if (options) {
+    // Inline comma-separated options
     options.split(',').forEach((o) => {
       const [text, value] = decodeOption(o);
       const option = createElement('option');
@@ -409,7 +515,8 @@ function enableNavSearch(form) {
  * @param {HTMLFormElement} form - Footer sign-up form
  */
 function enableFooterSignUp(form) {
-  form.classList.add('footer-sign-up');
+  const formName = 'footer-sign-up';
+  form.classList.add(formName);
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const data = new FormData(form);
@@ -419,40 +526,87 @@ function enableFooterSignUp(form) {
     const { email, mobile, optIn } = entries;
     const country = window.location.pathname.split('/')[1];
     const { locale, language } = getLocaleAndLanguage();
-    let leadSource = `sub-em-footer-${country}`;
-    if (form.closest('dialog')) {
-      leadSource = `sub-em-modal-${country}`;
-    }
-    if (window.leadSourceOverride) {
-      leadSource = `sub-em-${window.leadSourceOverride}-${country}`;
-    }
+    const smsOptIn = Boolean(optIn);
+    let page = 'footer';
+    if (form.closest('dialog')) page = 'modal';
+    if (window.leadSourceOverride) page = window.leadSourceOverride;
 
-    const payload = {
-      email,
-      mobile,
-      sms_optin: optIn ? '1' : '0',
-      lead_source: leadSource,
-      pageUrl: window.location.href,
-      actionUrl: `/${locale}/${language}/rest/V1/vitamix-api/newslettersubscribe`,
-    };
-    const params = new URLSearchParams(payload);
+    // Tracks the real backend outcome, used below to fire the right analytics event.
+    let success = false;
+    let leadSource;
     try {
-      const resp = await fetch(`https://www.vitamix.com/bin/vitamix/newslettersubscription?${params.toString()}`);
-      if (!resp.ok) {
+      if (window.useEdgeCheckout) {
+        // Edge locales submit to the new AEM Forms endpoint, not the legacy Magento REST
+        // API, so it's safe to encode the SMS channel in leadSource here.
+        leadSource = getLeadSource(page, country, { emailOptIn: true, smsOptIn });
+        const payload = {
+          formId: `${locale}/${language}/newsletter`,
+          pageUrl: window.location.href,
+          email,
+          mobile,
+          smsOptIn,
+          emailOptIn: true,
+          leadSource,
+        };
+        const resp = await fetchWithRetry(getFormSubmissionUrl(), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
+        success = resp.ok;
+        const body = await resp.json().catch(() => ({}));
+        const message = getResponseMessage(body);
+        if (!success) {
+          // eslint-disable-next-line no-console
+          console.error('Failed to submit newsletter subscription', resp.status, message ?? resp);
+        } else if (message) {
+          // eslint-disable-next-line no-console
+          console.log(message);
+        }
+      } else {
+        // Non-edge locales still run on Magento: proxy through the AEM bin servlet,
+        // which forwards to the Magento REST newsletter-subscribe API server-side.
+        // Never encode channel in leadSource here — it previously caused duplicate SMS
+        // subscriptions on Magento's side (see getLegacyLeadSource doc comment).
+        leadSource = getLegacyLeadSource(page, country);
+        const params = new URLSearchParams({
+          email,
+          mobile,
+          sms_optin: smsOptIn ? '1' : '0',
+          lead_source: leadSource,
+          pageUrl: window.location.href,
+          actionUrl: `/${locale}/${language}/rest/V1/vitamix-api/newslettersubscribe`,
+        });
+        const resp = await fetchWithRetry(`https://www.vitamix.com/bin/vitamix/newslettersubscription?${params.toString()}`);
+        success = resp.ok;
+        if (!success) {
+          // eslint-disable-next-line no-console
+          console.error('Failed to submit newsletter subscription', resp);
+        }
+        // The message may be nested under `data` or sit at the root of the response.
+        const body = await resp.json().catch(() => ({}));
+        const message = getResponseMessage(body);
         // eslint-disable-next-line no-console
-        console.error('Failed to submit newsletter subscription', resp);
+        console.log(message);
       }
-      const { data: { message } } = await resp.json();
-      // eslint-disable-next-line no-console
-      console.log(message);
     } catch (error) {
+      // resp.json() failed (error or malformed response) — not a successful submission.
+      success = false;
       // eslint-disable-next-line no-console
       console.error('Failed to submit newsletter subscription', error);
     }
+
     const thankYou = document.createElement('div');
     thankYou.className = 'form-thank-you';
     thankYou.innerHTML = `<p>${e.submitter.dataset.thankYou}</p>`;
     form.replaceWith(thankYou);
+
+    document.dispatchEvent(new CustomEvent(
+      success ? 'form:submit-success' : 'form:submit-error',
+      { detail: { formName: leadSource } },
+    ));
   });
 }
 
@@ -568,11 +722,15 @@ function buildForm(fields, path) {
   // group buttons at the end
   const buttons = [];
 
+  let section = form;
   fields.forEach((field) => {
     if (field.type === 'submit' || field.type === 'reset') {
       buttons.push(field);
+    } else if (field.type === 'section') {
+      section = buildSection(field, form);
+      form.append(section);
     } else {
-      form.append(buildField(field));
+      section.append(buildField(field));
     }
   });
 

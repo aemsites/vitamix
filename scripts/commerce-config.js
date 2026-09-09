@@ -1,0 +1,232 @@
+const { hostname } = window.location;
+
+function resolveApiOrigin(org, site) {
+  const isProduction = !hostname.endsWith('.aem.page')
+    && !hostname.endsWith('.aem.live')
+    && !hostname.endsWith('.aem.network')
+    && hostname !== 'localhost'
+    && !hostname.startsWith('127.')
+    && !hostname.startsWith('integration.')
+    && !hostname.startsWith('uat.');
+  const base = isProduction
+    ? 'https://api.adobecommerce.live'
+    : 'https://api-stage.adobecommerce.live';
+  return `${base}/${org}/sites/${site}`;
+}
+
+const defaults = {
+  org: undefined,
+  site: undefined,
+  getLocale: () => window.location.pathname.split('/').filter(Boolean)[0] || 'us',
+  getLanguage: () => window.location.pathname.split('/').filter(Boolean)[1] || 'en_us',
+  getOrderPath(page) {
+    return `/${this.getLocale()}/${this.getLanguage()}/order/${page}`;
+  },
+  getAccountPath(page) {
+    const base = `/${this.getLocale()}/${this.getLanguage()}/account`;
+    return page ? `${base}/${page}` : base;
+  },
+  currency: (locale) => (locale === 'ca' ? 'CAD' : 'USD'),
+  addressDoctorOrigin: 'https://vitamix-address-doctor-proxy-worker.adobeaem.workers.dev',
+  cardProvider: 'chase',
+  maxCartQty: 3,
+  affirmMinOrderTotal: 50,
+  getFraudToken() {
+    try { return sessionStorage.getItem('forter_token') || undefined; } catch { return undefined; }
+  },
+  strings: {
+    'en-us': {
+      stepCart: 'Cart',
+      stepCheckout: 'Checkout',
+      stepConfirmation: 'Confirmation',
+      checkoutStepsLabel: 'Checkout steps',
+      remove: 'Remove',
+      removeItem: 'Remove item',
+      maxCartQtyMessage: 'Maximum {max} per order.',
+      continueShopping: 'Continue shopping',
+      apply: 'Apply',
+      applied: 'Applied',
+      discount: 'Discount',
+      subtotal: 'Subtotal',
+      shipping: 'Shipping',
+      estimatedTaxes: 'Estimated taxes',
+      total: 'Total',
+      free: 'Free',
+      freeGift: 'Free gift',
+      or: 'or',
+      orderSummary: 'Order summary',
+      discountPlaceholder: 'Discount code or gift card',
+      cancelHeading: 'Payment not completed',
+      cancelCustomerCancelled: 'You cancelled the payment.',
+      cancelRetry: 'Something went wrong, please try again later.',
+      cancelContactSupport: "We're sorry, but an error occurred while processing your payment. To complete your purchase, please contact our Customer Care team at 1-800-VITAMIX.",
+      cancelReturnToCheckout: 'Return to checkout',
+      orderPaymentNotCompleted: 'Payment not completed',
+      orderPaymentCancelled: 'You cancelled the payment.',
+      orderPaymentFailed: 'Payment could not be processed. Please try again.',
+      orderReturnToCheckout: 'Return to checkout',
+      orderThankYou: 'Thank you for your order!',
+      orderIdLabel: 'Order number:',
+      orderConfirmationEmail: 'A confirmation will be sent to {email}.',
+      orderItemsOrdered: 'Items ordered',
+      orderQtyLabel: 'Qty:',
+      orderTax: 'Tax',
+      orderShippingAddress: 'Shipping address',
+      orderContact: 'Contact',
+      orderGiftMessage: 'Gift message',
+      reviewBannerTitle: 'PayPal authorized.',
+      reviewBannerBody: 'Nothing has been charged yet — review below and complete your order.',
+      reviewHeading: 'Review your order',
+      reviewSubtitle: 'One last look before we complete your order.',
+      reviewSecuredByPaypal: 'Secured by PayPal',
+      reviewShippingMethod: 'Shipping method',
+      reviewDeliveringTo: 'Delivering to {location}',
+      reviewPaymentMethod: 'Payment method',
+      reviewPaypalExpress: 'PayPal Express',
+      reviewAuthorizedNotCharged: 'Authorized · not yet charged',
+      reviewVerifiedByPaypal: 'Verified by PayPal',
+      reviewItemsInOrder: 'Items in your order',
+      reviewColItem: 'Item',
+      reviewColPrice: 'Price',
+      reviewColQty: 'Qty',
+      reviewColSubtotal: 'Subtotal',
+      reviewOrderTotal: 'Order total',
+      reviewGrandTotal: 'Grand total',
+      reviewPromo: 'Promo',
+      reviewCompleteOrder: 'Complete order',
+      reviewTermsPrefix: 'By completing this order you agree to our ',
+      reviewTermsLink: 'Terms and Conditions of Sale',
+      reviewTermsSuffix: '.',
+      reviewCancelReturnToCart: 'Cancel and return to cart',
+      reviewCompleteError: 'We could not complete your order. Please try again.',
+      reviewOrderCancelled: 'This order can no longer be completed — it may have expired or been cancelled. Returning you to your cart…',
+      errorApplePayCountry: 'Shipping is not available to this country.',
+      errorApplePayGeneric: 'Unable to process your order. Please try a different address or payment method.',
+      errorRecaptcha: 'Unable to complete checkout. Please refresh the page and try again.',
+      errorCartChanged: 'Your cart changed during checkout. Please review your cart and try again.',
+    },
+    'fr-ca': {
+      stepCart: 'Panier',
+      stepCheckout: 'Caisse',
+      stepConfirmation: 'Confirmation',
+      checkoutStepsLabel: 'Étapes de la caisse',
+      remove: 'Retirer',
+      removeItem: "Retirer l'article",
+      maxCartQtyMessage: 'Maximum {max} par commande.',
+      continueShopping: 'Continuer vos achats',
+      apply: 'Appliquer',
+      applied: 'Appliqué',
+      discount: 'Rabais',
+      subtotal: 'Sous-total',
+      shipping: 'Livraison',
+      estimatedTaxes: 'Taxes estimées',
+      total: 'Total',
+      free: 'Gratuit',
+      freeGift: 'Cadeau gratuit',
+      or: 'ou',
+      orderSummary: 'Récapitulatif de commande',
+      discountPlaceholder: 'Code de réduction ou carte-cadeau',
+      cancelHeading: 'Paiement non effectué',
+      cancelCustomerCancelled: 'Vous avez annulé le paiement.',
+      cancelRetry: 'Un problème est survenu, veuillez réessayer plus tard.',
+      cancelContactSupport: "Nous sommes désolés, mais une erreur s'est produite lors du traitement de votre paiement. Pour finaliser votre achat, veuillez communiquer avec notre équipe du service à la clientèle au 1 800 VITAMIX.",
+      cancelReturnToCheckout: 'Retourner à la caisse',
+      orderPaymentNotCompleted: 'Paiement non complété',
+      orderPaymentCancelled: 'Vous avez annulé le paiement.',
+      orderPaymentFailed: 'Le paiement n\'a pas pu être traité. Veuillez réessayer.',
+      orderReturnToCheckout: 'Retour à la caisse',
+      orderThankYou: 'Merci pour votre commande !',
+      orderIdLabel: 'Numéro de commande :',
+      orderConfirmationEmail: 'Une confirmation sera envoyée à {email}.',
+      orderItemsOrdered: 'Articles commandés',
+      orderQtyLabel: 'Qté :',
+      orderTax: 'Taxe',
+      orderShippingAddress: 'Adresse de livraison',
+      orderContact: 'Contact',
+      orderGiftMessage: 'Message cadeau',
+      reviewBannerTitle: 'PayPal autorisé.',
+      reviewBannerBody: 'Aucun montant n\'a encore été facturé — vérifiez ci-dessous et finalisez votre commande.',
+      reviewHeading: 'Vérifiez votre commande',
+      reviewSubtitle: 'Un dernier coup d\'œil avant de finaliser votre commande.',
+      reviewSecuredByPaypal: 'Sécurisé par PayPal',
+      reviewShippingMethod: 'Mode de livraison',
+      reviewDeliveringTo: 'Livraison à {location}',
+      reviewPaymentMethod: 'Mode de paiement',
+      reviewPaypalExpress: 'PayPal Express',
+      reviewAuthorizedNotCharged: 'Autorisé · non encore facturé',
+      reviewVerifiedByPaypal: 'Vérifié par PayPal',
+      reviewItemsInOrder: 'Articles de votre commande',
+      reviewColItem: 'Article',
+      reviewColPrice: 'Prix',
+      reviewColQty: 'Qté',
+      reviewColSubtotal: 'Sous-total',
+      reviewOrderTotal: 'Total de la commande',
+      reviewGrandTotal: 'Total général',
+      reviewPromo: 'Promo',
+      reviewCompleteOrder: 'Finaliser la commande',
+      reviewTermsPrefix: 'En finalisant cette commande, vous acceptez nos ',
+      reviewTermsLink: 'conditions générales de vente',
+      reviewTermsSuffix: '.',
+      reviewCancelReturnToCart: 'Annuler et retourner au panier',
+      reviewCompleteError: 'Nous n\'avons pas pu finaliser votre commande. Veuillez réessayer.',
+      reviewOrderCancelled: 'Cette commande ne peut plus être finalisée — elle a peut-être expiré ou été annulée. Retour à votre panier…',
+      errorApplePayCountry: 'La livraison n\'est pas disponible dans ce pays.',
+      errorApplePayGeneric: 'Impossible de traiter votre commande. Veuillez essayer une autre adresse ou un autre mode de paiement.',
+      errorRecaptcha: 'Impossible de finaliser la commande. Veuillez actualiser la page et réessayer.',
+      errorCartChanged: 'Votre panier a changé pendant le paiement. Veuillez vérifier votre panier et réessayer.',
+    },
+  },
+  getStrings() {
+    const key = this.getLanguage().toLowerCase().replace('_', '-');
+    return this.strings[key] || this.strings['en-us'];
+  },
+};
+
+/**
+ * Formats a numeric amount as a localized currency string.
+ *
+ * 1. Resolve the store language from the URL path (e.g. 'en_us', 'fr_ca')
+ * 2. Convert to a BCP 47 locale tag (e.g. 'en-US', 'fr-CA')
+ * 3. Format with Intl.NumberFormat using that deterministic locale
+ *
+ * Using a store-derived locale instead of the browser default ensures
+ * consistent currency symbol rendering ('$399.95') regardless of the
+ * visitor's OS/browser language settings.
+ *
+ * @param {number} amount
+ * @param {string} currencyCode - ISO 4217 code, e.g. 'USD', 'CAD'
+ * @returns {string}
+ */
+export function formatPrice(amount, currencyCode) {
+  const lang = defaults.getLanguage();
+  const locale = lang.replace('_', '-').replace(/-([a-z]{2})$/, (_, r) => `-${r.toUpperCase()}`);
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: currencyCode || 'USD',
+  }).format(amount);
+}
+
+/**
+ * Formats a numeric amount with currency-appropriate grouping and decimals
+ * but without the currency symbol. Used alongside a separate currency code
+ * label (e.g. the Total row: "USD $549.95" → "USD 549.95" with the symbol
+ * already provided by the label).
+ *
+ * @param {number} amount
+ * @returns {string}
+ */
+export function formatPriceAmount(amount) {
+  const lang = defaults.getLanguage();
+  const locale = lang.replace('_', '-').replace(/-([a-z]{2})$/, (_, r) => `-${r.toUpperCase()}`);
+  return new Intl.NumberFormat(locale, {
+    style: 'decimal',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+export function getConfig() {
+  const merged = { ...defaults, ...(window.CommerceConfig || {}) };
+  merged.apiOrigin = resolveApiOrigin(merged.org, merged.site);
+  return merged;
+}

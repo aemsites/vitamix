@@ -46,6 +46,7 @@ export default async function decorate(widget) {
 
   const { locale, language } = getLocaleAndLanguage();
   const lang = (language || 'en_us').split('_')[0];
+  import('./util.js').then(({ setupFormValidation }) => setupFormValidation(form, lang));
   const countryCode = (locale || 'us').toUpperCase();
   const copy = await loadFormCopy(lang);
   const provinceOptions = await getStatesProvincesOptions(countryCode, lang).catch(() => []);
@@ -126,6 +127,7 @@ export default async function decorate(widget) {
       submitButton.textContent = labels.sending ?? 'Sending...';
     }
 
+    let didNavigate = false;
     try {
       const resp = await fetch(SHEET_LOGGER_URL, {
         method: 'POST',
@@ -133,16 +135,24 @@ export default async function decorate(widget) {
         body: JSON.stringify(payload),
       });
       if (!resp.ok) {
-        throw new Error(`Sheet logger responded with ${resp.status}`);
+        const { handleFormSubmitError } = await import('./util.js');
+        await handleFormSubmitError(resp, form, labels.submissionFailed ?? 'Something went wrong. Please try again.');
+        return;
       }
+      didNavigate = true;
       const thankYouPath = `/${locale}/${language}/manage-address-thankyou`;
       window.location.href = thankYouPath;
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Manage address form submission failed', err);
-      [...form.elements].forEach((el) => { el.disabled = false; });
-      if (submitButton) {
-        submitButton.textContent = submitButton.dataset.originalLabel || buttonLabel;
+      const { toast } = await import('./util.js');
+      toast(labels.networkError ?? 'Could not reach the server. Please try again.', 'error');
+    } finally {
+      if (!didNavigate) {
+        [...form.elements].forEach((el) => { el.disabled = false; });
+        if (submitButton) {
+          submitButton.textContent = submitButton.dataset.originalLabel || buttonLabel;
+        }
       }
     }
   });

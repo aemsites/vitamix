@@ -32,6 +32,7 @@ export default async function decorate(widget) {
 
   const { language } = getLocaleAndLanguage();
   const lang = (language || 'en_us').split('_')[0];
+  import('./util.js').then(({ setupFormValidation }) => setupFormValidation(form, lang));
   const copy = await loadFormCopy(lang);
   const labels = copy.labels || {};
   const inputHints = copy.inputPlaceholders || {};
@@ -90,10 +91,15 @@ export default async function decorate(widget) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, pageUrl: window.location.href, resend: true }),
       });
-      if (!resp.ok) throw new Error(`Sheet logger responded with ${resp.status}`);
+      if (!resp.ok) {
+        const { handleFormSubmitError } = await import('./util.js');
+        await handleFormSubmitError(resp, form, labels.submissionFailed ?? 'Something went wrong. Please try again.');
+      }
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Login resend failed', err);
+      const { toast } = await import('./util.js');
+      toast(labels.networkError ?? 'Could not reach the server. Please try again.', 'error');
     }
     resendBtn.disabled = false;
     resendBtn.textContent = originalText;
@@ -113,6 +119,7 @@ export default async function decorate(widget) {
       submitButton.textContent = labels.sending ?? 'Sending...';
     }
 
+    let didAdvance = false;
     try {
       const resp = await fetch(SHEET_LOGGER_URL, {
         method: 'POST',
@@ -120,8 +127,11 @@ export default async function decorate(widget) {
         body: JSON.stringify(payload),
       });
       if (!resp.ok) {
-        throw new Error(`Sheet logger responded with ${resp.status}`);
+        const { handleFormSubmitError } = await import('./util.js');
+        await handleFormSubmitError(resp, form, labels.submissionFailed ?? 'Something went wrong. Please try again.');
+        return;
       }
+      didAdvance = true;
       form.setAttribute('hidden', '');
       form.classList.add('is-hidden');
       verifyEl.removeAttribute('hidden');
@@ -130,9 +140,14 @@ export default async function decorate(widget) {
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Login form submission failed', err);
-      [...form.elements].forEach((el) => { el.disabled = false; });
-      if (submitButton) {
-        submitButton.textContent = submitButton.dataset.originalLabel || buttonLabel;
+      const { toast } = await import('./util.js');
+      toast(labels.networkError ?? 'Could not reach the server. Please try again.', 'error');
+    } finally {
+      if (!didAdvance) {
+        [...form.elements].forEach((el) => { el.disabled = false; });
+        if (submitButton) {
+          submitButton.textContent = submitButton.dataset.originalLabel || buttonLabel;
+        }
       }
     }
   });

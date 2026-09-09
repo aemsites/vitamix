@@ -4,6 +4,7 @@ import {
   getCurrentBranch,
   buildProductUrl,
   waitForElement,
+  setupTestMode,
 } from '../utils/test-helpers.js';
 
 /**
@@ -21,6 +22,10 @@ test.describe('Stale Session Cart ID', () => {
   test.beforeAll(async () => {
     currentBranch = await getCurrentBranch();
     console.log(`Running tests against branch: ${currentBranch}`);
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await setupTestMode(page);
   });
 
   test('should refresh side-by-side before add-to-cart and use the fresh cart_id', async ({ page }) => {
@@ -76,7 +81,7 @@ test.describe('Stale Session Cart ID', () => {
     });
 
     // Load the product page
-    const productUrl = buildProductUrl(productPath, currentBranch);
+    const productUrl = buildProductUrl(productPath, currentBranch, { cart: 'magento' });
     await page.goto(productUrl);
     await page.waitForLoadState('networkidle');
 

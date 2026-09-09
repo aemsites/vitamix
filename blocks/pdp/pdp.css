@@ -675,6 +675,7 @@ a.button.pdp-find-dealer-button.emphasis {
   height: 24px;
   width: 24px;
   margin: 0;
+  padding: 0;
 }
 
 .pdp p + h1 {

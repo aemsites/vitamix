@@ -1,18 +1,33 @@
 import { loadScript } from './aem.js';
 import './consented/newsletter.js';
-/* eslint-disable import/no-cycle -- loaded dynamically by scripts.js after consent */
 import {
   configureAnalyticsTrackingServers,
   ensureAnalyticsTrackingConfigured,
   getDeploymentEnv,
   initDigitalDataPage,
   initInstrumentation,
+  bootstrapEarlyTracking,
   syncDigitalDataPageContext,
-} from './consented/instrumentation.js';
+  trackCartChange,
+  trackCheckoutShipping,
+  trackLogin,
+  trackSocialEvents,
+  trackFormEvents,
+} from './consented/instrumentation/index.js';
+
+bootstrapEarlyTracking();
 
 document.body.classList.add('consented');
 // Populate digitalData.page (pageType, categories, user profile) before Launch page view.
 initDigitalDataPage();
+// Register cart:change / analytics:cart-add listeners before Launch loads so edge
+// add-to-cart and Magento redirect paths are never missed. Idempotent — safe if
+// called again; initInstrumentation() intentionally does not re-register.
+trackCartChange();
+trackCheckoutShipping();
+trackLogin();
+trackSocialEvents();
+trackFormEvents();
 
 // add delayed functionality here
 window.config = {
@@ -34,27 +49,53 @@ const chatbot = document.createElement('div');
 chatbot.id = 'chatbot-container';
 document.body.appendChild(chatbot);
 
-loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-chatbot.lc-dd65664b07118365206104c205ccc20e-lc.min.js');
+let metaPixelId = 2138559226702249;
+
+if (currentEnvironment.dataset.deploymentEnv === 'prod') {
+  loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-chatbot.lc-dd65664b07118365206104c205ccc20e-lc.min.js');
+} else {
+  loadScript('https://uat.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-chatbot.lc-0714245cb61f874967f99f575877978f-lc.min.js');
+}
 loadScript('https://www.vitamix.com/etc.clientlibs/core/wcm/components/commons/site/clientlibs/container.lc-0a6aff292f5cc42142779cde92054524-lc.min.js');
 
 await loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-library.lc-259cf15444c5fe1f89e5c54df7b6e1e9-lc.min.js');
 await loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-analytics.lc-26814920488a848ff91c1f425646d010-lc.min.js');
+// Patch AppMeasurement trackers (smetrics/ssl) as soon as clientlib-analytics loads.
 configureAnalyticsTrackingServers();
 loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-base.lc-daf5b8dac79e9cf7cb1c0b30d8372e7a-lc.min.js');
 
-if (currentEnvironment.dataset.deploymentEnv === 'prod') {
-  // for production, use the production launch script
-  await loadScript('https://assets.adobedtm.com/launch-EN40f2d69539754c3ea73511e70c65c801.min.js');
-} else {
-  // for development, use the development launch script
-  await loadScript('https://assets.adobedtm.com/8639b8ee2552/0f7a35c4f04b/launch-EN10955306e5aa4722aaabcdd1910448ad-development.min.js');
+const launchConfigByEnv = {
+  prod: {
+    pixelId: 1597403650511067,
+    scriptUrl: 'https://assets.adobedtm.com/launch-EN40f2d69539754c3ea73511e70c65c801.min.js',
+  },
+  stage: {
+    pixelId: 1241297614751799,
+    scriptUrl: 'https://assets.adobedtm.com/8639b8ee2552/0f7a35c4f04b/launch-EN10955306e5aa4722aaabcdd1910448ad-development.min.js',
+  },
+  uat: {
+    pixelId: 1371926081780272,
+    scriptUrl: 'https://assets.adobedtm.com/8639b8ee2552/0f7a35c4f04b/launch-EN10955306e5aa4722aaabcdd1910448ad-development.min.js',
+  },
+  localhost: {
+    pixelId: 2138559226702249,
+    scriptUrl: 'https://assets.adobedtm.com/8639b8ee2552/0f7a35c4f04b/launch-EN10955306e5aa4722aaabcdd1910448ad-development.min.js',
+  },
+};
+
+const launchConfig = launchConfigByEnv[currentEnvironment.dataset.deploymentEnv];
+if (launchConfig) {
+  metaPixelId = launchConfig.pixelId;
+  await loadScript(launchConfig.scriptUrl);
 }
 
+// Re-apply tracker config after Launch creates late AppMeasurement instances.
 configureAnalyticsTrackingServers();
 // Launch overwrites pageType to defaultpage — restore Edge page-specific values.
 syncDigitalDataPageContext();
 
-// digitalData.page pageType + prodView via Launch direct call.
+// Page events (prodView, scView, scCheckout, purchase)
+// and Target orderConfirmPage after Launch is available.
 initInstrumentation();
 ensureAnalyticsTrackingConfigured();
 
@@ -118,7 +159,7 @@ n.queue=[];t=b.createElement(e);t.async=!0;
 t.src=v;s=b.getElementsByTagName(e)[0];
 s.parentNode.insertBefore(t,s)}(window,document,'script',
 'https://connect.facebook.net/en_US/fbevents.js');
-fbq('init', '1597403650511067');
+fbq('init', metaPixelId);
 fbq('track', 'PageView');
 
 // End Facebook Pixel Code
@@ -218,3 +259,12 @@ loadScript('https://cdn.datasteam.io/js/D26F66D1AD707A.js');
 })
 (window,document,"script","//bat.bing.com/bat.js","uetq");
 
+/* eslint-enable */
+
+// Order confirmation page (EDS checkout parity with isOrderSuccessPage() in
+// instrumentation/shared.js): loads the purchase/conversion pixels below.
+const isOrderConfirmation = /\/order\/complete\/?$/.test(pathname);
+
+if (isOrderConfirmation) {
+  import('./consented/conversion.js');
+}

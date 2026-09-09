@@ -27,7 +27,7 @@ function showMinimizedTeaser(text, newsletterLink) {
 
   textEl.addEventListener('click', (e) => {
     e.stopPropagation();
-    window.leadSourceOverride = 'minimizedmodal';
+    window.leadSourceOverride = 'minimize-modal';
     newsletterLink.click();
     attachFormSubmitListener();
     setTimeout(() => attachFormSubmitListener(), 1000);

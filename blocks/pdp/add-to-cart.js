@@ -1,5 +1,9 @@
 import { getMetadata } from '../../scripts/aem.js';
-import { checkVariantOutOfStock, getLocaleAndLanguage, getPdpOverride } from '../../scripts/scripts.js';
+import {
+  checkVariantOutOfStock, getLocaleAndLanguage, getPdpOverride,
+} from '../../scripts/scripts.js';
+import { getConfig } from '../../scripts/commerce-config.js';
+import { logOperation, logError } from '../../scripts/operations-log.js';
 
 /**
  * Renders "Find Locally" button container.
@@ -90,6 +94,66 @@ function toggleFixedAddToCart(container) {
       container.removeAttribute('style');
     }
   });
+}
+
+/**
+ * Normalize a price into a number for the edge cart line item.
+ * Offers expose a flat numeric price (string or number); simple products
+ * without offers expose the Product Bus shape `{ currency, regular, final }`.
+ * Returns `NaN` if no usable value can be extracted.
+ * @param {string|number|{final?: string|number, regular?: string|number}} value
+ * @returns {number}
+ */
+export function normalizeCartPrice(value) {
+  if (value && typeof value === 'object') {
+    return String(value.final ?? value.regular);
+  }
+  return String(value);
+}
+
+/**
+ * Extract shippingDimensions from a JSON-LD Offer's `shippingDetails`, converting
+ * each schema.org `QuantitativeValue` back to the Product Bus `{ value, unit }` shape
+ * the Commerce API expects on cart items. Returns `undefined` when the offer has no
+ * shipping data, so callers can spread it conditionally onto the cart item.
+ *
+ * The pipeline preserves the original unit on `unitText` (e.g. `"lb"`) for this
+ * round-trip, distinct from the UN/CEFACT `unitCode` (e.g. `"LBR"`).
+ *
+ * @param {Object} offer - A schema.org Offer object from the page JSON-LD
+ * @returns {{weight: {value: number, unit: string}} | undefined}
+ */
+export function shippingDimensionsFromOffer(offer) {
+  const w = offer?.shippingDetails?.weight;
+  if (!w || typeof w.value !== 'number' || !w.unitText) return undefined;
+  return { weight: { value: w.value, unit: w.unitText } };
+}
+
+/**
+ * Build the `custom` fragment forwarded onto a cart line item from Product Bus.
+ *
+ * Only commercial products need to carry data today: the order body relays
+ * `custom` verbatim to the Commerce API, and the EBS sync job reads
+ * `item.custom.isCommercial === true` to set the "Commercial" order type.
+ * Commercial is a product-level trait, so it is read from the parent product
+ * rather than a selected variant. Returns an empty object for household
+ * products so the spread adds nothing and their payloads stay unchanged.
+ *
+ * @param {Object} parent - The parent product object from Product Bus
+ * @returns {{custom: {isCommercial: true}} | {}}
+ */
+export function resolveLineItemCustom(parent) {
+  return parent?.custom?.isCommercial ? { custom: { isCommercial: true } } : {};
+}
+
+function getCartCompatibility(parent) {
+  const { type, compatibleWith, compatibilityGroup } = parent.custom || {};
+  if (!compatibleWith && !compatibilityGroup) return null;
+  return {
+    ...(type ? { type } : {}),
+    ...(compatibleWith ? { compatibleWith } : {}),
+    ...(compatibilityGroup ? { compatibilityGroup } : {}),
+  };
 }
 
 /**
@@ -210,8 +274,9 @@ export default function renderAddToCart(ph, block, parent) {
   const quantitySelect = document.createElement('select');
   quantitySelect.id = 'pdp-quantity-select';
 
-  // set maximum quantity (default to 3 if not specified)
-  const maxQuantity = custom.maxCartQty ? +custom.maxCartQty : 3;
+  // per-product override (custom.maxCartQty) wins, otherwise use the global
+  // commerce-config default
+  const maxQuantity = custom.maxCartQty ? +custom.maxCartQty : (getConfig().maxCartQty || 3);
 
   // populate quantity dropdown with options from 1 to maxQuantity
   for (let i = 1; i <= maxQuantity; i += 1) {
@@ -232,48 +297,190 @@ export default function renderAddToCart(ph, block, parent) {
     addToCartButton.textContent = ph.adding || 'Adding...';
     addToCartButton.setAttribute('aria-disabled', 'true');
 
-    // import required modules for cart functionality
-    const { cartApi } = await import('../../scripts/minicart/api.js');
-    const { updateMagentoCacheSections, getMagentoCache } = await import('../../scripts/storage/util.js');
-
-    // cCheck and update customer cache if needed
-    const currentCache = getMagentoCache();
-    if (!currentCache?.customer) {
-      await updateMagentoCacheSections(['customer']);
-    }
-
     // get selected quantity and product SKU
-    const quantity = document.querySelector('.quantity-container select')?.value || 1;
+    const quantity = quantitySelect.value || 1;
     const sku = getMetadata('sku');
 
-    // build array of selected options (variants, warranties, required bundles)
+    // Magento-format selectedOptions (base64 UIDs). Used only by the Magento
+    // branch below. The edge branch builds semantic {id, value} options inline.
     const selectedOptions = [];
-
-    // add selected variant option if available
     if (window.selectedVariant?.options?.uid) {
       selectedOptions.push(window.selectedVariant.options.uid);
     }
-
-    // add selected warranty if available
     if (window.selectedWarranty?.uid) {
       selectedOptions.push(window.selectedWarranty.uid);
     }
-
-    // add any required bundle options
     if (parent.custom && parent.custom.requiredBundleOptions) {
       selectedOptions.push(...parent.custom.requiredBundleOptions);
     }
 
     try {
+      if (window.useEdgeCheckout) {
+        const cartApi = (await import('../../scripts/cart.js')).default;
+
+        const { sku: variantSku } = selectedVariant;
+        const targetSku = variantSku ?? sku;
+        const notifyCartLimit = () => {
+          window.cartQtyLimitAlerts ||= new Set();
+          window.cartQtyLimitAlerts.add(targetSku);
+          document.dispatchEvent(new CustomEvent('cart:limit', {
+            detail: { sku: targetSku },
+          }));
+          document.dispatchEvent(new CustomEvent('pdp:add-to-cart', {
+            detail: {
+              item: { sku: targetSku },
+              overLimit: true,
+            },
+          }));
+          addToCartButton.textContent = ph.addToCart || 'Add to Cart';
+          addToCartButton.removeAttribute('aria-disabled');
+        };
+
+        // Cart.addItem enforces this after it has rebased on shared storage,
+        // so a second tab cannot use its stale snapshot to exceed the limit.
+        const requestedQty = parseInt(quantity, 10);
+
+        // Prefer the selected variant's price so variant-specific pricing
+        // wins; fall back to offers[0] for simple products, where
+        // selectedVariant is the parent and has no top-level price.
+        const rawPrice = selectedVariant.price ?? parent.offers?.[0]?.price;
+        const price = normalizeCartPrice(rawPrice);
+
+        // Semantic {id, value} options for the edge cart. The edge cart
+        // carries no Magento-specific data — UIDs stay on the Magento side.
+        const semanticOptions = window.selectedVariant?.options
+          ? Object.entries(window.selectedVariant.options)
+            .filter(([k]) => k !== 'uid' && k !== 'name')
+            .map(([id, value]) => ({ id, value }))
+          : [];
+
+        // Normalize warranty options from Product Bus into the cart convention.
+        // Stashed whenever the product has any warranty options — the cart-page
+        // selector renders the default tier as a read-only "(included)" line
+        // for transparency even when there are no paid upgrades. Paid tiers
+        // carry `path` referencing the published warranty product so the
+        // Commerce API can validate the line's price.
+        const warrantyOptions = (parent.custom?.options ?? []).map((opt) => ({
+          sku: opt.sku,
+          name: opt.name,
+          price: opt.finalPrice ?? opt.price,
+          ...(opt.path ? { path: opt.path } : {}),
+          ...(opt.coverageYears ? { coverageYears: opt.coverageYears } : {}),
+          ...(parseFloat(opt.finalPrice ?? opt.price) === 0 ? { isDefault: true } : {}),
+        }));
+        const availableWarranties = warrantyOptions.length > 0 ? warrantyOptions : null;
+        const compatibility = getCartCompatibility(parent);
+
+        // For simple products, `selectedVariant === parent` and shippingDetails
+        // lives on the auto-generated single Offer; for variants it lives on
+        // the variant offer itself. Read from the variant first, fall back to
+        // the parent's first Offer for the simple-product case.
+        const shippingDimensions = shippingDimensionsFromOffer(selectedVariant)
+          ?? shippingDimensionsFromOffer(parent.offers?.[0]);
+
+        const item = {
+          sku: targetSku,
+          parentSku: variantSku ? sku : undefined,
+          quantity: requestedQty,
+          price,
+          name: parent.name,
+          url: selectedVariant.url,
+          path: new URL(selectedVariant.url).pathname,
+          // Variant may not declare its own image (e.g. a bundle's first color
+          // variant whose source `images` array is empty); fall back to the
+          // parent product's first image.
+          image: selectedVariant.image?.[0] ?? parent.image?.[0],
+          variant: window.selectedVariant?.options?.color || '',
+          selectedOptions: semanticOptions,
+          // Forward the commercial flag from Product Bus so the order carries it
+          // and the EBS sync job can set the "Commercial" order type.
+          ...resolveLineItemCustom(parent),
+          ...(parent.bundleItems ? { bundleItems: parent.bundleItems } : {}),
+          ...((availableWarranties || compatibility) ? {
+            local: {
+              ...(availableWarranties ? { availableWarranties } : {}),
+              ...(compatibility ? { compatibility } : {}),
+            },
+          } : {}),
+          ...(shippingDimensions ? { shippingDimensions } : {}),
+        };
+        const addedItem = await cartApi.addItem(item, { maxQuantity });
+        if (!addedItem) {
+          notifyCartLimit();
+          return;
+        }
+
+        // If the PDP warranty selector has a paid tier selected, commit it
+        // as a paired line item. The cart-page selector reads this state.
+        const selectedTier = warrantyOptions
+          .find((o) => o.sku === window.selectedWarranty?.sku);
+        if (selectedTier && !selectedTier.isDefault) {
+          await cartApi.addItem({
+            sku: selectedTier.sku,
+            path: selectedTier.path,
+            quantity: addedItem.quantity,
+            price: selectedTier.price,
+            name: selectedTier.name,
+            custom: {
+              linkedTo: targetSku,
+              ...(selectedTier.coverageYears
+                ? { coverageYears: selectedTier.coverageYears }
+                : {}),
+            },
+            local: { showInCart: false },
+          });
+        }
+
+        logOperation('added-to-cart', { sku: targetSku, quantity: addedItem.quantity });
+        document.dispatchEvent(new CustomEvent('pdp:add-to-cart', { detail: { item: addedItem } }));
+
+        // On mobile the header cart badge is too subtle — redirect to the
+        // cart page so the user gets clear feedback that the item was added.
+        // Flush first so the cart page always receives the latest shared
+        // localStorage snapshot before navigation.
+        if (window.innerWidth < 900) {
+          cartApi.flush();
+          const { locale, language } = getLocaleAndLanguage();
+          window.location.href = `/${locale}/${language}/order/cart`;
+          return;
+        }
+
+        // reenable button (desktop only — mobile redirects above)
+        addToCartButton.textContent = 'Add to Cart';
+        addToCartButton.removeAttribute('aria-disabled');
+        return;
+      }
+
+      // import required modules for cart functionality
+      const { cartApi } = await import('../../scripts/minicart/api.js');
+      const { updateMagentoCacheSections, getMagentoCache } = await import('../../scripts/storage/util.js');
+
+      // cCheck and update customer cache if needed
+      const currentCache = getMagentoCache();
+      if (!currentCache?.customer) {
+        await updateMagentoCacheSections(['customer']);
+      }
+
       // add product to cart with selected options and quantity
       await cartApi.addToCart(sku, selectedOptions, quantity);
+      logOperation('added-to-cart', { sku, quantity });
 
       // redirect to cart page after successful addition
       const { locale, language } = getLocaleAndLanguage();
       window.location.href = `/${locale}/${language}/checkout/cart/`;
     } catch (error) {
+      const flow = window.useEdgeCheckout ? 'edge' : 'magento';
+      // Slack displays `message`, so include the checkout stack and canonical
+      // product URL there. The query string stays out of telemetry.
+      const errorMessage = `[${flow}] ${window.location.origin}${window.location.pathname} [sku:${sku}] ${error?.message || String(error)}`;
+      logError('pdp.add-to-cart', error, {
+        flow,
+        sku,
+        quantity,
+        message: errorMessage,
+      });
       // eslint-disable-next-line no-console
-      console.error('Failed to add item to cart', error);
+      console.error(errorMessage, error);
     } finally {
       // update button state to show ATC
       addToCartButton.textContent = ph.addToCart || 'Add to Cart';

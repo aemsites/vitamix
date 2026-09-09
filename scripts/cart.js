@@ -1,0 +1,281 @@
+import { getConfig } from './commerce-config.js';
+
+function deepEqual(a, b) {
+  if (a === b) return true;
+  if (typeof a !== typeof b) return false;
+  if (a === null || b === null) return false;
+  if (typeof a !== 'object') return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) {
+    if (a.length !== b.length) return false;
+    return a.every((v, i) => deepEqual(v, b[i]));
+  }
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+  return keysA.every((k) => k in b && deepEqual(a[k], b[k]));
+}
+
+export class Cart {
+  static get STORAGE_KEY() {
+    return `cart:${getConfig().getLocale()}`;
+  }
+
+  static STORAGE_VERSION = 1;
+
+  // Kept distinct from Magento's cart_items_count cookie so Edge cart activity
+  // cannot appear as a Magento cart badge when a tester changes checkout mode.
+  static COUNT_COOKIE = 'edge_cart_items_count';
+
+  /** @type {CartItem[]} */
+  #items = [];
+
+  constructor() {
+    this.#restore();
+    this.#persistNow();
+    window.addEventListener?.('storage', (event) => {
+      if (event.key === Cart.STORAGE_KEY) {
+        this.#restore('sync', true);
+      }
+    });
+  }
+
+  static #getStoredItems() {
+    const stored = localStorage.getItem(Cart.STORAGE_KEY);
+    if (!stored) return null;
+
+    const parsed = JSON.parse(stored);
+    if (parsed.version !== Cart.STORAGE_VERSION) {
+      localStorage.removeItem(Cart.STORAGE_KEY);
+      return null;
+    }
+    return parsed.items;
+  }
+
+  #restore(action = 'restore', clearWhenAbsent = false) {
+    const items = Cart.#getStoredItems();
+    if (items === null && !clearWhenAbsent) return;
+
+    this.#items = items ?? [];
+    this.#dispatchChange(action);
+  }
+
+  #refresh() {
+    this.#items = Cart.#getStoredItems() ?? [];
+  }
+
+  #persistNow() {
+    const expires = new Date(Date.now() + 30 * 864e5).toUTCString();
+    document.cookie = `${Cart.COUNT_COOKIE}=${this.visibleItemCount}; expires=${expires}; path=/`;
+    localStorage.setItem(Cart.STORAGE_KEY, JSON.stringify(this));
+  }
+
+  #dispatchChange(action, item = undefined) {
+    document.dispatchEvent(
+      new CustomEvent('cart:change', {
+        detail: {
+          cart: this,
+          ...(item === undefined ? {} : { item }),
+          action,
+        },
+      }),
+    );
+  }
+
+  #maybeSendEmptyEvent() {
+    if (this.itemCount === 0) {
+      this.#dispatchChange('empty');
+    }
+  }
+
+  /**
+   * Re-persist the latest shared cart before a page navigation.
+   */
+  flush() {
+    this.#refresh();
+    this.#persistNow();
+  }
+
+  get items() {
+    return this.#items;
+  }
+
+  get itemCount() {
+    return this.#items.reduce(
+      (acc, item) => acc + item.quantity,
+      0,
+    );
+  }
+
+  /**
+   * Quantity sum excluding entries flagged invisible via `local.showInCart`
+   * and free gift-with-purchase lines. Display surfaces (header badge,
+   * cart-page empty state, etc.) should prefer this over `itemCount` so
+   * hidden line items (e.g. linked add-ons) and promotional gifts don't
+   * inflate the user-facing count.
+   */
+  get visibleItemCount() {
+    return this.#items.reduce((acc, item) => {
+      if (item.local?.showInCart === false) return acc;
+      if (item.custom?.giftWithPurchase) return acc;
+      return acc + item.quantity;
+    }, 0);
+  }
+
+  get subtotal() {
+    return this.#items.reduce(
+      (acc, item) => acc + item.quantity * parseFloat(item.price),
+      0,
+    );
+  }
+
+  clear() {
+    this.#refresh();
+    this.#items = [];
+    this.#persistNow();
+    this.#dispatchChange('clear');
+    this.#maybeSendEmptyEvent();
+  }
+
+  /**
+   * Add an item to the cart. If an entry with the same SKU already exists,
+   * the merge succeeds only when the existing and incoming `custom` payloads
+   * are deep-equal; on merge, quantity is incremented by the incoming
+   * quantity. A `custom` mismatch throws — defensive guard against UI bugs.
+   *
+   * Pass `{ allowSeparateEntry: true }` when the same SKU legitimately needs
+   * multiple distinct entries with different `custom` payloads (e.g. the same
+   * warranty SKU linked to two different parent products).
+   *
+   * @param {CartItem} item
+   * @param {{ allowSeparateEntry?: boolean, maxQuantity?: number }} [opts]
+   * @returns {CartItem|null} The added item, capped to `maxQuantity` when supplied;
+   *   `null` when the SKU is already at its limit.
+   */
+  addItem(item, { allowSeparateEntry = false, maxQuantity = undefined } = {}) {
+    // A second tab can have an old in-memory snapshot. Always rebase the
+    // mutation on localStorage and persist it in this same turn so its item is
+    // retained instead of being overwritten by the stale snapshot.
+    this.#refresh();
+
+    let itemToAdd = item;
+    if (maxQuantity !== undefined) {
+      const existingQuantity = this.#items
+        .filter((i) => i.sku === item.sku)
+        .reduce((total, existing) => total + existing.quantity, 0);
+      const quantity = Math.max(0, Math.min(item.quantity, maxQuantity - existingQuantity));
+      if (quantity === 0) return null;
+      if (quantity !== item.quantity) itemToAdd = { ...item, quantity };
+    }
+
+    const existing = this.#items.find((i) => i.sku === itemToAdd.sku);
+    if (existing) {
+      if (!deepEqual(existing.custom, itemToAdd.custom)) {
+        if (allowSeparateEntry) {
+          this.#items.push(itemToAdd);
+        } else {
+          throw new Error(`Cannot merge cart item ${itemToAdd.sku}: incompatible custom payloads`);
+        }
+      } else {
+        existing.quantity += itemToAdd.quantity;
+      }
+    } else {
+      this.#items.push(itemToAdd);
+    }
+    this.#persistNow();
+    this.#dispatchChange('add', itemToAdd);
+    return itemToAdd;
+  }
+
+  /**
+   * @param {string} sku
+   * @param {number} quantity
+   */
+  updateItem(sku, quantity) {
+    this.#refresh();
+    const existing = this.#items.find((i) => i.sku === sku);
+    if (!existing) {
+      throw new Error(`Item with sku ${sku} not found`);
+    }
+    existing.quantity = quantity;
+    this.#persistNow();
+    this.#dispatchChange('update', existing);
+    this.#maybeSendEmptyEvent();
+  }
+
+  /**
+   * @param {string} sku
+   * @param {string|((item: CartItem) => boolean)} [matcher] Disambiguator when
+   *   the same SKU has multiple entries. A string matches `custom.linkedTo`
+   *   (back-compat with the warranty flow); a function is a custom predicate
+   *   evaluated against each candidate item.
+   */
+  removeItem(sku, matcher = undefined) {
+    this.#refresh();
+    const predicate = typeof matcher === 'function'
+      ? matcher
+      : (item) => matcher === undefined || item.custom?.linkedTo === matcher;
+    const index = this.#items.findIndex(
+      (i) => i.sku === sku && predicate(i),
+    );
+    const item = index === -1 ? undefined : this.#items[index];
+    if (index !== -1) {
+      this.#items.splice(index, 1);
+    }
+    this.#persistNow();
+    this.#dispatchChange('remove', item);
+    this.#maybeSendEmptyEvent();
+  }
+
+  /**
+   * Returns cart items in API-compatible format.
+   *
+   * Fields forwarded to the order body:
+   *   - the projected scalar fields (`sku`, `path`, `quantity`, `name`,
+   *     `price`, optional `imageUrl` / `productUrl`)
+   *   - `custom` (verbatim) — site-defined fields the server reads
+   *
+   * Fields kept cart-local and not forwarded:
+   *   - `local` — site-defined data used by the cart UI only
+   *   - `bundleItems` — reference data; the Commerce API re-reads the
+   *     authoritative bundle composition from Product Bus at preview time
+   *     so cart staleness can never affect billing or fulfillment.
+   *
+   * Fields forwarded that drive server-side bundle resolution:
+   *   - `selectedOptions` — `{id, value}` pairs; the Commerce API uses
+   *     them to pick which configurable bundle item variant ships.
+   *     Omitted when absent or empty so the server-side estimate-token
+   *     hash sees the same shape across calls.
+   *
+   * @returns {Array<object>}
+   */
+  getItemsForAPI() {
+    const { currency, getLocale } = getConfig();
+    const currencyCode = typeof currency === 'function' ? currency(getLocale()) : currency;
+    return this.items.map((item) => ({
+      sku: item.sku,
+      path: item.path || new URL(item.url, window.location.origin).pathname,
+      quantity: item.quantity,
+      name: item.name,
+      price: {
+        final: String(item.price),
+        currency: currencyCode,
+      },
+      ...(item.image ? { imageUrl: item.image } : {}),
+      ...(item.url ? { productUrl: item.url } : {}),
+      ...(item.selectedOptions?.length ? { selectedOptions: item.selectedOptions } : {}),
+      ...(item.custom ? { custom: item.custom } : {}),
+      ...(item.shippingDimensions ? { shippingDimensions: item.shippingDimensions } : {}),
+    }));
+  }
+
+  toJSON() {
+    return {
+      version: Cart.STORAGE_VERSION,
+      items: this.#items,
+    };
+  }
+}
+
+window.cart = new Cart();
+export default window.cart;

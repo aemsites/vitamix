@@ -1,0 +1,418 @@
+import {
+  estimateExpressCheckout,
+  getCustomerTimezone,
+  parsePreview,
+  validateApplePayMerchant,
+} from '../commerce-api.js';
+import { getUser, isLoggedIn } from '../auth-api.js';
+import { logOperation, getCheckoutId } from '../operations-log.js';
+import resolvePaymentFailureMessage from '../payment-failure.js';
+import {
+  buildApplePayExpressOrderPayload,
+  buildApplePayExpressPreviewPayload,
+  getApplePayExpressContext,
+} from './apple-pay-context.js';
+import { expressPayloadMatchesCart } from '../checkout-context.js';
+
+const APPLE_PAY_SDK_URL = 'https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js';
+
+async function loadSdk() {
+  if (document.querySelector(`script[src="${APPLE_PAY_SDK_URL}"]`)) return;
+  await new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = APPLE_PAY_SDK_URL;
+    script.crossOrigin = 'anonymous';
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+}
+
+function createApplePayButton(locale) {
+  const btn = document.createElement('apple-pay-button');
+  btn.setAttribute('buttonstyle', 'black');
+  btn.setAttribute('type', 'buy');
+  btn.setAttribute('locale', locale || 'en-US');
+  return btn;
+}
+
+function startExpressSession(btn, config, callbacks) {
+  btn.addEventListener('click', () => {
+    const cart = callbacks.getCart();
+    const locale = config.getLocale();
+    const language = config.getLanguage();
+    const bcp47 = `${language.split('_')[0]}-${(language.split('_')[1] || locale).toUpperCase()}`;
+    const checkoutContext = getApplePayExpressContext(callbacks.expressEntryPoint);
+
+    let lastShippingContact = null;
+
+    const request = {
+      countryCode: locale.toUpperCase(),
+      currencyCode: typeof config.currency === 'function' ? config.currency(locale) : config.currency,
+      supportedNetworks: ['visa', 'masterCard', 'amex', 'discover'],
+      merchantCapabilities: ['supports3DS'],
+      requiredShippingContactFields: ['name', 'email', 'phone', 'postalAddress'],
+      total: { label: config.site || 'Store', amount: cart.subtotal.toFixed(2) },
+    };
+
+    const session = new window.ApplePaySession(3, request);
+
+    session.onvalidatemerchant = async (e) => {
+      try {
+        const { merchantSession } = await validateApplePayMerchant(e.validationURL, locale, bcp47);
+        session.completeMerchantValidation(merchantSession);
+      } catch {
+        session.abort();
+      }
+    };
+
+    session.onshippingcontactselected = async (e) => {
+      lastShippingContact = e.shippingContact;
+      const contact = e.shippingContact;
+
+      if (contact.countryCode && contact.countryCode.toLowerCase() !== locale) {
+        session.completeShippingContactSelection({
+          errors: [new window.ApplePayError('shippingContactInvalid', 'countryCode', callbacks.strings?.errorApplePayCountry || 'Shipping is not available to this country.')],
+          newTotal: { label: config.site || 'Store', amount: cart.subtotal.toFixed(2) },
+          newShippingMethods: [],
+          newLineItems: [],
+        });
+        return;
+      }
+
+      try {
+        // Estimate shipping methods with the applied coupon so the method
+        // amounts, the Shipping line, and the total agree (e.g. a free-shipping
+        // coupon must show 0 on the method, not the undiscounted rate). Mirrors
+        // the coupon injection in previewOrderDirect.
+        const couponCode = sessionStorage.getItem('checkout_coupon_code') || undefined;
+        const couponSource = sessionStorage.getItem('checkout_coupon_source') || undefined;
+        const result = await estimateExpressCheckout(
+          contact.countryCode,
+          contact.administrativeArea,
+          contact.postalCode,
+          cart.getItemsForAPI(),
+          {
+            ...checkoutContext,
+            ...(couponCode ? { couponCode } : {}),
+            ...(couponCode && couponSource ? { couponSource } : {}),
+          },
+        );
+        const methods = result.shippingMethods || [];
+        if (!methods.length) {
+          session.completeShippingContactSelection({
+            errors: [new window.ApplePayError('addressUnserviceable')],
+            newTotal: { label: config.site || 'Store', amount: '0.00' },
+            newShippingMethods: [],
+            newLineItems: [],
+          });
+          return;
+        }
+        const defaultMethod = methods[0];
+        // Mint the estimate token + payload for the default method here, on the
+        // event that reliably fires. Apple Pay auto-selects the first method and
+        // does NOT fire onshippingmethodselected for it, so a shopper who pays
+        // with the default would otherwise reach onpaymentauthorized with no
+        // token/payload. Previewing here (and re-previewing in
+        // onshippingmethodselected when the shopper changes method) keeps
+        // state.currentEstimatePayload in sync with the selected address on every
+        // change. Mirrors the PayPal express flow's onShippingAddressChange.
+        const preview = await callbacks.previewOrderDirect(
+          buildApplePayExpressPreviewPayload(
+            cart,
+            String(defaultMethod.id),
+            bcp47,
+            contact,
+            checkoutContext,
+          ),
+        );
+        const { shippingRate } = parsePreview(preview, cart.subtotal);
+        session.completeShippingContactSelection({
+          newShippingMethods: methods.map((m) => ({
+            identifier: String(m.id),
+            label: m.label,
+            detail: m.eta || '',
+            amount: String(m.rate),
+          })),
+          newTotal: { label: config.site || 'Store', amount: String(preview.total) },
+          newLineItems: [
+            { label: 'Subtotal', amount: String(preview.subtotal) },
+            { label: 'Tax', amount: String(preview.taxAmount) },
+            { label: 'Shipping', amount: String(shippingRate) },
+          ],
+        });
+      } catch {
+        session.completeShippingContactSelection({
+          errors: [new window.ApplePayError('addressUnserviceable')],
+          newTotal: { label: config.site || 'Store', amount: '0.00' },
+          newShippingMethods: [],
+          newLineItems: [],
+        });
+      }
+    };
+
+    session.onshippingmethodselected = async (e) => {
+      try {
+        const previewResult = await callbacks.previewOrderDirect(
+          buildApplePayExpressPreviewPayload(
+            cart,
+            e.shippingMethod.identifier,
+            bcp47,
+            lastShippingContact,
+            checkoutContext,
+          ),
+        );
+        // previewOrderDirect already stored the token + payload as a matched
+        // pair on state; no manual assignment needed.
+        const { shippingRate } = parsePreview(previewResult, cart.subtotal);
+        session.completeShippingMethodSelection({
+          newTotal: { label: config.site || 'Store', amount: String(previewResult.total) },
+          newLineItems: [
+            { label: 'Subtotal', amount: String(previewResult.subtotal) },
+            { label: 'Tax', amount: String(previewResult.taxAmount) },
+            { label: 'Shipping', amount: String(shippingRate) },
+          ],
+        });
+      } catch {
+        session.abort();
+        callbacks.showError(callbacks.strings?.errorApplePayGeneric || 'Unable to process your order. Please try a different address or payment method.');
+      }
+    };
+
+    session.onpaymentauthorized = async (e) => {
+      const { payment } = e;
+      const contact = payment.shippingContact;
+      try {
+        // Abort if the cart changed while the Apple Pay sheet was open: the
+        // previewed snapshot no longer matches the live cart, so replaying it
+        // would order stale items and the success path would clear the newly
+        // changed cart.
+        if (!expressPayloadMatchesCart(
+          callbacks.getState().currentEstimatePayload,
+          cart.getItemsForAPI(),
+        )) {
+          session.completePayment(window.ApplePaySession.STATUS_FAILURE);
+          callbacks.showError(callbacks.strings?.errorCartChanged
+            || 'Your cart changed during checkout. Please review your cart and try again.');
+          return;
+        }
+        // When the user is signed in, use their account email so the order is linked
+        // to the right account. The Apple Pay contact email may differ from the
+        // commerce account email, which causes assertEmail to reject the request.
+        const customerEmail = (isLoggedIn() && getUser()?.email) || contact.emailAddress || '';
+        const customerTimezone = getCustomerTimezone();
+        const orderBody = buildApplePayExpressOrderPayload({
+          payment,
+          estimatePayload: callbacks.getState().currentEstimatePayload,
+          estimateToken: callbacks.getState().currentEstimateToken,
+          customerEmail,
+          customerTimezone,
+        });
+
+        const createdOrder = await callbacks.createOrder(orderBody);
+        const fraudToken = (() => {
+          try { return sessionStorage.getItem('forter_token') || undefined; } catch { return undefined; }
+        })();
+        const idempotencyKey = crypto.randomUUID?.() || `${Date.now()}`;
+        const result = await callbacks.initiatePayment(
+          createdOrder.order?.id ?? createdOrder.id,
+          idempotencyKey,
+          fraudToken,
+          'chase-wallet',
+          'apple-pay',
+          { token: payment.token, billingContact: payment.billingContact },
+        );
+
+        if (result.status === 'completed') {
+          session.completePayment(window.ApplePaySession.STATUS_SUCCESS);
+          callbacks.onComplete(createdOrder);
+        } else {
+          session.completePayment(window.ApplePaySession.STATUS_FAILURE);
+          logOperation('checkout-failed', {
+            checkoutId: getCheckoutId(),
+            orderId: createdOrder.order?.id ?? createdOrder.id,
+            provider: 'apple-pay',
+            status: result.status,
+            checkoutFailure: result.checkoutFailure,
+          });
+          callbacks.showError(resolvePaymentFailureMessage(
+            { checkoutFailure: result.checkoutFailure },
+            {
+              contactSupport: callbacks.strings?.cancelContactSupport,
+              retry: callbacks.strings?.cancelRetry,
+            },
+          ));
+        }
+      } catch (err) {
+        session.completePayment(window.ApplePaySession.STATUS_FAILURE);
+        logOperation('checkout-failed', {
+          checkoutId: getCheckoutId(),
+          provider: 'apple-pay',
+          status: err?.status,
+          message: err?.body?.message || err?.message,
+        });
+        const msg = err?.errorHeader?.toLowerCase().includes('recaptcha')
+          ? callbacks.strings.errorRecaptcha
+          : 'Apple Pay payment failed. Please try again.';
+        callbacks.showError(msg);
+      }
+    };
+
+    session.begin();
+  });
+}
+
+/**
+ * Begins an Apple Pay checkout session synchronously within a user gesture,
+ * then returns a Promise that resolves/rejects when the session completes.
+ *
+ * IMPORTANT: This must be called synchronously from a trusted click handler.
+ * session.begin() fires inside the Promise executor (which is synchronous),
+ * preserving the user gesture required by Apple Pay.
+ *
+ * @param {Object} config
+ * @param {Object} callbacks
+ * @returns {Promise<string>} Resolves with 'success' or 'cancel'
+ */
+export function beginCheckoutSession(config, callbacks) {
+  return new Promise((resolve, reject) => {
+    const state = callbacks.getState();
+
+    if (!window.ApplePaySession) {
+      reject(new Error('not-available'));
+      return;
+    }
+
+    if (!state.currentPreview) {
+      reject(new Error('no-preview'));
+      return;
+    }
+
+    const locale = config.getLocale();
+    const language = config.getLanguage();
+    const bcp47 = `${language.split('_')[0]}-${(language.split('_')[1] || locale).toUpperCase()}`;
+
+    const request = {
+      countryCode: locale.toUpperCase(),
+      currencyCode: typeof config.currency === 'function' ? config.currency(locale) : config.currency,
+      supportedNetworks: ['visa', 'masterCard', 'amex', 'discover'],
+      merchantCapabilities: ['supports3DS'],
+      requiredShippingContactFields: [],
+      total: {
+        label: config.site || 'Store',
+        amount: parseFloat(state.currentPreview.total).toFixed(2),
+      },
+    };
+
+    let session;
+    try {
+      session = new window.ApplePaySession(3, request);
+    } catch {
+      reject(new Error('not-available'));
+      return;
+    }
+
+    session.onvalidatemerchant = async (e) => {
+      try {
+        const { merchantSession } = await validateApplePayMerchant(e.validationURL, locale, bcp47);
+        session.completeMerchantValidation(merchantSession);
+      } catch {
+        session.abort();
+        reject(new Error('merchant-validation-failed'));
+      }
+    };
+
+    session.oncancel = () => resolve('cancel');
+
+    session.onpaymentauthorized = async (e) => {
+      const formData = callbacks.getFormData();
+      try {
+        const orderBody = callbacks.buildOrderJSON(formData);
+        const createdOrder = await callbacks.createOrder(orderBody);
+
+        const fraudToken = (() => {
+          try { return sessionStorage.getItem('forter_token') || undefined; } catch { return undefined; }
+        })();
+        const idempotencyKey = crypto.randomUUID?.() || `${Date.now()}`;
+        const result = await callbacks.initiatePayment(
+          createdOrder.order?.id ?? createdOrder.id,
+          idempotencyKey,
+          fraudToken,
+          'chase-wallet',
+          'apple-pay',
+          { token: e.payment.token, billingContact: e.payment.billingContact },
+        );
+
+        if (result.status === 'completed') {
+          session.completePayment(window.ApplePaySession.STATUS_SUCCESS);
+          const email = formData.get('email') || '';
+          const cart = callbacks.getCart();
+          const preview = callbacks.getState().currentPreview;
+          callbacks.saveCheckoutSession?.(email, cart, preview, createdOrder.order ?? createdOrder);
+          callbacks.onComplete(createdOrder);
+          resolve('success');
+        } else {
+          session.completePayment(window.ApplePaySession.STATUS_FAILURE);
+          logOperation('checkout-failed', {
+            checkoutId: getCheckoutId(),
+            orderId: createdOrder.order?.id ?? createdOrder.id,
+            provider: 'apple-pay',
+            status: result.status,
+            checkoutFailure: result.checkoutFailure,
+          });
+          // Carry the neutral failure bucket out so the checkout error handler can
+          // show the matching copy (Customer Care vs retry) instead of a generic message.
+          const err = new Error('payment-failed');
+          err.checkoutFailure = result.checkoutFailure;
+          reject(err);
+        }
+      } catch (err) {
+        session.completePayment(window.ApplePaySession.STATUS_FAILURE);
+        logOperation('checkout-failed', {
+          checkoutId: getCheckoutId(),
+          provider: 'apple-pay',
+          status: err?.status,
+          message: err?.body?.message || err?.message,
+        });
+        const reason = err?.errorHeader?.toLowerCase().includes('recaptcha') ? 'recaptcha-blocked' : 'payment-failed';
+        reject(new Error(reason));
+      }
+    };
+
+    try {
+      session.begin(); // synchronous — user gesture still active here
+    } catch {
+      reject(new Error('not-available'));
+    }
+  });
+}
+
+/** @type {import('./types').PaymentProvider} */
+export default {
+  id: 'apple-pay',
+  label: 'Apple Pay',
+  supportsExpress: true,
+  hidesBilling: true,
+
+  load: async () => loadSdk(),
+
+  isAvailable: () => Boolean(window.ApplePaySession),
+
+  renderExpressButton(container, callbacks) {
+    if (!callbacks.expressEntryPoint) {
+      throw new Error('Apple Pay express checkout requires an entry point');
+    }
+    const config = callbacks.getConfig();
+    const locale = config.getLocale();
+    const language = config.getLanguage();
+    const bcp47 = `${language.split('_')[0]}-${(language.split('_')[1] || locale).toUpperCase()}`;
+    const btn = createApplePayButton(bcp47);
+    startExpressSession(btn, config, callbacks);
+    container.appendChild(btn);
+  },
+
+  renderCheckoutButton() {
+    // Apple Pay is initiated directly from the form's submit button gesture
+    // via callbacks.beginApplePay — no button rendered here.
+  },
+};

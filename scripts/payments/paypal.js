@@ -1,0 +1,481 @@
+import {
+  createPayPalSession,
+  getCustomerTimezone,
+  patchPayPalSession,
+  getPayPalSession,
+} from '../commerce-api.js';
+import { getLocaleAndLanguage } from '../scripts.js';
+import { getUser, isLoggedIn } from '../auth-api.js';
+import { logOperation, getCheckoutId } from '../operations-log.js';
+import resolvePaymentFailureMessage from '../payment-failure.js';
+import ensureCheckoutPreviewToken, { withPayPalExpressContext } from './paypal-context.js';
+import { buildExpressOrderPayload, expressPayloadMatchesCart } from '../checkout-context.js';
+import {
+  isExpressReviewEnabled,
+  resolveExpressOutcome,
+  withInitiateRetry,
+} from './paypal-review.js';
+
+let sdkLoadPromise = null;
+
+const PAY_LATER_LABELS = {
+  fr: 'Payer plus tard',
+  de: 'Später bezahlen',
+  es: 'Pagar después',
+  it: 'Paga dopo',
+  nl: 'Nu kopen, later betalen',
+  pt: 'Pague depois',
+  pl: 'Zapłać później',
+  zh: '先买后付',
+  ja: '後払い',
+};
+
+function getPayLaterLabel(language) {
+  const lang = (language || 'en').split('_')[0].toLowerCase();
+  return PAY_LATER_LABELS[lang] || 'Pay Later';
+}
+
+function loadSdk(clientId, currency, locale, intent = 'capture', commit = false) {
+  if (sdkLoadPromise) return sdkLoadPromise;
+  sdkLoadPromise = new Promise((resolve, reject) => {
+    if (window.paypal) { resolve(); return; }
+    const script = document.createElement('script');
+    const [lang, country] = locale.split('_');
+    const normalizedLocale = country ? `${lang}_${country.toUpperCase()}` : locale;
+    const params = new URLSearchParams({
+      'client-id': clientId,
+      currency,
+      components: 'buttons,messages',
+      locale: normalizedLocale,
+      intent,
+      // Review-mode express → "Continue" (commit:false), promising a review page;
+      // review-off → "Pay Now" (commit:true), finalizing on approval.
+      commit: String(commit),
+      'enable-funding': 'paylater',
+    });
+    script.src = `https://www.paypal.com/sdk/js?${params}`;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('PayPal SDK failed to load'));
+    document.head.appendChild(script);
+  });
+  return sdkLoadPromise;
+}
+
+const PAYPAL_WORDMARK = /* html */`
+<span class="pp-wordmark" aria-label="PayPal">
+  <b class="pp-pay">Pay</b><b class="pp-pal">Pal</b>
+</span>`;
+
+function payLaterWordmark(label) {
+  return /* html */`
+<span class="pp-wordmark" aria-label="PayPal ${label}">
+  <b class="pp-pay">Pay</b><b class="pp-pal">Pal</b>
+</span>
+<span class="pp-later">${label}</span>`;
+}
+
+function createButton(innerHTML, className) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = className;
+  btn.innerHTML = innerHTML;
+  return btn;
+}
+
+function showNotConfiguredDialog() {
+  const dialog = document.createElement('dialog');
+  dialog.className = 'paypal-not-configured-dialog';
+  dialog.innerHTML = /* html */`
+    <p>PayPal Express Checkout is not configured yet.</p>
+    <button class="button" autofocus>Close</button>
+  `;
+  dialog.querySelector('button').addEventListener('click', () => dialog.close());
+  dialog.addEventListener('close', () => dialog.remove());
+  document.body.appendChild(dialog);
+  dialog.showModal();
+}
+
+/** @type {import('./types').PaymentProvider} */
+export default {
+  id: 'paypal',
+  label: 'PayPal',
+  supportsExpress: true,
+  hidesBilling: true,
+
+  load: async (config) => {
+    const clientId = window.CommerceConfig?.paypal?.clientId;
+    if (!clientId) return;
+    const currency = typeof config.currency === 'function'
+      ? config.currency(config.getLocale())
+      : (config.currency || 'USD');
+    const locale = config.getLanguage().replace('-', '_');
+    const intent = (window.CommerceConfig?.paypal?.intent || 'capture').toLowerCase();
+    // Review-mode express renders a "Continue" button (commit:false); otherwise
+    // "Pay Now" (commit:true). Gated on the surfaced orderReview.express flag.
+    const commit = !isExpressReviewEnabled();
+    try {
+      await loadSdk(clientId, currency, locale, intent, commit);
+    } catch { /* fall back to stub buttons */ }
+  },
+
+  isAvailable: () => !!window.paypal,
+
+  /**
+   * Renders the PayPal Express Checkout button (and Pay Later button if
+   * eligible) into the provided container element.
+   *
+   * 1. Guard: if window.paypal is not loaded, render stub dialog buttons
+   * 2. Declare closure state: lastShippingMethods, lastShippingAddress
+   * 3. Build buttonConfig with createOrder, onShippingAddressChange,
+   *    onShippingOptionsChange, onApprove, onError, onCancel
+   * 4. Render primary PayPal button
+   * 5. Render Pay Later button only if isEligible()
+   *
+   * @param {HTMLElement} container
+   * @param {object} callbacks
+   */
+  renderExpressButton(container, callbacks) {
+    if (!window.paypal) {
+      // No SDK — stub buttons with localized Pay Later label
+      const label = getPayLaterLabel(callbacks.getConfig().getLanguage());
+      const paypalWrapper = document.createElement('div');
+      paypalWrapper.className = 'paypal-paypal-wrapper';
+      const paypalBtn = createButton(PAYPAL_WORDMARK, 'paypal-express-btn');
+      paypalBtn.addEventListener('click', showNotConfiguredDialog);
+      paypalWrapper.appendChild(paypalBtn);
+      container.appendChild(paypalWrapper);
+
+      const payLaterWrapper = document.createElement('div');
+      payLaterWrapper.className = 'paypal-paylater-wrapper';
+      const payLaterStub = createButton(
+        payLaterWordmark(label),
+        'paypal-express-btn paylater-express-btn',
+      );
+      payLaterStub.addEventListener('click', showNotConfiguredDialog);
+      payLaterWrapper.appendChild(payLaterStub);
+      container.appendChild(payLaterWrapper);
+      return;
+    }
+
+    if (!callbacks.expressEntryPoint) {
+      throw new Error('PayPal express checkout requires an entry point');
+    }
+
+    let lastShippingMethods = [];
+    let lastShippingAddress = null;
+
+    const expressConfig = callbacks.getConfig();
+    const currency = typeof expressConfig.currency === 'function'
+      ? expressConfig.currency(expressConfig.getLocale())
+      : (expressConfig.currency || 'USD');
+
+    const buttonConfig = {
+      style: {
+        layout: 'vertical',
+        color: 'gold',
+        shape: 'rect',
+        label: 'paypal',
+        tagline: false,
+        height: 55,
+      },
+
+      createOrder: async () => {
+        const config = callbacks.getConfig();
+        const cart = callbacks.getCart();
+        const state = callbacks.getState();
+        const { paypalOrderId } = await createPayPalSession(cart.getItemsForAPI(), config);
+        state.paypalSessionId = paypalOrderId;
+        return paypalOrderId;
+      },
+
+      onShippingAddressChange: async (data, actions) => {
+        lastShippingAddress = data.shippingAddress;
+        const state = callbacks.getState();
+        const cart = callbacks.getCart();
+        const config = callbacks.getConfig();
+        // Forward the applied coupon so the server prices the PayPal amount with the
+        // discount (and persists it for the shipping-option re-estimate). Mirrors the
+        // coupon injection in the shared previewOrderDirect callback.
+        const couponCode = sessionStorage.getItem('checkout_coupon_code') || undefined;
+        const couponSource = sessionStorage.getItem('checkout_coupon_source') || undefined;
+        try {
+          const result = await patchPayPalSession(state.paypalSessionId, {
+            type: 'address',
+            country: config.getLocale(),
+            locale: getLocaleAndLanguage(false, true).language,
+            currency,
+            address: {
+              country: data.shippingAddress.countryCode,
+              state: data.shippingAddress.state,
+              zip: data.shippingAddress.postalCode,
+            },
+            items: cart.getItemsForAPI(),
+            ...(couponCode ? { couponCode } : {}),
+            ...(couponCode && couponSource ? { couponSource } : {}),
+          });
+          if (!result.shippingMethods?.length) {
+            return actions.reject(data.errors.ADDRESS_ERROR);
+          }
+          lastShippingMethods = result.shippingMethods;
+          // Preview with the default (first) method so estimateToken is always set
+          // even when the user never changes the shipping option (onShippingOptionsChange
+          // only fires on an explicit option change, not on initial address selection).
+          const countryCode = data.shippingAddress.countryCode?.toLowerCase();
+          const [defaultMethod] = lastShippingMethods;
+          const preview = await callbacks.previewOrderDirect(withPayPalExpressContext({
+            items: cart.getItemsForAPI(),
+            locale: getLocaleAndLanguage(false, true).language,
+            shippingMethod: { id: String(defaultMethod.id) },
+            ...(countryCode ? {
+              country: countryCode,
+              shipping: {
+                country: countryCode,
+                state: data.shippingAddress.state,
+                zip: data.shippingAddress.postalCode || '',
+              },
+            } : {}),
+          }, callbacks.expressEntryPoint));
+          state.currentEstimateToken = preview.estimateToken;
+        } catch {
+          return actions.reject(data.errors.ADDRESS_ERROR);
+        }
+        return undefined;
+      },
+
+      onShippingOptionsChange: async (data, actions) => {
+        const selectedId = data.selectedShippingOption?.id;
+        const method = lastShippingMethods.find((m) => m.id === selectedId);
+        if (!method) return actions.reject(data.errors.METHOD_UNAVAILABLE);
+        const state = callbacks.getState();
+        const cart = callbacks.getCart();
+        const config = callbacks.getConfig();
+        await patchPayPalSession(state.paypalSessionId, {
+          type: 'option',
+          country: config.getLocale(),
+          locale: getLocaleAndLanguage(false, true).language,
+          currency,
+          selectedOptionId: method.id,
+          total: method.total,
+          taxAmount: method.taxAmount,
+          shippingRate: method.rate,
+        });
+        const countryCode = lastShippingAddress?.countryCode?.toLowerCase();
+        const preview = await callbacks.previewOrderDirect(withPayPalExpressContext({
+          items: cart.getItemsForAPI(),
+          locale: getLocaleAndLanguage(false, true).language,
+          shippingMethod: { id: String(method.id) },
+          ...(countryCode ? {
+            country: countryCode,
+            shipping: {
+              country: countryCode,
+              state: lastShippingAddress.state,
+              zip: lastShippingAddress.postalCode || '',
+            },
+          } : {}),
+        }, callbacks.expressEntryPoint));
+        state.currentEstimateToken = preview.estimateToken;
+        return undefined;
+      },
+
+      onApprove: async () => {
+        try {
+          const state = callbacks.getState();
+          const cart = callbacks.getCart();
+          const config = callbacks.getConfig();
+          // Abort if the cart changed while the PayPal wallet was open (a
+          // cross-tab edit or async gift-with-purchase reconciliation): the
+          // captured estimate payload no longer matches what the shopper sees,
+          // and replaying it would order the stale snapshot while the success
+          // path clears the newly changed cart.
+          if (!expressPayloadMatchesCart(state.currentEstimatePayload, cart.getItemsForAPI())) {
+            callbacks.showError(callbacks.strings?.errorCartChanged
+              || 'Your cart changed during checkout. Please review your cart and try again.');
+            return;
+          }
+          const session = await getPayPalSession(
+            state.paypalSessionId,
+            config.getLocale(),
+            getLocaleAndLanguage(false, true).language,
+          );
+          const customerTimezone = getCustomerTimezone();
+          // When signed in, the order owner is the commerce account. PayPal may
+          // return a different payer email, which remains on billing/shipping.
+          const accountEmail = isLoggedIn() ? getUser()?.email : '';
+          const customerEmail = accountEmail || session.payer.email || '';
+          const fullName = `${session.payer.firstName} ${session.payer.lastName}`.trim();
+          const walletAddress = {
+            name: fullName,
+            ...session.shippingAddress,
+            email: session.payer.email,
+          };
+          // Replay the exact payload that minted the estimate token (items,
+          // selectedOptions, shippingMethod, coupon, checkout context) and
+          // overlay only the wallet-provided identity + token. This keeps the
+          // order body consistent with the token's payloadHash by construction.
+          const orderBody = buildExpressOrderPayload(state.currentEstimatePayload, {
+            customer: {
+              firstName: session.payer.firstName,
+              lastName: session.payer.lastName,
+              email: customerEmail,
+              phone: '',
+            },
+            shipping: walletAddress,
+            billing: walletAddress,
+            estimateToken: state.currentEstimateToken,
+            customerTimezone,
+          });
+          const createdOrder = await callbacks.createOrder(orderBody);
+          const fraudToken = (() => {
+            try { return sessionStorage.getItem('forter_token') || undefined; } catch { return undefined; }
+          })();
+          const orderId = createdOrder.order?.id ?? createdOrder.id;
+          const idempotencyKey = crypto.randomUUID?.() || `${Date.now()}`;
+          // Retry a transient (retryable 5xx) initiate against the SAME order and
+          // idempotencyKey rather than dead-ending an approved checkout.
+          const result = await withInitiateRetry(() => callbacks.initiatePayment(
+            orderId,
+            idempotencyKey,
+            fraudToken,
+            'paypal-express',
+            'paypal',
+            { paypalOrderId: state.paypalSessionId },
+          ));
+          const outcome = resolveExpressOutcome(result);
+          if (outcome === 'review') {
+            // Review mode: hand off to the storefront review page. Seed the
+            // checkout session first — especially the email proof — so the review
+            // page can resolve the order via getOrder (the express flow does not
+            // otherwise persist checkout_email like the checkout-page flow does).
+            callbacks.saveCheckoutSession(
+              customerEmail,
+              cart,
+              callbacks.getState().currentPreview,
+              createdOrder.order ?? createdOrder,
+            );
+            window.location.href = `${config.getOrderPath('review')}?orderId=${encodeURIComponent(orderId)}`;
+          } else if (outcome === 'completed') {
+            callbacks.onComplete(createdOrder);
+          } else {
+            callbacks.showError(resolvePaymentFailureMessage(
+              { checkoutFailure: result.checkoutFailure },
+              {
+                contactSupport: callbacks.strings?.cancelContactSupport,
+                retry: callbacks.strings?.cancelRetry,
+              },
+            ));
+          }
+        } catch (err) {
+          callbacks.showError(err?.errorHeader?.toLowerCase().includes('recaptcha')
+            ? callbacks.strings.errorRecaptcha
+            : 'PayPal payment failed. Please try again.');
+        }
+      },
+
+      onError: () => {
+        callbacks.showError('PayPal encountered an error. Please try again.');
+      },
+
+      onCancel: () => {
+        // User dismissed the PayPal sheet intentionally — no action needed.
+      },
+    };
+
+    // Render PayPal and Pay Later as two separate funding-source buttons,
+    // each in its own wrapper, so layout is controlled by CSS. Rendering a
+    // single horizontal button and relying on enable-funding=paylater caused
+    // PayPal's SDK to silently drop the Pay Later button at narrow (mobile)
+    // widths. Two explicit funding sources always render when eligible.
+    const paypalWrapper = document.createElement('div');
+    paypalWrapper.className = 'paypal-paypal-wrapper';
+    container.appendChild(paypalWrapper);
+    window.paypal.Buttons({
+      ...buttonConfig,
+      fundingSource: window.paypal.FUNDING.PAYPAL,
+    }).render(paypalWrapper);
+
+    const payLaterButtons = window.paypal.Buttons({
+      ...buttonConfig,
+      fundingSource: window.paypal.FUNDING.PAYLATER,
+    });
+    if (payLaterButtons.isEligible()) {
+      const payLaterWrapper = document.createElement('div');
+      payLaterWrapper.className = 'paypal-paylater-wrapper';
+      container.appendChild(payLaterWrapper);
+      payLaterButtons.render(payLaterWrapper);
+    }
+  },
+
+  renderCheckoutButton(container, callbacks) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'button paypal-redirect-btn';
+    btn.textContent = 'Continue with PayPal';
+    container.appendChild(btn);
+
+    btn.addEventListener('click', async () => {
+      callbacks.clearError();
+      btn.disabled = true;
+
+      if (!await ensureCheckoutPreviewToken(callbacks)) {
+        callbacks.showError('Unable to calculate totals. Please try again.');
+        btn.disabled = false;
+        return;
+      }
+
+      const formData = callbacks.getFormData();
+      const email = formData.get('email') || '';
+
+      let createdOrder;
+      try {
+        const orderBody = callbacks.buildOrderJSON(formData);
+        createdOrder = await callbacks.createOrder(orderBody);
+        callbacks.saveCheckoutSession(
+          email,
+          callbacks.getCart(),
+          callbacks.getState().currentPreview,
+          createdOrder.order ?? createdOrder,
+        );
+      } catch (err) {
+        callbacks.showError(err?.errorHeader?.toLowerCase().includes('recaptcha')
+          ? callbacks.strings.errorRecaptcha
+          : (err.body?.message || 'Unable to place order. Please try again.'));
+        btn.disabled = false;
+        return;
+      }
+
+      const idempotencyKey = crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+      const fraudToken = (() => {
+        try { return sessionStorage.getItem('forter_token') || undefined; } catch { return undefined; }
+      })();
+
+      const orderId = createdOrder.order?.id ?? createdOrder.id;
+      try {
+        const payment = await callbacks.initiatePayment(
+          orderId,
+          idempotencyKey,
+          fraudToken,
+          'paypal',
+          'paypal',
+        );
+        if (payment.action === 'redirect' && payment.redirectUrl) {
+          logOperation('checkout-redirect-start', {
+            checkoutId: getCheckoutId(), orderId, provider: 'paypal',
+          });
+          window.location.href = payment.redirectUrl;
+        } else {
+          logOperation('checkout-failed', {
+            checkoutId: getCheckoutId(), orderId, provider: 'paypal', status: payment.status,
+          });
+          callbacks.showError('Unexpected payment response. Please try again.');
+          btn.disabled = false;
+        }
+      } catch (err) {
+        logOperation('checkout-failed', {
+          checkoutId: getCheckoutId(), orderId, provider: 'paypal', status: err?.status, message: err?.body?.message || err?.message,
+        });
+        callbacks.showError(err.body?.message || 'Something went wrong. Please try again.');
+        btn.disabled = false;
+      }
+    });
+  },
+};

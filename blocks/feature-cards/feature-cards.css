@@ -1,0 +1,80 @@
+main > .section > .feature-cards-wrapper {
+  padding: 0;
+}
+
+.feature-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  width: 100%;
+}
+
+.feature-card {
+  background: #fff;
+  border: 1px solid var(--commerce-color-border, #e5e7eb);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.feature-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.feature-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+.feature-card-icon img,
+.feature-card-icon svg {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.feature-card-title {
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.feature-card-body {
+  font-size: var(--commerce-font-size-sm, 14px);
+  line-height: 1.6;
+  color: var(--commerce-color-text, #111);
+}
+
+.feature-card-body p {
+  margin: 0 0 8px;
+}
+
+.feature-card-body p:last-child {
+  margin-bottom: 0;
+}
+
+/* Reset any global .button styling on links inside card bodies */
+.feature-card-body a.button {
+  all: unset;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+@media (width <= 999px) {
+  .feature-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (width <= 599px) {
+  .feature-cards {
+    grid-template-columns: 1fr;
+  }
+}

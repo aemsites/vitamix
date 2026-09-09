@@ -6,6 +6,9 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './tests',
+  /* Only pick up e2e specs. Unit tests under tests/unit/ use `*.test.js`
+     and are run by Node's built-in runner via `npm run test:unit`. */
+  testMatch: '**/*.spec.js',
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
@@ -35,10 +38,18 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
+      // Desktop is a focused coverage leg: run tests that explicitly exercise
+      // desktop-only behavior plus a small cross-browser smoke set. The full
+      // suite runs on Mobile Chrome because mobile traffic is the higher-risk
+      // storefront path and duplicating every live-page test doubles origin load.
+      grep: /@desktop|@cross-browser/,
       use: { ...devices['Desktop Chrome'] },
     },
     {
       name: 'Mobile Chrome',
+      // Mobile is the primary integration leg. Exclude only tests that are
+      // explicitly desktop-only, such as minicart desktop popover behavior.
+      grepInvert: /@desktop/,
       use: { ...devices['Pixel 5'] },
     },
   ],

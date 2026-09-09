@@ -41,6 +41,7 @@ export default async function decorate(widget) {
 
   const { locale, language } = getLocaleAndLanguage();
   const lang = (language || 'en_us').split('_')[0];
+  import('./util.js').then(({ setupFormValidation }) => setupFormValidation(form, lang));
   const copy = await loadFormCopy(lang);
   const labels = copy.labels || {};
   const inputHints = copy.inputPlaceholders || {};
@@ -99,6 +100,7 @@ export default async function decorate(widget) {
       submitButton.textContent = labels.sending ?? 'Sending...';
     }
 
+    let didNavigate = false;
     try {
       const resp = await fetch(getFormSubmissionUrl(), {
         method: 'POST',
@@ -106,16 +108,24 @@ export default async function decorate(widget) {
         body: JSON.stringify(payload),
       });
       if (!resp.ok) {
-        throw new Error(`Forms API submission failed with ${resp.status}`);
+        const { handleFormSubmitError } = await import('./util.js');
+        await handleFormSubmitError(resp, form, labels.submissionFailed ?? 'Something went wrong. Please try again.');
+        return;
       }
+      didNavigate = true;
       const thankYouPath = `/${locale}/${language}/corporate-information/media-center/media-request-thankyou`;
       window.location.href = thankYouPath;
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Media contact form submission failed', err);
-      [...form.elements].forEach((el) => { el.disabled = false; });
-      if (submitButton) {
-        submitButton.textContent = submitButton.dataset.originalLabel || buttonLabel;
+      const { toast } = await import('./util.js');
+      toast(labels.networkError ?? 'Could not reach the server. Please try again.', 'error');
+    } finally {
+      if (!didNavigate) {
+        [...form.elements].forEach((el) => { el.disabled = false; });
+        if (submitButton) {
+          submitButton.textContent = submitButton.dataset.originalLabel || buttonLabel;
+        }
       }
     }
   });

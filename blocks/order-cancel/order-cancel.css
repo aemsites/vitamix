@@ -1,0 +1,47 @@
+.section > .order-cancel-wrapper {
+  margin-top: 32px;
+}
+
+.order-cancel-result {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 80px 24px 64px;
+  text-align: center;
+}
+
+.order-cancel-icon {
+  margin-bottom: 24px;
+  color: #c62828;
+}
+
+.order-cancel-result h2 {
+  margin: 0 0 12px;
+  font-size: 28px;
+}
+
+.order-cancel-reason {
+  margin: 0 0 8px;
+  font-size: 16px;
+  color: #333;
+}
+
+.order-cancel-detail {
+  margin: 0 0 32px;
+  font-size: 14px;
+  color: #777;
+}
+
+.order-cancel-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: 32px;
+}
+
+@media (width >= 480px) {
+  .order-cancel-actions {
+    flex-direction: row;
+    justify-content: center;
+  }
+}

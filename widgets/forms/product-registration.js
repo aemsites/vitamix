@@ -1,8 +1,27 @@
-import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { getFormSubmissionUrl, getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { getLeadSource } from '../../scripts/lead-source.js';
 import getStatesProvincesOptions from './states-provinces.js';
 
-/** Sheet logger endpoint for product registration form */
-const SHEET_LOGGER_URL = 'https://sheet-logger.david8603.workers.dev/vitamix.com/forms-testing/product-registration';
+/**
+ * Builds the product-registration submission payload from raw form entries.
+ *
+ * The SFDC Lead integration reads the phone number from `mobile` (the key the
+ * newsletter/SMS opt-in lead flow already uses). The registration form field is
+ * named `phone`, so the value is mirrored into `mobile`; without it the Lead is
+ * created with no phone number ("phone number not being provided by web").
+ * See issue #783.
+ *
+ * @param {Record<string, string>} entries - Raw entries (Object.fromEntries(FormData)).
+ * @param {{ locale: string, language: string, pageUrl: string }} ctx - Submission context.
+ * @returns {Record<string, string>} Payload to POST to the forms endpoint.
+ */
+export function buildRegistrationPayload(entries, { locale, language, pageUrl }) {
+  const payload = { ...entries };
+  if (payload.phone) payload.mobile = payload.phone;
+  payload.formId = `${locale}/${language}/product-registration`;
+  payload.pageUrl = pageUrl;
+  return payload;
+}
 
 /**
  * Loads form copy from the widget's local JSON (same name as the script).
@@ -45,6 +64,7 @@ export default async function decorate(widget) {
 
   const { locale, language } = getLocaleAndLanguage();
   const lang = (language || 'en_us').split('_')[0];
+  import('./util.js').then(({ setupFormValidation }) => setupFormValidation(form, lang));
   const countryCode = (locale || 'us').toUpperCase();
   const copy = await loadFormCopy(lang);
   const provinceOptions = await getStatesProvincesOptions(countryCode, lang).catch(() => []);
@@ -69,7 +89,14 @@ export default async function decorate(widget) {
   if (serialInput) serialInput.placeholder = inputHints.serialNumber ?? '';
 
   const findLink = form.querySelector('.find-serial-link');
-  if (findLink) findLink.textContent = labels.findYourSerialNumber ?? 'Find your serial number';
+  if (findLink) {
+    findLink.textContent = labels.findYourSerialNumber ?? 'Find your serial number';
+    findLink.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const { openModal } = await import('../../blocks/modal/modal.js');
+      await openModal(`/${locale}/${language}/customer-service/product-registration-find-serial`);
+    });
+  }
 
   const radioLegend = form.querySelector('.product-registration-radio-group .radio-legend');
   if (radioLegend) radioLegend.textContent = labels.iPlanToUseIt ?? 'I plan to use it';
@@ -138,9 +165,17 @@ export default async function decorate(widget) {
   const emailConsentEl = form.querySelector('.email-consent-disclaimer');
   if (emailConsentEl) emailConsentEl.textContent = labels.emailConsentDisclaimer ?? '';
   form.querySelector('.click-here-prefix').textContent = labels.clickHereToConsult ?? 'Click here to consult our ';
-  form.querySelector('.privacy-policy-link').textContent = labels.privacyPolicyLinkText ?? 'privacy policy';
+  const privacyPolicyLink = form.querySelector('.privacy-policy-link');
+  if (privacyPolicyLink) {
+    privacyPolicyLink.textContent = labels.privacyPolicyLinkText ?? 'privacy policy';
+    privacyPolicyLink.href = `/${locale}/${language}/privacy-statement`;
+  }
   form.querySelector('.and-our').textContent = labels.andOur ?? ' and our ';
-  form.querySelector('.terms-link').textContent = labels.termsOfUseLinkText ?? 'terms of use.';
+  const termsOfUseLink = form.querySelector('.terms-link');
+  if (termsOfUseLink) {
+    termsOfUseLink.textContent = labels.termsOfUseLinkText ?? 'terms of use.';
+    termsOfUseLink.href = `/${locale}/${language}/legal-notice`;
+  }
 
   const submitBtn = form.querySelector('button[type="submit"]');
   const clearBtn = form.querySelector('.clear-form-btn');
@@ -150,8 +185,19 @@ export default async function decorate(widget) {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const data = new FormData(form);
-    const payload = Object.fromEntries(data.entries());
-    payload.pageUrl = window.location.href;
+    const payload = buildRegistrationPayload(
+      Object.fromEntries(data.entries()),
+      { locale, language, pageUrl: window.location.href },
+    );
+    // Registration submits only to the new AEM Forms endpoint (no legacy Magento path),
+    // so the channel-suppression concern that applies to Magento-backed forms doesn't
+    // apply here — SMS opt-in is safe to encode in the leadSource. Registration has no
+    // SMS-only path (email is always part of registering a product), so email is
+    // always treated as opted in; only the SMS checkbox varies the channel.
+    payload.leadSource = getLeadSource('reg', (locale || 'us').toLowerCase(), {
+      emailOptIn: true,
+      smsOptIn: payload.smsOptIn === 'yes',
+    });
 
     const submitButton = form.querySelector('button[type="submit"]');
     const buttonLabel = submitButton?.textContent;
@@ -161,23 +207,32 @@ export default async function decorate(widget) {
       submitButton.textContent = labels.sending ?? 'Sending...';
     }
 
+    let didNavigate = false;
     try {
-      const resp = await fetch(SHEET_LOGGER_URL, {
+      const resp = await fetch(getFormSubmissionUrl(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       if (!resp.ok) {
-        throw new Error(`Sheet logger responded with ${resp.status}`);
+        const { handleFormSubmitError } = await import('./util.js');
+        await handleFormSubmitError(resp, form, labels.submissionFailed ?? 'Something went wrong. Please try again.');
+        return;
       }
-      const thankYouPath = `/${locale}/${language}/product-registration-thankyou`;
+      didNavigate = true;
+      const thankYouPath = `/${locale}/${language}/customer-service/product-registration-thankyou`;
       window.location.href = thankYouPath;
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Product registration form submission failed', err);
-      [...form.elements].forEach((el) => { el.disabled = false; });
-      if (submitButton) {
-        submitButton.textContent = submitButton.dataset.originalLabel || buttonLabel;
+      const { toast } = await import('./util.js');
+      toast(labels.networkError ?? 'Could not reach the server. Please try again.', 'error');
+    } finally {
+      if (!didNavigate) {
+        [...form.elements].forEach((el) => { el.disabled = false; });
+        if (submitButton) {
+          submitButton.textContent = submitButton.dataset.originalLabel || buttonLabel;
+        }
       }
     }
   });
