@@ -9,12 +9,13 @@
 
   <div class="product-list-toolbar">
     <button type="button" class="product-list-filters-trigger secondary">
+      <span class="product-list-filters-trigger-icon" aria-hidden="true"></span>
       <span class="product-list-filters-trigger-label"></span>
       <span class="product-list-filters-count"></span>
     </button>
     <div class="product-list-filter-dropdowns" aria-label="Product filters"></div>
     <p class="product-list-item-count" aria-live="polite">
-      <span id="product-list-widget-results-count">0</span>
+      <span class="product-list-widget-results-count">0</span>
       <span class="product-list-item-count-label"></span>
     </p>
     <div class="product-list-widget-dropdown product-list-sort">
@@ -31,9 +32,16 @@
     </div>
   </div>
 
-  <div class="product-list-active-filters" hidden>
-    <button type="button" class="product-list-clear-all"></button>
-    <div class="product-list-filter-tags"></div>
+  <div class="product-list-active-filters">
+    <p class="product-list-item-count product-list-item-count-mobile" aria-live="polite">
+      <span class="product-list-widget-results-count">0</span>
+      <span class="product-list-item-count-label"></span>
+    </p>
+    <div class="product-list-active-filters-tags" hidden>
+      <span class="product-list-active-filters-divider" aria-hidden="true">|</span>
+      <button type="button" class="product-list-clear-all"></button>
+      <div class="product-list-filter-tags"></div>
+    </div>
   </div>
 
   <aside class="product-list-facet-drawer" aria-hidden="true" aria-label="Filters">
