@@ -216,6 +216,86 @@ test('validateForm: returns true when all fields are valid', () => {
   assert.equal(validateForm(form), true);
 });
 
+// ---------------------------------------------------------------------------
+// validateForm — hidden section skip (billing hidden for wallet providers)
+// ---------------------------------------------------------------------------
+
+// An invalid field inside a `[hidden]` section (e.g. billing after selecting
+// Apple Pay, which collects billing from the wallet) must not block submit or
+// steal focus — otherwise the submit button silently does nothing with an
+// error the user cannot see.
+function makeInvalidField(name, { hidden, onFocus, onError } = {}) {
+  const hiddenAncestor = {};
+  const wrapper = {
+    classList: { contains: () => false, add() { onError?.(); }, remove() {} },
+    querySelector: (sel) => (sel === '.field-error' ? { textContent: '', id: '' } : null),
+    appendChild() {},
+  };
+  const section = {
+    classList: { contains: () => false },
+    querySelector: () => null,
+    scrollIntoView() {},
+  };
+  return {
+    name,
+    value: '941', // invalid US zip
+    required: true,
+    disabled: false,
+    type: 'text',
+    id: name,
+    form: { dataset: { lang: 'en' } },
+    closest(sel) {
+      if (sel === '[hidden]') return hidden ? hiddenAncestor : null;
+      if (sel === '.form-field') return wrapper;
+      if (sel === '.form-section') return section;
+      return null;
+    },
+    setAttribute() {},
+    removeAttribute() {},
+    focus() { onFocus?.(); },
+  };
+}
+
+function makeFormWith(fields) {
+  return {
+    querySelectorAll: () => ({ forEach: (fn) => fields.forEach(fn) }),
+    dataset: { lang: 'en' },
+  };
+}
+
+test('validateForm: returns true when the only invalid field is in a hidden section', () => {
+  const form = makeFormWith([makeInvalidField('billing-zip', { hidden: true })]);
+  assert.equal(validateForm(form), true);
+});
+
+test('validateForm: does not focus an invalid field in a hidden section', () => {
+  let focused = false;
+  const form = makeFormWith([
+    makeInvalidField('billing-zip', { hidden: true, onFocus: () => { focused = true; } }),
+  ]);
+  validateForm(form);
+  assert.equal(focused, false);
+});
+
+test('validateForm: does not show an error on an invalid field in a hidden section', () => {
+  let errored = false;
+  const form = makeFormWith([
+    makeInvalidField('billing-zip', { hidden: true, onError: () => { errored = true; } }),
+  ]);
+  validateForm(form);
+  assert.equal(errored, false);
+});
+
+test('validateForm: still fails on a visible invalid field alongside a hidden one', () => {
+  let visibleFocused = false;
+  const form = makeFormWith([
+    makeInvalidField('billing-zip', { hidden: true }),
+    makeInvalidField('shipping-zip', { hidden: false, onFocus: () => { visibleFocused = true; } }),
+  ]);
+  assert.equal(validateForm(form), false);
+  assert.equal(visibleFocused, true);
+});
+
 // isValidPhone — shared NANP phone check
 test('isValidPhone: 10 digits is valid', () => {
   assert.equal(isValidPhone('2165550142'), true);

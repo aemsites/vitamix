@@ -158,6 +158,12 @@ export function validateForm(form) {
 
   form.querySelectorAll('input, select, textarea').forEach((input) => {
     if (input.disabled || input.type === 'hidden' || input.type === 'radio' || input.type === 'checkbox') return;
+    // Skip fields inside a hidden section (e.g. billing is hidden when a
+    // provider that collects it itself — Apple Pay, Google Pay, PayPal — is
+    // selected). Leftover values in these fields must not block submit or
+    // surface an error the user can't see. Collapsed (`is-collapsed`) sections
+    // use a class, not the `hidden` attribute, so they are still validated.
+    if (input.closest('[hidden]')) return;
 
     const error = validateField(input);
     if (error) {

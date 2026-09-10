@@ -10,10 +10,12 @@ function formData(values) {
   };
 }
 
-function formWithBillingChoice(value = 'same') {
+function formWithBillingChoice(value = 'same', { billingSectionHidden = false } = {}) {
   return {
     querySelector(selector) {
       if (selector === '[name="billing-choice"]:checked') return { value };
+      // A wallet provider (Apple Pay/Google Pay/PayPal) hides this section.
+      if (selector === '.billing-section') return { hidden: billingSectionHidden };
       return null;
     },
   };
@@ -87,6 +89,30 @@ test('buildOrderJSON serializes different billing validation state when present'
   assert.equal(order.shipping.isValidated, true);
   assert.equal(order.billing.isValidated, false);
   assert.equal(order.billing.address1, '456 Billing Rd');
+});
+
+test('buildOrderJSON falls back to shipping as billing when the billing section is hidden (wallet provider)', () => {
+  const order = buildOrderJSON(
+    formData({
+      ...baseValues,
+      paymentMethod: 'apple-pay',
+      'billing-firstname': 'John',
+      'billing-lastname': 'Doe',
+      'billing-street-0': '456 Billing Rd',
+      'billing-city': 'Columbus',
+      'billing-state': 'OH',
+      'billing-zip': '43004',
+    }),
+    formWithBillingChoice('different', { billingSectionHidden: true }),
+    cart,
+    { shippingAddressIsValidated: true, billingAddressIsValidated: false },
+    config,
+  );
+
+  // Billing is hidden, so the stale 'different' fields are ignored and billing
+  // falls back to the shipping address rather than the abandoned billing entry.
+  assert.equal(order.billing.address1, '123 Main St');
+  assert.equal(order.billing.city, 'Cleveland');
 });
 
 test('buildOrderJSON omits different billing validation state until billing validation runs', () => {
