@@ -52,6 +52,7 @@ function startExpressSession(btn, config, callbacks) {
       supportedNetworks: ['visa', 'masterCard', 'amex', 'discover'],
       merchantCapabilities: ['supports3DS'],
       requiredShippingContactFields: ['name', 'email', 'phone', 'postalAddress'],
+      requiredBillingContactFields: ['postalAddress'],
       total: { label: config.site || 'Store', amount: cart.subtotal.toFixed(2) },
     };
 
@@ -298,6 +299,7 @@ export function beginCheckoutSession(config, callbacks) {
       supportedNetworks: ['visa', 'masterCard', 'amex', 'discover'],
       merchantCapabilities: ['supports3DS'],
       requiredShippingContactFields: [],
+      requiredBillingContactFields: ['postalAddress'],
       total: {
         label: config.site || 'Store',
         amount: parseFloat(state.currentPreview.total).toFixed(2),
