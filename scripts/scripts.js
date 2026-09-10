@@ -2285,19 +2285,6 @@ async function loadDelayed() {
     } catch { /* ignore */ }
   });
 
-  const initContentScore = async () => {
-    const CONTENT_SCORE = 'https://tools.aem.live/tools/content-score/src/scripts.js';
-    const { init } = await import(CONTENT_SCORE);
-    await init();
-  };
-
-  const sk = document.querySelector('aem-sidekick');
-
-  if (sk) initContentScore();
-  else {
-    document.addEventListener('sidekick-ready', initContentScore, { once: true });
-  }
-
   if (
     window.location.hostname === 'localhost'
     || (window.location.hostname.endsWith('.vitamix.com') && window.location.hostname !== 'www.vitamix.com')
