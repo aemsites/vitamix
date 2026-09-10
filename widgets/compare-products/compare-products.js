@@ -208,7 +208,8 @@ function createProductColors(product, onSelect) {
 }
 
 /**
- * Builds a compact star-rating element from reviews.json data (reviewAverage/reviewCount),
+ * Builds a compact star-rating element from the product's reviewAverage/reviewCount
+ * (sourced from the product index's ratingValue/reviewCount columns),
  * replacing the previous per-product Bazaarvoice inline_rating widget.
  * @param {Object} product - Product with reviewAverage (0-5) and reviewCount
  * @returns {HTMLElement}

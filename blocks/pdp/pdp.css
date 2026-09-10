@@ -517,6 +517,52 @@ a.button.pdp-find-dealer-button.emphasis {
   min-height: 22.5px;
 }
 
+.pdp-reviews-summary-placeholder a.pdp-reviews-summary-link {
+  display: inline-block;
+  text-decoration: none;
+}
+
+.pdp-reviews-summary-link .star-rating {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-40);
+  min-height: 1.25rem;
+  font-size: var(--body-size-xs);
+}
+
+.pdp-reviews-summary-link .star-rating-stars {
+  position: relative;
+  display: inline-block;
+  white-space: nowrap;
+  font-size: var(--font-size-90);
+}
+
+.pdp-reviews-summary-link .star-rating-track,
+.pdp-reviews-summary-link .star-rating-fill {
+  display: block;
+  letter-spacing: 0;
+}
+
+.pdp-reviews-summary-link .star-rating-track {
+  color: var(--color-gray-400);
+}
+
+.pdp-reviews-summary-link .star-rating-fill {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  color: var(--color-blue);
+}
+
+.pdp-reviews-summary-link .star-rating-count {
+  color: var(--color-blue);
+  text-decoration: none;
+}
+
+.pdp-reviews-summary-placeholder a.pdp-reviews-summary-link:hover .star-rating-count {
+  text-decoration: underline;
+}
+
 .pdp-reviews-container {
   grid-area: reviews;
 }

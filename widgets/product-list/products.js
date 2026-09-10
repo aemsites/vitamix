@@ -1,7 +1,7 @@
 /* eslint-disable max-len */
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 import {
-  fetchReviewsData, getReviewsBySlug, slugFromUrl, fetchPlpData, getBadgesBySlug, PLP_DATASETS,
+  slugFromUrl, fetchPlpData, getBadgesBySlug, PLP_DATASETS,
   fetchProductIndex, buildProductIndexBySlug,
 } from '../../scripts/plp-data.js';
 
@@ -141,12 +141,8 @@ export default async function lookupProductListProducts(config = {}, facets = {}
 
   window.productListWidgetIndexByDataset = window.productListWidgetIndexByDataset || {};
   if (!window.productListWidgetIndexByDataset[plpDataset]) {
-    const [plpRows, reviewsRows] = await Promise.all([
-      fetchPlpData(locale, language, plpDataset),
-      fetchReviewsData(locale, language),
-    ]);
+    const plpRows = await fetchPlpData(locale, language, plpDataset);
     const facetDefs = getFacetDefsFromRows(plpRows);
-    const reviewsBySlug = getReviewsBySlug(reviewsRows);
     const badgesBySlug = getBadgesBySlug(plpRows);
 
     const data = await fetchProductIndex(locale, language, { commercial: plpDataset === 'commercial' });
@@ -170,9 +166,6 @@ export default async function lookupProductListProducts(config = {}, facets = {}
         if (!product.title) product.title = titleFromUrl(urlPathname);
         product.bullets = (row.Bullets || '').split(';').map((s) => s.trim()).filter(Boolean);
         product.comparisonFeatures = (row['Comparison Features'] || '').split(';').map((s) => s.trim()).filter(Boolean);
-        const reviews = reviewsBySlug[slug];
-        product.reviewCount = reviews ? reviews.reviewCount : 0;
-        product.reviewAverage = reviews ? reviews.reviewAverage : 0;
         product.badge = badgesBySlug[slug] || '';
         facetDefs.forEach(({ rawKey, key }) => {
           product[key] = parseFacetValues(row[rawKey]);

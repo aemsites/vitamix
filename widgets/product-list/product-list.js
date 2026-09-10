@@ -118,9 +118,10 @@ function createCompareButton(product, copy) {
   btn.type = 'button';
   btn.className = 'product-list-widget-compare-btn pdp-compare-button';
 
-  const icon = document.createElement('span');
+  const icon = document.createElement('img');
   icon.className = 'product-list-widget-compare-icon';
-  icon.setAttribute('aria-hidden', 'true');
+  icon.setAttribute('alt', '');
+  icon.loading = 'lazy';
   btn.appendChild(icon);
 
   // Only the compare-products widget path tracks membership client-side (Magento's server-side
@@ -131,10 +132,11 @@ function createCompareButton(product, copy) {
     const inCompare = widgetMode && isInStoredCompare(product.url);
     const label = inCompare
       ? (copy.viewComparisonList || 'View Comparison List')
-      : (copy.addToComparisonList || 'Add to Comparison list');
+      : (copy.addToComparisonList || 'Add to Comparison List');
     btn.title = label;
     btn.setAttribute('aria-label', label);
     btn.classList.toggle('product-list-widget-compare-btn-active', inCompare);
+    icon.src = inCompare ? '/blocks/plp/checkmark.svg' : '/blocks/plp/plus.svg';
   };
   updateState();
 
