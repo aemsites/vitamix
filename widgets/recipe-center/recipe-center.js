@@ -108,6 +108,33 @@ function highlightMatch(text, searchTerm) {
   return `${before}<span class="highlight">${match}</span>${after}`;
 }
 
+/** Query params that control listing state but are not recipe-index columns. */
+const FILTER_CONTROL_KEYS = new Set(['page', 'sort']);
+
+/**
+ * Column names from the loaded recipe index (keys on each recipe row).
+ * @returns {Set<string>}
+ */
+function getRecipeIndexColumns() {
+  if (window.recipeIndex?.columns) return window.recipeIndex.columns;
+  const first = window.recipeIndex?.data?.[0];
+  return new Set(first ? Object.keys(first) : []);
+}
+
+/**
+ * Whether a config key should be applied as a recipe filter.
+ * Only `fulltext` and keys that match recipe-index columns are filterable.
+ * @param {string} key - Config key
+ * @param {*} value - Config value
+ * @returns {boolean}
+ */
+function isRecipeFilterKey(key, value) {
+  if (FILTER_CONTROL_KEYS.has(key)) return false;
+  if (key === 'fulltext') return !!(value && String(value).trim());
+  if (!getRecipeIndexColumns().has(key)) return false;
+  return !!value;
+}
+
 /**
  * Fetches and filters recipes from the recipe index.
  * @param {Object} config - Object with filter criteria
@@ -120,11 +147,12 @@ async function lookupRecipes(config = {}, facets = {}, hiddenContainers = new Se
     // fetch the main recipe index
     const resp = await fetch(`/${locale}/${language}/recipes/query-index.json`);
     if (!resp.ok) {
-      window.recipeIndex = { data: [] };
+      window.recipeIndex = { data: [], columns: new Set() };
       return [];
     }
 
     const { data } = await resp.json();
+    const columns = new Set(data[0] ? Object.keys(data[0]) : []);
 
     // parse and filter recipes - only include Updated or New status, exclude Deleted
     const recipes = data
@@ -148,24 +176,15 @@ async function lookupRecipes(config = {}, facets = {}, hiddenContainers = new Se
 
     window.recipeIndex = {
       data: recipes,
+      columns,
     };
   }
 
   // extract all facet keys from the facets object for dynamic filter UI
   const facetKeys = Object.keys(facets);
 
-  // extract all filter criteria keys from the config object
-  // exclude fulltext if it's empty or just whitespace, and exclude 'page' and 'sort'
-  const filterKeys = Object.keys(config).filter((key) => {
-    // Exclude pagination and sorting keys from filtering
-    if (key === 'page' || key === 'sort') {
-      return false;
-    }
-    if (key === 'fulltext') {
-      return config[key] && config[key].trim().length > 0;
-    }
-    return config[key]; // exclude any other empty values
-  });
+  // Only apply query params that match recipe-index columns (plus fulltext)
+  const filterKeys = Object.keys(config).filter((key) => isRecipeFilterKey(key, config[key]));
 
   // Track which recipe titles have been counted for each facet value to avoid duplicates
   const facetTitleTracking = {};
@@ -560,11 +579,7 @@ function updateURL(filterConfig, replace = false) {
  * @returns {boolean}
  */
 function hasActiveFilters(filterConfig) {
-  return Object.keys(filterConfig).some((key) => {
-    if (key === 'page' || key === 'sort') return false;
-    if (key === 'fulltext') return filterConfig[key] && filterConfig[key].trim().length > 0;
-    return !!filterConfig[key];
-  });
+  return Object.keys(filterConfig).some((key) => isRecipeFilterKey(key, filterConfig[key]));
 }
 
 /**
