@@ -80,7 +80,10 @@ export function isEdgeCheckoutOverrideEnabled(localeKey) {
   return getEdgeCheckoutOverrideLocales().includes(localeKey.toLowerCase());
 }
 
-export const isProdHost = hostname.includes('vitamix.com');
+// Production is only the canonical apex/www host. Environment subdomains such as
+// uat.vitamix.com, test.vitamix.com, or stage.vitamix.com must NOT be treated as
+// production, otherwise they pick up production public API keys/endpoints.
+export const isProdHost = hostname === 'www.vitamix.com' || hostname === 'vitamix.com';
 
 // Affirm public API key — safe to expose client-side (used for PDP promo widgets).
 // Checkout gets its key from the server's checkout object so it always matches the
