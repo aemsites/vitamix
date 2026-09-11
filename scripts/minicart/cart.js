@@ -460,6 +460,18 @@ export async function addToCart(sku, options, quantity) {
       );
       handleCartErrors(errors);
 
+      // handleCartErrors resolves recoverable errors (missing cart, no access,
+      // invalid input) by resetting the cart and returning without throwing. In
+      // those cases Magento returns a null `addProductsToCart`, so guard before
+      // destructuring to avoid a cryptic "Cannot destructure property 'cart'
+      // from null" crash — surface the same generic error the user_errors path
+      // does so the shopper gets feedback instead of a silent no-op.
+      if (!data?.addProductsToCart) {
+        const { locale, language } = getLocaleAndLanguage();
+        await openModal(`/${locale}/${language}/products/modals/atc-error`);
+        throw new Error('Failed to add item to cart: no cart returned');
+      }
+
       const { cart, user_errors: userErrors } = data.addProductsToCart;
       if (userErrors && userErrors.length > 0) {
         const { locale, language } = getLocaleAndLanguage();
