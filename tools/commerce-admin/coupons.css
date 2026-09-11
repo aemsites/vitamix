@@ -458,6 +458,11 @@
   text-decoration: underline;
 }
 
+.coupons-grid-table th.coupons-grid-col-id,
+.coupons-grid-table td.coupons-grid-col-id {
+  min-width: 10rem;
+}
+
 .coupons-grid-table th.coupons-grid-col-year,
 .coupons-grid-table td.coupons-grid-col-year {
   text-align: right;

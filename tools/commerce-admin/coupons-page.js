@@ -1248,7 +1248,7 @@ function couponOverviewRowHtml(row, {
   return `<tr${openAttrs}>
       ${statusCell}
       <td${tdAttr('title', 'coupons-grid-lead coupons-grid-name')}>${highlightMatch(String(name), query)}</td>
-      <td${tdAttr('id')}><code class="coupons-grid-id">${highlightMatch(id || '—', query)}</code></td>
+      <td${tdAttr('id', 'coupons-grid-col-id')}><code class="coupons-grid-id">${highlightMatch(id || '—', query)}</code></td>
       <td${tdAttr('discount')}>${disc}</td>
       <td${tdAttr('min')}>${escapeHtml(min)}</td>
       <td${tdAttr('cap')}>${escapeHtml(cap)}</td>
@@ -1268,7 +1268,7 @@ function couponOverviewHeadHtml({ sortable = true, importPreview = false } = {})
     return `<tr>
               ${status}
               ${couponSortableTh('title', 'Title')}
-              ${couponSortableTh('id', 'Id')}
+              ${couponSortableTh('id', 'Id', 'coupons-grid-col-id')}
               ${couponSortableTh('discount', 'Discount')}
               ${couponSortableTh('min', 'Min order')}
               ${couponSortableTh('cap', 'Cap')}
@@ -1282,7 +1282,7 @@ function couponOverviewHeadHtml({ sortable = true, importPreview = false } = {})
   return `<tr>
               ${status}
               <th scope="col">Title</th>
-              <th scope="col">Id</th>
+              <th scope="col" class="coupons-grid-col-id">Id</th>
               <th scope="col">Discount</th>
               <th scope="col">Min order</th>
               <th scope="col">Cap</th>
