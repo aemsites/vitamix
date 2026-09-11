@@ -8,7 +8,7 @@ import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   logOperation, getCheckoutId, clearCheckoutId, anonymize, logApiError, logNetworkError, logError,
-  errorDetails,
+  errorDetails, isIgnoredErrorSource,
 } from '../../scripts/operations-log.js';
 
 const PATH = '/us/en_us/products/operations-log';
@@ -254,6 +254,70 @@ test('logError: records the error name alongside message', () => {
   assert.equal(body.name, 'TypeError');
   assert.equal(body.message, 'cannot read property');
   assert.equal(body.orderId, 'ord-1');
+});
+
+// --- ignored error sources --------------------------------------------------
+
+test('isIgnoredErrorSource: ignores browser-extension scripts', () => {
+  assert.equal(
+    isIgnoredErrorSource('chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/scripts/inpage.js'),
+    true,
+  );
+  assert.equal(isIgnoredErrorSource('moz-extension://abc/content.js'), true);
+});
+
+test('isIgnoredErrorSource: ignores sources under an ignored path prefix', () => {
+  assert.equal(isIgnoredErrorSource('https://www.vitamix.com/scripts/consented/at.js'), true);
+});
+
+test('isIgnoredErrorSource: keeps first-party AEM-scope sources', () => {
+  assert.equal(isIgnoredErrorSource('https://www.vitamix.com/scripts/commerce.js'), false);
+  assert.equal(isIgnoredErrorSource('https://www.vitamix.com/blocks/cart/cart.js'), false);
+});
+
+test('isIgnoredErrorSource: fails open on non-URL / empty input', () => {
+  assert.equal(isIgnoredErrorSource(undefined), false);
+  assert.equal(isIgnoredErrorSource(''), false);
+  assert.equal(isIgnoredErrorSource('not a url'), false);
+});
+
+test('logError: drops chrome-extension errors reported via fileName', () => {
+  captureFetch();
+  logError('window.error', { message: 'Failed to connect to MetaMask' }, {
+    fileName: 'chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/scripts/inpage.js',
+    lineNumber: 7,
+    columnNumber: 84292,
+  });
+  assert.equal(lastUrl, undefined, 'extension error must not be sent');
+});
+
+test('logError: drops chrome-extension errors detected from the stack only', () => {
+  captureFetch();
+  const err = {
+    message: 'Failed to connect to MetaMask',
+    stack: 'i: Failed to connect to MetaMask\n    at Object.connect (chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/scripts/inpage.js:7:84292)',
+  };
+  logError('unhandledrejection', err);
+  assert.equal(lastUrl, undefined, 'extension error must not be sent');
+});
+
+test('logError: drops errors from an ignored /scripts/consented/ source', () => {
+  captureFetch();
+  const err = {
+    message: 'Network request failed',
+    stack: 'Error: Network request failed\n@https://www.vitamix.com/scripts/consented/at.js:19:44964',
+  };
+  logError('unhandledrejection', err);
+  assert.equal(lastUrl, undefined, 'consented third-party error must not be sent');
+});
+
+test('logError: still logs first-party AEM-scope errors', () => {
+  captureFetch();
+  const err = new Error('boom');
+  err.stack = 'Error: boom\n    at fn (https://www.vitamix.com/scripts/commerce.js:12:34)';
+  logError('checkout-order', err);
+  assert.equal(lastUrl, `https://main--vitamix--aemsites.aem.network${PATH}`);
+  assert.equal(JSON.parse(lastInit.body).message, 'boom');
 });
 
 test('logError: retains stack frames past the old 5-line cap', () => {
