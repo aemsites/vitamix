@@ -152,6 +152,60 @@ function trimStack(stack) {
 }
 
 /**
+ * Recovers structured `fileName`/`lineNumber`/`columnNumber` from the first
+ * real stack frame. V8 (Chrome/Edge) does not expose these as Error properties
+ * — it only embeds them in the stack string — so a network `TypeError` there
+ * arrives as bare `message: 'Failed to fetch'` unless we parse them out.
+ * Handles both V8 (`at fn (url:line:col)` / `at url:line:col`) and
+ * SpiderMonkey/JSC (`fn@url:line:col`) frame formats. Best-effort: returns an
+ * empty object if nothing parses.
+ * @param {string} [stack]
+ * @returns {{fileName?:string, lineNumber?:number, columnNumber?:number}}
+ */
+function parseTopFrame(stack) {
+  if (typeof stack !== 'string') return {};
+  const lines = stack.split('\n');
+  for (let i = 0; i < lines.length; i += 1) {
+    const loc = lines[i].trim()
+      .replace(/^at\s+/, '') // V8 frame prefix
+      .replace(/^.*?\(/, '') // drop `fn (` wrapper, keeping the url inside
+      .replace(/\)$/, '')
+      .replace(/^.*@/, ''); // drop SpiderMonkey/JSC `fn@` prefix
+    const m = loc.match(/^(.*):(\d+):(\d+)$/);
+    if (m && m[1]) {
+      return { fileName: m[1], lineNumber: Number(m[2]), columnNumber: Number(m[3]) };
+    }
+  }
+  return {};
+}
+
+/**
+ * Normalizes any thrown value into a consistent, loggable set of diagnostic
+ * fields: `name`, `message`, trimmed `stack`, and structured
+ * `fileName`/`lineNumber`/`columnNumber`. Source location prefers the engine's
+ * native Error properties (Firefox) and falls back to parsing the top stack
+ * frame (Chrome/Edge). Safe on non-Error throwables (strings, DOMExceptions,
+ * plain objects) — every field is optional except `message`.
+ * @param {*} error
+ * @returns {Object}
+ */
+export function errorDetails(error) {
+  const stack = trimStack(error?.stack);
+  const details = {
+    name: error?.name,
+    message: error?.message || String(error),
+    stack,
+    ...parseTopFrame(error?.stack),
+  };
+  // Firefox exposes these directly on the Error; when present they are
+  // authoritative, so let them override the parsed frame.
+  if (error?.fileName) details.fileName = error.fileName;
+  if (Number.isFinite(error?.lineNumber)) details.lineNumber = error.lineNumber;
+  if (Number.isFinite(error?.columnNumber)) details.columnNumber = error.columnNumber;
+  return details;
+}
+
+/**
  * Logs a generic (non-API) error.
  * @param {string} scope - Where it happened, e.g. 'checkout-order' or 'global'.
  * @param {*} error - An Error or error-like value.
@@ -160,9 +214,7 @@ function trimStack(stack) {
 export function logError(scope, error, extra = {}) {
   logOperation('error', {
     scope,
-    name: error?.name,
-    message: error?.message || String(error),
-    stack: trimStack(error?.stack),
+    ...errorDetails(error),
     ...extra,
   });
 }
@@ -208,7 +260,7 @@ export function logNetworkError({
     kind: 'network',
     method,
     path,
-    message: error?.message || String(error),
+    ...errorDetails(error),
     requestBody: anonymize(requestBody),
   });
 }

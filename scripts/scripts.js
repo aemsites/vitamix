@@ -38,10 +38,13 @@ function registerErrorLogging() {
   window.addEventListener('error', (event) => {
     const stack = event.error?.stack || '';
     if (!isInAemScope(event.filename) && !isInAemScope(stack)) return;
+    // ErrorEvent carries the authoritative source location for uncaught
+    // errors; pass it under the same keys errorDetails() emits so it overrides
+    // the stack-parsed values downstream.
     logError('window.error', event.error || { message: event.message }, {
-      filename: event.filename,
-      lineno: event.lineno,
-      colno: event.colno,
+      fileName: event.filename,
+      lineNumber: event.lineno,
+      columnNumber: event.colno,
     });
   });
   window.addEventListener('unhandledrejection', (event) => {

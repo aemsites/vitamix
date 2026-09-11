@@ -8,6 +8,7 @@ import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   logOperation, getCheckoutId, clearCheckoutId, anonymize, logApiError, logNetworkError, logError,
+  errorDetails,
 } from '../../scripts/operations-log.js';
 
 const PATH = '/us/en_us/products/operations-log';
@@ -184,6 +185,61 @@ test('logNetworkError: logs error action with kind network and anonymized body',
   assert.equal(body.message, 'Failed to fetch');
   // undefined keys (country/zip) are dropped by JSON serialization.
   assert.deepEqual(body.requestBody, { country: 'us', shipping: { state: 'CA' } });
+});
+
+test('logNetworkError: now carries name and stack (not message-only)', () => {
+  captureFetch();
+  const err = new TypeError('Failed to fetch');
+  err.stack = 'TypeError: Failed to fetch\n    at postOrder (https://x/scripts/commerce.js:42:9)';
+  logNetworkError({
+    method: 'POST', path: '/orders', error: err, requestBody: {},
+  });
+  const body = JSON.parse(lastInit.body);
+  assert.equal(body.name, 'TypeError');
+  assert.ok(body.stack.includes('postOrder'), 'stack should be included');
+  assert.equal(body.fileName, 'https://x/scripts/commerce.js');
+  assert.equal(body.lineNumber, 42);
+  assert.equal(body.columnNumber, 9);
+});
+
+// --- errorDetails -----------------------------------------------------------
+
+test('errorDetails: parses file/line/col from a V8 stack frame', () => {
+  const err = new Error('boom');
+  err.stack = 'Error: boom\n    at fn (https://x/scripts/mod.js:12:34)';
+  const d = errorDetails(err);
+  assert.equal(d.name, 'Error');
+  assert.equal(d.message, 'boom');
+  assert.equal(d.fileName, 'https://x/scripts/mod.js');
+  assert.equal(d.lineNumber, 12);
+  assert.equal(d.columnNumber, 34);
+});
+
+test('errorDetails: parses a SpiderMonkey/JSC (fn@url) frame', () => {
+  const err = { message: 'boom', stack: 'postOrder@https://x/scripts/mod.js:5:7' };
+  const d = errorDetails(err);
+  assert.equal(d.fileName, 'https://x/scripts/mod.js');
+  assert.equal(d.lineNumber, 5);
+  assert.equal(d.columnNumber, 7);
+});
+
+test('errorDetails: native Firefox fileName/lineNumber override the parsed frame', () => {
+  const err = new Error('boom');
+  err.stack = 'Error: boom\n    at fn (https://x/scripts/mod.js:12:34)';
+  err.fileName = 'https://x/scripts/real.js';
+  err.lineNumber = 99;
+  err.columnNumber = 1;
+  const d = errorDetails(err);
+  assert.equal(d.fileName, 'https://x/scripts/real.js');
+  assert.equal(d.lineNumber, 99);
+  assert.equal(d.columnNumber, 1);
+});
+
+test('errorDetails: safe on non-Error throwables', () => {
+  const d = errorDetails('just a string');
+  assert.equal(d.message, 'just a string');
+  assert.equal(d.stack, undefined);
+  assert.equal(d.fileName, undefined);
 });
 
 // --- logError ---------------------------------------------------------------
