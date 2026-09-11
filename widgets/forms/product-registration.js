@@ -93,8 +93,33 @@ export default async function decorate(widget) {
     findLink.textContent = labels.findYourSerialNumber ?? 'Find your serial number';
     findLink.addEventListener('click', async (e) => {
       e.preventDefault();
-      const { openModal } = await import('../../blocks/modal/modal.js');
-      await openModal(`/${locale}/${language}/customer-service/product-registration-find-serial`);
+      const { createModal } = await import('../../blocks/modal/modal.js');
+      const modalCopy = copy.findSerialNumberModal ?? {};
+
+      const imageSection = document.createElement('div');
+      imageSection.className = 'section';
+      const picture = document.createElement('picture');
+      const img = document.createElement('img');
+      img.src = `${window.hlx?.codeBasePath || ''}/widgets/forms/assets/warranty-look-up.avif`;
+      img.alt = modalCopy.imageAlt ?? '';
+      img.loading = 'lazy';
+      picture.append(img);
+      imageSection.append(picture);
+
+      const textSection = document.createElement('div');
+      textSection.className = 'section';
+      const title = document.createElement('p');
+      title.innerHTML = `<strong>${modalCopy.title ?? ''}</strong>`;
+      const description = document.createElement('p');
+      description.textContent = modalCopy.description ?? '';
+      textSection.append(title, description);
+
+      // path labels the modal for debugging; look is scoped via the find-serial-modal class
+      const path = 'product-registration-find-serial';
+      const { block, showModal } = await createModal([imageSection, textSection], path);
+      block.dataset.modalPath = path;
+      block.classList.add('find-serial-modal');
+      showModal();
     });
   }
 

@@ -152,19 +152,105 @@ function trimStack(stack) {
 }
 
 /**
- * Logs a generic (non-API) error.
+ * Recovers structured `fileName`/`lineNumber`/`columnNumber` from the first
+ * real stack frame. V8 (Chrome/Edge) does not expose these as Error properties
+ * — it only embeds them in the stack string — so a network `TypeError` there
+ * arrives as bare `message: 'Failed to fetch'` unless we parse them out.
+ * Handles both V8 (`at fn (url:line:col)` / `at url:line:col`) and
+ * SpiderMonkey/JSC (`fn@url:line:col`) frame formats. Best-effort: returns an
+ * empty object if nothing parses.
+ * @param {string} [stack]
+ * @returns {{fileName?:string, lineNumber?:number, columnNumber?:number}}
+ */
+function parseTopFrame(stack) {
+  if (typeof stack !== 'string') return {};
+  const lines = stack.split('\n');
+  for (let i = 0; i < lines.length; i += 1) {
+    const loc = lines[i].trim()
+      .replace(/^at\s+/, '') // V8 frame prefix
+      .replace(/^.*?\(/, '') // drop `fn (` wrapper, keeping the url inside
+      .replace(/\)$/, '')
+      .replace(/^.*@/, ''); // drop SpiderMonkey/JSC `fn@` prefix
+    const m = loc.match(/^(.*):(\d+):(\d+)$/);
+    if (m && m[1]) {
+      return { fileName: m[1], lineNumber: Number(m[2]), columnNumber: Number(m[3]) };
+    }
+  }
+  return {};
+}
+
+/**
+ * Normalizes any thrown value into a consistent, loggable set of diagnostic
+ * fields: `name`, `message`, trimmed `stack`, and structured
+ * `fileName`/`lineNumber`/`columnNumber`. Source location prefers the engine's
+ * native Error properties (Firefox) and falls back to parsing the top stack
+ * frame (Chrome/Edge). Safe on non-Error throwables (strings, DOMExceptions,
+ * plain objects) — every field is optional except `message`.
+ * @param {*} error
+ * @returns {Object}
+ */
+export function errorDetails(error) {
+  const stack = trimStack(error?.stack);
+  const details = {
+    name: error?.name,
+    message: error?.message || String(error),
+    stack,
+    ...parseTopFrame(error?.stack),
+  };
+  // Firefox exposes these directly on the Error; when present they are
+  // authoritative, so let them override the parsed frame.
+  if (error?.fileName) details.fileName = error.fileName;
+  if (Number.isFinite(error?.lineNumber)) details.lineNumber = error.lineNumber;
+  if (Number.isFinite(error?.columnNumber)) details.columnNumber = error.columnNumber;
+  return details;
+}
+
+/**
+ * Source-location path prefixes whose errors are NOT logged. Matched against
+ * the URL pathname of the error's originating frame. `/scripts/consented/`
+ * holds third-party consent-gated scripts (e.g. Adobe Target's at.js) that we
+ * serve from our own origin but do not own — their errors are noise. Add more
+ * prefixes here as further sources of noise are identified.
+ * @type {string[]}
+ */
+const IGNORED_SOURCE_PREFIXES = ['/scripts/consented/'];
+
+/**
+ * Whether an error originating from `source` (a script URL) should be dropped
+ * rather than logged. Ignores browser-extension scripts — MetaMask and other
+ * extensions inject code whose errors surface on our pages but are not ours —
+ * and any source whose path starts with an IGNORED_SOURCE_PREFIXES entry.
+ * Best-effort: unparseable sources are not ignored (fail open, keep logging).
+ * @param {string} [source] - Originating script URL.
+ * @returns {boolean}
+ */
+export function isIgnoredErrorSource(source) {
+  if (typeof source !== 'string' || !source) return false;
+  let url;
+  try {
+    url = new URL(source);
+  } catch {
+    return false;
+  }
+  // chrome-extension:, moz-extension:, safari-web-extension: — extension noise.
+  if (url.protocol.endsWith('-extension:')) return true;
+  return IGNORED_SOURCE_PREFIXES.some((prefix) => url.pathname.startsWith(prefix));
+}
+
+/**
+ * Logs a generic (non-API) error. Errors originating from browser extensions or
+ * an ignored source prefix (see {@link isIgnoredErrorSource}) are dropped.
  * @param {string} scope - Where it happened, e.g. 'checkout-order' or 'global'.
  * @param {*} error - An Error or error-like value.
  * @param {Object} [extra] - Extra non-PII context.
  */
 export function logError(scope, error, extra = {}) {
-  logOperation('error', {
-    scope,
-    name: error?.name,
-    message: error?.message || String(error),
-    stack: trimStack(error?.stack),
-    ...extra,
-  });
+  const details = { ...errorDetails(error), ...extra };
+  // Check both the (possibly extra-overridden) fileName and the stack's top
+  // frame — for unhandled rejections only the stack carries the source.
+  const stackSource = parseTopFrame(details.stack).fileName;
+  if (isIgnoredErrorSource(details.fileName) || isIgnoredErrorSource(stackSource)) return;
+  logOperation('error', { scope, ...details });
 }
 
 /**
@@ -208,7 +294,7 @@ export function logNetworkError({
     kind: 'network',
     method,
     path,
-    message: error?.message || String(error),
+    ...errorDetails(error),
     requestBody: anonymize(requestBody),
   });
 }

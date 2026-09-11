@@ -48,6 +48,52 @@
   color: var(--color-red);
 }
 
+/* find serial number modal, triggered from this widget but rendered outside its DOM */
+.modal.find-serial-modal dialog {
+  max-width: 1000px;
+  max-height: 750px;
+  height: 90dvh;
+  width: 90dvw;
+}
+
+.modal.find-serial-modal dialog .modal-content {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-gray-300);
+}
+
+.modal.find-serial-modal dialog .modal-content .section:nth-child(1) {
+  flex: 1;
+  max-width: 320px;
+  line-height: 0;
+}
+
+.modal.find-serial-modal dialog .modal-content .section:nth-child(1) picture,
+.modal.find-serial-modal dialog .modal-content .section:nth-child(1) img {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  height: auto;
+  object-fit: contain;
+}
+
+.modal.find-serial-modal dialog .modal-content .section:nth-child(2) {
+  padding: var(--spacing-300);
+}
+
+.modal.find-serial-modal dialog .modal-content .section:nth-child(2) p:first-of-type strong {
+  font-family: var(--heading-font-family);
+  font-size: var(--heading-size-m);
+  font-weight: 500;
+}
+
+@media (width >= 1000px) {
+  .modal.find-serial-modal dialog .modal-content {
+    flex-direction: row;
+    max-height: calc(90dvh - 64px);
+  }
+}
+
 .forms-product-registration .product-registration-link {
   font-size: var(--font-size-20);
   margin-top: 0.25em;

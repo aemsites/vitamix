@@ -38,10 +38,13 @@ function registerErrorLogging() {
   window.addEventListener('error', (event) => {
     const stack = event.error?.stack || '';
     if (!isInAemScope(event.filename) && !isInAemScope(stack)) return;
+    // ErrorEvent carries the authoritative source location for uncaught
+    // errors; pass it under the same keys errorDetails() emits so it overrides
+    // the stack-parsed values downstream.
     logError('window.error', event.error || { message: event.message }, {
-      filename: event.filename,
-      lineno: event.lineno,
-      colno: event.colno,
+      fileName: event.filename,
+      lineNumber: event.lineno,
+      columnNumber: event.colno,
     });
   });
   window.addEventListener('unhandledrejection', (event) => {
@@ -54,7 +57,7 @@ function registerErrorLogging() {
 // Locale+language pairs enabled for edge checkout.
 // Format: '<locale>/<language>' (e.g., 'ca/fr_ca'). Add pairs as each region goes live.
 // Keep this empty to use Adobe Commerce by default in every environment.
-const EDGE_CHECKOUT_LOCALES = [];
+const EDGE_CHECKOUT_LOCALES = ['ca/fr_ca'];
 export const EDGE_CHECKOUT_OVERRIDE_STORAGE_KEY = 'edgeCheckout';
 
 /**
@@ -2287,19 +2290,6 @@ async function loadDelayed() {
       sessionStorage.setItem('forter_token', token);
     } catch { /* ignore */ }
   });
-
-  const initContentScore = async () => {
-    const CONTENT_SCORE = 'https://tools.aem.live/tools/content-score/src/scripts.js';
-    const { init } = await import(CONTENT_SCORE);
-    await init();
-  };
-
-  const sk = document.querySelector('aem-sidekick');
-
-  if (sk) initContentScore();
-  else {
-    document.addEventListener('sidekick-ready', initContentScore, { once: true });
-  }
 
   if (
     window.location.hostname === 'localhost'

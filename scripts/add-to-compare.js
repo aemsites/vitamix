@@ -113,11 +113,11 @@ const TOAST_VISIBLE_MS = 3000;
 let toastHideTimer;
 
 /**
- * Finds the header's compare nav link, if present, so the toast can reuse the same URL
+ * Finds the header's compare nav link, if present, so callers can reuse the same URL
  * ("View Comparison") instead of guessing at one.
  * @returns {string|null}
  */
-function getHeaderCompareHref() {
+export function getHeaderCompareHref() {
   const link = document.querySelector('header li .icon-compare')?.closest('li')?.querySelector('a[href]');
   return link ? link.getAttribute('href') : null;
 }

@@ -8,6 +8,7 @@ import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   logOperation, getCheckoutId, clearCheckoutId, anonymize, logApiError, logNetworkError, logError,
+  errorDetails, isIgnoredErrorSource,
 } from '../../scripts/operations-log.js';
 
 const PATH = '/us/en_us/products/operations-log';
@@ -186,6 +187,61 @@ test('logNetworkError: logs error action with kind network and anonymized body',
   assert.deepEqual(body.requestBody, { country: 'us', shipping: { state: 'CA' } });
 });
 
+test('logNetworkError: now carries name and stack (not message-only)', () => {
+  captureFetch();
+  const err = new TypeError('Failed to fetch');
+  err.stack = 'TypeError: Failed to fetch\n    at postOrder (https://x/scripts/commerce.js:42:9)';
+  logNetworkError({
+    method: 'POST', path: '/orders', error: err, requestBody: {},
+  });
+  const body = JSON.parse(lastInit.body);
+  assert.equal(body.name, 'TypeError');
+  assert.ok(body.stack.includes('postOrder'), 'stack should be included');
+  assert.equal(body.fileName, 'https://x/scripts/commerce.js');
+  assert.equal(body.lineNumber, 42);
+  assert.equal(body.columnNumber, 9);
+});
+
+// --- errorDetails -----------------------------------------------------------
+
+test('errorDetails: parses file/line/col from a V8 stack frame', () => {
+  const err = new Error('boom');
+  err.stack = 'Error: boom\n    at fn (https://x/scripts/mod.js:12:34)';
+  const d = errorDetails(err);
+  assert.equal(d.name, 'Error');
+  assert.equal(d.message, 'boom');
+  assert.equal(d.fileName, 'https://x/scripts/mod.js');
+  assert.equal(d.lineNumber, 12);
+  assert.equal(d.columnNumber, 34);
+});
+
+test('errorDetails: parses a SpiderMonkey/JSC (fn@url) frame', () => {
+  const err = { message: 'boom', stack: 'postOrder@https://x/scripts/mod.js:5:7' };
+  const d = errorDetails(err);
+  assert.equal(d.fileName, 'https://x/scripts/mod.js');
+  assert.equal(d.lineNumber, 5);
+  assert.equal(d.columnNumber, 7);
+});
+
+test('errorDetails: native Firefox fileName/lineNumber override the parsed frame', () => {
+  const err = new Error('boom');
+  err.stack = 'Error: boom\n    at fn (https://x/scripts/mod.js:12:34)';
+  err.fileName = 'https://x/scripts/real.js';
+  err.lineNumber = 99;
+  err.columnNumber = 1;
+  const d = errorDetails(err);
+  assert.equal(d.fileName, 'https://x/scripts/real.js');
+  assert.equal(d.lineNumber, 99);
+  assert.equal(d.columnNumber, 1);
+});
+
+test('errorDetails: safe on non-Error throwables', () => {
+  const d = errorDetails('just a string');
+  assert.equal(d.message, 'just a string');
+  assert.equal(d.stack, undefined);
+  assert.equal(d.fileName, undefined);
+});
+
 // --- logError ---------------------------------------------------------------
 
 test('logError: records the error name alongside message', () => {
@@ -198,6 +254,70 @@ test('logError: records the error name alongside message', () => {
   assert.equal(body.name, 'TypeError');
   assert.equal(body.message, 'cannot read property');
   assert.equal(body.orderId, 'ord-1');
+});
+
+// --- ignored error sources --------------------------------------------------
+
+test('isIgnoredErrorSource: ignores browser-extension scripts', () => {
+  assert.equal(
+    isIgnoredErrorSource('chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/scripts/inpage.js'),
+    true,
+  );
+  assert.equal(isIgnoredErrorSource('moz-extension://abc/content.js'), true);
+});
+
+test('isIgnoredErrorSource: ignores sources under an ignored path prefix', () => {
+  assert.equal(isIgnoredErrorSource('https://www.vitamix.com/scripts/consented/at.js'), true);
+});
+
+test('isIgnoredErrorSource: keeps first-party AEM-scope sources', () => {
+  assert.equal(isIgnoredErrorSource('https://www.vitamix.com/scripts/commerce.js'), false);
+  assert.equal(isIgnoredErrorSource('https://www.vitamix.com/blocks/cart/cart.js'), false);
+});
+
+test('isIgnoredErrorSource: fails open on non-URL / empty input', () => {
+  assert.equal(isIgnoredErrorSource(undefined), false);
+  assert.equal(isIgnoredErrorSource(''), false);
+  assert.equal(isIgnoredErrorSource('not a url'), false);
+});
+
+test('logError: drops chrome-extension errors reported via fileName', () => {
+  captureFetch();
+  logError('window.error', { message: 'Failed to connect to MetaMask' }, {
+    fileName: 'chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/scripts/inpage.js',
+    lineNumber: 7,
+    columnNumber: 84292,
+  });
+  assert.equal(lastUrl, undefined, 'extension error must not be sent');
+});
+
+test('logError: drops chrome-extension errors detected from the stack only', () => {
+  captureFetch();
+  const err = {
+    message: 'Failed to connect to MetaMask',
+    stack: 'i: Failed to connect to MetaMask\n    at Object.connect (chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/scripts/inpage.js:7:84292)',
+  };
+  logError('unhandledrejection', err);
+  assert.equal(lastUrl, undefined, 'extension error must not be sent');
+});
+
+test('logError: drops errors from an ignored /scripts/consented/ source', () => {
+  captureFetch();
+  const err = {
+    message: 'Network request failed',
+    stack: 'Error: Network request failed\n@https://www.vitamix.com/scripts/consented/at.js:19:44964',
+  };
+  logError('unhandledrejection', err);
+  assert.equal(lastUrl, undefined, 'consented third-party error must not be sent');
+});
+
+test('logError: still logs first-party AEM-scope errors', () => {
+  captureFetch();
+  const err = new Error('boom');
+  err.stack = 'Error: boom\n    at fn (https://www.vitamix.com/scripts/commerce.js:12:34)';
+  logError('checkout-order', err);
+  assert.equal(lastUrl, `https://main--vitamix--aemsites.aem.network${PATH}`);
+  assert.equal(JSON.parse(lastInit.body).message, 'boom');
 });
 
 test('logError: retains stack frames past the old 5-line cap', () => {

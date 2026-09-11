@@ -51,7 +51,7 @@ document.body.appendChild(chatbot);
 
 let metaPixelId = 2138559226702249;
 
-if (currentEnvironment.dataset.deploymentEnv === 'prod') {
+if (window.location.hostname !== 'uat.vitamix.com') {
   loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-chatbot.lc-dd65664b07118365206104c205ccc20e-lc.min.js');
 } else {
   loadScript('https://uat.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-chatbot.lc-0714245cb61f874967f99f575877978f-lc.min.js');

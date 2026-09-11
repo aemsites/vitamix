@@ -59,7 +59,13 @@ export function buildOrderJSON(formData, form, cart, state, config) {
   const shippingAddr = collectAddress(form, formData, 'shipping-', email, country);
   shippingAddr.isValidated = state.shippingAddressIsValidated !== false;
 
-  const sameAsBilling = form.querySelector('[name="billing-choice"]:checked')?.value !== 'different';
+  // A wallet provider (Apple Pay/Google Pay/PayPal) hides the billing section
+  // and supplies billing from the wallet, so on-page billing does not apply
+  // even if the shopper had switched to "different billing" beforehand.
+  const billingSection = form.querySelector('.billing-section');
+  const billingApplies = !!billingSection && !billingSection.hidden;
+  const sameAsBilling = !billingApplies
+    || form.querySelector('[name="billing-choice"]:checked')?.value !== 'different';
   const billingAddr = sameAsBilling ? null : collectAddress(form, formData, 'billing-', email, country);
   if (billingAddr && state.billingAddressIsValidated !== undefined) {
     billingAddr.isValidated = state.billingAddressIsValidated !== false;
@@ -263,7 +269,13 @@ export function initOrder(form, cart, state, config, strings) {
         }
       }
 
-      const useDifferentBilling = form.querySelector('[name="billing-choice"]:checked')?.value === 'different';
+      // Skip billing validation when the billing section is hidden — a wallet
+      // provider (Apple Pay/Google Pay/PayPal) collects billing itself, so a
+      // stale/invalid on-page billing address must not block submit.
+      const billingSection = form.querySelector('.billing-section');
+      const billingApplies = !!billingSection && !billingSection.hidden;
+      const useDifferentBilling = billingApplies
+        && form.querySelector('[name="billing-choice"]:checked')?.value === 'different';
       if (useDifferentBilling && !state.billingAddressValidated) {
         const validBillingAddress = await state.ensureValidBillingAddress?.();
         if (!validBillingAddress) {
