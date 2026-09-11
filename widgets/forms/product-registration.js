@@ -114,7 +114,7 @@ export default async function decorate(widget) {
       description.textContent = modalCopy.description ?? '';
       textSection.append(title, description);
 
-      // path just labels the modal for debugging; actual look is scoped via the find-serial-modal class
+      // path labels the modal for debugging; look is scoped via the find-serial-modal class
       const path = 'product-registration-find-serial';
       const { block, showModal } = await createModal([imageSection, textSection], path);
       block.dataset.modalPath = path;
