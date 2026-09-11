@@ -78,7 +78,18 @@ async function geoCode(address) {
   const results = json?.results;
 
   if (!results || !results.length) {
-    return null;
+    return {
+      // Geo Location
+      location: null,
+
+      // Country
+      countryShort: null,
+      countryLong: null,
+
+      // State
+      stateShort: null,
+      stateLong: null,
+    };
   }
 
   const result = results[0];
