@@ -195,11 +195,19 @@ function renderRelatedProducts(ph, custom) {
     relatedProductsContainer.classList.add('pdp-related-products-container');
     const fillProducts = async () => {
       const products = await Promise.all(relatedProducts.map(async (url) => {
-        const resp = await fetch(`${url}.json`);
-        if (!resp.ok) return null;
-        const json = await resp.json();
-        json.url = url;
-        return json;
+        try {
+          const resp = await fetch(`${url}.json`);
+          if (!resp.ok) return null;
+          const json = await resp.json();
+          json.url = url;
+          return json;
+        } catch {
+          // Network-level failure (offline, connection reset, or blocked by a
+          // browser extension) rejects the fetch before a response exists. Drop
+          // just this product instead of rejecting Promise.all and losing the
+          // whole related-products section.
+          return null;
+        }
       }));
       const currentRelatedProducts = products.filter((product) => product && product.custom.retired === 'No');
       if (currentRelatedProducts.length > 0) {
