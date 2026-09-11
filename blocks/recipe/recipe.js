@@ -18,12 +18,22 @@ async function loadRecipeIds() {
   return recipeIdsPromise;
 }
 
+// btoa only accepts Latin1 (code points <= 255); recipe ids can carry non-Latin1
+// characters (smart quotes, em dashes, etc.), so encode UTF-8 bytes first. For
+// all-ASCII input this returns the same string as a plain btoa call.
+function base64EncodeUtf8(str) {
+  const bytes = new TextEncoder().encode(str);
+  let binary = '';
+  bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
+  return btoa(binary);
+}
+
 function buildSaveHref(recipeId) {
   const { locale, language } = getLocaleAndLanguage();
   const recipebookUrl = `https://www.vitamix.com/${locale}/${language}/recipebook?recipe_id=${recipeId}`;
   const { vitamix_customer: customer } = getCookies();
   if (customer) return recipebookUrl;
-  const encodedReturn = btoa(recipebookUrl);
+  const encodedReturn = base64EncodeUtf8(recipebookUrl);
   return `https://www.vitamix.com/${locale}/${language}/customer/account/login/referer/${encodeURIComponent(encodedReturn)}/`;
 }
 
