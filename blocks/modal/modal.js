@@ -2,6 +2,7 @@ import { loadFragment } from '../fragment/fragment.js';
 import {
   buildBlock, decorateBlock, loadBlock, loadCSS, toClassName,
 } from '../../scripts/aem.js';
+import { logError } from '../../scripts/operations-log.js';
 
 /*
   This is not a traditional block, so there is no decorate function.
@@ -111,6 +112,8 @@ export async function createModal(contentNodes, path, options = {}) {
  * @param {string} fragmentUrl - URL or path of the modal fragment
  * @param {{ root?: ShadowRoot|DocumentFragment|Element }} [options]
  *   Optional root to append modal to (e.g. embed shadow root)
+ * @returns {Promise<HTMLElement|null>} The modal block, or null if the fragment
+ *   could not be loaded (e.g. missing/unauthored modal path)
  */
 export async function openModal(fragmentUrl, options = {}) {
   const path = fragmentUrl.startsWith('http')
@@ -118,6 +121,14 @@ export async function openModal(fragmentUrl, options = {}) {
     : fragmentUrl;
 
   const fragment = await loadFragment(path);
+  if (!fragment) {
+    // Fragment missing/404 — usually a broken or stale `/modals/` link, or a
+    // modal not authored for this locale. Log to operations-log so the broken
+    // link can be tracked down; the Error carries the stack of the caller that
+    // requested it. Never throw — a missing modal must not break the page.
+    logError('modal', new Error(`Modal fragment failed to load: ${path}`), { fragmentPath: path });
+    return null;
+  }
   const { block, showModal } = await createModal(fragment.childNodes, path, options);
   block.dataset.modalPath = path;
   showModal();
