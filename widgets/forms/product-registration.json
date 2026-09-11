@@ -33,6 +33,11 @@
       "clearForm": "Clear form",
       "sending": "Sending..."
     },
+    "findSerialNumberModal": {
+      "title": "Countertop Blender",
+      "description": "The 18 digit serial number is located on the back, or the bottom, of the base.",
+      "imageAlt": "Serial number is located on the back or on the bottom of your machine."
+    },
     "inputPlaceholders": {
       "selectOption": "Select an option",
       "serialNumber": "",
@@ -119,6 +124,11 @@
       "clearForm": "Effacer le formulaire",
       "sending": "Envoi en cours..."
     },
+    "findSerialNumberModal": {
+      "title": "Blender de comptoir",
+      "description": "Le numéro de série à 18 chiffres se trouve à l'arrière ou au bas de la base.",
+      "imageAlt": "Le numéro de série se trouve à l'arrière ou au bas de votre appareil."
+    },
     "inputPlaceholders": {
       "selectOption": "Sélectionner une option",
       "serialNumber": "",
@@ -204,6 +214,11 @@
       "register": "Registrar",
       "clearForm": "Borrar formulario",
       "sending": "Enviando..."
+    },
+    "findSerialNumberModal": {
+      "title": "Licuadora de mostrador",
+      "description": "El número de serie de 18 dígitos se encuentra en la parte posterior o inferior de la base.",
+      "imageAlt": "El número de serie se encuentra en la parte posterior o inferior de su máquina."
     },
     "inputPlaceholders": {
       "selectOption": "Seleccionar una opción",
