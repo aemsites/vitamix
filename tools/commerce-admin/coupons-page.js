@@ -670,6 +670,31 @@ function couponDetailModalInnerHtml(d, thumbByPath) {
     <div class="coupons-modal-codes" data-cp-modal-codes-mount>${renderCodesSection()}</div>`;
 }
 
+/**
+ * Ref-counted body scroll lock: several coupon dialogs can be open/opening at
+ * once (e.g. a New/Edit dialog whose submit handler opens the detail modal
+ * before the outer dialog finishes closing). A plain "capture then restore"
+ * per-dialog is order-dependent and can leave `overflow: hidden` stuck once
+ * the outer dialog's stale restore runs after the inner one already unlocked.
+ */
+let couponsScrollLockCount = 0;
+let couponsScrollLockPrevOverflow = '';
+
+function lockCouponsBodyScroll() {
+  if (couponsScrollLockCount === 0) {
+    couponsScrollLockPrevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+  }
+  couponsScrollLockCount += 1;
+}
+
+function unlockCouponsBodyScroll() {
+  couponsScrollLockCount = Math.max(0, couponsScrollLockCount - 1);
+  if (couponsScrollLockCount === 0) {
+    document.body.style.overflow = couponsScrollLockPrevOverflow;
+  }
+}
+
 function closeCouponDetailDialog() {
   const el = document.querySelector('dialog.coupons-detail-dialog');
   if (!el) return;
@@ -733,7 +758,7 @@ function wireCouponDetailModal(dialog) {
   });
 }
 
-async function openCouponDetailModal() {
+async function openCouponDetailModal(options = {}) {
   closeCouponDetailDialog();
   const d = state.couponDetail;
   if (!d || !state.selectedCouponId) return;
@@ -812,14 +837,17 @@ async function openCouponDetailModal() {
 
   dialog.append(toolbar, scroll, footer);
   document.body.appendChild(dialog);
-  const prevBodyOverflow = document.body.style.overflow;
+  lockCouponsBodyScroll();
   dialog.addEventListener('close', () => {
-    document.body.style.overflow = prevBodyOverflow;
+    unlockCouponsBodyScroll();
+    couponDetailUrlId = '';
+    syncCouponsListUrl();
   }, { once: true });
   wireCouponDetailModal(dialog);
   bindCodesEvents(dialog);
-  document.body.style.overflow = 'hidden';
   dialog.showModal();
+  couponDetailUrlId = state.selectedCouponId;
+  syncCouponsListUrl({ push: !options.fromUrl });
 }
 
 function renderMarketTabs() {
@@ -907,13 +935,17 @@ const state = {
 const QS_COUPON_SEARCH = 'q';
 const QS_COUPON_SORT = 'sort';
 const QS_COUPON_DIR = 'dir';
+const QS_COUPON_ID = 'id';
 
 let couponsListUrlSyncMuted = false;
 let couponsListUrlTimer = 0;
+/** Coupon id to reflect in the `id` query param while its detail modal is open. */
+let couponDetailUrlId = '';
+let couponsModalApplySeq = 0;
 
 /**
  * @param {string} [search]
- * @returns {{ q: string, sort: string, dir: ''|'asc'|'desc' }}
+ * @returns {{ q: string, sort: string, dir: ''|'asc'|'desc', id: string }}
  */
 function readCouponsListUrlState(search = window.location.search) {
   const params = new URLSearchParams(search);
@@ -922,7 +954,10 @@ function readCouponsListUrlState(search = window.location.search) {
   const dirRaw = String(params.get(QS_COUPON_DIR) || '').trim().toLowerCase();
   const sort = isCouponOverviewSortKey(sortRaw) ? sortRaw : '';
   const dir = dirRaw === 'asc' || dirRaw === 'desc' ? dirRaw : '';
-  return { q, sort, dir };
+  const id = String(params.get(QS_COUPON_ID) || '').trim();
+  return {
+    q, sort, dir, id,
+  };
 }
 
 function applyCouponsListUrlToState() {
@@ -955,6 +990,8 @@ function syncCouponsListUrl(opts = {}) {
     url.searchParams.set(QS_COUPON_SORT, state.overviewSortKey);
     url.searchParams.set(QS_COUPON_DIR, state.overviewSortDir);
   }
+  if (couponDetailUrlId) url.searchParams.set(QS_COUPON_ID, couponDetailUrlId);
+  else url.searchParams.delete(QS_COUPON_ID);
   const same = url.pathname === window.location.pathname && url.search === window.location.search;
   if (same) return;
   if (opts.push) window.history.pushState({ coupons: true }, '', url);
@@ -972,6 +1009,36 @@ function scheduleCouponsListUrlPush() {
 function flushCouponsListUrlPush() {
   window.clearTimeout(couponsListUrlTimer);
   syncCouponsListUrl({ push: true });
+}
+
+/**
+ * Opens (or closes) the coupon detail modal to match the `id` query param —
+ * used on initial load and on browser back/forward so a coupon link is
+ * shareable as a deep link.
+ */
+async function applyCouponDetailFromUrl() {
+  couponsModalApplySeq += 1;
+  const seq = couponsModalApplySeq;
+  const { id } = readCouponsListUrlState();
+  if (!id) {
+    closeCouponDetailDialog();
+    return;
+  }
+  if (document.querySelector('dialog.coupons-detail-dialog') && state.selectedCouponId === id) return;
+  state.selectedCouponId = id;
+  try {
+    await refreshSelection();
+  } catch (err) {
+    console.warn('[commerce-admin/coupons] open coupon from URL failed', {
+      couponId: id,
+      message: err?.message || String(err),
+    });
+    return;
+  }
+  if (seq !== couponsModalApplySeq) return;
+  render();
+  await openCouponDetailModal({ fromUrl: true });
+  if (seq !== couponsModalApplySeq) closeCouponDetailDialog();
 }
 
 /** @param {'error'|'info'} tone */
@@ -1402,7 +1469,6 @@ async function openDialog(title, innerHtml, onSubmit, afterMount, dialogClass, s
       </div>
     </div>`;
   document.body.appendChild(dialog);
-  const prevBodyOverflow = document.body.style.overflow;
   const scrollRoot = dialog.querySelector('.coupons-dialog-scroll');
   let baseline = '';
   const recaptureBaseline = () => {
@@ -1431,7 +1497,7 @@ async function openDialog(title, innerHtml, onSubmit, afterMount, dialogClass, s
   window.addEventListener('beforeunload', onBeforeUnload);
   const onDialogClose = () => {
     window.removeEventListener('beforeunload', onBeforeUnload);
-    document.body.style.overflow = prevBodyOverflow;
+    unlockCouponsBodyScroll();
     document.querySelector('datalist#cp-form-categories-datalist')?.remove();
     couponProductSelectionFields.forEach((f) => f.destroy());
     couponProductSelectionFields = [];
@@ -1469,7 +1535,7 @@ async function openDialog(title, innerHtml, onSubmit, afterMount, dialogClass, s
   wireDialogEscapeDismiss(dialog, () => {
     tryDismiss();
   });
-  document.body.style.overflow = 'hidden';
+  lockCouponsBodyScroll();
   dialog.showModal();
 }
 
@@ -2694,9 +2760,8 @@ function openCouponExportImportDialog() {
     dialog.remove();
   };
 
-  const prevBodyOverflow = document.body.style.overflow;
   dialog.addEventListener('close', () => {
-    document.body.style.overflow = prevBodyOverflow;
+    unlockCouponsBodyScroll();
   }, { once: true });
 
   btnCancel?.addEventListener('click', dismiss);
@@ -2771,7 +2836,7 @@ function openCouponExportImportDialog() {
     }
   });
 
-  document.body.style.overflow = 'hidden';
+  lockCouponsBodyScroll();
   dialog.showModal();
 }
 
@@ -3278,6 +3343,7 @@ function openAddCodesDialog() {
       await fetchCodesForCoupon();
       afterCodesRefresh();
       showToast(`Created ${total} code(s)`, 'success');
+      return undefined;
     },
     async (dlg) => {
       wireAddCodesDialog(dlg);
@@ -3401,12 +3467,15 @@ async function init() {
     applyCouponsListUrlToState();
     await refreshCouponList();
     render();
+    await applyCouponDetailFromUrl();
     window.addEventListener('popstate', () => {
       couponsListUrlSyncMuted = true;
       window.clearTimeout(couponsListUrlTimer);
       applyCouponsListUrlToState();
       render();
-      couponsListUrlSyncMuted = false;
+      applyCouponDetailFromUrl().finally(() => {
+        couponsListUrlSyncMuted = false;
+      });
     });
   } catch (err) {
     console.warn('[commerce-admin/coupons] initial load failed', { message: err?.message || String(err) });
