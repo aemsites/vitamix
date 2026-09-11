@@ -206,17 +206,51 @@ export function errorDetails(error) {
 }
 
 /**
- * Logs a generic (non-API) error.
+ * Source-location path prefixes whose errors are NOT logged. Matched against
+ * the URL pathname of the error's originating frame. `/scripts/consented/`
+ * holds third-party consent-gated scripts (e.g. Adobe Target's at.js) that we
+ * serve from our own origin but do not own — their errors are noise. Add more
+ * prefixes here as further sources of noise are identified.
+ * @type {string[]}
+ */
+const IGNORED_SOURCE_PREFIXES = ['/scripts/consented/'];
+
+/**
+ * Whether an error originating from `source` (a script URL) should be dropped
+ * rather than logged. Ignores browser-extension scripts — MetaMask and other
+ * extensions inject code whose errors surface on our pages but are not ours —
+ * and any source whose path starts with an IGNORED_SOURCE_PREFIXES entry.
+ * Best-effort: unparseable sources are not ignored (fail open, keep logging).
+ * @param {string} [source] - Originating script URL.
+ * @returns {boolean}
+ */
+export function isIgnoredErrorSource(source) {
+  if (typeof source !== 'string' || !source) return false;
+  let url;
+  try {
+    url = new URL(source);
+  } catch {
+    return false;
+  }
+  // chrome-extension:, moz-extension:, safari-web-extension: — extension noise.
+  if (url.protocol.endsWith('-extension:')) return true;
+  return IGNORED_SOURCE_PREFIXES.some((prefix) => url.pathname.startsWith(prefix));
+}
+
+/**
+ * Logs a generic (non-API) error. Errors originating from browser extensions or
+ * an ignored source prefix (see {@link isIgnoredErrorSource}) are dropped.
  * @param {string} scope - Where it happened, e.g. 'checkout-order' or 'global'.
  * @param {*} error - An Error or error-like value.
  * @param {Object} [extra] - Extra non-PII context.
  */
 export function logError(scope, error, extra = {}) {
-  logOperation('error', {
-    scope,
-    ...errorDetails(error),
-    ...extra,
-  });
+  const details = { ...errorDetails(error), ...extra };
+  // Check both the (possibly extra-overridden) fileName and the stack's top
+  // frame — for unhandled rejections only the stack carries the source.
+  const stackSource = parseTopFrame(details.stack).fileName;
+  if (isIgnoredErrorSource(details.fileName) || isIgnoredErrorSource(stackSource)) return;
+  logOperation('error', { scope, ...details });
 }
 
 /**
