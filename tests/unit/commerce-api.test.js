@@ -8,6 +8,7 @@ import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   getOrder, estimateShipping, estimatePrice, estimateExpressCheckout, parsePreview,
+  normalizeCouponCode,
 } from '../../scripts/commerce-api.js';
 import { __setLocale, __resetScripts } from './mocks/scripts.mjs';
 
@@ -236,6 +237,51 @@ test('estimatePrice: includes couponSource when provided with couponCode', async
   assert.equal(lastUrl, `${API_ORIGIN}/estimate/price`);
   assert.equal(body.couponCode, 'IDME10');
   assert.equal(body.couponSource, 'auto');
+});
+
+// --- coupon code normalization ----------------------------------------------
+
+test('normalizeCouponCode: uppercases the code', () => {
+  assert.equal(normalizeCouponCode('save10'), 'SAVE10');
+});
+
+test('normalizeCouponCode: replaces legacy special chars with underscore', () => {
+  assert.equal(normalizeCouponCode('SAVE*10#'), 'SAVE_10_');
+});
+
+test('normalizeCouponCode: preserves the accepted charset A-Z 0-9 - _ +', () => {
+  assert.equal(normalizeCouponCode('SUMMER-2024_A+B'), 'SUMMER-2024_A+B');
+});
+
+test('normalizeCouponCode: keeps a shopper-entered + rather than mapping it to _', () => {
+  assert.equal(normalizeCouponCode('deal+5'), 'DEAL+5');
+});
+
+test('normalizeCouponCode: coerces non-string input', () => {
+  assert.equal(normalizeCouponCode(12345), '12345');
+});
+
+test('post: normalizes couponCode to the API charset before sending', async () => {
+  mockFetch(200, { discounts: [], orderDiscountTotal: 0 });
+  await estimatePrice('us', [], 'Save*10#');
+  const body = JSON.parse(lastInit.body);
+  assert.equal(body.couponCode, 'SAVE_10_');
+});
+
+test('post: sends a shopper-entered + through unchanged', async () => {
+  mockFetch(200, { rates: [] });
+  await estimateShipping('us', 'CA', [], 'free+ship');
+  const body = JSON.parse(lastInit.body);
+  assert.equal(body.couponCode, 'FREE+SHIP');
+});
+
+test('post: does not mutate the caller-supplied coupon code', async () => {
+  mockFetch(200, { subtotal: '0.00', shippingMethods: [] });
+  const context = { couponCode: 'save*10' };
+  await estimateExpressCheckout('us', 'MN', '55441', [], context);
+  assert.equal(context.couponCode, 'save*10', 'original body should be untouched');
+  const body = JSON.parse(lastInit.body);
+  assert.equal(body.couponCode, 'SAVE_10');
 });
 
 test('parsePreview: returns zero shipping when a cart rule grants free shipping', () => {
