@@ -67,7 +67,17 @@ export const EDGE_CHECKOUT_OVERRIDE_STORAGE_KEY = 'edgeCheckout';
  * @returns {string[]}
  */
 export function getEdgeCheckoutOverrideLocales() {
-  return (localStorage.getItem(EDGE_CHECKOUT_OVERRIDE_STORAGE_KEY) || '')
+  let raw = '';
+  try {
+    // Accessing localStorage throws SecurityError when the browser blocks site
+    // data (e.g. "block all cookies", or a restricted cross-origin context).
+    // This runs during eager page load, so a throw here would break bootstrap;
+    // treat it as no override (the default checkout path).
+    raw = localStorage.getItem(EDGE_CHECKOUT_OVERRIDE_STORAGE_KEY) || '';
+  } catch {
+    return [];
+  }
+  return raw
     .split(',')
     .map((locale) => locale.trim().toLowerCase())
     .filter(Boolean);
