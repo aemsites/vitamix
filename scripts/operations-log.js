@@ -207,13 +207,15 @@ export function errorDetails(error) {
 
 /**
  * Source-location path prefixes whose errors are NOT logged. Matched against
- * the URL pathname of the error's originating frame. `/scripts/consented/`
- * holds third-party consent-gated scripts (e.g. Adobe Target's at.js) that we
- * serve from our own origin but do not own — their errors are noise. Add more
- * prefixes here as further sources of noise are identified.
+ * the URL pathname of the error's originating frame. The `/scripts/consented/`
+ * directory and the `/scripts/consented.js` entry file hold third-party
+ * consent-gated scripts (Adobe Target's at.js, and inlined ad/analytics pixels
+ * such as Bing UET, Facebook, Amazon DSP, Pinterest) that we serve from our own
+ * origin but do not own — their errors are noise. Add more prefixes here as
+ * further sources of noise are identified.
  * @type {string[]}
  */
-const IGNORED_SOURCE_PREFIXES = ['/scripts/consented/'];
+const IGNORED_SOURCE_PREFIXES = ['/scripts/consented/', '/scripts/consented.js'];
 
 /**
  * Whether an error originating from `source` (a script URL) should be dropped
