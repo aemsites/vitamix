@@ -1209,7 +1209,16 @@ export function applyImgColor(block) {
       const thumbnailImg = new Image();
       thumbnailImg.src = thumbnail;
       thumbnailImg.onload = () => {
-        const color = colorThief.getColor(thumbnailImg, 50);
+        let color;
+        try {
+          color = colorThief.getColor(thumbnailImg, 50);
+        } catch {
+          // colorthief throws when it can't extract a palette (getPalette
+          // returns null for e.g. a fully transparent or near-white thumbnail
+          // with no sampleable pixels). Leave the default color treatment.
+          return;
+        }
+        if (!Array.isArray(color)) return;
         const [r, g, b] = color;
         const y = Math.floor(r * 0.2126 + g * 0.7152 + b * 0.0722);
         const brightness = {
