@@ -2351,7 +2351,7 @@ function couponsJsonForExport(rows) {
 
 function downloadCouponExportJson(text) {
   const raw = String(text || '');
-  if (!raw.trim()) throw new Error('Nothing to save — the JSON array is empty.');
+  if (!raw.trim()) throw new Error('Nothing to download — the JSON array is empty.');
   const stamp = new Date().toISOString().slice(0, 10);
   const market = state.marketFilter === 'all' ? 'all' : state.marketFilter;
   const filename = `coupons-${market}-${stamp}.json`;
@@ -2653,7 +2653,7 @@ function openCouponExportImportDialog() {
           <h2 class="coupons-dialog-title">Export / import coupons</h2>
           <p class="coupons-field-hint">JSON array of the <strong>${escapeHtml(String(shown.length))}</strong>
             coupon program${shown.length === 1 ? '' : 's'} currently shown (${escapeHtml(couponExportMarketHint())}).
-            Codes are omitted. Save downloads this file; Preview import validates the array and lists
+            Codes are omitted. Download this file; Preview import validates the array and lists
             programs that will be created or updated. Unchanged ids are skipped.</p>
           <label class="pim-sr-only" for="cp-export-json">Coupon types JSON</label>
           <textarea id="cp-export-json" class="coupons-json-input" spellcheck="false" rows="16">${escapeHtml(initialJson)}</textarea>
@@ -2669,7 +2669,7 @@ function openCouponExportImportDialog() {
         <button type="button" class="coupons-btn" data-cp-cancel>Cancel</button>
         <button type="button" class="coupons-btn" data-cp-export-back hidden>Back</button>
         <button type="button" class="coupons-btn" data-cp-export-preview>Preview import</button>
-        <button type="button" class="coupons-btn coupons-btn-primary" data-cp-export-save>Save</button>
+        <button type="button" class="coupons-btn coupons-btn-primary" data-cp-export-save>Download</button>
         <button type="button" class="coupons-btn coupons-btn-primary" data-cp-export-import hidden>Import</button>
       </div>
     </div>`;
@@ -2777,10 +2777,10 @@ function openCouponExportImportDialog() {
   btnSave?.addEventListener('click', () => {
     try {
       const filename = downloadCouponExportJson(textarea?.value ?? '');
-      showToast(`Saved ${filename}`, 'success');
+      showToast(`Downloaded ${filename}`, 'success');
     } catch (err) {
-      setStatus(err?.message || 'Could not save JSON');
-      showToast(err?.message || 'Could not save JSON', 'error');
+      setStatus(err?.message || 'Could not download JSON');
+      showToast(err?.message || 'Could not download JSON', 'error');
     }
   });
 
