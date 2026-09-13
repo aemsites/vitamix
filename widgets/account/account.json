@@ -5,7 +5,8 @@
       "overview": "My Account",
       "information": "Account Information",
       "address": "Addresses",
-      "orders": "Order History"
+      "orders": "Order History",
+      "recipes": "Recipe Book"
     },
     "greeting": "Welcome back",
     "panels": {
@@ -21,6 +22,9 @@
       },
       "orders": {
         "title": "Order History"
+      },
+      "recipes": {
+        "title": "Recipe Book"
       }
     },
     "overviewLabels": {
@@ -101,6 +105,22 @@
     },
     "ordersEmpty": "No orders yet.",
     "ordersLoading": "Loading orders…",
+    "recipeBook": {
+      "empty": "No saved recipes yet.",
+      "loading": "Loading recipes…",
+      "loadError": "Could not load recipes. Please try again.",
+      "delete": "Remove",
+      "deleteAria": "Remove {{title}} from recipe book",
+      "deleteConfirm": "Remove this recipe from your recipe book?",
+      "deleteError": "Could not remove recipe. Please try again.",
+      "unavailable": "Recipe unavailable",
+      "time": "Time",
+      "yield": "Yield",
+      "hour": "hour",
+      "hours": "hours",
+      "minute": "minute",
+      "minutes": "minutes"
+    },
     "logout": "Log out",
     "sectionSelectAria": "Account menu",
     "orderMock": {
@@ -168,7 +188,8 @@
       "overview": "Mon compte",
       "information": "Informations du compte",
       "address": "Adresses",
-      "orders": "Historique des commandes"
+      "orders": "Historique des commandes",
+      "recipes": "Livre de recettes"
     },
     "greeting": "Bon retour",
     "panels": {
@@ -184,6 +205,9 @@
       },
       "orders": {
         "title": "Historique des commandes"
+      },
+      "recipes": {
+        "title": "Livre de recettes"
       }
     },
     "overviewLabels": {
@@ -264,6 +288,22 @@
     },
     "ordersEmpty": "Aucune commande pour le moment.",
     "ordersLoading": "Chargement des commandes…",
+    "recipeBook": {
+      "empty": "Aucune recette enregistrée pour le moment.",
+      "loading": "Chargement des recettes…",
+      "loadError": "Impossible de charger les recettes. Veuillez réessayer.",
+      "delete": "Supprimer",
+      "deleteAria": "Retirer {{title}} du livre de recettes",
+      "deleteConfirm": "Retirer cette recette de votre livre de recettes ?",
+      "deleteError": "Impossible de retirer la recette. Veuillez réessayer.",
+      "unavailable": "Recette indisponible",
+      "time": "Temps",
+      "yield": "Portions",
+      "hour": "heure",
+      "hours": "heures",
+      "minute": "minute",
+      "minutes": "minutes"
+    },
     "logout": "Se déconnecter",
     "sectionSelectAria": "Menu du compte",
     "orderMock": {
@@ -331,7 +371,8 @@
       "overview": "Mi cuenta",
       "information": "Información de la cuenta",
       "address": "Direcciones",
-      "orders": "Historial de pedidos"
+      "orders": "Historial de pedidos",
+      "recipes": "Libro de recetas"
     },
     "greeting": "Bienvenido de nuevo",
     "panels": {
@@ -347,6 +388,9 @@
       },
       "orders": {
         "title": "Historial de pedidos"
+      },
+      "recipes": {
+        "title": "Libro de recetas"
       }
     },
     "overviewLabels": {
@@ -410,6 +454,22 @@
     },
     "ordersEmpty": "Aún no hay pedidos.",
     "ordersLoading": "Cargando pedidos…",
+    "recipeBook": {
+      "empty": "Aún no hay recetas guardadas.",
+      "loading": "Cargando recetas…",
+      "loadError": "No se pudieron cargar las recetas. Inténtelo de nuevo.",
+      "delete": "Eliminar",
+      "deleteAria": "Eliminar {{title}} del libro de recetas",
+      "deleteConfirm": "¿Eliminar esta receta de su libro de recetas?",
+      "deleteError": "No se pudo eliminar la receta. Inténtelo de nuevo.",
+      "unavailable": "Receta no disponible",
+      "time": "Tiempo",
+      "yield": "Raciones",
+      "hour": "hora",
+      "hours": "horas",
+      "minute": "minuto",
+      "minutes": "minutos"
+    },
     "logout": "Cerrar sesión",
     "sectionSelectAria": "Menú de la cuenta",
     "orderMock": {
