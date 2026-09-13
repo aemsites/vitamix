@@ -18,21 +18,32 @@ import {
 import addToCompare, {
   useWidgetCompare, isInStoredCompare, removeFromCompare,
 } from '../../scripts/add-to-compare.js';
+import { createStarRating } from '../../scripts/plp-data.js';
 
 /**
  * Renders the title section of the PDP block.
  * @param {Element} block - The PDP block element
  * @returns {Element} The title container element
  */
-function renderTitle(block, custom, reviewsId) {
+function renderTitle(block, custom, aggregateRating) {
   const titleContainer = document.createElement('div');
   titleContainer.classList.add('title');
 
   const reviewsPlaceholder = document.createElement('div');
   reviewsPlaceholder.classList.add('pdp-reviews-summary-placeholder');
-  // data-bv-seo="false": suppress Bazaarvoice's own structured-data markup; the
-  // product JSON-LD (with aggregateRating) is rendered server-side by the pipeline.
-  reviewsPlaceholder.innerHTML = `<div data-bv-show="rating_summary" data-bv-product-id="${reviewsId}" data-bv-seo="false">`;
+  // Rating average/count come from the product JSON-LD's aggregateRating (rendered
+  // server-side) rather than a Bazaarvoice rating_summary widget; the link jumps to
+  // the Bazaarvoice-loaded review details further down the page.
+  if (aggregateRating?.reviewCount) {
+    const reviewsLink = document.createElement('a');
+    reviewsLink.classList.add('pdp-reviews-summary-link');
+    reviewsLink.href = '#pdp-reviews';
+    reviewsLink.append(createStarRating({
+      reviewAverage: aggregateRating.ratingValue,
+      reviewCount: aggregateRating.reviewCount,
+    }));
+    reviewsPlaceholder.append(reviewsLink);
+  }
 
   const { collection } = custom;
   const collectionContainer = document.createElement('p');
@@ -69,16 +80,21 @@ function renderDetails(ph, features) {
  */
 // eslint-disable-next-line no-unused-vars
 async function renderReviews(ph, block, reviewsId) {
-  // TODO: Add Bazaarvoice reviews
   const bazaarvoiceContainer = document.createElement('div');
+  bazaarvoiceContainer.id = 'pdp-reviews';
   bazaarvoiceContainer.classList.add('pdp-reviews-container');
   bazaarvoiceContainer.innerHTML = `<div data-bv-show="reviews" data-bv-product-id="${reviewsId}" data-bv-seo="false"></div>`;
 
-  setTimeout(async () => {
-    await loadScript(`https://apps.bazaarvoice.com/deployments/vitamix/main_site/production/${ph.languageCode || 'en_US'}/bv.js`);
-  }, 500);
-
   window.bvCallback = () => { };
+
+  // Defer loading bv.js until the reviews section is close to the viewport, rather
+  // than on a fixed timer, since it's rendered well below the fold.
+  const io = new IntersectionObserver((entries) => {
+    if (!entries.some((entry) => entry.isIntersecting)) return;
+    io.disconnect();
+    loadScript(`https://apps.bazaarvoice.com/deployments/vitamix/main_site/production/${ph.languageCode || 'en_US'}/bv.js`);
+  }, { rootMargin: '500px' });
+  io.observe(bazaarvoiceContainer);
 
   block.parentElement.append(bazaarvoiceContainer);
 }
@@ -345,13 +361,13 @@ async function renderFreeGift() {
  */
 export default async function decorate(block) {
   const { jsonLdData, variants } = window;
-  const { custom, offers } = jsonLdData;
+  const { custom, offers, aggregateRating } = jsonLdData;
   const { locale, language } = getLocaleAndLanguage();
   const ph = await fetchPlaceholders(`/${locale}/${language}/products/config`);
 
   const reviewsId = custom.reviewsId || toClassName(getMetadata('sku')).replace(/-/g, '');
   const galleryContainer = renderGallery(block, variants);
-  const titleContainer = renderTitle(block, custom, reviewsId);
+  const titleContainer = renderTitle(block, custom, aggregateRating);
   const alertContainer = renderAlert(ph, block, custom, variants[0]?.custom);
   const relatedProductsContainer = renderRelatedProducts(ph, custom);
 

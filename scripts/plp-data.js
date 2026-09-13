@@ -1,8 +1,9 @@
 /* eslint-disable max-len */
 /**
  * Shared PLP data layer, used by widgets/product-list and blocks/product-row:
- * fetching/parsing the commerce product index, plp-data-{dataset}.json, and
- * reviews.json, joining them by slug, and rendering the resulting badges/star-rating.
+ * fetching/parsing the commerce product index (which carries each product's
+ * ratingValue/reviewCount) and plp-data-{dataset}.json, joining them by slug,
+ * and rendering the resulting badges/star-rating.
  */
 
 // Color tier for each callout type - drives which .product-badge-tier-* class is applied.
@@ -112,7 +113,8 @@ export function createCallouts(product, copy) {
 }
 
 /**
- * Builds a compact star-rating element from reviews.json data (reviewAverage/reviewCount).
+ * Builds a compact star-rating element from the product's reviewAverage/reviewCount
+ * (sourced from the product index's ratingValue/reviewCount columns).
  * @param {Object} product - Product with reviewAverage (0-5) and reviewCount
  * @returns {HTMLElement} `.star-rating` element (empty if the product has no reviews)
  */
@@ -143,8 +145,8 @@ export function createStarRating(product) {
 }
 
 /**
- * Resolves a URL/pathname down to its trailing slug, for joining product rows
- * against reviews.json (whose Path values may use a different URL prefix).
+ * Resolves a URL/pathname down to its trailing slug, for joining product-index
+ * products against plp-data rows (whose Product URLs may use a different URL prefix).
  * @param {string} rawUrl - Absolute URL or pathname
  * @returns {string}
  */
@@ -156,38 +158,6 @@ export function slugFromUrl(rawUrl) {
     pathname = rawUrl;
   }
   return pathname.split('/').filter(Boolean).pop() || '';
-}
-
-/**
- * Fetches reviews.json, the source of truth for each product's review count/average rating
- * (replaces the previous per-product Bazaarvoice inline widget lookup).
- * @param {string} locale
- * @param {string} language
- * @returns {Promise<Array<Object>>}
- */
-export async function fetchReviewsData(locale, language) {
-  const resp = await fetch(`/${locale}/${language}/products/config/reviews.json`);
-  if (!resp.ok) return [];
-  const json = await resp.json();
-  return Array.isArray(json.data) ? json.data : [];
-}
-
-/**
- * Builds a slug -> { reviewCount, reviewAverage } lookup from reviews.json rows.
- * @param {Array<Object>} reviewsRows - Raw reviews.json rows (Path, Number of Reviews, Average Rating)
- * @returns {Object.<string, {reviewCount: number, reviewAverage: number}>}
- */
-export function getReviewsBySlug(reviewsRows) {
-  const bySlug = {};
-  reviewsRows.forEach((row) => {
-    const slug = slugFromUrl((row.Path || '').trim());
-    if (!slug) return;
-    bySlug[slug] = {
-      reviewCount: parseInt(row['Number of Reviews'], 10) || 0,
-      reviewAverage: parseFloat(row['Average Rating']) || 0,
-    };
-  });
-  return bySlug;
 }
 
 /**
@@ -252,6 +222,12 @@ function parseProductRow(data, locale, language) {
       case 'variantSkus':
       case 'visibility':
         parsed[key] = value ? value.split(',').map((s) => s.trim()) : [];
+        break;
+      case 'ratingValue':
+        parsed.reviewAverage = parseFloat(value) || 0;
+        break;
+      case 'reviewCount':
+        parsed[key] = parseInt(value, 10) || 0;
         break;
       default:
         parsed[key] = typeof value === 'string' ? value.trim() : value;
