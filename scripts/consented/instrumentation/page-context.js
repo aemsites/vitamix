@@ -601,7 +601,8 @@ export async function fireProdView() {
     return;
   }
 
-  if (!(await pushProductEvent('prodView', buildProductId(productName)))) {
+  const productPrice = window.selectedVariant?.price?.final;
+  if (!(await pushProductEvent('prodView', buildProductId(productName, productPrice)))) {
     debugWarn('Adobe Analytics prodView skipped: Adobe Launch (_satellite) not available');
   }
 }
