@@ -801,6 +801,13 @@ function buildAutoBlocks(main) {
             console.error('Fragment loading failed', error);
           }
         });
+      }, (error) => {
+        // The dynamic import can reject with "Failed to fetch dynamically
+        // imported module" on a transient network failure. Handle it here (the
+        // outer try/catch is synchronous and can't) so it doesn't surface as an
+        // unhandled rejection; the fragment links are simply left in place.
+        // eslint-disable-next-line no-console
+        console.error('Fragment module import failed', error);
       });
     }
 
@@ -1232,6 +1239,11 @@ export function applyImgColor(block) {
         const toHex = (n) => n.toString(16).padStart(2, '0');
         block.style.setProperty('--image-color', `#${toHex(r)}${toHex(g)}${toHex(b)}`);
       };
+    }, () => {
+      // Dynamic import can reject with "Failed to fetch dynamically imported
+      // module" on a transient network failure. Swallow it so it doesn't
+      // surface as an unhandled rejection; the image just keeps its default
+      // color treatment.
     });
   }
 }
@@ -2182,7 +2194,13 @@ async function loadLazy(doc) {
   // for Magento pages: importing it initializes that cart and can overwrite
   // Magento's shared cart-count cookie.
   if (window.useEdgeCheckout) {
-    import('./gift-with-purchase.js').then(({ initGWP }) => initGWP());
+    // A dynamic import can reject with "Failed to fetch dynamically imported
+    // module" on a transient network failure (offline, connection reset, or a
+    // blocked request). Swallow that rejection so it doesn't surface as an
+    // unhandled rejection — GWP just stays uninitialized for this page load and
+    // resumes on the next navigation. The second `then` arg catches only the
+    // import failure, so genuine errors thrown inside initGWP still propagate.
+    import('./gift-with-purchase.js').then(({ initGWP }) => initGWP(), () => {});
   }
 
   const { hash } = window.location;
