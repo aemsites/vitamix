@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="robots" content="noindex" />
+    <title>Vitamix Commerce Admin – Inventory</title>
+    <link rel="stylesheet" href="commerce-auth.css" />
+    <link rel="stylesheet" href="pim.css" />
+    <link rel="stylesheet" href="commerce-admin-chrome.css" />
+    <link rel="stylesheet" href="inventory.css" />
+  </head>
+  <body class="commerce-admin-body" data-commerce-header="subpage" data-commerce-header-page="Inventory">
+    <div id="commerce-admin-auth-root" aria-live="polite">
+      <p class="commerce-admin-auth-placeholder">Checking sign-in…</p>
+    </div>
+    <header id="commerce-admin-app-header"></header>
+    <main class="pim-main">
+      <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <p>Loading inventory…</p>
+      </div>
+
+      <div class="error" id="error"></div>
+
+      <div class="pim-content" id="content">
+        <div class="pim-toolbar">
+          <input
+            type="search"
+            id="searchInput"
+            class="pim-search"
+            placeholder="Search by title, SKU, color…"
+            aria-label="Search inventory"
+          />
+          <label class="pim-index-label" for="indexSelect">Index</label>
+          <select id="indexSelect" class="pim-index-select" aria-label="Product index locale">
+            <option value="us/en_us">US (en-US)</option>
+            <option value="ca/en_us">CA (en-CA)</option>
+            <option value="ca/fr_ca">CA (fr-CA)</option>
+          </select>
+          <span class="pim-count" id="productCount">0 SKUs</span>
+          <button type="button" class="inv-btn" id="exportImportBtn">Export / import…</button>
+        </div>
+
+        <div class="inv-filter-tabs" id="filterTabs" role="tablist" aria-label="Availability filter">
+          <button type="button" class="inv-filter-tab is-active" data-filter="all" role="tab" aria-selected="true">All</button>
+          <button type="button" class="inv-filter-tab" data-filter="OutOfStock" role="tab" aria-selected="false">Out of stock</button>
+          <button type="button" class="inv-filter-tab" data-filter="ManagedInventory" role="tab" aria-selected="false">Managed inventory</button>
+          <button type="button" class="inv-filter-tab" data-filter="Discontinued" role="tab" aria-selected="false">Discontinued</button>
+          <button type="button" class="inv-filter-tab" data-filter="InStock" role="tab" aria-selected="false">Generally available</button>
+        </div>
+
+        <div id="productList" class="pim-list-wrapper">
+          <table class="pim-list" role="grid" aria-label="Inventory">
+            <thead>
+              <tr>
+                <th class="pim-col-thumb" scope="col"><span class="pim-sr-only">Image</span></th>
+                <th class="pim-col-product pim-sortable" scope="col" data-sort="title" tabindex="0">Product</th>
+                <th class="pim-col-sku pim-sortable" scope="col" data-sort="sku" tabindex="0">SKU</th>
+                <th class="inv-col-variant pim-sortable" scope="col" data-sort="color" tabindex="0">Variant</th>
+                <th class="pim-col-availability pim-sortable" scope="col" data-sort="availability" tabindex="0">Availability</th>
+                <th class="inv-col-qty pim-sortable" scope="col" data-sort="inventoryQuantity" tabindex="0">Qty</th>
+              </tr>
+            </thead>
+            <tbody id="productGrid"></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+    <script type="module" src="auth-page-boot.js"></script>
+    <script type="module" src="commerce-admin-header.js"></script>
+    <script type="module" src="inventory.js"></script>
+  </body>
+</html>

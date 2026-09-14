@@ -460,6 +460,8 @@ export async function init() {
   }
 }
 
-if (typeof document !== 'undefined' && document.getElementById('productGrid')) {
+// Guard against auto-init when pim.js is imported purely for its helpers (e.g. by inventory.js),
+// which renders into its own #productGrid on a different page.
+if (typeof document !== 'undefined' && document.body?.getAttribute('data-commerce-header-page') === 'Catalog') {
   init();
 }
