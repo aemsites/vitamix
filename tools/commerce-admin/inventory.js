@@ -359,14 +359,8 @@ function downloadInventoryTsv(text) {
   return filename;
 }
 
-/** @param {string} line */
-function isInventoryTsvHeaderLine(line) {
-  const s = String(line || '').toLowerCase();
-  return /\bsku\b/.test(s) && (/\bavailability\b/.test(s) || /\bqty\b/.test(s) || /managed/.test(s));
-}
-
 /** @param {unknown} raw */
-function parseManagedStockCell(raw) {
+function parseYesNoCell(raw) {
   const s = invTsvCell(raw).toLowerCase();
   if (!s) return undefined;
   if (['1', 'true', 'yes', 'y'].includes(s)) return true;
@@ -382,68 +376,86 @@ function parseQuantityCell(raw) {
   return Number.isNaN(n) ? undefined : n;
 }
 
+const MANAGED_INVENTORY_CONFIG_URL = 'https://main--vitamix--aemsites.aem.page/us/en_us/products/config/inventory.json';
+
 /**
- * Parse pasted TSV into rows. Columns: SKU, Title, Variant, Availability, Managed Stock, Qty.
- * A leading header line (containing "sku") is skipped automatically. Blank cells mean
- * "no opinion" for that column and won't be treated as a change.
- * @param {string} text
- * @returns {Array<{ sku: string, title: string, color: string, availability: string,
- *   managedStock: boolean|undefined, inventoryQuantity: number|undefined }>}
+ * The config feed keys SKUs without leading zeros or the market/variant suffix
+ * (e.g. local `073492-04` → config `73492`), so match on that normalized form.
+ * @param {string} sku
+ * @returns {string}
  */
-function parseInventoryImportTsv(text) {
-  const rawLines = String(text || '').replace(/\r\n/g, '\n').split('\n');
-  const startIdx = rawLines.length && isInventoryTsvHeaderLine(rawLines[0]) ? 1 : 0;
-  return rawLines.slice(startIdx)
-    .map((line) => line.split('\t'))
-    .filter((cols) => invTsvCell(cols[0]))
-    .map((cols) => ({
-      sku: invTsvCell(cols[0]),
-      title: invTsvCell(cols[1] ?? ''),
-      color: invTsvCell(cols[2] ?? ''),
-      availability: invTsvCell(cols[3] ?? ''),
-      managedStock: parseManagedStockCell(cols[4]),
-      inventoryQuantity: parseQuantityCell(cols[5]),
-    }));
+function normalizeSkuForConfigMatch(sku) {
+  return String(sku || '').trim().toUpperCase()
+    .replace(/^0+(?=.)/, '')
+    .replace(/-[A-Z0-9]+$/, '');
 }
 
-/**
- * Compare one parsed TSV row against the currently loaded SKU (if any).
- * @param {object} parsed
- * @returns {{ parsed: object, existing: object|null, changedKeys: Set<string>,
- *   kind: 'update'|'unchanged'|'missing' }}
- */
-function diffInventoryImportRow(parsed) {
-  const existing = allSkuRows.find((r) => r.sku === parsed.sku) || null;
-  if (!existing) {
-    return {
-      parsed, existing, changedKeys: new Set(), kind: 'missing',
-    };
-  }
-
-  const changedKeys = new Set();
-  if (parsed.availability && parsed.availability !== existing.availability) {
-    changedKeys.add('availability');
-  }
-  if (parsed.managedStock !== undefined && parsed.managedStock !== !!existing.managedStock) {
-    changedKeys.add('managedStock');
-  }
-  if (parsed.inventoryQuantity !== undefined) {
-    const existingQty = existing.inventoryQuantity != null ? existing.inventoryQuantity : null;
-    if (parsed.inventoryQuantity !== existingQty) changedKeys.add('inventoryQuantity');
-  }
+/** @param {object} raw - one row from the config JSON's `data` array */
+function parseManagedInventoryConfigRow(raw) {
   return {
-    parsed, existing, changedKeys, kind: changedKeys.size ? 'update' : 'unchanged',
+    sku: invTsvCell(raw?.SKU),
+    title: invTsvCell(raw?.Title ?? ''),
+    color: invTsvCell(raw?.Variant ?? ''),
+    availability: invTsvCell(raw?.Availability ?? ''),
+    managedStock: parseYesNoCell(raw?.['Managed Stock']),
+    inventoryQuantity: parseQuantityCell(raw?.Qty),
   };
 }
 
 /**
- * @param {string} text - pasted TSV
+ * Fetch the managed-inventory config feed (via the CORS proxy) and parse its rows.
+ * @returns {Promise<Array<object>>}
+ */
+async function fetchManagedInventoryConfig() {
+  const fetchUrl = CORS_PROXY + encodeURIComponent(MANAGED_INVENTORY_CONFIG_URL) + CORS_KEY;
+  const response = await fetch(fetchUrl);
+  if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  const json = await response.json();
+  const rows = Array.isArray(json?.data) ? json.data : [];
+  return rows.map(parseManagedInventoryConfigRow).filter((r) => r.sku);
+}
+
+/**
+ * Diff every config row against the currently loaded SKU(s) it normalizes to (there can be more
+ * than one local row per physical SKU, e.g. the same accessory sold inside several bundles).
+ * @param {Array<object>} configRows
  * @returns {{ results: object[], changed: object[], missing: object[], unchanged: object[] }}
  */
-function buildInventoryImportPreview(text) {
-  const parsedRows = parseInventoryImportTsv(text);
-  if (!parsedRows.length) throw new Error('No SKU rows found. Paste TSV with a SKU column.');
-  const results = parsedRows.map(diffInventoryImportRow);
+function buildManagedInventorySyncPreview(configRows) {
+  const localBySku = new Map();
+  allSkuRows.forEach((row) => {
+    const key = normalizeSkuForConfigMatch(row.sku);
+    if (!localBySku.has(key)) localBySku.set(key, []);
+    localBySku.get(key).push(row);
+  });
+
+  const results = [];
+  configRows.forEach((configRow) => {
+    const matches = localBySku.get(normalizeSkuForConfigMatch(configRow.sku)) || [];
+    if (!matches.length) {
+      results.push({
+        configRow, existing: null, changedKeys: new Set(), kind: 'missing',
+      });
+      return;
+    }
+    matches.forEach((existing) => {
+      const changedKeys = new Set();
+      if (configRow.availability && configRow.availability !== existing.availability) {
+        changedKeys.add('availability');
+      }
+      const managedStockChanged = configRow.managedStock !== undefined
+        && configRow.managedStock !== !!existing.managedStock;
+      if (managedStockChanged) changedKeys.add('managedStock');
+      if (configRow.inventoryQuantity !== undefined) {
+        const existingQty = existing.inventoryQuantity != null ? existing.inventoryQuantity : null;
+        if (configRow.inventoryQuantity !== existingQty) changedKeys.add('inventoryQuantity');
+      }
+      results.push({
+        configRow, existing, changedKeys, kind: changedKeys.size ? 'update' : 'unchanged',
+      });
+    });
+  });
+
   return {
     results,
     changed: results.filter((r) => r.kind === 'update'),
@@ -452,16 +464,16 @@ function buildInventoryImportPreview(text) {
   };
 }
 
-function inventoryImportStatusBadge(kind) {
-  if (kind === 'update') return '<span class="inv-import-badge inv-import-badge-update">Update</span>';
+function managedInventorySyncStatusBadge(kind) {
+  if (kind === 'update') return '<span class="inv-sync-badge inv-sync-badge-update">Update</span>';
   if (kind === 'missing') {
-    return '<span class="inv-import-badge inv-import-badge-missing">Not found</span>';
+    return '<span class="inv-sync-badge inv-sync-badge-missing">Not found</span>';
   }
-  return '<span class="inv-import-badge inv-import-badge-same">Unchanged</span>';
+  return '<span class="inv-sync-badge inv-sync-badge-same">Unchanged</span>';
 }
 
 /** @param {unknown} before @param {unknown} after */
-function inventoryImportDiffCellHtml(before, after) {
+function inventorySyncDiffCellHtml(before, after) {
   return `${escapeHtml(before ?? '—')} → ${escapeHtml(after ?? '—')}`;
 }
 
@@ -472,28 +484,29 @@ function inventoryManagedStockLabel(existing) {
 }
 
 /**
- * @param {{ parsed: object, existing: object|null, changedKeys: Set<string>, kind: string }} entry
+ * @param {{ configRow: object, existing: object|null, changedKeys: Set<string>,
+ *   kind: string }} entry
  */
-function inventoryImportRowHtml({
-  parsed, existing, changedKeys, kind,
+function managedInventorySyncRowHtml({
+  configRow, existing, changedKeys, kind,
 }) {
-  const cellClass = (key) => (changedKeys.has(key) ? ' class="inv-import-cell-changed"' : '');
+  const cellClass = (key) => (changedKeys.has(key) ? ' class="inv-sync-cell-changed"' : '');
   const availabilityHtml = changedKeys.has('availability')
-    ? inventoryImportDiffCellHtml(existing?.availability, parsed.availability)
-    : escapeHtml((existing?.availability) || parsed.availability || '—');
+    ? inventorySyncDiffCellHtml(existing?.availability, configRow.availability)
+    : escapeHtml((existing?.availability) || configRow.availability || '—');
   const managedHtml = changedKeys.has('managedStock')
-    ? inventoryImportDiffCellHtml(existing?.managedStock ? 'Yes' : 'No', parsed.managedStock ? 'Yes' : 'No')
+    ? inventorySyncDiffCellHtml(existing?.managedStock ? 'Yes' : 'No', configRow.managedStock ? 'Yes' : 'No')
     : escapeHtml(inventoryManagedStockLabel(existing));
   const existingQty = existing?.inventoryQuantity != null ? existing.inventoryQuantity : null;
   const qtyHtml = changedKeys.has('inventoryQuantity')
-    ? inventoryImportDiffCellHtml(existingQty, parsed.inventoryQuantity)
+    ? inventorySyncDiffCellHtml(existingQty, configRow.inventoryQuantity)
     : escapeHtml(existingQty != null ? String(existingQty) : '—');
-  const rowClass = kind === 'missing' ? ' class="inv-import-row-missing"' : '';
+  const rowClass = kind === 'missing' ? ' class="inv-sync-row-missing"' : '';
   return `<tr${rowClass}>
-    <td class="inv-import-col-status">${inventoryImportStatusBadge(kind)}</td>
-    <td>${escapeHtml(parsed.sku)}</td>
-    <td>${escapeHtml((existing?.title) || parsed.title || '—')}</td>
-    <td>${escapeHtml((existing?.color) || parsed.color || '—')}</td>
+    <td class="inv-sync-col-status">${managedInventorySyncStatusBadge(kind)}</td>
+    <td>${escapeHtml(configRow.sku)}</td>
+    <td>${escapeHtml((existing?.title) || configRow.title || '—')}</td>
+    <td>${escapeHtml((existing?.color) || configRow.color || '—')}</td>
     <td${cellClass('availability')}>${availabilityHtml}</td>
     <td${cellClass('managedStock')}>${managedHtml}</td>
     <td${cellClass('inventoryQuantity')}>${qtyHtml}</td>
@@ -501,20 +514,20 @@ function inventoryImportRowHtml({
 }
 
 /** @param {{ changed: object[], missing: object[], unchanged: object[] }} preview */
-function inventoryImportPreviewLead({ changed, missing, unchanged }) {
+function managedInventorySyncPreviewLead({ changed, missing, unchanged }) {
   if (!changed.length && !missing.length) {
     return unchanged.length
-      ? 'Nothing to import. Every SKU in this TSV already matches this locale.'
-      : 'Nothing to import.';
+      ? 'No differences. Every matched SKU already matches the config feed.'
+      : 'No SKUs to compare.';
   }
   const bits = [];
-  if (changed.length) bits.push(`${changed.length} SKU${changed.length === 1 ? '' : 's'} will change`);
+  if (changed.length) bits.push(`${changed.length} SKU${changed.length === 1 ? '' : 's'} differ`);
   if (missing.length) bits.push(`${missing.length} not found in the current inventory list`);
-  if (unchanged.length) bits.push(`${unchanged.length} unchanged and skipped`);
-  return `${bits.join('. ')}. Write-back isn't implemented yet — preview only.`;
+  if (unchanged.length) bits.push(`${unchanged.length} unchanged`);
+  return `${bits.join('. ')}. Preview only — nothing has been written back.`;
 }
 
-function openInventoryExportImportDialog() {
+function openInventoryExportDialog() {
   const query = document.getElementById('searchInput').value;
   const shown = filterAndSortRows(query);
   const initialTsv = inventoryTsvForExport(shown);
@@ -524,39 +537,23 @@ function openInventoryExportImportDialog() {
   dialog.innerHTML = `
     <div class="inv-dialog-inner">
       <div class="inv-dialog-scroll" tabindex="-1">
-        <div data-inv-export-pane="tsv">
-          <h2 class="inv-dialog-title">Export / import inventory</h2>
-          <p class="inv-field-hint">TSV of the <strong>${escapeHtml(String(shown.length))}</strong>
-            SKU${shown.length === 1 ? '' : 's'} currently shown. Download, edit in a spreadsheet, paste back,
-            then Preview import to see exactly which SKUs would change. Write-back isn't implemented yet.</p>
-          <label class="pim-sr-only" for="inv-export-tsv">Inventory TSV</label>
-          <textarea id="inv-export-tsv" class="inv-tsv-input" spellcheck="false" rows="16">${escapeHtml(initialTsv)}</textarea>
-          <div class="inv-export-status" data-inv-export-status hidden></div>
-        </div>
-        <div data-inv-export-pane="preview" hidden>
-          <h2 class="inv-dialog-title">Import preview</h2>
-          <p class="inv-field-hint" data-inv-export-preview-lead></p>
-          <div class="inv-table-wrap pim-list-wrapper" data-inv-export-preview-table></div>
-        </div>
+        <h2 class="inv-dialog-title">Export inventory</h2>
+        <p class="inv-field-hint">TSV of the <strong>${escapeHtml(String(shown.length))}</strong>
+          SKU${shown.length === 1 ? '' : 's'} currently shown. Download and open in a spreadsheet.</p>
+        <label class="pim-sr-only" for="inv-export-tsv">Inventory TSV</label>
+        <textarea id="inv-export-tsv" class="inv-tsv-input" spellcheck="false" rows="16">${escapeHtml(initialTsv)}</textarea>
+        <div class="inv-export-status" data-inv-export-status hidden></div>
       </div>
       <div class="inv-dialog-actions">
         <button type="button" class="inv-btn" data-inv-cancel>Cancel</button>
-        <button type="button" class="inv-btn" data-inv-export-back hidden>Back</button>
-        <button type="button" class="inv-btn" data-inv-export-preview>Preview import</button>
         <button type="button" class="inv-btn inv-btn-primary" data-inv-export-save>Download</button>
       </div>
     </div>`;
   document.body.appendChild(dialog);
 
-  const tsvPane = dialog.querySelector('[data-inv-export-pane="tsv"]');
-  const previewPane = dialog.querySelector('[data-inv-export-pane="preview"]');
   const statusEl = dialog.querySelector('[data-inv-export-status]');
   const textarea = /** @type {HTMLTextAreaElement | null} */ (dialog.querySelector('#inv-export-tsv'));
-  const leadEl = dialog.querySelector('[data-inv-export-preview-lead]');
-  const tableHost = dialog.querySelector('[data-inv-export-preview-table]');
   const btnCancel = dialog.querySelector('[data-inv-cancel]');
-  const btnBack = dialog.querySelector('[data-inv-export-back]');
-  const btnPreview = dialog.querySelector('[data-inv-export-preview]');
   const btnSave = dialog.querySelector('[data-inv-export-save]');
 
   const setStatus = (msg, tone = 'error') => {
@@ -573,41 +570,6 @@ function openInventoryExportImportDialog() {
     statusEl.classList.toggle('inv-export-status-ok', tone !== 'error');
   };
 
-  const showTsvPane = () => {
-    if (tsvPane instanceof HTMLElement) tsvPane.hidden = false;
-    if (previewPane instanceof HTMLElement) previewPane.hidden = true;
-    btnBack?.setAttribute('hidden', '');
-    btnPreview?.removeAttribute('hidden');
-    btnSave?.removeAttribute('hidden');
-  };
-
-  const showPreviewPane = (preview) => {
-    if (tsvPane instanceof HTMLElement) tsvPane.hidden = true;
-    if (previewPane instanceof HTMLElement) previewPane.hidden = false;
-    btnBack?.removeAttribute('hidden');
-    btnPreview?.setAttribute('hidden', '');
-    btnSave?.setAttribute('hidden', '');
-    if (leadEl) leadEl.textContent = inventoryImportPreviewLead(preview);
-    if (tableHost) {
-      const toShow = [...preview.changed, ...preview.missing];
-      const body = toShow.length
-        ? toShow.map(inventoryImportRowHtml).join('')
-        : '<tr><td colspan="7" class="inv-empty-cell">No changed or unrecognized SKUs in this TSV.</td></tr>';
-      tableHost.innerHTML = `<table class="inv-preview-table" aria-label="Imported inventory changes">
-          <thead><tr>
-            <th scope="col">Status</th>
-            <th scope="col">SKU</th>
-            <th scope="col">Title</th>
-            <th scope="col">Variant</th>
-            <th scope="col">Availability</th>
-            <th scope="col">Managed stock</th>
-            <th scope="col">Qty</th>
-          </tr></thead>
-          <tbody>${body}</tbody>
-        </table>`;
-    }
-  };
-
   const dismiss = () => {
     dialog.close();
     dialog.remove();
@@ -619,10 +581,6 @@ function openInventoryExportImportDialog() {
   }, { once: true });
 
   btnCancel?.addEventListener('click', dismiss);
-  btnBack?.addEventListener('click', () => {
-    showTsvPane();
-    setStatus('');
-  });
   dialog.addEventListener('click', (e) => {
     if (e.target === dialog) dismiss();
   });
@@ -638,19 +596,112 @@ function openInventoryExportImportDialog() {
     }
   });
 
-  btnPreview?.addEventListener('click', () => {
-    try {
-      const preview = buildInventoryImportPreview(textarea?.value ?? '');
-      setStatus('');
-      showPreviewPane(preview);
-    } catch (err) {
-      setStatus(err?.message || 'Import is not valid');
-      showToast(err?.message || 'Import is not valid', 'error');
+  document.body.style.overflow = 'hidden';
+  dialog.showModal();
+}
+
+function openManagedInventorySyncDialog() {
+  const dialog = document.createElement('dialog');
+  dialog.className = 'inv-dialog inv-dialog-export';
+  dialog.innerHTML = `
+    <div class="inv-dialog-inner">
+      <div class="inv-dialog-scroll" tabindex="-1">
+        <h2 class="inv-dialog-title">Sync managed inventory</h2>
+        <p class="inv-field-hint">Compares the config sheet against the managed-inventory data
+          currently loaded for this locale. Preview only — nothing is written back.
+          <a href="https://da.live/sheet#/aemsites/vitamix/us/en_us/products/config/inventory" target="_blank" rel="noopener">Edit and preview inventory sheet</a>.</p>
+        <div class="inv-export-status" data-inv-sync-status hidden></div>
+        <p class="inv-field-hint" data-inv-sync-lead></p>
+        <div class="inv-table-wrap pim-list-wrapper" data-inv-sync-table></div>
+      </div>
+      <div class="inv-dialog-actions">
+        <button type="button" class="inv-btn" data-inv-cancel>Close</button>
+        <button type="button" class="inv-btn inv-btn-primary" data-inv-sync-refresh>Refresh</button>
+      </div>
+    </div>`;
+  document.body.appendChild(dialog);
+
+  const statusEl = dialog.querySelector('[data-inv-sync-status]');
+  const leadEl = dialog.querySelector('[data-inv-sync-lead]');
+  const tableHost = dialog.querySelector('[data-inv-sync-table]');
+  const btnCancel = dialog.querySelector('[data-inv-cancel]');
+  const btnRefresh = /** @type {HTMLButtonElement | null} */ (dialog.querySelector('[data-inv-sync-refresh]'));
+
+  const setStatus = (msg, tone = 'error') => {
+    if (!(statusEl instanceof HTMLElement)) return;
+    if (!msg) {
+      statusEl.hidden = true;
+      statusEl.textContent = '';
+      statusEl.classList.remove('inv-export-status-error', 'inv-export-status-ok');
+      return;
     }
+    statusEl.hidden = false;
+    statusEl.textContent = msg;
+    statusEl.classList.toggle('inv-export-status-error', tone === 'error');
+    statusEl.classList.toggle('inv-export-status-ok', tone !== 'error');
+  };
+
+  const dismiss = () => {
+    dialog.close();
+    dialog.remove();
+  };
+
+  const prevBodyOverflow = document.body.style.overflow;
+  dialog.addEventListener('close', () => {
+    document.body.style.overflow = prevBodyOverflow;
+  }, { once: true });
+
+  btnCancel?.addEventListener('click', dismiss);
+  dialog.addEventListener('click', (e) => {
+    if (e.target === dialog) dismiss();
   });
+  wireDialogEscapeDismiss(dialog, dismiss);
+
+  const runSync = async () => {
+    setStatus('');
+    if (leadEl) leadEl.textContent = '';
+    if (tableHost) tableHost.innerHTML = '';
+    if (btnRefresh) {
+      btnRefresh.disabled = true;
+      btnRefresh.textContent = 'Loading…';
+    }
+    try {
+      const configRows = await fetchManagedInventoryConfig();
+      const preview = buildManagedInventorySyncPreview(configRows);
+      if (leadEl) leadEl.textContent = managedInventorySyncPreviewLead(preview);
+      if (tableHost) {
+        const toShow = [...preview.changed, ...preview.missing];
+        const body = toShow.length
+          ? toShow.map(managedInventorySyncRowHtml).join('')
+          : '<tr><td colspan="7" class="inv-empty-cell">No differences found.</td></tr>';
+        tableHost.innerHTML = `<table class="inv-preview-table" aria-label="Managed inventory sync differences">
+            <thead><tr>
+              <th scope="col">Status</th>
+              <th scope="col">SKU</th>
+              <th scope="col">Title</th>
+              <th scope="col">Variant</th>
+              <th scope="col">Availability</th>
+              <th scope="col">Managed stock</th>
+              <th scope="col">Qty</th>
+            </tr></thead>
+            <tbody>${body}</tbody>
+          </table>`;
+      }
+    } catch (err) {
+      setStatus(err?.message || 'Could not load the managed inventory config');
+    } finally {
+      if (btnRefresh) {
+        btnRefresh.disabled = false;
+        btnRefresh.textContent = 'Refresh';
+      }
+    }
+  };
+
+  btnRefresh?.addEventListener('click', runSync);
 
   document.body.style.overflow = 'hidden';
   dialog.showModal();
+  runSync();
 }
 
 async function loadIndex() {
@@ -723,8 +774,12 @@ function init() {
     setActiveFilter(btn.getAttribute('data-filter'));
   });
 
-  document.getElementById('exportImportBtn')?.addEventListener('click', () => {
-    openInventoryExportImportDialog();
+  document.getElementById('exportBtn')?.addEventListener('click', () => {
+    openInventoryExportDialog();
+  });
+
+  document.getElementById('syncManagedInventoryBtn')?.addEventListener('click', () => {
+    openManagedInventorySyncDialog();
   });
 
   searchInput.addEventListener('input', refreshList);

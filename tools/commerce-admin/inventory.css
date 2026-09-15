@@ -71,7 +71,7 @@
 }
 
 /* Pushes the toolbar's Export/import button to the far right of .pim-toolbar */
-#exportImportBtn {
+.inv-toolbar-btn {
   margin-left: auto;
 }
 
@@ -207,12 +207,12 @@
   white-space: nowrap;
 }
 
-.inv-import-col-status {
+.inv-sync-col-status {
   width: 1%;
   white-space: nowrap;
 }
 
-.inv-import-badge {
+.inv-sync-badge {
   display: inline-block;
   font-size: 11px;
   font-weight: 650;
@@ -223,26 +223,26 @@
   line-height: 1.3;
 }
 
-.inv-import-badge-update {
+.inv-sync-badge-update {
   background: #fff4d6;
   color: #6b4f12;
 }
 
-.inv-import-badge-missing {
+.inv-sync-badge-missing {
   background: #fbeae5;
   color: #6b2d1a;
 }
 
-.inv-import-badge-same {
+.inv-sync-badge-same {
   background: #f0f0f1;
   color: #6d7175;
 }
 
-.inv-import-row-missing {
+.inv-sync-row-missing {
   opacity: 0.85;
 }
 
-.inv-import-cell-changed {
+.inv-sync-cell-changed {
   background: #fff4d6;
   box-shadow: inset 0 0 0 1px #e3c56a;
 }
