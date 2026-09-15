@@ -207,12 +207,12 @@
   white-space: nowrap;
 }
 
-.inv-sync-col-status {
+.inv-update-col-status {
   width: 1%;
   white-space: nowrap;
 }
 
-.inv-sync-badge {
+.inv-update-badge {
   display: inline-block;
   font-size: 11px;
   font-weight: 650;
@@ -223,26 +223,26 @@
   line-height: 1.3;
 }
 
-.inv-sync-badge-update {
+.inv-update-badge-update {
   background: #fff4d6;
   color: #6b4f12;
 }
 
-.inv-sync-badge-missing {
+.inv-update-badge-missing {
   background: #fbeae5;
   color: #6b2d1a;
 }
 
-.inv-sync-badge-same {
+.inv-update-badge-same {
   background: #f0f0f1;
   color: #6d7175;
 }
 
-.inv-sync-row-missing {
+.inv-update-row-missing {
   opacity: 0.85;
 }
 
-.inv-sync-cell-changed {
+.inv-update-cell-changed {
   background: #fff4d6;
   box-shadow: inset 0 0 0 1px #e3c56a;
 }

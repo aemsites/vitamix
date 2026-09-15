@@ -421,7 +421,7 @@ async function fetchManagedInventoryConfig() {
  * @param {Array<object>} configRows
  * @returns {{ results: object[], changed: object[], missing: object[], unchanged: object[] }}
  */
-function buildManagedInventorySyncPreview(configRows) {
+function buildManagedInventoryUpdatePreview(configRows) {
   const localBySku = new Map();
   allSkuRows.forEach((row) => {
     const key = normalizeSkuForConfigMatch(row.sku);
@@ -464,16 +464,16 @@ function buildManagedInventorySyncPreview(configRows) {
   };
 }
 
-function managedInventorySyncStatusBadge(kind) {
-  if (kind === 'update') return '<span class="inv-sync-badge inv-sync-badge-update">Update</span>';
+function managedInventoryUpdateStatusBadge(kind) {
+  if (kind === 'update') return '<span class="inv-update-badge inv-update-badge-update">Update</span>';
   if (kind === 'missing') {
-    return '<span class="inv-sync-badge inv-sync-badge-missing">Not found</span>';
+    return '<span class="inv-update-badge inv-update-badge-missing">Not found</span>';
   }
-  return '<span class="inv-sync-badge inv-sync-badge-same">Unchanged</span>';
+  return '<span class="inv-update-badge inv-update-badge-same">Unchanged</span>';
 }
 
 /** @param {unknown} before @param {unknown} after */
-function inventorySyncDiffCellHtml(before, after) {
+function inventoryUpdateDiffCellHtml(before, after) {
   return `${escapeHtml(before ?? '—')} → ${escapeHtml(after ?? '—')}`;
 }
 
@@ -487,23 +487,23 @@ function inventoryManagedStockLabel(existing) {
  * @param {{ configRow: object, existing: object|null, changedKeys: Set<string>,
  *   kind: string }} entry
  */
-function managedInventorySyncRowHtml({
+function managedInventoryUpdateRowHtml({
   configRow, existing, changedKeys, kind,
 }) {
-  const cellClass = (key) => (changedKeys.has(key) ? ' class="inv-sync-cell-changed"' : '');
+  const cellClass = (key) => (changedKeys.has(key) ? ' class="inv-update-cell-changed"' : '');
   const availabilityHtml = changedKeys.has('availability')
-    ? inventorySyncDiffCellHtml(existing?.availability, configRow.availability)
+    ? inventoryUpdateDiffCellHtml(existing?.availability, configRow.availability)
     : escapeHtml((existing?.availability) || configRow.availability || '—');
   const managedHtml = changedKeys.has('managedStock')
-    ? inventorySyncDiffCellHtml(existing?.managedStock ? 'Yes' : 'No', configRow.managedStock ? 'Yes' : 'No')
+    ? inventoryUpdateDiffCellHtml(existing?.managedStock ? 'Yes' : 'No', configRow.managedStock ? 'Yes' : 'No')
     : escapeHtml(inventoryManagedStockLabel(existing));
   const existingQty = existing?.inventoryQuantity != null ? existing.inventoryQuantity : null;
   const qtyHtml = changedKeys.has('inventoryQuantity')
-    ? inventorySyncDiffCellHtml(existingQty, configRow.inventoryQuantity)
+    ? inventoryUpdateDiffCellHtml(existingQty, configRow.inventoryQuantity)
     : escapeHtml(existingQty != null ? String(existingQty) : '—');
-  const rowClass = kind === 'missing' ? ' class="inv-sync-row-missing"' : '';
+  const rowClass = kind === 'missing' ? ' class="inv-update-row-missing"' : '';
   return `<tr${rowClass}>
-    <td class="inv-sync-col-status">${managedInventorySyncStatusBadge(kind)}</td>
+    <td class="inv-update-col-status">${managedInventoryUpdateStatusBadge(kind)}</td>
     <td>${escapeHtml(configRow.sku)}</td>
     <td>${escapeHtml((existing?.title) || configRow.title || '—')}</td>
     <td>${escapeHtml((existing?.color) || configRow.color || '—')}</td>
@@ -514,7 +514,7 @@ function managedInventorySyncRowHtml({
 }
 
 /** @param {{ changed: object[], missing: object[], unchanged: object[] }} preview */
-function managedInventorySyncPreviewLead({ changed, missing, unchanged }) {
+function managedInventoryUpdatePreviewLead({ changed, missing, unchanged }) {
   if (!changed.length && !missing.length) {
     return unchanged.length
       ? 'No differences. Every matched SKU already matches the config feed.'
@@ -600,32 +600,32 @@ function openInventoryExportDialog() {
   dialog.showModal();
 }
 
-function openManagedInventorySyncDialog() {
+function openManagedInventoryUpdateDialog() {
   const dialog = document.createElement('dialog');
   dialog.className = 'inv-dialog inv-dialog-export';
   dialog.innerHTML = `
     <div class="inv-dialog-inner">
       <div class="inv-dialog-scroll" tabindex="-1">
-        <h2 class="inv-dialog-title">Sync managed inventory</h2>
+        <h2 class="inv-dialog-title">Update managed inventory</h2>
         <p class="inv-field-hint">Compares the config sheet against the managed-inventory data
           currently loaded for this locale. Preview only — nothing is written back.
           <a href="https://da.live/sheet#/aemsites/vitamix/us/en_us/products/config/inventory" target="_blank" rel="noopener">Edit and preview inventory sheet</a>.</p>
-        <div class="inv-export-status" data-inv-sync-status hidden></div>
-        <p class="inv-field-hint" data-inv-sync-lead></p>
-        <div class="inv-table-wrap pim-list-wrapper" data-inv-sync-table></div>
+        <div class="inv-export-status" data-inv-update-status hidden></div>
+        <p class="inv-field-hint" data-inv-update-lead></p>
+        <div class="inv-table-wrap pim-list-wrapper" data-inv-update-table></div>
       </div>
       <div class="inv-dialog-actions">
         <button type="button" class="inv-btn" data-inv-cancel>Close</button>
-        <button type="button" class="inv-btn inv-btn-primary" data-inv-sync-refresh>Refresh</button>
+        <button type="button" class="inv-btn inv-btn-primary" data-inv-update-refresh>Refresh</button>
       </div>
     </div>`;
   document.body.appendChild(dialog);
 
-  const statusEl = dialog.querySelector('[data-inv-sync-status]');
-  const leadEl = dialog.querySelector('[data-inv-sync-lead]');
-  const tableHost = dialog.querySelector('[data-inv-sync-table]');
+  const statusEl = dialog.querySelector('[data-inv-update-status]');
+  const leadEl = dialog.querySelector('[data-inv-update-lead]');
+  const tableHost = dialog.querySelector('[data-inv-update-table]');
   const btnCancel = dialog.querySelector('[data-inv-cancel]');
-  const btnRefresh = /** @type {HTMLButtonElement | null} */ (dialog.querySelector('[data-inv-sync-refresh]'));
+  const btnRefresh = /** @type {HTMLButtonElement | null} */ (dialog.querySelector('[data-inv-update-refresh]'));
 
   const setStatus = (msg, tone = 'error') => {
     if (!(statusEl instanceof HTMLElement)) return;
@@ -657,7 +657,7 @@ function openManagedInventorySyncDialog() {
   });
   wireDialogEscapeDismiss(dialog, dismiss);
 
-  const runSync = async () => {
+  const runUpdate = async () => {
     setStatus('');
     if (leadEl) leadEl.textContent = '';
     if (tableHost) tableHost.innerHTML = '';
@@ -667,14 +667,14 @@ function openManagedInventorySyncDialog() {
     }
     try {
       const configRows = await fetchManagedInventoryConfig();
-      const preview = buildManagedInventorySyncPreview(configRows);
-      if (leadEl) leadEl.textContent = managedInventorySyncPreviewLead(preview);
+      const preview = buildManagedInventoryUpdatePreview(configRows);
+      if (leadEl) leadEl.textContent = managedInventoryUpdatePreviewLead(preview);
       if (tableHost) {
         const toShow = [...preview.changed, ...preview.missing];
         const body = toShow.length
-          ? toShow.map(managedInventorySyncRowHtml).join('')
+          ? toShow.map(managedInventoryUpdateRowHtml).join('')
           : '<tr><td colspan="7" class="inv-empty-cell">No differences found.</td></tr>';
-        tableHost.innerHTML = `<table class="inv-preview-table" aria-label="Managed inventory sync differences">
+        tableHost.innerHTML = `<table class="inv-preview-table" aria-label="Managed inventory update differences">
             <thead><tr>
               <th scope="col">Status</th>
               <th scope="col">SKU</th>
@@ -697,11 +697,11 @@ function openManagedInventorySyncDialog() {
     }
   };
 
-  btnRefresh?.addEventListener('click', runSync);
+  btnRefresh?.addEventListener('click', runUpdate);
 
   document.body.style.overflow = 'hidden';
   dialog.showModal();
-  runSync();
+  runUpdate();
 }
 
 async function loadIndex() {
@@ -778,8 +778,8 @@ function init() {
     openInventoryExportDialog();
   });
 
-  document.getElementById('syncManagedInventoryBtn')?.addEventListener('click', () => {
-    openManagedInventorySyncDialog();
+  document.getElementById('updateManagedInventoryBtn')?.addEventListener('click', () => {
+    openManagedInventoryUpdateDialog();
   });
 
   searchInput.addEventListener('input', refreshList);
