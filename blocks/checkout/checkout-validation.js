@@ -3,9 +3,7 @@ import { isValidPostalCode } from '../../scripts/address-validation.js';
 const MESSAGES = {
   en: {
     required: 'This field is required.',
-    name: 'Please use only letters, spaces, hyphens, or apostrophes.',
-    street: 'Please use only letters, numbers, and standard address characters (. , -).',
-    city: 'Please use only letters, spaces, hyphens, or periods.',
+    name: 'Please enter a valid name.',
     zip: 'Please enter a valid 5-digit ZIP code.',
     postalCode: 'Please enter a valid postal code (e.g. A1B 2C3).',
     phone: 'Please enter a valid 10-digit phone number.',
@@ -14,9 +12,7 @@ const MESSAGES = {
   },
   fr: {
     required: 'Ce champ est requis.',
-    name: 'Veuillez utiliser uniquement des lettres, espaces, tirets ou apostrophes.',
-    street: "Veuillez utiliser uniquement des lettres, chiffres et caractères d'adresse standard (. , -).",
-    city: 'Veuillez utiliser uniquement des lettres, espaces, tirets ou points.',
+    name: 'Veuillez entrer un nom valide.',
     zip: 'Veuillez entrer un code postal à 5 chiffres valide.',
     postalCode: 'Veuillez entrer un code postal valide (ex. A1B 2C3).',
     phone: 'Veuillez entrer un numéro de téléphone à 10 chiffres valide.',
@@ -25,12 +21,8 @@ const MESSAGES = {
   },
 };
 
-// Letters (including accented), spaces, hyphens, apostrophes
-const NAME_RE = /^[A-Za-zÀ-ÖØ-öø-ÿ''\- ]+$/;
-// Letters, numbers, spaces, and common address punctuation (., ,, -, /)
-const STREET_RE = /^[A-Za-z0-9 .,\-/]+$/;
-// Letters (including accented), spaces, hyphens, periods, apostrophes
-const CITY_RE = /^[A-Za-zÀ-ÖØ-öø-ÿ''\-. ]+$/;
+// Unicode letters and combining marks, digits, whitespace, and common name punctuation.
+const NAME_RE = /^[\p{L}\p{M}\d\s,_.’'`-]+$/u;
 // Basic email
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -99,12 +91,6 @@ export function validateField(input) {
     case 'lastname':
       return NAME_RE.test(trimmed) ? null : msgs.name;
 
-    case 'street-0':
-      return STREET_RE.test(trimmed) ? null : msgs.street;
-
-    case 'city':
-      return CITY_RE.test(trimmed) ? null : msgs.city;
-
     case 'zip': {
       if (isValidPostalCode(trimmed, isCanada)) return null;
       return isCanada ? msgs.postalCode : msgs.zip;
@@ -117,6 +103,7 @@ export function validateField(input) {
       return EMAIL_RE.test(trimmed) ? null : msgs.email;
 
     default:
+      // Street and city are free-text fields in Magento, with no character allowlist.
       return null;
   }
 }
