@@ -689,7 +689,99 @@
     padding: var(--spacing-200) var(--horizontal-spacing);
   }
 }
+/* triple banner overlay variant */
 
+.cards.overlay > ul.rows-3 > li {
+  align-items: flex-end;
+}
+
+/*
+ * Position card content at the bottom-left.
+ */
+.cards.overlay > ul.rows-3 > li .card-body {
+  position: relative;
+  width: 100%;
+  padding: var(--spacing-400);
+  text-align: left;
+  z-index: 1;
+}
+
+/*
+ * Eyebrow text above the main heading.
+ */
+.cards.overlay > ul.rows-3 > li .card-body .eyebrow {
+  margin-top: 0;
+  margin-bottom: var(--spacing-100);
+}
+
+/*
+ * Main card heading.
+ */
+.cards.overlay > ul.rows-3 > li .card-body h2,
+.cards.overlay > ul.rows-3 > li .card-body h3 {
+  margin-top: 0;
+  margin-bottom: var(--spacing-100);
+}
+
+/*
+ * Description text.
+ */
+.cards.overlay > ul.rows-3 > li .card-body p {
+  margin-top: var(--spacing-100);
+  margin-bottom: var(--spacing-100);
+}
+
+/*
+ * CTA wrapper.
+ */
+.cards.overlay > ul.rows-3 > li .card-body .button-wrapper {
+  margin-top: var(--spacing-200);
+  margin-bottom: 0;
+}
+
+/*
+ * White CTA button with dark text.
+ */
+.cards.overlay > ul.rows-3 > li .card-body a.button {
+  display: inline-block;
+  background-color: var(--color-white);
+  color: var(--color-charcoal);
+  text-decoration: none;
+}
+
+/*
+ * Keep button text dark on hover/focus.
+ */
+.cards.overlay > ul.rows-3 > li .card-body a.button:hover,
+.cards.overlay > ul.rows-3 > li .card-body a.button:focus-visible {
+  color: var(--color-charcoal);
+}
+
+/*
+ * Overlay normally adds an arrow after links.
+ * Don't add that arrow to the CTA button.
+ */
+.cards.overlay > ul.rows-3 > li.card-click a.button::after {
+  content: none;
+}
+
+/*
+ * Desktop: three equal-width cards.
+ */
+@media (width >= 800px) {
+  .cards.overlay > ul.rows-3 {
+    --grid-cols: 3;
+  }
+
+  .cards.overlay > ul.rows-3 > li .card-body {
+    padding: var(--spacing-400);
+  }
+
+  .cards.overlay > ul.rows-3 h2,
+  .cards.overlay > ul.rows-3 h3 {
+    font-size: var(--heading-size-l);
+  }
+}
 /* icon list variant */
 .cards.icon-list ul > li .card-image {
   aspect-ratio: unset;
