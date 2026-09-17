@@ -74,6 +74,7 @@ import { jsonDiffLines, jsonEqual, renderJsonDiffHtml } from './commerce-json-di
  * @property {ProductCondition[]} [includedProducts]
  * @property {ProductCondition[]} [excludedProducts]
  * @property {boolean} [stackable]
+ * @property {string[]} [includeStackableCouponTypes]
  * @property {boolean} [autoApply]
  * @property {boolean} [allowManualEntry]
  * @property {boolean} [excludeDiscountedProducts] When true, blocks coupon on
@@ -141,6 +142,8 @@ function hydrateCouponDetailScopePills(root, d) {
 
 /** @type {Array<{ destroy: () => void; refresh: () => Promise<void> }>} */
 let couponProductSelectionFields = [];
+/** @type {Array<{ destroy: () => void }>} */
+let couponStackableSelectionFields = [];
 
 /**
  * @param {HTMLDialogElement} dlg
@@ -520,6 +523,340 @@ function pillHtml(label, on) {
   return `<span class="${cl}">${escapeHtml(label)}</span>`;
 }
 
+/** @param {unknown} raw */
+function normalizeStackableCouponTypeIds(raw) {
+  const source = Array.isArray(raw) ? raw : String(raw || '').split(',');
+  const seen = new Set();
+  const out = [];
+  source.forEach((item) => {
+    const id = String(item || '').trim();
+    if (!id || seen.has(id)) return;
+    seen.add(id);
+    out.push(id);
+  });
+  return out;
+}
+
+/** @param {Record<string, unknown>} row */
+function couponStackableCouponTypeIds(row) {
+  if (!row || typeof row !== 'object') return [];
+  return normalizeStackableCouponTypeIds(
+    row.includeStackableCouponTypes ?? row.include_stackable_coupon_types,
+  );
+}
+
+function stackableCouponLabelById(id) {
+  const rawId = String(id || '').trim();
+  if (!rawId) return '';
+  const row = state.coupons.find((c) => couponIdFromRow(c) === rawId);
+  const name = row && typeof row === 'object' ? String(row.name || '').trim() : '';
+  return name ? `${name} (${rawId})` : rawId;
+}
+
+function sortedCouponTypeRowsForStacking() {
+  return state.coupons
+    .filter((row) => couponIdFromRow(row))
+    .slice()
+    .sort((a, b) => stackableCouponLabelById(couponIdFromRow(a)).localeCompare(
+      stackableCouponLabelById(couponIdFromRow(b)),
+      undefined,
+      { sensitivity: 'base', numeric: true },
+    ));
+}
+
+/** @param {string[]} ids */
+function formatStackableCouponTypeIds(ids) {
+  return normalizeStackableCouponTypeIds(ids).join(', ');
+}
+
+/** @param {string} raw */
+function parseStackableCouponTypeInput(raw) {
+  return normalizeStackableCouponTypeIds(raw);
+}
+
+/** @param {string} id */
+function couponStackablePillHtml(id) {
+  return `<span class="ps-pill ps-pill-category cp-coupon-pill">
+    <span class="ps-pill-text">
+      <span class="ps-pill-label">${escapeHtml(stackableCouponLabelById(id))}</span>
+      <span class="ps-pill-meta">${escapeHtml(id)}</span>
+    </span>
+  </span>`;
+}
+
+/** @param {string} id @param {{ selected?: boolean; remove?: boolean; query?: string }} opts */
+function couponStackablePillButtonHtml(id, opts = {}) {
+  const selected = opts.selected === true;
+  const attr = opts.remove ? 'data-cp-stackable-remove' : 'data-cp-stackable-toggle';
+  const ariaAction = selected ? 'Remove' : 'Add';
+  const labelHtml = opts.query
+    ? highlightMatch(stackableCouponLabelById(id), opts.query)
+    : escapeHtml(stackableCouponLabelById(id));
+  const idHtml = opts.query ? highlightMatch(id, opts.query) : escapeHtml(id);
+  return `<button type="button" class="ps-pill ps-pill-category ps-picker-pill cp-coupon-pill${selected ? ' ps-pill-is-selected' : ''}" ${attr}="${escapeHtml(id)}" aria-pressed="${selected ? 'true' : 'false'}" aria-label="${escapeHtml(`${ariaAction} ${stackableCouponLabelById(id)}`)}">
+    <span class="ps-pill-text">
+      <span class="ps-pill-label">${labelHtml}</span>
+      <span class="ps-pill-meta">${idHtml}</span>
+    </span>
+    ${opts.remove ? '<span class="ps-pill-remove" aria-hidden="true">&times;</span>' : ''}
+  </button>`;
+}
+
+/**
+ * @param {{ title: string; selectedIds: string[]; currentId?: string }} options
+ * @returns {Promise<string[] | null>}
+ */
+function openCouponTypeSelectorModal(options) {
+  const { title, currentId = '' } = options;
+  const selectedIds = new Set(
+    normalizeStackableCouponTypeIds(options.selectedIds).filter((id) => id !== currentId),
+  );
+
+  return new Promise((resolve) => {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'ps-modal-dialog cp-coupon-selector-dialog';
+    dialog.innerHTML = `
+      <div class="ps-modal-inner">
+        <h2 class="ps-modal-title"></h2>
+        <div class="ps-modal-body">
+          <div class="ps-root cp-coupon-selector">
+            <div class="ps-layout">
+              <div class="ps-toolbar-row">
+                <div class="ps-toolbar">
+                  <span class="ps-status" data-cp-stackable-status aria-live="polite"></span>
+                </div>
+                <button type="button" class="ps-clear-btn" data-cp-stackable-clear>Clear all</button>
+              </div>
+              <section class="ps-panel ps-panel-selection" aria-label="Selected stackable coupons">
+                <div class="ps-pills" data-cp-stackable-selection></div>
+              </section>
+              <section class="ps-panel ps-panel-picker" aria-label="Browse coupon types">
+                <input type="search" class="ps-search" data-cp-stackable-search placeholder="Filter by coupon name or id…" autocomplete="off" aria-label="Filter coupon types" />
+                <div class="ps-pills ps-picker-list" data-cp-stackable-picker role="listbox" aria-label="Matching coupon types"></div>
+              </section>
+            </div>
+          </div>
+        </div>
+        <div class="ps-modal-actions">
+          <button type="button" class="ps-modal-btn" data-cp-stackable-cancel>Cancel</button>
+          <button type="button" class="ps-modal-btn ps-modal-btn-primary" data-cp-stackable-apply>Apply</button>
+        </div>
+      </div>`;
+
+    const titleEl = dialog.querySelector('.ps-modal-title');
+    const statusEl = dialog.querySelector('[data-cp-stackable-status]');
+    const clearBtn = dialog.querySelector('[data-cp-stackable-clear]');
+    const searchEl = /** @type {HTMLInputElement | null} */ (
+      dialog.querySelector('[data-cp-stackable-search]')
+    );
+    const selectionEl = dialog.querySelector('[data-cp-stackable-selection]');
+    const pickerEl = dialog.querySelector('[data-cp-stackable-picker]');
+    if (titleEl) titleEl.textContent = title;
+
+    const allRows = sortedCouponTypeRowsForStacking()
+      .filter((row) => couponIdFromRow(row) !== currentId);
+    let searchQuery = '';
+    let settled = false;
+
+    const finish = (/** @type {string[] | null} */ result) => {
+      if (settled) return;
+      settled = true;
+      if (dialog.open) dialog.close();
+      dialog.remove();
+      resolve(result);
+    };
+
+    const sortedSelectedIds = () => [...selectedIds].sort((a, b) => stackableCouponLabelById(a)
+      .localeCompare(stackableCouponLabelById(b), undefined, {
+        sensitivity: 'base',
+        numeric: true,
+      }));
+
+    const matchesSearch = (/** @type {Record<string, unknown>} */ row) => {
+      const q = searchQuery.trim().toLowerCase();
+      if (!q) return true;
+      const id = couponIdFromRow(row);
+      return `${stackableCouponLabelById(id)} ${id}`.toLowerCase().includes(q);
+    };
+
+    const renderSelection = () => {
+      if (!selectionEl) return;
+      const ids = sortedSelectedIds();
+      selectionEl.innerHTML = ids.length
+        ? ids.map((id) => couponStackablePillButtonHtml(id, { selected: true, remove: true })).join('')
+        : '<span class="ps-pills-empty">Nothing selected yet — pick coupon types below.</span>';
+    };
+
+    const renderPicker = () => {
+      if (!pickerEl) return;
+      const rows = allRows.filter(matchesSearch);
+      pickerEl.innerHTML = rows.length
+        ? rows.map((row) => {
+          const id = couponIdFromRow(row);
+          return couponStackablePillButtonHtml(id, {
+            selected: selectedIds.has(id),
+            query: searchQuery,
+          });
+        }).join('')
+        : '<span class="ps-picker-empty">No coupon types match this search.</span>';
+    };
+
+    const renderAll = () => {
+      renderSelection();
+      renderPicker();
+      if (statusEl) statusEl.textContent = `${selectedIds.size} selected / ${allRows.length} available`;
+      if (clearBtn instanceof HTMLButtonElement) clearBtn.disabled = selectedIds.size === 0;
+    };
+
+    const toggleId = (id) => {
+      if (!id) return;
+      if (selectedIds.has(id)) selectedIds.delete(id);
+      else selectedIds.add(id);
+      renderAll();
+    };
+
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog) {
+        finish(null);
+        return;
+      }
+      const target = /** @type {HTMLElement | null} */ (e.target)?.closest(
+        '[data-cp-stackable-toggle], [data-cp-stackable-remove]',
+      );
+      if (!target) return;
+      const id = target.getAttribute('data-cp-stackable-toggle')
+        || target.getAttribute('data-cp-stackable-remove')
+        || '';
+      toggleId(id);
+    });
+    searchEl?.addEventListener('input', () => {
+      searchQuery = searchEl.value;
+      renderPicker();
+    });
+    clearBtn?.addEventListener('click', () => {
+      selectedIds.clear();
+      renderAll();
+    });
+    dialog.querySelector('[data-cp-stackable-cancel]')?.addEventListener('click', () => finish(null));
+    dialog.querySelector('[data-cp-stackable-apply]')?.addEventListener('click', () => {
+      finish(sortedSelectedIds());
+    });
+    wireDialogEscapeDismiss(dialog, () => finish(null));
+
+    renderAll();
+    document.body.appendChild(dialog);
+    dialog.showModal();
+    searchEl?.focus();
+  });
+}
+
+/**
+ * @param {Element | null} container
+ * @param {HTMLInputElement | null} input
+ * @param {{ label?: string; emptyText?: string; currentId?: string }} options
+ */
+function mountCouponStackableSelectionField(container, input, options = {}) {
+  if (!(container instanceof HTMLElement) || !(input instanceof HTMLInputElement)) return null;
+  const {
+    label = 'Stackable coupons',
+    emptyText = 'None — click to select coupon types.',
+    currentId = '',
+  } = options;
+  input.classList.add('psf-value-input');
+  input.readOnly = true;
+  input.tabIndex = -1;
+  input.setAttribute('aria-hidden', 'true');
+
+  const root = document.createElement('div');
+  root.className = 'psf-root cp-stackable-coupon-root';
+  root.innerHTML = `
+    <div class="psf-display psf-display-editable" role="button" tabindex="0">
+      <div class="ps-pills psf-pills" aria-live="polite"></div>
+      <span class="psf-empty"></span>
+    </div>
+    <button type="button" class="psf-edit-btn">Edit selection…</button>`;
+
+  const displayEl = root.querySelector('.psf-display');
+  const pillsEl = root.querySelector('.psf-pills');
+  const emptyEl = root.querySelector('.psf-empty');
+  const editBtn = root.querySelector('.psf-edit-btn');
+  if (emptyEl) emptyEl.textContent = emptyText;
+  container.replaceChildren(root);
+
+  const renderDisplay = () => {
+    if (!displayEl || !pillsEl || !emptyEl) return;
+    const ids = parseStackableCouponTypeInput(input.value);
+    if (!ids.length) {
+      emptyEl.hidden = false;
+      displayEl.classList.add('psf-display-empty');
+      pillsEl.replaceChildren();
+      return;
+    }
+    emptyEl.hidden = true;
+    displayEl.classList.remove('psf-display-empty');
+    pillsEl.innerHTML = ids.map((id) => couponStackablePillHtml(id)).join('');
+  };
+
+  const openEditor = async () => {
+    const result = await openCouponTypeSelectorModal({
+      title: label,
+      selectedIds: parseStackableCouponTypeInput(input.value),
+      currentId,
+    });
+    if (!result) return;
+    input.value = formatStackableCouponTypeIds(result);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    renderDisplay();
+  };
+
+  const onKeydown = (/** @type {KeyboardEvent} */ e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    openEditor().catch(() => {});
+  };
+  displayEl?.addEventListener('click', () => { openEditor().catch(() => {}); });
+  displayEl?.addEventListener('keydown', onKeydown);
+  editBtn?.addEventListener('click', () => { openEditor().catch(() => {}); });
+  input.addEventListener('input', renderDisplay);
+  renderDisplay();
+
+  return {
+    destroy() {
+      input.removeEventListener('input', renderDisplay);
+    },
+  };
+}
+
+/** @param {HTMLDialogElement} dlg */
+function wireCouponStackableSelectionField(dlg) {
+  couponStackableSelectionFields.forEach((f) => f.destroy());
+  couponStackableSelectionFields = [];
+  const field = mountCouponStackableSelectionField(
+    dlg.querySelector('[data-cp-stackable-coupons-mount]'),
+    dlg.querySelector('#cp-form-stackable-coupons'),
+    { currentId: String(state.selectedCouponId || '').trim() },
+  );
+  if (field) couponStackableSelectionFields.push(field);
+}
+
+function inboundStackableCouponRows(couponId) {
+  const id = String(couponId || '').trim();
+  if (!id) return [];
+  return sortedCouponTypeRowsForStacking().filter((row) => {
+    const rowId = couponIdFromRow(row);
+    return rowId !== id && couponStackableCouponTypeIds(row).includes(id);
+  });
+}
+
+/** @param {string[]} ids @param {string} emptyText */
+function couponStackableReferenceListHtml(ids, emptyText) {
+  if (!ids.length) return `<p class="coupons-muted">${escapeHtml(emptyText)}</p>`;
+  const items = ids.map((id) => `<li class="coupons-stackable-reference-item">
+    <button type="button" class="coupons-link-button" data-cp-open-ref-coupon="${escapeHtml(id)}">${escapeHtml(stackableCouponLabelById(id))}</button>
+  </li>`).join('');
+  return `<ul class="coupons-stackable-reference-list">${items}</ul>`;
+}
+
 /** Single state badge (not an on/off pair). */
 function statePillHtml(label) {
   return `<span class="coupons-pill coupons-pill-state">${escapeHtml(label)}</span>`;
@@ -615,6 +952,8 @@ function couponDetailModalInnerHtml(d, thumbByPath) {
   const listBanner = state.detailFromListFallback
     ? '<div class="coupons-modal-banner">List snapshot only — edit and delete use the API path and may be unavailable.</div>'
     : '';
+  const outboundStackableIds = couponStackableCouponTypeIds(d);
+  const inboundStackableIds = inboundStackableCouponRows(id).map((row) => couponIdFromRow(row));
 
   return `
     ${listBanner}
@@ -654,6 +993,19 @@ function couponDetailModalInnerHtml(d, thumbByPath) {
     ].join(''),
   )}
     </div>
+    <section class="coupons-modal-section coupons-stackable-section">
+      <h3 class="coupons-modal-section-title">Stackable coupons</h3>
+      <div class="coupons-stackable-reference-grid">
+        <div>
+          <h4 class="coupons-stackable-reference-title">Can stack with</h4>
+          ${couponStackableReferenceListHtml(outboundStackableIds, 'No stackable coupon types selected.')}
+        </div>
+        <div>
+          <h4 class="coupons-stackable-reference-title">Inbound references</h4>
+          ${couponStackableReferenceListHtml(inboundStackableIds, 'No other coupon types reference this coupon.')}
+        </div>
+      </div>
+    </section>
     ${isProductList ? couponDiscountedProductsSectionHtml(discountedProducts, thumbByPath) : `<section class="coupons-modal-section">
       <h3 class="coupons-modal-section-title">Included products</h3>
       <p class="coupons-field-hint" style="margin:0 0 8px">Products and categories the coupon applies to. Leave empty to allow any product unless excluded below.</p>
@@ -726,6 +1078,25 @@ function wireCouponDetailModal(dialog) {
   dialog.querySelector('[data-cp-modal-edit]')?.addEventListener('click', () => {
     shut();
     openEditCouponDialog();
+  });
+  dialog.querySelectorAll('[data-cp-open-ref-coupon]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-cp-open-ref-coupon') || '';
+      if (!id || id === state.selectedCouponId) return;
+      try {
+        state.selectedCouponId = id;
+        await refreshSelection();
+        render();
+        shut();
+        await openCouponDetailModal();
+      } catch (err) {
+        console.warn('[commerce-admin/coupons] open referenced coupon failed', {
+          couponId: id,
+          message: err?.message,
+        });
+        showToast(err.message || 'Failed to load referenced coupon', 'error');
+      }
+    });
   });
   dialog.querySelector('[data-cp-modal-delete]')?.addEventListener('click', async () => {
     if (!state.selectedCouponId) return;
@@ -1501,6 +1872,8 @@ async function openDialog(title, innerHtml, onSubmit, afterMount, dialogClass, s
     document.querySelector('datalist#cp-form-categories-datalist')?.remove();
     couponProductSelectionFields.forEach((f) => f.destroy());
     couponProductSelectionFields = [];
+    couponStackableSelectionFields.forEach((f) => f.destroy());
+    couponStackableSelectionFields = [];
   };
   dialog.addEventListener('close', onDialogClose, { once: true });
   if (typeof afterMount === 'function') {
@@ -1607,6 +1980,15 @@ function couponFormOptionsSectionHtml() {
   </div>`;
 }
 
+function couponStackableOptionsFieldHtml() {
+  return `<div class="coupons-field coupons-field-full cp-stackable-coupon-field">
+    <label>Stackable coupons</label>
+    <p class="coupons-field-hint">Select coupon types this coupon can combine with. Saved as <code>includeStackableCouponTypes</code>.</p>
+    <div data-cp-stackable-coupons-mount></div>
+    <input type="text" id="cp-form-stackable-coupons" autocomplete="off" />
+  </div>`;
+}
+
 function couponFormHtml({ idReadonly }) {
   const idBlock = idReadonly
     ? `<div class="coupons-field coupons-field-full">
@@ -1647,6 +2029,7 @@ function couponFormHtml({ idReadonly }) {
         <label for="cp-form-max-cap">Max discount cap ($)</label>
         <input type="number" id="cp-form-max-cap" min="0" step="any" placeholder="empty = no cap" />
       </div>
+      ${couponStackableOptionsFieldHtml()}
       ${couponProductListSectionHtml()}
       <div class="coupons-field coupons-field-full" data-cp-discount-only>
         <label>Included products</label>
@@ -1799,6 +2182,9 @@ function readCouponBodyFromForm(dlg, { requireId }) {
   const shippingMode = normalizeShippingBenefitMode(dlg.querySelector('#cp-form-shipping')?.value);
   const shipFields = shippingBenefitFieldsFromMode(shippingMode);
   const stackable = !!dlg.querySelector('#cp-form-stackable')?.checked;
+  const includeStackableCouponTypes = parseStackableCouponTypeInput(
+    dlg.querySelector('#cp-form-stackable-coupons')?.value || '',
+  ).filter((couponId) => couponId !== id);
   const autoApply = !!dlg.querySelector('#cp-form-auto')?.checked;
   const allowManualEntry = !!dlg.querySelector('#cp-form-manual')?.checked;
   const defaultUsageLimit = readOptionalInt(dlg.querySelector('#cp-form-def-limit')?.value);
@@ -1812,6 +2198,7 @@ function readCouponBodyFromForm(dlg, { requireId }) {
     maximumDiscountAmount: maxCap,
     ...shipFields,
     stackable,
+    includeStackableCouponTypes,
     autoApply,
     allowManualEntry,
     defaultUsageLimit,
@@ -1951,6 +2338,10 @@ function fillCouponForm(dlg, d) {
     shipEl.value = couponShippingModeFromRow(d);
   }
   dlg.querySelector('#cp-form-stackable').checked = d.stackable !== false;
+  const stackableCouponsEl = dlg.querySelector('#cp-form-stackable-coupons');
+  if (stackableCouponsEl instanceof HTMLInputElement) {
+    stackableCouponsEl.value = formatStackableCouponTypeIds(couponStackableCouponTypeIds(d));
+  }
   dlg.querySelector('#cp-form-exclude-discounted').checked = !!(
     d.excludeDiscountedProducts ?? d.exclude_discounted_products
   );
@@ -2899,6 +3290,7 @@ function openNewCouponDialog() {
       });
       syncPreview();
       wireCouponProductSelectionFields(dlg);
+      wireCouponStackableSelectionField(dlg);
       wireCouponProductListRows(dlg);
       wireCouponFormTabs(dlg);
     },
@@ -2930,6 +3322,7 @@ function openEditCouponDialog() {
       fillCouponForm(dlg, snap);
       wireCouponCountryCheckboxGuards(dlg);
       wireCouponProductSelectionFields(dlg);
+      wireCouponStackableSelectionField(dlg);
       wireCouponProductListRows(dlg);
       wireCouponFormTabs(dlg, { isEdit: true });
     },

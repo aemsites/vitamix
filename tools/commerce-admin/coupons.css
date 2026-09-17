@@ -615,6 +615,23 @@
   background: #fdecea;
 }
 
+.coupons-link-button {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #1a56b0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.coupons-link-button:hover,
+.coupons-link-button:focus-visible {
+  text-decoration: underline;
+}
+
 .coupons-detail-dialog {
   max-width: min(96vw, 720px);
   width: 100%;
@@ -831,6 +848,36 @@
   background: #fffbf0;
   border: 1px solid #e9d4a8;
   border-radius: 8px;
+}
+
+.coupons-stackable-reference-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (width >= 560px) {
+  .coupons-stackable-reference-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.coupons-stackable-reference-title {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #202223;
+}
+
+.coupons-stackable-reference-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.coupons-stackable-reference-item + .coupons-stackable-reference-item {
+  margin-top: 4px;
 }
 
 .coupons-section-title {
@@ -1053,6 +1100,66 @@
 .coupons-field .cp-form-checkbox input[type='checkbox']:focus-visible {
   outline: 2px solid #2c6ecb;
   outline-offset: 2px;
+}
+
+.coupons-body .cp-coupon-pill {
+  --ps-pill-thumb: 0px;
+  --ps-pill-pad-y: 8px;
+  --ps-pill-pad-x: 12px;
+
+  align-items: flex-start;
+  box-sizing: border-box;
+  min-height: 44px;
+  max-width: min(100%, 520px);
+  border-radius: 8px;
+  line-height: 1.35;
+}
+
+.coupons-body button.cp-coupon-pill {
+  appearance: none;
+  display: flex;
+  border: 1px solid var(--ps-category-pill-border);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.coupons-body .cp-coupon-pill .ps-pill-text {
+  display: block;
+  min-width: 0;
+  padding: 0;
+}
+
+.coupons-body .cp-coupon-pill .ps-pill-label,
+.coupons-body .cp-coupon-pill .ps-pill-meta {
+  display: block;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.coupons-body .cp-coupon-pill .ps-pill-label {
+  font-weight: 600;
+}
+
+.coupons-body .cp-coupon-pill .ps-pill-meta {
+  margin-top: 2px;
+}
+
+.coupons-body .cp-coupon-selector .ps-panel-picker {
+  min-height: 0;
+}
+
+.coupons-body .cp-coupon-selector .ps-picker-list {
+  height: min(46vh, 430px);
+  max-height: min(46vh, 430px);
+}
+
+.coupons-body .cp-coupon-selector .ps-picker-list .cp-coupon-pill {
+  width: 100%;
+  max-width: none;
+  padding: 8px 12px;
 }
 
 .coupons-advanced {
