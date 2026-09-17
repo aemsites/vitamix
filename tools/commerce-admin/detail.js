@@ -1,10 +1,12 @@
-import {
-  fetchReviewLog,
-  appendReviewEvent,
-  getReviewHistoryForProduct,
-  REVIEW_STATUS_OPTIONS,
-} from './review-status.js';
-import { getFirstName } from './user-identity.js';
+import { getApiEnvironment } from './commerce-otp-api.js';
+import { startProductImageSync } from './product-image-sync.js';
+import { startProductExportImport } from './commerce-catalog-io.js';
+import { showToast } from './commerce-otp-ui.js';
+
+/** Product JSON edits are production-only (active API env, not staging). */
+function canUseEditMode() {
+  return getApiEnvironment() === 'prod';
+}
 
 const AEM_BASE = 'https://main--vitamix--aemsites.aem.network';
 const IMAGE_QUERY = '?width=750&format=webply&optimize=medium';
@@ -34,8 +36,6 @@ function getIndexUrl() {
 let currentProductData = null;
 let currentIndexByUrlKey = {};
 let editMode = false;
-/** @type {Array<{ op: string, user: string, ts: string, status?: string, text?: string }>} */
-let reviewHistory = [];
 
 function getProductParam() {
   const params = new URLSearchParams(window.location.search);
@@ -157,15 +157,26 @@ function renderPrice(price, isEditMode) {
 function renderImages(images, isEditMode) {
   if (!Array.isArray(images) && !isEditMode) return '';
   const list = Array.isArray(images) ? images : [];
-  const items = list.map((img, i) => {
+  const items = list.map((img) => {
     const src = resolveImageUrl(img.url || img);
     const label = img.label ? ` title="${escapeHtml(img.label)}"` : '';
     const wrap = src ? `<a href="${escapeHtml(src)}" target="_blank" rel="noopener" class="pim-detail-img-wrap"${label}><img src="${escapeHtml(src)}" alt="" loading="lazy" class="pim-detail-img" /></a>` : '<span class="pim-detail-img-wrap pim-detail-no-img">—</span>';
-    const delBtn = isEditMode ? `<button type="button" class="pim-edit-delete" data-edit-path="images" data-edit-index="${i}" aria-label="Delete">×</button>` : '';
-    return `<span class="pim-edit-list-item" data-edit-path="images" data-edit-index="${i}">${wrap}${delBtn}</span>`;
+    return `<span class="pim-detail-img-item">${wrap}</span>`;
   });
-  const addPlaceholder = isEditMode ? '<button type="button" class="pim-edit-add pim-detail-img-add" data-edit-path="images" data-edit-action="add" aria-label="Add image"><span class="pim-detail-img-add-inner">+</span></button>' : '';
-  return `<div class="pim-detail-section" data-edit-path="images"><h3 class="pim-detail-section-title">Images</h3><div class="pim-detail-gallery">${items.join('')}${addPlaceholder}</div></div>`;
+  const syncBtn = isEditMode
+    ? '<button type="button" class="pim-sync-images-btn" data-pim-sync-images>Sync images</button>'
+    : '';
+  const empty = items.length === 0 && isEditMode
+    ? '<p class="pim-detail-images-empty">No product images yet. Sync from DAM to load them.</p>'
+    : '';
+  return `<div class="pim-detail-section" data-edit-path="images">
+    <div class="pim-detail-section-head">
+      <h3 class="pim-detail-section-title">Images</h3>
+      ${syncBtn}
+    </div>
+    ${empty}
+    <div class="pim-detail-gallery">${items.join('')}</div>
+  </div>`;
 }
 
 function renderCategories(categories) {
@@ -252,14 +263,34 @@ function renderCustom(custom, isEditMode) {
   return `<div class="pim-detail-section"><h3 class="pim-detail-section-title">Custom</h3><table class="pim-detail-custom-table"><tbody>${rows}</tbody></table></div>`;
 }
 
+function variantImageEntries(images) {
+  if (!Array.isArray(images)) return [];
+  return images.map((img) => {
+    const src = resolveImageUrl(img);
+    if (!src) return null;
+    const label = img && typeof img === 'object' ? String(img.label || '') : '';
+    return { src, label };
+  }).filter(Boolean);
+}
+
+function renderVariantThumbs(variant) {
+  const entries = variantImageEntries(variant.images);
+  if (!entries.length) return '—';
+  const sku = variant.sku || variant.name || 'variant';
+  return `<div class="pim-detail-var-thumbs">${entries.map((img, i) => {
+    const alt = img.label || `${sku} image ${i + 1}`;
+    const title = img.label ? ` title="${escapeHtml(img.label)}"` : '';
+    return `<a href="${escapeHtml(img.src)}" target="_blank" rel="noopener" class="pim-detail-var-thumb-link"${title}><img src="${escapeHtml(img.src)}" alt="${escapeHtml(alt)}" loading="lazy" class="pim-detail-var-img" /></a>`;
+  }).join('')}</div>`;
+}
+
 function renderVariants(variants) {
   if (!Array.isArray(variants) || variants.length === 0) return '';
   const rows = variants.map((v) => {
     const price = v.price ? (v.price.final ?? v.price.regular ?? '') : '';
     const opts = Array.isArray(v.options) ? v.options.map((o) => `${o.id || ''}: ${o.value || ''}`).filter(Boolean).join('; ') : '';
-    const img = (v.images && v.images[0]) ? resolveImageUrl(v.images[0].url || v.images[0]) : '';
     return `<tr>
-      <td class="pim-detail-var-thumb">${img ? `<img src="${escapeHtml(img)}" alt="" loading="lazy" class="pim-detail-var-img" />` : '—'}</td>
+      <td class="pim-detail-var-thumb">${renderVariantThumbs(v)}</td>
       <td class="pim-detail-var-sku">${escapeHtml(v.sku || '')}</td>
       <td class="pim-detail-var-name">${escapeHtml(v.name || '')}</td>
       <td class="pim-detail-var-opts">${escapeHtml(opts)}</td>
@@ -267,7 +298,7 @@ function renderVariants(variants) {
       <td class="pim-detail-var-avail"><span class="pim-card-availability ${String(v.availability || '').toLowerCase().replace(/\s+/g, '-')}">${escapeHtml(v.availability || '')}</span></td>
     </tr>`;
   }).join('');
-  return `<div class="pim-detail-section"><h3 class="pim-detail-section-title">Variants (${variants.length})</h3><div class="pim-detail-table-wrap"><table class="pim-detail-variants-table"><thead><tr><th></th><th>SKU</th><th>Name</th><th>Options</th><th>Price</th><th>Availability</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  return `<div class="pim-detail-section"><h3 class="pim-detail-section-title">Variants (${variants.length})</h3><div class="pim-detail-table-wrap"><table class="pim-detail-variants-table"><thead><tr><th>Images</th><th>SKU</th><th>Name</th><th>Options</th><th>Price</th><th>Availability</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
 }
 
 function renderOptions(options) {
@@ -277,60 +308,6 @@ function renderOptions(options) {
     return `<tr><td class="pim-detail-custom-key">${escapeHtml(o.label || o.id || '')}</td><td class="pim-detail-custom-val">${escapeHtml(values)}</td></tr>`;
   }).join('');
   return `<div class="pim-detail-section"><h3 class="pim-detail-section-title">Options</h3><table class="pim-detail-custom-table"><tbody>${rows}</tbody></table></div>`;
-}
-
-function getCurrentReviewStatus(history) {
-  const last = [...(history || [])].filter((e) => e.op === 'status_change').pop();
-  return last ? last.status : '';
-}
-
-function formatReviewTs(ts) {
-  if (!ts) return '';
-  try {
-    const d = new Date(ts);
-    return d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
-  } catch {
-    return ts;
-  }
-}
-
-function renderReviewSection(urlKey, history) {
-  const currentStatus = getCurrentReviewStatus(history);
-  const effectiveStatus = currentStatus || 'Not started';
-  const optionsHtml = REVIEW_STATUS_OPTIONS.map((opt) => {
-    const val = escapeHtml(opt);
-    const label = escapeHtml(opt);
-    const sel = opt === effectiveStatus ? ' selected' : '';
-    return `<option value="${val}"${sel}>${label}</option>`;
-  }).join('');
-  const historyHtml = (history || []).map((e) => {
-    if (e.op === 'status_change') {
-      return `<li class="pim-review-entry pim-review-status"><span class="pim-review-meta">${escapeHtml(e.user || '')} · ${formatReviewTs(e.ts)}</span><span class="pim-review-status-badge">${escapeHtml(e.status || '')}</span></li>`;
-    }
-    if (e.op === 'comment') {
-      return `<li class="pim-review-entry pim-review-comment"><span class="pim-review-meta">${escapeHtml(e.user || '')} · ${formatReviewTs(e.ts)}</span><p class="pim-review-comment-text">${escapeHtml(e.text || '')}</p></li>`;
-    }
-    return '';
-  }).filter(Boolean).join('');
-  return `
-    <div class="pim-detail-section pim-review-section" data-review-urlkey="${escapeHtml(urlKey)}">
-      <h3 class="pim-detail-section-title">Review</h3>
-      <div class="pim-review-controls">
-        <label for="pim-review-status-select">Status</label>
-        <select id="pim-review-status-select" class="pim-review-status-select" aria-label="Review status">
-          ${optionsHtml}
-        </select>
-      </div>
-      <div class="pim-review-add-comment">
-        <label for="pim-review-comment-input">Add comment</label>
-        <textarea id="pim-review-comment-input" class="pim-review-comment-input" rows="2" placeholder="Add a comment…" aria-label="Comment text"></textarea>
-        <button type="button" id="pim-review-save" class="pim-review-comment-submit">Save</button>
-      </div>
-      <div class="pim-review-history">
-        <h4 class="pim-review-history-title">History</h4>
-        <ul class="pim-review-history-list">${historyHtml || '<li class="pim-review-empty">No status changes or comments yet.</li>'}</ul>
-      </div>
-    </div>`;
 }
 
 function renderProduct(data, indexByUrlKey = {}, isEditMode = false) {
@@ -435,8 +412,7 @@ function arrayDelete(path, index) {
 
 function arrayAdd(path) {
   let template;
-  if (path === 'images') template = { url: './media_new.jpg' };
-  else if (path === 'custom.resources') template = { name: 'New resource', type: 'pdf', url: 'https://' };
+  if (path === 'custom.resources') template = { name: 'New resource', type: 'pdf', url: 'https://' };
   else if (path === 'custom.crosssellSkus' || path === 'custom.relatedSkus') template = `/${getCatalogFromParams()}/products/new-product`;
   else template = {};
   const arr = getByPath(currentProductData, path) || [];
@@ -447,7 +423,7 @@ function arrayAdd(path) {
 
 function attachEditHandlers() {
   const content = document.getElementById('content');
-  if (!content) return;
+  if (!content || !canUseEditMode() || !editMode) return;
 
   content.querySelectorAll('.pim-editable').forEach((el) => {
     const prev = el.pimEditClick;
@@ -479,6 +455,7 @@ function attachEditHandlers() {
     const prev = btn.pimDelClick;
     if (prev) btn.removeEventListener('click', prev);
     const path = btn.getAttribute('data-edit-path');
+    if (path === 'images') return;
     const index = parseInt(btn.getAttribute('data-edit-index'), 10);
     const handler = (e) => {
       e.preventDefault();
@@ -493,6 +470,7 @@ function attachEditHandlers() {
     const prev = btn.pimAddClick;
     if (prev) btn.removeEventListener('click', prev);
     const path = btn.getAttribute('data-edit-path');
+    if (path === 'images') return;
     const handler = (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -501,75 +479,62 @@ function attachEditHandlers() {
     btn.pimAddClick = handler;
     btn.addEventListener('click', handler);
   });
+
+  const syncBtn = content.querySelector('[data-pim-sync-images]');
+  if (syncBtn instanceof HTMLButtonElement) {
+    syncBtn.addEventListener('click', async () => {
+      if (!canUseEditMode() || !currentProductData) return;
+      const urlKey = getProductParam();
+      syncBtn.disabled = true;
+      const prevLabel = syncBtn.textContent;
+      syncBtn.textContent = 'Fetching…';
+      try {
+        const product = { ...currentProductData };
+        if (!product.path) {
+          product.path = `/${getCatalogFromParams()}/products/${urlKey}`;
+        }
+        await startProductImageSync({
+          product,
+          urlKey,
+          previewSrc: resolveImageUrl,
+          onApplied: (updated) => {
+            currentProductData = updated;
+            refreshDetailContent();
+          },
+        });
+      } catch (err) {
+        showToast(err.message || 'Failed to sync images', 'error');
+      } finally {
+        syncBtn.disabled = false;
+        syncBtn.textContent = prevLabel || 'Sync images';
+      }
+    });
+  }
 }
 
-async function refreshReviewSection() {
-  const urlKey = getProductParam();
-  if (!urlKey) return;
-  try {
-    const events = await fetchReviewLog();
-    reviewHistory = getReviewHistoryForProduct(events, urlKey);
-  } catch {
-    reviewHistory = [];
+function applyEditModeToggle(editCheckbox) {
+  if (!(editCheckbox instanceof HTMLInputElement)) return;
+  const allowed = canUseEditMode();
+  const label = editCheckbox.closest('.pim-edit-toggle');
+  editCheckbox.disabled = !allowed;
+  if (!allowed) {
+    editCheckbox.checked = false;
+    editMode = false;
   }
-  refreshDetailContent();
+  if (label instanceof HTMLElement) {
+    label.title = allowed ? '' : 'Switch the API to Production to edit products.';
+    label.setAttribute('aria-disabled', allowed ? 'false' : 'true');
+  }
 }
 
 function refreshDetailContent() {
   const content = document.getElementById('content');
-  const urlKey = getProductParam();
-  content.innerHTML = renderProduct(currentProductData, currentIndexByUrlKey, editMode);
-  if (urlKey) {
-    const reviewEl = document.createElement('div');
-    reviewEl.innerHTML = renderReviewSection(urlKey, reviewHistory);
-    content.appendChild(reviewEl.firstElementChild);
-  }
-  if (editMode) content.classList.add('pim-edit-mode');
-  else content.classList.remove('pim-edit-mode');
+  const isEdit = editMode && canUseEditMode();
+  content.innerHTML = renderProduct(currentProductData, currentIndexByUrlKey, isEdit);
+  content.classList.toggle('pim-edit-mode', isEdit);
+  const ioBtn = document.getElementById('productExportImportBtn');
+  if (ioBtn instanceof HTMLButtonElement) ioBtn.hidden = !isEdit;
   attachEditHandlers();
-  attachReviewHandlers();
-}
-
-function attachReviewHandlers() {
-  const urlKey = getProductParam();
-  if (!urlKey) return;
-  const statusSelect = document.getElementById('pim-review-status-select');
-  const commentInput = document.getElementById('pim-review-comment-input');
-  const saveBtn = document.getElementById('pim-review-save');
-  if (saveBtn) {
-    saveBtn.addEventListener('click', async () => {
-      const status = statusSelect ? statusSelect.value : '';
-      const text = ((commentInput && commentInput.value) || '').trim();
-      const currentStatus = getCurrentReviewStatus(reviewHistory);
-      const statusChanged = status !== currentStatus;
-      if (!statusChanged && !text) return;
-      const user = await getFirstName();
-      try {
-        if (statusChanged) {
-          await appendReviewEvent({
-            op: 'status_change',
-            urlKey,
-            user,
-            status,
-            ts: new Date().toISOString(),
-          });
-        }
-        if (text) {
-          await appendReviewEvent({
-            op: 'comment',
-            urlKey,
-            user,
-            text,
-            ts: new Date().toISOString(),
-          });
-        }
-        if (commentInput) commentInput.value = '';
-        await refreshReviewSection();
-      } catch (err) {
-        showError(err.message || 'Failed to save');
-      }
-    });
-  }
 }
 /* eslint-enable no-use-before-define */
 
@@ -592,24 +557,55 @@ async function init() {
   errorEl.classList.remove('active');
 
   try {
-    const [data, indexData, reviewEvents] = await Promise.all([
+    const [data, indexData] = await Promise.all([
       fetchProductJson(urlKey),
       fetchProductsIndex().catch(() => []),
-      fetchReviewLog().catch(() => []),
     ]);
     currentProductData = JSON.parse(JSON.stringify(data));
     currentIndexByUrlKey = buildIndexByUrlKey(indexData);
-    reviewHistory = getReviewHistoryForProduct(reviewEvents, urlKey);
     loading.classList.remove('active');
     toolbar.style.display = 'flex';
     const backLink = toolbar.querySelector('.pim-detail-back-link');
     if (backLink) backLink.href = `catalog.html?catalog=${encodeURIComponent(getCatalogFromParams())}`;
 
-    editCheckbox.addEventListener('change', () => {
-      editMode = editCheckbox.checked;
-      content.classList.toggle('pim-edit-mode', editMode);
-      refreshDetailContent();
-    });
+    if (editCheckbox instanceof HTMLInputElement) {
+      applyEditModeToggle(editCheckbox);
+      editCheckbox.addEventListener('change', () => {
+        if (!canUseEditMode()) {
+          applyEditModeToggle(editCheckbox);
+          refreshDetailContent();
+          return;
+        }
+        editMode = editCheckbox.checked;
+        refreshDetailContent();
+      });
+    }
+
+    const ioBtn = document.getElementById('productExportImportBtn');
+    if (ioBtn instanceof HTMLButtonElement) {
+      ioBtn.addEventListener('click', async () => {
+        if (!canUseEditMode() || !editMode || !currentProductData) return;
+        ioBtn.disabled = true;
+        try {
+          const product = { ...currentProductData };
+          if (!product.path) {
+            product.path = `/${getCatalogFromParams()}/products/${urlKey}`;
+          }
+          await startProductExportImport({
+            product,
+            fallbackPath: product.path,
+            onApplied: (updated) => {
+              currentProductData = updated;
+              refreshDetailContent();
+            },
+          });
+        } catch (err) {
+          showToast(err.message || 'Failed to export / import product', 'error');
+        } finally {
+          ioBtn.disabled = false;
+        }
+      });
+    }
 
     refreshDetailContent();
   } catch (err) {
