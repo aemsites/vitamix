@@ -94,8 +94,8 @@ const MOCK_CART_ITEM = {
  * run. These tests exercise checkout behavior, not PDP add-to-cart behavior, so
  * seed the cart storage with the same schema that scripts/cart.js restores.
  */
-async function seedCart(page, items = [MOCK_CART_ITEM]) {
-  await page.addInitScript((cartItems) => {
+async function seedCart(page, items = [MOCK_CART_ITEM], locale = 'us') {
+  await page.addInitScript(({ cartItems, cartLocale }) => {
     window.IS_TEST_MODE = true;
 
     // Keep the seed one-shot. addInitScript runs on every same-page reload and
@@ -108,7 +108,7 @@ async function seedCart(page, items = [MOCK_CART_ITEM]) {
       }, 0);
       const expires = new Date(Date.now() + 30 * 864e5).toUTCString();
 
-      localStorage.setItem('cart:us', JSON.stringify({
+      localStorage.setItem(`cart:${cartLocale}`, JSON.stringify({
         version: 1,
         items: cartItems,
       }));
@@ -120,7 +120,7 @@ async function seedCart(page, items = [MOCK_CART_ITEM]) {
     // resolution. Disable GWP to avoid live promo rules adding product-page
     // fetches and extra hidden cart lines during checkout tests.
     localStorage.setItem('vitamix.priceRules.stub', JSON.stringify({ promotions: [] }));
-  }, items);
+  }, { cartItems: items, cartLocale: locale });
 }
 
 /**
@@ -134,7 +134,7 @@ async function setupCheckoutMocks(page, overrides = {}) {
   // Suppress operations-log calls at the network layer too. This protects
   // local test runs against branch previews that do not yet include the
   // window.IS_TEST_MODE guard in scripts/operations-log.js.
-  await page.route('**/us/en_us/products/operations-log', (route) => route.fulfill({ status: 204, body: '' }));
+  await page.route('**/products/operations-log', (route) => route.fulfill({ status: 204, body: '' }));
 
   // Block only the external Google reCAPTCHA SDK and Tag Manager — keep
   // the local `/scripts/recaptcha.js` wrapper alive (the checkout block
@@ -232,18 +232,18 @@ async function setupCheckoutMocks(page, overrides = {}) {
   // Stub the order-complete page. The real one loads slowly and triggers
   // `networkidle` issues. We only care that the redirect happens — the
   // destination's actual content is not part of the test.
-  await page.route('**/us/en_us/order/complete*', (route) => route.fulfill({
+  await page.route('**/order/complete*', (route) => route.fulfill({
     status: 200,
     contentType: 'text/html',
     body: '<!doctype html><html><body><h1>Order complete (stub)</h1></body></html>',
   }));
 }
 
-async function gotoCheckout(page, baseUrl) {
+async function gotoCheckout(page, baseUrl, localePath = '/us/en_us') {
   // Do NOT wait for `networkidle` — the checkout page loads analytics /
   // RUM / Forter beacons that keep firing indefinitely. The subsequent
   // `expect(...).toBeVisible({ timeout })` calls do the waiting we need.
-  await page.goto(`${baseUrl}/us/en_us/order/checkout?cart=edge&martech=off`);
+  await page.goto(`${baseUrl}${localePath}/order/checkout?cart=edge&martech=off`);
 }
 
 /**
@@ -705,6 +705,117 @@ test.describe('Edge Checkout Page', () => {
   // ─── Address validation ───────────────────────────────────────────────────
 
   test.describe('Address validation', () => {
+    ['manual', 'Google Places'].forEach((entryMode) => {
+      test(`accepts Canadian French shipping and billing text via ${entryMode} @cross-browser`, async ({ page }, testInfo) => {
+        const address = {
+          firstName: 'Élodie',
+          lastName: 'D’Arcy',
+          street: '2900 boulevard Édouard-Montpetit',
+          city: 'Montréal',
+          state: 'QC',
+          zip: 'H3T 1J4',
+          phone: '5145551234',
+        };
+        const billing = {
+          ...address,
+          firstName: 'E\u0301lodie',
+          lastName: 'St. Łukasz 2',
+          street: "12 rue de l'Église #4",
+          city: 'Saint-Louis-du-Ha! Ha!',
+        };
+        const pageErrors = [];
+        page.on('pageerror', (error) => pageErrors.push(error.message));
+
+        await seedCart(page, [MOCK_CART_ITEM], 'ca');
+        let orderBody;
+        await setupCheckoutMocks(page, {
+          createOrder: async (route) => {
+            orderBody = route.request().postDataJSON();
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({ order: { id: MOCK_ORDER_ID, customer: orderBody.customer } }),
+            });
+          },
+        });
+
+        if (entryMode === 'Google Places') {
+          await page.route('**/places/autocomplete*', (route) => route.fulfill({
+            json: {
+              suggestions: [{
+                placePrediction: {
+                  placeId: 'montreal-address',
+                  structuredFormat: {
+                    mainText: { text: address.street },
+                    secondaryText: { text: 'Montréal, Québec, Canada' },
+                  },
+                },
+              }],
+            },
+          }));
+          await page.route('**/places/details*', (route) => route.fulfill({
+            json: {
+              addressComponents: [
+                { longText: '2900', types: ['street_number'] },
+                { longText: 'boulevard Édouard-Montpetit', types: ['route'] },
+                { longText: address.city, types: ['locality'] },
+                { longText: 'Québec', shortText: 'QC', types: ['administrative_area_level_1'] },
+                { longText: address.zip, types: ['postal_code'] },
+              ],
+            },
+          }));
+        }
+
+        await gotoCheckout(page, baseUrl, '/ca/fr_ca');
+        await expect(page.locator('.checkout-form')).toBeVisible({ timeout: 15000 });
+        await expect(page.locator('.checkout-form')).toHaveAttribute('data-lang', 'fr');
+        await fillContact(page);
+
+        if (entryMode === 'manual') {
+          await fillShipping(page, address);
+        } else {
+          await field(page, 'shipping-firstname').fill(address.firstName);
+          await field(page, 'shipping-lastname').fill(address.lastName);
+          await field(page, 'shipping-telephone').fill(address.phone);
+          const street = field(page, 'shipping-street-0');
+          await street.fill('2900 boulevard');
+          await expect(page.locator('#shipping-street-0-places-listbox')).toBeVisible();
+          await street.press('ArrowDown');
+          await street.press('Enter');
+          await expect(street).toHaveValue(address.street);
+          await expect(field(page, 'shipping-city')).toHaveValue(address.city);
+          await expect(field(page, 'shipping-zip')).toHaveValue(address.zip);
+          await street.press('Tab');
+        }
+
+        await selectCreditCardAndWaitForPreview(page);
+        await page.locator('.checkout-form [name="billing-choice"][value="different"]').check();
+        await fillBilling(page, billing);
+        await field(page, 'billing-street-1').fill('Bâtiment « Érable »');
+        await field(page, 'billing-street-1').press('Tab');
+        await expect(page.locator('.checkout-form .has-error')).toHaveCount(0);
+        await page.screenshot({ path: testInfo.outputPath('canadian-address.png'), fullPage: true });
+        await page.locator('.checkout-submit-btn').click();
+
+        await expect.poll(() => orderBody, { timeout: 15000 }).toBeDefined();
+        expect(orderBody.customer.firstName).toBe(address.firstName);
+        expect(orderBody.customer.lastName).toBe(address.lastName);
+        expect(orderBody.shipping).toMatchObject({
+          address1: address.street, city: address.city, state: 'QC', zip: address.zip, country: 'ca',
+        });
+        expect(orderBody.billing).toMatchObject({
+          name: `${billing.firstName} ${billing.lastName}`,
+          address1: billing.street,
+          address2: 'Bâtiment « Érable »',
+          city: billing.city,
+          state: 'QC',
+          zip: billing.zip,
+          country: 'ca',
+        });
+        expect(pageErrors).toEqual([]);
+      });
+    });
+
     const SUGGESTED_COMPONENTS = [
       { longText: '124', shortText: '124', types: ['street_number'] },
       { longText: 'Main Street', shortText: 'Main St', types: ['route'] },
