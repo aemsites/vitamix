@@ -13,7 +13,6 @@ import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
 const ASSETS_ORIGIN = 'https://main--vitamix--aemsites.aem.live';
 const CORS_PROXY = 'https://fcors.org/?url=';
 const CORS_KEY = '&key=Mg23N96GgR8O3NjU';
-const IMAGE_FILENAME_OK = /^[A-Za-z0-9_-]+$/;
 
 function colorSlugFromValue(value) {
   return typeof value === 'string'
@@ -99,13 +98,6 @@ function absoluteAssetUrl(urlKey, rel) {
   return `${ASSETS_ORIGIN}/assets/products/${encodeURIComponent(urlKey)}/${tail.split('/').map(encodeURIComponent).join('/')}`;
 }
 
-function filenameFromRel(rel) {
-  const base = String(rel || '').split('/').pop() || '';
-  const noExt = base.replace(/\.[^.]+$/, '');
-  const safe = noExt.replace(/[^A-Za-z0-9_-]/g, '');
-  return IMAGE_FILENAME_OK.test(safe) ? safe : '';
-}
-
 function mediaFromRow(row, urlKey) {
   const rel = rowField(row, 'Path', 'path');
   if (!rel) return null;
@@ -117,8 +109,6 @@ function mediaFromRow(row, urlKey) {
   if (label) media.label = label;
   const videoRaw = rowField(row, 'Video', 'video');
   if (videoRaw) media.video = absoluteAssetUrl(urlKey, videoRaw) || videoRaw;
-  const filename = filenameFromRel(filePath);
-  if (filename) media.filename = filename;
   return { media, colorSlug };
 }
 
