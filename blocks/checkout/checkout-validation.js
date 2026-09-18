@@ -28,12 +28,12 @@ const MESSAGES = {
 // why accented names never reach Chase there.
 //
 // We allow considerably more than Magento, based on what Chase was observed to
-// accept in UAT:
-//   "Dufour-L'Arrivee"  accepted  -> hyphen and straight apostrophe are fine
-//   "D’Arcy"            accepted  -> curly apostrophe (U+2019) is fine, despite
-//                                    being non-ASCII, so iOS/macOS autocorrect
-//                                    does not trap the customer
-//   "Dufour-L'Arrivèe"  DECLINED  -> the accented letter is the only difference
+// accept in UAT (names below are stand-ins for the values actually tested):
+//   "Dupont-L'Ecuyer"  accepted  -> hyphen and straight apostrophe are fine
+//   "D’Arcy"           accepted  -> curly apostrophe (U+2019) is fine, despite
+//                                   being non-ASCII, so iOS/macOS autocorrect
+//                                   does not trap the customer
+//   "Dupont-L'Écuyer"  DECLINED  -> the accented letter is the only difference
 //
 // So the exclusion is narrow and specific: accented/diacritic letters, not
 // non-ASCII as a class.

@@ -26,8 +26,8 @@ function makeInput(name, value, { required = false, locale = null, lang = 'en' }
       // still go through. Each was confirmed against Chase in UAT, or is the
       // same character class as a confirmed case.
       const names = [
-        'Caroline', 'Depass', 'Jean-Luc', 'Marie-Claude', 'Anne Marie',
-        "O'Neill", "Dufour-L'Arrivee", 'Mary Jane', 'St John',
+        'Genevieve', 'Depass', 'Jean-Luc', 'Marie-Claude', 'Anne Marie',
+        "O'Neill", "Dupont-L'Ecuyer", 'Mary Jane', 'St John',
         // Curly apostrophe (U+2019) — what iOS/macOS autocorrect produces, and
         // confirmed accepted by Chase, so it must not be rejected here.
         'D’Arcy', 'O’Neill',
@@ -44,11 +44,11 @@ function makeInput(name, value, { required = false, locale = null, lang = 'en' }
     test(`validateField: ${context} rejects accented names that Chase declines`, () => {
       // These reach Chase as AVS fields and cause a hard decline on the hosted
       // payment page rather than a field error, so they must be caught here.
-      // "Dufour-L'Arrivèe" declined while "Dufour-L'Arrivee" was accepted — the
-      // accented letter was the only difference.
+      // In UAT an accented spelling declined while the unaccented spelling of
+      // the same name was accepted — the accent was the only difference.
       const rejected = [
-        'Élodie', 'E\u0301lodie', "Dufour-L'Arriv\u00e9e", "Dufour-L'Arriv\u00e8e",
-        'T\u00eate', 'St\u00e9phane', 'Łukasz', '李',
+        'Élodie', 'E\u0301lodie', "Dupont-L'\u00c9cuyer", "Dupont-L'\u00e8cuyer",
+        'T\u00eate', '\u00c9tienne', 'Łukasz', '李',
       ];
       ['firstname', 'lastname'].forEach((fieldName) => {
         rejected.forEach((value) => {
