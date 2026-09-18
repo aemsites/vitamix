@@ -69,12 +69,14 @@ describe('clearCheckoutCouponState', () => {
   test('removes a completed manual coupon without clearing confirmation data', () => {
     sessionStorage.setItem('checkout_coupon_code', 'VITA2526CHAMP');
     sessionStorage.setItem('checkout_coupon_source', 'manual');
+    sessionStorage.setItem('checkout_coupons', JSON.stringify([{ code: 'VITA2526CHAMP', source: 'manual' }]));
     sessionStorage.setItem('checkout_order', JSON.stringify({ id: 'order-1' }));
 
     clearCheckoutCouponState();
 
     assert.equal(sessionStorage.getItem('checkout_coupon_code'), null);
     assert.equal(sessionStorage.getItem('checkout_coupon_source'), null);
+    assert.equal(sessionStorage.getItem('checkout_coupons'), null);
     assert.equal(sessionStorage.getItem('checkout_order'), '{"id":"order-1"}');
   });
 });

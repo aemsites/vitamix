@@ -13,6 +13,7 @@ import { logOperation, getCheckoutId } from '../../scripts/operations-log.js';
 import resolvePaymentFailureMessage from '../../scripts/payment-failure.js';
 import { getStandardCheckoutContext } from '../../scripts/checkout-context.js';
 import { isEstimateExpiringSoon } from '../../scripts/estimate-token.js';
+import { getCouponRequestFields } from '../../scripts/commerce/coupon-state.js';
 
 export { validateLinkIntegrity, isEstimateExpiringSoon };
 
@@ -99,8 +100,9 @@ export function buildOrderJSON(formData, form, cart, state, config) {
     order.giftMessage = giftMessage.trim();
   }
 
-  const couponCode = sessionStorage.getItem('checkout_coupon_code') || undefined;
-  if (couponCode) order.couponCode = couponCode;
+  // couponCode + couponSource, sent identically (same array, same order) to the
+  // one used at preview so the estimate token's consistency hash matches.
+  Object.assign(order, getCouponRequestFields());
 
   order.locale = `${language.split('_')[0]}-${(language.split('_')[1] || locale).toUpperCase()}`;
   order.country = locale;
@@ -189,12 +191,11 @@ export function initOrder(form, cart, state, config, strings) {
     getState: () => state,
     updatePreview: () => updatePreview(form, cart, state, config),
     previewOrderDirect: async (body) => {
-      const couponCode = sessionStorage.getItem('checkout_coupon_code') || undefined;
-      const couponSource = sessionStorage.getItem('checkout_coupon_source') || undefined;
+      // Inject the stored coupon fields (scalar for one coupon, index-aligned
+      // arrays for several) unless the caller already supplied them.
       const estimatePayload = {
         ...body,
-        ...(couponCode && !body.couponCode ? { couponCode } : {}),
-        ...(couponCode && couponSource && !body.couponSource ? { couponSource } : {}),
+        ...(body.couponCode ? {} : getCouponRequestFields()),
       };
       const result = await previewOrder(estimatePayload);
       if (result.estimateToken) {

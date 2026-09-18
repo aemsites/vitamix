@@ -1,6 +1,7 @@
 import { estimateShipping, previewOrder } from '../../scripts/commerce-api.js';
 import { formatPrice } from '../../scripts/commerce-config.js';
 import { getStandardCheckoutContext } from '../../scripts/checkout-context.js';
+import { getCoupons, getCouponRequestFields, clearCoupons } from '../../scripts/commerce/coupon-state.js';
 import { wireRadioTabNav } from './checkout-form.js';
 
 /**
@@ -151,12 +152,7 @@ export async function updatePreview(form, cart, state, config) {
     ...(checkoutContext || {}),
   };
 
-  const couponCode = sessionStorage.getItem('checkout_coupon_code') || undefined;
-  const couponSource = sessionStorage.getItem('checkout_coupon_source') || undefined;
-  if (couponCode) {
-    orderBody.couponCode = couponCode;
-    if (couponSource) orderBody.couponSource = couponSource;
-  }
+  Object.assign(orderBody, getCouponRequestFields());
 
   if (email && firstName && lastName) {
     orderBody.customer = {
@@ -181,9 +177,11 @@ export async function updatePreview(form, cart, state, config) {
       'coupon_product_not_eligible', 'coupon_manual_entry_rejected', 'unauthorized',
     ]);
     const couponError = COUPON_ERRORS.has(err?.errorHeader) ? err.errorHeader : null;
-    if (couponError) {
-      sessionStorage.removeItem('checkout_coupon_code');
-      sessionStorage.removeItem('checkout_coupon_source');
+    // A 422 coupon error only occurs on the single-string (legacy) contract;
+    // array input is tolerant and reports invalid codes via couponStatus. Only
+    // drop the coupon in the single-coupon case so multi-coupon state survives.
+    if (couponError && getCoupons().length <= 1) {
+      clearCoupons();
     }
     document.dispatchEvent(new CustomEvent('checkout:preview', { detail: { preview: null, couponError } }));
   }
@@ -248,8 +246,7 @@ async function fetchAndPreview(form, shippingContainer, cart, state, config, str
   const locale = config.getLocale();
   const country = locale === 'ca' ? 'ca' : 'us';
 
-  const couponCode = sessionStorage.getItem('checkout_coupon_code') || undefined;
-  const couponSource = sessionStorage.getItem('checkout_coupon_source') || undefined;
+  const { couponCode, couponSource } = getCouponRequestFields();
 
   try {
     const previousRadio = shippingContainer.querySelector('input[name="shippingMethod"]:checked');
