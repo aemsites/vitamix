@@ -20,10 +20,17 @@ function makeInput(name, value, { required = false, locale = null, lang = 'en' }
     const options = { required: true, locale, lang };
     const context = `${prefix || 'unprefixed'} ${locale}/${lang}`;
 
-    test(`validateField: ${context} accepts Magento-compatible names without changing them`, () => {
+    test(`validateField: ${context} accepts ASCII names with spaces, hyphens and apostrophes`, () => {
+      // Kept deliberately broader than Magento's validate-alpha (/^[a-zA-Z]+$/),
+      // which rejects all of these. Common Québécois and anglophone names must
+      // still go through. Each was confirmed against Chase in UAT, or is the
+      // same character class as a confirmed case.
       const names = [
-        'Élodie', 'E\u0301lodie', 'Łukasz', '李', 'D’Arcy', "O'Neill", 'Jean-Luc',
-        'St. John', 'Doe, Jr. 2', 'Anne_Marie', 'D`Arcy',
+        'Caroline', 'Depass', 'Jean-Luc', 'Marie-Claude', 'Anne Marie',
+        "O'Neill", "Dufour-L'Arrivee", 'Mary Jane', 'St John',
+        // Curly apostrophe (U+2019) — what iOS/macOS autocorrect produces, and
+        // confirmed accepted by Chase, so it must not be rejected here.
+        'D’Arcy', 'O’Neill',
       ];
       ['firstname', 'lastname'].forEach((fieldName) => {
         names.forEach((value) => {
@@ -34,10 +41,44 @@ function makeInput(name, value, { required = false, locale = null, lang = 'en' }
       });
     });
 
-    test(`validateField: ${context} still rejects characters outside Magento's name rules`, () => {
+    test(`validateField: ${context} rejects accented names that Chase declines`, () => {
+      // These reach Chase as AVS fields and cause a hard decline on the hosted
+      // payment page rather than a field error, so they must be caught here.
+      // "Dufour-L'Arrivèe" declined while "Dufour-L'Arrivee" was accepted — the
+      // accented letter was the only difference.
+      const rejected = [
+        'Élodie', 'E\u0301lodie', "Dufour-L'Arriv\u00e9e", "Dufour-L'Arriv\u00e8e",
+        'T\u00eate', 'St\u00e9phane', 'Łukasz', '李',
+      ];
       ['firstname', 'lastname'].forEach((fieldName) => {
-        ['Jane@Doe', 'Jane#Doe', 'Jane/Doe', '<b>Jane</b>', 'Jane😀'].forEach((value) => {
+        rejected.forEach((value) => {
+          assert.notEqual(
+            validateField(makeInput(`${prefix}${fieldName}`, value, options)),
+            null,
+            `${fieldName}: ${value}`,
+          );
+        });
+      });
+    });
+
+    test(`validateField: ${context} still rejects digits, symbols and markup in names`, () => {
+      ['firstname', 'lastname'].forEach((fieldName) => {
+        ['Jane@Doe', 'Jane#Doe', 'Jane/Doe', '<b>Jane</b>', 'Jane😀', 'Doe, Jr. 2', 'Anne_Marie', 'Jane2'].forEach((value) => {
           assert.notEqual(validateField(makeInput(`${prefix}${fieldName}`, value, options)), null, value);
+        });
+      });
+    });
+
+    test(`validateField: ${context} requires a name to start with a letter`, () => {
+      // Note: values are trimmed before validation, so a leading space is not an
+      // error — only leading punctuation is.
+      ['firstname', 'lastname'].forEach((fieldName) => {
+        ['-Smith', "'Brien", '’Brien', '-', "'"].forEach((value) => {
+          assert.notEqual(
+            validateField(makeInput(`${prefix}${fieldName}`, value, options)),
+            null,
+            `${fieldName}: ${value}`,
+          );
         });
       });
     });

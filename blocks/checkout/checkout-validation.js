@@ -3,7 +3,7 @@ import { isValidPostalCode } from '../../scripts/address-validation.js';
 const MESSAGES = {
   en: {
     required: 'This field is required.',
-    name: 'Please enter a valid name.',
+    name: 'Please use letters, spaces, hyphens, or apostrophes (no accented letters).',
     zip: 'Please enter a valid 5-digit ZIP code.',
     postalCode: 'Please enter a valid postal code (e.g. A1B 2C3).',
     phone: 'Please enter a valid 10-digit phone number.',
@@ -12,7 +12,7 @@ const MESSAGES = {
   },
   fr: {
     required: 'Ce champ est requis.',
-    name: 'Veuillez entrer un nom valide.',
+    name: 'Veuillez utiliser des lettres, espaces, traits d’union ou apostrophes (sans lettres accentuées).',
     zip: 'Veuillez entrer un code postal à 5 chiffres valide.',
     postalCode: 'Veuillez entrer un code postal valide (ex. A1B 2C3).',
     phone: 'Veuillez entrer un numéro de téléphone à 10 chiffres valide.',
@@ -21,8 +21,23 @@ const MESSAGES = {
   },
 };
 
-// Unicode letters and combining marks, digits, whitespace, and common name punctuation.
-const NAME_RE = /^[\p{L}\p{M}\d\s,_.’'`-]+$/u;
+// Cardholder names are forwarded to Chase as AVS fields, and Chase rejects the
+// payment outright when they contain accented letters — the customer sees a hard
+// decline on the hosted payment page, not a field error. The legacy Magento
+// checkout avoids this with its `validate-alpha` rule (/^[a-zA-Z]+$/), which is
+// why accented names never reach Chase there.
+//
+// We allow considerably more than Magento, based on what Chase was observed to
+// accept in UAT:
+//   "Dufour-L'Arrivee"  accepted  -> hyphen and straight apostrophe are fine
+//   "D’Arcy"            accepted  -> curly apostrophe (U+2019) is fine, despite
+//                                    being non-ASCII, so iOS/macOS autocorrect
+//                                    does not trap the customer
+//   "Dufour-L'Arrivèe"  DECLINED  -> the accented letter is the only difference
+//
+// So the exclusion is narrow and specific: accented/diacritic letters, not
+// non-ASCII as a class.
+const NAME_RE = /^[A-Za-z][A-Za-z '’-]*$/;
 // Basic email
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
