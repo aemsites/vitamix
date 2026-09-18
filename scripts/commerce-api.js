@@ -88,8 +88,10 @@ async function post(path, body, recaptchaAction) {
  * @param {string} state - State or province code (e.g. 'QC', 'CA')
  * @param {Array<{sku: string, path: string, quantity: number, price: Object}>} items
  *   Cart items in API format
- * @param {string} [couponCode] - coupon code; free-shipping discounts apply when provided
- * @param {string} [couponSource] - coupon source, for verified/auto-applied coupons
+ * @param {string|string[]} [couponCode] - coupon code(s); free-shipping discounts
+ *   apply when provided. An array (max 5) submits multiple coupons.
+ * @param {string|string[]} [couponSource] - coupon source(s); a single value applies
+ *   to all codes, an array is index-aligned with couponCode ('auto' for verified coupons)
  * @returns {Promise<{ rates: Array<{ id: string, label: string, rate: string }> }>}
  * @throws {CommerceApiError}
  */
@@ -113,9 +115,13 @@ export async function estimateShipping(country, state, items, couponCode, coupon
  *
  * @param {string} country - ISO 3166-1 alpha-2 country code (e.g. 'us', 'ca')
  * @param {Array} items - Cart items in API format
- * @param {string} couponCode - The coupon code to validate
- * @param {string} [couponSource] - coupon source, for verified/auto-applied coupons
- * @returns {Promise<{ subtotal: number, discounts: Array, orderDiscountTotal: number }>}
+ * @param {string|string[]} couponCode - The coupon code(s) to validate. An array
+ *   (max 5) validates multiple coupons; invalid codes are reported in couponStatus
+ *   rather than failing the request.
+ * @param {string|string[]} [couponSource] - coupon source(s); a single value applies
+ *   to all codes, an array is index-aligned with couponCode ('auto' for verified coupons)
+ * @returns {Promise<{ subtotal: number, discounts: Array, orderDiscountTotal: number,
+ *   couponStatus?: Array<{ code: string, status: string }> }>}
  * @throws {CommerceApiError}
  */
 export async function estimatePrice(country, items, couponCode, couponSource) {

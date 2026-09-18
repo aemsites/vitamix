@@ -127,12 +127,13 @@ describe('buildExpressOrderPayload', () => {
     assert.equal(body.shipping.zip, 'M5A');
   });
 
-  test('drops couponSource — preview-only, not hashed, rejected by the order schema', () => {
-    // previewOrderDirect injects couponSource for auto/ID.me coupons; it must not
-    // reach POST /orders (the Order schema rejects unknown properties) and it is
-    // not part of the estimate token hash, so it is safe to omit.
+  test('retains couponSource — now a valid order field, replayed from the preview', () => {
+    // The order schema accepts couponSource (multi-coupon support). Replaying it
+    // verbatim keeps correct source attribution (e.g. 'auto' ID.me/affiliate
+    // coupons) on the created order; it is not part of the estimate token hash,
+    // so keeping it never breaks token consistency.
     const body = buildExpressOrderPayload(estimatePayload, identity);
-    assert.equal('couponSource' in body, false);
+    assert.equal(body.couponSource, 'manual');
     assert.equal(body.couponCode, 'FFVITAMIXMAY26');
   });
 

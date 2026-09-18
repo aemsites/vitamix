@@ -13,6 +13,7 @@ import {
   getApplePayExpressContext,
 } from './apple-pay-context.js';
 import { expressPayloadMatchesCart } from '../checkout-context.js';
+import { getCouponRequestFields } from '../commerce/coupon-state.js';
 
 const APPLE_PAY_SDK_URL = 'https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js';
 
@@ -86,8 +87,6 @@ function startExpressSession(btn, config, callbacks) {
         // amounts, the Shipping line, and the total agree (e.g. a free-shipping
         // coupon must show 0 on the method, not the undiscounted rate). Mirrors
         // the coupon injection in previewOrderDirect.
-        const couponCode = sessionStorage.getItem('checkout_coupon_code') || undefined;
-        const couponSource = sessionStorage.getItem('checkout_coupon_source') || undefined;
         const result = await estimateExpressCheckout(
           contact.countryCode,
           contact.administrativeArea,
@@ -95,8 +94,7 @@ function startExpressSession(btn, config, callbacks) {
           cart.getItemsForAPI(),
           {
             ...checkoutContext,
-            ...(couponCode ? { couponCode } : {}),
-            ...(couponCode && couponSource ? { couponSource } : {}),
+            ...getCouponRequestFields(),
           },
         );
         const methods = result.shippingMethods || [];

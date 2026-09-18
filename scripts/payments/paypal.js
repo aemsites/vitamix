@@ -10,6 +10,7 @@ import { logOperation, getCheckoutId } from '../operations-log.js';
 import resolvePaymentFailureMessage from '../payment-failure.js';
 import ensureCheckoutPreviewToken, { withPayPalExpressContext } from './paypal-context.js';
 import { buildExpressOrderPayload, expressPayloadMatchesCart } from '../checkout-context.js';
+import { getCouponRequestFields } from '../commerce/coupon-state.js';
 import {
   isExpressReviewEnabled,
   resolveExpressOutcome,
@@ -196,8 +197,6 @@ export default {
         // Forward the applied coupon so the server prices the PayPal amount with the
         // discount (and persists it for the shipping-option re-estimate). Mirrors the
         // coupon injection in the shared previewOrderDirect callback.
-        const couponCode = sessionStorage.getItem('checkout_coupon_code') || undefined;
-        const couponSource = sessionStorage.getItem('checkout_coupon_source') || undefined;
         try {
           const result = await patchPayPalSession(state.paypalSessionId, {
             type: 'address',
@@ -210,8 +209,7 @@ export default {
               zip: data.shippingAddress.postalCode,
             },
             items: cart.getItemsForAPI(),
-            ...(couponCode ? { couponCode } : {}),
-            ...(couponCode && couponSource ? { couponSource } : {}),
+            ...getCouponRequestFields(),
           });
           if (!result.shippingMethods?.length) {
             return actions.reject(data.errors.ADDRESS_ERROR);
