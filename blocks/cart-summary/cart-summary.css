@@ -397,8 +397,25 @@ dialog.paypal-not-configured-dialog::backdrop {
   font-size: var(--commerce-font-size-sm);
 }
 
-.cart-summary-discount-row[hidden] {
+.cart-summary-discounts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--commerce-gap-sm);
+}
+
+.cart-summary-discounts[hidden] {
   display: none;
+}
+
+.cart-summary-discount-item .discount-label-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cart-summary-discount-item.cart-summary-discount-pending {
+  color: var(--commerce-color-text-muted);
+  font-style: italic;
 }
 
 .cart-summary-shipping {
@@ -417,11 +434,6 @@ dialog.paypal-not-configured-dialog::backdrop {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.cart-summary-discount-pending {
-  color: var(--commerce-color-text-muted);
-  font-style: italic;
 }
 
 .cart-summary-final-amount .currency {
@@ -446,7 +458,7 @@ dialog.paypal-not-configured-dialog::backdrop {
 }
 
 /* Coupon remove button */
-.cart-summary-discount-row .discount-remove {
+.cart-summary-discount-item .discount-remove {
   background: none;
   border: none;
   padding: 0 2px;
@@ -457,8 +469,60 @@ dialog.paypal-not-configured-dialog::backdrop {
   transition: color 0.15s ease;
 }
 
-.cart-summary-discount-row .discount-remove:hover {
+.cart-summary-discount-item .discount-remove:hover {
   color: var(--commerce-color-error);
+}
+
+/* Auto-coupon pills (ID.me / affiliate) — wrap to their own row */
+.cart-summary .coupon-pills {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--commerce-gap-sm);
+}
+
+.cart-summary .coupon-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--commerce-color-surface, #f4f4f4);
+  border: 1px solid var(--commerce-color-border);
+  border-radius: var(--commerce-radius-badge);
+  font-size: var(--commerce-font-size-sm);
+}
+
+.cart-summary .coupon-pill-label {
+  font-weight: var(--commerce-font-weight-bold);
+}
+
+.cart-summary .coupon-pill-remove {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  line-height: 1;
+  font-size: 16px;
+  color: var(--commerce-color-text-muted);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.cart-summary .coupon-pill-remove:hover {
+  color: var(--commerce-color-error);
+}
+
+/* Per-code rejection feedback from couponStatus */
+.cart-summary .coupon-status {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cart-summary .coupon-status-message {
+  margin: 0;
+  font-size: var(--commerce-font-size-sm);
+  color: var(--commerce-color-text-muted);
 }
 
 /* Coupon error — lives inside .cart-summary-discount, wraps to its own row */

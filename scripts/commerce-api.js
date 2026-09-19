@@ -18,6 +18,27 @@ class CommerceApiError extends Error {
   }
 }
 
+// Characters the Commerce API accepts in a coupon code. The `+` is valid but was
+// absent from the historical coupon import (which uppercased and mapped every
+// other special char — `*`, `#`, etc. — to `_` via /[^A-Z0-9\-_]/g), so codes at
+// rest never contain it. We normalize the same way here but keep `+` in the set,
+// so a `+` a shopper types is sent through unchanged while legacy special chars
+// still collapse to `_` and match the imported codes.
+const COUPON_NON_CHARSET = /[^A-Z0-9\-_+]/g;
+
+/**
+ * Normalizes a coupon code to the API-accepted character set: uppercased, with
+ * any character outside [A-Z0-9-_+] replaced by `_`. Mirrors the historical
+ * import so shopper-entered codes match what is stored. Display values are left
+ * untouched — only the value sent to the API is normalized.
+ *
+ * @param {string} raw - The coupon code as entered/displayed
+ * @returns {string}
+ */
+export function normalizeCouponCode(raw) {
+  return String(raw).toUpperCase().replace(COUPON_NON_CHARSET, '_');
+}
+
 /**
  * Read the shopper browser timezone for Commerce API order payloads, when available.
  *
@@ -55,24 +76,32 @@ async function post(path, body, recaptchaAction) {
     if (recaptchaToken) headers[RECAPTCHA_HEADER] = recaptchaToken;
   }
 
+  // Normalize the coupon code to the API charset at the single request boundary,
+  // so every endpoint (estimate/price, estimate/shipping, estimate/order, order
+  // preview/create) sends a normalized value without each builder repeating it.
+  // Copy rather than mutate the caller's body, which may be reused elsewhere.
+  const payload = typeof body?.couponCode === 'string'
+    ? { ...body, couponCode: normalizeCouponCode(body.couponCode) }
+    : body;
+
   let resp;
   let data;
   try {
     resp = await loggedFetch(`${getConfig().apiOrigin}${path}`, {
       method: 'POST',
       headers,
-      body: JSON.stringify(body),
+      body: JSON.stringify(payload),
     });
     data = await resp.json();
   } catch (err) {
     logNetworkError({
-      method: 'POST', path, error: err, requestBody: body,
+      method: 'POST', path, error: err, requestBody: payload,
     });
     throw err;
   }
   if (!resp.ok) {
     logApiError({
-      method: 'POST', path, status: resp.status, responseBody: data, requestBody: body,
+      method: 'POST', path, status: resp.status, responseBody: data, requestBody: payload,
     });
     throw new CommerceApiError(resp.status, data, resp.headers.get('x-error'));
   }
@@ -88,8 +117,10 @@ async function post(path, body, recaptchaAction) {
  * @param {string} state - State or province code (e.g. 'QC', 'CA')
  * @param {Array<{sku: string, path: string, quantity: number, price: Object}>} items
  *   Cart items in API format
- * @param {string} [couponCode] - coupon code; free-shipping discounts apply when provided
- * @param {string} [couponSource] - coupon source, for verified/auto-applied coupons
+ * @param {string|string[]} [couponCode] - coupon code(s); free-shipping discounts
+ *   apply when provided. An array (max 5) submits multiple coupons.
+ * @param {string|string[]} [couponSource] - coupon source(s); a single value applies
+ *   to all codes, an array is index-aligned with couponCode ('auto' for verified coupons)
  * @returns {Promise<{ rates: Array<{ id: string, label: string, rate: string }> }>}
  * @throws {CommerceApiError}
  */
@@ -113,9 +144,13 @@ export async function estimateShipping(country, state, items, couponCode, coupon
  *
  * @param {string} country - ISO 3166-1 alpha-2 country code (e.g. 'us', 'ca')
  * @param {Array} items - Cart items in API format
- * @param {string} couponCode - The coupon code to validate
- * @param {string} [couponSource] - coupon source, for verified/auto-applied coupons
- * @returns {Promise<{ subtotal: number, discounts: Array, orderDiscountTotal: number }>}
+ * @param {string|string[]} couponCode - The coupon code(s) to validate. An array
+ *   (max 5) validates multiple coupons; invalid codes are reported in couponStatus
+ *   rather than failing the request.
+ * @param {string|string[]} [couponSource] - coupon source(s); a single value applies
+ *   to all codes, an array is index-aligned with couponCode ('auto' for verified coupons)
+ * @returns {Promise<{ subtotal: number, discounts: Array, orderDiscountTotal: number,
+ *   couponStatus?: Array<{ code: string, status: string }> }>}
  * @throws {CommerceApiError}
  */
 export async function estimatePrice(country, items, couponCode, couponSource) {

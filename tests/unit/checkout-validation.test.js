@@ -2,18 +2,136 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { validateField, validateForm, isValidPhone } from '../../blocks/checkout/checkout-validation.js';
 
-// ---------------------------------------------------------------------------
-// validateField — zip code
-// ---------------------------------------------------------------------------
-
-function makeInput(name, value, { required = false, locale = null } = {}) {
+function makeInput(name, value, { required = false, locale = null, lang = 'en' } = {}) {
   return {
     name,
     value,
     required,
-    form: locale ? { dataset: { lang: 'en', locale } } : { dataset: { lang: 'en' } },
+    form: { dataset: { lang, ...(locale ? { locale } : {}) } },
   };
 }
+
+// ---------------------------------------------------------------------------
+// validateField — Magento-compatible names and address text
+// ---------------------------------------------------------------------------
+
+['', 'shipping-', 'billing-'].forEach((prefix) => {
+  [['us', 'en'], ['ca', 'fr']].forEach(([locale, lang]) => {
+    const options = { required: true, locale, lang };
+    const context = `${prefix || 'unprefixed'} ${locale}/${lang}`;
+
+    test(`validateField: ${context} accepts ASCII names with spaces, hyphens and apostrophes`, () => {
+      // Kept deliberately broader than Magento's validate-alpha (/^[a-zA-Z]+$/),
+      // which rejects all of these. Common Québécois and anglophone names must
+      // still go through. Each was confirmed against Chase in UAT, or is the
+      // same character class as a confirmed case.
+      const names = [
+        'Genevieve', 'Depass', 'Jean-Luc', 'Marie-Claude', 'Anne Marie',
+        "O'Neill", "Dupont-L'Ecuyer", 'Mary Jane', 'St John',
+        // Curly apostrophe (U+2019) — what iOS/macOS autocorrect produces, and
+        // confirmed accepted by Chase, so it must not be rejected here.
+        'D’Arcy', 'O’Neill',
+      ];
+      ['firstname', 'lastname'].forEach((fieldName) => {
+        names.forEach((value) => {
+          const input = makeInput(`${prefix}${fieldName}`, value, options);
+          assert.equal(validateField(input), null, `${fieldName}: ${value}`);
+          assert.equal(input.value, value);
+        });
+      });
+    });
+
+    test(`validateField: ${context} rejects accented names that Chase declines`, () => {
+      // These reach Chase as AVS fields and cause a hard decline on the hosted
+      // payment page rather than a field error, so they must be caught here.
+      // In UAT an accented spelling declined while the unaccented spelling of
+      // the same name was accepted — the accent was the only difference.
+      const rejected = [
+        'Élodie', 'E\u0301lodie', "Dupont-L'\u00c9cuyer", "Dupont-L'\u00e8cuyer",
+        'T\u00eate', '\u00c9tienne', 'Łukasz', '李',
+      ];
+      ['firstname', 'lastname'].forEach((fieldName) => {
+        rejected.forEach((value) => {
+          assert.notEqual(
+            validateField(makeInput(`${prefix}${fieldName}`, value, options)),
+            null,
+            `${fieldName}: ${value}`,
+          );
+        });
+      });
+    });
+
+    test(`validateField: ${context} still rejects digits, symbols and markup in names`, () => {
+      ['firstname', 'lastname'].forEach((fieldName) => {
+        ['Jane@Doe', 'Jane#Doe', 'Jane/Doe', '<b>Jane</b>', 'Jane😀', 'Doe, Jr. 2', 'Anne_Marie', 'Jane2'].forEach((value) => {
+          assert.notEqual(validateField(makeInput(`${prefix}${fieldName}`, value, options)), null, value);
+        });
+      });
+    });
+
+    test(`validateField: ${context} requires a name to start with a letter`, () => {
+      // Note: values are trimmed before validation, so a leading space is not an
+      // error — only leading punctuation is.
+      ['firstname', 'lastname'].forEach((fieldName) => {
+        ['-Smith', "'Brien", '’Brien', '-', "'"].forEach((value) => {
+          assert.notEqual(
+            validateField(makeInput(`${prefix}${fieldName}`, value, options)),
+            null,
+            `${fieldName}: ${value}`,
+          );
+        });
+      });
+    });
+
+    test(`validateField: ${context} accepts free-text street and city values unchanged`, () => {
+      const values = {
+        'street-0': [
+          '2900 boulevard Édouard-Montpetit', '2900 boulevard E\u0301douard-Montpetit',
+          "12 rue de l'Église #4", '10 King’s Rd (A&B)', '東京都新宿区西新宿2-8-1',
+        ],
+        'street-1': ['Appartement n° 4', 'Bâtiment « Érable »', '#4 (A&B)'],
+        city: [
+          'Montréal', 'Montre\u0301al', 'L’Assomption', "L'Île-Perrot", 'Saint-Louis-du-Ha! Ha!',
+          'Łódź', 'Québec (Sainte-Foy)', '25 de Mayo', '東京都',
+        ],
+      };
+      Object.entries(values).forEach(([fieldName, examples]) => {
+        examples.forEach((value) => {
+          const input = makeInput(`${prefix}${fieldName}`, value, options);
+          assert.equal(validateField(input), null, `${fieldName}: ${value}`);
+          assert.equal(input.value, value);
+        });
+      });
+    });
+
+    test(`validateField: ${context} preserves required and optional text validation`, () => {
+      ['firstname', 'lastname', 'street-0', 'street-1', 'city'].forEach((fieldName) => {
+        ['', '   '].forEach((value) => {
+          assert.equal(
+            validateField(makeInput(`${prefix}${fieldName}`, value, options)),
+            lang === 'fr' ? 'Ce champ est requis.' : 'This field is required.',
+          );
+          assert.equal(
+            validateField(makeInput(`${prefix}${fieldName}`, value, { ...options, required: false })),
+            null,
+          );
+        });
+      });
+    });
+  });
+});
+
+test('validateField: Canadian French address retains postal-code and email checks', () => {
+  const options = { required: true, locale: 'ca', lang: 'fr' };
+  assert.equal(validateField(makeInput('shipping-zip', 'H3T 1J4', options)), null);
+  assert.notEqual(validateField(makeInput('shipping-zip', 'H3T ÉJ4', options)), null);
+  assert.equal(validateField(makeInput('email', 'test@example.com', options)), null);
+  assert.notEqual(validateField(makeInput('email', 'not-an-email', options)), null);
+});
+
+// ---------------------------------------------------------------------------
+// validateField — zip code
+// ---------------------------------------------------------------------------
 
 test('validateField: 3-digit US ZIP is invalid', () => {
   const input = makeInput('shipping-zip', '941', { required: true });
