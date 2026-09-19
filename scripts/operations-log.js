@@ -42,6 +42,22 @@ function logUrl() {
 }
 
 /**
+ * The current page URL, as `origin + pathname` — the query string and hash are
+ * deliberately dropped. Campaign and transactional links into the site carry
+ * PII and secrets in the query (customer ids from email sends, `?code=` coupon
+ * codes, and the provider tokens on payment redirect returns), and every event
+ * here is logged, so forwarding a raw `href` would route around the allowlist
+ * that {@link anonymize} applies to request bodies. Origin is kept so
+ * production, stage and branch previews stay distinguishable.
+ * @returns {string|undefined} Undefined outside a browser context.
+ */
+function pageHref() {
+  const origin = window?.location?.origin;
+  const pathname = window?.location?.pathname;
+  return origin && pathname ? `${origin}${pathname}` : undefined;
+}
+
+/**
  * Test harnesses can set this flag before page scripts run to suppress
  * operations-log network calls while still exercising purchase-flow code paths.
  * @returns {boolean}
@@ -53,13 +69,19 @@ function isTestMode() {
 /**
  * Posts a single operations-log event. Fire-and-forget: never throws, never
  * blocks. Uses `keepalive` so the beacon survives navigation/redirects.
+ *
+ * Every event carries `href` (see {@link pageHref}) so entries can be grouped
+ * by the page they came from. `data` wins on key collision, so a caller with a
+ * more accurate location can override it.
  * @param {LogAction} action
  * @param {Object} [data] - Additional, non-PII context to log.
  */
 export function logOperation(action, data = {}) {
   try {
     if (isTestMode()) return;
-    const body = JSON.stringify({ action, ts: Date.now(), ...data });
+    const body = JSON.stringify({
+      action, ts: Date.now(), href: pageHref(), ...data,
+    });
     fetch(logUrl(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

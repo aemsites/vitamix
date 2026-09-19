@@ -24,8 +24,8 @@ function captureFetch() {
   });
 }
 
-function setHostname(hostname) {
-  globalThis.window.location = { hostname };
+function setHostname(hostname, pathname = '/us/en_us/products/ascent-x5') {
+  globalThis.window.location = { hostname, origin: `https://${hostname}`, pathname };
 }
 
 beforeEach(() => {
@@ -71,6 +71,57 @@ test('logOperation: includes action, timestamp, and extra data', () => {
   assert.equal(typeof body.ts, 'number');
   assert.equal(lastInit.method, 'POST');
   assert.equal(lastInit.keepalive, true);
+});
+
+// --- href -------------------------------------------------------------------
+
+test('logOperation: includes href as origin + pathname', () => {
+  captureFetch();
+  setHostname('www.vitamix.com', '/us/en_us/products/ascent-x5');
+  logOperation('cart-view');
+  const body = JSON.parse(lastInit.body);
+  assert.equal(body.href, 'https://www.vitamix.com/us/en_us/products/ascent-x5');
+});
+
+test('logOperation: href drops the query string and hash', () => {
+  captureFetch();
+  globalThis.window.location = {
+    hostname: 'www.vitamix.com',
+    origin: 'https://www.vitamix.com',
+    pathname: '/us/en_us/order/complete',
+    search: '?orderId=ord-1&token=secret&email=a%40b.com',
+    hash: '#receipt',
+  };
+  logOperation('checkout-complete');
+  const { href } = JSON.parse(lastInit.body);
+  assert.equal(href, 'https://www.vitamix.com/us/en_us/order/complete');
+  assert.ok(!href.includes('?'), 'query string must not be logged');
+  assert.ok(!href.includes('#'), 'hash must not be logged');
+});
+
+test('logOperation: omits href when location is unavailable', () => {
+  captureFetch();
+  globalThis.window.location = { hostname: 'www.vitamix.com' };
+  logOperation('cart-view');
+  const body = JSON.parse(lastInit.body);
+  assert.ok(!('href' in body), 'href should be dropped rather than sent as null');
+});
+
+test('logOperation: caller-supplied href wins over the current location', () => {
+  captureFetch();
+  setHostname('www.vitamix.com', '/us/en_us/cart');
+  logOperation('checkout-redirect-return', { href: 'https://www.vitamix.com/us/en_us/checkout' });
+  const body = JSON.parse(lastInit.body);
+  assert.equal(body.href, 'https://www.vitamix.com/us/en_us/checkout');
+});
+
+test('logError: carries href so errors can be grouped by page', () => {
+  captureFetch();
+  setHostname('www.vitamix.com', '/us/en_us/products/ascent-x5');
+  logError('window.error', new Error('boom'));
+  const body = JSON.parse(lastInit.body);
+  assert.equal(body.href, 'https://www.vitamix.com/us/en_us/products/ascent-x5');
+  assert.equal(body.message, 'boom');
 });
 
 // --- test mode --------------------------------------------------------------
