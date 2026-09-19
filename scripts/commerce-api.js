@@ -18,6 +18,27 @@ class CommerceApiError extends Error {
   }
 }
 
+// Characters the Commerce API accepts in a coupon code. The `+` is valid but was
+// absent from the historical coupon import (which uppercased and mapped every
+// other special char — `*`, `#`, etc. — to `_` via /[^A-Z0-9\-_]/g), so codes at
+// rest never contain it. We normalize the same way here but keep `+` in the set,
+// so a `+` a shopper types is sent through unchanged while legacy special chars
+// still collapse to `_` and match the imported codes.
+const COUPON_NON_CHARSET = /[^A-Z0-9\-_+]/g;
+
+/**
+ * Normalizes a coupon code to the API-accepted character set: uppercased, with
+ * any character outside [A-Z0-9-_+] replaced by `_`. Mirrors the historical
+ * import so shopper-entered codes match what is stored. Display values are left
+ * untouched — only the value sent to the API is normalized.
+ *
+ * @param {string} raw - The coupon code as entered/displayed
+ * @returns {string}
+ */
+export function normalizeCouponCode(raw) {
+  return String(raw).toUpperCase().replace(COUPON_NON_CHARSET, '_');
+}
+
 /**
  * Read the shopper browser timezone for Commerce API order payloads, when available.
  *
@@ -55,24 +76,32 @@ async function post(path, body, recaptchaAction) {
     if (recaptchaToken) headers[RECAPTCHA_HEADER] = recaptchaToken;
   }
 
+  // Normalize the coupon code to the API charset at the single request boundary,
+  // so every endpoint (estimate/price, estimate/shipping, estimate/order, order
+  // preview/create) sends a normalized value without each builder repeating it.
+  // Copy rather than mutate the caller's body, which may be reused elsewhere.
+  const payload = typeof body?.couponCode === 'string'
+    ? { ...body, couponCode: normalizeCouponCode(body.couponCode) }
+    : body;
+
   let resp;
   let data;
   try {
     resp = await loggedFetch(`${getConfig().apiOrigin}${path}`, {
       method: 'POST',
       headers,
-      body: JSON.stringify(body),
+      body: JSON.stringify(payload),
     });
     data = await resp.json();
   } catch (err) {
     logNetworkError({
-      method: 'POST', path, error: err, requestBody: body,
+      method: 'POST', path, error: err, requestBody: payload,
     });
     throw err;
   }
   if (!resp.ok) {
     logApiError({
-      method: 'POST', path, status: resp.status, responseBody: data, requestBody: body,
+      method: 'POST', path, status: resp.status, responseBody: data, requestBody: payload,
     });
     throw new CommerceApiError(resp.status, data, resp.headers.get('x-error'));
   }
