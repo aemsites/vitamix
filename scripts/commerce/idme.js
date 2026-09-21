@@ -1,4 +1,5 @@
 import { getMetadata } from '../aem.js';
+import { addCoupon, getAutoCoupons, AUTO_COUPON_SOURCE } from './coupon-state.js';
 
 const isProd = window.location.hostname === 'www.vitamix.com';
 const IDME_CLIENT_ID = isProd ? '566879020d6a5533db11a112e307aed3' : 'f05216080667a3fb48ef1aed700d7b5f';
@@ -6,7 +7,7 @@ const IDME_SCOPES = 'military,medical,nurse,responder,teacher';
 // ID.me Groups product — single hostname for both sandbox and production.
 // The environment is determined by the client_id, not the URL.
 const IDME_GROUPS_BASE = 'https://groups.id.me';
-const IDME_COUPON_SOURCE = 'auto';
+const IDME_COUPON_SOURCE = AUTO_COUPON_SOURCE;
 
 function buildIDMeAuthUrl(callbackUrl) {
   const clientId = (!isProd && localStorage.getItem('idme-client-id')?.trim()) || IDME_CLIENT_ID;
@@ -25,8 +26,7 @@ function buildIDMeAuthUrl(callbackUrl) {
 }
 
 function hasIDMeCoupon() {
-  return sessionStorage.getItem('checkout_coupon_source') === IDME_COUPON_SOURCE
-    && !!sessionStorage.getItem('checkout_coupon_code');
+  return getAutoCoupons().length > 0;
 }
 
 export function syncIDMeVisibility() {
@@ -37,8 +37,7 @@ export function syncIDMeVisibility() {
 }
 
 function applyIDMeCoupon(coupon) {
-  sessionStorage.setItem('checkout_coupon_code', coupon);
-  sessionStorage.setItem('checkout_coupon_source', IDME_COUPON_SOURCE);
+  addCoupon(coupon, IDME_COUPON_SOURCE);
   syncIDMeVisibility();
   document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
 }

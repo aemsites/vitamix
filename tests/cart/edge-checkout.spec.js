@@ -777,15 +777,15 @@ test.describe('Edge Checkout', () => {
 
     test.use({ viewport: { width: 1280, height: 720 } });
 
-    test('hides the coupon row when no coupon is applied', async ({ page }) => {
+    test('hides the coupon rows when no coupon is applied', async ({ page }) => {
       await seedCartSummary(page);
       await page.goto(buildProductUrl(cartPath, currentBranch, { cart: 'edge' }));
 
-      const discountRow = page.locator('.cart-summary-discount-row');
+      const discounts = page.locator('.cart-summary-discounts');
       await expect(page.locator('.cart-summary-content')).toBeVisible({ timeout: 30000 });
-      await expect(discountRow).toBeHidden();
-      await expect(discountRow.locator('.discount-remove')).toBeHidden();
-      console.log('✓ Coupon row is hidden without an applied coupon');
+      await expect(discounts).toBeHidden();
+      await expect(discounts.locator('.discount-remove')).toBeHidden();
+      console.log('✓ Coupon rows are hidden without an applied coupon');
     });
 
     test('shows the remove action when a coupon is applied', async ({ page }) => {
@@ -795,15 +795,18 @@ test.describe('Edge Checkout', () => {
         contentType: 'application/json',
         body: JSON.stringify({
           subtotal: 549.99,
-          discounts: [{ source: 'coupon', name: 'SAVE10', amount: 10 }],
+          discounts: [{
+            id: 'coupon:SAVE10', source: 'coupon', name: 'SAVE10', amount: 10,
+          }],
           orderDiscountTotal: 10,
+          couponStatus: [{ code: 'SAVE10', status: 'applied' }],
         }),
       }));
       await page.goto(buildProductUrl(cartPath, currentBranch, { cart: 'edge' }));
 
-      const discountRow = page.locator('.cart-summary-discount-row');
+      const discountRow = page.locator('.cart-summary-discount-item').first();
       await expect(discountRow).toBeVisible({ timeout: 30000 });
-      await expect(discountRow.locator('.cart-summary-discount-label')).toContainText('SAVE10');
+      await expect(discountRow).toContainText('SAVE10');
       await discountRow.hover();
       await expect(discountRow.locator('.discount-remove')).toBeVisible();
       console.log('✓ Coupon row includes its remove action for an applied coupon');

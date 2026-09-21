@@ -74,12 +74,13 @@ export function buildExpressOrderPayload(estimatePayload, identity) {
   const {
     customer, shipping, billing, estimateToken, customerTimezone,
   } = identity;
-  // `couponSource` is a preview-only hint: it shapes the estimate and is
-  // accepted by the preview schema, but it is NOT part of the estimate token's
-  // hash and is NOT a valid field on the order schema (which rejects unknown
-  // properties). Drop it so replaying the previewed payload yields a valid order
-  // body. `couponCode` is kept (it is hashed and is a valid order field).
-  const { couponSource, ...orderFields } = estimatePayload;
+  // Replay the previewed payload verbatim. `couponCode` and `couponSource`
+  // (scalar for one coupon, index-aligned arrays for several) are both valid
+  // order fields and are carried through unchanged so the created order matches
+  // what was previewed. `couponCode` is part of the estimate token's hash;
+  // `couponSource` is not, but keeping it preserves correct source attribution
+  // (e.g. an 'auto' ID.me / affiliate coupon) on the stored order.
+  const orderFields = estimatePayload;
   return {
     ...orderFields,
     customer,

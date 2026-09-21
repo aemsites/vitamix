@@ -6,6 +6,24 @@ import buildWarrantySelector from '../cart/warranty-selector.js';
 import { parsePreview, estimatePrice } from '../../scripts/commerce-api.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 import { initIDMe, syncIDMeVisibility } from '../../scripts/commerce/idme.js';
+import {
+  getCoupons, getManualCoupon, getAutoCoupons, setManualCoupon, removeCoupon,
+  getCouponRequestFields, clearCoupons,
+} from '../../scripts/commerce/coupon-state.js';
+import { renderCouponPills, renderCouponStatus, couponCodeFromDiscount } from '../../scripts/commerce/coupon-ui.js';
+
+const LOCAL_STRINGS = {
+  'en-us': {
+    removeCoupon: 'Remove coupon',
+    couponRejectedInvalid: 'isn\'t a valid coupon code.',
+    couponRejectedNotCombinable: 'can\'t be combined with your other offers.',
+  },
+  'fr-ca': {
+    removeCoupon: 'Retirer le coupon',
+    couponRejectedInvalid: 'n\'est pas un code promo valide.',
+    couponRejectedNotCombinable: 'ne peut pas être combiné avec vos autres offres.',
+  },
+};
 
 const COUPON_ERROR_MESSAGES = {
   'en-us': {
@@ -36,14 +54,16 @@ const COUPON_ERROR_MESSAGES = {
   },
 };
 
+function getLang() {
+  return getLocaleAndLanguage().locale === 'ca' ? 'fr-ca' : 'en-us';
+}
+
 function getStrings() {
-  return getConfig().getStrings();
+  return { ...getConfig().getStrings(), ...(LOCAL_STRINGS[getLang()] || LOCAL_STRINGS['en-us']) };
 }
 
 function getCouponErrorMessage(errorCode) {
-  const { locale } = getLocaleAndLanguage();
-  const lang = locale === 'ca' ? 'fr-ca' : 'en-us';
-  const msgs = COUPON_ERROR_MESSAGES[lang] || COUPON_ERROR_MESSAGES['en-us'];
+  const msgs = COUPON_ERROR_MESSAGES[getLang()] || COUPON_ERROR_MESSAGES['en-us'];
   return msgs[errorCode] || msgs.default;
 }
 
@@ -69,7 +89,9 @@ function buildTemplate(s) {
     <div class="order-summary-discount">
       <input type="text" placeholder="${s.discountPlaceholder}" class="discount-input">
       <button class="discount-apply">${s.apply}</button>
+      <div class="coupon-pills" hidden></div>
       <p class="order-summary-coupon-error" hidden></p>
+      <div class="coupon-status" hidden></div>
     </div>
     <div class="order-summary-totals">
       <div class="order-summary-row">
@@ -228,69 +250,100 @@ export default async function decorate(block) {
   const discountApply = block.querySelector('.discount-apply');
   const discountsEl = block.querySelector('.order-summary-discounts');
   const couponErrorEl = block.querySelector('.order-summary-coupon-error');
+  const pillsEl = block.querySelector('.coupon-pills');
+  const statusEl = block.querySelector('.coupon-status');
   currencyEl.textContent = getCurrencyCode();
 
-  const removeCoupon = () => {
-    sessionStorage.removeItem('checkout_coupon_code');
-    sessionStorage.removeItem('checkout_coupon_source');
+  // Clears the manual coupon (keeps auto coupons) and re-syncs every block.
+  const removeManualCoupon = () => {
+    setManualCoupon('');
     discountInput.value = '';
-    discountsEl.innerHTML = '';
-    discountsEl.hidden = true;
     couponErrorEl.hidden = true;
     document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
   };
 
+  // Removable pills for auto/verified coupons; the input only holds the manual one.
+  const renderPills = () => renderCouponPills(pillsEl, getAutoCoupons(), (code) => {
+    removeCoupon(code);
+    document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
+  }, s);
+
+  // A remove button appears only on the manual coupon's row; auto coupons are
+  // removed via their pill.
   const makeRemoveBtn = () => {
     const btn = document.createElement('button');
     btn.className = 'discount-remove';
-    btn.setAttribute('aria-label', 'Remove coupon');
+    btn.setAttribute('aria-label', s.removeCoupon || 'Remove coupon');
     btn.textContent = '×';
-    btn.addEventListener('click', removeCoupon);
+    btn.addEventListener('click', removeManualCoupon);
     return btn;
+  };
+
+  const buildDiscountRow = (labelText, amountText, removable, extraClass = '') => {
+    const row = document.createElement('div');
+    row.className = `order-summary-row order-summary-discount-item${extraClass ? ` ${extraClass}` : ''}`;
+    const amount = document.createElement('span');
+    amount.className = 'order-summary-discount-amount';
+    amount.textContent = amountText;
+    if (removable) {
+      const labelGroup = document.createElement('span');
+      labelGroup.className = 'discount-label-group';
+      const label = document.createElement('span');
+      label.textContent = labelText;
+      labelGroup.append(label, makeRemoveBtn());
+      row.append(labelGroup, amount);
+    } else {
+      const label = document.createElement('span');
+      label.textContent = labelText;
+      row.append(label, amount);
+    }
+    return row;
   };
 
   const renderDiscountRows = (discounts, currency) => {
     discountsEl.innerHTML = '';
-    discountsEl.hidden = true;
-    discounts.filter((d) => parseFloat(d.amount) > 0).forEach((d) => {
-      discountsEl.hidden = false;
-      const row = document.createElement('div');
-      row.className = 'order-summary-row order-summary-discount-item';
-      const amount = document.createElement('span');
-      amount.className = 'order-summary-discount-amount';
-      amount.textContent = `-${formatPrice(parseFloat(d.amount), currency)}`;
-
-      if (d.source === 'coupon') {
-        const labelGroup = document.createElement('span');
-        labelGroup.className = 'discount-label-group';
-        const label = document.createElement('span');
-        label.textContent = d.name || s.discount;
-        labelGroup.append(label, makeRemoveBtn());
-        row.append(labelGroup, amount);
-      } else {
-        const label = document.createElement('span');
-        label.textContent = d.name || s.discount;
-        row.append(label, amount);
-      }
-      discountsEl.appendChild(row);
+    const manualCode = getManualCoupon().toLowerCase();
+    const rows = discounts.filter((d) => parseFloat(d.amount) > 0);
+    discountsEl.hidden = rows.length === 0;
+    rows.forEach((d) => {
+      const code = couponCodeFromDiscount(d);
+      const removable = !!code && code.toLowerCase() === manualCode;
+      discountsEl.appendChild(buildDiscountRow(
+        d.name || s.discount,
+        `-${formatPrice(parseFloat(d.amount), currency)}`,
+        removable,
+      ));
     });
   };
 
-  const showPendingDiscount = (code) => {
+  // Placeholder rows (one per stored coupon) shown while an estimate is in flight.
+  const showPendingDiscounts = () => {
+    const coupons = getCoupons();
     discountsEl.innerHTML = '';
-    discountsEl.hidden = false;
-    const row = document.createElement('div');
-    row.className = 'order-summary-row order-summary-discount-item order-summary-discount-pending';
-    const labelGroup = document.createElement('span');
-    labelGroup.className = 'discount-label-group';
-    const label = document.createElement('span');
-    label.textContent = `${s.discount} (${code})`;
-    labelGroup.append(label, makeRemoveBtn());
-    const amount = document.createElement('span');
-    amount.className = 'order-summary-discount-amount';
-    amount.textContent = '--';
-    row.append(labelGroup, amount);
-    discountsEl.appendChild(row);
+    discountsEl.hidden = coupons.length === 0;
+    coupons.forEach(({ code, source }) => {
+      discountsEl.appendChild(buildDiscountRow(
+        `${s.discount} (${code})`,
+        '--',
+        source !== 'auto',
+        'order-summary-discount-pending',
+      ));
+    });
+  };
+
+  // Renders per-code rejection feedback and rolls back an invalid manual code so
+  // it is not persisted or left in the input.
+  const handleCouponStatus = (couponStatus) => {
+    renderCouponStatus(statusEl, couponStatus, s);
+    const manual = getManualCoupon();
+    if (!manual) return;
+    const entry = (couponStatus || []).find(
+      (e) => e.code?.toLowerCase() === manual.toLowerCase(),
+    );
+    if (entry?.status === 'rejected_invalid') {
+      setManualCoupon('');
+      discountInput.value = '';
+    }
   };
 
   let priceEstimateRequest = 0;
@@ -339,18 +392,19 @@ export default async function decorate(block) {
   };
 
   const updatePriceEstimate = async () => {
-    const couponCode = sessionStorage.getItem('checkout_coupon_code') || '';
-    const couponSource = sessionStorage.getItem('checkout_coupon_source') || undefined;
+    renderPills();
+    const { couponCode, couponSource } = getCouponRequestFields();
     if (!couponCode || !cart.itemCount) {
       discountsEl.innerHTML = '';
       discountsEl.hidden = true;
+      renderCouponStatus(statusEl, [], s);
       updateTotals();
       return;
     }
 
     priceEstimateRequest += 1;
     const requestId = priceEstimateRequest;
-    showPendingDiscount(couponCode);
+    showPendingDiscounts();
 
     try {
       const estimate = await estimatePrice(
@@ -361,40 +415,47 @@ export default async function decorate(block) {
       );
       if (requestId !== priceEstimateRequest) return;
       renderPriceEstimate(estimate);
-    } catch {
-      if (requestId === priceEstimateRequest) showPendingDiscount(couponCode);
+      handleCouponStatus(estimate.couponStatus);
+    } catch (err) {
+      if (requestId !== priceEstimateRequest) return;
+      // Only the single-string (legacy) contract throws a 422 for a bad coupon;
+      // array input is tolerant. Drop the lone coupon and surface the error.
+      if (getCoupons().length <= 1) {
+        clearCoupons();
+        discountInput.value = '';
+        discountsEl.innerHTML = '';
+        discountsEl.hidden = true;
+        couponErrorEl.textContent = getCouponErrorMessage(err?.errorHeader);
+        couponErrorEl.hidden = false;
+        renderPills();
+      } else {
+        showPendingDiscounts();
+      }
     }
   };
 
-  const savedCoupon = sessionStorage.getItem('checkout_coupon_code') || '';
-  const savedCouponSource = sessionStorage.getItem('checkout_coupon_source') || '';
-  if (savedCoupon) {
-    if (savedCouponSource !== 'auto') discountInput.value = savedCoupon;
-    showPendingDiscount(savedCoupon);
-  }
+  const savedManual = getManualCoupon();
+  if (savedManual) discountInput.value = savedManual;
+  renderPills();
+  if (getCoupons().length) showPendingDiscounts();
 
   discountApply.addEventListener('click', async () => {
     couponErrorEl.hidden = true;
     const code = discountInput.value.trim();
-    const existingCouponSource = sessionStorage.getItem('checkout_coupon_source') || '';
     if (!code) {
-      if (existingCouponSource !== 'auto') {
-        sessionStorage.removeItem('checkout_coupon_code');
-        sessionStorage.removeItem('checkout_coupon_source');
-        discountsEl.innerHTML = '';
-        discountsEl.hidden = true;
-      }
+      removeManualCoupon();
       return;
     }
 
     discountApply.disabled = true;
     discountApply.classList.add('loading');
     try {
+      // Validate the typed code on its own so a bad single code returns the
+      // usual 422; if valid, store it and let the coupon-apply listener
+      // re-estimate the full set (manual + any auto coupons).
       const country = getLocaleAndLanguage().locale;
-      const estimate = await estimatePrice(country, cart.getItemsForAPI(), code);
-      sessionStorage.setItem('checkout_coupon_code', code);
-      sessionStorage.removeItem('checkout_coupon_source');
-      renderPriceEstimate(estimate);
+      await estimatePrice(country, cart.getItemsForAPI(), code);
+      setManualCoupon(code);
       document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
     } catch (err) {
       couponErrorEl.textContent = getCouponErrorMessage(err?.errorHeader);
@@ -496,9 +557,8 @@ export default async function decorate(block) {
   document.addEventListener('cart:limit', refreshSummary);
   document.addEventListener('checkout:coupon-apply', () => {
     syncIDMeVisibility();
-    const couponCode = sessionStorage.getItem('checkout_coupon_code') || '';
-    const couponSource = sessionStorage.getItem('checkout_coupon_source') || '';
-    if (!couponCode || couponSource === 'auto') updatePriceEstimate();
+    renderPills();
+    updatePriceEstimate();
   });
 
   document.addEventListener('checkout:shipping-selected', (e) => {
@@ -518,11 +578,15 @@ export default async function decorate(block) {
     const { preview, couponError } = e.detail || {};
     hasOrderPreview = Boolean(preview);
     if (!preview) renderEstimatedTotals();
+    renderPills();
 
     if (couponError) {
-      sessionStorage.removeItem('checkout_coupon_source');
+      // checkout-shipping already cleared a lone (single-string) coupon; reflect
+      // that here and surface the error.
+      discountInput.value = getManualCoupon();
       discountsEl.innerHTML = '';
-      discountInput.value = '';
+      discountsEl.hidden = true;
+      renderCouponStatus(statusEl, [], s);
       couponErrorEl.textContent = getCouponErrorMessage(couponError);
       couponErrorEl.hidden = false;
       syncIDMeVisibility();
@@ -540,6 +604,7 @@ export default async function decorate(block) {
     subtotalEl.textContent = formatPrice(subtotal, currency);
 
     renderDiscountRows(discounts, currency);
+    handleCouponStatus(preview.couponStatus);
 
     shippingEl.textContent = shippingRate === 0
       ? s.free

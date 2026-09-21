@@ -1,5 +1,6 @@
 import { getConfig, formatPrice } from '../../scripts/commerce-config.js';
 import { getOrder } from '../../scripts/commerce-api.js';
+import { clearCoupons } from '../../scripts/commerce/coupon-state.js';
 import { logOperation, getCheckoutId, clearCheckoutId } from '../../scripts/operations-log.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 import resolvePaymentFailureMessage from '../../scripts/payment-failure.js';
@@ -27,8 +28,7 @@ export function parseJson(raw) {
  */
 export function clearCheckoutCouponState() {
   try {
-    sessionStorage.removeItem('checkout_coupon_code');
-    sessionStorage.removeItem('checkout_coupon_source');
+    clearCoupons();
   } catch {
     // Confirmation remains usable when session storage is unavailable.
   }
@@ -460,7 +460,13 @@ export default async function decorate(block) {
 
   block.replaceChildren(container);
 
-  const couponCode = sessionStorage.getItem('checkout_coupon_code') || '';
+  // The stored order is authoritative once placed; fall back to the tab-scoped
+  // coupon state only if the order omits it. Keep a single code for the existing
+  // analytics contract (discountCode); couponCodes[] carries the full set.
+  const couponCode = order?.couponCodes?.[0]
+    || order?.couponCode
+    || sessionStorage.getItem('checkout_coupon_code')
+    || '';
   const analyticsContext = {
     orderId,
     order,
