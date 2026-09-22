@@ -218,3 +218,15 @@ test('fireCjConversion reuses a tag already injected by consented.js', async () 
   assert.equal(appendedScripts.length, 0);
   assert.equal(globalThis.window.cj.order.orderId, 'OC6849504389');
 });
+
+test('reportCjConversion returns false instead of throwing on bad input', async () => {
+  const cj = await freshCjModule('report-guard');
+  assert.equal(cj.reportCjConversion(null), false);
+  assert.equal(appendedScripts.length, 0);
+});
+
+test('reportCjConversion publishes a valid order context', async () => {
+  const cj = await freshCjModule('report-ok');
+  assert.equal(cj.reportCjConversion(ORDER_CONTEXT), true);
+  assert.equal(globalThis.window.cj.order.orderId, 'OC6849504389');
+});

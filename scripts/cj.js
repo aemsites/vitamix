@@ -1,13 +1,13 @@
 /**
  * Commission Junction (CJ) affiliate conversion reporting.
  *
- * Loaded only on the order confirmation page. CJ's Universal Tag expects the conversion
- * payload for every completed order — affiliate-sourced or not — so this module builds
- * `window.cj.order` from the confirmed order and ensures the tag is present to transmit
- * it. Orders with no affiliate click ID simply omit `cjeventOrder`.
+ * Called by the order-complete block once it has the confirmed order. CJ's Universal Tag
+ * expects the conversion payload for every completed order — affiliate-sourced or not —
+ * so this builds `window.cj.order` and ensures the tag is present to transmit it. Orders
+ * with no affiliate click ID simply omit `cjeventOrder`.
  *
- * Intentionally dependency-free: the site serves unbundled source, so a standalone
- * module costs one request rather than a chain of them.
+ * Dependency-free: the site serves unbundled source, so this adds a single request
+ * alongside the block's existing imports rather than extending the chain.
  */
 
 /** CJ Universal Tag ID. Identical across environments. */
@@ -45,7 +45,6 @@ const CJEVENT_TS_KEY = 'cjevent_captured';
 export const CJEVENT_MAX_AGE_MS = 395 * 24 * 60 * 60 * 1000;
 
 let cjConversionFired = false;
-let cjConversionRegistered = false;
 
 /**
  * @param {...any} args
@@ -288,35 +287,15 @@ export function fireCjConversion(context) {
 }
 
 /**
- * Retries briefly while the order-complete block resolves the confirmed order.
- * @param {object} context
- * @param {number} [attempt]
- * @returns {void}
+ * Reports a confirmed order to CJ.
+ * @param {object} context Order context from the order-complete block
+ * @returns {boolean} Whether the conversion was published
  */
-function fireWhenOrderReady(context, attempt = 0) {
-  if (fireCjConversion(context) || cjConversionFired) return;
-  if (attempt >= 40) {
-    debug('order data unavailable', context);
-    return;
+export function reportCjConversion(context) {
+  try {
+    return fireCjConversion(context);
+  } catch (error) {
+    debug('reporting failed', error);
+    return false;
   }
-  setTimeout(() => fireWhenOrderReady(context, attempt + 1), 250);
-}
-
-/**
- * Listens for order confirmation and reports the conversion.
- * @returns {void}
- */
-export function registerCjConversion() {
-  const params = new URLSearchParams(window.location.search);
-  const hasOrder = !!(params.get('orderId') || params.get('id')) && !params.get('reason');
-  if (cjConversionRegistered || !hasOrder) return;
-  cjConversionRegistered = true;
-
-  document.addEventListener('order:confirmed', (event) => {
-    fireWhenOrderReady(event.detail);
-  }, { once: true });
-
-  // The block may have confirmed before this module finished loading.
-  const pendingContext = window.vitamixEdsAnalytics?.orderConfirmedContext;
-  if (pendingContext) fireWhenOrderReady(pendingContext);
 }
