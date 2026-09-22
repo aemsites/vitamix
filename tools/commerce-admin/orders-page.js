@@ -411,6 +411,30 @@ function appendPill(container, label, on) {
   container.appendChild(span);
 }
 
+/**
+ * Applied coupon code(s) for an order as an ordered, de-duplicated array.
+ * An order may now carry multiple coupons: prefers couponCodes[] (the full
+ * applied set), then couponCode (string | string[]), then the legacy single
+ * `coupon` string.
+ * @param {Record<string, unknown>} o
+ * @returns {string[]}
+ */
+function orderCouponCodes(o) {
+  const raw = o?.couponCodes ?? o?.couponCode ?? o?.coupon;
+  let list = [];
+  if (Array.isArray(raw)) list = raw;
+  else if (raw != null) list = [raw];
+  const seen = new Set();
+  const codes = [];
+  list.forEach((value) => {
+    const code = String(value ?? '').trim();
+    if (!code || seen.has(code)) return;
+    seen.add(code);
+    codes.push(code);
+  });
+  return codes;
+}
+
 function statBlock(label, value) {
   const div = document.createElement('div');
   div.className = 'coupons-modal-stat';
@@ -569,6 +593,24 @@ function buildOrderRichHeader(o) {
   const customerType = customerTypeLabel(o.customerType);
   if (customerType) stats.appendChild(statBlock('Customer type', customerType));
   wrap.appendChild(stats);
+
+  const couponCodes = orderCouponCodes(o);
+  if (couponCodes.length) {
+    const couponRow = document.createElement('div');
+    couponRow.className = 'coupons-modal-pills orders-modal-coupons';
+    couponRow.setAttribute('aria-label', 'Coupons');
+    const label = document.createElement('span');
+    label.className = 'orders-modal-coupons-label';
+    label.textContent = couponCodes.length > 1 ? 'Coupons' : 'Coupon';
+    couponRow.appendChild(label);
+    couponCodes.forEach((couponCode) => {
+      const span = document.createElement('span');
+      span.className = 'coupons-pill coupons-pill-state';
+      span.textContent = couponCode;
+      couponRow.appendChild(span);
+    });
+    wrap.appendChild(couponRow);
+  }
 
   const pills = document.createElement('div');
   pills.className = 'coupons-modal-pills';
@@ -1376,8 +1418,11 @@ function renderTable(wrap, orders, query, onEditSaved) {
     const totalStr = o.total != null && String(o.total).trim() !== ''
       ? `$${String(o.total).trim()}`
       : '—';
-    const couponStr = o.coupon != null && String(o.coupon).trim() !== ''
-      ? String(o.coupon).trim()
+    const couponCodes = orderCouponCodes(o);
+    const couponHtml = couponCodes.length
+      ? `<span class="orders-coupon-pills">${couponCodes
+        .map((code) => `<span class="coupons-pill coupons-pill-state">${highlightMatch(code, query)}</span>`)
+        .join('')}</span>`
       : '—';
     const paymentMethodStr = o.paymentMethod != null && String(o.paymentMethod).trim() !== ''
       ? String(o.paymentMethod).trim()
@@ -1396,7 +1441,7 @@ function renderTable(wrap, orders, query, onEditSaved) {
             <td>${highlightMatch(itemCount, query)}</td>
             <td>${highlightMatch(subtotalStr, query)}</td>
             <td>${highlightMatch(totalStr, query)}</td>
-            <td>${highlightMatch(couponStr, query)}</td>
+            <td>${couponHtml}</td>
             <td>${highlightMatch(paymentMethodStr, query)}</td>
             <td>${marketHtml}</td>
             <td>${highlightMatch(updatedStr, query)}</td>

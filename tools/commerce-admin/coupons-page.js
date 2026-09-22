@@ -848,13 +848,40 @@ function inboundStackableCouponRows(couponId) {
   });
 }
 
+/** Compact discount summary for a stackable-reference card. */
+function stackableRefDiscountText(row) {
+  if (!row || typeof row !== 'object') return '';
+  if (row.discountType === 'fixed' && row.discountValue != null) return `$${row.discountValue} off`;
+  if (row.discountType === 'percentage' && row.discountValue != null) return `${row.discountValue}% off`;
+  return '';
+}
+
+/**
+ * A single clickable card for a stackable-reference coupon. Resolves the id to
+ * its list row (already in memory via state.coupons) to show the coupon's name,
+ * market, id, and discount. Clicking navigates to that coupon (data attribute
+ * handled by the [data-cp-open-ref-coupon] wiring).
+ * @param {string} id
+ */
+function couponStackableReferenceCardHtml(id) {
+  const rawId = String(id || '').trim();
+  const row = state.coupons.find((c) => couponIdFromRow(c) === rawId);
+  const name = (row && typeof row === 'object' && String(row.name || '').trim()) || rawId;
+  const path = parseCouponTypePath(rawId);
+  const emoji = path && path.country ? commerceMarketEmojiHtml(path.country) : '';
+  const discount = stackableRefDiscountText(row);
+  return `<button type="button" class="coupons-stackable-ref-card" data-cp-open-ref-coupon="${escapeHtml(rawId)}" aria-label="${escapeHtml(`Open ${name}`)}">
+    <span class="coupons-stackable-ref-card-label">${emoji ? `${emoji} ` : ''}${escapeHtml(name)}</span>
+    <span class="coupons-stackable-ref-card-meta">${escapeHtml(rawId)}</span>
+    ${discount ? `<span class="coupons-stackable-ref-card-note">${escapeHtml(discount)}</span>` : ''}
+  </button>`;
+}
+
 /** @param {string[]} ids @param {string} emptyText */
 function couponStackableReferenceListHtml(ids, emptyText) {
   if (!ids.length) return `<p class="coupons-muted">${escapeHtml(emptyText)}</p>`;
-  const items = ids.map((id) => `<li class="coupons-stackable-reference-item">
-    <button type="button" class="coupons-link-button" data-cp-open-ref-coupon="${escapeHtml(id)}">${escapeHtml(stackableCouponLabelById(id))}</button>
-  </li>`).join('');
-  return `<ul class="coupons-stackable-reference-list">${items}</ul>`;
+  const cards = ids.map((id) => couponStackableReferenceCardHtml(id)).join('');
+  return `<div class="coupons-stackable-reference-list">${cards}</div>`;
 }
 
 /** Single state badge (not an on/off pair). */
@@ -998,10 +1025,12 @@ function couponDetailModalInnerHtml(d, thumbByPath) {
       <div class="coupons-stackable-reference-grid">
         <div>
           <h4 class="coupons-stackable-reference-title">Can stack with</h4>
+          <p class="coupons-field-hint coupons-stackable-reference-hint">Coupon types this one is configured to stack with.</p>
           ${couponStackableReferenceListHtml(outboundStackableIds, 'No stackable coupon types selected.')}
         </div>
         <div>
-          <h4 class="coupons-stackable-reference-title">Inbound references</h4>
+          <h4 class="coupons-stackable-reference-title">Stackable from</h4>
+          <p class="coupons-field-hint coupons-stackable-reference-hint">Other coupon types that list this one as stackable. Open one to manage its stacking.</p>
           ${couponStackableReferenceListHtml(inboundStackableIds, 'No other coupon types reference this coupon.')}
         </div>
       </div>

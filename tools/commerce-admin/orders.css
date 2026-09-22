@@ -641,3 +641,25 @@
   color: #454749;
   word-break: break-word;
 }
+
+/* Coupon pills — one per applied coupon (table cell + detail modal) */
+.orders-coupon-pills {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.orders-coupon-pills .coupons-pill {
+  margin: 0;
+}
+
+.orders-modal-coupons {
+  align-items: center;
+}
+
+.orders-modal-coupons-label {
+  margin-right: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6d7175;
+}

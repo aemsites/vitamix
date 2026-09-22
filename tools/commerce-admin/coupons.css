@@ -869,15 +869,59 @@
   color: #202223;
 }
 
-.coupons-stackable-reference-list {
-  margin: 0;
-  padding-left: 18px;
-  font-size: 13px;
-  line-height: 1.45;
+.coupons-stackable-reference-hint {
+  margin: 0 0 8px;
 }
 
-.coupons-stackable-reference-item + .coupons-stackable-reference-item {
-  margin-top: 4px;
+.coupons-stackable-reference-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.coupons-stackable-ref-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #e1e3e5;
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.coupons-stackable-ref-card:hover {
+  border-color: #98a2b3;
+  background: #f9fafb;
+}
+
+.coupons-stackable-ref-card:focus-visible {
+  outline: 2px solid #1a3a6e;
+  outline-offset: 1px;
+}
+
+.coupons-stackable-ref-card-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #202223;
+  overflow-wrap: anywhere;
+}
+
+.coupons-stackable-ref-card-meta {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  color: #6d7175;
+  overflow-wrap: anywhere;
+}
+
+.coupons-stackable-ref-card-note {
+  font-size: 12px;
+  color: #454749;
 }
 
 .coupons-section-title {
