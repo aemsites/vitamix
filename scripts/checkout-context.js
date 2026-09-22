@@ -74,12 +74,9 @@ export function buildExpressOrderPayload(estimatePayload, identity) {
   const {
     customer, shipping, billing, estimateToken, customerTimezone,
   } = identity;
-  // Replay the previewed payload verbatim. `couponCode` and `couponSource`
-  // (scalar for one coupon, index-aligned arrays for several) are both valid
-  // order fields and are carried through unchanged so the created order matches
-  // what was previewed. `couponCode` is part of the estimate token's hash;
-  // `couponSource` is not, but keeping it preserves correct source attribution
-  // (e.g. an 'auto' ID.me / affiliate coupon) on the stored order.
+  // Replay the previewed payload as the order body so the created order matches
+  // what was previewed (items, shipping, coupon fields, and checkout context).
+  // The wallet contributes only the customer identity and the estimate token.
   const orderFields = estimatePayload;
   return {
     ...orderFields,

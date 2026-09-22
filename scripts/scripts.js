@@ -326,9 +326,8 @@ function setAffiliateCoupon() {
   }
 
   if (COUPON) {
-    // Affiliate URL coupons are applied programmatically, not typed by the
-    // customer, so they must validate as 'auto' — otherwise auto-apply-only
-    // types (allowManualEntry: false) are rejected as manual entries.
+    // Affiliate URL coupons are applied programmatically rather than typed by
+    // the customer, so they are recorded as a verified ('auto') source.
     addCoupon(COUPON, AUTO_COUPON_SOURCE);
 
     // TODO: remove once all locales migrate off Magento — applies the coupon to the PHP cart

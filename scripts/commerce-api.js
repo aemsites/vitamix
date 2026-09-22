@@ -79,10 +79,15 @@ async function post(path, body, recaptchaAction) {
   // Normalize the coupon code to the API charset at the single request boundary,
   // so every endpoint (estimate/price, estimate/shipping, estimate/order, order
   // preview/create) sends a normalized value without each builder repeating it.
-  // Copy rather than mutate the caller's body, which may be reused elsewhere.
-  const payload = typeof body?.couponCode === 'string'
-    ? { ...body, couponCode: normalizeCouponCode(body.couponCode) }
-    : body;
+  // Handles both a single code and the multi-coupon array. Copy rather than
+  // mutate the caller's body, which may be reused elsewhere.
+  const { couponCode } = body || {};
+  let payload = body;
+  if (typeof couponCode === 'string') {
+    payload = { ...body, couponCode: normalizeCouponCode(couponCode) };
+  } else if (Array.isArray(couponCode)) {
+    payload = { ...body, couponCode: couponCode.map(normalizeCouponCode) };
+  }
 
   let resp;
   let data;

@@ -275,6 +275,14 @@ test('post: sends a shopper-entered + through unchanged', async () => {
   assert.equal(body.couponCode, 'FREE+SHIP');
 });
 
+test('post: normalizes every code in a multi-coupon array', async () => {
+  mockFetch(200, { discounts: [], orderDiscountTotal: 0, couponStatus: [] });
+  await estimatePrice('us', [], ['save*10', 'idme20'], ['manual', 'auto']);
+  const body = JSON.parse(lastInit.body);
+  assert.deepEqual(body.couponCode, ['SAVE_10', 'IDME20']);
+  assert.deepEqual(body.couponSource, ['manual', 'auto']);
+});
+
 test('post: does not mutate the caller-supplied coupon code', async () => {
   mockFetch(200, { subtotal: '0.00', shippingMethods: [] });
   const context = { couponCode: 'save*10' };
