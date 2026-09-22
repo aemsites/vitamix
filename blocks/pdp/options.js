@@ -48,13 +48,16 @@ export function updateFreeGiftVisibility(
  * @param {boolean} isParentOutOfStock - Whether the parent product is out of stock
  */
 export function onOptionChange(ph, block, variants, color, isParentOutOfStock = false) {
+  const queryParams = new URLSearchParams(window.location.search);
   if (variants[0].options.color.replace(/\s+/g, '-').toLowerCase() !== color) {
-    // eslint-disable-next-line no-restricted-globals
-    history.replaceState(null, '', `?color=${color}`);
+    queryParams.set('color', color);
   } else {
-    // eslint-disable-next-line no-restricted-globals
-    history.replaceState(null, '', window.location.pathname);
+    queryParams.delete('color');
   }
+  const queryString = queryParams.toString();
+  const nextUrl = `${window.location.pathname}${queryString ? `?${queryString}` : ''}${window.location.hash || ''}`;
+  // eslint-disable-next-line no-restricted-globals
+  history.replaceState(null, '', nextUrl);
 
   const selectedOptionLabel = block.querySelector('.selected-option-label');
   const variant = variants.find((colorVariant) => colorVariant.options.color.replace(/\s+/g, '-').toLowerCase() === color);
