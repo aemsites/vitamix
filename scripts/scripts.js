@@ -322,7 +322,14 @@ function setAffiliateCoupon() {
   const { cjdata, cjevent, COUPON } = Object.fromEntries(urlParams);
 
   if (cjevent) {
-    localStorage.setItem('cjevent', JSON.stringify({ value: cjevent, ts: Date.now() }));
+    try {
+      // CJ's Universal Tag reads this key directly, so store its value verbatim.
+      // The capture time lives alongside it and is applied by scripts/cj.js.
+      localStorage.setItem('cjevent', cjevent);
+      localStorage.setItem('cjevent_captured', String(Date.now()));
+    } catch {
+      // Storage unavailable (private mode / quota); CJ's own cookies still apply.
+    }
   }
 
   if (COUPON) {
@@ -2175,6 +2182,18 @@ async function loadEager(doc) {
 async function loadLazy(doc) {
   const main = doc.querySelector('main');
   loadHeader(doc.querySelector('header'));
+
+  // Affiliate conversion reporting for the order confirmation page. Requested before
+  // the sections render so the listener is in place for the block's confirmation
+  // event; scripts/cj.js also reads the already-published context if it arrives first.
+  if (/\/order\/complete\/?$/.test(window.location.pathname)) {
+    import('./cj.js')
+      .then(({ registerCjConversion }) => registerCjConversion())
+      .catch(() => {
+        // Reporting is best-effort and must never interrupt page load.
+      });
+  }
+
   await loadSections(main);
 
   // Gift-with-purchase operates on the Edge localStorage cart. Do not load it
