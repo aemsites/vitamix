@@ -42,7 +42,8 @@ export async function fireProdView() {
   // later, after Launch is ready, well after that assignment has happened.
   setDigitalDataProductColor(window.selectedVariant?.options?.color);
 
-  if (!(await pushProductEvent('prodView', buildProductId(productName)))) {
+  const productPrice = window.selectedVariant?.price?.final;
+  if (!(await pushProductEvent('prodView', buildProductId(productName, productPrice)))) {
     debugWarn('Adobe Analytics prodView skipped: Adobe Launch (_satellite) not available');
     return;
   }
