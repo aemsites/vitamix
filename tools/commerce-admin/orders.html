@@ -21,7 +21,54 @@
     <main class="pim-main orders-page">
       <h1 class="orders-page-title">Orders</h1>
 
-      <div class="orders-toolbar pim-toolbar">
+      <div class="orders-toolbar pim-toolbar orders-filters-toolbar">
+        <div class="orders-toolbar-filters" role="group" aria-label="Filters">
+          <div class="orders-filter-field">
+            <label class="orders-filter-label" for="orders-range">Range</label>
+            <select id="orders-range" class="pim-index-select orders-filter-select" aria-label="Date range">
+              <option value="1m">Last month</option>
+              <option value="3m">Last 3 months</option>
+              <option value="custom">Custom range…</option>
+            </select>
+          </div>
+          <div class="orders-filter-field orders-range-dates" id="orders-range-dates" hidden>
+            <label class="orders-filter-label" for="orders-range-from">From</label>
+            <input type="date" id="orders-range-from" class="orders-date-input" aria-label="Range start date" />
+            <label class="orders-filter-label" for="orders-range-to">To</label>
+            <input type="date" id="orders-range-to" class="orders-date-input" aria-label="Range end date" />
+          </div>
+          <div class="orders-filter-field">
+            <label class="orders-filter-label" for="orders-market">Market</label>
+            <select id="orders-market" class="pim-index-select orders-filter-select orders-market-select" aria-label="Filter by market"></select>
+          </div>
+          <div class="orders-filter-field">
+            <label class="orders-filter-label" for="orders-state">State</label>
+            <select id="orders-state" class="pim-index-select orders-filter-select orders-state-select" aria-label="Filter by state"></select>
+          </div>
+        </div>
+        <div class="orders-chart-controls">
+          <div class="orders-filter-field">
+            <label class="orders-filter-label" for="orders-chart-group">Group by</label>
+            <select id="orders-chart-group" class="pim-index-select orders-filter-select orders-chart-group-select" aria-label="Group chart by day or week">
+              <option value="day">Day</option>
+              <option value="week">Week</option>
+            </select>
+          </div>
+          <div class="orders-filter-field">
+            <label class="orders-filter-label" for="orders-chart-metric">Show</label>
+            <select id="orders-chart-metric" class="pim-index-select orders-filter-select orders-chart-metric-select" aria-label="Chart metric: orders or revenue">
+              <option value="orders">Orders</option>
+              <option value="revenue">Revenue ($)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div id="orders-chart" class="orders-chart-wrap">
+        <div id="orders-chart-canvas" class="orders-chart-canvas" aria-live="polite"></div>
+      </div>
+
+      <div class="orders-search-row">
         <input
           type="search"
           id="orders-search"
@@ -29,36 +76,14 @@
           placeholder="Search by order id or email…"
           aria-label="Search orders"
         />
-        <div class="orders-toolbar-right">
-          <div class="orders-toolbar-filters" role="group" aria-label="Filters">
-            <div class="orders-filter-field">
-              <label class="orders-filter-label" for="orders-range">Range</label>
-              <select id="orders-range" class="pim-index-select orders-filter-select" aria-label="Date range">
-                <option value="1m">Last month</option>
-                <option value="3m">Last 3 months</option>
-                <option value="custom">Custom range…</option>
-              </select>
-            </div>
-            <div class="orders-filter-field orders-range-dates" id="orders-range-dates" hidden>
-              <label class="orders-filter-label" for="orders-range-from">From</label>
-              <input type="date" id="orders-range-from" class="orders-date-input" aria-label="Range start date" />
-              <label class="orders-filter-label" for="orders-range-to">To</label>
-              <input type="date" id="orders-range-to" class="orders-date-input" aria-label="Range end date" />
-            </div>
-            <div class="orders-filter-field">
-              <label class="orders-filter-label" for="orders-state">State</label>
-              <select id="orders-state" class="pim-index-select orders-filter-select orders-state-select" aria-label="Filter by state"></select>
-            </div>
-            <div class="orders-filter-field">
-              <label class="orders-filter-label" for="orders-sort">Sort</label>
-              <select id="orders-sort" class="pim-index-select orders-filter-select orders-sort-select" aria-label="Sort by date">
-                <option value="newest">Newest first</option>
-                <option value="oldest">Oldest first</option>
-              </select>
-            </div>
-          </div>
-          <span class="pim-count" id="orders-count"></span>
+        <div class="orders-filter-field">
+          <label class="orders-filter-label" for="orders-sort">Sort</label>
+          <select id="orders-sort" class="pim-index-select orders-filter-select orders-sort-select" aria-label="Sort by date">
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+          </select>
         </div>
+        <span class="pim-count" id="orders-count"></span>
       </div>
 
       <p id="orders-error" class="orders-error" hidden></p>
