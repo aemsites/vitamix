@@ -141,16 +141,28 @@
 .orders-chart-bar {
   width: 100%;
   min-width: 1px;
-  background: #9ec5e8;
+  background: #d2d5d8;
   border-radius: 2px 2px 0 0;
   min-height: 1px;
   cursor: default;
+  display: flex;
+  flex-direction: column-reverse;
+  overflow: hidden;
 }
 
 .orders-chart-bar:hover,
 .orders-chart-bar:focus-visible {
-  background: #1a56b0;
+  filter: brightness(0.94);
   outline: none;
+}
+
+.orders-chart-bar-segment {
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.orders-chart-bar-segment + .orders-chart-bar-segment {
+  border-top: 1px solid rgb(0 0 0 / 10%);
 }
 
 .orders-chart-bar-label {

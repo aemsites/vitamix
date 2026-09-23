@@ -122,6 +122,9 @@ test.describe('ordersPerPeriodBuckets — day granularity', () => {
     // strictly ascending by period
     const keys = buckets.map((b) => b.periodStart);
     expect([...keys].sort()).toEqual(keys);
+    // Orders with no `state` default to 'pending', grouped into one byState entry.
+    expect(buckets[1].byState).toHaveLength(1);
+    expect(buckets[1].byState[0]).toMatchObject({ state: 'pending', count: 2, amount: 15.5 });
   });
 
   test('derives bounds from min/max createdAt when no bounds are given', () => {
@@ -141,6 +144,40 @@ test.describe('ordersPerPeriodBuckets — day granularity', () => {
   test('ignores orders with missing or invalid createdAt', () => {
     const orders = [{ createdAt: null }, { createdAt: 'not-a-date' }];
     expect(ordersPerPeriodBuckets(orders)).toEqual([]);
+  });
+
+  test('breaks a bucket down per state, ordered success → pending → processing → ... → danger', () => {
+    const orders = [
+      { createdAt: '2026-04-01T10:00:00.000Z', state: 'payment_completed', total: '10' },
+      { createdAt: '2026-04-01T11:00:00.000Z', state: 'payment_completed', total: '20' },
+      { createdAt: '2026-04-01T12:00:00.000Z', state: 'payment_processing', total: '5' },
+      { createdAt: '2026-04-01T13:00:00.000Z', state: 'payment_cancelled', total: '7' },
+    ];
+    const since = new Date(2026, 3, 1).toISOString();
+    const until = new Date(2026, 3, 2).toISOString();
+    const [bucket] = ordersPerPeriodBuckets(orders, { since, until }, 'day');
+
+    expect(bucket.count).toBe(4);
+    expect(bucket.amount).toBe(42);
+    expect(bucket.byState.map((s) => s.state)).toEqual([
+      'payment_completed', 'payment_processing', 'payment_cancelled',
+    ]);
+    expect(bucket.byState.map((s) => s.badgeClass)).toEqual([
+      'orders-badge-success', 'orders-badge-processing', 'orders-badge-danger',
+    ]);
+    expect(bucket.byState[0]).toMatchObject({ count: 2, amount: 30 });
+    expect(bucket.byState[1]).toMatchObject({ count: 1, amount: 5 });
+    expect(bucket.byState[2]).toMatchObject({ count: 1, amount: 7 });
+  });
+
+  test('a single-state bucket (e.g. state filter applied) has exactly one byState entry', () => {
+    const orders = [
+      { createdAt: '2026-04-01T10:00:00.000Z', state: 'payment_completed' },
+      { createdAt: '2026-04-01T11:00:00.000Z', state: 'payment_completed' },
+    ];
+    const [bucket] = ordersPerPeriodBuckets(orders);
+    expect(bucket.byState).toHaveLength(1);
+    expect(bucket.byState[0].count).toBe(2);
   });
 });
 
@@ -174,8 +211,17 @@ test.describe('ordersPerPeriodChartHtml', () => {
 
   test('renders one bar column per bucket with accessible order-count labels by default', () => {
     const buckets = [
-      { periodStart: '2026-01-01', count: 0, amount: 0 },
-      { periodStart: '2026-01-02', count: 3, amount: 45 },
+      {
+        periodStart: '2026-01-01', count: 0, amount: 0, byState: [],
+      },
+      {
+        periodStart: '2026-01-02',
+        count: 3,
+        amount: 45,
+        byState: [{
+          state: 'payment_completed', badgeClass: 'orders-badge-success', count: 3, amount: 45,
+        }],
+      },
     ];
     const html = ordersPerPeriodChartHtml(buckets);
     expect((html.match(/orders-chart-bar-col/g) || []).length).toBe(2);
@@ -185,7 +231,14 @@ test.describe('ordersPerPeriodChartHtml', () => {
 
   test('renders revenue amounts with currency code in revenue metric mode', () => {
     const buckets = [
-      { periodStart: '2026-01-01', count: 2, amount: 150.5 },
+      {
+        periodStart: '2026-01-01',
+        count: 2,
+        amount: 150.5,
+        byState: [{
+          state: 'payment_completed', badgeClass: 'orders-badge-success', count: 2, amount: 150.5,
+        }],
+      },
     ];
     const html = ordersPerPeriodChartHtml(buckets, { metric: 'revenue', currencyCode: 'CAD' });
     expect(html).toContain('$150.50 CAD');
@@ -194,7 +247,14 @@ test.describe('ordersPerPeriodChartHtml', () => {
 
   test('week granularity shows a start–end range in the accessible label', () => {
     const buckets = [
-      { periodStart: '2026-01-04', count: 5, amount: 0 },
+      {
+        periodStart: '2026-01-04',
+        count: 5,
+        amount: 0,
+        byState: [{
+          state: 'pending', badgeClass: 'orders-badge-pending', count: 5, amount: 0,
+        }],
+      },
     ];
     const html = ordersPerPeriodChartHtml(buckets, { granularity: 'week' });
     expect(html).toMatch(/Jan 4.*Jan 10/);
@@ -202,11 +262,66 @@ test.describe('ordersPerPeriodChartHtml', () => {
 
   test('includes a screen-reader summary of total orders and periods', () => {
     const buckets = [
-      { periodStart: '2026-02-01', count: 1, amount: 10 },
-      { periodStart: '2026-02-02', count: 2, amount: 20 },
+      {
+        periodStart: '2026-02-01',
+        count: 1,
+        amount: 10,
+        byState: [{
+          state: 'pending', badgeClass: 'orders-badge-pending', count: 1, amount: 10,
+        }],
+      },
+      {
+        periodStart: '2026-02-02',
+        count: 2,
+        amount: 20,
+        byState: [{
+          state: 'pending', badgeClass: 'orders-badge-pending', count: 2, amount: 20,
+        }],
+      },
     ];
     const html = ordersPerPeriodChartHtml(buckets);
     expect(html).toContain('pim-sr-only');
     expect(html).toContain('3 orders across 2 days');
+  });
+
+  test('renders one colored segment per state, using STATE badge colors, when multiple states share a bucket', () => {
+    const buckets = [
+      {
+        periodStart: '2026-03-01',
+        count: 3,
+        amount: 0,
+        byState: [
+          {
+            state: 'payment_completed', badgeClass: 'orders-badge-success', count: 2, amount: 0,
+          },
+          {
+            state: 'payment_cancelled', badgeClass: 'orders-badge-danger', count: 1, amount: 0,
+          },
+        ],
+      },
+    ];
+    const html = ordersPerPeriodChartHtml(buckets);
+    expect((html.match(/orders-chart-bar-segment/g) || []).length).toBe(2);
+    // success segment is 2/3 of the bar; matches the STATE column badge text color.
+    expect(html).toContain('height:67%;background:#78ae9e');
+    // cancelled segment is 1/3 of the bar; matches the danger badge text color.
+    expect(html).toContain('height:33%;background:#c48c7c');
+    expect(html).toContain('payment completed: 2 orders');
+    expect(html).toContain('payment cancelled: 1 order');
+  });
+
+  test('does not include a redundant breakdown in the tooltip for a single-state bucket', () => {
+    const buckets = [
+      {
+        periodStart: '2026-03-01',
+        count: 2,
+        amount: 0,
+        byState: [{
+          state: 'payment_completed', badgeClass: 'orders-badge-success', count: 2, amount: 0,
+        }],
+      },
+    ];
+    const html = ordersPerPeriodChartHtml(buckets);
+    expect(html).not.toContain('(payment completed:');
   });
 });

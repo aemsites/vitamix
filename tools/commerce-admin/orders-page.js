@@ -154,6 +154,18 @@ function uniqueStates(orders) {
   return [...set].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 }
 
+/**
+ * First state present in `states` that maps to the "completed" badge class
+ * (e.g. `payment_completed`, `completed`, `fulfilled`) — used to default the
+ * State filter to completed orders instead of "All states". Falls back to ''
+ * (All states) when no completed-like state is present in the loaded data.
+ * @param {string[]} states
+ * @returns {string}
+ */
+function defaultCompletedState(states) {
+  return states.find((s) => orderStateBadgeClass(s) === 'orders-badge-success') || '';
+}
+
 /** The API has no free-text search — full email addresses route to the customer-orders endpoint. */
 function looksLikeEmail(s) {
   return /^\S+@\S+\.\S+$/.test(s);
@@ -485,7 +497,54 @@ const PERIOD_STEP_DAYS = { day: 1, week: 7 };
 const MAX_CHART_PERIODS = 1200;
 
 /**
- * Ascending, zero-filled period-bucketed order counts + revenue for the chart.
+ * Stacking order for state segments within a bar, bottom → top (matches the
+ * STATE column badge classes from {@link orderStateBadgeClass}).
+ */
+const STATE_STACK_ORDER = [
+  'orders-badge-success',
+  'orders-badge-pending',
+  'orders-badge-processing',
+  'orders-badge-authorized',
+  'orders-badge-shipping',
+  'orders-badge-info',
+  'orders-badge-danger',
+  'orders-badge-error',
+  'orders-badge-refund',
+  'orders-badge-neutral',
+];
+
+/**
+ * Chart segment fill colors — a medium tone blended from each STATE column
+ * badge's pale background and darker text color. The pure pale background
+ * alone reads as near-white on a large solid chart fill (a large flat area of
+ * a color looks lighter than a small badge chip of the same color, especially
+ * without dark text riding on top of it), so this splits the difference:
+ * still soft/pastel, but visible as a distinct color.
+ */
+const STATE_BAR_COLORS = {
+  'orders-badge-success': '#78ae9e',
+  'orders-badge-info': '#81a3d7',
+  'orders-badge-danger': '#c48c7c',
+  'orders-badge-error': '#da8a84',
+  'orders-badge-pending': '#c4ac7e',
+  'orders-badge-processing': '#9c83ca',
+  'orders-badge-authorized': '#70acaf',
+  'orders-badge-shipping': '#82aa84',
+  'orders-badge-refund': '#c2799e',
+  'orders-badge-neutral': '#9a9c9d',
+};
+
+/** Chart segment color for an order state, matching its STATE column badge. */
+function stateBarColor(badgeClass) {
+  return STATE_BAR_COLORS[badgeClass] || STATE_BAR_COLORS['orders-badge-neutral'];
+}
+
+/**
+ * Ascending, zero-filled period-bucketed order counts + revenue for the chart,
+ * broken down per order state (`byState`) so the chart can render a stacked
+ * bar using the same colors as the STATE column badges. When the state filter
+ * has narrowed `orders` to a single state, `byState` naturally has one entry
+ * and the bar renders as a single solid color — no special-casing needed.
  *
  * When `bounds` (`{ since, until }`, UTC ISO instants with `until` exclusive —
  * the same shape produced by `dateRangeToUtcQuery`) is given, every local
@@ -497,12 +556,15 @@ const MAX_CHART_PERIODS = 1200;
  * @param {object[]} orders already filtered by search/state/market
  * @param {{ since: string, until: string } | null} [bounds]
  * @param {'day'|'week'} [granularity]
- * @returns {{ periodStart: string, count: number, amount: number }[]}
+ * @returns {{
+ *   periodStart: string, count: number, amount: number,
+ *   byState: { state: string, badgeClass: string, count: number, amount: number }[],
+ * }[]}
  */
 export function ordersPerPeriodBuckets(orders, bounds = null, granularity = 'day') {
   const step = PERIOD_STEP_DAYS[granularity] || 1;
-  const counts = new Map();
-  const amounts = new Map();
+  /** periodKey -> stateKey -> { state, badgeClass, count, amount } */
+  const byPeriodState = new Map();
   let minPeriod = null;
   let maxPeriod = null;
   orders.forEach((o) => {
@@ -511,8 +573,16 @@ export function ordersPerPeriodBuckets(orders, bounds = null, granularity = 'day
     if (Number.isNaN(d.getTime())) return;
     const period = periodStartLocal(d, granularity);
     const key = dayKeyFromDate(period);
-    counts.set(key, (counts.get(key) || 0) + 1);
-    amounts.set(key, (amounts.get(key) || 0) + orderAmount(o));
+    const rawState = String(o?.state || 'pending').trim() || 'pending';
+    const stateKey = rawState.toLowerCase();
+    if (!byPeriodState.has(key)) byPeriodState.set(key, new Map());
+    const stateMap = byPeriodState.get(key);
+    const entry = stateMap.get(stateKey) || {
+      state: rawState, badgeClass: orderStateBadgeClass(rawState), count: 0, amount: 0,
+    };
+    entry.count += 1;
+    entry.amount += orderAmount(o);
+    stateMap.set(stateKey, entry);
     if (!minPeriod || period < minPeriod) minPeriod = period;
     if (!maxPeriod || period > maxPeriod) maxPeriod = period;
   });
@@ -537,7 +607,19 @@ export function ordersPerPeriodBuckets(orders, bounds = null, granularity = 'day
   let guard = 0;
   while (cursor <= endPeriod && guard < MAX_CHART_PERIODS) {
     const key = dayKeyFromDate(cursor);
-    out.push({ periodStart: key, count: counts.get(key) || 0, amount: amounts.get(key) || 0 });
+    const stateMap = byPeriodState.get(key);
+    const byState = stateMap
+      ? [...stateMap.values()].sort((a, b) => {
+        const ia = STATE_STACK_ORDER.indexOf(a.badgeClass);
+        const ib = STATE_STACK_ORDER.indexOf(b.badgeClass);
+        return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+      })
+      : [];
+    const count = byState.reduce((sum, s) => sum + s.count, 0);
+    const amount = byState.reduce((sum, s) => sum + s.amount, 0);
+    out.push({
+      periodStart: key, count, amount, byState,
+    });
     cursor = addDaysLocal(cursor, step);
     guard += 1;
   }
@@ -573,10 +655,23 @@ function formatChartAmount(amount, currencyCode) {
 }
 
 /**
+ * Human-friendly label for a raw order state (`payment_processing` → `payment processing`).
+ */
+function chartStateLabel(state) {
+  return String(state || 'pending').replace(/_/g, ' ');
+}
+
+/**
  * Render the orders chart as an HTML string (ascending by period; zero-value
- * periods shown as empty columns). Labels a bounded subset of bars to avoid
+ * periods shown as empty columns). Each bar is a stack of per-state segments
+ * colored the same as the STATE column badges (a period with only one state
+ * present — e.g. the state filter narrowed to one value — naturally renders
+ * as a single solid-color bar). Labels a bounded subset of bars to avoid
  * crowding — always the first and last, evenly spaced in between.
- * @param {{ periodStart: string, count: number, amount: number }[]} buckets ascending
+ * @param {{
+ *   periodStart: string, count: number, amount: number,
+ *   byState: { state: string, badgeClass: string, count: number, amount: number }[],
+ * }[]} buckets ascending
  * @param {{ granularity?: 'day'|'week', metric?: 'orders'|'revenue', currencyCode?: string }}
  *   [opts]
  * @returns {string} HTML
@@ -588,29 +683,45 @@ export function ordersPerPeriodChartHtml(buckets, opts = {}) {
   if (!buckets.length) {
     return '<p class="orders-chart-empty">No orders in the current view.</p>';
   }
-  const values = buckets.map((b) => (metric === 'revenue' ? b.amount : b.count));
-  const max = Math.max(1, ...values);
+  const bucketValue = (b) => (metric === 'revenue' ? b.amount : b.count);
+  const stateValue = (s) => (metric === 'revenue' ? s.amount : s.count);
+  const stateValueText = (s) => (metric === 'revenue'
+    ? formatChartAmount(s.amount, currencyCode)
+    : `${s.count} order${s.count === 1 ? '' : 's'}`);
+  const max = Math.max(1, ...buckets.map(bucketValue));
   const step = Math.max(1, Math.ceil(buckets.length / CHART_MAX_LABELS));
   const totalCount = buckets.reduce((sum, b) => sum + b.count, 0);
   const totalAmount = buckets.reduce((sum, b) => sum + b.amount, 0);
   const bars = buckets.map((b, i) => {
-    const value = metric === 'revenue' ? b.amount : b.count;
+    const value = bucketValue(b);
     const heightPct = value <= 0 ? 0 : Math.max(Math.round((value / max) * 100), 4);
     const shortLabel = chartPeriodLabel(b.periodStart);
     const rangeLabel = chartPeriodRangeLabel(b.periodStart, granularity);
     const showLabel = i % step === 0 || i === buckets.length - 1;
+    const byState = Array.isArray(b.byState) ? b.byState : [];
     const valueText = metric === 'revenue'
       ? formatChartAmount(b.amount, currencyCode)
       : `${b.count} order${b.count === 1 ? '' : 's'}`;
-    const a11yLabel = `${rangeLabel}: ${valueText}`;
+    const breakdownText = byState.length > 1
+      ? ` (${byState.map((s) => `${chartStateLabel(s.state)}: ${stateValueText(s)}`).join(', ')})`
+      : '';
+    const a11yLabel = `${rangeLabel}: ${valueText}${breakdownText}`;
     /* Reserve the label row for every column (hidden when unlabeled) so bar tracks
        stay the same height across the row — avoids the old absolute-offset label
        poking past the chart's box and forcing a scrollbar. */
     const labelAttrs = showLabel ? '' : ' aria-hidden="true" style="visibility:hidden"';
+    const segmentsHtml = value > 0 ? byState.map((s) => {
+      const sv = stateValue(s);
+      if (sv <= 0) return '';
+      const segPct = Math.max(Math.round((sv / value) * 100), 0);
+      const segLabel = `${chartStateLabel(s.state)}: ${stateValueText(s)}`;
+      return `<div class="orders-chart-bar-segment" style="height:${segPct}%;`
+        + `background:${stateBarColor(s.badgeClass)}" title="${escapeHtml(segLabel)}"></div>`;
+    }).join('') : '';
     return '<div class="orders-chart-bar-col">'
        + '<div class="orders-chart-bar-track">'
        + `<div class="orders-chart-bar" style="height:${heightPct}%" tabindex="0" role="img"`
-       + ` aria-label="${escapeHtml(a11yLabel)}" title="${escapeHtml(a11yLabel)}"></div>`
+       + ` aria-label="${escapeHtml(a11yLabel)}" title="${escapeHtml(a11yLabel)}">${segmentsHtml}</div>`
        + '</div>'
        + `<span class="orders-chart-bar-label"${labelAttrs}>${escapeHtml(shortLabel)}</span>`
        + '</div>';
@@ -1805,7 +1916,7 @@ async function init() {
 
   const initialQ = getUrlParam('q');
   const initialMarket = getUrlParam('market') || '';
-  const initialState = getUrlParam('state') || '';
+  const initialState = getUrlParam('state');
   const initialSort = getUrlParam('sort') === 'oldest' ? 'oldest' : 'newest';
   const initialRange = getUrlParam('range');
   const initialFrom = getUrlParam('from');
@@ -2097,7 +2208,8 @@ async function init() {
     if (metricSel) metricSel.value = initialMetric;
 
     rangeOrders = await fetchOrdersForRange();
-    fillStateSelect(stateSel, uniqueStates(rangeOrders), initialState);
+    const initialStates = uniqueStates(rangeOrders);
+    fillStateSelect(stateSel, initialStates, initialState || defaultCompletedState(initialStates));
     fillMarketSelect(marketSel, uniqueMarkets(rangeOrders), initialMarket);
     applyView();
 
