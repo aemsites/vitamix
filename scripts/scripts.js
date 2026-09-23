@@ -325,13 +325,19 @@ function setAffiliateCoupon() {
   const { cjdata, cjevent, COUPON } = Object.fromEntries(urlParams);
 
   if (cjevent) {
-    localStorage.setItem('cjevent', JSON.stringify({ value: cjevent, ts: Date.now() }));
+    try {
+      // CJ's Universal Tag reads this key directly, so store its value verbatim.
+      // The capture time lives alongside it and bounds how long the value stays valid.
+      localStorage.setItem('cjevent', cjevent);
+      localStorage.setItem('cjevent_captured', String(Date.now()));
+    } catch {
+      // Storage unavailable (private mode / quota); CJ's own cookies still apply.
+    }
   }
 
   if (COUPON) {
-    // Affiliate URL coupons are applied programmatically, not typed by the
-    // customer, so they must validate as 'auto' — otherwise auto-apply-only
-    // types (allowManualEntry: false) are rejected as manual entries.
+    // Affiliate URL coupons are applied programmatically rather than typed by
+    // the customer, so they are recorded as a verified ('auto') source.
     addCoupon(COUPON, AUTO_COUPON_SOURCE);
 
     // TODO: remove once all locales migrate off Magento — applies the coupon to the PHP cart
@@ -2179,6 +2185,7 @@ async function loadEager(doc) {
 async function loadLazy(doc) {
   const main = doc.querySelector('main');
   loadHeader(doc.querySelector('header'));
+
   await loadSections(main);
 
   // Gift-with-purchase operates on the Edge localStorage cart. Do not load it
