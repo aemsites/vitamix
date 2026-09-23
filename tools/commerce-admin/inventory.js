@@ -404,12 +404,19 @@ function normalizeSkuForConfigMatch(sku) {
     .replace(/-[A-Z0-9]+$/, '');
 }
 
+/** @param {unknown} market */
+function normalizeInventoryMarket(market) {
+  const value = invTsvCell(market).toLowerCase();
+  return value === 'us' || value === 'ca' ? value : '';
+}
+
 /** @param {object} raw - one row from the config JSON's `data` array */
 function parseManagedInventoryConfigRow(raw) {
   const row = {
     sku: invTsvCell(raw?.SKU),
     title: invTsvCell(raw?.Title ?? ''),
     color: invTsvCell(raw?.Variant ?? ''),
+    market: normalizeInventoryMarket(raw?.Market),
     availability: invTsvCell(raw?.Availability ?? ''),
     managedStock: parseYesNoCell(raw?.['Managed Stock']),
     inventoryQuantity: parseQuantityCell(raw?.Qty),
@@ -447,15 +454,22 @@ async function fetchManagedInventoryConfig() {
 function mergeSpreadsheetQuantities(rows, configRows) {
   const quantityBySku = new Map(
     configRows.map((configRow) => [
-      normalizeSkuForConfigMatch(configRow.sku),
+      `${configRow.market}:${normalizeSkuForConfigMatch(configRow.sku)}`,
       configRow.inventoryQuantity,
     ]),
   );
   return rows.map((row) => {
-    const key = normalizeSkuForConfigMatch(row.sku);
+    const key = `${row.market}:${normalizeSkuForConfigMatch(row.sku)}`;
+    const fallbackKey = `:${normalizeSkuForConfigMatch(row.sku)}`;
+    let inventoryQuantity = null;
+    if (quantityBySku.has(key)) {
+      inventoryQuantity = quantityBySku.get(key);
+    } else if (quantityBySku.has(fallbackKey)) {
+      inventoryQuantity = quantityBySku.get(fallbackKey);
+    }
     return {
       ...row,
-      inventoryQuantity: quantityBySku.has(key) ? quantityBySku.get(key) : null,
+      inventoryQuantity,
     };
   });
 }
@@ -476,7 +490,10 @@ function buildManagedInventoryUpdatePreview(configRows) {
 
   const results = [];
   configRows.forEach((configRow) => {
-    const matches = localBySku.get(normalizeSkuForConfigMatch(configRow.sku)) || [];
+    const skuMatches = localBySku.get(normalizeSkuForConfigMatch(configRow.sku)) || [];
+    const matches = configRow.market
+      ? skuMatches.filter((row) => row.market === configRow.market)
+      : skuMatches;
     if (!matches.length) {
       results.push({
         configRow, existing: null, changedKeys: new Set(), kind: 'missing',
