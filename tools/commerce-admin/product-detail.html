@@ -19,13 +19,16 @@
     <main class="pim-main pim-detail-main">
       <div class="pim-detail-toolbar" id="toolbar" style="display: none;">
         <a href="catalog.html" class="pim-detail-back-link">← Back to products</a>
-        <label class="pim-edit-toggle" for="editModeCheckbox">
+        <div class="pim-detail-toolbar-right">
+          <button type="button" class="pim-io-open-btn" id="productExportImportBtn" hidden>Export / import…</button>
+          <label class="pim-edit-toggle" for="editModeCheckbox">
           <span class="pim-edit-toggle-label">Edit mode</span>
           <span class="pim-edit-toggle-track">
             <input type="checkbox" id="editModeCheckbox" class="pim-edit-toggle-input" />
             <span class="pim-edit-toggle-thumb"></span>
           </span>
         </label>
+        </div>
       </div>
 
       <div class="loading" id="loading">
