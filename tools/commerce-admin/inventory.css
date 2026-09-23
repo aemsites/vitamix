@@ -32,6 +32,23 @@
   color: #6d7175;
 }
 
+.inv-col-market {
+  min-width: 76px;
+  white-space: nowrap;
+}
+
+.inv-market-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.inv-market-badge .commerce-admin-market-emoji {
+  font-size: 16px;
+}
+
 .inv-col-qty {
   width: 70px;
   text-align: right;

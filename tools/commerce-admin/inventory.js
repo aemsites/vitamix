@@ -8,13 +8,19 @@ import {
   getUrlKeyFromProduct,
   showError,
 } from './pim.js';
-import { showToast } from './commerce-otp-ui.js';
+import { commerceMarketEmojiHtml, showToast } from './commerce-otp-ui.js';
 import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
 
 const CORS_PROXY = 'https://fcors.org/?url=';
 const CORS_KEY = '&key=Mg23N96GgR8O3NjU';
 
 const CATALOG_PARAM = 'catalog';
+const ALL_CATALOG = 'all';
+const INVENTORY_CATALOGS = [
+  { path: 'us/en_us', market: 'us', language: 'EN' },
+  { path: 'ca/en_us', market: 'ca', language: 'EN' },
+  { path: 'ca/fr_ca', market: 'ca', language: 'FR' },
+];
 const FILTER_PARAM = 'filter';
 const VALID_FILTERS = ['all', 'OutOfStock', 'ManagedInventory', 'Discontinued', 'InStock'];
 
@@ -97,7 +103,7 @@ function highlightMatch(text, query) {
  * @param {Array<object>} data - raw index.json rows
  * @returns {Array<object>}
  */
-function buildSkuRows(data) {
+function buildSkuRows(data, catalog) {
   const parents = getParentProducts(data);
   const variants = getVariantProducts(data);
   const parentBySku = new Map(parents.map((p) => [p.sku, p]));
@@ -113,6 +119,9 @@ function buildSkuRows(data) {
       price: p.price != null ? String(p.price) : '',
       image: p.image || '',
       urlKey: getUrlKeyFromProduct(p),
+      localePath: catalog.path,
+      market: catalog.market,
+      language: catalog.language,
     }));
 
   const variantRows = variants.map((v) => {
@@ -126,6 +135,9 @@ function buildSkuRows(data) {
       price: v.price != null ? String(v.price) : '',
       image: v.image || (parent ? parent.image : ''),
       urlKey: parent ? getUrlKeyFromProduct(parent) : getUrlKeyFromProduct(v),
+      localePath: catalog.path,
+      market: catalog.market,
+      language: catalog.language,
     };
   });
 
@@ -271,9 +283,10 @@ function renderRows(rows, query = '') {
   countEl.textContent = `${rows.length} SKU${plural}`;
 
   rows.forEach((row) => {
-    const imgUrl = resolveImageUrlForLocale(currentLocalePath, row.image);
+    const imgUrl = resolveImageUrlForLocale(row.localePath, row.image);
     const availability = row.availability || '—';
     const availabilityClass = availability.toLowerCase().replace(/\s+/g, '-');
+    const marketHtml = `<span class="inv-market-badge">${commerceMarketEmojiHtml(row.market)}<span>${escapeHtml(row.language)}</span></span>`;
 
     const tr = document.createElement('tr');
     tr.className = 'pim-row';
@@ -289,6 +302,7 @@ function renderRows(rows, query = '') {
       <td class="pim-col-product pim-cell-title">${highlightMatch(row.title, query)}</td>
       <td class="pim-col-sku pim-cell-sku">${highlightMatch(row.sku || '', query)}</td>
       <td class="inv-col-variant">${row.color ? highlightMatch(row.color, query) : '—'}</td>
+      <td class="inv-col-market">${marketHtml}</td>
       <td class="pim-col-availability">
         <span class="pim-card-availability ${availabilityClass}">${highlightMatch(availability, query)}</span>
       </td>
@@ -392,7 +406,7 @@ function normalizeSkuForConfigMatch(sku) {
 
 /** @param {object} raw - one row from the config JSON's `data` array */
 function parseManagedInventoryConfigRow(raw) {
-  return {
+  const row = {
     sku: invTsvCell(raw?.SKU),
     title: invTsvCell(raw?.Title ?? ''),
     color: invTsvCell(raw?.Variant ?? ''),
@@ -400,6 +414,15 @@ function parseManagedInventoryConfigRow(raw) {
     managedStock: parseYesNoCell(raw?.['Managed Stock']),
     inventoryQuantity: parseQuantityCell(raw?.Qty),
   };
+  if (row.availability === 'OutOfStock' || (row.managedStock && row.inventoryQuantity === 0)) {
+    return {
+      ...row,
+      availability: 'OutOfStock',
+      managedStock: false,
+      inventoryQuantity: null,
+    };
+  }
+  return row;
 }
 
 /**
@@ -413,6 +436,28 @@ async function fetchManagedInventoryConfig() {
   const json = await response.json();
   const rows = Array.isArray(json?.data) ? json.data : [];
   return rows.map(parseManagedInventoryConfigRow).filter((r) => r.sku);
+}
+
+/**
+ * Merge spreadsheet quantities into the loaded inventory rows.
+ * @param {Array<object>} rows
+ * @param {Array<object>} configRows
+ * @returns {Array<object>}
+ */
+function mergeSpreadsheetQuantities(rows, configRows) {
+  const quantityBySku = new Map(
+    configRows.map((configRow) => [
+      normalizeSkuForConfigMatch(configRow.sku),
+      configRow.inventoryQuantity,
+    ]),
+  );
+  return rows.map((row) => {
+    const key = normalizeSkuForConfigMatch(row.sku);
+    return {
+      ...row,
+      inventoryQuantity: quantityBySku.has(key) ? quantityBySku.get(key) : null,
+    };
+  });
 }
 
 /**
@@ -446,10 +491,6 @@ function buildManagedInventoryUpdatePreview(configRows) {
       const managedStockChanged = configRow.managedStock !== undefined
         && configRow.managedStock !== !!existing.managedStock;
       if (managedStockChanged) changedKeys.add('managedStock');
-      if (configRow.inventoryQuantity !== undefined) {
-        const existingQty = existing.inventoryQuantity != null ? existing.inventoryQuantity : null;
-        if (configRow.inventoryQuantity !== existingQty) changedKeys.add('inventoryQuantity');
-      }
       results.push({
         configRow, existing, changedKeys, kind: changedKeys.size ? 'update' : 'unchanged',
       });
@@ -491,22 +532,25 @@ function managedInventoryUpdateRowHtml({
   configRow, existing, changedKeys, kind,
 }) {
   const cellClass = (key) => (changedKeys.has(key) ? ' class="inv-update-cell-changed"' : '');
+  const market = existing?.market || 'us';
+  const language = existing?.language || 'EN';
+  const marketHtml = `<span class="inv-market-badge">${commerceMarketEmojiHtml(market)}<span>${escapeHtml(language)}</span></span>`;
   const availabilityHtml = changedKeys.has('availability')
     ? inventoryUpdateDiffCellHtml(existing?.availability, configRow.availability)
     : escapeHtml((existing?.availability) || configRow.availability || '—');
   const managedHtml = changedKeys.has('managedStock')
     ? inventoryUpdateDiffCellHtml(existing?.managedStock ? 'Yes' : 'No', configRow.managedStock ? 'Yes' : 'No')
     : escapeHtml(inventoryManagedStockLabel(existing));
-  const existingQty = existing?.inventoryQuantity != null ? existing.inventoryQuantity : null;
-  const qtyHtml = changedKeys.has('inventoryQuantity')
-    ? inventoryUpdateDiffCellHtml(existingQty, configRow.inventoryQuantity)
-    : escapeHtml(existingQty != null ? String(existingQty) : '—');
+  const qtyHtml = escapeHtml(
+    configRow.inventoryQuantity != null ? String(configRow.inventoryQuantity) : '—',
+  );
   const rowClass = kind === 'missing' ? ' class="inv-update-row-missing"' : '';
   return `<tr${rowClass}>
     <td class="inv-update-col-status">${managedInventoryUpdateStatusBadge(kind)}</td>
     <td>${escapeHtml(configRow.sku)}</td>
     <td>${escapeHtml((existing?.title) || configRow.title || '—')}</td>
     <td>${escapeHtml((existing?.color) || configRow.color || '—')}</td>
+    <td>${marketHtml}</td>
     <td${cellClass('availability')}>${availabilityHtml}</td>
     <td${cellClass('managedStock')}>${managedHtml}</td>
     <td${cellClass('inventoryQuantity')}>${qtyHtml}</td>
@@ -670,19 +714,21 @@ function openManagedInventoryUpdateDialog() {
       const preview = buildManagedInventoryUpdatePreview(configRows);
       if (leadEl) leadEl.textContent = managedInventoryUpdatePreviewLead(preview);
       if (tableHost) {
-        const toShow = [...preview.changed, ...preview.missing];
+        const managedUnchanged = preview.unchanged.filter((entry) => entry.existing?.managedStock);
+        const toShow = [...preview.changed, ...managedUnchanged, ...preview.missing];
         const body = toShow.length
           ? toShow.map(managedInventoryUpdateRowHtml).join('')
-          : '<tr><td colspan="7" class="inv-empty-cell">No differences found.</td></tr>';
+          : '<tr><td colspan="8" class="inv-empty-cell">No differences found.</td></tr>';
         tableHost.innerHTML = `<table class="inv-preview-table" aria-label="Managed inventory update differences">
             <thead><tr>
               <th scope="col">Status</th>
               <th scope="col">SKU</th>
               <th scope="col">Title</th>
               <th scope="col">Variant</th>
+              <th scope="col">Market</th>
               <th scope="col">Availability</th>
               <th scope="col">Managed stock</th>
-              <th scope="col">Qty</th>
+              <th scope="col">Sheet qty</th>
             </tr></thead>
             <tbody>${body}</tbody>
           </table>`;
@@ -716,26 +762,37 @@ async function loadIndex() {
   if (loadingText) loadingText.textContent = 'Loading inventory…';
 
   try {
-    const json = await fetchProductsIndexForLocale(currentLocalePath);
-    const data = json.data || json;
-    allSkuRows = buildSkuRows(data);
+    const catalogs = currentLocalePath === ALL_CATALOG
+      ? INVENTORY_CATALOGS
+      : INVENTORY_CATALOGS.filter((catalog) => catalog.path === currentLocalePath);
+    const loaded = await Promise.all(catalogs.map(async (catalog) => {
+      const json = await fetchProductsIndexForLocale(catalog.path);
+      return { catalog, rows: buildSkuRows(json.data || json, catalog) };
+    }));
+    allSkuRows = loaded.flatMap((entry) => entry.rows);
     content.classList.add('active');
     refreshList();
 
     if (loadingText) loadingText.textContent = 'Loading managed inventory flags…';
-    // Every row's urlKey points at its parent product page (simple products point at themselves),
-    // so this also covers variant rows whose configurable parent was excluded from allSkuRows.
-    const productUrlKeys = allSkuRows.map((r) => r.urlKey).filter(Boolean);
-    const uniqueProductUrlKeys = [...new Set(productUrlKeys)];
-    const stockInfoBySku = await fetchStockInfoMap(currentLocalePath, uniqueProductUrlKeys);
-    allSkuRows = allSkuRows.map((row) => {
-      const stockInfo = stockInfoBySku.get(row.sku);
-      return {
-        ...row,
-        managedStock: stockInfo?.managedStock || false,
-        inventoryQuantity: stockInfo ? stockInfo.inventoryQuantity : null,
-      };
-    });
+    const enriched = await Promise.all(loaded.map(async ({ catalog, rows }) => {
+      // Every row's urlKey points at its parent product page (simple products point at themselves).
+      const productUrlKeys = rows.map((row) => row.urlKey).filter(Boolean);
+      const uniqueProductUrlKeys = [...new Set(productUrlKeys)];
+      const stockInfoBySku = await fetchStockInfoMap(catalog.path, uniqueProductUrlKeys);
+      return rows.map((row) => {
+        const stockInfo = stockInfoBySku.get(row.sku);
+        return {
+          ...row,
+          managedStock: stockInfo?.managedStock || false,
+          inventoryQuantity: stockInfo ? stockInfo.inventoryQuantity : null,
+        };
+      });
+    }));
+    allSkuRows = enriched.flat();
+
+    if (loadingText) loadingText.textContent = 'Loading spreadsheet quantities…';
+    const managedInventoryConfig = await fetchManagedInventoryConfig();
+    allSkuRows = mergeSpreadsheetQuantities(allSkuRows, managedInventoryConfig);
     refreshList();
   } catch (err) {
     // eslint-disable-next-line no-console
@@ -751,11 +808,14 @@ function init() {
   const searchInput = document.getElementById('searchInput');
 
   const catalogFromUrl = readCatalogFromParams();
-  if (catalogFromUrl) {
+  const isKnownCatalog = catalogFromUrl === ALL_CATALOG
+    || INVENTORY_CATALOGS.some((catalog) => catalog.path === catalogFromUrl);
+  if (isKnownCatalog) {
     indexSelect.value = catalogFromUrl;
     currentLocalePath = catalogFromUrl;
   } else {
-    currentLocalePath = indexSelect.value;
+    currentLocalePath = ALL_CATALOG;
+    indexSelect.value = ALL_CATALOG;
   }
   updateUrlParams({ [CATALOG_PARAM]: currentLocalePath });
 
@@ -804,7 +864,7 @@ function init() {
   document.getElementById('productList').addEventListener('click', (e) => {
     const row = e.target.closest('tr.pim-row');
     if (!row || !row.dataset.urlkey) return;
-    const catalog = currentLocalePath ? `catalog=${encodeURIComponent(currentLocalePath)}&` : '';
+    const catalog = row.localePath ? `catalog=${encodeURIComponent(row.localePath)}&` : '';
     window.location.href = `product-detail.html?${catalog}product=${encodeURIComponent(row.dataset.urlkey)}`;
   });
   document.getElementById('productList').addEventListener('keydown', (e) => {
@@ -812,7 +872,7 @@ function init() {
     if (!row || !row.dataset.urlkey) return;
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      const catalog = currentLocalePath ? `catalog=${encodeURIComponent(currentLocalePath)}&` : '';
+      const catalog = row.localePath ? `catalog=${encodeURIComponent(row.localePath)}&` : '';
       window.location.href = `product-detail.html?${catalog}product=${encodeURIComponent(row.dataset.urlkey)}`;
     }
   });

@@ -34,6 +34,7 @@
           />
           <label class="pim-index-label" for="indexSelect">Index</label>
           <select id="indexSelect" class="pim-index-select" aria-label="Product index locale">
+            <option value="all">All markets</option>
             <option value="us/en_us">US (en-US)</option>
             <option value="ca/en_us">CA (en-CA)</option>
             <option value="ca/fr_ca">CA (fr-CA)</option>
@@ -59,6 +60,7 @@
                 <th class="pim-col-product pim-sortable" scope="col" data-sort="title" tabindex="0">Product</th>
                 <th class="pim-col-sku pim-sortable" scope="col" data-sort="sku" tabindex="0">SKU</th>
                 <th class="inv-col-variant pim-sortable" scope="col" data-sort="color" tabindex="0">Variant</th>
+                <th class="inv-col-market" scope="col">Market</th>
                 <th class="pim-col-availability pim-sortable" scope="col" data-sort="availability" tabindex="0">Availability</th>
                 <th class="inv-col-qty pim-sortable" scope="col" data-sort="inventoryQuantity" tabindex="0">Qty</th>
               </tr>
