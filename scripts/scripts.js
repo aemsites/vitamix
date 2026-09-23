@@ -58,7 +58,7 @@ function registerErrorLogging() {
 // Locale+language pairs enabled for edge checkout.
 // Format: '<locale>/<language>' (e.g., 'ca/fr_ca'). Add pairs as each region goes live.
 // Keep this empty to use Adobe Commerce by default in every environment.
-const EDGE_CHECKOUT_LOCALES = ['ca/fr_ca'];
+const EDGE_CHECKOUT_LOCALES = ['ca/fr_ca', 'ca/en_us'];
 export const EDGE_CHECKOUT_OVERRIDE_STORAGE_KEY = 'edgeCheckout';
 
 /**
