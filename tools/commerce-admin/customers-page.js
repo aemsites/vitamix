@@ -9,8 +9,8 @@ import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
 import { createDetailModalHeaderCloseAndJson } from './commerce-detail-modal-json.js';
 import { openJsonEditDialog } from './commerce-json-edit-dialog.js';
 import { PB_ORG, PB_SITE } from './commerce-pbus-config.js';
-import { escapeHtml, showToast, commerceMarketEmojiHtml } from './commerce-otp-ui.js';
-import { openOrderById, orderStateBadgeClass } from './orders-page.js';
+import { escapeHtml, showToast } from './commerce-otp-ui.js';
+import { openOrderById, orderStateBadgeClass, orderMarketBadgeHtml } from './orders-page.js';
 
 function getUrlParam(key) {
   return new URLSearchParams(window.location.search).get(key) || '';
@@ -446,7 +446,7 @@ function buildCustomerOrdersTable(orders, onOpenOrder) {
     let itemCount = '—';
     if (o.itemCount != null && String(o.itemCount).trim() !== '') itemCount = String(o.itemCount);
     const total = formatMoneyCell(o.total != null && String(o.total).trim() !== '' ? o.total : o.subtotal);
-    const marketHtml = o.country ? commerceMarketEmojiHtml(o.country) : '—';
+    const marketHtml = orderMarketBadgeHtml(o);
 
     const tr = document.createElement('tr');
     const clickable = Boolean(id) && typeof onOpenOrder === 'function';
