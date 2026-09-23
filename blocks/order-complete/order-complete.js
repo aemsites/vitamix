@@ -4,6 +4,7 @@ import { clearCoupons } from '../../scripts/commerce/coupon-state.js';
 import { logOperation, getCheckoutId, clearCheckoutId } from '../../scripts/operations-log.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 import resolvePaymentFailureMessage from '../../scripts/payment-failure.js';
+import { reportCjConversion } from '../../scripts/cj.js';
 
 export function normalizeTotalsDiscounts(discounts = []) {
   return discounts.filter((discount) => Math.abs(parseFloat(discount?.amount)) > 0);
@@ -478,6 +479,7 @@ export default async function decorate(block) {
   window.vitamixEdsAnalytics = window.vitamixEdsAnalytics || {};
   window.vitamixEdsAnalytics.orderConfirmedContext = analyticsContext;
   document.dispatchEvent(new CustomEvent('order:confirmed', { detail: analyticsContext }));
+  reportCjConversion(analyticsContext);
   clearCheckoutCouponState();
 
   logOperation('checkout-complete', {

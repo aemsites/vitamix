@@ -127,11 +127,9 @@ describe('buildExpressOrderPayload', () => {
     assert.equal(body.shipping.zip, 'M5A');
   });
 
-  test('retains couponSource — now a valid order field, replayed from the preview', () => {
-    // The order schema accepts couponSource (multi-coupon support). Replaying it
-    // verbatim keeps correct source attribution (e.g. 'auto' ID.me/affiliate
-    // coupons) on the created order; it is not part of the estimate token hash,
-    // so keeping it never breaks token consistency.
+  test('replays couponSource from the previewed payload onto the order body', () => {
+    // couponCode and couponSource are both valid order fields, so replaying the
+    // previewed payload carries them through unchanged.
     const body = buildExpressOrderPayload(estimatePayload, identity);
     assert.equal(body.couponSource, 'manual');
     assert.equal(body.couponCode, 'FFVITAMIXMAY26');

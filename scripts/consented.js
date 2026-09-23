@@ -222,7 +222,10 @@ tdl.init("https://perkspot.go2cloud.org");
 tdl.identify();
 // End of Tune Pixel Code
 
-// Krateo pixel
+// Commission Junction Universal Tag — click capture on landing pages.
+// The order confirmation page publishes its conversion payload via scripts/cj.js,
+// which adds this same tag if it is not already present.
+if (!document.getElementById('cjapitag')) {
     (function(a,b,c,d){
         var cookieUrl = encodeURIComponent("https://www.vitamix.com/us/en_us/cookie/index/index");
         a='https://www.mczbf.com/tags/11931/tag.js?cookieUrl='+cookieUrl;
@@ -231,6 +234,7 @@ tdl.identify();
         d.id='cjapitag';
         a=b.getElementsByTagName(c)[0];a.parentNode.insertBefore(d,a)
     })();
+}
 
 
 
