@@ -322,7 +322,14 @@ function setAffiliateCoupon() {
   const { cjdata, cjevent, COUPON } = Object.fromEntries(urlParams);
 
   if (cjevent) {
-    localStorage.setItem('cjevent', JSON.stringify({ value: cjevent, ts: Date.now() }));
+    try {
+      // CJ's Universal Tag reads this key directly, so store its value verbatim.
+      // The capture time lives alongside it and bounds how long the value stays valid.
+      localStorage.setItem('cjevent', cjevent);
+      localStorage.setItem('cjevent_captured', String(Date.now()));
+    } catch {
+      // Storage unavailable (private mode / quota); CJ's own cookies still apply.
+    }
   }
 
   if (COUPON) {
@@ -2175,6 +2182,7 @@ async function loadEager(doc) {
 async function loadLazy(doc) {
   const main = doc.querySelector('main');
   loadHeader(doc.querySelector('header'));
+
   await loadSections(main);
 
   // Gift-with-purchase operates on the Edge localStorage cart. Do not load it
