@@ -363,6 +363,268 @@ export function orderMarketBadgeHtml(o, query = '') {
   return `<span class="orders-market-badge ${modifier}">${highlighted}</span>`;
 }
 
+/**
+ * Stable filter/select key for an order's market: `us`, `ca-en`, `ca-fr`, `mx`,
+ * or the lowercase country when it isn't one of the known three. Empty when
+ * the order has no `country`.
+ * @param {object} o order object
+ * @returns {string}
+ */
+export function orderMarketKey(o) {
+  const country = String(o?.country || '').trim().toLowerCase();
+  if (!country) return '';
+  if (country === 'ca') {
+    const loc = String(o?.locale || '').trim().toLowerCase();
+    return loc.startsWith('fr') ? 'ca-fr' : 'ca-en';
+  }
+  return country;
+}
+
+/** Orders whose market key matches `marketKey` (all orders when empty/falsy).
+ * A bare `ca` matches both `ca-en` and `ca-fr` ("CA · All").
+ */
+export function filterByMarket(orders, marketKey) {
+  if (!marketKey) return orders;
+  if (marketKey === 'ca') {
+    return orders.filter((o) => String(o?.country || '').trim().toLowerCase() === 'ca');
+  }
+  return orders.filter((o) => orderMarketKey(o) === marketKey);
+}
+
+/**
+ * Distinct `{ key, label }` markets present in `orders`, sorted by label. When both CA store
+ * views are present, a combined `ca` ("CA · All") option is added alongside `ca-en`/`ca-fr` so
+ * Canada can be filtered as a whole.
+ * @param {object[]} orders
+ * @returns {{ key: string, label: string }[]}
+ */
+export function uniqueMarkets(orders) {
+  const map = new Map();
+  orders.forEach((o) => {
+    const key = orderMarketKey(o);
+    if (!key || map.has(key)) return;
+    map.set(key, orderMarketLabel(o));
+  });
+  if (map.has('ca-en') || map.has('ca-fr')) {
+    map.set('ca', 'CA · All');
+  }
+  return [...map.entries()]
+    .map(([key, label]) => ({ key, label }))
+    .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
+}
+
+function fillMarketSelect(select, markets, current) {
+  select.innerHTML = '';
+  const all = document.createElement('option');
+  all.value = '';
+  all.textContent = 'All markets';
+  select.appendChild(all);
+  markets.forEach(({ key, label }) => {
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = label;
+    select.appendChild(opt);
+  });
+  if (current) {
+    const match = [...select.options].find(
+      (o) => o.value && o.value.toLowerCase() === String(current).toLowerCase(),
+    );
+    if (match) select.value = match.value;
+  }
+}
+
+/**
+ * Local `YYYY-MM-DD` day key for a `Date` (matches `toDateInputValue`).
+ * @param {Date} date
+ * @returns {string}
+ */
+function dayKeyFromDate(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/** Numeric order amount for revenue aggregation: prefers `total`, falls back to `subtotal`. */
+function orderAmount(o) {
+  const raw = o?.total != null && String(o.total).trim() !== '' ? o.total : o?.subtotal;
+  const n = Number(raw);
+  return Number.isNaN(n) ? 0 : n;
+}
+
+/**
+ * Static market → currency mapping for chart labels only (cosmetic display,
+ * not settlement math — revenue view is only ever enabled for a single
+ * market, so this is unambiguous).
+ */
+const MARKET_CURRENCY = {
+  us: 'USD', ca: 'CAD', 'ca-en': 'CAD', 'ca-fr': 'CAD', mx: 'MXN',
+};
+
+/**
+ * @param {string} marketKey e.g. `us`, `ca-en`, `ca-fr`, `mx`
+ * @returns {string} ISO currency code, or '' when unknown/not a specific market
+ */
+export function currencyForMarketKey(marketKey) {
+  return MARKET_CURRENCY[marketKey] || '';
+}
+
+/** Sunday-start local week-start `Date` for a given local `Date`. */
+function weekStartLocal(date) {
+  const midnight = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  return addDaysLocal(midnight, -midnight.getDay());
+}
+
+/** Local period-start `Date` (day midnight, or Sunday-start week) for a given `Date`. */
+function periodStartLocal(date, granularity) {
+  const midnight = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  return granularity === 'week' ? weekStartLocal(midnight) : midnight;
+}
+
+const PERIOD_STEP_DAYS = { day: 1, week: 7 };
+const MAX_CHART_PERIODS = 1200;
+
+/**
+ * Ascending, zero-filled period-bucketed order counts + revenue for the chart.
+ *
+ * When `bounds` (`{ since, until }`, UTC ISO instants with `until` exclusive —
+ * the same shape produced by `dateRangeToUtcQuery`) is given, every local
+ * period in that window is included so the trend has no gaps, even when some
+ * periods have zero orders. Without `bounds` (e.g. an exact order-id lookup,
+ * which isn't tied to a date-range control), buckets span only the earliest
+ * to latest `createdAt` period actually present in `orders`.
+ *
+ * @param {object[]} orders already filtered by search/state/market
+ * @param {{ since: string, until: string } | null} [bounds]
+ * @param {'day'|'week'} [granularity]
+ * @returns {{ periodStart: string, count: number, amount: number }[]}
+ */
+export function ordersPerPeriodBuckets(orders, bounds = null, granularity = 'day') {
+  const step = PERIOD_STEP_DAYS[granularity] || 1;
+  const counts = new Map();
+  const amounts = new Map();
+  let minPeriod = null;
+  let maxPeriod = null;
+  orders.forEach((o) => {
+    if (!o?.createdAt) return;
+    const d = new Date(o.createdAt);
+    if (Number.isNaN(d.getTime())) return;
+    const period = periodStartLocal(d, granularity);
+    const key = dayKeyFromDate(period);
+    counts.set(key, (counts.get(key) || 0) + 1);
+    amounts.set(key, (amounts.get(key) || 0) + orderAmount(o));
+    if (!minPeriod || period < minPeriod) minPeriod = period;
+    if (!maxPeriod || period > maxPeriod) maxPeriod = period;
+  });
+
+  let startPeriod;
+  let endPeriod;
+  if (bounds && bounds.since && bounds.until) {
+    const sinceD = new Date(bounds.since);
+    startPeriod = periodStartLocal(sinceD, granularity);
+    const untilD = new Date(bounds.until);
+    const untilDay = new Date(untilD.getFullYear(), untilD.getMonth(), untilD.getDate());
+    endPeriod = periodStartLocal(addDaysLocal(untilDay, -1), granularity);
+  } else if (minPeriod && maxPeriod) {
+    startPeriod = minPeriod;
+    endPeriod = maxPeriod;
+  } else {
+    return [];
+  }
+
+  const out = [];
+  let cursor = startPeriod;
+  let guard = 0;
+  while (cursor <= endPeriod && guard < MAX_CHART_PERIODS) {
+    const key = dayKeyFromDate(cursor);
+    out.push({ periodStart: key, count: counts.get(key) || 0, amount: amounts.get(key) || 0 });
+    cursor = addDaysLocal(cursor, step);
+    guard += 1;
+  }
+  return out;
+}
+
+const CHART_MAX_LABELS = 12;
+
+/** Short display label (`Jan 5`) for a `YYYY-MM-DD` period-start day, in the browser's locale. */
+function chartPeriodLabel(periodStart) {
+  const [y, m, d] = periodStart.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+/** Full period span for tooltips/aria: the day itself, or `Sep 1–Sep 7` for a week. */
+function chartPeriodRangeLabel(periodStart, granularity) {
+  if (granularity !== 'week') return chartPeriodLabel(periodStart);
+  const [y, m, d] = periodStart.split('-').map(Number);
+  const end = addDaysLocal(new Date(y, m - 1, d), 6);
+  const endKey = dayKeyFromDate(end);
+  return `${chartPeriodLabel(periodStart)}–${chartPeriodLabel(endKey)}`;
+}
+
+/** `$1,234.56 CAD` (or without a trailing code when the currency is unknown). */
+function formatChartAmount(amount, currencyCode) {
+  const n = Number(amount) || 0;
+  const formatted = n.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  return currencyCode ? `$${formatted} ${currencyCode}` : `$${formatted}`;
+}
+
+/**
+ * Render the orders chart as an HTML string (ascending by period; zero-value
+ * periods shown as empty columns). Labels a bounded subset of bars to avoid
+ * crowding — always the first and last, evenly spaced in between.
+ * @param {{ periodStart: string, count: number, amount: number }[]} buckets ascending
+ * @param {{ granularity?: 'day'|'week', metric?: 'orders'|'revenue', currencyCode?: string }}
+ *   [opts]
+ * @returns {string} HTML
+ */
+export function ordersPerPeriodChartHtml(buckets, opts = {}) {
+  const granularity = opts.granularity === 'week' ? 'week' : 'day';
+  const metric = opts.metric === 'revenue' ? 'revenue' : 'orders';
+  const currencyCode = opts.currencyCode || '';
+  if (!buckets.length) {
+    return '<p class="orders-chart-empty">No orders in the current view.</p>';
+  }
+  const values = buckets.map((b) => (metric === 'revenue' ? b.amount : b.count));
+  const max = Math.max(1, ...values);
+  const step = Math.max(1, Math.ceil(buckets.length / CHART_MAX_LABELS));
+  const totalCount = buckets.reduce((sum, b) => sum + b.count, 0);
+  const totalAmount = buckets.reduce((sum, b) => sum + b.amount, 0);
+  const bars = buckets.map((b, i) => {
+    const value = metric === 'revenue' ? b.amount : b.count;
+    const heightPct = value <= 0 ? 0 : Math.max(Math.round((value / max) * 100), 4);
+    const shortLabel = chartPeriodLabel(b.periodStart);
+    const rangeLabel = chartPeriodRangeLabel(b.periodStart, granularity);
+    const showLabel = i % step === 0 || i === buckets.length - 1;
+    const valueText = metric === 'revenue'
+      ? formatChartAmount(b.amount, currencyCode)
+      : `${b.count} order${b.count === 1 ? '' : 's'}`;
+    const a11yLabel = `${rangeLabel}: ${valueText}`;
+    /* Reserve the label row for every column (hidden when unlabeled) so bar tracks
+       stay the same height across the row — avoids the old absolute-offset label
+       poking past the chart's box and forcing a scrollbar. */
+    const labelAttrs = showLabel ? '' : ' aria-hidden="true" style="visibility:hidden"';
+    return '<div class="orders-chart-bar-col">'
+       + '<div class="orders-chart-bar-track">'
+       + `<div class="orders-chart-bar" style="height:${heightPct}%" tabindex="0" role="img"`
+       + ` aria-label="${escapeHtml(a11yLabel)}" title="${escapeHtml(a11yLabel)}"></div>`
+       + '</div>'
+       + `<span class="orders-chart-bar-label"${labelAttrs}>${escapeHtml(shortLabel)}</span>`
+       + '</div>';
+  }).join('');
+  const summaryValue = metric === 'revenue'
+    ? formatChartAmount(totalAmount, currencyCode)
+    : `${totalCount} order${totalCount === 1 ? '' : 's'}`;
+  const periodWord = granularity === 'week' ? 'week' : 'day';
+  const metricWord = metric === 'revenue' ? 'Revenue' : 'Orders';
+  const summary = `${metricWord} per ${periodWord}: ${summaryValue} across ${buckets.length} `
+    + `${periodWord}${buckets.length === 1 ? '' : 's'}.`;
+  return `<p class="pim-sr-only">${escapeHtml(summary)}</p><div class="orders-chart">${bars}</div>`;
+}
+
 function summarizeOrderSubtotalLine(items) {
   const list = Array.isArray(items) ? items : [];
   if (!list.length) return '—';
@@ -1524,11 +1786,15 @@ async function init() {
   const rangeDatesEl = document.getElementById('orders-range-dates');
   const rangeFromInput = document.getElementById('orders-range-from');
   const rangeToInput = document.getElementById('orders-range-to');
+  const marketSel = document.getElementById('orders-market');
   const stateSel = document.getElementById('orders-state');
   const sortSel = document.getElementById('orders-sort');
   const countEl = document.getElementById('orders-count');
   const errEl = document.getElementById('orders-error');
-  if (!wrap || !search || !rangeSel || !stateSel || !sortSel) return;
+  const groupBySel = document.getElementById('orders-chart-group');
+  const metricSel = document.getElementById('orders-chart-metric');
+  const chartCanvasEl = document.getElementById('orders-chart-canvas');
+  if (!wrap || !search || !rangeSel || !marketSel || !stateSel || !sortSel) return;
 
   const authed = await waitForCommerceAuthReady(PB_ORG, PB_SITE);
   if (!authed) {
@@ -1538,11 +1804,14 @@ async function init() {
   }
 
   const initialQ = getUrlParam('q');
+  const initialMarket = getUrlParam('market') || '';
   const initialState = getUrlParam('state') || '';
   const initialSort = getUrlParam('sort') === 'oldest' ? 'oldest' : 'newest';
   const initialRange = getUrlParam('range');
   const initialFrom = getUrlParam('from');
   const initialTo = getUrlParam('to');
+  const initialGroupBy = getUrlParam('group');
+  const initialMetric = getUrlParam('metric') === 'revenue' ? 'revenue' : 'orders';
 
   search.value = initialQ;
   sortSel.value = initialSort;
@@ -1559,6 +1828,8 @@ async function init() {
   let lastSearchQuery = '';
   let searchDebounceTimer = null;
   let searchRequestToken = 0;
+  /** Once the user manually picks Day/Week, stop auto-switching it on range changes. */
+  let groupByOverridden = false;
 
   function syncCustomFieldsVisibility() {
     rangeDatesEl.hidden = rangeSel.value !== 'custom';
@@ -1586,11 +1857,14 @@ async function init() {
     const isCustom = rangeSel.value === 'custom';
     setUrlParams({
       q: search.value,
+      market: marketSel.value,
       state: stateSel.value,
       sort: sortSel.value === 'newest' ? '' : sortSel.value,
       range: rangeSel.value === '1m' ? '' : rangeSel.value,
       from: isCustom ? rangeFromInput.value : '',
       to: isCustom ? rangeToInput.value : '',
+      group: groupBySel ? groupBySel.value : '',
+      metric: metricSel && metricSel.value === 'revenue' ? 'revenue' : '',
     });
   }
 
@@ -1605,6 +1879,35 @@ async function init() {
       );
     }
     return dateRangeToUtcQuery(addMonthsLocal(today, -1), today);
+  }
+
+  /** Inclusive calendar-day span of the currently selected range (`until` is exclusive, so -1). */
+  function currentRangeSpanDays() {
+    const { since, until } = currentSinceUntil();
+    const ms = new Date(until).getTime() - new Date(since).getTime();
+    return Math.round(ms / (24 * 60 * 60 * 1000)) - 1;
+  }
+
+  /** Day for ≤ 1 month, Week for longer — unless the user has manually chosen one this session. */
+  function applyAutoGroupBy() {
+    if (groupByOverridden || !groupBySel) return;
+    groupBySel.value = currentRangeSpanDays() > 31 ? 'week' : 'day';
+  }
+
+  /**
+   * Revenue mixes currencies across markets (US=USD, CA=CAD, MX=MXN), so the metric toggle is only
+   * enabled once a specific market is selected; "All markets" forces the chart back to Orders.
+   */
+  function syncMetricAvailability() {
+    if (!metricSel) return;
+    const enabled = Boolean(marketSel.value);
+    metricSel.disabled = !enabled;
+    metricSel.title = enabled
+      ? ''
+      : 'Select a specific market to view revenue — orders can be in different currencies otherwise';
+    if (!enabled && metricSel.value === 'revenue') {
+      metricSel.value = 'orders';
+    }
   }
 
   async function fetchOrdersForRange() {
@@ -1665,6 +1968,7 @@ async function init() {
   }
 
   function applyView() {
+    syncMetricAvailability();
     const q = search.value;
     const usingSearch = mode === 'search' && Array.isArray(searchOrders);
     let base = usingSearch ? searchOrders : rangeOrders;
@@ -1675,6 +1979,7 @@ async function init() {
     persistUrlParams();
 
     let list = usingSearch ? base : filterByQuery(base, q);
+    list = filterByMarket(list, marketSel.value);
     list = filterByState(list, stateSel.value);
     list = sortByCreated(list, sortSel.value);
 
@@ -1683,6 +1988,23 @@ async function init() {
       ? `${total} order${total === 1 ? '' : 's'}`
       : `${list.length} of ${total} orders`;
     renderTable(wrap, list, q, handleEditSaved);
+
+    if (chartCanvasEl) {
+      /* Order-id exact lookups aren't bound to a date-range control, so the chart
+         derives its own span from the (single) result instead of the range picker. */
+      const chartBounds = (usingSearch && !looksLikeEmail(lastSearchQuery))
+        ? null
+        : currentSinceUntil();
+      const granularity = groupBySel && groupBySel.value === 'week' ? 'week' : 'day';
+      const metric = metricSel && !metricSel.disabled && metricSel.value === 'revenue'
+        ? 'revenue' : 'orders';
+      const currencyCode = metric === 'revenue' ? currencyForMarketKey(marketSel.value) : '';
+      const buckets = ordersPerPeriodBuckets(list, chartBounds, granularity);
+      chartCanvasEl.innerHTML = ordersPerPeriodChartHtml(
+        buckets,
+        { granularity, metric, currencyCode },
+      );
+    }
   }
 
   /** After a detail-modal edit, refresh whichever data source is currently displayed. */
@@ -1699,8 +2021,9 @@ async function init() {
         showToast(err.message || 'Failed to refresh search results', 'error');
       }
     }
-    const states = uniqueStates((mode === 'search' && searchOrders) || rangeOrders);
-    fillStateSelect(stateSel, states, stateSel.value);
+    const scopeOrders = (mode === 'search' && searchOrders) || rangeOrders;
+    fillStateSelect(stateSel, uniqueStates(scopeOrders), stateSel.value);
+    fillMarketSelect(marketSel, uniqueMarkets(scopeOrders), marketSel.value);
     applyView();
   }
 
@@ -1724,6 +2047,7 @@ async function init() {
     }
     if (!wasSearchMode) {
       fillStateSelect(stateSel, uniqueStates(rangeOrders), stateSel.value);
+      fillMarketSelect(marketSel, uniqueMarkets(rangeOrders), marketSel.value);
       applyView();
     } else if (emailSearchActive) {
       applyView();
@@ -1739,8 +2063,9 @@ async function init() {
       mode = 'search';
       lastSearchQuery = q;
       searchOrders = results;
-      const states = uniqueStates(results.length ? results : rangeOrders);
-      fillStateSelect(stateSel, states, stateSel.value);
+      const scopeOrders = results.length ? results : rangeOrders;
+      fillStateSelect(stateSel, uniqueStates(scopeOrders), stateSel.value);
+      fillMarketSelect(marketSel, uniqueMarkets(scopeOrders), marketSel.value);
       applyView();
     } catch {
       /* not found or lookup failed — keep showing the locally filtered range results */
@@ -1763,8 +2088,17 @@ async function init() {
     }
     syncCustomFieldsVisibility();
 
+    if (groupBySel && ['day', 'week'].includes(initialGroupBy)) {
+      groupBySel.value = initialGroupBy;
+      groupByOverridden = true;
+    } else {
+      applyAutoGroupBy();
+    }
+    if (metricSel) metricSel.value = initialMetric;
+
     rangeOrders = await fetchOrdersForRange();
     fillStateSelect(stateSel, uniqueStates(rangeOrders), initialState);
+    fillMarketSelect(marketSel, uniqueMarkets(rangeOrders), initialMarket);
     applyView();
 
     const trimmedInitialQ = initialQ.trim();
@@ -1779,18 +2113,29 @@ async function init() {
       scheduleTargetedSearch();
     });
     stateSel.addEventListener('change', applyView);
+    marketSel.addEventListener('change', applyView);
     sortSel.addEventListener('change', applyView);
+    if (groupBySel) {
+      groupBySel.addEventListener('change', () => {
+        groupByOverridden = true;
+        applyView();
+      });
+    }
+    if (metricSel) metricSel.addEventListener('change', applyView);
     rangeSel.addEventListener('change', () => {
       syncCustomFieldsVisibility();
       if (rangeSel.value === 'custom') seedCustomRangeDefaultsIfEmpty();
+      applyAutoGroupBy();
       reloadRangeOrders();
     });
     rangeFromInput.addEventListener('change', () => {
       normalizeCustomRangeInputs();
+      applyAutoGroupBy();
       reloadRangeOrders();
     });
     rangeToInput.addEventListener('change', () => {
       normalizeCustomRangeInputs();
+      applyAutoGroupBy();
       reloadRangeOrders();
     });
   } catch (err) {
