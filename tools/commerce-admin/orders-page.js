@@ -9,7 +9,7 @@ import { openOrderContactEditDialog } from './order-contact-edit-dialog.js';
 import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
 import { createDetailModalHeaderCloseAndJson } from './commerce-detail-modal-json.js';
 import { PB_ORG, PB_SITE } from './commerce-pbus-config.js';
-import { escapeHtml, showToast, commerceMarketEmojiHtml } from './commerce-otp-ui.js';
+import { escapeHtml, showToast } from './commerce-otp-ui.js';
 import { highlightMatch } from './search-highlight.js';
 
 function getUrlParam(key) {
@@ -124,6 +124,8 @@ function filterByQuery(orders, q) {
     const ship = shippingName(o);
     if (bill !== '—' && bill.toLowerCase().includes(needle)) return true;
     if (ship !== '—' && ship.toLowerCase().includes(needle)) return true;
+    const market = orderMarketLabel(o);
+    if (market !== '—' && market.toLowerCase().includes(needle)) return true;
     return false;
   });
 }
@@ -324,6 +326,41 @@ function orderCountryTagClass(country) {
   if (c === 'ca') return 'coupons-tag-ca';
   if (c === 'mx') return 'coupons-tag-mx';
   return 'coupons-tag-muted';
+}
+
+/**
+ * Format market code and language for display (e.g. CA · EN, CA · FR, US, MX).
+ * @param {object} o order object
+ * @returns {string}
+ */
+export function orderMarketLabel(o) {
+  const country = String(o?.country || '').trim().toUpperCase();
+  if (!country) return '—';
+  if (country === 'CA') {
+    const loc = String(o?.locale || '').trim().toLowerCase();
+    return loc.startsWith('fr') ? 'CA · FR' : 'CA · EN';
+  }
+  return country;
+}
+
+/**
+ * Visual badge HTML for an order's market (e.g. CA · EN, CA · FR, US).
+ * @param {object} o order object
+ * @param {string} [query] optional search query to highlight
+ * @returns {string} HTML string
+ */
+export function orderMarketBadgeHtml(o, query = '') {
+  const label = orderMarketLabel(o);
+  if (label === '—') return '—';
+  const c = String(o?.country || '').trim().toLowerCase();
+  let modifier = 'orders-market-badge-muted';
+  if (c === 'us') modifier = 'orders-market-badge-us';
+  else if (c === 'ca') {
+    const loc = String(o?.locale || '').trim().toLowerCase();
+    modifier = loc.startsWith('fr') ? 'orders-market-badge-ca-fr' : 'orders-market-badge-ca-en';
+  } else if (c === 'mx') modifier = 'orders-market-badge-mx';
+  const highlighted = query ? highlightMatch(label, query) : escapeHtml(label);
+  return `<span class="orders-market-badge ${modifier}">${highlighted}</span>`;
 }
 
 function summarizeOrderSubtotalLine(items) {
@@ -1427,7 +1464,7 @@ function renderTable(wrap, orders, query, onEditSaved) {
     const paymentMethodStr = o.paymentMethod != null && String(o.paymentMethod).trim() !== ''
       ? String(o.paymentMethod).trim()
       : '—';
-    const marketHtml = o.country ? commerceMarketEmojiHtml(o.country) : '—';
+    const marketHtml = orderMarketBadgeHtml(o, query);
     const emailRaw = o.email || o.customer?.email || '';
     const emailStr = String(emailRaw).trim();
     const emailHtml = emailStr
@@ -1761,4 +1798,6 @@ async function init() {
   }
 }
 
-init();
+if (typeof document !== 'undefined') {
+  init();
+}

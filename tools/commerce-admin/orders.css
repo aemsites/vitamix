@@ -566,6 +566,50 @@
   margin-bottom: 2px;
 }
 
+.orders-market-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  line-height: 1.2;
+  border: 1px solid transparent;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.orders-market-badge-us {
+  background: #e3f2e6;
+  color: #1b5e20;
+  border-color: #b7d9bf;
+}
+
+.orders-market-badge-ca-en {
+  background: #e8eef7;
+  color: #0d47a1;
+  border-color: #b8c9e8;
+}
+
+.orders-market-badge-ca-fr {
+  background: #e0f2fe;
+  color: #0369a1;
+  border-color: #bae6fd;
+}
+
+.orders-market-badge-mx {
+  background: #fdecea;
+  color: #bf360c;
+  border-color: #f0c4bc;
+}
+
+.orders-market-badge-muted {
+  background: #f0f0f1;
+  color: #6d7175;
+  border-color: #d2d5d8;
+}
+
 .orders-detail-history .orders-history-event {
   font-size: 13px;
   color: #202223;
