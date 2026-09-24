@@ -437,6 +437,55 @@ async function createMarketingCard(item) {
   return card;
 }
 
+// Maps legacy query params/values (old PLP links) to their current equivalents.
+const LEGACY_QUERY_PARAM_MAP = [
+  {
+    param: 'product_series_value', value: '659_316_325_334_536', newParam: 'productType', newValue: 'Countertop Blending',
+  },
+  {
+    param: 'blender_compatibility', value: '208', newParam: 'compatibility', newValue: 'Ascent Series',
+  },
+  {
+    param: 'blender_compatibility', value: '491', newParam: 'compatibility', newValue: 'Propel Series',
+  },
+  {
+    param: 'blender_compatibility', value: '653', newParam: 'compatibility', newValue: 'VX1, VX3',
+  },
+  {
+    param: 'blender_compatibility', value: '551', newParam: 'compatibility', newValue: 'Legacy Series',
+  },
+  {
+    param: 'catalog_product_type', value: '130_124_127_557_560', newParam: 'productType', newValue: 'Food Processing, Immersion Blending, Cookbook, Kitchen Tool, Smoothie Cup',
+  },
+  {
+    param: 'blender_compatibility', value: '554', newParam: 'productType', newValue: 'Immersion Blending',
+  },
+  {
+    param: 'product_series_value', value: '545', newParam: 'series', newValue: 'Immersion Blending',
+  },
+  {
+    param: 'product_collections', value: '475', newParam: 'collections', newValue: 'Kitchen Systems & Bundles',
+  },
+  {
+    param: 'catalog_product_type', value: '106_109_100', newParam: 'productType', newValue: 'Container, Food Processing',
+  },
+];
+
+/**
+ * Rewrites any legacy query param/value pair to its current equivalent and pushes the
+ * resulting URL so the browser history reflects the redirect before filters are read.
+ */
+function redirectLegacyQueryParams() {
+  const params = new URLSearchParams(window.location.search);
+  const match = LEGACY_QUERY_PARAM_MAP.find((m) => params.get(m.param) === m.value);
+  if (!match) return;
+  params.delete(match.param);
+  params.set(match.newParam, match.newValue);
+  const search = params.toString();
+  const url = `${window.location.pathname}${search ? `?${search}` : ''}${window.location.hash || ''}`;
+  window.history.pushState(null, '', url);
+}
+
 /**
  * Builds the initial filter config from the widget's authored defaults (dataset, set from the
  * block's own href query params), then layers the live page URL's matching query params on top
@@ -882,6 +931,7 @@ function getFilterConfigFromInputs(widget) {
 export default async function decorate(widget) {
   const configMode = widget.classList.contains('product-list-config-mode');
   if (!configMode && !isWidgetConfigPage()) {
+    redirectLegacyQueryParams();
     stripQueryParams(['show']);
   }
   delete widget.dataset.show;
