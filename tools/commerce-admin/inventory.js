@@ -10,6 +10,12 @@ import {
 } from './pim.js';
 import { commerceMarketEmojiHtml, showToast } from './commerce-otp-ui.js';
 import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
+import {
+  catalogApiPath,
+  fetchCatalogProduct,
+  normalizeProductPath,
+} from './commerce-catalog-io.js';
+import { putOrPatchResource } from './commerce-resource-save.js';
 
 const CORS_PROXY = 'https://fcors.org/?url=';
 const CORS_KEY = '&key=Mg23N96GgR8O3NjU';
@@ -545,9 +551,10 @@ function inventoryManagedStockLabel(existing) {
  * @param {{ configRow: object, existing: object|null, changedKeys: Set<string>,
  *   kind: string }} entry
  */
-function managedInventoryUpdateRowHtml({
-  configRow, existing, changedKeys, kind,
-}) {
+function managedInventoryUpdateRowHtml(entry, index) {
+  const {
+    configRow, existing, changedKeys, kind,
+  } = entry;
   const cellClass = (key) => (changedKeys.has(key) ? ' class="inv-update-cell-changed"' : '');
   const market = existing?.market || 'us';
   const language = existing?.language || 'EN';
@@ -562,7 +569,13 @@ function managedInventoryUpdateRowHtml({
     configRow.inventoryQuantity != null ? String(configRow.inventoryQuantity) : '—',
   );
   const rowClass = kind === 'missing' ? ' class="inv-update-row-missing"' : '';
+  const canChange = kind === 'update'
+    && (changedKeys.has('availability') || changedKeys.has('managedStock'));
+  const selectHtml = canChange
+    ? `<input type="checkbox" class="inv-update-select" data-inv-update-select value="${index}" aria-label="Select ${escapeHtml(configRow.sku)} inventory change" />`
+    : '';
   return `<tr${rowClass}>
+    <td class="inv-update-col-select">${selectHtml}</td>
     <td class="inv-update-col-status">${managedInventoryUpdateStatusBadge(kind)}</td>
     <td>${escapeHtml(configRow.sku)}</td>
     <td>${escapeHtml((existing?.title) || configRow.title || '—')}</td>
@@ -585,7 +598,49 @@ function managedInventoryUpdatePreviewLead({ changed, missing, unchanged }) {
   if (changed.length) bits.push(`${changed.length} SKU${changed.length === 1 ? '' : 's'} differ`);
   if (missing.length) bits.push(`${missing.length} not found in the current inventory list`);
   if (unchanged.length) bits.push(`${unchanged.length} unchanged`);
-  return `${bits.join('. ')}. Preview only — nothing has been written back.`;
+  return `${bits.join('. ')}. Select inventory changes to write back.`;
+}
+
+/** @param {object[]} entries */
+async function applyManagedInventoryChanges(entries) {
+  const byPath = new Map();
+  entries.forEach((entry) => {
+    const { existing } = entry;
+    const path = normalizeProductPath(
+      `/${existing.localePath}/products/${existing.urlKey}`,
+    );
+    if (!byPath.has(path)) byPath.set(path, []);
+    byPath.get(path).push(entry);
+  });
+
+  await Promise.all([...byPath.entries()].map(async ([path, productEntries]) => {
+    const product = await fetchCatalogProduct(path);
+    if (!product) throw new Error(`Product not found: ${path}`);
+    productEntries.forEach(({ configRow, existing, changedKeys }) => {
+      let target = product;
+      if (existing.parentSku) {
+        target = (product.variants || []).find((item) => item.sku === existing.sku);
+        if (!target) throw new Error(`Variant not found: ${existing.sku}`);
+      }
+      if (changedKeys.has('availability')) {
+        target.availability = configRow.availability;
+      }
+      if (changedKeys.has('managedStock')) {
+        if (configRow.managedStock) {
+          if (!target.custom) target.custom = {};
+          target.custom.managedStock = '1';
+        } else if (target.custom) {
+          delete target.custom.managedStock;
+        }
+      }
+    });
+    await putOrPatchResource(catalogApiPath(path), product);
+  }));
+
+  entries.forEach(({ configRow, existing, changedKeys }) => {
+    if (changedKeys.has('availability')) existing.availability = configRow.availability;
+    if (changedKeys.has('managedStock')) existing.managedStock = configRow.managedStock;
+  });
 }
 
 function openInventoryExportDialog() {
@@ -669,7 +724,7 @@ function openManagedInventoryUpdateDialog() {
       <div class="inv-dialog-scroll" tabindex="-1">
         <h2 class="inv-dialog-title">Update managed inventory</h2>
         <p class="inv-field-hint">Compares the config sheet against the managed-inventory data
-          currently loaded for this locale. Preview only — nothing is written back.
+          currently loaded for this locale. Nothing is written until you select inventory changes.
           <a href="https://da.live/sheet#/aemsites/vitamix/us/en_us/products/config/inventory" target="_blank" rel="noopener">Edit and preview inventory sheet</a>.</p>
         <div class="inv-export-status" data-inv-update-status hidden></div>
         <p class="inv-field-hint" data-inv-update-lead></p>
@@ -677,6 +732,7 @@ function openManagedInventoryUpdateDialog() {
       </div>
       <div class="inv-dialog-actions">
         <button type="button" class="inv-btn" data-inv-cancel>Close</button>
+        <button type="button" class="inv-btn inv-btn-primary" data-inv-update-change hidden>Change status</button>
         <button type="button" class="inv-btn inv-btn-primary" data-inv-update-refresh>Refresh</button>
       </div>
     </div>`;
@@ -686,7 +742,9 @@ function openManagedInventoryUpdateDialog() {
   const leadEl = dialog.querySelector('[data-inv-update-lead]');
   const tableHost = dialog.querySelector('[data-inv-update-table]');
   const btnCancel = dialog.querySelector('[data-inv-cancel]');
+  const btnChange = /** @type {HTMLButtonElement | null} */ (dialog.querySelector('[data-inv-update-change]'));
   const btnRefresh = /** @type {HTMLButtonElement | null} */ (dialog.querySelector('[data-inv-update-refresh]'));
+  let shownEntries = [];
 
   const setStatus = (msg, tone = 'error') => {
     if (!(statusEl instanceof HTMLElement)) return;
@@ -718,6 +776,34 @@ function openManagedInventoryUpdateDialog() {
   });
   wireDialogEscapeDismiss(dialog, dismiss);
 
+  const updateSelectionControls = () => {
+    if (!tableHost) return;
+    const rowChecks = [...tableHost.querySelectorAll('[data-inv-update-select]')];
+    const selected = rowChecks.filter((checkbox) => checkbox.checked);
+    const selectAll = tableHost.querySelector('[data-inv-update-select-all]');
+    if (selectAll instanceof HTMLInputElement) {
+      selectAll.checked = rowChecks.length > 0 && selected.length === rowChecks.length;
+      selectAll.indeterminate = selected.length > 0 && selected.length < rowChecks.length;
+    }
+    if (btnChange) {
+      btnChange.hidden = selected.length === 0;
+      btnChange.textContent = selected.length === 1
+        ? 'Change status (1)'
+        : `Change status (${selected.length})`;
+    }
+  };
+
+  tableHost?.addEventListener('change', (event) => {
+    const { target } = event;
+    if (!(target instanceof HTMLInputElement)) return;
+    if (target.matches('[data-inv-update-select-all]')) {
+      tableHost.querySelectorAll('[data-inv-update-select]').forEach((checkbox) => {
+        checkbox.checked = target.checked;
+      });
+    }
+    updateSelectionControls();
+  });
+
   const runUpdate = async () => {
     setStatus('');
     if (leadEl) leadEl.textContent = '';
@@ -733,11 +819,19 @@ function openManagedInventoryUpdateDialog() {
       if (tableHost) {
         const managedUnchanged = preview.unchanged.filter((entry) => entry.existing?.managedStock);
         const toShow = [...preview.changed, ...managedUnchanged, ...preview.missing];
+        shownEntries = toShow;
+        const selectableCount = toShow.filter(
+          (entry) => entry.kind === 'update'
+            && (entry.changedKeys.has('availability') || entry.changedKeys.has('managedStock')),
+        ).length;
         const body = toShow.length
           ? toShow.map(managedInventoryUpdateRowHtml).join('')
-          : '<tr><td colspan="8" class="inv-empty-cell">No differences found.</td></tr>';
+          : '<tr><td colspan="9" class="inv-empty-cell">No differences found.</td></tr>';
         tableHost.innerHTML = `<table class="inv-preview-table" aria-label="Managed inventory update differences">
             <thead><tr>
+              <th scope="col" class="inv-update-col-select">
+                ${selectableCount ? '<input type="checkbox" data-inv-update-select-all aria-label="Select all inventory changes" />' : ''}
+              </th>
               <th scope="col">Status</th>
               <th scope="col">SKU</th>
               <th scope="col">Title</th>
@@ -749,6 +843,7 @@ function openManagedInventoryUpdateDialog() {
             </tr></thead>
             <tbody>${body}</tbody>
           </table>`;
+        updateSelectionControls();
       }
     } catch (err) {
       setStatus(err?.message || 'Could not load the managed inventory config');
@@ -761,6 +856,31 @@ function openManagedInventoryUpdateDialog() {
   };
 
   btnRefresh?.addEventListener('click', runUpdate);
+  btnChange?.addEventListener('click', async () => {
+    const selected = [...(tableHost?.querySelectorAll('[data-inv-update-select]:checked') || [])]
+      .map((checkbox) => shownEntries[Number(checkbox.value)])
+      .filter(Boolean);
+    if (!selected.length) return;
+    btnChange.disabled = true;
+    if (btnRefresh) btnRefresh.disabled = true;
+    btnChange.textContent = 'Changing status…';
+    setStatus('');
+    try {
+      await applyManagedInventoryChanges(selected);
+      showToast(
+        `Applied ${selected.length} inventory change${selected.length === 1 ? '' : 's'}`,
+        'success',
+      );
+      await runUpdate();
+    } catch (err) {
+      setStatus(err?.message || 'Could not apply inventory changes');
+      showToast(err?.message || 'Could not apply inventory changes', 'error');
+    } finally {
+      btnChange.disabled = false;
+      if (btnRefresh) btnRefresh.disabled = false;
+      updateSelectionControls();
+    }
+  });
 
   document.body.style.overflow = 'hidden';
   dialog.showModal();

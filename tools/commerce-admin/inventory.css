@@ -229,6 +229,21 @@
   white-space: nowrap;
 }
 
+.inv-update-col-select {
+  width: 1%;
+  padding-right: 2px !important;
+  text-align: center !important;
+}
+
+.inv-update-col-select input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  vertical-align: middle;
+  accent-color: #202223;
+  cursor: pointer;
+}
+
 .inv-update-badge {
   display: inline-block;
   font-size: 11px;
