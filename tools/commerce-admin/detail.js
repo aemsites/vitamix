@@ -1,6 +1,12 @@
-import { getApiEnvironment } from './commerce-otp-api.js';
+import { apiFetch, getApiBase, getApiEnvironment } from './commerce-otp-api.js';
 import { startProductImageSync } from './product-image-sync.js';
-import { startProductExportImport } from './commerce-catalog-io.js';
+import {
+  catalogApiPath,
+  normalizeProductPath,
+  startProductExportImport,
+} from './commerce-catalog-io.js';
+import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
+import { PB_ORG, PB_SITE } from './commerce-pbus-config.js';
 import { showToast } from './commerce-otp-ui.js';
 
 /** Product JSON edits are production-only (active API env, not staging). */
@@ -310,6 +316,17 @@ function renderOptions(options) {
   return `<div class="pim-detail-section"><h3 class="pim-detail-section-title">Options</h3><table class="pim-detail-custom-table"><tbody>${rows}</tbody></table></div>`;
 }
 
+function renderDeleteProduct(productPath, isEditMode) {
+  if (!isEditMode || !productPath) return '';
+  return `<section class="pim-delete-product">
+    <div>
+      <h2 class="pim-delete-product-title">Delete product</h2>
+      <p class="pim-delete-product-copy">Permanently remove this product from the catalog.</p>
+    </div>
+    <button type="button" class="pim-delete-product-btn" data-pim-delete-product>Delete product</button>
+  </section>`;
+}
+
 function renderProduct(data, indexByUrlKey = {}, isEditMode = false) {
   const availabilityClass = (data.availability || '').toLowerCase().replace(/\s+/g, '-');
   const priceBlock = renderPrice(data.price, isEditMode);
@@ -339,8 +356,91 @@ function renderProduct(data, indexByUrlKey = {}, isEditMode = false) {
     (data.metadata && Object.keys(data.metadata).length > 0)
       ? `<div class="pim-detail-section"><h3 class="pim-detail-section-title">Raw metadata</h3><pre class="pim-detail-raw">${escapeHtml(JSON.stringify(data.metadata, null, 2))}</pre></div>`
       : '',
+    renderDeleteProduct(
+      normalizeProductPath(data.path || `/${getCatalogFromParams()}/products/${getProductParam()}`),
+      isEditMode,
+    ),
   ];
   return sections.filter(Boolean).join('\n');
+}
+
+function openDeleteProductDialog(productPath) {
+  const normalizedPath = normalizeProductPath(productPath);
+  const requestPath = catalogApiPath(normalizedPath);
+  const requestUrl = `${getApiBase()}/${PB_ORG}/sites/${PB_SITE}/${requestPath}`;
+  const dialog = document.createElement('dialog');
+  dialog.className = 'pim-delete-dialog';
+  dialog.innerHTML = `
+    <form method="dialog" class="pim-delete-dialog-inner">
+      <h2 class="pim-delete-dialog-title">Delete product?</h2>
+      <p class="pim-delete-dialog-copy">This permanently removes <strong>${escapeHtml(normalizedPath)}</strong>.</p>
+      <div class="pim-delete-dialog-call">
+        <span>API call</span>
+        <code>DELETE ${escapeHtml(requestUrl)}</code>
+      </div>
+      <label class="pim-delete-dialog-label" for="pim-delete-product-path">Enter the full product path to confirm</label>
+      <input id="pim-delete-product-path" class="pim-delete-dialog-input" type="text" autocomplete="off" spellcheck="false" placeholder="${escapeHtml(normalizedPath)}" />
+      <p class="pim-delete-dialog-status" data-pim-delete-status aria-live="polite"></p>
+      <div class="pim-delete-dialog-actions">
+        <button type="button" class="pim-delete-dialog-cancel">Cancel</button>
+        <button type="submit" class="pim-delete-dialog-confirm" disabled>Delete product</button>
+      </div>
+    </form>`;
+  document.body.appendChild(dialog);
+
+  const form = dialog.querySelector('form');
+  const input = dialog.querySelector('#pim-delete-product-path');
+  const cancelBtn = dialog.querySelector('.pim-delete-dialog-cancel');
+  const confirmBtn = dialog.querySelector('.pim-delete-dialog-confirm');
+  const statusEl = dialog.querySelector('[data-pim-delete-status]');
+  const dismiss = () => {
+    dialog.close();
+    dialog.remove();
+  };
+
+  input.addEventListener('input', () => {
+    confirmBtn.disabled = input.value !== normalizedPath;
+  });
+  cancelBtn.addEventListener('click', dismiss);
+  dialog.addEventListener('click', (event) => {
+    if (event.target === dialog) dismiss();
+  });
+  wireDialogEscapeDismiss(dialog, dismiss);
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (input.value !== normalizedPath || !canUseEditMode()) return;
+    input.disabled = true;
+    cancelBtn.disabled = true;
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Deleting…';
+    statusEl.textContent = '';
+    try {
+      const resp = await apiFetch(PB_ORG, PB_SITE, requestPath, { method: 'DELETE' });
+      if (!resp.ok) {
+        const message = resp.headers.get('x-error')
+          || (await resp.text().catch(() => '')).trim()
+          || `HTTP ${resp.status}`;
+        throw new Error(message);
+      }
+      const results = await resp.json();
+      const result = Array.isArray(results) ? results[0] : null;
+      if (!result || (result.status !== 200 && result.success !== true)) {
+        throw new Error(result?.message || result?.reason || 'The API did not delete this product.');
+      }
+      showToast(`Deleted ${normalizedPath}`);
+      window.location.assign(`catalog.html?catalog=${encodeURIComponent(getCatalogFromParams())}`);
+    } catch (err) {
+      statusEl.textContent = err.message || 'Failed to delete product';
+      input.disabled = false;
+      cancelBtn.disabled = false;
+      confirmBtn.disabled = input.value !== normalizedPath;
+      confirmBtn.textContent = 'Delete product';
+      showToast(err.message || 'Failed to delete product', 'error');
+    }
+  });
+
+  dialog.showModal();
+  input.focus();
 }
 
 function showInlineEditor(options) {
@@ -508,6 +608,17 @@ function attachEditHandlers() {
         syncBtn.disabled = false;
         syncBtn.textContent = prevLabel || 'Sync images';
       }
+    });
+  }
+
+  const deleteBtn = content.querySelector('[data-pim-delete-product]');
+  if (deleteBtn instanceof HTMLButtonElement) {
+    deleteBtn.addEventListener('click', () => {
+      const productPath = normalizeProductPath(
+        currentProductData.path
+          || `/${getCatalogFromParams()}/products/${getProductParam()}`,
+      );
+      openDeleteProductDialog(productPath);
     });
   }
 }

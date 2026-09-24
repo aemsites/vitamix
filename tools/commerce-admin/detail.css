@@ -318,6 +318,150 @@
   padding: 24px;
 }
 
+.pim-delete-product {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-top: 40px;
+  padding-top: 24px;
+  border-top: 1px solid #d72c0d;
+}
+
+.pim-delete-product-title {
+  margin: 0 0 4px;
+  color: #8e1f0b;
+  font-size: 1rem;
+}
+
+.pim-delete-product-copy {
+  margin: 0;
+  color: #6d7175;
+  font-size: 14px;
+}
+
+.pim-delete-product-btn,
+.pim-delete-dialog-confirm {
+  flex-shrink: 0;
+  padding: 9px 16px;
+  border: 1px solid #b42318;
+  border-radius: 6px;
+  background: #d72c0d;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pim-delete-product-btn:hover,
+.pim-delete-dialog-confirm:hover:not(:disabled) {
+  background: #b42318;
+}
+
+.pim-delete-dialog {
+  width: min(560px, calc(100vw - 32px));
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  box-shadow: 0 16px 48px rgb(0 0 0 / 24%);
+}
+
+.pim-delete-dialog::backdrop {
+  background: rgb(0 0 0 / 45%);
+}
+
+.pim-delete-dialog-inner {
+  padding: 24px;
+}
+
+.pim-delete-dialog-title {
+  margin: 0 0 8px;
+  color: #202223;
+  font-size: 1.25rem;
+}
+
+.pim-delete-dialog-copy {
+  margin: 0 0 20px;
+  color: #414548;
+  font-size: 14px;
+}
+
+.pim-delete-dialog-call {
+  margin-bottom: 20px;
+}
+
+.pim-delete-dialog-call span,
+.pim-delete-dialog-label {
+  display: block;
+  margin-bottom: 6px;
+  color: #414548;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.pim-delete-dialog-call code {
+  display: block;
+  overflow-wrap: anywhere;
+  padding: 10px 12px;
+  border: 1px solid #e1e3e5;
+  border-radius: 6px;
+  background: #f6f6f7;
+  color: #202223;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.pim-delete-dialog-input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid #8c9196;
+  border-radius: 6px;
+  color: #202223;
+  font-size: 14px;
+}
+
+.pim-delete-dialog-input:focus {
+  border-color: #2c2c2e;
+  outline: 2px solid rgb(44 44 46 / 18%);
+}
+
+.pim-delete-dialog-status {
+  min-height: 20px;
+  margin: 8px 0 0;
+  color: #b42318;
+  font-size: 13px;
+}
+
+.pim-delete-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.pim-delete-dialog-cancel {
+  padding: 9px 16px;
+  border: 1px solid #c9cccf;
+  border-radius: 6px;
+  background: #fff;
+  color: #202223;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.pim-delete-dialog-confirm:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (width <= 560px) {
+  .pim-delete-product {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
 .pim-detail-meta {
   display: flex;
   flex-wrap: wrap;
