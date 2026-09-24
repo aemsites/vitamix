@@ -68,3 +68,97 @@ export default function decorate(block) {
     block.parentElement.classList.add('fill');
   }
 }
+
+/**
+ * Promo Bar block
+ * A short, full-width promotional strip.
+ *
+ * Authoring (DA table):
+ *   | Promo Bar                                                  |
+ *   | (optional) background image — single cell, image only       |
+ *   | product image | title (+ optional paragraph) | CTA link      |
+ *
+ * The product image and paragraph are optional.
+ * Variants: light, or any color token name (e.g. "red" -> var(--color-red)).
+ */
+
+/**
+ * Returns `true` if a cell contains only media (picture/img/svg) and no text.
+ * @param {Element} cell
+ * @returns {boolean}
+ */
+function isMediaCell(cell) {
+  if (!cell.querySelector('picture, img, svg')) return false;
+  return !cell.textContent.trim();
+}
+
+/**
+ * Returns `true` if a cell contains only links (the CTA cell).
+ * @param {Element} cell
+ * @returns {boolean}
+ */
+function isCtaCell(cell) {
+  const links = [...cell.querySelectorAll('a[href]')];
+  if (!links.length) return false;
+  const linkText = links.map((a) => a.textContent.trim()).join('');
+  return cell.textContent.replace(/\s/g, '') === linkText.replace(/\s/g, '');
+}
+
+/**
+ * Returns the perceived luminance (0–255) of an element's background color.
+ * @param {Element} el
+ * @returns {number}
+ */
+function getLuminance(el) {
+  const [r, g, b] = getComputedStyle(el).backgroundColor.match(/\d+/g).map(Number);
+  return (r * 299 + g * 587 + b * 114) / 1000;
+}
+
+export default function decorate(block) {
+  const variants = [...block.classList].filter((c) => c !== 'block' && c !== 'promo-bar');
+  const rows = [...block.children];
+
+  // optional background row: a single cell containing only an image
+  const bgRow = rows.find((row) => row.children.length === 1 && isMediaCell(row.firstElementChild));
+  const contentRow = rows.find((row) => row !== bgRow) || rows[0];
+
+  const inner = document.createElement('div');
+  inner.className = 'promo-bar-inner';
+
+  [...contentRow.children].forEach((cell) => {
+    if (isMediaCell(cell)) {
+      cell.className = 'promo-bar-image';
+    } else if (isCtaCell(cell)) {
+      cell.className = 'promo-bar-cta';
+    } else {
+      cell.className = 'promo-bar-content';
+      // treat the first heading (or first paragraph if no heading) as the title
+      const title = cell.querySelector('h1, h2, h3, h4, h5, h6') || cell.querySelector('p');
+      if (title) title.classList.add('promo-bar-title');
+    }
+    inner.append(cell);
+  });
+
+  if (!inner.querySelector('.promo-bar-image')) block.classList.add('no-image');
+
+  const children = [inner];
+  if (bgRow) {
+    const bg = bgRow.firstElementChild;
+    bg.className = 'promo-bar-bg';
+    children.unshift(bg);
+    block.classList.add('has-bg');
+  }
+
+  block.replaceChildren(...children);
+
+  // optional color token override, e.g. "Promo Bar (red)"
+  const colorOverride = variants.find(
+    (c) => getComputedStyle(document.documentElement).getPropertyValue(`--color-${c}`).trim(),
+  );
+  if (colorOverride) {
+    block.style.setProperty('--promo-bar-color', `var(--color-${colorOverride})`);
+    if (!bgRow && !variants.includes('light')) {
+      block.classList.add(getLuminance(block) > 128 ? 'light' : 'dark');
+    }
+  }
+}
