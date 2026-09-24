@@ -1,6 +1,6 @@
 /* eslint-disable max-len */
 import {
-  fetchPlaceholders, loadCSS, toClassName,
+  fetchPlaceholders, loadCSS, toClassName, createOptimizedPicture,
 } from '../../scripts/aem.js';
 import { formatPrice, buildVideo } from '../../scripts/scripts.js';
 import { loadFragment } from '../../blocks/fragment/fragment.js';
@@ -77,10 +77,7 @@ function hasVariants(product) {
 function createProductImage() {
   const wrap = document.createElement('div');
   wrap.className = 'product-list-widget-image-wrap';
-  const img = document.createElement('img');
-  img.loading = 'lazy';
-  wrap.appendChild(img);
-  return { wrap, img };
+  return wrap;
 }
 
 function getSortedVariants(product) {
@@ -97,14 +94,15 @@ function findVariantBySlug(product, colorSlug) {
   return product.variants.find((v) => v.color && toClassName(v.color) === colorSlug) || null;
 }
 
-function updateCardImage(img, product, variant) {
-  if (variant && variant.image) {
-    img.src = variant.image;
-    img.alt = variant.title || product.title || '';
-  } else {
-    img.src = product.image || '';
-    img.alt = product.title || '';
-  }
+function updateCardImage(wrap, product, variant) {
+  const src = variant && variant.image ? variant.image : product.image;
+  const alt = variant && variant.image ? variant.title || product.title : product.title;
+  const picture = createOptimizedPicture(src, alt, false, [
+    { media: '(min-width: 600px)', width: '750' },
+    { width: '300' },
+  ]);
+  wrap.querySelector('picture')?.remove();
+  wrap.prepend(picture);
 }
 
 function setSelectedSwatch(colorsEl, colorSlug) {
@@ -283,12 +281,12 @@ function createProductListCard(product, ph, copy, activeColorSlug) {
   card.className = 'product-list-widget-product-card';
   card.setAttribute('role', 'listitem');
 
-  const { wrap: imageWrap, img } = createProductImage();
+  const imageWrap = createProductImage();
   imageWrap.append(createCallouts(product, copy), createCompareButton(product, copy));
 
   const title = createProductTitle(product);
   const colors = createProductColors(product, copy, (variant, swatch) => {
-    updateCardImage(img, product, variant);
+    updateCardImage(imageWrap, product, variant);
     setSelectedSwatch(colors, swatch.dataset.color);
   });
   const reviews = createStarRating(product);
@@ -299,7 +297,7 @@ function createProductListCard(product, ph, copy, activeColorSlug) {
   const initialVariant = findVariantBySlug(product, activeColorSlug)
     || getSortedVariants(product)[0]
     || null;
-  updateCardImage(img, product, initialVariant);
+  updateCardImage(imageWrap, product, initialVariant);
   if (initialVariant) setSelectedSwatch(colors, toClassName(initialVariant.color));
 
   card.append(imageWrap, title, colors, reviews);
