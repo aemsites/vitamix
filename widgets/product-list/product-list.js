@@ -437,37 +437,59 @@ async function createMarketingCard(item) {
   return card;
 }
 
-// Maps legacy query params/values (old PLP links) to their current equivalents.
+// Maps legacy query params/values (old PLP links) to their current equivalents. The matched
+// `param` is always removed first, then `sets` is applied (which may re-add it with a new value).
 const LEGACY_QUERY_PARAM_MAP = [
   {
-    param: 'product_series_value', value: '659_316_325_334_536', newParam: 'productType', newValue: 'Countertop Blending',
+    param: 'product_series_value', value: '659_316_325_334_536', sets: { productType: 'Countertop Blending' },
   },
   {
-    param: 'blender_compatibility', value: '208', newParam: 'compatibility', newValue: 'Ascent Series',
+    param: 'blender_compatibility', value: '208', sets: { compatibility: 'Ascent Series' },
   },
   {
-    param: 'blender_compatibility', value: '491', newParam: 'compatibility', newValue: 'Propel Series',
+    param: 'blender_compatibility', value: '491', sets: { compatibility: 'Propel Series' },
   },
   {
-    param: 'blender_compatibility', value: '653', newParam: 'compatibility', newValue: 'VX1, VX3',
+    param: 'blender_compatibility', value: '653', sets: { compatibility: 'VX1, VX3' },
   },
   {
-    param: 'blender_compatibility', value: '551', newParam: 'compatibility', newValue: 'Legacy Series',
+    param: 'blender_compatibility', value: '551', sets: { compatibility: 'Legacy Series' },
   },
   {
-    param: 'catalog_product_type', value: '130_124_127_557_560', newParam: 'productType', newValue: 'Food Processing, Immersion Blending, Cookbook, Kitchen Tool, Smoothie Cup',
+    param: 'catalog_product_type', value: '130_124_127_557_560', sets: { productType: 'Food Processing, Immersion Blending, Cookbook, Kitchen Tool, Smoothie Cup' },
   },
   {
-    param: 'blender_compatibility', value: '554', newParam: 'productType', newValue: 'Immersion Blending',
+    param: 'blender_compatibility', value: '554', sets: { productType: 'Immersion Blending' },
   },
   {
-    param: 'product_series_value', value: '545', newParam: 'series', newValue: 'Immersion Blending',
+    param: 'product_series_value', value: '545', sets: { series: 'Immersion Blending' },
   },
   {
-    param: 'product_collections', value: '475', newParam: 'collections', newValue: 'Kitchen Systems & Bundles',
+    param: 'product_collections', value: '475', sets: { collections: 'Kitchen Systems & Bundles' },
   },
   {
-    param: 'catalog_product_type', value: '106_109_100', newParam: 'productType', newValue: 'Container, Food Processing',
+    param: 'catalog_product_type', value: '106_109_100', sets: { productType: 'Container, Food Processing' },
+  },
+  {
+    param: 'applications', value: '250', sets: { applications: 'Drinks & Smoothies' },
+  },
+  {
+    param: 'applications', value: '253_256', sets: { applications: 'Food Prep, Frozen Treats' },
+  },
+  {
+    param: 'catalog_product_type', value: '557', sets: { catalog_product_type: '557', productType: 'Immersion Blender' },
+  },
+  {
+    param: 'catalog_product_type', value: '118_112', sets: { productType: 'Commercial Container, Commercial Accessory' },
+  },
+  {
+    param: 'catalog_product_type', value: '118', sets: { catalog_product_type: '557', productType: 'Commercial Container' },
+  },
+  {
+    param: 'catalog_product_type', value: '112', sets: { catalog_product_type: '557', productType: 'Commercial Accessory' },
+  },
+  {
+    param: 'cat', value: '200', sets: { catalog_product_type: '557', applications: 'Food Prep' },
   },
 ];
 
@@ -480,7 +502,7 @@ function redirectLegacyQueryParams() {
   const match = LEGACY_QUERY_PARAM_MAP.find((m) => params.get(m.param) === m.value);
   if (!match) return;
   params.delete(match.param);
-  params.set(match.newParam, match.newValue);
+  Object.entries(match.sets).forEach(([key, value]) => params.set(key, value));
   const search = params.toString();
   const url = `${window.location.pathname}${search ? `?${search}` : ''}${window.location.hash || ''}`;
   window.history.pushState(null, '', url);
