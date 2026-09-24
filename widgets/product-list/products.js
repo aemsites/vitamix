@@ -2,7 +2,7 @@
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 import {
   fetchReviewsData, getReviewsBySlug, slugFromUrl, fetchPlpData, getBadgesBySlug, PLP_DATASETS,
-  fetchProductIndex, buildProductIndexBySlug,
+  fetchProductIndex, buildProductIndexBySlug, buildProductsUrl,
 } from '../../scripts/plp-data.js';
 
 // Column-name overrides for the label derived from a "* Facet" column in plp-data.json.
@@ -166,7 +166,7 @@ export default async function lookupProductListProducts(config = {}, facets = {}
 
         const augmented = indexBySlug[slug];
         const product = { ...augmented };
-        product.url = urlPathname;
+        product.url = buildProductsUrl(locale, language, slug);
         if (!product.title) product.title = titleFromUrl(urlPathname);
         product.bullets = (row.Bullets || '').split(';').map((s) => s.trim()).filter(Boolean);
         product.comparisonFeatures = (row['Comparison Features'] || '').split(';').map((s) => s.trim()).filter(Boolean);
