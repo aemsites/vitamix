@@ -91,6 +91,24 @@ function splitSheetPath(rel) {
   };
 }
 
+function rowMarket(row) {
+  return rowField(row, 'Market', 'market').toUpperCase();
+}
+
+/** Rows with no Market are visible everywhere; otherwise Market must match the current market. */
+function marketAllowed(row, market) {
+  const rowMkt = rowMarket(row);
+  if (!rowMkt) return true;
+  if (!market) return true;
+  return rowMkt === market.toUpperCase();
+}
+
+/** Derives the storefront market (e.g. `US`/`CA`) from a catalog path like `/ca/en_us/...`. */
+function marketFromCatalogPath(path) {
+  const seg = String(path || '').replace(/^\/+/, '').split('/')[0] || '';
+  return seg.toUpperCase();
+}
+
 function absoluteAssetUrl(urlKey, rel) {
   const tail = String(rel || '').replace(/^\/+/, '').trim();
   if (!tail) return '';
@@ -138,10 +156,12 @@ function mediaList(entries) {
  * @param {object} product ProductBus entry
  * @param {object[]} rows images.json `data`
  * @param {string} urlKey
+ * @param {string} [market] current market (e.g. `US`/`CA`); rows for other markets are skipped
  */
-export function planImageSync(product, rows, urlKey) {
+export function planImageSync(product, rows, urlKey, market) {
   const byColor = new Map();
   (Array.isArray(rows) ? rows : []).forEach((row) => {
+    if (!marketAllowed(row, market)) return;
     const parsed = mediaFromRow(row, urlKey);
     if (!parsed) return;
     const list = byColor.get(parsed.colorSlug) || [];
@@ -366,7 +386,8 @@ export async function startProductImageSync({
   if (!base.path) {
     throw new Error('Product is missing a catalog path; cannot write via the commerce API.');
   }
-  const plan = planImageSync(base, rows, urlKey);
+  const market = marketFromCatalogPath(base.path);
+  const plan = planImageSync(base, rows, urlKey, market);
   const saved = await openPlanDialog(plan, previewSrc, async (nextProduct) => {
     await putOrPatchResource(catalogApiPath(nextProduct.path), nextProduct);
     showToast('Images synced');
