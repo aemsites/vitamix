@@ -9,6 +9,7 @@ import {
 } from '../storage/util.js';
 import { getCartFromLocalStorage } from './util.js';
 import { getLocaleAndLanguage, openModal } from '../scripts.js';
+import { logError } from '../operations-log.js';
 
 /* Queries */
 const cartQueryFragment = `fragment cartQuery on Cart {
@@ -452,15 +453,50 @@ export async function addToCart(sku, options, quantity) {
         }],
       };
 
-      const { data, errors } = await performMonolithGraphQLQuery(
+      const requestAddToCart = () => performMonolithGraphQLQuery(
         addProductsToCartMutation,
         variables,
         false,
         false,
       );
-      handleCartErrors(errors);
 
-      const { cart, user_errors: userErrors } = data.addProductsToCart;
+      let response = await requestAddToCart();
+      handleCartErrors(response.errors);
+
+      // handleCartErrors resolves recoverable errors (missing cart, no access,
+      // invalid input) by resetting the cart and returning without throwing. In
+      // those cases Magento returns a null `addProductsToCart`, so guard before
+      // destructuring to avoid a cryptic "Cannot destructure property 'cart'
+      // from null" crash. This has also been observed with no `errors` at all
+      // (an apparent transient Magento glitch) — log the full response body
+      // (not just `data`/`errors`) since we don't yet know what shape it takes
+      // when this happens, then retry once before treating it as a real
+      // failure and surfacing the generic error the user_errors path does.
+      if (!response.data?.addProductsToCart) {
+        logError('cart.add-to-cart', new Error('addProductsToCart returned null'), {
+          attempt: 1,
+          sku,
+          quantity,
+          responseBody: response,
+        });
+        console.error('No cart returned from addProductsToCart, retrying once', response);
+        response = await requestAddToCart();
+        handleCartErrors(response.errors);
+      }
+
+      if (!response.data?.addProductsToCart) {
+        logError('cart.add-to-cart', new Error('addProductsToCart returned null after retry'), {
+          attempt: 2,
+          sku,
+          quantity,
+          responseBody: response,
+        });
+        const { locale, language } = getLocaleAndLanguage();
+        await openModal(`/${locale}/${language}/products/modals/atc-error`);
+        throw new Error('Failed to add item to cart: no cart returned');
+      }
+
+      const { cart, user_errors: userErrors } = response.data.addProductsToCart;
       if (userErrors && userErrors.length > 0) {
         const { locale, language } = getLocaleAndLanguage();
 
