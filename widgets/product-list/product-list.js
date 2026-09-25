@@ -4,7 +4,7 @@ import {
 } from '../../scripts/aem.js';
 import { formatPrice, buildVideo } from '../../scripts/scripts.js';
 import { loadFragment } from '../../blocks/fragment/fragment.js';
-import addToCompare, { useWidgetCompare, isInStoredCompare, getHeaderCompareHref } from '../../scripts/add-to-compare.js';
+import addToCompare, { isInStoredCompare, getHeaderCompareHref } from '../../scripts/add-to-compare.js';
 import { createCallouts, createStarRating } from '../../scripts/plp-data.js';
 import lookupProductListProducts, { getWidgetLocaleAndLanguage, getFacetDefinitions } from './products.js';
 
@@ -121,12 +121,8 @@ function createCompareButton(product, copy) {
   icon.setAttribute('aria-hidden', 'true');
   btn.appendChild(icon);
 
-  // Only the compare-products widget path tracks membership client-side (Magento's server-side
-  // compare list has no easy client-side "is this already in it?" check), so the "already added"
-  // (checkmark) state only applies there.
-  const widgetMode = useWidgetCompare();
   const updateState = () => {
-    const inCompare = widgetMode && isInStoredCompare(product.url);
+    const inCompare = isInStoredCompare(product.url);
     const label = inCompare
       ? (copy.viewComparisonList || 'View Comparison List')
       : (copy.addToComparisonList || 'Add to Comparison list');
@@ -138,7 +134,7 @@ function createCompareButton(product, copy) {
 
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
-    if (widgetMode && isInStoredCompare(product.url)) {
+    if (isInStoredCompare(product.url)) {
       // Already added: the checkmark navigates to the comparison list rather than removing it.
       const viewHref = getHeaderCompareHref();
       if (viewHref) window.location.href = viewHref;

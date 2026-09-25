@@ -630,17 +630,12 @@ export default async function decorate(block) {
     }
   }
 
-  // The compare nav item can come from either compare implementation (see
-  // scripts/add-to-compare.js): Magento's server-side compare list (compare_products_count
-  // cookie) or the compare-products widget's localStorage-backed list. Toggle (rather than
-  // destroy) so it can react live to the widget adding/removing without a page reload.
+  // Toggle rather than destroy so the item reacts live to compare-list changes.
   const updateCompareVisibility = () => {
-    const hasMagentoCompare = Boolean(getCookies().compare_products_count)
-      && getCookies().compare_products_count !== '0';
     const hasWidgetCompare = getStoredComparePaths().length > 0;
     const compare = block.querySelector('li .icon-compare');
     if (!compare) return;
-    compare.closest('li').setAttribute('aria-hidden', String(!(hasMagentoCompare || hasWidgetCompare)));
+    compare.closest('li').setAttribute('aria-hidden', String(!hasWidgetCompare));
   };
   updateCompareVisibility();
   window.addEventListener(COMPARE_STORAGE_EVENT, updateCompareVisibility);

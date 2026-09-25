@@ -1,8 +1,4 @@
 import { loadCSS } from './aem.js';
-import { getLocaleAndLanguage } from './scripts.js';
-import { openModal } from '../blocks/modal/modal.js';
-
-const AEM_NETWORK_ORIGIN = 'https://main--vitamix--aemsites.aem.network';
 
 /** localStorage key for the compare-products widget's persisted comparison list. */
 const STORAGE_KEY = 'vitamix-compare-products';
@@ -14,20 +10,6 @@ export const COMPARE_STORAGE_EVENT = 'vitamix:compare-products-updated';
 
 /** Max products the compare-products widget's localStorage-backed list can hold at once. */
 export const MAX_COMPARE_ITEMS = 4;
-
-/** Path prefixes that use the client-side compare-products widget (localStorage-backed) instead
- *  of Magento's server-side compare list. */
-const WIDGET_COMPARE_PATH_PREFIXES = ['/drafts/'];
-
-/**
- * Whether the given path should add to the compare-products widget's localStorage list instead
- * of Magento's server-side compare list.
- * @param {string} [pathname] - Defaults to the current page's pathname
- * @returns {boolean}
- */
-export function useWidgetCompare(pathname = window.location.pathname) {
-  return WIDGET_COMPARE_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix));
-}
 
 /**
  * Normalizes one stored entry to `{ url, title, image }`. Accepts legacy bare-string entries
@@ -125,8 +107,7 @@ export function getHeaderCompareHref() {
 /**
  * Shows a transient compare-list toast (add/remove/limit-reached), with small round thumbnails
  * of every item currently in the comparison list and a "View Comparison" link (reusing the
- * header's compare link) when one is available. Used by the compare-products widget path, which
- * - unlike Magento's compare-add flow - has no confirmation modal of its own.
+ * header's compare link) when one is available.
  * @param {string} message
  * @param {Object} [options]
  * @param {string} [options.viewComparisonLabel] - Localized override for the link text
@@ -197,116 +178,21 @@ function getProductThumb(product) {
 
 /**
  * Removes a product from the compare-products widget's stored list and shows a confirmation
- * toast. No-op (Magento path has no client-side "remove" of its own) unless in widget mode.
+ * toast.
  * @param {string} path
  * @param {Object} [options]
  * @param {string} [options.removedMessage] - Localized override for the toast text
  * @param {string} [options.viewComparisonLabel] - Localized override for the toast link text
  */
 export function removeFromCompare(path, options = {}) {
-  if (!useWidgetCompare()) return;
   setStoredCompareItems(getStoredCompareItems().filter((item) => item.url !== path));
   showCompareToast(options.removedMessage || DEFAULT_REMOVED_MESSAGE, options);
 }
 
 /**
- * Whether to route product-page fetches through the fcors proxy (localhost, .aem.page, .aem.live).
- * @returns {boolean}
- */
-function useFcors() {
-  const { hostname } = window.location;
-  return hostname === 'localhost'
-    || hostname.endsWith('.aem.page')
-    || hostname.endsWith('.aem.live');
-}
-
-/**
- * Fetches a product page's HTML so its JSON-LD (and Magento entityId) can be read.
- * @param {string} path - Product path (e.g. /us/en_us/products/ascent-x2)
- * @returns {Promise<string|null>}
- */
-async function fetchProductPageHtml(path) {
-  const pathOnly = path.startsWith('http') ? new URL(path).pathname : path;
-  let resp;
-  if (useFcors()) {
-    const corsProxy = 'https://fcors.org/?url=';
-    const corsKey = '&key=Mg23N96GgR8O3NjU';
-    const fullUrl = `${AEM_NETWORK_ORIGIN}${pathOnly}`;
-    resp = await fetch(`${corsProxy}${encodeURIComponent(fullUrl)}${corsKey}`);
-  } else {
-    resp = await fetch(pathOnly);
-  }
-  return resp.ok ? resp.text() : null;
-}
-
-/**
- * Resolves a product's Magento entityId, fetching and scraping its page's JSON-LD when the
- * caller doesn't already know it (e.g. product-list cards, which have no entityId of their own -
- * unlike a PDP, which already has it from its own page's JSON-LD). Caches the result on the
- * product object so repeat adds skip the fetch.
- * @param {Object} product - { url, entityId? }
- * @returns {Promise<string|null>}
- */
-async function resolveEntityId(product) {
-  if (product.entityId) return product.entityId;
-  if (!product.url) return null;
-  try {
-    const html = await fetchProductPageHtml(product.url);
-    if (!html) return null;
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    const jsonLdScript = doc.querySelector('script[type="application/ld+json"]');
-    if (!jsonLdScript?.textContent) return null;
-    const jsonLd = JSON.parse(jsonLdScript.textContent);
-    const entityId = jsonLd?.custom?.entityId || null;
-    product.entityId = entityId;
-    return entityId;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Adds a product to Magento's server-side compare list: POSTs to the compare-add endpoint, then
- * opens the confirmation modal (previously duplicated in pdp.js and product-list.js).
- * @param {Object} product - { url, title, entityId? }
- * @returns {Promise<boolean>} Whether the add succeeded
- */
-async function addToMagentoCompare(product) {
-  const { locale, language } = getLocaleAndLanguage();
-  const entityId = await resolveEntityId(product);
-  if (!entityId) return false;
-
-  const resp = await fetch(`/${locale}/${language}/catalog/product_compare/add/`, {
-    headers: {
-      'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
-      'x-requested-with': 'XMLHttpRequest',
-    },
-    body: `product=${entityId}&uenc=${encodeURIComponent(window.location.href)}`,
-    method: 'POST',
-    credentials: 'include',
-  });
-  if (!resp.ok) return false;
-
-  const modal = await openModal(`/${locale}/${language}/products/modals/compare`);
-  if (modal) {
-    const content = modal.querySelector('.default-content-wrapper');
-    const productEl = document.createElement('p');
-    productEl.className = 'product';
-    productEl.textContent = product.title || '';
-    content?.prepend(productEl);
-  }
-  return true;
-}
-
-/**
- * Adds a product to the comparison list - the single place PDP and product-list "Compare"
- * buttons call. Routes to the client-side compare-products widget's localStorage-backed list
- * (capped at MAX_COMPARE_ITEMS) on /drafts/* paths, or Magento's server-side compare list (POST +
- * confirmation modal) everywhere else, so the two implementations can be switched centrally.
- * The widget path has no confirmation modal of its own, so it shows a toast instead (thumbnails
- * of the current list + a "View Comparison" link reusing the header's compare link), or a
- * "limit reached" toast if the list is already full.
- * @param {Object} product - { url, title, entityId?, image? }
+ * Adds a product to the localStorage-backed comparison list used by PDP and product-list.
+ * The list is capped at MAX_COMPARE_ITEMS and shows a toast after adding or reaching the limit.
+ * @param {Object} product - { url, title, image? }
  * @param {Object} [options]
  * @param {string} [options.addedMessage] - Localized override for the "added" toast text
  * @param {string} [options.limitMessage] - Localized override for the "limit reached" toast text
@@ -314,22 +200,19 @@ async function addToMagentoCompare(product) {
  * @returns {Promise<boolean>} Whether the add succeeded
  */
 export default async function addToCompare(product, options = {}) {
-  if (useWidgetCompare()) {
-    const current = getStoredCompareItems();
-    if (current.some((item) => item.url === product.url)) return true; // already in the list
+  const current = getStoredCompareItems();
+  if (current.some((item) => item.url === product.url)) return true;
 
-    if (current.length >= MAX_COMPARE_ITEMS) {
-      showCompareToast(options.limitMessage || DEFAULT_LIMIT_MESSAGE, options);
-      return false;
-    }
-
-    setStoredCompareItems([...current, {
-      url: product.url,
-      title: product.title || '',
-      image: getProductThumb(product),
-    }]);
-    showCompareToast(options.addedMessage || DEFAULT_ADDED_MESSAGE, options);
-    return true;
+  if (current.length >= MAX_COMPARE_ITEMS) {
+    showCompareToast(options.limitMessage || DEFAULT_LIMIT_MESSAGE, options);
+    return false;
   }
-  return addToMagentoCompare(product);
+
+  setStoredCompareItems([...current, {
+    url: product.url,
+    title: product.title || '',
+    image: getProductThumb(product),
+  }]);
+  showCompareToast(options.addedMessage || DEFAULT_ADDED_MESSAGE, options);
+  return true;
 }
