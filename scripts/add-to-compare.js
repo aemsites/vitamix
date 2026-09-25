@@ -20,7 +20,7 @@ const DEFAULT_LIMIT_MESSAGE = `You can compare up to ${MAX_COMPARE_ITEMS} produc
 const DEFAULT_VIEW_COMPARISON_LABEL = 'View Comparison';
 
 /** How long the compare toast stays visible, in ms. */
-const TOAST_VISIBLE_MS = 3000;
+const TOAST_VISIBLE_MS = 15000;
 
 let toastHideTimer;
 
