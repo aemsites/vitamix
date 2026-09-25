@@ -8,6 +8,7 @@ import {
 import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
 import { PB_ORG, PB_SITE } from './commerce-pbus-config.js';
 import { showToast } from './commerce-otp-ui.js';
+import { getProductRefFromIndex } from './pim.js';
 
 /** Product JSON edits are production-only (active API env, not staging). */
 function canUseEditMode() {
@@ -41,6 +42,7 @@ function getIndexUrl() {
 
 let currentProductData = null;
 let currentIndexByUrlKey = {};
+let currentProductRef = '';
 let editMode = false;
 
 function getProductParam() {
@@ -95,8 +97,9 @@ function showError(message) {
   el.classList.add('active');
 }
 
-async function fetchProductJson(urlKey) {
-  const url = `${getProductJsonBase()}${encodeURIComponent(urlKey)}.json`;
+async function fetchProductJson(productRef) {
+  const encodedPath = productRef.split('/').map(encodeURIComponent).join('/');
+  const url = `${getProductJsonBase()}${encodedPath}.json`;
   const fetchUrl = CORS_PROXY + encodeURIComponent(url) + CORS_KEY;
   const response = await fetch(fetchUrl);
   if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -217,7 +220,8 @@ function renderLinkedProducts(paths, indexByUrlKey, sectionTitle, pathKey, isEdi
     const urlKey = pathToUrlKey(path);
     const product = indexByUrlKey[urlKey];
     const catalog = getCatalogFromParams();
-    const detailHref = `product-detail.html?catalog=${encodeURIComponent(catalog)}&product=${encodeURIComponent(urlKey)}`;
+    const productRef = product ? getProductRefFromIndex(product, catalog) : urlKey;
+    const detailHref = `product-detail.html?catalog=${encodeURIComponent(catalog)}&product=${encodeURIComponent(productRef)}`;
     const name = product ? (product.title || product.name || product.sku || urlKey) : urlKey;
     const imgSrc = product && product.image ? resolveIndexImageUrl(product.image) : '';
     const delBtn = isEditMode ? `<button type="button" class="pim-edit-delete" data-edit-path="${escapeHtml(pathKey)}" data-edit-index="${i}" aria-label="Delete">×</button>` : '';
@@ -357,7 +361,7 @@ function renderProduct(data, indexByUrlKey = {}, isEditMode = false) {
       ? `<div class="pim-detail-section"><h3 class="pim-detail-section-title">Raw metadata</h3><pre class="pim-detail-raw">${escapeHtml(JSON.stringify(data.metadata, null, 2))}</pre></div>`
       : '',
     renderDeleteProduct(
-      normalizeProductPath(data.path || `/${getCatalogFromParams()}/products/${getProductParam()}`),
+      normalizeProductPath(data.path || `/${getCatalogFromParams()}/products/${currentProductRef}`),
       isEditMode,
     ),
   ];
@@ -584,14 +588,14 @@ function attachEditHandlers() {
   if (syncBtn instanceof HTMLButtonElement) {
     syncBtn.addEventListener('click', async () => {
       if (!canUseEditMode() || !currentProductData) return;
-      const urlKey = getProductParam();
+      const urlKey = pathToUrlKey(currentProductRef);
       syncBtn.disabled = true;
       const prevLabel = syncBtn.textContent;
       syncBtn.textContent = 'Fetching…';
       try {
         const product = { ...currentProductData };
         if (!product.path) {
-          product.path = `/${getCatalogFromParams()}/products/${urlKey}`;
+          product.path = `/${getCatalogFromParams()}/products/${currentProductRef}`;
         }
         await startProductImageSync({
           product,
@@ -616,7 +620,7 @@ function attachEditHandlers() {
     deleteBtn.addEventListener('click', () => {
       const productPath = normalizeProductPath(
         currentProductData.path
-          || `/${getCatalogFromParams()}/products/${getProductParam()}`,
+          || `/${getCatalogFromParams()}/products/${currentProductRef}`,
       );
       openDeleteProductDialog(productPath);
     });
@@ -650,15 +654,15 @@ function refreshDetailContent() {
 /* eslint-enable no-use-before-define */
 
 async function init() {
-  const urlKey = getProductParam();
+  const productRef = getProductParam();
   const loading = document.getElementById('loading');
   const content = document.getElementById('content');
   const errorEl = document.getElementById('error');
   const toolbar = document.getElementById('toolbar');
   const editCheckbox = document.getElementById('editModeCheckbox');
 
-  if (!urlKey) {
-    showError('Missing product parameter. Use ?product=urlKey');
+  if (!productRef) {
+    showError('Missing product parameter. Use ?product=path');
     loading.classList.remove('active');
     return;
   }
@@ -668,10 +672,22 @@ async function init() {
   errorEl.classList.remove('active');
 
   try {
-    const [data, indexData] = await Promise.all([
-      fetchProductJson(urlKey),
-      fetchProductsIndex().catch(() => []),
-    ]);
+    const indexPromise = fetchProductsIndex().catch(() => []);
+    currentProductRef = productRef;
+    let data;
+    try {
+      data = await fetchProductJson(productRef);
+    } catch (err) {
+      if (!/^HTTP 404\b/.test(err.message)) throw err;
+      const index = buildIndexByUrlKey(await indexPromise);
+      const indexedProduct = index[pathToUrlKey(productRef)];
+      const indexedRef = indexedProduct
+        && getProductRefFromIndex(indexedProduct, getCatalogFromParams());
+      if (!indexedRef || indexedRef === productRef) throw err;
+      data = await fetchProductJson(indexedRef);
+      currentProductRef = indexedRef;
+    }
+    const indexData = await indexPromise;
     currentProductData = JSON.parse(JSON.stringify(data));
     currentIndexByUrlKey = buildIndexByUrlKey(indexData);
     loading.classList.remove('active');
@@ -700,7 +716,7 @@ async function init() {
         try {
           const product = { ...currentProductData };
           if (!product.path) {
-            product.path = `/${getCatalogFromParams()}/products/${urlKey}`;
+            product.path = `/${getCatalogFromParams()}/products/${currentProductRef}`;
           }
           await startProductExportImport({
             product,

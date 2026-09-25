@@ -226,6 +226,19 @@ export function getUrlKeyFromProduct(p) {
   return p.urlKey || (p.url ? p.url.replace(/\/$/, '').split('/').pop() : '') || p.sku || '';
 }
 
+export function getProductRefFromIndex(p, localePath) {
+  if (p.url) {
+    try {
+      const prefix = `/${localePath}/products/`;
+      const path = new URL(p.url).pathname;
+      if (path.startsWith(prefix)) return path.slice(prefix.length).replace(/\/$/, '');
+    } catch {
+      return getUrlKeyFromProduct(p);
+    }
+  }
+  return getUrlKeyFromProduct(p);
+}
+
 function enrichForSort(p) {
   return {
     ...p,
@@ -301,12 +314,14 @@ export function renderProductList(parents, query = '') {
     const availabilityClass = (availability || '').toLowerCase().replace(/\s+/g, '-');
     const price = product.price != null ? String(product.price) : '';
     const urlKey = getUrlKeyFromProduct(product);
+    const productRef = getProductRefFromIndex(product, currentLocalePath);
 
     const title = product.title || product.sku;
     const tr = document.createElement('tr');
     const selectedProduct = readProductFromParams();
-    tr.className = `pim-row${selectedProduct && urlKey === selectedProduct ? ' pim-row-selected' : ''}`;
+    tr.className = `pim-row${selectedProduct && productRef === selectedProduct ? ' pim-row-selected' : ''}`;
     tr.dataset.urlkey = urlKey;
+    tr.dataset.product = productRef;
     tr.setAttribute('role', 'button');
     tr.tabIndex = 0;
     const thumbCell = imgUrl
@@ -328,7 +343,7 @@ export function renderProductList(parents, query = '') {
   const productFromUrl = readProductFromParams();
   if (productFromUrl) {
     const selectedRow = [...tbody.querySelectorAll('tr.pim-row')].find(
-      (tr) => tr.dataset.urlkey === productFromUrl,
+      (tr) => tr.dataset.product === productFromUrl,
     );
     if (selectedRow) {
       selectedRow.classList.add('pim-row-selected');
@@ -422,17 +437,17 @@ export async function init() {
 
     document.getElementById('productList').addEventListener('click', (e) => {
       const row = e.target.closest('tr.pim-row');
-      if (!row || !row.dataset.urlkey) return;
+      if (!row || !row.dataset.product) return;
       const catalog = currentLocalePath ? `catalog=${encodeURIComponent(currentLocalePath)}&` : '';
-      window.location.href = `product-detail.html?${catalog}product=${encodeURIComponent(row.dataset.urlkey)}`;
+      window.location.href = `product-detail.html?${catalog}product=${encodeURIComponent(row.dataset.product)}`;
     });
     document.getElementById('productList').addEventListener('keydown', (e) => {
       const row = e.target.closest('tr.pim-row');
-      if (!row || !row.dataset.urlkey) return;
+      if (!row || !row.dataset.product) return;
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         const catalog = currentLocalePath ? `catalog=${encodeURIComponent(currentLocalePath)}&` : '';
-        window.location.href = `product-detail.html?${catalog}product=${encodeURIComponent(row.dataset.urlkey)}`;
+        window.location.href = `product-detail.html?${catalog}product=${encodeURIComponent(row.dataset.product)}`;
       }
     });
 
