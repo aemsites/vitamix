@@ -1,87 +1,17 @@
 import { loadCSS } from './aem.js';
+import {
+  getCompareSlug, getStoredCompareItems, setStoredCompareItems, MAX_COMPARE_ITEMS,
+} from './compare-storage.js';
 
-/** localStorage key for the compare-products widget's persisted comparison list. */
-const STORAGE_KEY = 'vitamix-compare-products';
-
-/** Dispatched on `window` whenever the stored compare list changes, so same-tab listeners
- *  (e.g. the header's compare icon, other "Compare" buttons for the same product) can react
- *  without a page reload. */
-export const COMPARE_STORAGE_EVENT = 'vitamix:compare-products-updated';
-
-/** Max products the compare-products widget's localStorage-backed list can hold at once. */
-export const MAX_COMPARE_ITEMS = 4;
-
-/**
- * Normalizes one stored entry to `{ url, title, image }`. Accepts legacy bare-string entries
- * (paths only, from before thumbnails were tracked) so existing localStorage state isn't lost.
- * @param {string|Object} raw
- * @returns {{url: string, title: string, image: string}|null}
- */
-function normalizeStoredItem(raw) {
-  if (typeof raw === 'string' && raw) return { url: raw, title: '', image: '' };
-  if (raw && typeof raw === 'object' && typeof raw.url === 'string' && raw.url) {
-    return { url: raw.url, title: raw.title || '', image: raw.image || '' };
-  }
-  return null;
-}
-
-/**
- * Reads the compare-products widget's persisted comparison list from localStorage.
- * @returns {Array<{url: string, title: string, image: string}>}
- */
-export function getStoredCompareItems() {
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    if (!Array.isArray(parsed)) return [];
-    return parsed.map(normalizeStoredItem).filter(Boolean);
-  } catch {
-    return [];
-  }
-}
-
-/**
- * Reads just the product paths from the stored comparison list.
- * @returns {string[]}
- */
-export function getStoredComparePaths() {
-  return getStoredCompareItems().map((item) => item.url);
-}
-
-/**
- * Whether a product path is already in the stored comparison list.
- * @param {string} path
- * @returns {boolean}
- */
-export function isInStoredCompare(path) {
-  return getStoredComparePaths().includes(path);
-}
-
-/**
- * Persists the compare-products widget's comparison list to localStorage (deduped by url, capped
- * at MAX_COMPARE_ITEMS) and notifies same-tab listeners (localStorage's native `storage` event
- * only fires in *other* tabs).
- * @param {Array<{url: string, title?: string, image?: string}>} items
- * @returns {Array<{url: string, title: string, image: string}>} The stored (deduped/capped) items
- */
-export function setStoredCompareItems(items) {
-  const seen = new Set();
-  const unique = [];
-  (items || []).forEach((raw) => {
-    const item = normalizeStoredItem(raw);
-    if (!item || seen.has(item.url)) return;
-    seen.add(item.url);
-    unique.push(item);
-  });
-  const capped = unique.slice(0, MAX_COMPARE_ITEMS);
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(capped));
-  } catch {
-    // localStorage unavailable (e.g. private browsing) - state just won't persist
-  }
-  window.dispatchEvent(new CustomEvent(COMPARE_STORAGE_EVENT, { detail: { items: capped } }));
-  return capped;
-}
+export {
+  COMPARE_STORAGE_EVENT,
+  getCompareSlug,
+  getStoredCompareItems,
+  getStoredCompareSlugs,
+  isInStoredCompare,
+  MAX_COMPARE_ITEMS,
+  setStoredCompareItems,
+} from './compare-storage.js';
 
 /** Default (English) toast text; callers can pass localized overrides via `options`. */
 const DEFAULT_ADDED_MESSAGE = 'Successfully added to comparison';
@@ -90,7 +20,7 @@ const DEFAULT_LIMIT_MESSAGE = `You can compare up to ${MAX_COMPARE_ITEMS} produc
 const DEFAULT_VIEW_COMPARISON_LABEL = 'View Comparison';
 
 /** How long the compare toast stays visible, in ms. */
-const TOAST_VISIBLE_MS = 3000;
+const TOAST_VISIBLE_MS = 15000;
 
 let toastHideTimer;
 
@@ -179,13 +109,14 @@ function getProductThumb(product) {
 /**
  * Removes a product from the compare-products widget's stored list and shows a confirmation
  * toast.
- * @param {string} path
+ * @param {string} value - Product slug, path, or URL
  * @param {Object} [options]
  * @param {string} [options.removedMessage] - Localized override for the toast text
  * @param {string} [options.viewComparisonLabel] - Localized override for the toast link text
  */
-export function removeFromCompare(path, options = {}) {
-  setStoredCompareItems(getStoredCompareItems().filter((item) => item.url !== path));
+export function removeFromCompare(value, options = {}) {
+  const slug = getCompareSlug(value);
+  setStoredCompareItems(getStoredCompareItems().filter((item) => item.slug !== slug));
   showCompareToast(options.removedMessage || DEFAULT_REMOVED_MESSAGE, options);
 }
 
@@ -200,8 +131,10 @@ export function removeFromCompare(path, options = {}) {
  * @returns {Promise<boolean>} Whether the add succeeded
  */
 export default async function addToCompare(product, options = {}) {
+  const slug = getCompareSlug(product.url || product.slug);
+  if (!slug) return false;
   const current = getStoredCompareItems();
-  if (current.some((item) => item.url === product.url)) return true;
+  if (current.some((item) => item.slug === slug)) return true;
 
   if (current.length >= MAX_COMPARE_ITEMS) {
     showCompareToast(options.limitMessage || DEFAULT_LIMIT_MESSAGE, options);
@@ -209,7 +142,7 @@ export default async function addToCompare(product, options = {}) {
   }
 
   setStoredCompareItems([...current, {
-    url: product.url,
+    slug,
     title: product.title || '',
     image: getProductThumb(product),
   }]);
