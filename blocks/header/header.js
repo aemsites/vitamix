@@ -630,12 +630,18 @@ export default async function decorate(block) {
     }
   }
 
-  // Toggle rather than destroy so the item reacts live to compare-list changes.
+  // Toggle and update the badge live as products are added or removed.
   const updateCompareVisibility = () => {
-    const hasWidgetCompare = getStoredCompareSlugs().length > 0;
+    const count = getStoredCompareSlugs().length;
     const compare = block.querySelector('li .icon-compare');
     if (!compare) return;
-    compare.closest('li').setAttribute('aria-hidden', String(!hasWidgetCompare));
+    compare.closest('li').setAttribute('aria-hidden', String(count === 0));
+    if (!compareLink) return;
+    if (count > 0) {
+      compareLink.dataset.compareItems = String(count);
+    } else {
+      delete compareLink.dataset.compareItems;
+    }
   };
   updateCompareVisibility();
   window.addEventListener(COMPARE_STORAGE_EVENT, updateCompareVisibility);
