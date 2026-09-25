@@ -16,7 +16,7 @@ import {
   formatPrice,
 } from '../../scripts/scripts.js';
 import addToCompare, {
-  useWidgetCompare, isInStoredCompare, removeFromCompare,
+  isInStoredCompare, removeFromCompare,
 } from '../../scripts/add-to-compare.js';
 
 /**
@@ -97,32 +97,19 @@ function renderFAQ(ph) {
 }
 
 function renderCompare(ph, jsonLdData) {
-  const { locale, language } = getLocaleAndLanguage();
-  const { custom, image } = jsonLdData;
-  const { entityId } = custom;
+  const { image } = jsonLdData;
   const path = window.location.pathname;
-  const widgetMode = useWidgetCompare();
-  const comparisonLabel = ph.viewComparisonList || 'View Comparison List';
-  const comparisonLinkText = comparisonLabel.endsWith('.')
-    ? comparisonLabel
-    : `${comparisonLabel}.`;
   const compareContainer = document.createElement('div');
   compareContainer.classList.add('pdp-compare-container');
-  // The Magento compare index page only makes sense for the Magento server-side compare list.
-  const viewListLink = widgetMode ? '' : `<a href="/${locale}/${language}/catalog/product_compare/index/" title="${comparisonLabel}" class="comparelistlink">${comparisonLinkText}</a>`;
   compareContainer.innerHTML = `
     <div>
       <button class="pdp-compare-button">${ph.compare || 'Compare'}</button>
-      ${viewListLink}
     </div>`;
 
   const compareButton = compareContainer.querySelector('.pdp-compare-button');
 
-  // Only the compare-products widget path tracks membership client-side (Magento's server-side
-  // compare list has no easy client-side "is this already in it?" check), so the toggle-to-
-  // "Remove from Compare" state only applies there.
   const updateLabel = () => {
-    const inCompare = widgetMode && isInStoredCompare(path);
+    const inCompare = isInStoredCompare(path);
     compareButton.textContent = inCompare
       ? (ph.removeFromCompare || 'Remove from Compare')
       : (ph.compare || 'Compare');
@@ -131,14 +118,13 @@ function renderCompare(ph, jsonLdData) {
   updateLabel();
 
   compareButton.addEventListener('click', () => {
-    if (widgetMode && isInStoredCompare(path)) {
+    if (isInStoredCompare(path)) {
       removeFromCompare(path, { viewComparisonLabel: ph.viewComparison });
     } else {
       addToCompare({
         url: path,
         title: document.querySelector('h1')?.textContent || '',
         image: Array.isArray(image) ? image[0] : image,
-        entityId,
       }, {
         addedMessage: ph.addedToComparison,
         limitMessage: ph.compareLimitReached,
