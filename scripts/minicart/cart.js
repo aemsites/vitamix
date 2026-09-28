@@ -9,6 +9,7 @@ import {
 } from '../storage/util.js';
 import { getCartFromLocalStorage } from './util.js';
 import { getLocaleAndLanguage, openModal } from '../scripts.js';
+import { logError } from '../operations-log.js';
 
 /* Queries */
 const cartQueryFragment = `fragment cartQuery on Cart {
@@ -452,15 +453,27 @@ export async function addToCart(sku, options, quantity) {
         }],
       };
 
-      const { data, errors } = await performMonolithGraphQLQuery(
+      const response = await performMonolithGraphQLQuery(
         addProductsToCartMutation,
         variables,
         false,
         false,
       );
-      handleCartErrors(errors);
+      handleCartErrors(response.errors);
 
-      const { cart, user_errors: userErrors } = data.addProductsToCart;
+      // null on recoverable errors or transient failures; don't retry (may double-add)
+      if (!response.data?.addProductsToCart) {
+        logError('cart.add-to-cart', new Error('addProductsToCart returned null'), {
+          sku,
+          quantity,
+          responseBody: response,
+        });
+        const { locale, language } = getLocaleAndLanguage();
+        await openModal(`/${locale}/${language}/products/modals/atc-error`);
+        throw new Error('Failed to add item to cart: no cart returned');
+      }
+
+      const { cart, user_errors: userErrors } = response.data.addProductsToCart;
       if (userErrors && userErrors.length > 0) {
         const { locale, language } = getLocaleAndLanguage();
 
