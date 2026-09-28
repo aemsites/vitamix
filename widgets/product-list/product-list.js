@@ -1,10 +1,10 @@
 /* eslint-disable max-len */
 import {
-  fetchPlaceholders, loadCSS, toClassName,
+  fetchPlaceholders, loadCSS, toClassName, createOptimizedPicture,
 } from '../../scripts/aem.js';
 import { formatPrice, buildVideo } from '../../scripts/scripts.js';
 import { loadFragment } from '../../blocks/fragment/fragment.js';
-import addToCompare, { useWidgetCompare, isInStoredCompare, getHeaderCompareHref } from '../../scripts/add-to-compare.js';
+import addToCompare, { isInStoredCompare, getHeaderCompareHref } from '../../scripts/add-to-compare.js';
 import { createCallouts, createStarRating } from '../../scripts/plp-data.js';
 import lookupProductListProducts, { getWidgetLocaleAndLanguage, getFacetDefinitions } from './products.js';
 
@@ -77,10 +77,7 @@ function hasVariants(product) {
 function createProductImage() {
   const wrap = document.createElement('div');
   wrap.className = 'product-list-widget-image-wrap';
-  const img = document.createElement('img');
-  img.loading = 'lazy';
-  wrap.appendChild(img);
-  return { wrap, img };
+  return wrap;
 }
 
 function getSortedVariants(product) {
@@ -97,14 +94,15 @@ function findVariantBySlug(product, colorSlug) {
   return product.variants.find((v) => v.color && toClassName(v.color) === colorSlug) || null;
 }
 
-function updateCardImage(img, product, variant) {
-  if (variant && variant.image) {
-    img.src = variant.image;
-    img.alt = variant.title || product.title || '';
-  } else {
-    img.src = product.image || '';
-    img.alt = product.title || '';
-  }
+function updateCardImage(wrap, product, variant) {
+  const src = variant && variant.image ? variant.image : product.image;
+  const alt = variant && variant.image ? variant.title || product.title : product.title;
+  const picture = createOptimizedPicture(src, alt, false, [
+    { media: '(min-width: 600px)', width: '750' },
+    { width: '300' },
+  ]);
+  wrap.querySelector('picture')?.remove();
+  wrap.prepend(picture);
 }
 
 function setSelectedSwatch(colorsEl, colorSlug) {
@@ -123,12 +121,8 @@ function createCompareButton(product, copy) {
   icon.setAttribute('aria-hidden', 'true');
   btn.appendChild(icon);
 
-  // Only the compare-products widget path tracks membership client-side (Magento's server-side
-  // compare list has no easy client-side "is this already in it?" check), so the "already added"
-  // (checkmark) state only applies there.
-  const widgetMode = useWidgetCompare();
   const updateState = () => {
-    const inCompare = widgetMode && isInStoredCompare(product.url);
+    const inCompare = isInStoredCompare(product.url);
     const label = inCompare
       ? (copy.viewComparisonList || 'View Comparison List')
       : (copy.addToComparisonList || 'Add to Comparison list');
@@ -140,7 +134,7 @@ function createCompareButton(product, copy) {
 
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
-    if (widgetMode && isInStoredCompare(product.url)) {
+    if (isInStoredCompare(product.url)) {
       // Already added: the checkmark navigates to the comparison list rather than removing it.
       const viewHref = getHeaderCompareHref();
       if (viewHref) window.location.href = viewHref;
@@ -283,12 +277,12 @@ function createProductListCard(product, ph, copy, activeColorSlug) {
   card.className = 'product-list-widget-product-card';
   card.setAttribute('role', 'listitem');
 
-  const { wrap: imageWrap, img } = createProductImage();
+  const imageWrap = createProductImage();
   imageWrap.append(createCallouts(product, copy), createCompareButton(product, copy));
 
   const title = createProductTitle(product);
   const colors = createProductColors(product, copy, (variant, swatch) => {
-    updateCardImage(img, product, variant);
+    updateCardImage(imageWrap, product, variant);
     setSelectedSwatch(colors, swatch.dataset.color);
   });
   const reviews = createStarRating(product);
@@ -299,7 +293,7 @@ function createProductListCard(product, ph, copy, activeColorSlug) {
   const initialVariant = findVariantBySlug(product, activeColorSlug)
     || getSortedVariants(product)[0]
     || null;
-  updateCardImage(img, product, initialVariant);
+  updateCardImage(imageWrap, product, initialVariant);
   if (initialVariant) setSelectedSwatch(colors, toClassName(initialVariant.color));
 
   card.append(imageWrap, title, colors, reviews);
@@ -437,6 +431,77 @@ async function createMarketingCard(item) {
   });
 
   return card;
+}
+
+// Maps legacy query params/values (old PLP links) to their current equivalents. The matched
+// `param` is always removed first, then `sets` is applied (which may re-add it with a new value).
+const LEGACY_QUERY_PARAM_MAP = [
+  {
+    param: 'product_series_value', value: '659_316_325_334_536', sets: { productType: 'Countertop Blending' },
+  },
+  {
+    param: 'blender_compatibility', value: '208', sets: { compatibility: 'Ascent Series' },
+  },
+  {
+    param: 'blender_compatibility', value: '491', sets: { compatibility: 'Propel Series' },
+  },
+  {
+    param: 'blender_compatibility', value: '653', sets: { compatibility: 'VX1, VX3' },
+  },
+  {
+    param: 'blender_compatibility', value: '551', sets: { compatibility: 'Legacy Series' },
+  },
+  {
+    param: 'catalog_product_type', value: '130_124_127_557_560', sets: { productType: 'Food Processing, Immersion Blending, Cookbook, Kitchen Tool, Smoothie Cup' },
+  },
+  {
+    param: 'blender_compatibility', value: '554', sets: { productType: 'Immersion Blending' },
+  },
+  {
+    param: 'product_series_value', value: '545', sets: { series: 'Immersion Blending' },
+  },
+  {
+    param: 'product_collections', value: '475', sets: { collections: 'Kitchen Systems & Bundles' },
+  },
+  {
+    param: 'catalog_product_type', value: '106_109_100', sets: { productType: 'Container, Food Processing' },
+  },
+  {
+    param: 'applications', value: '250', sets: { applications: 'Drinks & Smoothies' },
+  },
+  {
+    param: 'applications', value: '253_256', sets: { applications: 'Food Prep, Frozen Treats' },
+  },
+  {
+    param: 'catalog_product_type', value: '557', sets: { catalog_product_type: '557', productType: 'Immersion Blender' },
+  },
+  {
+    param: 'catalog_product_type', value: '118_112', sets: { productType: 'Commercial Container, Commercial Accessory' },
+  },
+  {
+    param: 'catalog_product_type', value: '118', sets: { catalog_product_type: '557', productType: 'Commercial Container' },
+  },
+  {
+    param: 'catalog_product_type', value: '112', sets: { catalog_product_type: '557', productType: 'Commercial Accessory' },
+  },
+  {
+    param: 'cat', value: '200', sets: { catalog_product_type: '557', applications: 'Food Prep' },
+  },
+];
+
+/**
+ * Rewrites any legacy query param/value pair to its current equivalent and pushes the
+ * resulting URL so the browser history reflects the redirect before filters are read.
+ */
+function redirectLegacyQueryParams() {
+  const params = new URLSearchParams(window.location.search);
+  const match = LEGACY_QUERY_PARAM_MAP.find((m) => params.get(m.param) === m.value);
+  if (!match) return;
+  params.delete(match.param);
+  Object.entries(match.sets).forEach(([key, value]) => params.set(key, value));
+  const search = params.toString();
+  const url = `${window.location.pathname}${search ? `?${search}` : ''}${window.location.hash || ''}`;
+  window.history.pushState(null, '', url);
 }
 
 /**
@@ -884,6 +949,7 @@ function getFilterConfigFromInputs(widget) {
 export default async function decorate(widget) {
   const configMode = widget.classList.contains('product-list-config-mode');
   if (!configMode && !isWidgetConfigPage()) {
+    redirectLegacyQueryParams();
     stripQueryParams(['show']);
   }
   delete widget.dataset.show;

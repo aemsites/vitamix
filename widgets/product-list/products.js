@@ -166,7 +166,6 @@ export default async function lookupProductListProducts(config = {}, facets = {}
 
         const augmented = indexBySlug[slug];
         const product = { ...augmented };
-        product.url = urlPathname;
         if (!product.title) product.title = titleFromUrl(urlPathname);
         product.bullets = (row.Bullets || '').split(';').map((s) => s.trim()).filter(Boolean);
         product.comparisonFeatures = (row['Comparison Features'] || '').split(';').map((s) => s.trim()).filter(Boolean);

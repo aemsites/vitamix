@@ -327,6 +327,10 @@ main > .recipe-container.section > .recipe-wrapper {
   text-decoration: none;
 }
 
+.recipe .recipe-toolbar .recipe-save.is-saved .recipe-save-label {
+  font-weight: 600;
+}
+
 .recipe .recipe-toolbar button img,
 .recipe .recipe-toolbar a.recipe-save img {
   margin-right: 0.5ch;
@@ -345,7 +349,7 @@ main > .recipe-container.section > .recipe-wrapper {
     padding: var(--spacing-60) var(--spacing-80);
   }
 
-  .recipe .recipe-toolbar > a.recipe-save + button::before,
+  .recipe .recipe-toolbar > .recipe-save + button::before,
   .recipe .recipe-toolbar > button + .recipe-share-wrapper::before {
     content: '';
     position: absolute;

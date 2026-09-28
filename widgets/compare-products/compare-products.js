@@ -3,14 +3,14 @@ import {
 } from '../../scripts/aem.js';
 import { formatPrice } from '../../scripts/scripts.js';
 import {
-  getStoredComparePaths, setStoredCompareItems, MAX_COMPARE_ITEMS,
+  getCompareSlug, getStoredCompareSlugs, setStoredCompareItems, MAX_COMPARE_ITEMS,
 } from '../../scripts/add-to-compare.js';
 import lookupProductListProducts, { getWidgetLocaleAndLanguage } from '../product-list/products.js';
 
 /** Show "add a product" grid until this many products are in the comparison */
 const MAX_COMPARISON_PRODUCTS = MAX_COMPARE_ITEMS;
 
-/** Query param carrying the comma-separated product paths being compared. */
+/** Query param carrying the comma-separated product slugs being compared. */
 const COMPARE_PARAM = 'compare-products';
 
 /** Sentinel for a comparison-feature bullet with no ":value" part (a plain included feature). */
@@ -32,42 +32,25 @@ async function loadWidgetCopy(lang) {
 }
 
 /**
- * Normalize a product path/URL to a pathname for comparison-by-path matching.
- * @param {string} value - Path or absolute URL
- * @returns {string}
- */
-function normalizePath(value) {
-  if (!value || typeof value !== 'string') return '';
-  let pathname = value;
-  try {
-    pathname = new URL(value, window.location.origin).pathname;
-  } catch {
-    pathname = value;
-  }
-  const trimmed = pathname.replace(/#.*$/, '').replace(/\?.*$/, '').trim();
-  const withSlash = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
-  return (withSlash.length > 1 ? withSlash.replace(/\/+$/, '') : withSlash).toLowerCase();
-}
-
-/**
- * Reads the selected comparison paths from the `compare-products` query param.
+ * Reads comparison slugs from the query param, accepting legacy paths and absolute URLs.
  * @returns {string[]}
  */
-function getComparePaths() {
+function getCompareSlugs() {
   const params = new URLSearchParams(window.location.search);
   const raw = params.get(COMPARE_PARAM);
   if (!raw) return [];
-  return raw.split(',').map((s) => s.trim()).filter(Boolean).map(normalizePath);
+  return [...new Set(raw.split(',').map(getCompareSlug).filter(Boolean))]
+    .slice(0, MAX_COMPARISON_PRODUCTS);
 }
 
 /**
- * Builds a `{ url, title, image }` entry for localStorage from a full product object.
+ * Builds a `{ slug, title, image }` entry for localStorage from a full product object.
  * @param {Object} product
- * @returns {{url: string, title: string, image: string}}
+ * @returns {{slug: string, title: string, image: string}}
  */
 function toStoredItem(product) {
   return {
-    url: product.url,
+    slug: getCompareSlug(product.url),
     title: product.title || '',
     image: product.variants?.[0]?.image || product.image || '',
   };
@@ -79,30 +62,29 @@ function toStoredItem(product) {
  * picked up as a fallback on future visits without the param.
  * @param {Object[]} products - Full product objects to compare (order matters)
  */
-function goToComparePaths(products) {
+function goToCompareSlugs(products) {
   const stored = setStoredCompareItems(products.map(toStoredItem));
-  const paths = stored.map((item) => item.url);
+  const slugs = stored.map((item) => item.slug);
   const url = new URL(window.location.href);
-  if (paths.length) url.searchParams.set(COMPARE_PARAM, paths.join(','));
+  if (slugs.length) url.searchParams.set(COMPARE_PARAM, slugs.join(','));
   else url.searchParams.delete(COMPARE_PARAM);
   window.location.href = url.toString();
 }
 
 /**
- * Writes the given paths into the `compare-products` query param via pushState (no reload),
+ * Writes the given slugs into the `compare-products` query param via pushState (no reload),
  * used to reflect a localStorage fallback into the URL on initial load.
- * @param {string[]} paths
+ * @param {string[]} slugs
  */
-function pushComparePathsToUrl(paths) {
+function pushCompareSlugsToUrl(slugs) {
   const url = new URL(window.location.href);
-  if (paths.length) url.searchParams.set(COMPARE_PARAM, paths.join(','));
+  if (slugs.length) url.searchParams.set(COMPARE_PARAM, slugs.join(','));
   else url.searchParams.delete(COMPARE_PARAM);
   window.history.pushState(null, '', url.toString());
 }
 
-function findProductByPath(products, path) {
-  const key = normalizePath(path);
-  return products.find((product) => normalizePath(product.url) === key) || null;
+function findProductBySlug(products, slug) {
+  return products.find((product) => getCompareSlug(product.url) === slug) || null;
 }
 
 function hasVariants(product) {
@@ -264,32 +246,6 @@ function createProductCta(product, copy) {
 }
 
 /**
- * Builds a placeholder cell for a selected path that no longer resolves to a product.
- * @param {string} path - Product path
- * @param {Object} copy - Widget copy
- * @param {Function} onRemove - Callback when the remove button is clicked
- * @returns {HTMLElement}
- */
-function buildPlaceholderCell(path, copy, onRemove) {
-  const cell = document.createElement('div');
-  cell.className = 'compare-products-widget-cell compare-products-widget-product-cell compare-products-widget-product-cell-placeholder';
-  cell.append(createRemoveButton(copy, null, path, onRemove));
-
-  const msg = document.createElement('p');
-  msg.className = 'compare-products-widget-placeholder-msg';
-  msg.textContent = copy.noResults;
-  cell.appendChild(msg);
-
-  const link = document.createElement('a');
-  link.href = path;
-  link.className = 'button link';
-  link.textContent = copy.viewDetails;
-  cell.appendChild(link);
-
-  return cell;
-}
-
-/**
  * Builds one product's header cell: image, colors, title, reviews, price and CTA.
  * @param {Object} product - Product from the product-list data source
  * @param {string} path - Path this slot was requested with (for removal)
@@ -445,10 +401,7 @@ function renderComparisonGrid(gridEl, slots, ph, copy, onRemove, ghost = null) {
   cornerCell.className = 'compare-products-widget-cell compare-products-widget-corner-cell';
   headerRow.appendChild(cornerCell);
   slots.forEach(({ path, product }) => {
-    const cell = product
-      ? buildProductCell(product, path, ph, copy, onRemove)
-      : buildPlaceholderCell(path, copy, onRemove);
-    headerRow.appendChild(cell);
+    headerRow.appendChild(buildProductCell(product, path, ph, copy, onRemove));
   });
   if (ghost) headerRow.appendChild(buildGhostCell(copy, ghost.onAdd));
   gridEl.appendChild(headerRow);
@@ -608,7 +561,7 @@ function openAddProductModal(candidates, ph, copy, currentProducts) {
     }
     results.forEach((product) => {
       list.appendChild(buildModalResultRow(product, ph, query, (picked) => {
-        goToComparePaths([...currentProducts, picked]);
+        goToCompareSlugs([...currentProducts, picked]);
       }));
     });
   };
@@ -679,29 +632,36 @@ export default async function decorate(widget) {
   const allProducts = (await lookupProductListProducts({}, {}, dataset))
     .filter((product) => !product.isMarketing);
 
-  let selectedPaths = getComparePaths();
-  if (selectedPaths.length === 0) {
+  let selectedSlugs = getCompareSlugs();
+  if (selectedSlugs.length === 0) {
     // No products selected via the URL - fall back to the localStorage-persisted list (if any)
     // and reflect it into the URL so the page is shareable/bookmarkable from here on.
-    const storedPaths = getStoredComparePaths().map(normalizePath);
-    if (storedPaths.length) {
-      selectedPaths = storedPaths;
-      pushComparePathsToUrl(selectedPaths);
+    const storedSlugs = getStoredCompareSlugs();
+    if (storedSlugs.length) {
+      selectedSlugs = storedSlugs;
+      pushCompareSlugsToUrl(selectedSlugs);
     }
+  } else {
+    pushCompareSlugsToUrl(selectedSlugs);
   }
-  const slots = selectedPaths.map((path) => ({
-    path,
-    product: findProductByPath(allProducts, path),
-  }));
-  const currentProducts = slots.filter((slot) => slot.product).map((slot) => slot.product);
+  const slots = selectedSlugs.map((slug) => ({
+    path: slug,
+    product: findProductBySlug(allProducts, slug),
+  })).filter((slot) => slot.product);
+  const currentProducts = slots.map((slot) => slot.product);
+  const validSlugs = slots.map((slot) => slot.path);
+  if (validSlugs.length !== selectedSlugs.length) {
+    setStoredCompareItems(currentProducts.map(toStoredItem));
+    pushCompareSlugsToUrl(validSlugs);
+  }
 
   const onRemove = (path) => {
-    const key = normalizePath(path);
-    goToComparePaths(currentProducts.filter((product) => normalizePath(product.url) !== key));
+    const slug = getCompareSlug(path);
+    goToCompareSlugs(currentProducts.filter((product) => getCompareSlug(product.url) !== slug));
   };
 
-  const excludeSet = new Set(selectedPaths.map(normalizePath));
-  const candidates = allProducts.filter((product) => !excludeSet.has(normalizePath(product.url)));
+  const excludeSet = new Set(validSlugs);
+  const candidates = allProducts.filter((product) => !excludeSet.has(getCompareSlug(product.url)));
 
   // With exactly one product selected, invite adding a second right in the grid via a ghost
   // column instead of the below-grid trigger; otherwise (0, or 2+) use the compact trigger.

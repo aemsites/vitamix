@@ -49,11 +49,12 @@ const CALLOUT_COPY_KEYS = {
 
 /**
  * @param {Object} product - Product data object
- * @returns {boolean} `true` if the product's regular/original price is higher than its current price
+ * @returns {boolean} `true` if the product's regular price is higher than its current price
  */
 function isOnSale(product) {
-  const regular = product.originalPrice || product.regularPrice;
-  return regular && product.price && Number(regular) > Number(product.price);
+  return product.regularPrice
+    && product.price
+    && Number(product.regularPrice) > Number(product.price);
 }
 
 /**
@@ -70,7 +71,7 @@ function calloutFromBadge(badge, copy) {
 
 /**
  * Builds callouts from plp-data's Badges column, plus an automatic Sale badge when the
- * product's current price is below its regular/original price. Title and collections
+ * product's current price is below its regular price. Title and collections
  * are not used. Capped to 2.
  * @param {Object} product - Product data object with `badge` from plp-data
  * @param {Object} copy - Localized copy object with badge labels (sale, new, bestSeller, bundleSave, exclusive, topRated, limitedEdition)

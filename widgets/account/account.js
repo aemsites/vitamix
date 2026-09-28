@@ -468,6 +468,18 @@ export default async function decorate(widget) {
     if (ordersLoadingEl) ordersLoadingEl.textContent = String(copy.ordersLoading || 'Loading orders…');
   }
 
+  const recipes = widget.querySelector('.account-panel[data-section="recipes"]');
+  const recipesLoadingEl = widget.querySelector('.account-recipes-loading');
+  const rb = /** @type {Record<string, string>} */ (copy.recipeBook || {});
+  /** @type {(() => Promise<void>) | null} */
+  let loadAccountRecipes = null;
+  if (recipes) {
+    const p = panels.recipes || {};
+    const t = recipes.querySelector('.account-panel-title');
+    if (t) t.textContent = p.title || '';
+    if (recipesLoadingEl) recipesLoadingEl.textContent = rb.loading || 'Loading recipes…';
+  }
+
   const mq = window.matchMedia('(min-width: 768px)');
   let activeSection = 'overview';
 
@@ -520,6 +532,9 @@ export default async function decorate(widget) {
     if (section === 'orders') {
       loadAccountOrders();
     }
+    if (section === 'recipes' && loadAccountRecipes) {
+      loadAccountRecipes();
+    }
   };
 
   navButtons.forEach((btn) => {
@@ -552,6 +567,7 @@ export default async function decorate(widget) {
   } = await import('./account-api.js');
   const { wireAccountAddressBook } = await import('./account-address-book.js');
   const { wireAccountInformation } = await import('./account-information.js');
+  const { wireAccountRecipes } = await import('./account-recipes.js');
 
   const copyWithLocale = { ...copy, accountLocale: locale || 'us' };
 
@@ -565,6 +581,15 @@ export default async function decorate(widget) {
     }
     wireAccountAddressBook(widget, email, lang, String(locale || 'us').toLowerCase(), copy);
     wireAccountInformation(widget, email, copyWithLocale, bundle?.customer);
+    ({ load: loadAccountRecipes } = wireAccountRecipes(
+      widget,
+      email,
+      locale || 'us',
+      language || 'en_us',
+      copy,
+      bundle?.customer,
+    ));
+    if (activeSection === 'recipes') loadAccountRecipes();
   }
 
   wireOrderDetailInteractions(widget, copy);

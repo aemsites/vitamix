@@ -24,6 +24,9 @@
               <li>
                 <button type="button" class="account-nav-item" data-section="orders"></button>
               </li>
+              <li>
+                <button type="button" class="account-nav-item" data-section="recipes"></button>
+              </li>
             </ul>
           </nav>
         </div>
@@ -114,6 +117,16 @@
                 <p class="account-order-detail-error" hidden></p>
               </div>
             </div>
+          </div>
+        </section>
+
+        <section class="account-panel" data-section="recipes" hidden aria-labelledby="account-panel-recipes-title">
+          <div class="account-panel-body">
+            <h4 id="account-panel-recipes-title" class="account-panel-title"></h4>
+            <p class="account-recipes-loading" hidden role="status" aria-live="polite"></p>
+            <p class="account-recipes-empty" hidden></p>
+            <p class="account-recipes-error" role="alert" hidden></p>
+            <ul class="account-recipe-list"></ul>
           </div>
         </section>
       </div>

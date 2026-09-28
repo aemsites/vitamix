@@ -165,16 +165,6 @@
   margin: 0;
 }
 
-.compare-products-widget-product-cell-placeholder {
-  justify-content: center;
-  min-height: 200px;
-  gap: var(--spacing-100);
-}
-
-.compare-products-widget-placeholder-msg {
-  margin: 0;
-}
-
 /* Feature comparison rows */
 .compare-products-widget-feature-label {
   position: sticky;
