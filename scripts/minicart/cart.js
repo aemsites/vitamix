@@ -461,16 +461,7 @@ export async function addToCart(sku, options, quantity) {
       );
       handleCartErrors(response.errors);
 
-      // handleCartErrors resolves recoverable errors (missing cart, no access,
-      // invalid input) by resetting the cart and returning without throwing. In
-      // those cases Magento returns a null `addProductsToCart`, so guard before
-      // destructuring to avoid a cryptic "Cannot destructure property 'cart'
-      // from null" crash. This has also been observed with no `errors` at all —
-      // log the full response body (not just `data`/`errors`) since we don't yet
-      // know what shape it takes, then surface the same generic error the
-      // user_errors path does. We intentionally don't retry: a null result
-      // doesn't prove the mutation failed, so replaying it could add the item
-      // twice.
+      // null on recoverable errors or transient failures; don't retry (may double-add)
       if (!response.data?.addProductsToCart) {
         logError('cart.add-to-cart', new Error('addProductsToCart returned null'), {
           sku,
