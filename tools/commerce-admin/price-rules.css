@@ -365,6 +365,10 @@
   color: #202223;
 }
 
+.pr-promo-col-date {
+  white-space: nowrap;
+}
+
 .pr-promo-grid-table thead th.pr-promo-col-mincart,
 .pr-promo-col-mincart {
   text-align: right;

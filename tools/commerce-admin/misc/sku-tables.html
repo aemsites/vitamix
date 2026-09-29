@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>SKU to products table - Vitamix Commerce Admin</title>
+    <link rel="stylesheet" href="../commerce-auth.css" />
+    <link rel="stylesheet" href="../pim.css" />
+    <link rel="stylesheet" href="../commerce-admin-chrome.css" />
+    <link rel="stylesheet" href="sku-tables.css" />
+  </head>
+  <body class="commerce-admin-body" data-commerce-header="subpage" data-commerce-header-page="SKU to products table" data-commerce-admin-home="../index.html">
+    <div id="commerce-admin-auth-root" aria-live="polite">
+      <p class="commerce-admin-auth-placeholder">Checking sign-in…</p>
+    </div>
+    <header id="commerce-admin-app-header"></header>
+    <main class="pim-main sku-tables-main">
+      <h1>SKU to products table</h1>
+      <div class="sku-tables-settings">
+        <label>Country
+          <select id="sku-tables-country">
+            <option value="us">United States</option>
+            <option value="ca">Canada</option>
+          </select>
+        </label>
+        <label>Start (Eastern Time)
+          <input id="sku-tables-start" type="datetime-local" required />
+        </label>
+        <label>End (Eastern Time)
+          <input id="sku-tables-end" type="datetime-local" required />
+        </label>
+      </div>
+      <label for="sku-tables-input">SKU spreadsheet</label>
+      <textarea id="sku-tables-input" rows="12" spellcheck="false" placeholder="Item Number&#9;Item Description&#9;US reg. price&#9;US Sale Price&#9;US $ off&#9;US % off"></textarea>
+      <div class="sku-tables-actions">
+        <button type="button" id="sku-tables-convert">Convert table</button>
+        <span id="sku-tables-status" role="status" aria-live="polite">Loading catalog...</span>
+      </div>
+      <section class="sku-tables-results" aria-label="Promotion table preview" hidden>
+        <h2>Promotion table</h2>
+        <div class="sku-tables-scroll">
+          <table>
+            <thead><tr><th scope="col">Source SKU</th><th scope="col">Start (ET)</th><th scope="col">End (ET)</th><th scope="col">Product</th><th scope="col">Regular Price</th><th scope="col">Sale Price</th><th scope="col">Conversion issues</th></tr></thead>
+            <tbody id="sku-tables-rows"></tbody>
+          </table>
+        </div>
+        <div class="sku-tables-actions sku-tables-copy-actions">
+          <button type="button" id="sku-tables-copy" disabled>Copy table for promotion</button>
+          <span id="sku-tables-copy-status" role="status" aria-live="polite"></span>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="../auth-page-boot.js"></script>
+    <script type="module" src="../commerce-admin-header.js"></script>
+    <script type="module" src="sku-tables-page.js"></script>
+  </body>
+</html>

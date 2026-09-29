@@ -1,0 +1,115 @@
+.sku-tables-main {
+  max-width: 1400px;
+}
+
+.sku-tables-main h1 {
+  margin-bottom: 24px;
+}
+
+.sku-tables-main label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.sku-tables-settings {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: end;
+  margin-bottom: 20px;
+}
+
+.sku-tables-settings select,
+.sku-tables-settings input {
+  display: block;
+  min-width: 190px;
+  padding: 8px;
+  border: 1px solid #b8bcbf;
+  border-radius: 4px;
+  background: #fff;
+  font: inherit;
+}
+
+#sku-tables-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px;
+  border: 1px solid #b8bcbf;
+  border-radius: 4px;
+  font: 13px/1.5 monospace;
+  resize: vertical;
+  min-height: 180px;
+}
+
+.sku-tables-actions {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+.sku-tables-actions button {
+  padding: 9px 14px;
+  border: 1px solid #262a2c;
+  border-radius: 4px;
+  background: #262a2c;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.sku-tables-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.sku-tables-results {
+  margin-top: 32px;
+}
+
+.sku-tables-scroll {
+  overflow-x: auto;
+}
+
+.sku-tables-results table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13px;
+}
+
+.sku-tables-results th,
+.sku-tables-results td {
+  padding: 10px;
+  border-bottom: 1px solid #dfe2e4;
+  vertical-align: top;
+}
+
+.sku-tables-results th {
+  background: #f3f5f5;
+  white-space: nowrap;
+}
+
+.sku-tables-results td:nth-child(4) {
+  overflow-wrap: anywhere;
+  min-width: 200px;
+}
+
+.sku-tables-results td:last-child {
+  min-width: 180px;
+}
+
+.sku-tables-error {
+  background: #fff0ee;
+}
+
+.sku-tables-warning {
+  background: #fff8e8;
+}
+
+.sku-tables-copy-actions {
+  margin-top: 20px;
+}

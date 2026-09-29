@@ -187,7 +187,7 @@ const AREAS = /** @type {const} */ (['rules', 'promotions']);
  *   cartRulesList: import('./price-rules-api.js').HelixCartPriceRule[]|null,
  *   cartDataSource: 'api'|'unavailable',
  *   cartLoadError: string,
- *   promoListSortKey: 'title'|'id'|'rows'|'mincart'|'group'|'market',
+ *   promoListSortKey: 'title'|'id'|'rows'|'start'|'end'|'mincart'|'group'|'market',
  *   promoListSortDir: 'asc'|'desc',
  *   cartRuleSortKey: 'title'|'id'|'min'|'off'|'freeship'|'scope'|'market',
  *   cartRuleSortDir: 'asc'|'desc',
@@ -200,7 +200,7 @@ const state = {
   promoListSearch: '',
   promoListGroupFilter: '',
   cartRuleSearch: '',
-  promoListSortKey: /** @type {'title'|'id'|'rows'|'mincart'|'group'|'market'} */ ('title'),
+  promoListSortKey: /** @type {'title'|'id'|'rows'|'start'|'end'|'mincart'|'group'|'market'} */ ('title'),
   promoListSortDir: /** @type {'asc'|'desc'} */ ('asc'),
   cartRuleSortKey: /** @type {'title'|'id'|'min'|'off'|'freeship'|'scope'|'market'} */ ('title'),
   cartRuleSortDir: /** @type {'asc'|'desc'} */ ('asc'),
@@ -2894,7 +2894,7 @@ function filteredPromotionRows() {
 /**
  * @param {PromoListRow} a
  * @param {PromoListRow} b
- * @param {'title'|'id'|'rows'|'mincart'|'group'|'market'} key
+ * @param {'title'|'id'|'rows'|'start'|'end'|'mincart'|'group'|'market'} key
  */
 function comparePromoListRows(a, b, key) {
   switch (key) {
@@ -2914,12 +2914,19 @@ function comparePromoListRows(a, b, key) {
 
 /**
  * @param {PromoListRow[]} list
- * @param {'title'|'id'|'rows'|'mincart'|'group'|'market'} key
+ * @param {'title'|'id'|'rows'|'start'|'end'|'mincart'|'group'|'market'} key
  * @param {'asc'|'desc'} dir
  */
 function sortPromoListRows(list, key, dir) {
   const m = dir === 'desc' ? -1 : 1;
   return list.slice().sort((a, b) => {
+    if (key === 'start' || key === 'end') {
+      const first = uniformPromotionWindow(a.rows)?.[key];
+      const second = uniformPromotionWindow(b.rows)?.[key];
+      if (first == null) return second == null ? 0 : 1;
+      if (second == null) return -1;
+      if (first !== second) return m * (first - second);
+    }
     const c = comparePromoListRows(a, b, key);
     if (c !== 0) return m * c;
     return String(a.title).localeCompare(String(b.title), undefined, { sensitivity: 'base' });
@@ -2975,7 +2982,7 @@ function sortCartRuleEntries(list, key, dir) {
 }
 
 /**
- * @param {'title'|'id'|'rows'|'mincart'|'group'|'market'} key
+ * @param {'title'|'id'|'rows'|'start'|'end'|'mincart'|'group'|'market'} key
  */
 function prPromoSortTh(key, label, extraClass = '') {
   const active = state.promoListSortKey === key;
@@ -3424,6 +3431,21 @@ function promotionRowInstantMs(value) {
   return Number.isNaN(t) ? NaN : t;
 }
 
+function uniformPromotionWindow(rows) {
+  if (!rows.length) return null;
+  const start = promotionRowInstantMs(rows[0].start);
+  const end = promotionRowInstantMs(rows[0].end);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+  if (!rows.every((row) => promotionRowInstantMs(row.start) === start
+    && promotionRowInstantMs(row.end) === end)) return null;
+  return {
+    start,
+    end,
+    startLabel: formatIsoForSaleLineView(rows[0].start),
+    endLabel: formatIsoForSaleLineView(rows[0].end),
+  };
+}
+
 /** @param {number} ms */
 function formatPromotionDurationMs(ms) {
   if (!Number.isFinite(ms) || ms <= 0) return '';
@@ -3845,18 +3867,21 @@ function renderPromotionsListPanel() {
 
   let tbodyHtml;
   if (!hasPromos) {
-    tbodyHtml = '<tr><td colspan="6" class="pr-empty-cell">No catalog promotions for this country (empty API list or no matching paths).</td></tr>';
+    tbodyHtml = '<tr><td colspan="8" class="pr-empty-cell">No catalog promotions for this country (empty API list or no matching paths).</td></tr>';
   } else if (!list.length) {
-    tbodyHtml = '<tr><td colspan="6" class="pr-empty-cell">No promotions match your filters.</td></tr>';
+    tbodyHtml = '<tr><td colspan="8" class="pr-empty-cell">No promotions match your filters.</td></tr>';
   } else {
     tbodyHtml = list
       .map((r) => {
         const label = `Open promotion ${r.title}`;
+        const window = uniformPromotionWindow(r.rows);
         return `<tr class="pr-promo-grid-row" role="button" tabindex="0" aria-label="${escapeHtml(label)}"
             data-pr-promo-open data-pr-country="${escapeHtml(r.countryKey)}" data-pr-id="${escapeHtml(r.id)}">
             <td class="pr-promo-col-title">${escapeHtml(r.title)}</td>
             <td><code class="pr-promo-id-code">${escapeHtml(r.id)}</code></td>
             <td>${r.rowCount}</td>
+            <td class="pr-promo-col-date">${escapeHtml(window?.startLabel || '—')}</td>
+            <td class="pr-promo-col-date">${escapeHtml(window?.endLabel || '—')}</td>
             <td class="pr-promo-col-mincart">${escapeHtml(formatPromotionMinCartListCell(r.minCartDigits))}</td>
             <td class="pr-promo-col-group">${commerceGroupBadgeHtml(r.group)}</td>
             <td class="pr-promo-col-market">${commerceMarketEmojiHtml(r.countryKey)}</td>
@@ -3892,6 +3917,8 @@ function renderPromotionsListPanel() {
             ${prPromoSortTh('title', 'Title', 'pr-promo-col-title')}
             ${prPromoSortTh('id', 'Id')}
             ${prPromoSortTh('rows', 'Rows')}
+            ${prPromoSortTh('start', 'Start (ET)', 'pr-promo-col-date')}
+            ${prPromoSortTh('end', 'End (ET)', 'pr-promo-col-date')}
             ${prPromoSortTh('mincart', 'Min. cart', 'pr-promo-col-mincart')}
             ${prPromoSortTh('group', 'Group', 'pr-promo-col-group')}
             ${prPromoSortTh('market', 'Market', 'pr-promo-col-market')}
@@ -4129,7 +4156,7 @@ function render() {
       e.preventDefault();
       e.stopPropagation();
       const sortKey = btn.getAttribute('data-pr-promo-sort');
-      const allowed = ['title', 'id', 'rows', 'mincart', 'group', 'market'];
+      const allowed = ['title', 'id', 'rows', 'start', 'end', 'mincart', 'group', 'market'];
       if (!sortKey || !allowed.includes(sortKey)) return;
       if (state.promoListSortKey === sortKey) {
         state.promoListSortDir = state.promoListSortDir === 'asc' ? 'desc' : 'asc';
