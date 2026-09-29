@@ -704,11 +704,11 @@
 .cards.overlay.bottom > ul > li .card-body {
   --overlay-gradient-color: 0 0 0;
 
-  padding: var(--spacing-600) var(--horizontal-spacing) var(--spacing-200);
+  padding: calc(var(--spacing-600) * 2) var(--horizontal-spacing) var(--spacing-200);
   background: linear-gradient(
     to top,
     rgb(var(--overlay-gradient-color) / 85%) 0%,
-    rgb(var(--overlay-gradient-color) / 60%) 55%,
+    rgb(var(--overlay-gradient-color) / 70%) 60%,
     rgb(var(--overlay-gradient-color) / 0%) 100%
   );
   text-align: left;
@@ -716,17 +716,21 @@
 
 .cards.overlay.bottom .card-body h2,
 .cards.overlay.bottom .card-body h3 {
-  margin: 0 0 var(--spacing-60);
+  margin: 0 0 var(--spacing-100);
   font-family: var(--serif-font-family);
 }
 
-.cards.overlay.bottom .card-body p:not(.button-wrapper) {
+.cards.overlay.bottom .card-body .eyebrow {
+  margin: 0 0 var(--spacing-40);
+}
+
+.cards.overlay.bottom .card-body p:not(.button-wrapper, .eyebrow) {
   margin: 0 0 var(--spacing-100);
 }
 
 .cards.overlay.bottom .card-body .button-wrapper {
   justify-content: flex-start;
-  margin: 0;
+  margin: var(--spacing-200) 0 0;
 }
 
 /* button: beat `.cards.overlay a { color: white }` so the label shows */
@@ -781,7 +785,7 @@
 
 @media (width >= 800px) {
   .cards.overlay.bottom > ul > li .card-body {
-    padding: var(--spacing-700) var(--spacing-300) var(--spacing-300);
+    padding: calc(var(--spacing-700) * 2) var(--spacing-300) var(--spacing-300);
   }
 }
 
