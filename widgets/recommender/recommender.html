@@ -1,0 +1,28 @@
+<section class="quiz" aria-live="polite"></section>
+
+<section class="results">
+  <h2 tabindex="-1">We found your match</h2>
+  <p>Based on your answers, here's the blender we think you'll love.</p>
+  <div class="product" hidden></div>
+  <p class="button-wrapper fallback">
+    <a class="button emphasis recommendation" href="#">See Your Recommendation</a>
+  </p>
+</section>
+
+<section class="error">
+  <p>Sorry, the recommender could not be loaded. Please try again later.</p>
+</section>
+
+<div class="footer">
+  <progress max="1" value="0" aria-label="Recommender progress"></progress>
+  <div data-stage="quiz">
+    <p>Question: <span class="step-label">1</span> of <span class="step-total">1</span></p>
+    <div class="button-wrapper">
+      <button type="button" class="button link prev" hidden>← Back</button>
+      <button type="button" class="button emphasis next" disabled>Next</button>
+    </div>
+  </div>
+  <div data-stage="results">
+    <button type="reset" class="button link">Start Over</button>
+  </div>
+</div>
