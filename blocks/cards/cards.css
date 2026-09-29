@@ -690,6 +690,101 @@
   }
 }
 
+/* overlay bottom variant: text bottom-left, gradient behind text only */
+.cards.overlay.bottom > ul > li {
+  align-items: flex-end;
+}
+
+/* drop the full-card tint; the gradient lives on .card-body instead */
+.cards.overlay.bottom > ul > li::after,
+.cards.overlay.bottom > ul > li.card-click:hover::after {
+  background-color: transparent;
+}
+
+.cards.overlay.bottom > ul > li .card-body {
+  --overlay-gradient-color: 0 0 0;
+
+  padding: var(--spacing-600) var(--horizontal-spacing) var(--spacing-200);
+  background: linear-gradient(
+    to top,
+    rgb(var(--overlay-gradient-color) / 85%) 0%,
+    rgb(var(--overlay-gradient-color) / 60%) 55%,
+    rgb(var(--overlay-gradient-color) / 0%) 100%
+  );
+  text-align: left;
+}
+
+.cards.overlay.bottom .card-body h2,
+.cards.overlay.bottom .card-body h3 {
+  margin: 0 0 var(--spacing-60);
+  font-family: var(--serif-font-family);
+}
+
+.cards.overlay.bottom .card-body p:not(.button-wrapper) {
+  margin: 0 0 var(--spacing-100);
+}
+
+.cards.overlay.bottom .card-body .button-wrapper {
+  justify-content: flex-start;
+  margin: 0;
+}
+
+/* button: beat `.cards.overlay a { color: white }` so the label shows */
+.cards.overlay.bottom .card-body a.button {
+  border: 1px solid var(--color-white);
+  border-radius: 0;
+  background-color: var(--color-white);
+  color: var(--color-charcoal);
+}
+
+.cards.overlay.bottom .card-body a.button:hover,
+.cards.overlay.bottom .card-body a.button:focus-visible {
+  background-color: transparent;
+  color: var(--color-white);
+}
+
+.cards.overlay.bottom .card-body a.button:focus-visible {
+  outline: 2px solid var(--color-white);
+  outline-offset: 2px;
+}
+
+/* no ▸ arrow on buttons */
+.cards.overlay.bottom > ul > li.card-click a.button::after {
+  content: none;
+}
+
+/* light modifier: dark text, light gradient, outline button */
+.cards.overlay.bottom.light,
+.cards.overlay.bottom.light a {
+  color: var(--color-charcoal);
+}
+
+.cards.overlay.bottom.light > ul > li .card-body {
+  --overlay-gradient-color: 255 255 255;
+}
+
+.cards.overlay.bottom.light .card-body a.button {
+  border-color: var(--color-charcoal);
+  background-color: transparent;
+  color: var(--color-charcoal);
+}
+
+.cards.overlay.bottom.light .card-body a.button:hover,
+.cards.overlay.bottom.light .card-body a.button:focus-visible {
+  background-color: var(--color-charcoal);
+  color: var(--color-white);
+}
+
+.cards.overlay.bottom.light .card-body a.button:focus-visible {
+  outline-color: var(--color-charcoal);
+}
+
+@media (width >= 800px) {
+  .cards.overlay.bottom > ul > li .card-body {
+    padding: var(--spacing-700) var(--spacing-300) var(--spacing-300);
+  }
+}
+
 /* icon list variant */
 .cards.icon-list ul > li .card-image {
   aspect-ratio: unset;
