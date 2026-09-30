@@ -624,6 +624,7 @@
   display: flex;
   align-items: center;
   position: relative;
+  width: 100%;          /* add: Safari won't stretch aspect-ratio grid items */
   min-width: 0;
   max-width: 100%;
 }
