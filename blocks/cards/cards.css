@@ -689,6 +689,10 @@
   .cards.overlay > ul > li .card-body {
     padding: var(--spacing-200) var(--horizontal-spacing);
   }
+
+  .cards.overlay.tall > ul.rows-2 > li,
+  .cards.overlay.tall > ul.rows-4 > li {
+    max-height: 500px;
 }
 
 /* overlay bottom variant: text bottom-left, gradient behind text only */
