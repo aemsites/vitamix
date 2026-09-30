@@ -695,7 +695,15 @@ function renderTimeline() {
   overlay.append(el('div', 'pcc-selection'));
 
   timelineEl.replaceChildren(grid, header, boundaryRow, rows, overlay);
-  renderDetails(items.filter((item) => !isInvalid(item) && !isPartial(item, view)));
+  const focus = state.focusBoundary;
+  if (focus === null) {
+    renderDetails(items.filter((item) => !isInvalid(item) && !isPartial(item, view)), 'fully within the window');
+  } else {
+    renderDetails(
+      items.filter((item) => item.start?.getTime() === focus || item.end?.getTime() === focus),
+      `starting or ending ${formatBoundaryEastern(focus)}`,
+    );
+  }
 }
 
 function isInvalid(item) {
@@ -853,10 +861,10 @@ const DETAIL_RENDERERS = {
   'promo-schedule': renderPromoScheduleDetail,
 };
 
-function renderDetails(items) {
-  const heading = el('h2', '', `Details (${items.length} fully within the window)`);
+function renderDetails(items, scope) {
+  const heading = el('h2', '', `Details (${items.length} ${scope})`);
   const cards = items.map((item) => {
-    const card = el('article', 'pcc-detail');
+    const card = el('article', `pcc-detail pcc-detail-${item.source}`);
     const head = el('header', 'pcc-detail-head');
     const swatch = el('span', 'pcc-swatch');
     const source = SOURCES.find((s) => s.key === item.source);
@@ -866,15 +874,17 @@ function renderDetails(items) {
       el('span', 'pcc-where', `${source.label} · ${item.where.toUpperCase()}`),
       el('h3', '', item.label),
     );
-    const span = `${formatEt(item.start.toISOString())} → ${formatEt(item.end.toISOString())}`
-      + ` (${formatDuration(item.end - item.start)})`;
+    const startText = item.start ? formatEt(item.start.toISOString()) : 'open';
+    const endText = item.end ? formatEt(item.end.toISOString()) : 'open';
+    const dur = item.start && item.end ? ` (${formatDuration(item.end - item.start)})` : '';
+    const span = `${startText} → ${endText}${dur}`;
     card.append(head, el('p', 'pcc-detail-when', span));
     const renderer = DETAIL_RENDERERS[item.source];
     if (renderer) card.append(renderer(item));
     else if (item.detail) card.append(el('p', 'pcc-detail-meta', item.detail));
     return card;
   });
-  if (!cards.length) cards.push(el('p', 'pcc-empty-details', 'No schedules fully within this window.'));
+  if (!cards.length) cards.push(el('p', 'pcc-empty-details', `No schedules ${scope}.`));
   detailsEl.replaceChildren(heading, ...cards);
 }
 

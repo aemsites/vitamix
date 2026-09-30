@@ -376,11 +376,29 @@
 }
 
 .pcc-detail {
+  --pcc-source-color: #999;
+
   margin-bottom: 16px;
   padding: 12px 16px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid color-mix(in srgb, var(--pcc-source-color) 25%, #fff);
   border-radius: 8px;
-  background: #fff;
+  background: color-mix(in srgb, var(--pcc-source-color) 6%, #fff);
+}
+
+.pcc-detail-commerce {
+  --pcc-source-color: #7b1fa2;
+}
+
+.pcc-detail-nav-banners {
+  --pcc-source-color: #ef6c00;
+}
+
+.pcc-detail-promo-schedule {
+  --pcc-source-color: #00897b;
+}
+
+.pcc-detail-free-gifts {
+  --pcc-source-color: #c2185b;
 }
 
 .pcc-detail-head {
@@ -421,7 +439,7 @@
 }
 
 .pcc-detail-table th {
-  background: #f3f5f5;
+  background: rgb(0 0 0 / 4%);
 }
 
 .pcc-detail-table a {
