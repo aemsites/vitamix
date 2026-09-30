@@ -28,9 +28,13 @@
             type="search"
             id="searchInput"
             class="pim-search"
-            placeholder="Search by title, SKU, availability, price…"
+            placeholder="Search by title, SKU, availability, price, category…"
             aria-label="Search products"
           />
+          <span class="pim-cat-filter" id="categoryFilterChip" hidden>
+            Category: <span class="pim-cat-filter-name"></span>
+            <button type="button" id="categoryFilterClear" aria-label="Clear category filter">×</button>
+          </span>
           <label class="pim-index-label" for="indexSelect">Index</label>
           <select id="indexSelect" class="pim-index-select" aria-label="Product index locale">
             <option value="us/en_us">US</option>
@@ -53,6 +57,7 @@
                 <th class="pim-col-sku pim-sortable" scope="col" data-sort="sku" tabindex="0">SKU</th>
                 <th class="pim-col-variants pim-sortable" scope="col" data-sort="variants" tabindex="0">Variants</th>
                 <th class="pim-col-availability pim-sortable" scope="col" data-sort="availability" tabindex="0">Availability</th>
+                <th class="pim-col-categories" scope="col">Categories</th>
                 <th class="pim-col-price pim-sortable" scope="col" data-sort="price" tabindex="0">Price</th>
               </tr>
             </thead>

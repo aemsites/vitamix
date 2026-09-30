@@ -219,6 +219,97 @@ body {
   white-space: nowrap;
 }
 
+.pim-col-categories {
+  width: 220px;
+  max-width: 220px;
+}
+
+/* Category tags (same palette as the product detail page) */
+.pim-cat-tags {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+  max-width: 220px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+}
+
+.pim-cat-tag {
+  display: inline-block;
+  flex: none;
+  margin: 0;
+  padding: 2px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.pim-cat-tag:hover {
+  filter: brightness(0.95);
+}
+
+.pim-cat-tag-i0 {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.pim-cat-tag-i1 {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.pim-cat-tag-i2 {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.pim-cat-tag-i3 {
+  background: #e9d5ff;
+  color: #6b21a8;
+}
+
+.pim-cat-tag-i4 {
+  background: #fce7f3;
+  color: #9d174d;
+}
+
+.pim-cat-tag.pim-cat-tag-active {
+  border-color: currentcolor;
+}
+
+.pim-cat-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 10px;
+  border-radius: 6px;
+  background: #e8f4fd;
+  font-size: 13px;
+}
+
+.pim-cat-filter[hidden] {
+  display: none;
+}
+
+.pim-cat-filter-name {
+  font-weight: 600;
+}
+
+.pim-cat-filter button {
+  padding: 0 6px;
+  border: 0;
+  background: transparent;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
 .pim-list tbody tr.pim-row {
   cursor: pointer;
 }
