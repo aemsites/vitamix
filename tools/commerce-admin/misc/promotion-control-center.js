@@ -503,6 +503,13 @@ function itemStatus(item, now) {
   return 'current';
 }
 
+const LOCALE_ORDER = MARKETS.flatMap((m) => m.locales);
+
+/** Rank of a locale (`us/en_us`) or bare country (`us`, for commerce) in LOCALE_ORDER. */
+function localeRank(where) {
+  return LOCALE_ORDER.findIndex((l) => l === where || l.startsWith(`${where}/`));
+}
+
 function visibleItems(view) {
   const sourceIndex = (item) => SOURCES.findIndex((s) => s.key === item.source);
   return Object.values(state.items).flat()
@@ -513,7 +520,8 @@ function visibleItems(view) {
       return e >= view.start && s <= view.end;
     })
     .sort((a, b) => (a.start?.getTime() ?? -Infinity) - (b.start?.getTime() ?? -Infinity)
-      || sourceIndex(a) - sourceIndex(b));
+      || sourceIndex(a) - sourceIndex(b)
+      || localeRank(a.where) - localeRank(b.where));
 }
 
 function itemTooltip(item) {
@@ -889,7 +897,16 @@ function renderDetails(items, scope) {
 }
 
 function renderStatus() {
-  statusList.replaceChildren(...[...state.status.entries()].map(([key, { text, error }]) => {
+  const rank = (key) => {
+    const [source, where = ''] = key.split(':');
+    return [SOURCES.findIndex((s) => s.key === source), localeRank(where)];
+  };
+  const entries = [...state.status.entries()].sort(([a], [b]) => {
+    const [sa, la] = rank(a);
+    const [sb, lb] = rank(b);
+    return sa - sb || la - lb;
+  });
+  statusList.replaceChildren(...entries.map(([key, { text, error }]) => {
     const li = el('li', error ? 'pcc-status-error' : '');
     const swatch = el('span', 'pcc-swatch');
     swatch.style.background = SOURCES.find((s) => key.startsWith(s.key)).color;
@@ -1048,10 +1065,15 @@ window.addEventListener('popstate', () => {
   applyUrlState();
   renderTimeline();
 });
-window.addEventListener('resize', () => {
+// Boundary labels are laid out in px, so re-render when the width changes (incl. hidden -> shown).
+let lastTimelineWidth = timelineEl.clientWidth;
+new ResizeObserver(() => {
+  const width = timelineEl.clientWidth;
+  if (width === lastTimelineWidth) return;
+  lastTimelineWidth = width;
   cancelAnimationFrame(resizeFrame);
   resizeFrame = requestAnimationFrame(renderTimeline);
-});
+}).observe(timelineEl);
 
 document.querySelector('#pcc-content-host').textContent = new URL(CONTENT_ORIGIN).host;
 renderFilters();
