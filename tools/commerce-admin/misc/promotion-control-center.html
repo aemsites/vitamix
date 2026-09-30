@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Promotion Control Center - Vitamix Commerce Admin</title>
+    <link rel="stylesheet" href="../commerce-auth.css" />
+    <link rel="stylesheet" href="../pim.css" />
+    <link rel="stylesheet" href="../commerce-admin-chrome.css" />
+    <link rel="stylesheet" href="promotion-control-center.css" />
+  </head>
+  <body class="commerce-admin-body" data-commerce-header="subpage" data-commerce-header-page="Promotion Control Center" data-commerce-admin-home="../index.html">
+    <div id="commerce-admin-auth-root" aria-live="polite">
+      <p class="commerce-admin-auth-placeholder">Checking sign-in…</p>
+    </div>
+    <header id="commerce-admin-app-header"></header>
+    <main class="pim-main pcc-main">
+      <h1>Promotion Control Center</h1>
+      <p class="pcc-lead">
+        Commerce promotions, nav banners, promo schedules and free gifts for US and CA.
+        Content from <code id="pcc-content-host"></code>.
+        Drag across the timeline to zoom into a timeframe; bars extending beyond the window are dimmed.
+      </p>
+      <div class="pcc-toolbar">
+        <fieldset class="pcc-filters" id="pcc-source-filters">
+          <legend>Sources</legend>
+        </fieldset>
+        <fieldset class="pcc-filters" id="pcc-market-filters">
+          <legend>Markets</legend>
+        </fieldset>
+        <div class="pcc-zoom-actions">
+          <button type="button" id="pcc-zoom-back" disabled>Back</button>
+          <button type="button" id="pcc-zoom-out">Zoom out</button>
+          <button type="button" id="pcc-zoom-reset">Reset</button>
+          <button type="button" id="pcc-reload">Reload</button>
+        </div>
+      </div>
+      <div class="pcc-range" id="pcc-range" aria-live="polite"></div>
+      <div class="pcc-timeline" id="pcc-timeline" role="region" aria-label="Promotion schedule timeline"></div>
+      <section class="pcc-details" id="pcc-details" aria-label="Schedule details"></section>
+      <section class="pcc-status" aria-label="Load status">
+        <h2>Sources</h2>
+        <ul id="pcc-status-list"></ul>
+      </section>
+    </main>
+    <script type="module" src="../auth-page-boot.js"></script>
+    <script type="module" src="../commerce-admin-header.js"></script>
+    <script type="module" src="promotion-control-center.js"></script>
+  </body>
+</html>
