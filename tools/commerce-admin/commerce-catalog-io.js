@@ -76,7 +76,7 @@ async function mapWithConcurrency(items, limit, mapper) {
 /**
  * @returns {Promise<{ sku: string, name: string, path: string }[]>}
  */
-export async function listCatalogSummaries() {
+export async function listCatalogSummaries(onProgress) {
   const all = [];
   let cursor = '';
   /* eslint-disable no-await-in-loop -- cursor pages must be sequential */
@@ -87,6 +87,7 @@ export async function listCatalogSummaries() {
     const data = await resp.json();
     const page = Array.isArray(data?.products) ? data.products : [];
     all.push(...page);
+    onProgress?.({ phase: 'listing', found: all.length });
     cursor = data?.truncated ? String(data.cursor || '') : '';
   } while (cursor);
   /* eslint-enable no-await-in-loop */
@@ -106,16 +107,23 @@ export async function fetchCatalogProduct(productPath) {
 /**
  * Full ProductBus entries for one catalog locale (`us/en_us`, …).
  * @param {string} locale
+ * @param {(progress: object) => void} [onProgress]
  * @returns {Promise<object[]>}
  */
-export async function fetchCatalogProductsForLocale(locale) {
-  const summaries = (await listCatalogSummaries())
+export async function fetchCatalogProductsForLocale(locale, onProgress) {
+  onProgress?.({ phase: 'listing', found: 0 });
+  const summaries = (await listCatalogSummaries(onProgress))
     .filter((row) => productInLocale(row?.path, locale));
+  let done = 0;
+  onProgress?.({ phase: 'products', done, total: summaries.length });
   const fetched = await mapWithConcurrency(summaries, FETCH_CONCURRENCY, async (row) => {
     try {
       return await fetchCatalogProduct(row.path);
     } catch {
       return null;
+    } finally {
+      done += 1;
+      onProgress?.({ phase: 'products', done, total: summaries.length });
     }
   });
   return fetched.filter(Boolean);
@@ -173,6 +181,150 @@ function parseImportJson(text) {
     seen.add(path);
   });
   return bodies;
+}
+
+const CATEGORY_TSV_HEADER = 'Slug\tCategories';
+
+function categoryNames(product) {
+  return (Array.isArray(product?.custom?.categories) ? product.custom.categories : [])
+    .map((category) => String(category?.name || category?.url_key || category?.urlKey || '').trim())
+    .filter(Boolean);
+}
+
+function categoryNameKey(name) {
+  return String(name).trim().toLocaleLowerCase();
+}
+
+function categorySlugFromName(name) {
+  return String(name).normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+function knownCategoriesByName(products) {
+  const known = new Map();
+  products.forEach((product) => {
+    const categories = Array.isArray(product?.custom?.categories) ? product.custom.categories : [];
+    categories.forEach((category) => {
+      const name = String(category?.name || category?.url_key || category?.urlKey || '').trim();
+      if (name && !known.has(categoryNameKey(name))) known.set(categoryNameKey(name), category);
+    });
+  });
+  return known;
+}
+
+function productSlug(product) {
+  return String(product?.urlKey || product?.path?.split('/').pop() || '').trim();
+}
+
+export function catalogCategoriesTsv(products) {
+  return `${[CATEGORY_TSV_HEADER, ...products.map((product) => (
+    `${productSlug(product)}\t${categoryNames(product).join(', ')}`
+  ))].join('\n')}\n`;
+}
+
+export function parseCategoriesTsv(text) {
+  const lines = String(text || '').replace(/(?:\r?\n)+$/, '').split(/\r?\n/);
+  if (lines.shift()?.replace(/^\uFEFF/, '').trim().toLowerCase() !== CATEGORY_TSV_HEADER.toLowerCase()) {
+    throw new Error('Categories TSV must start with Slug and Categories columns.');
+  }
+  const seen = new Set();
+  return lines.filter((line) => line.trim()).map((line, index) => {
+    const cells = line.split('\t');
+    const slug = cells[0]?.trim();
+    if (cells.length !== 2 || !slug || /[\\/\r\n]/.test(slug)) {
+      throw new Error(`Row ${index + 2}: expected a product slug and comma-separated categories.`);
+    }
+    if (seen.has(slug)) throw new Error(`Row ${index + 2}: duplicate slug ${slug}.`);
+    seen.add(slug);
+    const categories = cells[1].split(',').map((value) => value.trim()).filter(Boolean);
+    if (new Set(categories.map(categoryNameKey)).size !== categories.length) {
+      throw new Error(`Row ${index + 2}: duplicate category name.`);
+    }
+    return { slug, categories };
+  });
+}
+
+export function categoryPreviewRows(rows, existingByPath) {
+  const bySlug = new Map();
+  const known = knownCategoriesByName([...existingByPath.values()]);
+  existingByPath.forEach((product, path) => {
+    const slug = productSlug(product);
+    if (!bySlug.has(slug)) bySlug.set(slug, []);
+    bySlug.get(slug).push({ product, path });
+  });
+  return rows.map((row) => {
+    const matches = bySlug.get(row.slug) || [];
+    const existing = matches.length === 1 ? matches[0].product : null;
+    const before = categoryNames(existing);
+    const after = existing
+      ? categoryNames(withCategories(existing, row.categories, known)) : row.categories;
+    let kind = 'missing';
+    if (matches.length > 1) kind = 'ambiguous';
+    else if (existing) {
+      kind = JSON.stringify(before) === JSON.stringify(after) ? 'same' : 'update';
+    }
+    return {
+      ...row, path: matches[0]?.path, before, after, kind,
+    };
+  });
+}
+
+function categoryPreviewHtml(rows) {
+  const selectable = rows.some((row) => row.kind === 'update');
+  const body = rows.map((row, index) => {
+    let status = statusBadge(row.kind);
+    if (row.kind === 'missing') status = 'Not found';
+    if (row.kind === 'ambiguous') status = 'Ambiguous slug';
+    return `<tr>
+    <td>${row.kind === 'update' ? `<input type="checkbox" data-pim-io-select value="${index}" aria-label="Select ${escapeHtml(row.slug)} category change">` : ''}</td>
+    <td>${status}</td>
+    <td>${escapeHtml(row.slug)}</td>
+    <td>${escapeHtml(row.before.join(', ')) || '—'}</td>
+    <td>${escapeHtml(row.after.join(', ')) || '—'}</td>
+  </tr>`;
+  }).join('');
+  return `<table class="pim-io-category-table" aria-label="Category import differences">
+    <thead><tr><th scope="col">${selectable ? '<input type="checkbox" data-pim-io-select-all aria-label="Select all category changes">' : ''}</th>
+      <th scope="col">Status</th><th scope="col">Slug</th><th scope="col">Current categories</th><th scope="col">Imported categories</th></tr></thead>
+    <tbody>${body || '<tr><td colspan="5">No products in this TSV.</td></tr>'}</tbody>
+  </table>`;
+}
+
+export function withCategories(product, names, knownByName = new Map()) {
+  const local = knownCategoriesByName([product]);
+  const categories = names.map((name) => {
+    const known = local.get(categoryNameKey(name)) || knownByName.get(categoryNameKey(name));
+    if (known) return known;
+    const slug = categorySlugFromName(name);
+    if (!slug) throw new Error(`Cannot derive a category slug from "${name}".`);
+    return { url_key: slug, name };
+  });
+  return { ...product, custom: { ...product.custom, categories } };
+}
+
+async function applyCategoryChanges(rows, existingByPath, onProgress) {
+  const ok = [];
+  const failed = [];
+  let done = 0;
+  const known = knownCategoriesByName([...existingByPath.values()]);
+  await mapWithConcurrency(rows, WRITE_CONCURRENCY, async (row) => {
+    try {
+      const product = await fetchCatalogProduct(row.path);
+      if (!product) throw new Error('Product not found');
+      const body = withCategories(product, row.categories, known);
+      await putOrPatchResource(catalogApiPath(row.path), body);
+      ok.push(body);
+    } catch (err) {
+      failed.push({ path: row.path, message: err?.message || String(err) });
+    } finally {
+      done += 1;
+      onProgress?.(done, rows.length);
+    }
+  });
+  return { ok, failed };
 }
 
 function classifyBodies(bodies, existingByPath) {
@@ -249,10 +401,10 @@ function previewListHtml(parsed, existingByPath) {
   }).join('');
 }
 
-function downloadJson(text, filename) {
+function downloadJson(text, filename, categories = false) {
   const raw = String(text || '');
-  if (!raw.trim()) throw new Error('Nothing to download — the JSON is empty.');
-  const blob = new Blob([raw], { type: 'application/json' });
+  if (!raw.trim()) throw new Error('Nothing to download — the text is empty.');
+  const blob = new Blob([raw], { type: categories ? 'text/tab-separated-values;charset=utf-8' : 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -295,9 +447,10 @@ function stampFilename(prefix) {
  * @param {string} opts.hint
  * @param {string} opts.filename
  * @param {string} [opts.initialJson]
- * @param {() => Promise<string>} [opts.loadJson]
+ * @param {(onProgress: (progress: object) => void) => Promise<string>} [opts.loadJson]
  * @param {Map<string, object>} [opts.existingByPath]
  * @param {(imported: object[]) => void} [opts.onApplied]
+ * @param {string} [opts.locale] enables category TSV mode for catalog exports
  */
 export function openCatalogExportImportDialog({
   title,
@@ -307,6 +460,7 @@ export function openCatalogExportImportDialog({
   loadJson,
   existingByPath = new Map(),
   onApplied,
+  locale = '',
 }) {
   return new Promise((resolve) => {
     const dialog = document.createElement('dialog');
@@ -314,35 +468,58 @@ export function openCatalogExportImportDialog({
     dialog.innerHTML = `
       <div class="pim-io-dialog-inner">
         <div class="pim-io-dialog-scroll" tabindex="-1">
-          <div data-pim-io-pane="json">
+          ${locale ? `<div class="pim-io-choice" data-pim-io-pane="choice">
+            <h2 class="pim-io-title">${escapeHtml(title)}</h2>
+            <div class="pim-io-choice-options">
+              <button type="button" class="pim-io-choice-option" data-pim-io-format="json">
+                <strong>Full Catalog (JSON)</strong>
+                <span>Export or import complete product records.</span>
+              </button>
+              <button type="button" class="pim-io-choice-option" data-pim-io-format="categories">
+                <strong>Categories</strong>
+                <span>Export or import product category assignments as TSV.</span>
+              </button>
+            </div>
+            <div class="pim-io-load-progress" data-pim-io-load-progress role="status" aria-live="polite" hidden>
+              <span data-pim-io-load-label>Scanning catalog…</span>
+              <progress data-pim-io-load-bar aria-label="Catalog loading progress"></progress>
+            </div>
+          </div>` : ''}
+          <div data-pim-io-pane="json" ${locale ? 'hidden' : ''}>
             <h2 class="pim-io-title">${escapeHtml(title)}</h2>
             <p class="pim-io-hint">${hint}</p>
-            <label class="pim-sr-only" for="pim-io-json">Product JSON</label>
+            <label class="pim-sr-only" for="pim-io-json" data-pim-io-label>Product JSON</label>
             <textarea id="pim-io-json" class="pim-io-textarea" spellcheck="false" rows="16">${escapeHtml(initialJson)}</textarea>
-            <div class="pim-io-status" data-pim-io-status hidden></div>
           </div>
           <div data-pim-io-pane="preview" hidden>
             <h2 class="pim-io-title">Import preview</h2>
             <p class="pim-io-hint" data-pim-io-preview-lead></p>
             <div class="pim-io-preview" data-pim-io-preview-list></div>
           </div>
+          <div class="pim-io-status" data-pim-io-status hidden></div>
         </div>
         <div class="pim-io-actions">
           <button type="button" class="pim-io-btn" data-pim-io-cancel>Cancel</button>
           <button type="button" class="pim-io-btn" data-pim-io-back hidden>Back</button>
-          <button type="button" class="pim-io-btn" data-pim-io-preview>Preview import</button>
-          <button type="button" class="pim-io-btn pim-io-btn-primary" data-pim-io-save>Download</button>
+          <button type="button" class="pim-io-btn" data-pim-io-preview ${locale ? 'hidden' : ''}>Preview import</button>
+          <button type="button" class="pim-io-btn pim-io-btn-primary" data-pim-io-save ${locale ? 'hidden' : ''}>Download</button>
           <button type="button" class="pim-io-btn pim-io-btn-primary" data-pim-io-import hidden>Import</button>
         </div>
       </div>`;
     document.body.appendChild(dialog);
 
+    const choicePane = dialog.querySelector('[data-pim-io-pane="choice"]');
     const jsonPane = dialog.querySelector('[data-pim-io-pane="json"]');
     const previewPane = dialog.querySelector('[data-pim-io-pane="preview"]');
     const statusEl = dialog.querySelector('[data-pim-io-status]');
+    const loadProgress = dialog.querySelector('[data-pim-io-load-progress]');
+    const loadLabel = dialog.querySelector('[data-pim-io-load-label]');
+    const loadBar = dialog.querySelector('[data-pim-io-load-bar]');
     const textarea = /** @type {HTMLTextAreaElement | null} */ (dialog.querySelector('#pim-io-json'));
     const leadEl = dialog.querySelector('[data-pim-io-preview-lead]');
     const listHost = dialog.querySelector('[data-pim-io-preview-list]');
+    const hintEl = dialog.querySelector('.pim-io-hint');
+    const labelEl = dialog.querySelector('[data-pim-io-label]');
     const btnCancel = dialog.querySelector('[data-pim-io-cancel]');
     const btnBack = dialog.querySelector('[data-pim-io-back]');
     const btnPreview = dialog.querySelector('[data-pim-io-preview]');
@@ -351,6 +528,10 @@ export function openCatalogExportImportDialog({
 
     /** @type {{ body: object, existed: boolean }[]} */
     let pendingImport = [];
+    let categoryRows = [];
+    let mode = 'json';
+    let jsonText = initialJson;
+    let categoriesText = `${CATEGORY_TSV_HEADER}\n`;
     const liveExisting = existingByPath;
 
     const setStatus = (msg, tone = 'error') => {
@@ -372,18 +553,72 @@ export function openCatalogExportImportDialog({
         if (btn instanceof HTMLButtonElement) btn.disabled = busy;
       });
       if (textarea) textarea.disabled = busy;
+      choicePane?.querySelectorAll('button').forEach((btn) => { btn.disabled = busy; });
       if (busy && label) setStatus(label, 'ok');
     };
 
     const showJsonPane = () => {
+      if (choicePane instanceof HTMLElement) choicePane.hidden = true;
       if (jsonPane instanceof HTMLElement) jsonPane.hidden = false;
       if (previewPane instanceof HTMLElement) previewPane.hidden = true;
-      btnBack?.setAttribute('hidden', '');
+      if (locale) btnBack?.removeAttribute('hidden');
+      else btnBack?.setAttribute('hidden', '');
       btnPreview?.removeAttribute('hidden');
       btnSave?.removeAttribute('hidden');
       btnImport?.setAttribute('hidden', '');
       pendingImport = [];
+      categoryRows = [];
     };
+
+    const showChoicePane = () => {
+      if (choicePane instanceof HTMLElement) choicePane.hidden = false;
+      if (jsonPane instanceof HTMLElement) jsonPane.hidden = true;
+      if (previewPane instanceof HTMLElement) previewPane.hidden = true;
+      btnBack?.setAttribute('hidden', '');
+      btnPreview?.setAttribute('hidden', '');
+      btnSave?.setAttribute('hidden', '');
+      btnImport?.setAttribute('hidden', '');
+      setStatus('');
+    };
+
+    choicePane?.addEventListener('click', (event) => {
+      const selected = event.target instanceof Element
+        ? event.target.closest('[data-pim-io-format]') : null;
+      if (!(selected instanceof HTMLButtonElement)) return;
+      mode = selected.dataset.pimIoFormat;
+      if (textarea) textarea.value = mode === 'json' ? jsonText : categoriesText;
+      if (hintEl) {
+        hintEl.innerHTML = mode === 'json' ? hint
+          : `TSV of product slugs and comma-separated category names in <strong>${escapeHtml(locale)}</strong>. Edit or paste, then Preview import.`;
+      }
+      if (labelEl) labelEl.textContent = mode === 'json' ? 'Product JSON' : 'Categories TSV';
+      setStatus('');
+      showJsonPane();
+    });
+
+    const updateCategorySelection = () => {
+      const selected = [...(listHost?.querySelectorAll('[data-pim-io-select]:checked') || [])];
+      const checks = [...(listHost?.querySelectorAll('[data-pim-io-select]') || [])];
+      const all = listHost?.querySelector('[data-pim-io-select-all]');
+      if (all instanceof HTMLInputElement) {
+        all.checked = !!checks.length && selected.length === checks.length;
+        all.indeterminate = !!selected.length && selected.length < checks.length;
+      }
+      if (btnImport instanceof HTMLButtonElement) {
+        btnImport.hidden = !selected.length;
+        btnImport.textContent = `Import ${selected.length} category change${selected.length === 1 ? '' : 's'}`;
+      }
+    };
+
+    listHost?.addEventListener('change', (event) => {
+      if (!(event.target instanceof HTMLInputElement)) return;
+      if (event.target.matches('[data-pim-io-select-all]')) {
+        listHost.querySelectorAll('[data-pim-io-select]').forEach((checkbox) => {
+          checkbox.checked = event.target.checked;
+        });
+      }
+      updateCategorySelection();
+    });
 
     const showPreviewPane = (parsed) => {
       const {
@@ -429,8 +664,14 @@ export function openCatalogExportImportDialog({
 
     btnCancel?.addEventListener('click', () => dismiss(false));
     btnBack?.addEventListener('click', () => {
-      showJsonPane();
-      setStatus('');
+      if (previewPane instanceof HTMLElement && !previewPane.hidden) {
+        showJsonPane();
+        setStatus('');
+      } else if (locale) {
+        if (mode === 'json') jsonText = textarea?.value ?? '';
+        else categoriesText = textarea?.value ?? '';
+        showChoicePane();
+      }
     });
     dialog.addEventListener('click', (e) => {
       if (e.target === dialog) dismiss(false);
@@ -439,7 +680,8 @@ export function openCatalogExportImportDialog({
 
     btnSave?.addEventListener('click', () => {
       try {
-        const downloaded = downloadJson(textarea?.value ?? '', filename);
+        const categories = mode === 'categories';
+        const downloaded = downloadJson(textarea?.value ?? '', categories ? filename.replace(/\.json$/, '.tsv') : filename, categories);
         showToast(`Downloaded ${downloaded}`);
       } catch (err) {
         setStatus(err?.message || 'Could not download JSON');
@@ -449,6 +691,35 @@ export function openCatalogExportImportDialog({
 
     btnPreview?.addEventListener('click', async () => {
       try {
+        if (mode === 'categories') {
+          const rows = parseCategoriesTsv(textarea?.value ?? '');
+          setBusy(true, 'Comparing with catalog…');
+          const knownSlugs = new Set([...liveExisting.values()].map(productSlug));
+          const missing = rows.filter((row) => !knownSlugs.has(row.slug));
+          const fetched = await mapWithConcurrency(missing, FETCH_CONCURRENCY, async (row) => {
+            const path = `/${locale}/products/${row.slug}`;
+            const product = await fetchCatalogProduct(path);
+            return product && productSlug(product) === row.slug ? [path, product] : null;
+          });
+          fetched.filter(Boolean).forEach(([path, product]) => liveExisting.set(path, product));
+          categoryRows = categoryPreviewRows(rows, liveExisting);
+          if (leadEl) {
+            const changed = categoryRows.filter((row) => row.kind === 'update').length;
+            const unresolved = categoryRows.filter((row) => row.kind === 'missing' || row.kind === 'ambiguous').length;
+            const unchanged = categoryRows.length - changed - unresolved;
+            leadEl.textContent = `${changed} category changes. ${unchanged} unchanged. ${unresolved} unresolved. Select changes to import.`;
+          }
+          if (listHost) listHost.innerHTML = categoryPreviewHtml(categoryRows);
+          if (jsonPane instanceof HTMLElement) jsonPane.hidden = true;
+          if (previewPane instanceof HTMLElement) previewPane.hidden = false;
+          btnBack?.removeAttribute('hidden');
+          btnPreview?.setAttribute('hidden', '');
+          btnSave?.setAttribute('hidden', '');
+          updateCategorySelection();
+          setBusy(false);
+          setStatus('');
+          return;
+        }
         const bodies = parseImportJson(textarea?.value ?? '');
         setBusy(true, 'Comparing with catalog…');
         const missing = bodies
@@ -479,6 +750,33 @@ export function openCatalogExportImportDialog({
     });
 
     btnImport?.addEventListener('click', async () => {
+      if (mode === 'categories') {
+        const selected = [...(listHost?.querySelectorAll('[data-pim-io-select]:checked') || [])]
+          .map((checkbox) => categoryRows[Number(checkbox.value)]).filter(Boolean);
+        if (!selected.length) return;
+        setBusy(true);
+        try {
+          const onProgress = (done, total) => {
+            if (btnImport) btnImport.textContent = `Importing… (${done}/${total})`;
+          };
+          const { ok, failed } = await applyCategoryChanges(selected, liveExisting, onProgress);
+          if (ok.length) onApplied?.(ok);
+          if (failed.length) {
+            showToast(`Imported ${ok.length} of ${selected.length} category changes`, 'error');
+            showJsonPane();
+            setStatus(failed.map((entry) => `${entry.path}: ${entry.message}`).join('\n'));
+          } else {
+            showToast(`Imported ${ok.length} category changes`);
+            dismiss(true);
+          }
+        } catch (err) {
+          showJsonPane();
+          setStatus(err?.message || 'Import failed');
+        } finally {
+          setBusy(false);
+        }
+        return;
+      }
       if (!pendingImport.length) return;
       if (btnImport instanceof HTMLButtonElement) {
         btnImport.disabled = true;
@@ -523,12 +821,39 @@ export function openCatalogExportImportDialog({
     dialog.showModal();
 
     if (typeof loadJson === 'function') {
-      setBusy(true, 'Loading catalog…');
-      loadJson().then((text) => {
-        if (textarea) textarea.value = text;
+      const showLoadProgress = ({
+        phase, found = 0, done = 0, total = 0,
+      }) => {
+        if (!dialog.isConnected) return;
+        if (loadProgress instanceof HTMLElement) {
+          loadProgress.hidden = false;
+        }
+        if (loadLabel) {
+          loadLabel.textContent = phase === 'listing'
+            ? `Scanning catalog… ${found} listed` : `Loading products… ${done} of ${total}`;
+        }
+        if (loadBar instanceof HTMLProgressElement) {
+          if (phase === 'products' && total) {
+            loadBar.max = total;
+            loadBar.value = done;
+          } else {
+            loadBar.removeAttribute('value');
+          }
+        }
+      };
+      setBusy(true);
+      showLoadProgress({ phase: 'listing' });
+      loadJson(showLoadProgress).then((text) => {
+        if (!dialog.isConnected) return;
+        jsonText = text;
+        categoriesText = catalogCategoriesTsv([...liveExisting.values()]);
+        if (textarea) textarea.value = mode === 'json' ? jsonText : categoriesText;
+        if (loadProgress instanceof HTMLElement) loadProgress.hidden = true;
         setBusy(false);
         setStatus('');
       }).catch((err) => {
+        if (!dialog.isConnected) return;
+        if (loadProgress instanceof HTMLElement) loadProgress.hidden = true;
         setBusy(false);
         setStatus(err?.message || 'Failed to load catalog');
       });
@@ -585,9 +910,10 @@ export async function startCatalogExportImport({ locale, onApplied }) {
     hint: `JSON array of ProductBus products in <strong>${escapeHtml(loc)}</strong>. Copy or paste, then Preview import. Unchanged paths are skipped.`,
     filename: stampFilename(`catalog-${fileSlug}`),
     initialJson: '[]\n',
+    locale: loc,
     existingByPath,
-    loadJson: async () => {
-      const products = await fetchCatalogProductsForLocale(loc);
+    loadJson: async (onProgress) => {
+      const products = await fetchCatalogProductsForLocale(loc, onProgress);
       existingByPath.clear();
       products.forEach((p) => {
         const path = normalizeProductPath(p.path);
