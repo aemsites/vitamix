@@ -13,6 +13,10 @@ import { easternCivilToUtc, formatInstantInEastern } from '../commerce-eastern-t
 const CONTENT_ORIGIN = `https://main--vitamix--aemsites.aem.${getApiEnvironment() === 'prod' ? 'live' : 'page'}`;
 const CORS_PROXY = 'https://fcors.org/?url=';
 const CORS_KEY = '&key=Mg23N96GgR8O3NjU';
+const STOREFRONT_ORIGIN = 'https://www.vitamix.com';
+const PRODUCTION_REQUEST_INTERVAL = 3000;
+let productionRequestQueue = Promise.resolve();
+let lastProductionRequestAt = 0;
 
 const MARKETS = [
   { key: 'us', label: 'US', locales: ['us/en_us'] },
@@ -78,6 +82,10 @@ const state = {
   scheduledPages: [],
   /** @type {Map<string, { status?: number, lastModified?: string, error?: string }>} */
   pageChecks: new Map(),
+  /** @type {Map<string, Promise<object[]>>} production product index data by locale/category */
+  productionIndexes: new Map(),
+  /** @type {Map<string, Promise<object>>} production PDP data by product path */
+  productionProducts: new Map(),
   /** @type {Map<string, { text: string, error?: boolean }>} */
   status: new Map(),
   sources: new Set(SOURCES.map((s) => s.key)),
@@ -403,6 +411,8 @@ function loadAll() {
   state.items = {};
   state.status.clear();
   state.pageChecks.clear();
+  state.productionIndexes.clear();
+  state.productionProducts.clear();
   loadScheduledPages();
   const locales = MARKETS.flatMap((m) => m.locales);
   runLoader('commerce', loadCommercePromotions);
@@ -731,6 +741,10 @@ function formatEt(value) {
 
 function appendCells(tr, values) {
   values.forEach((value) => {
+    if (value instanceof HTMLTableCellElement) {
+      tr.append(value);
+      return;
+    }
     const td = el('td');
     if (value instanceof Node) td.append(value); else td.textContent = value;
     tr.append(td);
@@ -742,6 +756,160 @@ function amountOff(regular, sale) {
   const s = parseFloat(String(sale).replace(/[^0-9.]/g, ''));
   if (!Number.isFinite(r) || !Number.isFinite(s) || r <= 0) return '';
   return `$${(r - s).toFixed(2)} (${Math.round(((r - s) / r) * 100)}%)`;
+}
+
+function fetchProductionUrl(url) {
+  const request = productionRequestQueue.then(async () => {
+    const delay = Math.max(0, PRODUCTION_REQUEST_INTERVAL - (Date.now() - lastProductionRequestAt));
+    if (delay) {
+      await new Promise((resolve) => {
+        setTimeout(resolve, delay);
+      });
+    }
+    lastProductionRequestAt = Date.now();
+    return fetch(`${CORS_PROXY}${encodeURIComponent(url)}${CORS_KEY}`, { cache: 'no-store' });
+  });
+  productionRequestQueue = request.then(() => undefined, () => undefined);
+  return request;
+}
+
+function loadProductionIndex(locale, category) {
+  const key = `${locale}:${category}`;
+  if (!state.productionIndexes.has(key)) {
+    const folder = category === 'commercial' ? 'commercial/' : '';
+    const url = `${STOREFRONT_ORIGIN}/${locale}/products/${folder}index.json?include=all`;
+    const request = fetchProductionUrl(url).then(async (resp) => {
+      if (!resp.ok) throw new Error(`Index HTTP ${resp.status}`);
+      const json = await resp.json();
+      const rows = Array.isArray(json) ? json : json?.data;
+      if (!Array.isArray(rows)) throw new Error('Invalid product index response');
+      return rows;
+    });
+    state.productionIndexes.set(key, request);
+  }
+  return state.productionIndexes.get(key);
+}
+
+function loadProductionProduct(path) {
+  if (!state.productionProducts.has(path)) {
+    const request = fetchProductionUrl(`${STOREFRONT_ORIGIN}${path}`).then(async (resp) => {
+      if (!resp.ok) throw new Error(`PDP HTTP ${resp.status}`);
+      return resp.text();
+    });
+    state.productionProducts.set(path, request);
+  }
+  return state.productionProducts.get(path);
+}
+
+function productIndexMatch(rows, path, sku) {
+  const matchesPath = (row) => {
+    try {
+      return new URL(row.url, STOREFRONT_ORIGIN).pathname.replace(/\/$/, '') === path.replace(/\/$/, '');
+    } catch {
+      return false;
+    }
+  };
+  return rows.find((row) => String(row.sku || '') === String(sku || '') && matchesPath(row))
+    || rows.find(matchesPath);
+}
+
+function jsonLdProduct(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const scripts = [...doc.querySelectorAll('script[type="application/ld+json"]')];
+  const products = scripts.flatMap((script) => {
+    try {
+      const data = JSON.parse(script.textContent);
+      const values = Array.isArray(data) ? data : [data];
+      return values.flatMap((entry) => entry?.['@graph'] || [entry]);
+    } catch {
+      return [];
+    }
+  });
+  return products.find((entry) => {
+    const type = entry?.['@type'];
+    return type === 'Product' || (Array.isArray(type) && type.includes('Product'));
+  });
+}
+
+function productJsonLdPrice(product, sku) {
+  const offers = Array.isArray(product?.offers)
+    ? product.offers
+    : [product?.offers].filter(Boolean);
+  const offer = offers.find((entry) => String(entry.sku || '') === String(sku || ''))
+    || (offers.length === 1 ? offers[0] : null)
+    || (!sku ? offers[0] : null);
+  return offer ? { value: offer.price, currency: offer.priceCurrency } : null;
+}
+
+function formatProductionPrice(value) {
+  if (value == null || value === '') return '—';
+  const number = Number(value);
+  return Number.isFinite(number)
+    ? number.toFixed(2)
+    : String(value);
+}
+
+function priceCents(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw || raw === '—') return null;
+  const number = Number(raw.replace(/[^0-9.-]/g, ''));
+  return Number.isFinite(number) ? Math.round(number * 100) : null;
+}
+
+function markCheckedPrice(cell, current, row) {
+  cell.classList.remove('pcc-price-match-sale', 'pcc-price-mismatch');
+  const cents = priceCents(current);
+  if (cents === null) return;
+  if (cents === priceCents(row.dataset.salePrice)) {
+    cell.classList.add('pcc-price-match-sale');
+  } else if (cents !== priceCents(row.dataset.regularPrice)) {
+    cell.classList.add('pcc-price-mismatch');
+  }
+}
+
+async function validateCommerceCard(item, card, button) {
+  card.classList.add('pcc-production-validated');
+  button.disabled = true;
+  button.textContent = 'Validating…';
+  const rows = [...card.querySelectorAll('tbody tr[data-product-path]')];
+  const jobs = rows.map(async (row) => {
+    const { productPath: path, sku } = row.dataset;
+    const indexCell = row.querySelector('.pcc-current-index-price');
+    const pdpCell = row.querySelector('.pcc-current-pdp-price');
+    try {
+      const segments = path.split('/').filter(Boolean);
+      const locale = segments.slice(0, 2).join('/');
+      const category = segments[2] === 'products' && segments[3] === 'commercial'
+        ? 'commercial'
+        : 'products';
+      const indexRows = await loadProductionIndex(locale, category);
+      const indexProduct = productIndexMatch(indexRows, path, sku);
+      indexCell.textContent = indexProduct
+        ? formatProductionPrice(
+          indexProduct.price ?? indexProduct.regularPrice,
+        )
+        : 'Not in index';
+      if (!indexProduct) indexCell.classList.add('pcc-check-error');
+      else markCheckedPrice(indexCell, indexProduct.price ?? indexProduct.regularPrice, row);
+
+      const html = await loadProductionProduct(path);
+      const product = jsonLdProduct(html);
+      const pdpPrice = productJsonLdPrice(product, sku);
+      pdpCell.textContent = pdpPrice
+        ? formatProductionPrice(pdpPrice.value)
+        : 'No matching JSON-LD offer';
+      if (!pdpPrice) pdpCell.classList.add('pcc-check-error');
+      else markCheckedPrice(pdpCell, pdpPrice.value, row);
+    } catch (error) {
+      indexCell.textContent ||= error.message;
+      pdpCell.textContent ||= error.message;
+      indexCell.classList.add('pcc-check-error');
+      pdpCell.classList.add('pcc-check-error');
+    }
+  });
+  await Promise.all(jobs);
+  button.textContent = 'Validated production';
+  button.disabled = false;
 }
 
 function renderCommerceDetail(item) {
@@ -760,8 +928,17 @@ function renderCommerceDetail(item) {
 
   const table = el('table', 'pcc-detail-table');
   const headRow = el('tr');
-  ['Product', 'Variant SKU', 'Regular', 'Sale', 'Off', 'Start (ET)', 'End (ET)'].forEach((h) => {
-    const th = el('th', '', h);
+  [
+    'Product', 'Variant SKU', 'Regular', 'Sale', 'Current PLP price',
+    'Current PDP price', 'Off', 'Start (ET)', 'End (ET)',
+  ].forEach((h) => {
+    const isProductionPrice = h === 'Current PLP price' || h === 'Current PDP price';
+    const th = el('th', isProductionPrice ? 'pcc-production-price-column' : '');
+    if (isProductionPrice) {
+      th.append(el('span', '', 'Current'), document.createElement('br'), document.createTextNode(h.slice(8)));
+    } else {
+      th.textContent = h;
+    }
     th.scope = 'col';
     headRow.append(th);
   });
@@ -770,6 +947,10 @@ function renderCommerceDetail(item) {
   const tbody = el('tbody');
   lines.forEach((line) => {
     const tr = el('tr');
+    tr.dataset.productPath = line.path;
+    tr.dataset.sku = line.sku || '';
+    tr.dataset.salePrice = line.salePrice;
+    tr.dataset.regularPrice = line.regularPrice;
     const link = el('a', '', line.path);
     link.href = line.product;
     link.target = '_blank';
@@ -779,6 +960,8 @@ function renderCommerceDetail(item) {
       line.sku || '',
       line.regularPrice,
       line.salePrice,
+      el('td', 'pcc-current-index-price pcc-production-price-column', 'Not checked'),
+      el('td', 'pcc-current-pdp-price pcc-production-price-column', 'Not checked'),
       amountOff(line.regularPrice, line.salePrice),
       formatEt(line.start),
       formatEt(line.end),
@@ -819,6 +1002,10 @@ function contentLink(path) {
   return link;
 }
 
+function scheduledPagesForLocale(item) {
+  return [...new Set(state.scheduledPages.filter((url) => url.startsWith(`/${item.where}/`)))];
+}
+
 /** Promotion page paths per `checkSchedule()` on main. */
 function renderPromoScheduleDetail(item) {
   const body = el('div', 'pcc-detail-body');
@@ -827,16 +1014,18 @@ function renderPromoScheduleDetail(item) {
     return body;
   }
   const promotionBase = `/${item.where}/promotions/${item.promotion}`;
-  const pages = state.scheduledPages.filter((url) => url.startsWith(`/${item.where}/`));
+  const pages = scheduledPagesForLocale(item);
   body.append(el('p', 'pcc-detail-meta', `${pages.length} pages with schedule = promo-schedule in ${item.where}`));
   if (!pages.length) return body;
 
   const table = el('table', 'pcc-detail-table');
   table.append(el('thead'));
   const headRow = el('tr');
-  ['Page', 'Promotion page', 'Status', 'Last modified'].forEach((h) => {
-    const th = el('th', '', h);
+  ['Page', 'Promotion page', 'Status', 'Last modified', ''].forEach((h, index) => {
+    const actionColumn = index === 4;
+    const th = el('th', actionColumn ? 'pcc-production-action-cell' : '', h);
     th.scope = 'col';
+    if (actionColumn) th.setAttribute('aria-label', 'Production validation action');
     headRow.append(th);
   });
   table.tHead.append(headRow);
@@ -849,6 +1038,14 @@ function renderPromoScheduleDetail(item) {
     const tr = el('tr');
     appendCells(tr, [contentLink(page), contentLink(promoPath)]);
     tr.append(statusCell, modifiedCell);
+    const actionCell = el('td', 'pcc-production-action-cell');
+    const actionButton = el('button', 'pcc-validate-production pcc-row-production-action', 'Validate production');
+    actionButton.type = 'button';
+    actionButton.addEventListener('click', () => {
+      window.open(`${STOREFRONT_ORIGIN}${page}`, '_blank', 'noopener,noreferrer');
+    });
+    actionCell.append(actionButton);
+    tr.append(actionCell);
     tbody.append(tr);
 
     if (!state.pageChecks.has(promoPath)) {
@@ -869,6 +1066,19 @@ const DETAIL_RENDERERS = {
   'promo-schedule': renderPromoScheduleDetail,
 };
 
+function renderProductionAction(item, card) {
+  const button = el('button', 'pcc-validate-production', 'Validate production');
+  button.type = 'button';
+  if (item.source === 'commerce') {
+    button.addEventListener('click', () => validateCommerceCard(item, card, button));
+  } else {
+    button.addEventListener('click', () => {
+      window.open(`${STOREFRONT_ORIGIN}/${item.where}/`, '_blank', 'noopener,noreferrer');
+    });
+  }
+  return button;
+}
+
 function renderDetails(items, scope) {
   const heading = el('h2', '', `Details (${items.length} ${scope})`);
   const cards = items.map((item) => {
@@ -882,6 +1092,7 @@ function renderDetails(items, scope) {
       el('span', 'pcc-where', `${source.label} · ${item.where.toUpperCase()}`),
       el('h3', '', item.label),
     );
+    if (item.source !== 'promo-schedule') head.append(renderProductionAction(item, card));
     const startText = item.start ? formatEt(item.start.toISOString()) : 'open';
     const endText = item.end ? formatEt(item.end.toISOString()) : 'open';
     const dur = item.start && item.end ? ` (${formatDuration(item.end - item.start)})` : '';

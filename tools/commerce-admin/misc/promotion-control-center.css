@@ -407,6 +407,41 @@
   gap: 8px;
 }
 
+.pcc-validate-production {
+  flex: none;
+  margin-left: auto;
+  padding: 6px 10px;
+  border: 1px solid #52575b;
+  border-radius: 4px;
+  background: #fff;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.pcc-validate-production:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.pcc-validate-production:hover:not(:disabled) {
+  background: #f1f3f5;
+}
+
+.pcc-row-production-action {
+  display: block;
+  margin-left: 0;
+  white-space: nowrap;
+}
+
+.pcc-production-action-cell {
+  text-align: right;
+}
+
+.pcc-production-action-cell .pcc-row-production-action {
+  margin-left: auto;
+}
+
 .pcc-detail-head h3 {
   margin: 0;
   font-size: 15px;
@@ -459,6 +494,26 @@
 .pcc-detail-table .pcc-check-error {
   color: #b3261e;
   font-weight: 600;
+}
+
+.pcc-current-index-price,
+.pcc-current-pdp-price {
+  min-width: 115px;
+  white-space: nowrap;
+}
+
+.pcc-detail-table td.pcc-price-match-sale {
+  background: #d4edda;
+  color: #155724;
+}
+
+.pcc-detail-table td.pcc-price-mismatch {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.pcc-detail-commerce:not(.pcc-production-validated) .pcc-production-price-column {
+  display: none;
 }
 
 /* Load status */
