@@ -96,6 +96,8 @@ const state = {
   /** @type {number|null} boundary instant selected via its label */
   focusBoundary: null,
   pending: 0,
+  itemIds: new WeakMap(),
+  nextItemId: 1,
 };
 
 /** Eastern civil components (month 1-based) of an instant. */
@@ -455,6 +457,14 @@ function formatRangeDate(ms) {
   });
 }
 
+function scheduleItemId(item) {
+  if (!state.itemIds.has(item)) {
+    state.itemIds.set(item, String(state.nextItemId));
+    state.nextItemId += 1;
+  }
+  return state.itemIds.get(item);
+}
+
 function pickTickUnit(rangeMs) {
   return TICK_UNITS.find((u) => rangeMs / u.ms <= MAX_TICKS) || TICK_UNITS[TICK_UNITS.length - 1];
 }
@@ -545,6 +555,7 @@ function itemTooltip(item) {
 
 function renderRow(item, view, now) {
   const row = el('div', 'pcc-row');
+  row.dataset.itemId = scheduleItemId(item);
   const label = el('div', 'pcc-label');
   label.title = itemTooltip(item);
   const swatch = el('span', 'pcc-swatch');
@@ -1079,15 +1090,42 @@ function renderProductionAction(item, card) {
   return button;
 }
 
+function editTargetForItem(item) {
+  if (item.source === 'commerce') {
+    const params = new URLSearchParams({ market: item.market, id: item.promo.id });
+    return `../promotions.html?${params}`;
+  }
+  if (item.source === 'nav-banners') {
+    return `https://da.live/edit#/aemsites/vitamix/${item.where}/nav/nav-banners`;
+  }
+  const paths = {
+    'promo-schedule': '/promotions/promo-schedule',
+    'free-gifts': '/products/config/free-gifts',
+  };
+  return `https://da.live/sheet#/aemsites/vitamix/${item.where}${paths[item.source]}`;
+}
+
+function renderEditAction(item) {
+  const button = el('button', 'pcc-edit-detail', 'Edit');
+  button.type = 'button';
+  button.addEventListener('click', () => {
+    window.open(editTargetForItem(item), '_blank', 'noopener,noreferrer');
+  });
+  return button;
+}
+
 function renderDetails(items, scope) {
   const heading = el('h2', '', `Details (${items.length} ${scope})`);
   const cards = items.map((item) => {
     const card = el('article', `pcc-detail pcc-detail-${item.source}`);
+    card.dataset.itemId = scheduleItemId(item);
+    card.tabIndex = -1;
     const head = el('header', 'pcc-detail-head');
     const swatch = el('span', 'pcc-swatch');
     const source = SOURCES.find((s) => s.key === item.source);
     swatch.style.background = source.color;
     head.append(
+      renderEditAction(item),
       swatch,
       el('span', 'pcc-where', `${source.label} · ${item.where.toUpperCase()}`),
       el('h3', '', item.label),
@@ -1205,6 +1243,18 @@ function xToMs(x, rect) {
   return state.view.start + ratio * (state.view.end - state.view.start);
 }
 
+function scrollToItemDetail(x, y) {
+  const bar = document.elementFromPoint(x, y)?.closest('.pcc-bar');
+  const itemId = bar?.closest('.pcc-row')?.dataset.itemId;
+  if (!itemId) return;
+  const card = detailsEl.querySelector(`[data-item-id="${itemId}"]`);
+  if (!card) return;
+  card.classList.add('pcc-detail-target');
+  card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  card.focus({ preventScroll: true });
+  setTimeout(() => card.classList.remove('pcc-detail-target'), 1400);
+}
+
 timelineEl.addEventListener('pointerdown', (e) => {
   if (e.target.closest('.pcc-boundary-label')) return;
   if (e.button !== 0) return;
@@ -1239,6 +1289,8 @@ function endDrag(e, apply) {
     const a = xToMs(Math.min(x0, e.clientX), rect);
     const b = xToMs(Math.max(x0, e.clientX), rect);
     setView(a, b);
+  } else if (apply) {
+    scrollToItemDetail(e.clientX, e.clientY);
   }
 }
 
