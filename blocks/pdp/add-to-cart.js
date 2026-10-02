@@ -295,6 +295,7 @@ export default function renderAddToCart(ph, block, parent) {
   addToCartButton.addEventListener('click', async () => {
     // update button state to show loading
     addToCartButton.textContent = ph.adding || 'Adding...';
+    addToCartButton.disabled = true;
     addToCartButton.setAttribute('aria-disabled', 'true');
 
     // get selected quantity and product SKU
@@ -314,6 +315,7 @@ export default function renderAddToCart(ph, block, parent) {
       selectedOptions.push(...parent.custom.requiredBundleOptions);
     }
 
+    let isRedirecting = false;
     try {
       if (window.useEdgeCheckout) {
         const cartApi = (await import('../../scripts/cart.js')).default;
@@ -332,8 +334,6 @@ export default function renderAddToCart(ph, block, parent) {
               overLimit: true,
             },
           }));
-          addToCartButton.textContent = ph.addToCart || 'Add to Cart';
-          addToCartButton.removeAttribute('aria-disabled');
         };
 
         // Cart.addItem enforces this after it has rebased on shared storage,
@@ -442,12 +442,10 @@ export default function renderAddToCart(ph, block, parent) {
           cartApi.flush();
           const { locale, language } = getLocaleAndLanguage();
           window.location.href = `/${locale}/${language}/order/cart`;
+          isRedirecting = true;
           return;
         }
 
-        // reenable button (desktop only — mobile redirects above)
-        addToCartButton.textContent = 'Add to Cart';
-        addToCartButton.removeAttribute('aria-disabled');
         return;
       }
 
@@ -468,6 +466,7 @@ export default function renderAddToCart(ph, block, parent) {
       // redirect to cart page after successful addition
       const { locale, language } = getLocaleAndLanguage();
       window.location.href = `/${locale}/${language}/checkout/cart/`;
+      isRedirecting = true;
     } catch (error) {
       const flow = window.useEdgeCheckout ? 'edge' : 'magento';
       // Slack displays `message`, so include the checkout stack and canonical
@@ -482,9 +481,11 @@ export default function renderAddToCart(ph, block, parent) {
       // eslint-disable-next-line no-console
       console.error(errorMessage, error);
     } finally {
-      // update button state to show ATC
-      addToCartButton.textContent = ph.addToCart || 'Add to Cart';
-      addToCartButton.removeAttribute('aria-disabled');
+      if (!isRedirecting) {
+        addToCartButton.textContent = ph.addToCart || 'Add to Cart';
+        addToCartButton.disabled = false;
+        addToCartButton.removeAttribute('aria-disabled');
+      }
     }
   });
 
