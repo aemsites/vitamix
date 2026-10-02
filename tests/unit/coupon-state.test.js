@@ -11,6 +11,9 @@ import {
   getAutoCoupons,
   getCouponRequestFields,
   getStatusMessage,
+  setAffiliateCode,
+  getAffiliateCode,
+  clearAffiliateCode,
 } from '../../scripts/commerce/coupon-state.js';
 
 beforeEach(() => globalThis.__resetTestState());
@@ -128,4 +131,20 @@ test('getStatusMessage maps rejected statuses and is empty for applied', () => {
   assert.equal(getStatusMessage('rejected_invalid', strings), 'invalid');
   assert.equal(getStatusMessage('rejected_not_combinable', strings), 'not combinable');
   assert.equal(getStatusMessage('applied', strings), '');
+});
+
+test('affiliate code is kept when the coupon list is cleared', () => {
+  addCoupon('06-AFFILIATE', 'auto');
+  setAffiliateCode(' 06-AFFILIATE ');
+  clearCoupons();
+  assert.deepEqual(getCoupons(), []);
+  assert.equal(getAffiliateCode(), '06-AFFILIATE');
+  clearAffiliateCode();
+  assert.equal(getAffiliateCode(), '');
+});
+
+test('setAffiliateCode ignores blank codes', () => {
+  setAffiliateCode('06-FIRST');
+  setAffiliateCode('  ');
+  assert.equal(getAffiliateCode(), '06-FIRST');
 });

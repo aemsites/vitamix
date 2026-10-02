@@ -8,8 +8,9 @@ import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   getOrder, estimateShipping, estimatePrice, estimateExpressCheckout, parsePreview,
-  normalizeCouponCode,
+  normalizeCouponCode, createOrder,
 } from '../../scripts/commerce-api.js';
+import { setAffiliateCode } from '../../scripts/commerce/coupon-state.js';
 import { __setLocale, __resetScripts } from './mocks/scripts.mjs';
 
 const API_ORIGIN = 'https://api.test.com/test-org/sites/test-site';
@@ -309,4 +310,35 @@ test('parsePreview: preserves the quoted shipping rate without free shipping', (
     discounts: [{ id: 'save-10', amount: 10 }],
   };
   assert.equal(parsePreview(preview, 379.95).shippingRate, '12.63');
+});
+
+// --- createOrder affiliate code ---------------------------------------------
+
+test('createOrder: sends the affiliate code in custom data', async () => {
+  localStorage.setItem('auth_token', FUTURE_JWT);
+  setAffiliateCode('06-affiliate');
+  mockFetch(200, { order: {} });
+  await createOrder({ items: [], couponCode: '06-affiliate' });
+  const body = JSON.parse(lastInit.body);
+  assert.equal(body.custom.affiliateCode, '06-AFFILIATE');
+  assert.equal(body.custom.affiliateCode, body.couponCode);
+});
+
+test('createOrder: sends the affiliate code when no coupon is on the order', async () => {
+  localStorage.setItem('auth_token', FUTURE_JWT);
+  setAffiliateCode('06-AFFILIATE');
+  mockFetch(200, { order: {} });
+  await createOrder({ items: [], custom: { existing: 'value' } });
+  const body = JSON.parse(lastInit.body);
+  assert.ok(!('couponCode' in body));
+  assert.deepEqual(body.custom, { existing: 'value', affiliateCode: '06-AFFILIATE' });
+});
+
+test('createOrder: omits custom data when there is no affiliate code', async () => {
+  localStorage.setItem('auth_token', FUTURE_JWT);
+  mockFetch(200, { order: {} });
+  const orderBody = { items: [] };
+  await createOrder(orderBody);
+  assert.ok(!('custom' in JSON.parse(lastInit.body)));
+  assert.deepEqual(orderBody, { items: [] });
 });

@@ -19,6 +19,7 @@
 const COUPONS_KEY = 'checkout_coupons';
 const LEGACY_CODE_KEY = 'checkout_coupon_code';
 const LEGACY_SOURCE_KEY = 'checkout_coupon_source';
+const AFFILIATE_CODE_KEY = 'checkout_affiliate_code';
 
 /** Max coupons accepted by the API. Enforced client-side to avoid a 400. */
 export const MAX_COUPONS = 5;
@@ -196,6 +197,33 @@ export function getCouponRequestFields() {
     couponCode: coupons.map((c) => c.code),
     couponSource: coupons.map((c) => c.source),
   };
+}
+
+/**
+ * Records the coupon code an affiliate link was landed with. Kept separately
+ * from the coupon list so it is still reported when the coupon itself is
+ * removed or does not apply to the order.
+ * @param {string} code
+ */
+export function setAffiliateCode(code) {
+  const trimmed = (code || '').trim();
+  if (trimmed) sessionStorage.setItem(AFFILIATE_CODE_KEY, trimmed);
+}
+
+/**
+ * @returns {string} The affiliate coupon code, or '' when none was recorded
+ */
+export function getAffiliateCode() {
+  try {
+    return sessionStorage.getItem(AFFILIATE_CODE_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+/** Clears the affiliate coupon code. */
+export function clearAffiliateCode() {
+  sessionStorage.removeItem(AFFILIATE_CODE_KEY);
 }
 
 /**
