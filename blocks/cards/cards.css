@@ -624,6 +624,7 @@
   display: flex;
   align-items: center;
   position: relative;
+  width: 100%;          /* add: Safari won't stretch aspect-ratio grid items */
   min-width: 0;
   max-width: 100%;
 }
@@ -687,6 +688,11 @@
 
   .cards.overlay > ul > li .card-body {
     padding: var(--spacing-200) var(--horizontal-spacing);
+  }
+
+  .cards.overlay.tall > ul.rows-2 > li,
+  .cards.overlay.tall > ul.rows-4 > li {
+    max-height: 500px;
   }
 }
 
