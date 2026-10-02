@@ -18,7 +18,7 @@ import {
   getMetadata,
 } from './aem.js';
 import { logError } from './operations-log.js';
-import { addCoupon, AUTO_COUPON_SOURCE } from './commerce/coupon-state.js';
+import { addCoupon, setAffiliateCode, AUTO_COUPON_SOURCE } from './commerce/coupon-state.js';
 
 const { hostname } = window.location;
 
@@ -346,6 +346,7 @@ function setAffiliateCoupon() {
     // Affiliate URL coupons are applied programmatically rather than typed by
     // the customer, so they are recorded as a verified ('auto') source.
     addCoupon(COUPON, AUTO_COUPON_SOURCE);
+    if (cjevent || cjdata) setAffiliateCode(COUPON);
 
     // TODO: remove once all locales migrate off Magento — applies the coupon to the PHP cart
     const { locale, language } = getLocaleAndLanguage();
