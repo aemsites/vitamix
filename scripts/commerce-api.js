@@ -3,6 +3,7 @@ import { getToken } from './auth-api.js';
 import { mintRecaptchaToken, RECAPTCHA_ACTIONS, RECAPTCHA_HEADER } from './recaptcha.js';
 import { getLocaleAndLanguage, loggedFetch } from './scripts.js';
 import { logApiError, logNetworkError } from './operations-log.js';
+import { getAffiliateCode } from './commerce/coupon-state.js';
 
 /**
  * Error thrown when the Commerce API returns a non-2xx response.
@@ -218,7 +219,16 @@ export async function previewOrder(orderBody) {
  * @throws {CommerceApiError}
  */
 export async function createOrder(orderBody) {
-  return post('/orders', orderBody, RECAPTCHA_ACTIONS.ORDERS_CREATE);
+  // Report the affiliate coupon code on every order, whether or not the coupon
+  // was applied. Normalized so it matches the code stored on the order.
+  const affiliateCode = getAffiliateCode();
+  const body = affiliateCode
+    ? {
+      ...orderBody,
+      custom: { ...orderBody?.custom, affiliateCode: normalizeCouponCode(affiliateCode) },
+    }
+    : orderBody;
+  return post('/orders', body, RECAPTCHA_ACTIONS.ORDERS_CREATE);
 }
 
 /**

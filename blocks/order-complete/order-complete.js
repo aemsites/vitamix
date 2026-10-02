@@ -1,6 +1,6 @@
 import { getConfig, formatPrice } from '../../scripts/commerce-config.js';
 import { getOrder } from '../../scripts/commerce-api.js';
-import { clearCoupons } from '../../scripts/commerce/coupon-state.js';
+import { clearAffiliateCode, clearCoupons } from '../../scripts/commerce/coupon-state.js';
 import { logOperation, getCheckoutId, clearCheckoutId } from '../../scripts/operations-log.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 import resolvePaymentFailureMessage from '../../scripts/payment-failure.js';
@@ -30,6 +30,7 @@ export function parseJson(raw) {
 export function clearCheckoutCouponState() {
   try {
     clearCoupons();
+    clearAffiliateCode();
   } catch {
     // Confirmation remains usable when session storage is unavailable.
   }
