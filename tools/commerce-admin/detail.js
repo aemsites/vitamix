@@ -2,13 +2,14 @@ import { apiFetch, getApiBase, getApiEnvironment } from './commerce-otp-api.js';
 import { startProductImageSync } from './product-image-sync.js';
 import {
   catalogApiPath,
+  fetchCatalogProduct,
   normalizeProductPath,
   startProductExportImport,
 } from './commerce-catalog-io.js';
 import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
 import { PB_ORG, PB_SITE } from './commerce-pbus-config.js';
 import { showToast } from './commerce-otp-ui.js';
-import { getProductRefFromIndex } from './pim.js';
+import { fetchCatalogIndexForLocale, getProductRefFromIndex } from './pim.js';
 
 /** Product JSON edits are production-only (active API env, not staging). */
 function canUseEditMode() {
@@ -17,8 +18,6 @@ function canUseEditMode() {
 
 const AEM_BASE = 'https://main--vitamix--aemsites.aem.network';
 const IMAGE_QUERY = '?width=750&format=webply&optimize=medium';
-const CORS_PROXY = 'https://fcors.org/?url=';
-const CORS_KEY = '&key=Mg23N96GgR8O3NjU';
 
 const CATALOG_PARAM = 'catalog';
 const DEFAULT_CATALOG = 'us/en_us';
@@ -28,16 +27,8 @@ function getCatalogFromParams() {
   return params.get(CATALOG_PARAM) || DEFAULT_CATALOG;
 }
 
-function getProductJsonBase() {
-  return `${AEM_BASE}/${getCatalogFromParams()}/products/`;
-}
-
 function getProductsBaseUrl() {
   return `${AEM_BASE}/${getCatalogFromParams()}/products/`;
-}
-
-function getIndexUrl() {
-  return `${AEM_BASE}/${getCatalogFromParams()}/products/index.json?include=all`;
 }
 
 let currentProductData = null;
@@ -78,7 +69,7 @@ function setByPath(obj, path, value) {
 
 function resolveImageUrl(imagePath) {
   if (!imagePath) return '';
-  const path = typeof imagePath === 'string' ? imagePath : imagePath?.url || '';
+  const path = typeof imagePath === 'string' ? imagePath : imagePath?.url || imagePath?.src || '';
   if (path.startsWith('http://') || path.startsWith('https://')) return path;
   const normalized = path.startsWith('./') ? path.slice(2) : path;
   return normalized ? getProductsBaseUrl() + normalized + IMAGE_QUERY : '';
@@ -97,24 +88,17 @@ function showError(message) {
   el.classList.add('active');
 }
 
-async function fetchProductJson(productRef) {
-  const encodedPath = productRef.split('/').map(encodeURIComponent).join('/');
-  const url = `${getProductJsonBase()}${encodedPath}.json`;
-  const fetchUrl = CORS_PROXY + encodeURIComponent(url) + CORS_KEY;
-  const response = await fetch(fetchUrl);
-  if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-  const text = await response.text();
-  const trimmed = text.trim();
-  if (trimmed.startsWith('Sign in')) throw new Error('Product requires sign-in or is unavailable');
-  return JSON.parse(trimmed);
+function getCatalogProductPath(productRef) {
+  const path = normalizeProductPath(productRef);
+  const prefix = `/${getCatalogFromParams()}/products/`;
+  return path.startsWith(prefix) ? path : `${prefix}${path.replace(/^\/+/, '')}`;
 }
 
-async function fetchProductsIndex() {
-  const fetchUrl = CORS_PROXY + encodeURIComponent(getIndexUrl()) + CORS_KEY;
-  const response = await fetch(fetchUrl);
-  if (!response.ok) throw new Error(`Index: HTTP ${response.status}`);
-  const json = await response.json();
-  return json.data || json;
+async function fetchProductBusRecord(productRef) {
+  const path = getCatalogProductPath(productRef);
+  const product = await fetchCatalogProduct(path);
+  if (!product) throw new Error('HTTP 404: Product not found');
+  return product;
 }
 
 /** Build urlKey -> product (prefer parent) from index array */
@@ -122,7 +106,9 @@ function buildIndexByUrlKey(indexData) {
   const map = {};
   if (!Array.isArray(indexData)) return map;
   indexData.forEach((item) => {
-    const key = item.urlKey || (item.url ? item.url.replace(/\/$/, '').split('/').pop() : '');
+    const key = item.urlKey
+      || (item.path ? pathToUrlKey(item.path) : '')
+      || (item.url ? item.url.replace(/\/$/, '').split('/').pop() : '');
     if (!key) return;
     if (!map[key] || !item.parentSku) map[key] = item;
   });
@@ -136,7 +122,7 @@ function pathToUrlKey(path) {
 
 function resolveIndexImageUrl(imagePath) {
   if (!imagePath) return '';
-  const path = typeof imagePath === 'string' ? imagePath : imagePath?.url || '';
+  const path = typeof imagePath === 'string' ? imagePath : imagePath?.url || imagePath?.src || '';
   if (path.startsWith('http://') || path.startsWith('https://')) return path;
   const normalized = path.startsWith('./') ? path.slice(2) : path;
   return normalized ? getProductsBaseUrl() + normalized + IMAGE_QUERY : '';
@@ -223,7 +209,8 @@ function renderLinkedProducts(paths, indexByUrlKey, sectionTitle, pathKey, isEdi
     const productRef = product ? getProductRefFromIndex(product, catalog) : urlKey;
     const detailHref = `product-detail.html?catalog=${encodeURIComponent(catalog)}&product=${encodeURIComponent(productRef)}`;
     const name = product ? (product.title || product.name || product.sku || urlKey) : urlKey;
-    const imgSrc = product && product.image ? resolveIndexImageUrl(product.image) : '';
+    const image = product?.image || product?.images?.[0]?.url || product?.images?.[0];
+    const imgSrc = image ? resolveIndexImageUrl(image) : '';
     const delBtn = isEditMode ? `<button type="button" class="pim-edit-delete" data-edit-path="${escapeHtml(pathKey)}" data-edit-index="${i}" aria-label="Delete">×</button>` : '';
     return `<span class="pim-edit-list-item" data-edit-path="${escapeHtml(pathKey)}" data-edit-index="${i}"><a href="${escapeHtml(detailHref)}" class="pim-detail-linked-card">
       <span class="pim-detail-linked-thumb">${imgSrc ? `<img src="${escapeHtml(imgSrc)}" alt="" loading="lazy" />` : '<span class="pim-detail-linked-no-img">—</span>'}</span>
@@ -361,7 +348,7 @@ function renderProduct(data, indexByUrlKey = {}, isEditMode = false) {
       ? `<div class="pim-detail-section"><h3 class="pim-detail-section-title">Raw metadata</h3><pre class="pim-detail-raw">${escapeHtml(JSON.stringify(data.metadata, null, 2))}</pre></div>`
       : '',
     renderDeleteProduct(
-      normalizeProductPath(data.path || `/${getCatalogFromParams()}/products/${currentProductRef}`),
+      normalizeProductPath(data.path || getCatalogProductPath(currentProductRef)),
       isEditMode,
     ),
   ];
@@ -595,7 +582,7 @@ function attachEditHandlers() {
       try {
         const product = { ...currentProductData };
         if (!product.path) {
-          product.path = `/${getCatalogFromParams()}/products/${currentProductRef}`;
+          product.path = getCatalogProductPath(currentProductRef);
         }
         await startProductImageSync({
           product,
@@ -620,7 +607,7 @@ function attachEditHandlers() {
     deleteBtn.addEventListener('click', () => {
       const productPath = normalizeProductPath(
         currentProductData.path
-          || `/${getCatalogFromParams()}/products/${currentProductRef}`,
+          || getCatalogProductPath(currentProductRef),
       );
       openDeleteProductDialog(productPath);
     });
@@ -672,11 +659,13 @@ async function init() {
   errorEl.classList.remove('active');
 
   try {
-    const indexPromise = fetchProductsIndex().catch(() => []);
+    const indexPromise = fetchCatalogIndexForLocale(getCatalogFromParams())
+      .then((json) => json.data || json)
+      .catch(() => []);
     currentProductRef = productRef;
     let data;
     try {
-      data = await fetchProductJson(productRef);
+      data = await fetchProductBusRecord(productRef);
     } catch (err) {
       if (!/^HTTP 404\b/.test(err.message)) throw err;
       const index = buildIndexByUrlKey(await indexPromise);
@@ -684,10 +673,11 @@ async function init() {
       const indexedRef = indexedProduct
         && getProductRefFromIndex(indexedProduct, getCatalogFromParams());
       if (!indexedRef || indexedRef === productRef) throw err;
-      data = await fetchProductJson(indexedRef);
+      data = await fetchProductBusRecord(indexedRef);
       currentProductRef = indexedRef;
     }
     const indexData = await indexPromise;
+    currentProductRef = normalizeProductPath(data.path || getCatalogProductPath(currentProductRef));
     currentProductData = JSON.parse(JSON.stringify(data));
     currentIndexByUrlKey = buildIndexByUrlKey(indexData);
     loading.classList.remove('active');
@@ -716,7 +706,7 @@ async function init() {
         try {
           const product = { ...currentProductData };
           if (!product.path) {
-            product.path = `/${getCatalogFromParams()}/products/${currentProductRef}`;
+            product.path = getCatalogProductPath(currentProductRef);
           }
           await startProductExportImport({
             product,

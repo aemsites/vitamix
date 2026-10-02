@@ -1,4 +1,7 @@
-import { startCatalogExportImport } from './commerce-catalog-io.js';
+import {
+  normalizeProductPath,
+  startCatalogExportImport,
+} from './commerce-catalog-io.js';
 import { showToast } from './commerce-otp-ui.js';
 
 const AEM_BASE = 'https://main--vitamix--aemsites.aem.network';
@@ -79,38 +82,39 @@ export function resolveImageUrlForLocale(localePath, imagePath) {
  * @param {string} localePath
  * @returns {Promise<{ data?: object[] } | object[]>}
  */
-export async function fetchProductsIndexForLocale(localePath) {
+export async function fetchProductsIndexForLocale(localePath, fetchOptions = {}) {
   const clean = String(localePath || '').replace(/^\/+/, '').replace(/\/+$/, '');
   const indexUrl = `${AEM_BASE}/${clean}/products/index.json?include=all`;
   const url = CORS_PROXY + encodeURIComponent(indexUrl) + CORS_KEY;
-  const response = await fetch(url);
+  const response = await fetch(url, fetchOptions);
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
   }
   return response.json();
 }
 
-/**
- * Fetch the locale's products index plus its `products/commercial/` index (catalog grid).
- * @returns {Promise<{ data: Array<object> }>}
- */
-export async function fetchProductsIndex() {
-  const clean = String(currentLocalePath || '').replace(/^\/+/, '').replace(/\/+$/, '');
+/** Fetch and merge the main and commercial indexes for the catalog grid. */
+/** Fetch and merge the main and commercial indexes for a locale. */
+export async function fetchCatalogIndexForLocale(localePath) {
+  const clean = String(localePath || '').replace(/^\/+/, '').replace(/\/+$/, '');
   const commercialUrl = `${AEM_BASE}/${clean}/products/commercial/index.json?include=all`;
   const [main, commercial] = await Promise.all([
-    fetchProductsIndexForLocale(currentLocalePath),
-    fetch(CORS_PROXY + encodeURIComponent(commercialUrl) + CORS_KEY)
+    fetchProductsIndexForLocale(localePath, { cache: 'no-store' }),
+    fetch(CORS_PROXY + encodeURIComponent(commercialUrl) + CORS_KEY, { cache: 'no-store' })
       .then((resp) => (resp.ok ? resp.json() : []))
       .catch(() => []),
   ]);
   const rows = (json) => (Array.isArray(json) ? json : json?.data || []);
-  // Commercial images are relative to products/commercial/, not products/.
   const commercialRows = rows(commercial).map((row) => (
     typeof row.image === 'string' && row.image.startsWith('./')
       ? { ...row, image: `./commercial/${row.image.slice(2)}` }
       : row
   ));
   return { data: [...rows(main), ...commercialRows] };
+}
+
+export function fetchProductsIndex() {
+  return fetchCatalogIndexForLocale(currentLocalePath);
 }
 
 /**
@@ -148,6 +152,7 @@ export function getVariantProducts(data) {
  * @returns {number}
  */
 export function getVariantCount(variantSkus) {
+  if (Array.isArray(variantSkus)) return variantSkus.length;
   if (!variantSkus || typeof variantSkus !== 'string') return 0;
   return variantSkus.split(',').map((s) => s.trim()).filter(Boolean).length;
 }
@@ -252,8 +257,13 @@ function splitList(raw) {
  * @returns {{ name: string, slug: string }[]}
  */
 function productCategories(p) {
-  const names = splitList(p.categories);
-  const slugs = splitList(p.categoriesUrlKey);
+  const customCategories = Array.isArray(p.custom?.categories) ? p.custom.categories : [];
+  const names = splitList(p.categories).length
+    ? splitList(p.categories)
+    : customCategories.map((category) => category.name || category.url_key || category.urlKey);
+  const slugs = splitList(p.categoriesUrlKey).length
+    ? splitList(p.categoriesUrlKey)
+    : customCategories.map((category) => category.url_key || category.urlKey || category.name);
   const byName = (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
   if (!names.length) return slugs.map((slug) => ({ name: slug, slug })).sort(byName);
   const aligned = slugs.length === names.length;
@@ -274,10 +284,15 @@ function categoryNameForSlug(slug) {
 }
 
 export function getUrlKeyFromProduct(p) {
-  return p.urlKey || (p.url ? p.url.replace(/\/$/, '').split('/').pop() : '') || p.sku || '';
+  return p.urlKey
+    || (p.path ? normalizeProductPath(p.path).split('/').pop() : '')
+    || (p.url ? p.url.replace(/\/$/, '').split('/').pop() : '')
+    || p.sku
+    || '';
 }
 
 export function getProductRefFromIndex(p, localePath) {
+  if (p.path) return normalizeProductPath(p.path);
   if (p.url) {
     try {
       const prefix = `/${localePath}/products/`;
@@ -291,10 +306,13 @@ export function getProductRefFromIndex(p, localePath) {
 }
 
 function enrichForSort(p) {
+  const price = p.price && typeof p.price === 'object'
+    ? (p.price.final ?? p.price.regular)
+    : p.price;
   return {
     ...p,
-    _variants: getVariantCount(p.variantSkus),
-    _priceNum: p.price != null ? Number(p.price) : NaN,
+    _variants: getVariantCount(p.variantSkus || p.variants),
+    _priceNum: price != null ? Number(price) : NaN,
   };
 }
 
@@ -320,10 +338,13 @@ function sortProducts(products, key, dir) {
 function matchesQuery(product, q) {
   if (!q || !q.trim()) return true;
   const term = q.trim().toLowerCase();
-  const title = (product.title || product.sku || '').toLowerCase();
+  const title = (product.title || product.name || product.sku || '').toLowerCase();
   const sku = (product.sku || '').toLowerCase();
   const availability = (product.availability || '').toLowerCase();
-  const priceStr = (product.price != null ? String(product.price) : '').toLowerCase();
+  const price = product.price && typeof product.price === 'object'
+    ? (product.price.final ?? product.price.regular)
+    : product.price;
+  const priceStr = (price != null ? String(price) : '').toLowerCase();
   const categories = productCategories(product).map((c) => c.name).join(' ').toLowerCase();
   return (
     title.includes(term)
@@ -362,15 +383,19 @@ export function renderProductList(parents, query = '') {
   countEl.textContent = `${parents.length} product${plural}`;
 
   parents.forEach((product) => {
-    const variantCount = getVariantCount(product.variantSkus);
-    const imgUrl = resolveImageUrl(product.image);
+    const variantCount = getVariantCount(product.variantSkus || product.variants);
+    const image = product.image || product.images?.[0]?.url || product.images?.[0];
+    const imgUrl = resolveImageUrl(image);
     const availability = product.availability || '—';
     const availabilityClass = (availability || '').toLowerCase().replace(/\s+/g, '-');
-    const price = product.price != null ? String(product.price) : '';
+    const rawPrice = product.price && typeof product.price === 'object'
+      ? (product.price.final ?? product.price.regular)
+      : product.price;
+    const price = rawPrice != null ? String(rawPrice) : '';
     const urlKey = getUrlKeyFromProduct(product);
     const productRef = getProductRefFromIndex(product, currentLocalePath);
 
-    const title = product.title || product.sku;
+    const title = product.title || product.name || product.sku;
     const tr = document.createElement('tr');
     const selectedProduct = readProductFromParams();
     tr.className = `pim-row${selectedProduct && productRef === selectedProduct ? ' pim-row-selected' : ''}`;
