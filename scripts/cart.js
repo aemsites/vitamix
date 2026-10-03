@@ -204,6 +204,28 @@ export class Cart {
   }
 
   /**
+   * Sets the unit price of every non-gift entry with the given SKU.
+   * Dispatches `cart:change` (action `price`) only when a price changed.
+   *
+   * @param {string} sku
+   * @param {string|number} price
+   * @returns {boolean} true when at least one entry was repriced
+   */
+  updateItemPrice(sku, price) {
+    const next = parseFloat(price);
+    if (!sku || !Number.isFinite(next) || next < 0) return false;
+    this.#refresh();
+    const changed = this.#items.filter((i) => i.sku === sku
+      && !i.custom?.giftWithPurchase
+      && parseFloat(i.price) !== next);
+    if (!changed.length) return false;
+    changed.forEach((i) => { i.price = String(price); });
+    this.#persistNow();
+    this.#dispatchChange('price', changed[0]);
+    return true;
+  }
+
+  /**
    * @param {string} sku
    * @param {string|((item: CartItem) => boolean)} [matcher] Disambiguator when
    *   the same SKU has multiple entries. A string matches `custom.linkedTo`
