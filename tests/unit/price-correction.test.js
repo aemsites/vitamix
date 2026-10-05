@@ -56,8 +56,12 @@ test('getPriceCorrection: extracts sku and actualPrice from an item price mismat
     { sku: '076047', price: '549.95' },
   );
   assert.deepEqual(
+    getPriceCorrection({ status: 400, body: itemMismatchBody({ currency: 'CAD', regular: '549.95', final: '499.95' }) }),
+    { sku: '076047', price: '499.95' },
+  );
+  assert.equal(
     getPriceCorrection({ status: 400, body: itemMismatchBody({ currency: 'CAD', regular: '549.95' }) }),
-    { sku: '076047', price: '549.95' },
+    null,
   );
   assert.equal(getPriceCorrection({ status: 400, body: itemMismatchBody({}) }), null);
   assert.equal(getPriceCorrection({ status: 400, body: itemMismatchBody(null) }), null);
