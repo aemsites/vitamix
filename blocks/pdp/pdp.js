@@ -326,6 +326,24 @@ async function renderFreeGift() {
 }
 
 /**
+ * Determines whether a container rendered by `renderAddToCart` contains an
+ * actual "Add to Cart" button, as opposed to a "Find Locally"/"Find Dealer"
+ * CTA (rendered as `<a>` links) or an empty/hidden container (coming-soon,
+ * out-of-stock bundles, or an authored `addToCart=No` override).
+ *
+ * Defined locally (rather than imported from add-to-cart.js) so this file
+ * has no hard dependency on that module's exports — Edge Delivery Services
+ * syncs files to the CDN independently, so a stale cached add-to-cart.js
+ * without a given named export could otherwise break this module's import
+ * and leave the whole PDP block undecorated.
+ * @param {HTMLElement|string|null} container - Container returned by renderAddToCart
+ * @returns {boolean} True if an "Add to Cart" button is present
+ */
+function hasAddToCartButton(container) {
+  return !!(container instanceof HTMLElement && container.querySelector('button'));
+}
+
+/**
  * Decorates the PDP block.
  * @param {Element} block - The PDP block element
  */
@@ -354,9 +372,6 @@ export default async function decorate(block) {
   const freeGiftContainer = await renderFreeGift();
   const freeShippingContainer = renderFreeShipping(ph, offers);
   const shareContainer = renderShare(ph);
-
-  // Hide free gift container if parent is out of stock
-  updateFreeGiftVisibility(freeGiftContainer, isParentOutOfStock, false);
 
   buyBox.append(
     pricingContainer,
@@ -401,6 +416,10 @@ export default async function decorate(block) {
   // Set OOS to true if either parent or variant is out of stock
   buyBox.dataset.oos = isParentOutOfStock || variantOos;
 
-  // Hide free gift container if variant is also out of stock
-  updateFreeGiftVisibility(freeGiftContainer, isParentOutOfStock, variantOos);
+  // Only show the free gift (GWP) slot when an actual "Add to Cart" button
+  // is displayed for the selected variant — not for "Find Locally"/"Find
+  // Dealer" CTAs or empty (coming-soon/unavailable) containers. `onOptionChange`
+  // already refreshes this when a color query param swaps the rendered CTA, so
+  // this re-check is a no-op in that case and only matters for the default variant.
+  updateFreeGiftVisibility(freeGiftContainer, hasAddToCartButton(block.querySelector('.add-to-cart')));
 }
