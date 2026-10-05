@@ -2,7 +2,7 @@ import { buildSlide, buildThumbnails } from './gallery.js';
 import { rebuildIndices, checkVariantOutOfStock, formatPrice } from '../../scripts/scripts.js';
 import { toClassName } from '../../scripts/aem.js';
 import renderPricing from './pricing.js';
-import renderAddToCart, { hasAddToCartButton } from './add-to-cart.js';
+import renderAddToCart from './add-to-cart.js';
 import { updateAlert } from './alert.js';
 
 /**
@@ -18,6 +18,24 @@ function updateOOSMessage(ph, oosMessage, isParentOutOfStock) {
   } else {
     oosMessage.textContent = ph.colorOutOfStock || 'This color is temporarily out of stock.';
   }
+}
+
+/**
+ * Determines whether a container rendered by `renderAddToCart` contains an
+ * actual "Add to Cart" button, as opposed to a "Find Locally"/"Find Dealer"
+ * CTA (rendered as `<a>` links) or an empty/hidden container (coming-soon,
+ * out-of-stock bundles, or an authored `addToCart=No` override).
+ *
+ * Defined locally (rather than imported from add-to-cart.js) so this file
+ * has no hard dependency on that module's exports — Edge Delivery Services
+ * syncs files to the CDN independently, so a stale cached add-to-cart.js
+ * without a given named export could otherwise break this module's import
+ * and leave the whole PDP block undecorated.
+ * @param {HTMLElement|string|null} container - Container returned by renderAddToCart
+ * @returns {boolean} True if an "Add to Cart" button is present
+ */
+function hasAddToCartButton(container) {
+  return !!(container instanceof HTMLElement && container.querySelector('button'));
 }
 
 /**
