@@ -2,7 +2,7 @@ import { buildSlide, buildThumbnails } from './gallery.js';
 import { rebuildIndices, checkVariantOutOfStock, formatPrice } from '../../scripts/scripts.js';
 import { toClassName } from '../../scripts/aem.js';
 import renderPricing from './pricing.js';
-import renderAddToCart from './add-to-cart.js';
+import renderAddToCart, { hasAddToCartButton } from './add-to-cart.js';
 import { updateAlert } from './alert.js';
 
 /**
@@ -21,22 +21,23 @@ function updateOOSMessage(ph, oosMessage, isParentOutOfStock) {
 }
 
 /**
- * Updates the visibility of the free gift container based on stock availability.
+ * Updates the visibility of the free gift (GWP) container. The slot is only
+ * shown when an actual "Add to Cart" button is displayed for the product —
+ * it stays hidden for "Find Locally"/"Find Dealer" CTAs and for empty
+ * containers (coming-soon, out-of-stock bundles, authored `addToCart=No`).
  * @param {Element} freeGiftContainer - The free gift container element
- * @param {boolean} isParentOutOfStock - Whether the parent product is out of stock
- * @param {boolean} isVariantOutOfStock - Whether the variant is out of stock
+ * @param {boolean} isAddToCartButtonVisible - Whether an "Add to Cart" button is displayed
  */
 export function updateFreeGiftVisibility(
   freeGiftContainer,
-  isParentOutOfStock,
-  isVariantOutOfStock,
+  isAddToCartButtonVisible,
 ) {
   if (!freeGiftContainer) return;
 
-  if (isParentOutOfStock || isVariantOutOfStock) {
-    freeGiftContainer.classList.add('hidden');
-  } else {
+  if (isAddToCartButtonVisible) {
     freeGiftContainer.classList.remove('hidden');
+  } else {
+    freeGiftContainer.classList.add('hidden');
   }
 }
 
@@ -72,10 +73,6 @@ export function onOptionChange(ph, block, variants, color, isParentOutOfStock = 
   // Update the OOS message text based on parent vs variant
   const oosMessage = block.querySelector('.pdp-oos-message');
   updateOOSMessage(ph, oosMessage, isParentOutOfStock);
-
-  // Hide/show free gift container based on availability
-  const freeGiftContainer = block.querySelector('.pdp-free-gift-container');
-  updateFreeGiftVisibility(freeGiftContainer, isParentOutOfStock, oos);
 
   // update pricing
   const pricingContainer = renderPricing(ph, block, variant);
@@ -154,6 +151,11 @@ export function onOptionChange(ph, block, variants, color, isParentOutOfStock = 
       if (newQtySelect) newQtySelect.value = currentQty;
     }
   }
+
+  // Only show the free gift (GWP) slot when the newly rendered CTA is an
+  // actual "Add to Cart" button for this variant.
+  const freeGiftContainer = block.querySelector('.pdp-free-gift-container');
+  updateFreeGiftVisibility(freeGiftContainer, hasAddToCartButton(block.querySelector('.add-to-cart')));
 }
 
 function renderOOSMessage(ph, element, isParentOutOfStock) {

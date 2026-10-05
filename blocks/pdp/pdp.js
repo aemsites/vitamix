@@ -1,7 +1,7 @@
 import {
   loadScript, toClassName, getMetadata, fetchPlaceholders,
 } from '../../scripts/aem.js';
-import renderAddToCart from './add-to-cart.js';
+import renderAddToCart, { hasAddToCartButton } from './add-to-cart.js';
 import renderGallery from './gallery.js';
 import renderSpecs from './specification-tabs.js';
 import renderPricing from './pricing.js';
@@ -355,9 +355,6 @@ export default async function decorate(block) {
   const freeShippingContainer = renderFreeShipping(ph, offers);
   const shareContainer = renderShare(ph);
 
-  // Hide free gift container if parent is out of stock
-  updateFreeGiftVisibility(freeGiftContainer, isParentOutOfStock, false);
-
   buyBox.append(
     pricingContainer,
     optionsContainer || '',
@@ -401,6 +398,10 @@ export default async function decorate(block) {
   // Set OOS to true if either parent or variant is out of stock
   buyBox.dataset.oos = isParentOutOfStock || variantOos;
 
-  // Hide free gift container if variant is also out of stock
-  updateFreeGiftVisibility(freeGiftContainer, isParentOutOfStock, variantOos);
+  // Only show the free gift (GWP) slot when an actual "Add to Cart" button
+  // is displayed for the selected variant — not for "Find Locally"/"Find
+  // Dealer" CTAs or empty (coming-soon/unavailable) containers. `onOptionChange`
+  // already refreshes this when a color query param swaps the rendered CTA, so
+  // this re-check is a no-op in that case and only matters for the default variant.
+  updateFreeGiftVisibility(freeGiftContainer, hasAddToCartButton(block.querySelector('.add-to-cart')));
 }

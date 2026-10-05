@@ -178,6 +178,18 @@ export function isVariantAvailableForSale(variant) {
 }
 
 /**
+ * Determines whether a container rendered by `renderAddToCart` contains an
+ * actual "Add to Cart" button, as opposed to a "Find Locally"/"Find Dealer"
+ * CTA (rendered as `<a>` links) or an empty/hidden container (coming-soon,
+ * out-of-stock bundles, or an authored `addToCart=No` override).
+ * @param {HTMLElement|string|null} container - Container returned by renderAddToCart
+ * @returns {boolean} True if an "Add to Cart" button is present
+ */
+export function hasAddToCartButton(container) {
+  return !!(container instanceof HTMLElement && container.querySelector('button'));
+}
+
+/**
  * Renders the main add to cart functionality with quantity selector and add to cart button.
  * Handles product variants, warranties, bundles, and cart integration with Magento.
  * Falls back to "Find Locally" or "Find Dealer" buttons based on product configuration.
