@@ -107,45 +107,243 @@
   color: #202223;
 }
 
-/* Edit mode – editable values (horizontal padding only to avoid layout shift) */
-.pim-edit-mode .pim-editable {
+.pim-availability-edit-trigger {
+  border: 0;
+  font-family: inherit;
   cursor: pointer;
-  border-radius: 3px;
-  padding: 0 4px;
-  margin: 0 -4px;
 }
 
-.pim-edit-mode .pim-editable:hover {
-  background: #e8f4fc;
-  outline: 1px solid #2c2c2e;
+.pim-availability-edit-trigger:hover {
+  outline: 2px solid #2c2c2e;
+  outline-offset: 1px;
 }
 
-/* Availability pill: keep same look in edit mode (no padding override, hover outline only) */
-.pim-edit-mode .pim-editable.pim-card-availability {
-  padding: 2px 8px;
+.pim-availability-edit-trigger:focus-visible {
+  outline: 2px solid #2c2c2e;
+  outline-offset: 2px;
+}
+
+.pim-availability-dialog {
+  box-sizing: border-box;
+  width: min(1120px, calc(100vw - 32px));
+  max-width: none;
+  max-height: min(84vh, 760px);
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  box-shadow: 0 16px 48px rgb(0 0 0 / 24%);
+  color: #202223;
+}
+
+.pim-availability-dialog::backdrop {
+  background: rgb(0 0 0 / 45%);
+}
+
+.pim-availability-dialog-inner {
+  display: flex;
+  max-height: min(84vh, 760px);
+  flex-direction: column;
+}
+
+.pim-availability-dialog-header {
+  padding: 24px 24px 12px;
+}
+
+.pim-availability-dialog-header p {
+  margin: 6px 0 0;
+  color: #6d7175;
+  font-size: 14px;
+}
+
+.pim-availability-dialog-title {
   margin: 0;
+  font-size: 1.25rem;
 }
 
-.pim-edit-mode .pim-editable.pim-card-availability:hover {
-  outline: 1px solid #2c2c2e;
+.pim-availability-dialog-status {
+  min-height: 20px;
+  margin: 0;
+  padding: 0 24px 12px;
+  color: #6d7175;
+  font-size: 13px;
 }
 
-.pim-edit-mode .pim-editable.pim-card-availability.instock:hover { background: #d4edda; }
-.pim-edit-mode .pim-editable.pim-card-availability.outofstock:hover { background: #f8d7da; }
-.pim-edit-mode .pim-editable.pim-card-availability.discontinued:hover { background: #e2e3e5; }
-.pim-edit-mode .pim-editable.pim-card-availability:not(.instock, .outofstock, .discontinued):hover { background: #e1e3e5; }
-
-/* Keep header spacing unchanged in edit mode */
-.pim-edit-mode .pim-detail-header .pim-detail-name {
-  margin-bottom: 12px;
+.pim-availability-dialog-table-wrap {
+  overflow: auto;
+  padding: 0 24px;
+  -webkit-overflow-scrolling: touch;
+  border-top: 1px solid #e1e3e5;
+  border-bottom: 1px solid #e1e3e5;
+  background: #fff;
 }
 
-.pim-edit-mode .pim-edit-list-item {
-  position: relative;
+.pim-availability-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  font-size: 13px;
+  text-align: left;
+}
+
+.pim-availability-table th,
+.pim-availability-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid #e1e3e5;
+  vertical-align: middle;
+}
+
+.pim-availability-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #fafafa;
+  color: #6d7175;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pim-availability-table tbody tr:hover {
+  background: #f8f8f8;
+}
+
+.pim-availability-target-cell {
+  white-space: nowrap;
+}
+
+.pim-availability-row-changed {
+  background: #fffaf0;
+}
+
+.pim-availability-row-changed:hover {
+  background: #fff6e5 !important;
+}
+
+.pim-availability-row-changed .pim-availability-target-cell {
+  background: #fff4d6;
+  box-shadow: inset 0 0 0 1px #e3c56a;
+}
+
+.pim-availability-select-col {
+  width: 32px;
+  padding-left: 4px;
+  padding-right: 4px;
+  text-align: center;
+}
+
+.pim-availability-table input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #2c2c2e;
+}
+
+.pim-availability-item-name,
+.pim-availability-item-sku {
+  display: block;
+}
+
+.pim-availability-item-name {
+  font-weight: 500;
+}
+
+.pim-availability-item-sku {
+  margin-top: 3px;
+  color: #6d7175;
+  font-size: 12px;
+}
+
+.pim-availability-state {
+  white-space: nowrap;
+}
+
+.pim-availability-diff-arrow {
   display: inline-block;
+  margin: 0 9px;
+  color: #8c9196;
+  font-size: 16px;
+  vertical-align: middle;
 }
 
-/* Resources list (base) – before edit-mode overrides for no-descending-specificity */
+.pim-availability-target-select,
+.pim-availability-target-heading select {
+  min-width: 158px;
+  padding: 5px 25px 5px 9px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pim-availability-target-select.instock,
+.pim-availability-target-heading select option[value="InStock"] {
+  background: #d4edda;
+  color: #155724;
+}
+
+.pim-availability-target-select.outofstock,
+.pim-availability-target-heading select option[value="OutOfStock"] {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.pim-availability-target-select.discontinued,
+.pim-availability-target-heading select option[value="Discontinued"] {
+  background: #e2e3e5;
+  color: #414548;
+}
+
+.pim-availability-target-select.managedinventory,
+.pim-availability-target-heading select option[value="ManagedInventory"] {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.pim-availability-target-heading select {
+  display: block;
+  min-width: 174px;
+  border-color: #c9cccf;
+  background-color: #fff;
+  color: #414548;
+}
+
+.pim-availability-target-select:focus-visible,
+.pim-availability-target-heading select:focus-visible {
+  outline: 2px solid #2c2c2e;
+  outline-offset: 2px;
+}
+
+.pim-availability-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px 24px 24px;
+}
+
+.pim-availability-cancel,
+.pim-availability-apply {
+  padding: 9px 16px;
+  border: 1px solid #c9cccf;
+  border-radius: 6px;
+  background: #fff;
+  color: #202223;
+  font: inherit;
+  cursor: pointer;
+}
+
+.pim-availability-apply {
+  border-color: #2c2c2e;
+  background: #2c2c2e;
+  color: #fff;
+  font-weight: 600;
+}
+
+.pim-availability-apply:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .pim-detail-resource-list {
   margin: 0;
   padding: 0;
@@ -190,125 +388,10 @@
   color: #721c24;
 }
 
-.pim-detail-linked-grid .pim-edit-list-item {
+.pim-detail-linked-grid > span {
   display: flex;
   flex-direction: column;
   align-items: center;
-}
-
-/* Resources: keep one-per-line layout and same flex gap (link + PDF tag spacing) */
-.pim-edit-mode .pim-detail-resource-list .pim-edit-list-item {
-  display: flex;
-}
-
-.pim-edit-mode .pim-detail-resource-list .pim-detail-resource {
-  padding-right: 36px;
-}
-
-.pim-edit-mode .pim-edit-delete {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  line-height: 1;
-  background: #f8d7da;
-  color: #721c24;
-  border: none;
-  border-radius: 50%;
-  cursor: pointer;
-}
-
-.pim-edit-mode .pim-edit-delete:hover {
-  background: #f5c6cb;
-}
-
-.pim-edit-mode .pim-edit-add {
-  padding: 6px 12px;
-  font-size: 12px;
-  background: #d4edda;
-  color: #155724;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  margin-top: 8px;
-}
-
-.pim-edit-mode .pim-edit-add:hover {
-  background: #c3e6cb;
-}
-
-/* Inline editor overlay */
-.pim-inline-editor-wrap {
-  position: fixed;
-  inset: 0;
-  background: rgb(0 0 0 / 30%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.pim-inline-editor {
-  background: #fff;
-  padding: 16px;
-  border-radius: 8px;
-  box-shadow: 0 4px 20px rgb(0 0 0 / 15%);
-  min-width: 280px;
-  max-width: 90vw;
-}
-
-.pim-inline-editor label {
-  display: block;
-  font-size: 12px;
-  font-weight: 600;
-  color: #6d7175;
-  margin-bottom: 6px;
-}
-
-.pim-inline-editor input,
-.pim-inline-editor select,
-.pim-inline-editor textarea {
-  width: 100%;
-  padding: 8px 10px;
-  font-size: 14px;
-  border: 1px solid #e1e3e5;
-  border-radius: 6px;
-  margin-bottom: 12px;
-}
-
-.pim-inline-editor textarea {
-  min-height: 80px;
-  resize: vertical;
-}
-
-.pim-inline-editor-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-}
-
-.pim-inline-editor-actions button {
-  padding: 8px 16px;
-  font-size: 14px;
-  border-radius: 6px;
-  cursor: pointer;
-  border: none;
-}
-
-.pim-inline-editor-actions .pim-btn-cancel {
-  background: #f0f0f0;
-  color: #202223;
-}
-
-.pim-inline-editor-actions .pim-btn-save {
-  background: #2c2c2e;
-  color: #fff;
 }
 
 .pim-detail-content {
@@ -460,6 +543,21 @@
     align-items: stretch;
     flex-direction: column;
   }
+
+  .pim-availability-dialog-table-wrap {
+    padding: 0 8px;
+  }
+
+  .pim-availability-dialog-header,
+  .pim-availability-dialog-actions {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .pim-availability-dialog-status {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
 }
 
 .pim-detail-meta {
@@ -507,32 +605,6 @@
 
 .pim-detail-section-head .pim-detail-section-title {
   margin: 0;
-}
-
-.pim-sync-images-btn {
-  padding: 8px 14px;
-  font-size: 13px;
-  font-weight: 500;
-  border: none;
-  border-radius: 6px;
-  background: #2c2c2e;
-  color: #fff;
-  cursor: pointer;
-}
-
-.pim-sync-images-btn:disabled {
-  opacity: 0.55;
-  cursor: wait;
-}
-
-.pim-sync-images-btn:hover:not(:disabled) {
-  background: #414548;
-}
-
-.pim-detail-images-empty {
-  margin: 0 0 12px;
-  font-size: 14px;
-  color: #6d7175;
 }
 
 /* Gallery */

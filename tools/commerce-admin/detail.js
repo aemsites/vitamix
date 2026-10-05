@@ -1,11 +1,11 @@
 import { apiFetch, getApiBase, getApiEnvironment } from './commerce-otp-api.js';
-import { startProductImageSync } from './product-image-sync.js';
 import {
   catalogApiPath,
   fetchCatalogProduct,
   normalizeProductPath,
   startProductExportImport,
 } from './commerce-catalog-io.js';
+import { putOrPatchResource } from './commerce-resource-save.js';
 import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
 import { PB_ORG, PB_SITE } from './commerce-pbus-config.js';
 import { showToast } from './commerce-otp-ui.js';
@@ -21,6 +21,16 @@ const IMAGE_QUERY = '?width=750&format=webply&optimize=medium';
 
 const CATALOG_PARAM = 'catalog';
 const DEFAULT_CATALOG = 'us/en_us';
+const AVAILABILITY_CATALOGS = [
+  { path: 'us/en_us', label: 'US · en_us' },
+  { path: 'ca/fr_ca', label: 'CA · fr_ca' },
+];
+const AVAILABILITY_STATES = [
+  'InStock',
+  'OutOfStock',
+  'ManagedInventory',
+  'Discontinued',
+];
 
 function getCatalogFromParams() {
   const params = new URLSearchParams(window.location.search);
@@ -39,32 +49,6 @@ let editMode = false;
 function getProductParam() {
   const params = new URLSearchParams(window.location.search);
   return params.get('product') || '';
-}
-
-function getByPath(obj, path) {
-  const parts = path.replace(/\[(\d+)\]/g, '.$1').split('.').filter(Boolean);
-  return parts.reduce((cur, p) => {
-    if (cur == null) return undefined;
-    const key = /^\d+$/.test(p) ? parseInt(p, 10) : p;
-    return cur[key];
-  }, obj);
-}
-
-function setByPath(obj, path, value) {
-  const parts = path.replace(/\[(\d+)\]/g, '.$1').split('.').filter(Boolean);
-  if (parts.length === 0) return;
-  let cur = obj;
-  for (let i = 0; i < parts.length - 1; i += 1) {
-    const p = parts[i];
-    const nextKey = parts[i + 1];
-    const key = /^\d+$/.test(p) ? parseInt(p, 10) : p;
-    const nextIsNum = /^\d+$/.test(nextKey);
-    if (cur[key] == null) cur[key] = nextIsNum ? [] : {};
-    cur = cur[key];
-  }
-  const last = parts[parts.length - 1];
-  const lastKey = /^\d+$/.test(last) ? parseInt(last, 10) : last;
-  cur[lastKey] = value;
 }
 
 function resolveImageUrl(imagePath) {
@@ -128,29 +112,20 @@ function resolveIndexImageUrl(imagePath) {
   return normalized ? getProductsBaseUrl() + normalized + IMAGE_QUERY : '';
 }
 
-function renderValue(label, value, path, isEditMode) {
-  if (value == null && !isEditMode) return '';
-  let v = '';
-  if (value != null) {
-    v = typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value);
-  }
-  const editAttrs = isEditMode && path
-    ? ` data-edit-path="${escapeHtml(path)}" class="pim-editable pim-detail-value"`
-    : ' class="pim-detail-value"';
-  return `<div class="pim-detail-field"><span class="pim-detail-label">${escapeHtml(label)}</span><span${editAttrs}>${escapeHtml(v)}</span></div>`;
+function renderValue(label, value) {
+  if (value == null) return '';
+  const v = typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value);
+  return `<div class="pim-detail-field"><span class="pim-detail-label">${escapeHtml(label)}</span><span class="pim-detail-value">${escapeHtml(v)}</span></div>`;
 }
 
-function renderPrice(price, isEditMode) {
-  if (!price && !isEditMode) return '';
-  let p = '';
-  if (price && (price.final != null || price.regular != null)) {
-    p = price.final != null ? price.final : price.regular;
-  }
-  return renderValue('Price', p, 'price.regular', isEditMode);
+function renderPrice(price) {
+  if (!price) return '';
+  const value = price.final != null ? price.final : price.regular;
+  return renderValue('Price', value);
 }
 
-function renderImages(images, isEditMode) {
-  if (!Array.isArray(images) && !isEditMode) return '';
+function renderImages(images) {
+  if (!Array.isArray(images)) return '';
   const list = Array.isArray(images) ? images : [];
   const items = list.map((img) => {
     const src = resolveImageUrl(img.url || img);
@@ -158,18 +133,10 @@ function renderImages(images, isEditMode) {
     const wrap = src ? `<a href="${escapeHtml(src)}" target="_blank" rel="noopener" class="pim-detail-img-wrap"${label}><img src="${escapeHtml(src)}" alt="" loading="lazy" class="pim-detail-img" /></a>` : '<span class="pim-detail-img-wrap pim-detail-no-img">—</span>';
     return `<span class="pim-detail-img-item">${wrap}</span>`;
   });
-  const syncBtn = isEditMode
-    ? '<button type="button" class="pim-sync-images-btn" data-pim-sync-images>Sync images</button>'
-    : '';
-  const empty = items.length === 0 && isEditMode
-    ? '<p class="pim-detail-images-empty">No product images yet. Sync from DAM to load them.</p>'
-    : '';
-  return `<div class="pim-detail-section" data-edit-path="images">
+  return `<div class="pim-detail-section">
     <div class="pim-detail-section-head">
       <h3 class="pim-detail-section-title">Images</h3>
-      ${syncBtn}
     </div>
-    ${empty}
     <div class="pim-detail-gallery">${items.join('')}</div>
   </div>`;
 }
@@ -185,24 +152,22 @@ function renderCategories(categories) {
   return `<div class="pim-detail-section"><h3 class="pim-detail-section-title">Categories</h3><div class="pim-detail-tags">${tags}</div></div>`;
 }
 
-function renderResources(resources, isEditMode) {
-  if (!Array.isArray(resources) && !isEditMode) return '';
+function renderResources(resources) {
+  if (!Array.isArray(resources) || resources.length === 0) return '';
   const list = Array.isArray(resources) ? resources : [];
-  const items = list.map((r, i) => {
+  const items = list.map((r) => {
     const name = r.name || 'Resource';
     const url = r.url || '#';
     const type = (r.type || 'file').toLowerCase();
-    const delBtn = isEditMode ? `<button type="button" class="pim-edit-delete" data-edit-path="custom.resources" data-edit-index="${i}" aria-label="Delete">×</button>` : '';
-    return `<li class="pim-detail-resource pim-edit-list-item" data-edit-path="custom.resources" data-edit-index="${i}"><a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(name)}</a><span class="pim-detail-resource-type pim-detail-resource-type-${escapeHtml(type)}">${escapeHtml(r.type || '')}</span>${delBtn}</li>`;
+    return `<li class="pim-detail-resource"><a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(name)}</a><span class="pim-detail-resource-type pim-detail-resource-type-${escapeHtml(type)}">${escapeHtml(r.type || '')}</span></li>`;
   }).join('');
-  const addBtn = isEditMode ? '<button type="button" class="pim-edit-add" data-edit-path="custom.resources" data-edit-action="add">+ Add resource</button>' : '';
-  return `<div class="pim-detail-section" data-edit-path="custom.resources"><h3 class="pim-detail-section-title">Resources</h3><ul class="pim-detail-resource-list">${items}</ul>${addBtn}</div>`;
+  return `<div class="pim-detail-section"><h3 class="pim-detail-section-title">Resources</h3><ul class="pim-detail-resource-list">${items}</ul></div>`;
 }
 
-function renderLinkedProducts(paths, indexByUrlKey, sectionTitle, pathKey, isEditMode) {
+function renderLinkedProducts(paths, indexByUrlKey, sectionTitle) {
   const list = Array.isArray(paths) ? paths : [];
-  if (list.length === 0 && !isEditMode) return '';
-  const cards = list.map((path, i) => {
+  if (list.length === 0) return '';
+  const cards = list.map((path) => {
     const urlKey = pathToUrlKey(path);
     const product = indexByUrlKey[urlKey];
     const catalog = getCatalogFromParams();
@@ -211,14 +176,12 @@ function renderLinkedProducts(paths, indexByUrlKey, sectionTitle, pathKey, isEdi
     const name = product ? (product.title || product.name || product.sku || urlKey) : urlKey;
     const image = product?.image || product?.images?.[0]?.url || product?.images?.[0];
     const imgSrc = image ? resolveIndexImageUrl(image) : '';
-    const delBtn = isEditMode ? `<button type="button" class="pim-edit-delete" data-edit-path="${escapeHtml(pathKey)}" data-edit-index="${i}" aria-label="Delete">×</button>` : '';
-    return `<span class="pim-edit-list-item" data-edit-path="${escapeHtml(pathKey)}" data-edit-index="${i}"><a href="${escapeHtml(detailHref)}" class="pim-detail-linked-card">
+    return `<span><a href="${escapeHtml(detailHref)}" class="pim-detail-linked-card">
       <span class="pim-detail-linked-thumb">${imgSrc ? `<img src="${escapeHtml(imgSrc)}" alt="" loading="lazy" />` : '<span class="pim-detail-linked-no-img">—</span>'}</span>
       <span class="pim-detail-linked-name">${escapeHtml(name)}</span>
-    </a>${delBtn}</span>`;
+    </a></span>`;
   }).join('');
-  const addBtn = isEditMode ? `<button type="button" class="pim-edit-add" data-edit-path="${escapeHtml(pathKey)}" data-edit-action="add">+ Add</button>` : '';
-  return `<div class="pim-detail-section" data-edit-path="${escapeHtml(pathKey)}"><h3 class="pim-detail-section-title">${escapeHtml(sectionTitle)}</h3><div class="pim-detail-linked-grid">${cards}</div>${addBtn}</div>`;
+  return `<div class="pim-detail-section"><h3 class="pim-detail-section-title">${escapeHtml(sectionTitle)}</h3><div class="pim-detail-linked-grid">${cards}</div></div>`;
 }
 
 function formatCustomCellValue(key, v) {
@@ -245,17 +208,15 @@ function formatCustomCellValue(key, v) {
   return escapeHtml(String(v));
 }
 
-function renderCustom(custom, isEditMode) {
-  if (!custom && !isEditMode) return '';
+function renderCustom(custom) {
+  if (!custom) return '';
   const obj = custom && typeof custom === 'object' ? custom : {};
   const skipKeys = ['categories', 'resources', 'crosssellSkus', 'relatedSkus'];
   const entries = Object.entries(obj).filter(([k, v]) => v != null && v !== '' && !skipKeys.includes(k));
-  if (entries.length === 0 && !isEditMode) return '';
+  if (entries.length === 0) return '';
   const rows = entries.map(([k, v]) => {
     const val = formatCustomCellValue(k, v);
-    const path = `custom.${k}`;
-    const editAttrs = isEditMode ? ` data-edit-path="${escapeHtml(path)}" class="pim-editable pim-detail-custom-val"` : ' class="pim-detail-custom-val"';
-    return `<tr><td class="pim-detail-custom-key">${escapeHtml(k)}</td><td${editAttrs}>${val}</td></tr>`;
+    return `<tr><td class="pim-detail-custom-key">${escapeHtml(k)}</td><td class="pim-detail-custom-val">${val}</td></tr>`;
   }).join('');
   return `<div class="pim-detail-section"><h3 class="pim-detail-section-title">Custom</h3><table class="pim-detail-custom-table"><tbody>${rows}</tbody></table></div>`;
 }
@@ -281,7 +242,17 @@ function renderVariantThumbs(variant) {
   }).join('')}</div>`;
 }
 
-function renderVariants(variants) {
+function renderAvailability(value, editable = false) {
+  const state = value || '';
+  const availabilityClass = state.toLowerCase().replace(/\s+/g, '-');
+  const label = escapeHtml(state || '—');
+  if (editable) {
+    return `<button type="button" class="pim-card-availability pim-availability-edit-trigger ${availabilityClass}" data-availability-edit aria-label="Edit availability: ${label}">${label}</button>`;
+  }
+  return `<span class="pim-card-availability ${availabilityClass}">${label}</span>`;
+}
+
+function renderVariants(variants, editable = false) {
   if (!Array.isArray(variants) || variants.length === 0) return '';
   const rows = variants.map((v) => {
     const price = v.price ? (v.price.final ?? v.price.regular ?? '') : '';
@@ -292,7 +263,7 @@ function renderVariants(variants) {
       <td class="pim-detail-var-name">${escapeHtml(v.name || '')}</td>
       <td class="pim-detail-var-opts">${escapeHtml(opts)}</td>
       <td class="pim-detail-var-price">${escapeHtml(price)}</td>
-      <td class="pim-detail-var-avail"><span class="pim-card-availability ${String(v.availability || '').toLowerCase().replace(/\s+/g, '-')}">${escapeHtml(v.availability || '')}</span></td>
+      <td class="pim-detail-var-avail">${renderAvailability(v.availability, editable)}</td>
     </tr>`;
   }).join('');
   return `<div class="pim-detail-section"><h3 class="pim-detail-section-title">Variants (${variants.length})</h3><div class="pim-detail-table-wrap"><table class="pim-detail-variants-table"><thead><tr><th>Images</th><th>SKU</th><th>Name</th><th>Options</th><th>Price</th><th>Availability</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
@@ -307,8 +278,8 @@ function renderOptions(options) {
   return `<div class="pim-detail-section"><h3 class="pim-detail-section-title">Options</h3><table class="pim-detail-custom-table"><tbody>${rows}</tbody></table></div>`;
 }
 
-function renderDeleteProduct(productPath, isEditMode) {
-  if (!isEditMode || !productPath) return '';
+function renderDeleteProduct(productPath, canDelete) {
+  if (!canDelete || !productPath) return '';
   return `<section class="pim-delete-product">
     <div>
       <h2 class="pim-delete-product-title">Delete product</h2>
@@ -318,38 +289,35 @@ function renderDeleteProduct(productPath, isEditMode) {
   </section>`;
 }
 
-function renderProduct(data, indexByUrlKey = {}, isEditMode = false) {
-  const availabilityClass = (data.availability || '').toLowerCase().replace(/\s+/g, '-');
-  const priceBlock = renderPrice(data.price, isEditMode);
-  const nameEditAttrs = isEditMode ? ' data-edit-path="name" class="pim-editable pim-detail-name"' : ' class="pim-detail-name"';
-  const availabilityEditAttrs = isEditMode ? ` data-edit-path="availability" data-edit-type="availability" class="pim-editable pim-card-availability ${availabilityClass}"` : ` class="pim-card-availability ${availabilityClass}"`;
+function renderProduct(data, indexByUrlKey = {}, canEdit = false) {
+  const priceBlock = renderPrice(data.price);
   const sections = [
     `<div class="pim-detail-header">
-      <h1${nameEditAttrs}>${escapeHtml(data.name || data.sku || '')}</h1>
+      <h1 class="pim-detail-name">${escapeHtml(data.name || data.sku || '')}</h1>
       <div class="pim-detail-meta">
-        ${renderValue('SKU', data.sku, 'sku', isEditMode)}
-        ${renderValue('Type', data.type, 'type', isEditMode)}
-        ${renderValue('URL key', data.urlKey, 'urlKey', isEditMode)}
-        ${renderValue('Path', data.path, 'path', isEditMode)}
-        ${renderValue('Brand', data.brand, 'brand', isEditMode)}
-        <span${availabilityEditAttrs}>${escapeHtml(data.availability || '')}</span>
+        ${renderValue('SKU', data.sku)}
+        ${renderValue('Type', data.type)}
+        ${renderValue('URL key', data.urlKey)}
+        ${renderValue('Path', data.path)}
+        ${renderValue('Brand', data.brand)}
+        ${renderAvailability(data.availability, canEdit)}
         ${priceBlock}
       </div>
     </div>`,
-    renderImages(data.images, isEditMode),
+    renderImages(data.images),
     data.options && data.options.length ? renderOptions(data.options) : '',
-    renderVariants(data.variants),
+    renderVariants(data.variants, canEdit),
     renderCategories(data.custom?.categories),
-    renderResources(data.custom?.resources, isEditMode),
-    renderLinkedProducts(data.custom?.crosssellSkus, indexByUrlKey, 'Cross-sell', 'custom.crosssellSkus', isEditMode),
-    renderLinkedProducts(data.custom?.relatedSkus, indexByUrlKey, 'Related products', 'custom.relatedSkus', isEditMode),
-    renderCustom(data.custom, isEditMode),
+    renderResources(data.custom?.resources),
+    renderLinkedProducts(data.custom?.crosssellSkus, indexByUrlKey, 'Cross-sell'),
+    renderLinkedProducts(data.custom?.relatedSkus, indexByUrlKey, 'Related products'),
+    renderCustom(data.custom),
     (data.metadata && Object.keys(data.metadata).length > 0)
       ? `<div class="pim-detail-section"><h3 class="pim-detail-section-title">Raw metadata</h3><pre class="pim-detail-raw">${escapeHtml(JSON.stringify(data.metadata, null, 2))}</pre></div>`
       : '',
     renderDeleteProduct(
       normalizeProductPath(data.path || getCatalogProductPath(currentProductRef)),
-      isEditMode,
+      canEdit,
     ),
   ];
   return sections.filter(Boolean).join('\n');
@@ -434,174 +402,374 @@ function openDeleteProductDialog(productPath) {
   input.focus();
 }
 
-function showInlineEditor(options) {
-  const {
-    path,
-    currentValue,
-    type,
-    onSave,
-  } = options;
-  const isAvailability = type === 'availability';
-  const isObjectOrArray = typeof currentValue === 'object' && currentValue !== null;
-  const isLong = typeof currentValue === 'string' && currentValue.length > 80;
-  const overlay = document.createElement('div');
-  overlay.className = 'pim-inline-editor-wrap';
-  let inputHtml;
-  if (isAvailability) {
-    const val = String(currentValue || '');
-    inputHtml = `<select id="pim-edit-input">
-      <option value="InStock"${val === 'InStock' ? ' selected' : ''}>InStock</option>
-      <option value="OutOfStock"${val === 'OutOfStock' ? ' selected' : ''}>OutOfStock</option>
-      <option value="Discontinued"${val === 'Discontinued' ? ' selected' : ''}>Discontinued</option>
-    </select>`;
-  } else if (isObjectOrArray) {
-    const val = escapeHtml(JSON.stringify(currentValue, null, 2));
-    inputHtml = `<textarea id="pim-edit-input">${val}</textarea>`;
-  } else {
-    const val = currentValue != null ? escapeHtml(String(currentValue)) : '';
-    if (isLong) inputHtml = `<textarea id="pim-edit-input">${val}</textarea>`;
-    else inputHtml = `<input type="text" id="pim-edit-input" value="${val}" />`;
-  }
-  overlay.innerHTML = `
-    <div class="pim-inline-editor">
-      <label>${escapeHtml(path)}</label>
-      ${inputHtml}
-      <div class="pim-inline-editor-actions">
-        <button type="button" class="pim-btn-cancel">Cancel</button>
-        <button type="button" class="pim-btn-save">Save</button>
-      </div>
-    </div>`;
-  document.body.appendChild(overlay);
-  const input = overlay.querySelector('#pim-edit-input');
-  const remove = () => { overlay.remove(); };
-  overlay.querySelector('.pim-btn-cancel').addEventListener('click', remove);
-  overlay.querySelector('.pim-btn-save').addEventListener('click', () => {
-    let newVal = input.value;
-    if (isObjectOrArray) {
-      try {
-        newVal = JSON.parse(input.value);
-      } catch {
-        return;
-      }
+function normalizeAvailabilitySku(sku) {
+  return String(sku || '').trim().toUpperCase();
+}
+
+function getAvailabilityProductPath(locale, productRef) {
+  const normalizedRef = normalizeProductPath(productRef);
+  const prefix = `/${locale}/products/`;
+  if (normalizedRef.startsWith(prefix)) return normalizedRef;
+  return `${prefix}${normalizedRef.replace(/^\/+/, '')}`;
+}
+
+async function fetchAvailabilityRows() {
+  const productSku = normalizeAvailabilitySku(currentProductData?.sku);
+  if (!productSku) throw new Error('The current product does not have a SKU.');
+
+  const indexes = await Promise.all(AVAILABILITY_CATALOGS.map(async (catalog) => {
+    const json = await fetchCatalogIndexForLocale(catalog.path);
+    const rows = Array.isArray(json) ? json : json?.data;
+    if (!Array.isArray(rows)) {
+      throw new Error(`Could not read the product index for ${catalog.label}.`);
     }
-    onSave(newVal);
-    remove();
+    return { catalog, rows };
+  }));
+
+  const products = await Promise.all(indexes.map(async ({ catalog, rows }) => {
+    const indexedProduct = rows.find((item) => (
+      !item.parentSku && normalizeAvailabilitySku(item.sku) === productSku
+    ));
+    if (!indexedProduct) return { catalog, product: null };
+
+    const productPath = getAvailabilityProductPath(
+      catalog.path,
+      getProductRefFromIndex(indexedProduct, catalog.path),
+    );
+    const product = await fetchCatalogProduct(productPath);
+    if (!product) throw new Error(`Product not found in ${catalog.label}: ${productPath}`);
+    return { catalog, productPath, product };
+  }));
+
+  const rows = [];
+  const missingCatalogs = [];
+  products.forEach(({ catalog, productPath, product }) => {
+    if (!product) {
+      missingCatalogs.push(catalog.label);
+      return;
+    }
+    rows.push({
+      catalog: catalog.label,
+      locale: catalog.path,
+      productPath,
+      sku: product.sku,
+      name: product.name || product.sku,
+      availability: product.availability || '',
+    });
+    (Array.isArray(product.variants) ? product.variants : []).forEach((variant) => {
+      rows.push({
+        catalog: catalog.label,
+        locale: catalog.path,
+        productPath,
+        sku: variant.sku,
+        name: variant.name || variant.color || variant.sku,
+        availability: variant.availability || '',
+      });
+    });
   });
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) remove(); });
-  input.focus();
+  if (!rows.length) {
+    throw new Error(`Product SKU ${currentProductData.sku} was not found in either catalog.`);
+  }
+  return { rows, missingCatalogs };
 }
 
-/* eslint-disable no-use-before-define */
-function arrayDelete(path, index) {
-  const arr = getByPath(currentProductData, path) || [];
-  if (!Array.isArray(arr)) return;
-  const next = [...arr];
-  next.splice(index, 1);
-  setByPath(currentProductData, path, next);
-  refreshDetailContent();
+function availabilityStateOptions(current) {
+  const states = [...AVAILABILITY_STATES];
+  if (current && !states.includes(current)) states.push(current);
+  return `${current ? '' : '<option value="">Select a state</option>'}${states.map((state) => (
+    `<option value="${escapeHtml(state)}"${state === current ? ' selected' : ''}>${escapeHtml(state)}</option>`
+  )).join('')}`;
 }
 
-function arrayAdd(path) {
-  let template;
-  if (path === 'custom.resources') template = { name: 'New resource', type: 'pdf', url: 'https://' };
-  else if (path === 'custom.crosssellSkus' || path === 'custom.relatedSkus') template = `/${getCatalogFromParams()}/products/new-product`;
-  else template = {};
-  const arr = getByPath(currentProductData, path) || [];
-  const next = Array.isArray(arr) ? [...arr, template] : [template];
-  setByPath(currentProductData, path, next);
-  refreshDetailContent();
+function availabilityRowHtml(row, index) {
+  const state = row.availability || '';
+  return `<tr data-availability-row="${index}">
+    <td class="pim-availability-select-col"><input type="checkbox" data-availability-select aria-label="Select ${escapeHtml(row.name)} (${escapeHtml(row.sku)}) in ${escapeHtml(row.catalog)}" /></td>
+    <td><span class="pim-availability-item-name">${escapeHtml(row.name || row.sku)}</span><span class="pim-availability-item-sku">${escapeHtml(row.sku || '—')}</span></td>
+    <td>${escapeHtml(row.catalog)}</td>
+    <td><span class="pim-card-availability pim-availability-state ${state.toLowerCase()}">${escapeHtml(state || '—')}</span></td>
+    <td class="pim-availability-target-cell">
+      <span class="pim-availability-diff-arrow" aria-hidden="true">→</span>
+      <select class="pim-availability-target-select ${state.toLowerCase()}" data-availability-target aria-label="Target availability for ${escapeHtml(row.sku)}">${availabilityStateOptions(state)}</select>
+    </td>
+  </tr>`;
 }
 
-function attachEditHandlers() {
+function selectedAvailabilityChanges(rows, body) {
+  return rows.map((row, index) => {
+    const tableRow = body.querySelector(`[data-availability-row="${index}"]`);
+    const selected = tableRow?.querySelector('[data-availability-select]');
+    const target = tableRow?.querySelector('[data-availability-target]');
+    if (!selected?.checked || !target?.value || target.value === row.availability) return null;
+    return {
+      ...row,
+      targetAvailability: target.value,
+    };
+  }).filter(Boolean);
+}
+
+async function saveAvailabilityChanges(changes, onSaved) {
+  const groups = new Map();
+  changes.forEach((change) => {
+    if (!groups.has(change.productPath)) {
+      groups.set(change.productPath, {
+        path: change.productPath,
+        changes: [],
+      });
+    }
+    groups.get(change.productPath).changes.push(change);
+  });
+
+  const outcomes = await Promise.allSettled([...groups.values()].map(async (group) => {
+    const product = await fetchCatalogProduct(group.path);
+    if (!product) throw new Error(`Product not found: ${group.path}`);
+    group.changes.forEach((change) => {
+      const target = normalizeAvailabilitySku(change.sku) === normalizeAvailabilitySku(product.sku)
+        ? product
+        : (product.variants || []).find((variant) => (
+          normalizeAvailabilitySku(variant.sku) === normalizeAvailabilitySku(change.sku)
+        ));
+      if (!target) throw new Error(`SKU ${change.sku} was not found in ${group.path}.`);
+      target.availability = change.targetAvailability;
+    });
+    await putOrPatchResource(catalogApiPath(group.path), product);
+    const saved = { path: group.path, product, changes: group.changes };
+    onSaved(saved);
+    return saved;
+  }));
+  const savedProducts = outcomes
+    .filter((outcome) => outcome.status === 'fulfilled')
+    .map((outcome) => outcome.value);
+  const failures = outcomes
+    .filter((outcome) => outcome.status === 'rejected')
+    .map((outcome) => outcome.reason?.message || 'An availability update failed.');
+  if (failures.length) {
+    throw new Error(
+      `${savedProducts.length} of ${outcomes.length} product updates saved. ${failures.join(' ')}`,
+    );
+  }
+  return savedProducts;
+}
+
+function openAvailabilityDialog() {
+  if (!canUseEditMode() || !editMode || !currentProductData) return;
+  const dialog = document.createElement('dialog');
+  dialog.className = 'pim-availability-dialog';
+  dialog.innerHTML = `
+    <div class="pim-availability-dialog-inner">
+      <header class="pim-availability-dialog-header">
+        <h2 class="pim-availability-dialog-title">Edit availability</h2>
+        <p>Choose availability changes for this product and its variants in US (en_us) and Canada (fr_ca).</p>
+      </header>
+      <p class="pim-availability-dialog-status" data-availability-status role="status">Loading product availability…</p>
+      <div class="pim-availability-dialog-table-wrap">
+        <table class="pim-availability-table">
+          <thead><tr>
+            <th class="pim-availability-select-col"><input type="checkbox" data-availability-select-all aria-label="Select all rows" /></th>
+            <th>Product / variant</th>
+            <th>Catalog</th>
+            <th>Current availability</th>
+            <th class="pim-availability-target-heading">
+              <select data-availability-bulk-target aria-label="Set target availability for all rows">
+                <option value="">Set all to…</option>
+                ${AVAILABILITY_STATES.map((state) => `<option value="${state}">${state}</option>`).join('')}
+              </select>
+            </th>
+          </tr></thead>
+          <tbody data-availability-rows></tbody>
+        </table>
+      </div>
+      <footer class="pim-availability-dialog-actions">
+        <button type="button" class="pim-availability-cancel" data-availability-cancel>Cancel</button>
+        <button type="button" class="pim-availability-apply" data-availability-apply disabled>Make changes</button>
+      </footer>
+    </div>`;
+  document.body.appendChild(dialog);
+
+  const status = dialog.querySelector('[data-availability-status]');
+  const body = dialog.querySelector('[data-availability-rows]');
+  const selectAll = dialog.querySelector('[data-availability-select-all]');
+  const bulkTarget = dialog.querySelector('[data-availability-bulk-target]');
+  const cancelButton = dialog.querySelector('[data-availability-cancel]');
+  const applyButton = dialog.querySelector('[data-availability-apply]');
+  let rows = [];
+  let loading = true;
+  let saving = false;
+  const scrollLock = {
+    html: {
+      overflow: document.documentElement.style.overflow,
+      overscrollBehavior: document.documentElement.style.overscrollBehavior,
+    },
+    body: {
+      overflow: document.body.style.overflow,
+      overscrollBehavior: document.body.style.overscrollBehavior,
+    },
+  };
+  document.documentElement.style.overflow = 'hidden';
+  document.documentElement.style.overscrollBehavior = 'none';
+  document.body.style.overflow = 'hidden';
+  document.body.style.overscrollBehavior = 'none';
+
+  const updateRowDiff = (tableRow) => {
+    const index = Number(tableRow.dataset.availabilityRow);
+    const row = rows[index];
+    const target = tableRow.querySelector('[data-availability-target]');
+    if (!row || !target) return;
+    const targetState = target.value;
+    const targetClass = targetState.toLowerCase();
+    target.className = `pim-availability-target-select ${targetClass}`;
+    tableRow.classList.toggle(
+      'pim-availability-row-changed',
+      Boolean(targetState && targetState !== row.availability),
+    );
+  };
+  const updateApplyState = () => {
+    const selections = [...body.querySelectorAll('[data-availability-select]')];
+    const selectedCount = selections.filter((checkbox) => checkbox.checked).length;
+    selectAll.checked = selections.length > 0 && selectedCount === selections.length;
+    selectAll.indeterminate = selectedCount > 0 && selectedCount < selections.length;
+    applyButton.disabled = loading || selectedAvailabilityChanges(rows, body).length === 0;
+  };
+  const close = () => {
+    if (dialog.open && !saving) dialog.close();
+  };
+  const closeAfterSave = () => {
+    if (dialog.open) dialog.close();
+  };
+
+  dialog.addEventListener('close', () => dialog.remove(), { once: true });
+  dialog.addEventListener('close', () => {
+    document.documentElement.style.overflow = scrollLock.html.overflow;
+    document.documentElement.style.overscrollBehavior = scrollLock.html.overscrollBehavior;
+    document.body.style.overflow = scrollLock.body.overflow;
+    document.body.style.overscrollBehavior = scrollLock.body.overscrollBehavior;
+  }, { once: true });
+  cancelButton.addEventListener('click', close);
+  dialog.addEventListener('click', (event) => {
+    if (event.target === dialog) close();
+  });
+  wireDialogEscapeDismiss(dialog, close);
+  body.addEventListener('change', (event) => {
+    const { target } = event;
+    if (target instanceof HTMLSelectElement && target.matches('[data-availability-target]')) {
+      const tableRow = target.closest('[data-availability-row]');
+      updateRowDiff(tableRow);
+      const row = rows[Number(tableRow.dataset.availabilityRow)];
+      const checkbox = tableRow.querySelector('[data-availability-select]');
+      if (row && checkbox) checkbox.checked = target.value !== row.availability;
+      bulkTarget.value = '';
+    }
+    updateApplyState();
+  });
+  bulkTarget.addEventListener('change', () => {
+    if (!bulkTarget.value) return;
+    body.querySelectorAll('[data-availability-row]').forEach((tableRow) => {
+      const row = rows[Number(tableRow.dataset.availabilityRow)];
+      const target = tableRow.querySelector('[data-availability-target]');
+      const checkbox = tableRow.querySelector('[data-availability-select]');
+      if (!row || !target) return;
+      target.value = bulkTarget.value;
+      updateRowDiff(tableRow);
+      if (checkbox) checkbox.checked = target.value !== row.availability;
+    });
+    updateApplyState();
+  });
+  selectAll.addEventListener('change', () => {
+    body.querySelectorAll('[data-availability-select]').forEach((checkbox) => {
+      checkbox.checked = selectAll.checked;
+    });
+    updateApplyState();
+  });
+
+  applyButton.addEventListener('click', async () => {
+    const changes = selectedAvailabilityChanges(rows, body);
+    if (!changes.length || loading) return;
+    loading = true;
+    saving = true;
+    applyButton.disabled = true;
+    cancelButton.disabled = true;
+    body.querySelectorAll('input, select').forEach((control) => {
+      control.disabled = true;
+    });
+    status.textContent = 'Saving availability changes…';
+    let currentProductUpdated = false;
+    try {
+      const savedProducts = await saveAvailabilityChanges(
+        changes,
+        ({ path, product, changes: productChanges }) => {
+          productChanges.forEach((change) => {
+            const index = rows.findIndex((row) => (
+              row.productPath === path && row.sku === change.sku
+            ));
+            if (index < 0) return;
+            rows[index].availability = change.targetAvailability;
+            const tableRow = body.querySelector(`[data-availability-row="${index}"]`);
+            tableRow.classList.remove('pim-availability-row-changed');
+            tableRow.querySelector('.pim-availability-state').textContent = change.targetAvailability;
+            tableRow.querySelector('.pim-availability-state').className = `pim-card-availability pim-availability-state ${change.targetAvailability.toLowerCase()}`;
+            tableRow.querySelector('[data-availability-target]').value = change.targetAvailability;
+            updateRowDiff(tableRow);
+            tableRow.querySelector('[data-availability-select]').checked = false;
+          });
+          const currentPath = normalizeProductPath(
+            currentProductData.path || getCatalogProductPath(currentProductRef),
+          );
+          if (currentPath === path) {
+            currentProductData = product;
+            currentProductUpdated = true;
+          }
+        },
+      );
+      if (savedProducts.some(({ path }) => (
+        normalizeProductPath(currentProductData.path) === path
+      ))) {
+        refreshDetailContent();
+      }
+      if (selectedAvailabilityChanges(rows, body).length === 0) {
+        showToast('Availability updated');
+        closeAfterSave();
+      } else {
+        status.textContent = 'Some selected rows still need changes.';
+      }
+    } catch (err) {
+      status.textContent = err.message || 'Failed to save availability changes.';
+      if (currentProductUpdated) refreshDetailContent();
+      showToast(status.textContent, 'error');
+    } finally {
+      loading = false;
+      saving = false;
+      cancelButton.disabled = false;
+      body.querySelectorAll('input, select').forEach((control) => {
+        control.disabled = false;
+      });
+      updateApplyState();
+    }
+  });
+
+  dialog.showModal();
+  fetchAvailabilityRows().then(({ rows: loadedRows, missingCatalogs }) => {
+    rows = loadedRows;
+    body.innerHTML = rows.map(availabilityRowHtml).join('');
+    status.textContent = missingCatalogs.length
+      ? `Not found in ${missingCatalogs.join(' and ')}. You can still update the catalog shown below.`
+      : '';
+    loading = false;
+    updateApplyState();
+  }).catch((err) => {
+    status.textContent = err.message || 'Failed to load product availability.';
+    loading = false;
+    updateApplyState();
+    showToast(status.textContent, 'error');
+  });
+}
+
+function attachDeleteProductHandler() {
   const content = document.getElementById('content');
   if (!content || !canUseEditMode() || !editMode) return;
 
-  content.querySelectorAll('.pim-editable').forEach((el) => {
-    const prev = el.pimEditClick;
-    if (prev) el.removeEventListener('click', prev);
-    const path = el.getAttribute('data-edit-path');
-    const type = el.getAttribute('data-edit-type') || 'string';
-    const handler = (e) => {
-      if (e.target.closest('a')) return;
-      const current = getByPath(currentProductData, path);
-      showInlineEditor({
-        path,
-        currentValue: current,
-        type,
-        onSave: (newVal) => {
-          if (path === 'price.regular') {
-            if (!currentProductData.price) currentProductData.price = {};
-            currentProductData.price.regular = newVal;
-            if (currentProductData.price.final == null) currentProductData.price.final = newVal;
-          } else setByPath(currentProductData, path, newVal);
-          refreshDetailContent();
-        },
-      });
-    };
-    el.pimEditClick = handler;
-    el.addEventListener('click', handler);
+  content.querySelectorAll('[data-availability-edit]').forEach((button) => {
+    button.addEventListener('click', openAvailabilityDialog);
   });
-
-  content.querySelectorAll('.pim-edit-delete').forEach((btn) => {
-    const prev = btn.pimDelClick;
-    if (prev) btn.removeEventListener('click', prev);
-    const path = btn.getAttribute('data-edit-path');
-    if (path === 'images') return;
-    const index = parseInt(btn.getAttribute('data-edit-index'), 10);
-    const handler = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      arrayDelete(path, index);
-    };
-    btn.pimDelClick = handler;
-    btn.addEventListener('click', handler);
-  });
-
-  content.querySelectorAll('.pim-edit-add').forEach((btn) => {
-    const prev = btn.pimAddClick;
-    if (prev) btn.removeEventListener('click', prev);
-    const path = btn.getAttribute('data-edit-path');
-    if (path === 'images') return;
-    const handler = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      arrayAdd(path);
-    };
-    btn.pimAddClick = handler;
-    btn.addEventListener('click', handler);
-  });
-
-  const syncBtn = content.querySelector('[data-pim-sync-images]');
-  if (syncBtn instanceof HTMLButtonElement) {
-    syncBtn.addEventListener('click', async () => {
-      if (!canUseEditMode() || !currentProductData) return;
-      const urlKey = pathToUrlKey(currentProductRef);
-      syncBtn.disabled = true;
-      const prevLabel = syncBtn.textContent;
-      syncBtn.textContent = 'Fetching…';
-      try {
-        const product = { ...currentProductData };
-        if (!product.path) {
-          product.path = getCatalogProductPath(currentProductRef);
-        }
-        await startProductImageSync({
-          product,
-          urlKey,
-          previewSrc: resolveImageUrl,
-          onApplied: (updated) => {
-            currentProductData = updated;
-            refreshDetailContent();
-          },
-        });
-      } catch (err) {
-        showToast(err.message || 'Failed to sync images', 'error');
-      } finally {
-        syncBtn.disabled = false;
-        syncBtn.textContent = prevLabel || 'Sync images';
-      }
-    });
-  }
-
   const deleteBtn = content.querySelector('[data-pim-delete-product]');
   if (deleteBtn instanceof HTMLButtonElement) {
     deleteBtn.addEventListener('click', () => {
@@ -633,13 +801,10 @@ function refreshDetailContent() {
   const content = document.getElementById('content');
   const isEdit = editMode && canUseEditMode();
   content.innerHTML = renderProduct(currentProductData, currentIndexByUrlKey, isEdit);
-  content.classList.toggle('pim-edit-mode', isEdit);
   const ioBtn = document.getElementById('productExportImportBtn');
   if (ioBtn instanceof HTMLButtonElement) ioBtn.hidden = !isEdit;
-  attachEditHandlers();
+  attachDeleteProductHandler();
 }
-/* eslint-enable no-use-before-define */
-
 async function init() {
   const productRef = getProductParam();
   const loading = document.getElementById('loading');
