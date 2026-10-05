@@ -126,7 +126,7 @@
   font-size: var(--body-size-xs, 0.75rem);
 }
 
-/* Fractional-fill star rating (from reviews.json), replacing the previous Bazaarvoice widget */
+/* Fractional-fill star rating (from the product index's ratingValue/reviewCount), replacing the previous Bazaarvoice widget */
 .compare-products-widget-stars {
   position: relative;
   display: inline-block;

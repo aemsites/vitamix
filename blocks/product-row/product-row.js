@@ -4,7 +4,7 @@ import {
 } from '../../scripts/aem.js';
 import { getLocaleAndLanguage, formatPrice, buildVideo } from '../../scripts/scripts.js';
 import {
-  createCallouts, createStarRating, fetchReviewsData, getReviewsBySlug, slugFromUrl,
+  createCallouts, createStarRating, slugFromUrl,
   fetchPlpData, getBadgesBySlug, PLP_DATASETS, fetchProductIndex, buildProductIndexBySlug,
 } from '../../scripts/plp-data.js';
 
@@ -54,19 +54,14 @@ async function lookupProducts(pathnames) {
 
   if (!window.productRowIndex) {
     const commercial = window.location.pathname.includes('/commercial/');
-    const [data, reviewsRows, plpRowsByDataset] = await Promise.all([
+    const [data, plpRowsByDataset] = await Promise.all([
       fetchProductIndex(locale, language, { commercial }),
-      fetchReviewsData(locale, language),
       Promise.all(PLP_DATASETS.map((dataset) => fetchPlpData(locale, language, dataset))),
     ]);
-    const reviewsBySlug = getReviewsBySlug(reviewsRows);
     const badgesBySlug = getBadgesBySlug(plpRowsByDataset.flat());
     const bySlug = buildProductIndexBySlug(data, locale, language);
 
     Object.entries(bySlug).forEach(([slug, product]) => {
-      const reviews = reviewsBySlug[slug];
-      product.reviewCount = reviews ? reviews.reviewCount : 0;
-      product.reviewAverage = reviews ? reviews.reviewAverage : 0;
       product.badge = badgesBySlug[slug] || '';
     });
 
