@@ -109,14 +109,15 @@ function corsProxyFetch(url) {
  * @param {Object} row - Raw product row (parent only: no parentSku)
  * @param {string} locale - Locale (e.g. us)
  * @param {string} language - Language (e.g. en_us)
+ * @param {string} [variantImage] - Image from the first variant, if available
  * @returns {Object} Normalized item with type, path, title, description, image
  */
-function normalizeProduct(row, locale, language) {
+function normalizeProduct(row, locale, language, variantImage = '') {
   const urlKey = (row.urlKey || '').trim();
   const path = urlKey ? `/${locale}/${language}/products/${urlKey}` : '';
   const title = (row.title || row.name || '').trim();
   const description = (row.description || row.shortDescription || '').trim();
-  let image = row.image || '';
+  let image = variantImage || row.image || '';
   if (image && image.startsWith('./')) {
     image = `/${locale}/${language}/products/${image.substring(2)}`;
   }
@@ -214,8 +215,19 @@ async function loadSearchIndex() {
   }
 
   if (productsRes.status === 'fulfilled' && Array.isArray(productsRes.value?.data)) {
-    const parents = productsRes.value.data.filter((row) => !(row.parentSku || '').trim());
-    parents.forEach((row) => combined.push(normalizeProduct(row, locale, language)));
+    const { data } = productsRes.value;
+    const firstVariantImages = new Map();
+    data.forEach((row) => {
+      const parentSku = (row.parentSku || '').trim();
+      if (parentSku && !firstVariantImages.has(parentSku)) {
+        firstVariantImages.set(parentSku, row.image || '');
+      }
+    });
+    const parents = data.filter((row) => !(row.parentSku || '').trim());
+    parents.forEach((row) => {
+      const variantImage = firstVariantImages.get((row.sku || '').trim()) || '';
+      combined.push(normalizeProduct(row, locale, language, variantImage));
+    });
   }
 
   if (manualRowsRes.status === 'fulfilled' && Array.isArray(manualRowsRes.value)) {
