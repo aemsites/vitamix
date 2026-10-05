@@ -4,7 +4,7 @@ export const CONSISTENCY_MISMATCH = 'ADOBE_COMMERCE_CONSISTENCY_MISMATCH';
 
 /**
  * Returns the price update carried by a price mismatch error, or null:
- * - `price`: `details.actualPrice.final` for `details.sku`
+ * - `price`: `details.actualPrice` (`final`, else `regular`) for `details.sku`
  * - `bundle_price`: `details.itemSum` for `details.sku`
  *
  * @param {Object} err - CommerceApiError
@@ -19,7 +19,7 @@ export function getPriceCorrection(err) {
   if (!sku) return null;
   let next;
   if (field === 'bundle_price') next = itemSum;
-  else if (field === 'price') next = actualPrice?.final;
+  else if (field === 'price') next = actualPrice?.final ?? actualPrice?.regular;
   else return null;
   const price = parseFloat(next);
   if (!Number.isFinite(price) || price < 0) return null;
