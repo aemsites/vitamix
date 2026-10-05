@@ -4,6 +4,7 @@ import { mintRecaptchaToken, RECAPTCHA_ACTIONS, RECAPTCHA_HEADER } from './recap
 import { getLocaleAndLanguage, loggedFetch } from './scripts.js';
 import { logApiError, logNetworkError } from './operations-log.js';
 import { getAffiliateCode } from './commerce/coupon-state.js';
+import { applyPriceCorrection } from './commerce/price-correction.js';
 
 /**
  * Error thrown when the Commerce API returns a non-2xx response.
@@ -205,7 +206,13 @@ export async function estimateExpressCheckout(country, state, zip, items, contex
  * @throws {CommerceApiError}
  */
 export async function previewOrder(orderBody) {
-  return post('/orders/preview', orderBody, RECAPTCHA_ACTIONS.ORDERS_PREVIEW);
+  try {
+    return await post('/orders/preview', orderBody, RECAPTCHA_ACTIONS.ORDERS_PREVIEW);
+  } catch (err) {
+    // Sync cart prices with the price returned in the error, if any.
+    if (applyPriceCorrection(err)) err.cartRepriced = true;
+    throw err;
+  }
 }
 
 /**

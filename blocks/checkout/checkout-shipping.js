@@ -1,4 +1,5 @@
 import { estimateShipping, previewOrder } from '../../scripts/commerce-api.js';
+import { previewWithPriceSync } from '../../scripts/commerce/price-correction.js';
 import { formatPrice } from '../../scripts/commerce-config.js';
 import { getStandardCheckoutContext } from '../../scripts/checkout-context.js';
 import { getCoupons, getCouponRequestFields, clearCoupons } from '../../scripts/commerce/coupon-state.js';
@@ -166,7 +167,10 @@ export async function updatePreview(form, cart, state, config) {
   document.dispatchEvent(new CustomEvent('checkout:preview-loading'));
 
   try {
-    const preview = await previewOrder(orderBody);
+    const preview = await previewWithPriceSync(
+      previewOrder,
+      () => ({ ...orderBody, items: cart.getItemsForAPI() }),
+    );
     state.currentEstimateToken = preview.estimateToken;
     state.currentPreview = preview;
     document.dispatchEvent(new CustomEvent('checkout:preview', { detail: { preview } }));
