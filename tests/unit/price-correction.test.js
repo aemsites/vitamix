@@ -40,8 +40,34 @@ beforeEach(() => {
 test('getPriceCorrection: extracts sku and itemSum from a bundle price mismatch', () => {
   assert.deepEqual(
     getPriceCorrection({ status: 400, body: mismatchBody() }),
-    { sku: '001372-1093-VB', price: '949.95', previousPrice: '899.95' },
+    { sku: '001372-1093-VB', price: '949.95' },
   );
+});
+
+const itemMismatchBody = (actualPrice = { currency: 'CAD', regular: '549.95', final: '549.95' }) => ({
+  code: CONSISTENCY_MISMATCH,
+  message: "price mismatch for item: '076047'",
+  details: { field: 'price', sku: '076047', actualPrice },
+});
+
+test('getPriceCorrection: extracts sku and actualPrice from an item price mismatch', () => {
+  assert.deepEqual(
+    getPriceCorrection({ status: 400, body: itemMismatchBody() }),
+    { sku: '076047', price: '549.95' },
+  );
+  assert.deepEqual(
+    getPriceCorrection({ status: 400, body: itemMismatchBody({ currency: 'CAD', regular: '549.95' }) }),
+    { sku: '076047', price: '549.95' },
+  );
+  assert.equal(getPriceCorrection({ status: 400, body: itemMismatchBody({}) }), null);
+  assert.equal(getPriceCorrection({ status: 400, body: itemMismatchBody(null) }), null);
+});
+
+test('applyPriceCorrection: reprices a regular item from an item price mismatch', () => {
+  const cart = new Cart();
+  cart.addItem(bundleItem({ sku: '076047', price: '359.95' }));
+  assert.equal(applyPriceCorrection({ status: 400, body: itemMismatchBody() }, cart), true);
+  assert.equal(cart.items[0].price, '549.95');
 });
 
 test('getPriceCorrection: ignores other statuses, codes, fields, and bad sums', () => {
