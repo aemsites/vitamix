@@ -43,3 +43,20 @@ export function applyPriceCorrection(err, cart = window.cart) {
   }
   return changed;
 }
+
+/**
+ * Runs `preview(buildBody())`, retrying once with a rebuilt body when the
+ * failed preview updated cart prices.
+ *
+ * @param {(body: Object) => Promise<Object>} preview
+ * @param {() => Object} buildBody - builds the request body from the current cart
+ * @returns {Promise<Object>}
+ */
+export async function previewWithPriceSync(preview, buildBody) {
+  try {
+    return await preview(buildBody());
+  } catch (err) {
+    if (!err?.cartRepriced) throw err;
+    return preview(buildBody());
+  }
+}

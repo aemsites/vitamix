@@ -210,7 +210,7 @@ export async function previewOrder(orderBody) {
     return await post('/orders/preview', orderBody, RECAPTCHA_ACTIONS.ORDERS_PREVIEW);
   } catch (err) {
     // Sync cart prices with the price returned in the error, if any.
-    applyPriceCorrection(err);
+    if (applyPriceCorrection(err)) err.cartRepriced = true;
     throw err;
   }
 }

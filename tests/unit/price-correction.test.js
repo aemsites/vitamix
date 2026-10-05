@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { Cart } from '../../scripts/cart.js';
 import { previewOrder } from '../../scripts/commerce-api.js';
 import {
-  getPriceCorrection, applyPriceCorrection, CONSISTENCY_MISMATCH,
+  getPriceCorrection, applyPriceCorrection, previewWithPriceSync, CONSISTENCY_MISMATCH,
 } from '../../scripts/commerce/price-correction.js';
 import { __resetScripts } from './mocks/scripts.mjs';
 
@@ -108,6 +108,65 @@ test('previewOrder: repriced cart on mismatch and still rethrows the error', asy
   );
   assert.equal(window.cart.items[0].price, '949.95');
   assert.equal(window.cart.getItemsForAPI()[0].price.final, '949.95');
+});
+
+/** Fetch mock answering each call with the next queued [status, body]. */
+function queueFetch(responses) {
+  const bodies = [];
+  globalThis.__setFetchMock(async (url, init) => {
+    let status = 200;
+    let body = {};
+    if (String(url).endsWith('/orders/preview')) {
+      bodies.push(JSON.parse(init.body));
+      [status, body] = responses.shift();
+    }
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      json: async () => body,
+      headers: { get: () => null },
+    };
+  });
+  return bodies;
+}
+
+test('previewWithPriceSync: retries once with a rebuilt body after a price sync', async () => {
+  window.cart.clear();
+  window.cart.addItem(bundleItem());
+  const bodies = queueFetch([[400, mismatchBody()], [200, { estimateToken: 'tok' }]]);
+  const result = await previewWithPriceSync(
+    previewOrder,
+    () => ({ items: window.cart.getItemsForAPI() }),
+  );
+  assert.equal(result.estimateToken, 'tok');
+  assert.equal(bodies.length, 2);
+  assert.equal(bodies[0].items[0].price.final, '899.95');
+  assert.equal(bodies[1].items[0].price.final, '949.95');
+});
+
+test('previewWithPriceSync: does not retry when the cart was not repriced', async () => {
+  window.cart.clear();
+  window.cart.addItem(bundleItem({ price: '949.95' }));
+  const bodies = queueFetch([[400, mismatchBody()]]);
+  await assert.rejects(previewWithPriceSync(
+    previewOrder,
+    () => ({ items: window.cart.getItemsForAPI() }),
+  ));
+  assert.equal(bodies.length, 1);
+});
+
+test('previewWithPriceSync: retries at most once', async () => {
+  window.cart.clear();
+  window.cart.addItem(bundleItem());
+  const bodies = queueFetch([
+    [400, mismatchBody()],
+    [400, mismatchBody({ itemSum: '999.95' })],
+  ]);
+  await assert.rejects(previewWithPriceSync(
+    previewOrder,
+    () => ({ items: window.cart.getItemsForAPI() }),
+  ));
+  assert.equal(bodies.length, 2);
 });
 
 test('previewOrder: leaves the cart alone on unrelated errors', async () => {
