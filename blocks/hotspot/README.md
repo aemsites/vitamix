@@ -1,5 +1,8 @@
 ## Hotspot Authoring
 
+Use **Hotspot (light)** for white image markers with charcoal text and borders
+and a light hover/selected shadow. **Hotspot** uses charcoal markers by default.
+
 Use a two-column **Hotspot** block table:
 
 | Left cell | Right cell |

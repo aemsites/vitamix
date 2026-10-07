@@ -95,10 +95,21 @@
   transition: box-shadow 0.2s, transform 0.2s;
 }
 
+.hotspot.light button.hs span {
+  border-color: var(--color-charcoal);
+  background-color: var(--color-white);
+  color: var(--color-charcoal);
+}
+
 .hotspot button.hs:hover span,
 .hotspot button.hs[aria-pressed='true'] span {
   box-shadow: 0 0 0 var(--spacing-60) var(--overlay-charcoal);
   transform: scale(1.2);
+}
+
+.hotspot.light button.hs:hover span,
+.hotspot.light button.hs[aria-pressed='true'] span {
+  box-shadow: 0 0 0 var(--spacing-60) var(--overlay-lighter);
 }
 
 .hotspot button.hs:focus {
