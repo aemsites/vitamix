@@ -9,6 +9,7 @@ import {
   loadBlock,
 } from '../../scripts/aem.js';
 
+import loadColorSwatches from '../../scripts/color-swatches.js';
 import { getLocaleAndLanguage, formatPrice } from '../../scripts/scripts.js';
 
 /**
@@ -776,6 +777,7 @@ function buildFiltering(block, ph, config) {
 }
 
 export default async function decorate(block) {
+  await loadColorSwatches();
   const { locale, language } = getLocaleAndLanguage();
   const ph = await fetchPlaceholders(`/${locale}/${language}/products/config`);
   const config = readBlockConfig(block);

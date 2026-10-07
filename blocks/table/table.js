@@ -1,4 +1,5 @@
 import { toClassName } from '../../scripts/aem.js';
+import loadColorSwatches from '../../scripts/color-swatches.js';
 
 function buildRow(row, cellType = 'td') {
   const tr = document.createElement('tr');
@@ -89,7 +90,7 @@ function createColorSwatch(slug, label) {
 /**
  * Replace color name text in comparison table cells with visual swatches.
  * Uses a hidden .color-swatch probe element so getComputedStyle can resolve
- * --color-* variables defined in styles/color-swatches.css (imported via table.css).
+ * --color-* variables loaded from the shared color swatches configuration.
  * @param {HTMLTableElement} table
  */
 function replaceColorsRowWithSwatches(table) {
@@ -139,7 +140,8 @@ function replaceColorsRowWithSwatches(table) {
   probe.remove();
 }
 
-export default function decorate(block) {
+export default async function decorate(block) {
+  await loadColorSwatches();
   const table = document.createElement('table');
   const rows = [...block.children];
   const hasRowHeaders = block.classList.contains('row-headers');

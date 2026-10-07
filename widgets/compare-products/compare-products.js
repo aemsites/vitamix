@@ -1,6 +1,7 @@
 import {
   fetchPlaceholders, loadCSS, toClassName,
 } from '../../scripts/aem.js';
+import loadColorSwatches from '../../scripts/color-swatches.js';
 import { formatPrice } from '../../scripts/scripts.js';
 import {
   getCompareSlug, getStoredCompareSlugs, setStoredCompareItems, MAX_COMPARE_ITEMS,
@@ -621,8 +622,10 @@ export default async function decorate(widget) {
   const copy = await loadWidgetCopy(lang);
   const ph = await fetchPlaceholders(`/${locale}/${language}/products/config`);
 
-  loadCSS(`${window.hlx?.codeBasePath || ''}/widgets/compare-products/compare-products.css`);
-  loadCSS(`${window.hlx?.codeBasePath || ''}/styles/color-swatches.css`);
+  await Promise.all([
+    loadCSS(`${window.hlx?.codeBasePath || ''}/widgets/compare-products/compare-products.css`),
+    loadColorSwatches(),
+  ]);
 
   const gridEl = widget.querySelector('.compare-products-widget-grid');
   const addSectionEl = widget.querySelector('.compare-products-widget-add-section');

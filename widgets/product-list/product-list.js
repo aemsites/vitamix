@@ -2,6 +2,7 @@
 import {
   fetchPlaceholders, loadCSS, toClassName, createOptimizedPicture,
 } from '../../scripts/aem.js';
+import loadColorSwatches from '../../scripts/color-swatches.js';
 import { formatPrice, buildVideo } from '../../scripts/scripts.js';
 import { loadFragment } from '../../blocks/fragment/fragment.js';
 import addToCompare, { isInStoredCompare, getHeaderCompareHref } from '../../scripts/add-to-compare.js';
@@ -953,8 +954,10 @@ export default async function decorate(widget) {
   widget.productListFilterConfig = { ...baseConfig };
   widget.productListBaseConfig = { ...baseConfig };
 
-  loadCSS(`${window.hlx?.codeBasePath || ''}/widgets/product-list/product-list.css`);
-  loadCSS(`${window.hlx?.codeBasePath || ''}/styles/color-swatches.css`);
+  await Promise.all([
+    loadCSS(`${window.hlx?.codeBasePath || ''}/widgets/product-list/product-list.css`),
+    loadColorSwatches(),
+  ]);
 
   const toolbar = widget.querySelector('.product-list-toolbar');
   const filtersTrigger = widget.querySelector('.product-list-filters-trigger');
