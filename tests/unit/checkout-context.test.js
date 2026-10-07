@@ -6,6 +6,7 @@ import {
   getStandardCheckoutContext,
   buildExpressOrderPayload,
   expressPayloadMatchesCart,
+  formatCanadianPostal,
 } from '../../scripts/checkout-context.js';
 
 test('getStandardCheckoutContext describes form-based checkout', () => {
@@ -120,6 +121,26 @@ describe('buildExpressOrderPayload', () => {
     assert.equal(body.shipping.email, 'wallet@example.com');
   });
 
+  test('splits an unspaced Canadian wallet postal after the FSA', () => {
+    // The estimate token hashes `zip.split(' ')[0].split('-')[0]`; 'M5A1E1'
+    // would hash as 'M5A1E1' instead of the previewed 'M5A' and fail creation.
+    const wallet = { ...identity, shipping: { ...identity.shipping, zip: 'M5A1E1' } };
+    const body = buildExpressOrderPayload(estimatePayload, wallet);
+    assert.equal(body.shipping.zip, 'M5A 1E1');
+    assert.equal(body.shipping.zip.split(' ')[0].split('-')[0], estimatePayload.shipping.zip);
+  });
+
+  test('leaves US ZIP codes unchanged', () => {
+    const usPayload = {
+      ...estimatePayload,
+      country: 'us',
+      shipping: { country: 'us', state: 'OH', zip: '44101' },
+    };
+    const wallet = { ...identity, shipping: { ...identity.shipping, zip: '441011234' } };
+    const body = buildExpressOrderPayload(usPayload, wallet);
+    assert.equal(body.shipping.zip, '441011234');
+  });
+
   test('falls back to the previewed zip when the wallet has no postal', () => {
     const walletNoZip = { ...identity, shipping: { ...identity.shipping } };
     delete walletNoZip.shipping.zip;
@@ -211,5 +232,25 @@ describe('expressPayloadMatchesCart', () => {
   test('fails when the previewed payload is missing (nothing to replay)', () => {
     assert.equal(expressPayloadMatchesCart(undefined, items), false);
     assert.equal(expressPayloadMatchesCart(null, items), false);
+  });
+});
+
+describe('formatCanadianPostal', () => {
+  test('inserts a space after the FSA when there is no separator', () => {
+    assert.equal(formatCanadianPostal('L4G1G9'), 'L4G 1G9');
+  });
+
+  test('leaves postal codes that already have a space or dash unchanged', () => {
+    assert.equal(formatCanadianPostal('L4G 1G9'), 'L4G 1G9');
+    assert.equal(formatCanadianPostal('L4G-1G9'), 'L4G-1G9');
+  });
+
+  test('leaves an FSA-only or empty value unchanged', () => {
+    assert.equal(formatCanadianPostal('L4G'), 'L4G');
+    assert.equal(formatCanadianPostal(''), '');
+  });
+
+  test('trims surrounding whitespace', () => {
+    assert.equal(formatCanadianPostal(' L4G1G9 '), 'L4G 1G9');
   });
 });

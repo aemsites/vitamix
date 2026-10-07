@@ -41,6 +41,33 @@ export function getExpressCheckoutContext(paymentMethod, entryPoint) {
 }
 
 /**
+ * Splits a Canadian postal code saved without a separator into `FSA LDU`
+ * (`L4G1G9` -> `L4G 1G9`); values that already contain a space or dash are
+ * returned unchanged.
+ *
+ * Apple Pay previews with only the 3-character FSA, and the estimate token
+ * hashes the postal prefix (`zip.split(' ')[0].split('-')[0]`). An unspaced
+ * wallet postal would hash as `L4G1G9` instead of `L4G` and fail order
+ * creation with ADOBE_COMMERCE_CONSISTENCY_MISMATCH on `estimateToken`.
+ *
+ * @param {string} zip
+ * @returns {string}
+ */
+export function formatCanadianPostal(zip) {
+  const value = String(zip ?? '').trim();
+  if (value.length <= 3 || /[\s-]/.test(value)) return value;
+  return `${value.slice(0, 3)} ${value.slice(3)}`;
+}
+
+/**
+ * @param {Object} payload - previewed estimate payload
+ * @returns {boolean}
+ */
+function isCanada(payload) {
+  return String(payload?.shipping?.country ?? payload?.country ?? '').toLowerCase() === 'ca';
+}
+
+/**
  * Builds a wallet express order body by replaying the exact payload that minted
  * the estimate token and overlaying only the wallet-provided identity and the
  * token itself.
@@ -89,11 +116,14 @@ export function buildExpressOrderPayload(estimatePayload, identity) {
     // estimate token hashes only the postal prefix
     // (`zip.split(' ')[0].split('-')[0]`), so the full wallet postal still
     // matches the token. Falls back to the previewed zip when the wallet has
-    // none.
+    // none. A Canadian postal saved without a separator (`L4G1G9`) is split
+    // after the FSA so its hashed prefix stays `L4G` (see formatCanadianPostal).
     shipping: {
       ...shipping,
       ...orderFields.shipping,
-      ...(shipping?.zip ? { zip: shipping.zip } : {}),
+      ...(shipping?.zip ? {
+        zip: isCanada(orderFields) ? formatCanadianPostal(shipping.zip) : shipping.zip,
+      } : {}),
     },
     billing,
     estimateToken,
