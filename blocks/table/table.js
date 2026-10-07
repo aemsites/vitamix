@@ -140,14 +140,14 @@ function replaceColorsRowWithSwatches(table) {
   probe.remove();
 }
 
-export default async function decorate(block) {
-  await loadColorSwatches();
+export default function decorate(block) {
   const table = document.createElement('table');
   const rows = [...block.children];
   const hasRowHeaders = block.classList.contains('row-headers');
   const isComparison = block.classList.contains('comparison');
 
   if (isComparison) {
+    loadColorSwatches();
     const comparisonTable = buildComparisonTable(rows);
     const scrollWrapper = document.createElement('div');
     scrollWrapper.className = 'table-comparison-scroll';

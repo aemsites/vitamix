@@ -777,7 +777,7 @@ function buildFiltering(block, ph, config) {
 }
 
 export default async function decorate(block) {
-  await loadColorSwatches();
+  loadColorSwatches();
   const { locale, language } = getLocaleAndLanguage();
   const ph = await fetchPlaceholders(`/${locale}/${language}/products/config`);
   const config = readBlockConfig(block);

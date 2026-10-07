@@ -41,10 +41,8 @@ export default async function decorate(widget) {
   const ph = await fetchPlaceholders(`/${locale}/${language}/products/config`);
 
   // Load PLP block styles so product cards match the PLP block
-  await Promise.all([
-    loadCSS(`${window.hlx?.codeBasePath || ''}/blocks/plp/plp.css`),
-    loadColorSwatches(),
-  ]);
+  loadCSS(`${window.hlx?.codeBasePath || ''}/blocks/plp/plp.css`);
+  loadColorSwatches();
 
   const resultsEl = widget.querySelector('.plp-results');
   const countEl = widget.querySelector('#sales-plp-results-count');

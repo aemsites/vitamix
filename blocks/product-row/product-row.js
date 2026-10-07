@@ -419,7 +419,7 @@ async function buildProductRowGrid(block, ph, colorOverride) {
 }
 
 export default async function decorate(block) {
-  await loadColorSwatches();
+  loadColorSwatches();
   const { locale, language } = getLocaleAndLanguage();
   const ph = await fetchPlaceholders(`/${locale}/${language}/products/config`);
   const colorOverride = getMarketingColor(block);

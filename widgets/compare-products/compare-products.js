@@ -622,10 +622,8 @@ export default async function decorate(widget) {
   const copy = await loadWidgetCopy(lang);
   const ph = await fetchPlaceholders(`/${locale}/${language}/products/config`);
 
-  await Promise.all([
-    loadCSS(`${window.hlx?.codeBasePath || ''}/widgets/compare-products/compare-products.css`),
-    loadColorSwatches(),
-  ]);
+  loadCSS(`${window.hlx?.codeBasePath || ''}/widgets/compare-products/compare-products.css`);
+  loadColorSwatches();
 
   const gridEl = widget.querySelector('.compare-products-widget-grid');
   const addSectionEl = widget.querySelector('.compare-products-widget-add-section');

@@ -954,10 +954,8 @@ export default async function decorate(widget) {
   widget.productListFilterConfig = { ...baseConfig };
   widget.productListBaseConfig = { ...baseConfig };
 
-  await Promise.all([
-    loadCSS(`${window.hlx?.codeBasePath || ''}/widgets/product-list/product-list.css`),
-    loadColorSwatches(),
-  ]);
+  loadCSS(`${window.hlx?.codeBasePath || ''}/widgets/product-list/product-list.css`);
+  loadColorSwatches();
 
   const toolbar = widget.querySelector('.product-list-toolbar');
   const filtersTrigger = widget.querySelector('.product-list-filters-trigger');

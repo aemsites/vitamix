@@ -29,7 +29,7 @@ function buildColorSwatchesCSS(data) {
 
 /**
  * Load color swatches from the shared configuration and expose them as CSS variables.
- * @returns {Promise<void>} Resolves when the color swatch style has been added
+ * @returns {Promise<void>} Resolves when loading is complete; failures are logged and non-fatal
  */
 export default function loadColorSwatches() {
   if (!colorSwatchesPromise) {
@@ -49,7 +49,9 @@ export default function loadColorSwatches() {
       style.textContent = css;
     })().catch((error) => {
       colorSwatchesPromise = undefined;
-      throw error;
+      // Swatch colors are cosmetic; a missing config must not block page rendering.
+      // eslint-disable-next-line no-console
+      console.warn('color-swatches: failed to load configuration', error);
     });
   }
 

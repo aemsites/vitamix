@@ -352,7 +352,7 @@ function hasAddToCartButton(container) {
  * @param {Element} block - The PDP block element
  */
 export default async function decorate(block) {
-  await loadColorSwatches();
+  loadColorSwatches();
   const { jsonLdData, variants } = window;
   const { custom, offers } = jsonLdData;
   const { locale, language } = getLocaleAndLanguage();
