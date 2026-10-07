@@ -182,14 +182,6 @@ export function isVariantAvailableForSale(variant) {
  * actual "Add to Cart" button, as opposed to a "Find Locally"/"Find Dealer"
  * CTA (rendered as `<a>` links) or an empty/hidden container (coming-soon,
  * out-of-stock bundles, or an authored `addToCart=No` override).
- *
- * NOTE: `pdp.js` and `options.js` currently keep their own inlined copies of
- * this logic rather than importing it from here — see the identical helpers
- * in those files for why (a stale cached add-to-cart.js without this export
- * could otherwise break their static import and leave the PDP block
- * undecorated). Once the CDN cache TTL for the rollout that introduced this
- * export has comfortably elapsed, those inlined copies can be deleted and
- * replaced with `import { hasAddToCartButton } from './add-to-cart.js'`.
  * @param {HTMLElement|string|null} container - Container returned by renderAddToCart
  * @returns {boolean} True if an "Add to Cart" button is present
  */
