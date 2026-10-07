@@ -248,6 +248,9 @@ async function renderFreeGift() {
      * @param {string} dateStr - The datetime string to parse
      * @returns {Date|null} The parsed Date or null if empty
      */
+    if (window.jsonLdData?.custom?.isCommercial === true) {
+      return null;
+    }
     const parseDateOrNull = (dateStr) => {
       const trimmed = dateStr?.trim();
       if (!trimmed) {
