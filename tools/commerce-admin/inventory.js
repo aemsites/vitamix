@@ -407,7 +407,7 @@ const MANAGED_INVENTORY_CONFIG_URL = 'https://main--vitamix--aemsites.aem.page/u
 function normalizeSkuForConfigMatch(sku) {
   return String(sku || '').trim().toUpperCase()
     .replace(/^0+(?=.)/, '')
-    .replace(/-[A-Z0-9]+$/, '');
+    .replace(/-\d+$/, '');
 }
 
 /** @param {unknown} market */

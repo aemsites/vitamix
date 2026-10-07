@@ -1,7 +1,4 @@
-import {
-  normalizeProductPath,
-  startCatalogExportImport,
-} from './commerce-catalog-io.js';
+import { startCatalogExportImport } from './commerce-catalog-io.js';
 import { showToast } from './commerce-otp-ui.js';
 
 const AEM_BASE = 'https://main--vitamix--aemsites.aem.network';
@@ -10,7 +7,6 @@ const CORS_KEY = '&key=Mg23N96GgR8O3NjU';
 
 const CATALOG_PARAM = 'catalog';
 const PRODUCT_PARAM = 'product';
-const CATEGORY_PARAM = 'category';
 
 let currentLocalePath = 'us/en_us';
 
@@ -82,39 +78,23 @@ export function resolveImageUrlForLocale(localePath, imagePath) {
  * @param {string} localePath
  * @returns {Promise<{ data?: object[] } | object[]>}
  */
-export async function fetchProductsIndexForLocale(localePath, fetchOptions = {}) {
+export async function fetchProductsIndexForLocale(localePath) {
   const clean = String(localePath || '').replace(/^\/+/, '').replace(/\/+$/, '');
   const indexUrl = `${AEM_BASE}/${clean}/products/index.json?include=all`;
   const url = CORS_PROXY + encodeURIComponent(indexUrl) + CORS_KEY;
-  const response = await fetch(url, fetchOptions);
+  const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
   }
   return response.json();
 }
 
-/** Fetch and merge the main and commercial indexes for the catalog grid. */
-/** Fetch and merge the main and commercial indexes for a locale. */
-export async function fetchCatalogIndexForLocale(localePath) {
-  const clean = String(localePath || '').replace(/^\/+/, '').replace(/\/+$/, '');
-  const commercialUrl = `${AEM_BASE}/${clean}/products/commercial/index.json?include=all`;
-  const [main, commercial] = await Promise.all([
-    fetchProductsIndexForLocale(localePath, { cache: 'no-store' }),
-    fetch(CORS_PROXY + encodeURIComponent(commercialUrl) + CORS_KEY, { cache: 'no-store' })
-      .then((resp) => (resp.ok ? resp.json() : []))
-      .catch(() => []),
-  ]);
-  const rows = (json) => (Array.isArray(json) ? json : json?.data || []);
-  const commercialRows = rows(commercial).map((row) => (
-    typeof row.image === 'string' && row.image.startsWith('./')
-      ? { ...row, image: `./commercial/${row.image.slice(2)}` }
-      : row
-  ));
-  return { data: [...rows(main), ...commercialRows] };
-}
-
-export function fetchProductsIndex() {
-  return fetchCatalogIndexForLocale(currentLocalePath);
+/**
+ * Fetch products index via CORS proxy (same as recipe tool).
+ * @returns {Promise<{ data: Array<object> }>}
+ */
+export async function fetchProductsIndex() {
+  return fetchProductsIndexForLocale(currentLocalePath);
 }
 
 /**
@@ -152,7 +132,6 @@ export function getVariantProducts(data) {
  * @returns {number}
  */
 export function getVariantCount(variantSkus) {
-  if (Array.isArray(variantSkus)) return variantSkus.length;
   if (!variantSkus || typeof variantSkus !== 'string') return 0;
   return variantSkus.split(',').map((s) => s.trim()).filter(Boolean).length;
 }
@@ -243,56 +222,11 @@ let sortState = { key: 'title', dir: 1 };
 /** @type {Array<object>} */
 let allParents = [];
 
-/** Category slug selected by clicking a tag ('' = no filter). */
-let categoryFilter = '';
-
-function splitList(raw) {
-  if (Array.isArray(raw)) return raw.map((x) => String(x).trim()).filter(Boolean);
-  if (typeof raw !== 'string') return [];
-  return raw.split(',').map((s) => s.trim()).filter(Boolean);
-}
-
-/**
- * Display names (`categories`) paired with slugs (`categoriesUrlKey`) from an index row.
- * @returns {{ name: string, slug: string }[]}
- */
-function productCategories(p) {
-  const customCategories = Array.isArray(p.custom?.categories) ? p.custom.categories : [];
-  const names = splitList(p.categories).length
-    ? splitList(p.categories)
-    : customCategories.map((category) => category.name || category.url_key || category.urlKey);
-  const slugs = splitList(p.categoriesUrlKey).length
-    ? splitList(p.categoriesUrlKey)
-    : customCategories.map((category) => category.url_key || category.urlKey || category.name);
-  const byName = (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
-  if (!names.length) return slugs.map((slug) => ({ name: slug, slug })).sort(byName);
-  const aligned = slugs.length === names.length;
-  return names.map((name, i) => ({ name, slug: aligned ? slugs[i] : name.toLowerCase() }))
-    .sort(byName);
-}
-
-/** Stable color per category so the same tag looks the same on every row. */
-function categoryColorIndex(slug) {
-  let hash = 0;
-  for (let i = 0; i < slug.length; i += 1) hash = (hash * 31 + slug.charCodeAt(i)) % 9973;
-  return hash % 5;
-}
-
-function categoryNameForSlug(slug) {
-  const match = allParents.map(productCategories).flat().find((c) => c.slug === slug);
-  return match ? match.name : slug;
-}
-
 export function getUrlKeyFromProduct(p) {
-  return p.urlKey
-    || (p.path ? normalizeProductPath(p.path).split('/').pop() : '')
-    || (p.url ? p.url.replace(/\/$/, '').split('/').pop() : '')
-    || p.sku
-    || '';
+  return p.urlKey || (p.url ? p.url.replace(/\/$/, '').split('/').pop() : '') || p.sku || '';
 }
 
 export function getProductRefFromIndex(p, localePath) {
-  if (p.path) return normalizeProductPath(p.path);
   if (p.url) {
     try {
       const prefix = `/${localePath}/products/`;
@@ -306,13 +240,10 @@ export function getProductRefFromIndex(p, localePath) {
 }
 
 function enrichForSort(p) {
-  const price = p.price && typeof p.price === 'object'
-    ? (p.price.final ?? p.price.regular)
-    : p.price;
   return {
     ...p,
-    _variants: getVariantCount(p.variantSkus || p.variants),
-    _priceNum: price != null ? Number(price) : NaN,
+    _variants: getVariantCount(p.variantSkus),
+    _priceNum: p.price != null ? Number(p.price) : NaN,
   };
 }
 
@@ -338,26 +269,20 @@ function sortProducts(products, key, dir) {
 function matchesQuery(product, q) {
   if (!q || !q.trim()) return true;
   const term = q.trim().toLowerCase();
-  const title = (product.title || product.name || product.sku || '').toLowerCase();
+  const title = (product.title || product.sku || '').toLowerCase();
   const sku = (product.sku || '').toLowerCase();
   const availability = (product.availability || '').toLowerCase();
-  const price = product.price && typeof product.price === 'object'
-    ? (product.price.final ?? product.price.regular)
-    : product.price;
-  const priceStr = (price != null ? String(price) : '').toLowerCase();
-  const categories = productCategories(product).map((c) => c.name).join(' ').toLowerCase();
+  const priceStr = (product.price != null ? String(product.price) : '').toLowerCase();
   return (
     title.includes(term)
     || sku.includes(term)
     || availability.includes(term)
     || priceStr.includes(term)
-    || categories.includes(term)
   );
 }
 
 function filterAndSortParents(query) {
-  const filtered = allParents.filter((p) => matchesQuery(p, query)
-    && (!categoryFilter || productCategories(p).some((c) => c.slug === categoryFilter)));
+  const filtered = allParents.filter((p) => matchesQuery(p, query));
   const enriched = filtered.map(enrichForSort);
   return sortProducts(enriched, sortState.key, sortState.dir);
 }
@@ -383,19 +308,15 @@ export function renderProductList(parents, query = '') {
   countEl.textContent = `${parents.length} product${plural}`;
 
   parents.forEach((product) => {
-    const variantCount = getVariantCount(product.variantSkus || product.variants);
-    const image = product.image || product.images?.[0]?.url || product.images?.[0];
-    const imgUrl = resolveImageUrl(image);
+    const variantCount = getVariantCount(product.variantSkus);
+    const imgUrl = resolveImageUrl(product.image);
     const availability = product.availability || '—';
     const availabilityClass = (availability || '').toLowerCase().replace(/\s+/g, '-');
-    const rawPrice = product.price && typeof product.price === 'object'
-      ? (product.price.final ?? product.price.regular)
-      : product.price;
-    const price = rawPrice != null ? String(rawPrice) : '';
+    const price = product.price != null ? String(product.price) : '';
     const urlKey = getUrlKeyFromProduct(product);
     const productRef = getProductRefFromIndex(product, currentLocalePath);
 
-    const title = product.title || product.name || product.sku;
+    const title = product.title || product.sku;
     const tr = document.createElement('tr');
     const selectedProduct = readProductFromParams();
     tr.className = `pim-row${selectedProduct && productRef === selectedProduct ? ' pim-row-selected' : ''}`;
@@ -406,11 +327,6 @@ export function renderProductList(parents, query = '') {
     const thumbCell = imgUrl
       ? `<img src="${escapeHtml(imgUrl)}" alt="" loading="lazy" width="48" height="48" class="pim-thumb-img" />`
       : '<span class="pim-thumb-placeholder" aria-hidden="true"></span>';
-    const categoryTags = productCategories(product).map(({ name, slug }) => {
-      const active = slug === categoryFilter ? ' pim-cat-tag-active' : '';
-      const label = slug === categoryFilter ? `Clear category filter ${name}` : `Filter by category ${name}`;
-      return `<button type="button" class="pim-cat-tag pim-cat-tag-i${categoryColorIndex(slug)}${active}" data-category="${escapeHtml(slug)}" title="${escapeHtml(label)}">${highlightMatch(name, query)}</button>`;
-    }).join('');
     tr.innerHTML = `
       <td class="pim-col-thumb">${thumbCell}</td>
       <td class="pim-col-product pim-cell-title">${highlightMatch(title, query)}</td>
@@ -419,7 +335,6 @@ export function renderProductList(parents, query = '') {
       <td class="pim-col-availability">
         <span class="pim-card-availability ${availabilityClass}">${highlightMatch(availability, query)}</span>
       </td>
-      <td class="pim-col-categories"><div class="pim-cat-tags">${categoryTags || '—'}</div></td>
       <td class="pim-col-price pim-cell-price">${price ? highlightMatch(price, query) : '—'}</td>
     `;
     tbody.appendChild(tr);
@@ -439,25 +354,10 @@ export function renderProductList(parents, query = '') {
   updateSortHeaders();
 }
 
-function renderCategoryFilterChip() {
-  const chip = document.getElementById('categoryFilterChip');
-  if (!chip) return;
-  chip.hidden = !categoryFilter;
-  const label = chip.querySelector('.pim-cat-filter-name');
-  if (label) label.textContent = categoryFilter ? categoryNameForSlug(categoryFilter) : '';
-}
-
-function setCategoryFilter(slug) {
-  categoryFilter = slug;
-  updateUrlParams({ [CATEGORY_PARAM]: slug || null });
-  refreshList();
-}
-
 function refreshList() {
   const query = document.getElementById('searchInput').value;
   const list = filterAndSortParents(query);
   renderProductList(list, query);
-  renderCategoryFilterChip();
 }
 
 async function loadIndex() {
@@ -496,7 +396,6 @@ export async function init() {
   errorEl.classList.remove('active');
 
   const catalogFromUrl = readCatalogFromParams();
-  categoryFilter = getParams().get(CATEGORY_PARAM) || '';
   if (catalogFromUrl) {
     indexSelect.value = catalogFromUrl;
     currentLocalePath = catalogFromUrl;
@@ -536,22 +435,13 @@ export async function init() {
       });
     });
 
-    document.getElementById('categoryFilterClear')?.addEventListener('click', () => setCategoryFilter(''));
-
     document.getElementById('productList').addEventListener('click', (e) => {
-      const tag = e.target.closest('.pim-cat-tag');
-      if (tag) {
-        const slug = tag.dataset.category || '';
-        setCategoryFilter(slug === categoryFilter ? '' : slug);
-        return;
-      }
       const row = e.target.closest('tr.pim-row');
       if (!row || !row.dataset.product) return;
       const catalog = currentLocalePath ? `catalog=${encodeURIComponent(currentLocalePath)}&` : '';
       window.location.href = `product-detail.html?${catalog}product=${encodeURIComponent(row.dataset.product)}`;
     });
     document.getElementById('productList').addEventListener('keydown', (e) => {
-      if (e.target.closest('.pim-cat-tag')) return;
       const row = e.target.closest('tr.pim-row');
       if (!row || !row.dataset.product) return;
       if (e.key === 'Enter' || e.key === ' ') {
