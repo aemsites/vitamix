@@ -195,7 +195,7 @@ function categoryNameKey(name) {
   return String(name).trim().toLocaleLowerCase();
 }
 
-function categorySlugFromName(name) {
+export function categorySlugFromName(name) {
   return String(name).normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
@@ -219,9 +219,31 @@ function productSlug(product) {
   return String(product?.urlKey || product?.path?.split('/').pop() || '').trim();
 }
 
+function categoryExportProducts(products) {
+  const byPath = new Map();
+  products.forEach((product) => {
+    const path = normalizeProductPath(product.path);
+    if (!path) throw new Error('Cannot export categories for a product without a full path.');
+    if (!byPath.has(path)) byPath.set(path, product);
+  });
+  return [...byPath.values()];
+}
+
+function categoryExportCollisions(products) {
+  const bySlug = new Map();
+  categoryExportProducts(products).forEach((product) => {
+    const slug = productSlug(product);
+    if (!bySlug.has(slug)) bySlug.set(slug, []);
+    bySlug.get(slug).push(normalizeProductPath(product.path));
+  });
+  return new Map([...bySlug].filter(([, paths]) => paths.length > 1));
+}
+
 export function catalogCategoriesTsv(products) {
-  return `${[CATEGORY_TSV_HEADER, ...products.map((product) => (
-    `${productSlug(product)}\t${categoryNames(product).join(', ')}`
+  const unique = categoryExportProducts(products);
+  const collisions = categoryExportCollisions(unique);
+  return `${[CATEGORY_TSV_HEADER, ...unique.map((product) => (
+    `${collisions.has(productSlug(product)) ? normalizeProductPath(product.path) : productSlug(product)}\t${categoryNames(product).join(', ')}`
   ))].join('\n')}\n`;
 }
 
@@ -230,15 +252,14 @@ export function parseCategoriesTsv(text) {
   if (lines.shift()?.replace(/^\uFEFF/, '').trim().toLowerCase() !== CATEGORY_TSV_HEADER.toLowerCase()) {
     throw new Error('Categories TSV must start with Slug and Categories columns.');
   }
-  const seen = new Set();
   return lines.filter((line) => line.trim()).map((line, index) => {
     const cells = line.split('\t');
     const slug = cells[0]?.trim();
-    if (cells.length !== 2 || !slug || /[\\/\r\n]/.test(slug)) {
-      throw new Error(`Row ${index + 2}: expected a product slug and comma-separated categories.`);
+    const fullPath = /^\/[^/]+\/[^/]+\/(?:commercial\/)?products\/[^\\\r\n]+$/.test(slug || '');
+    if (cells.length !== 2 || !slug || /[\\\r\n]/.test(slug)
+      || (slug.includes('/') && !fullPath)) {
+      throw new Error(`Row ${index + 2}: expected a product slug or full path and categories.`);
     }
-    if (seen.has(slug)) throw new Error(`Row ${index + 2}: duplicate slug ${slug}.`);
-    seen.add(slug);
     const categories = cells[1].split(',').map((value) => value.trim()).filter(Boolean);
     if (new Set(categories.map(categoryNameKey)).size !== categories.length) {
       throw new Error(`Row ${index + 2}: duplicate category name.`);
@@ -249,27 +270,119 @@ export function parseCategoriesTsv(text) {
 
 export function categoryPreviewRows(rows, existingByPath) {
   const bySlug = new Map();
+  const byPath = new Map();
+  const slugCounts = new Map();
+  rows.forEach(({ slug }) => slugCounts.set(slug, (slugCounts.get(slug) || 0) + 1));
   const known = knownCategoriesByName([...existingByPath.values()]);
   existingByPath.forEach((product, path) => {
+    const normalizedPath = normalizeProductPath(path);
+    if (byPath.has(normalizedPath)) return;
+    byPath.set(normalizedPath, { product, path: normalizedPath });
     const slug = productSlug(product);
     if (!bySlug.has(slug)) bySlug.set(slug, []);
-    bySlug.get(slug).push({ product, path });
+    bySlug.get(slug).push({ product, path: normalizedPath });
   });
-  return rows.map((row) => {
-    const matches = bySlug.get(row.slug) || [];
+  const preview = rows.map((row) => {
+    const matches = row.slug.startsWith('/')
+      ? [byPath.get(normalizeProductPath(row.slug))].filter(Boolean) : bySlug.get(row.slug) || [];
     const existing = matches.length === 1 ? matches[0].product : null;
     const before = categoryNames(existing);
-    const after = existing
-      ? categoryNames(withCategories(existing, row.categories, known)) : row.categories;
+    const updated = existing ? withCategories(existing, row.categories, known) : null;
+    const beforeCategories = existing?.custom?.categories || [];
+    const target = updated || withCategories({}, row.categories, known);
+    const afterCategories = target.custom.categories;
+    const after = updated ? categoryNames(updated) : row.categories;
     let kind = 'missing';
     if (matches.length > 1) kind = 'ambiguous';
     else if (existing) {
-      kind = JSON.stringify(before) === JSON.stringify(after) ? 'same' : 'update';
+      kind = jsonEqual(beforeCategories, afterCategories) ? 'same' : 'update';
     }
     return {
-      ...row, path: matches[0]?.path, before, after, kind,
+      ...row,
+      path: matches[0]?.path,
+      matchingPaths: matches.map((match) => match.path),
+      before,
+      after,
+      beforeCategories,
+      afterCategories,
+      kind,
     };
   });
+  const categoryNamesBySlug = new Map();
+  const collectCategories = (categories) => {
+    categories.forEach((category) => {
+      const slug = category.url_key || category.urlKey;
+      const { name } = category;
+      if (!slug || !name) return;
+      if (!categoryNamesBySlug.has(slug)) categoryNamesBySlug.set(slug, new Map());
+      categoryNamesBySlug.get(slug).set(categoryNameKey(name), name);
+    });
+  };
+  known.forEach((category) => collectCategories([{
+    ...category,
+    url_key: categorySlugFromName(category.name || category.url_key || category.urlKey),
+  }]));
+  preview.forEach((row) => collectCategories(row.afterCategories));
+  return preview.map((row) => {
+    const warnings = [];
+    if (row.kind === 'ambiguous') {
+      warnings.push(`Different product paths share this slug: ${row.matchingPaths.join(', ')}. Use a full path to identify the product.`);
+    }
+    if (slugCounts.get(row.slug) > 1) {
+      warnings.push('Duplicate product slug. Selected rows apply in TSV order; the last one wins.');
+    }
+    const collisions = new Set();
+    row.afterCategories.forEach((category) => {
+      const slug = category.url_key || category.urlKey;
+      const names = categoryNamesBySlug.get(slug);
+      if (names?.size > 1 && !collisions.has(slug)) {
+        collisions.add(slug);
+        warnings.push(`Category slug "${slug}" is shared by different names: ${
+          [...names.values()].join(', ')
+        }.`);
+      }
+    });
+    return { ...row, warnings };
+  });
+}
+
+function categoryDiffHtml(before, after) {
+  const fields = (category) => ({
+    name: category.name || category.url_key || category.urlKey || '',
+    slug: category.url_key || category.urlKey || '',
+  });
+  const fieldDiff = (oldValue, newValue) => (oldValue === newValue
+    ? escapeHtml(newValue)
+    : `<del class="pim-io-category-diff-del">${escapeHtml(oldValue)}</del>
+      <span class="pim-io-category-diff-add">${escapeHtml(newValue)}</span>`);
+  const remaining = [...before];
+  const additions = after.map((category) => {
+    const next = fields(category);
+    let index = remaining.findIndex((current) => jsonEqual(current, category));
+    if (index < 0) {
+      index = remaining.findIndex((current) => fields(current).name === next.name);
+    }
+    if (index < 0) {
+      index = remaining.findIndex((current) => fields(current).slug === next.slug);
+    }
+    if (index < 0) return { category, type: 'add' };
+    const [previous] = remaining.splice(index, 1);
+    return { category, previous, type: 'same' };
+  });
+  const lines = [...remaining.map((category) => ({ category, type: 'del' })), ...additions];
+  return lines.map(({ category, previous, type }) => {
+    const { name, slug } = fields(category);
+    if (previous) {
+      const old = fields(previous);
+      return `<div class="pim-io-category-diff-same">${fieldDiff(old.name, name)}
+        [${fieldDiff(old.slug, slug)}]</div>`;
+    }
+    const label = escapeHtml(`${name} [${slug}]`);
+    const sign = { add: '+', del: '-', same: ' ' }[type];
+    const text = type === 'del' ? `<del>${label}</del>` : label;
+    return `<div class="pim-io-category-diff-${type}">
+      <span aria-hidden="true">${sign}</span> ${text}</div>`;
+  }).join('') || '—';
 }
 
 function categoryPreviewHtml(rows) {
@@ -278,18 +391,20 @@ function categoryPreviewHtml(rows) {
     let status = statusBadge(row.kind);
     if (row.kind === 'missing') status = 'Not found';
     if (row.kind === 'ambiguous') status = 'Ambiguous slug';
-    return `<tr>
+    const warnings = row.warnings.map((warning) => (
+      `<div class="pim-io-category-warning">${escapeHtml(warning)}</div>`
+    )).join('');
+    return `<tr${row.warnings.length ? ' class="pim-io-category-row-warning"' : ''}>
     <td>${row.kind === 'update' ? `<input type="checkbox" data-pim-io-select value="${index}" aria-label="Select ${escapeHtml(row.slug)} category change">` : ''}</td>
-    <td>${status}</td>
+    <td>${status}${warnings}</td>
     <td>${escapeHtml(row.slug)}</td>
-    <td>${escapeHtml(row.before.join(', ')) || '—'}</td>
-    <td>${escapeHtml(row.after.join(', ')) || '—'}</td>
+    <td>${categoryDiffHtml(row.beforeCategories, row.afterCategories)}</td>
   </tr>`;
   }).join('');
   return `<table class="pim-io-category-table" aria-label="Category import differences">
     <thead><tr><th scope="col">${selectable ? '<input type="checkbox" data-pim-io-select-all aria-label="Select all category changes">' : ''}</th>
-      <th scope="col">Status</th><th scope="col">Slug</th><th scope="col">Current categories</th><th scope="col">Imported categories</th></tr></thead>
-    <tbody>${body || '<tr><td colspan="5">No products in this TSV.</td></tr>'}</tbody>
+      <th scope="col">Status</th><th scope="col">Slug</th><th scope="col">Category changes</th></tr></thead>
+    <tbody>${body || '<tr><td colspan="4">No products in this TSV.</td></tr>'}</tbody>
   </table>`;
 }
 
@@ -297,10 +412,14 @@ export function withCategories(product, names, knownByName = new Map()) {
   const local = knownCategoriesByName([product]);
   const categories = names.map((name) => {
     const known = local.get(categoryNameKey(name)) || knownByName.get(categoryNameKey(name));
-    if (known) return known;
     const slug = categorySlugFromName(name);
     if (!slug) throw new Error(`Cannot derive a category slug from "${name}".`);
-    return { url_key: slug, name };
+    return {
+      ...known,
+      ...(known && Object.hasOwn(known, 'urlKey') ? { urlKey: slug } : {}),
+      url_key: slug,
+      name,
+    };
   });
   return { ...product, custom: { ...product.custom, categories } };
 }
@@ -310,7 +429,8 @@ async function applyCategoryChanges(rows, existingByPath, onProgress) {
   const failed = [];
   let done = 0;
   const known = knownCategoriesByName([...existingByPath.values()]);
-  await mapWithConcurrency(rows, WRITE_CONCURRENCY, async (row) => {
+  const hasDuplicates = new Set(rows.map((row) => row.path)).size !== rows.length;
+  await mapWithConcurrency(rows, hasDuplicates ? 1 : WRITE_CONCURRENCY, async (row) => {
     try {
       const product = await fetchCatalogProduct(row.path);
       if (!product) throw new Error('Product not found');
@@ -589,7 +709,7 @@ export function openCatalogExportImportDialog({
       if (textarea) textarea.value = mode === 'json' ? jsonText : categoriesText;
       if (hintEl) {
         hintEl.innerHTML = mode === 'json' ? hint
-          : `TSV of product slugs and comma-separated category names in <strong>${escapeHtml(locale)}</strong>. Edit or paste, then Preview import.`;
+          : `TSV of product slugs (full paths when slugs collide) and comma-separated category names in <strong>${escapeHtml(locale)}</strong>. Import regenerates all category slugs from display names. Edit or paste, then Preview import.`;
       }
       if (labelEl) labelEl.textContent = mode === 'json' ? 'Product JSON' : 'Categories TSV';
       setStatus('');
@@ -695,11 +815,20 @@ export function openCatalogExportImportDialog({
           const rows = parseCategoriesTsv(textarea?.value ?? '');
           setBusy(true, 'Comparing with catalog…');
           const knownSlugs = new Set([...liveExisting.values()].map(productSlug));
-          const missing = rows.filter((row) => !knownSlugs.has(row.slug));
+          const missing = rows.filter((row) => (
+            row.slug.startsWith('/')
+              ? !liveExisting.has(normalizeProductPath(row.slug)) : !knownSlugs.has(row.slug)
+          ));
           const fetched = await mapWithConcurrency(missing, FETCH_CONCURRENCY, async (row) => {
-            const path = `/${locale}/products/${row.slug}`;
+            const path = row.slug.startsWith('/')
+              ? normalizeProductPath(row.slug) : `/${locale}/products/${row.slug}`;
+            if (!productInLocale(path, locale)) {
+              throw new Error(`Product path is outside the selected catalog: ${path}`);
+            }
             const product = await fetchCatalogProduct(path);
-            return product && productSlug(product) === row.slug ? [path, product] : null;
+            return product && (row.slug.startsWith('/')
+              ? normalizeProductPath(product.path) === path
+              : productSlug(product) === row.slug) ? [path, product] : null;
           });
           fetched.filter(Boolean).forEach(([path, product]) => liveExisting.set(path, product));
           categoryRows = categoryPreviewRows(rows, liveExisting);
@@ -847,6 +976,14 @@ export function openCatalogExportImportDialog({
         if (!dialog.isConnected) return;
         jsonText = text;
         categoriesText = catalogCategoriesTsv([...liveExisting.values()]);
+        const collisions = categoryExportCollisions([...liveExisting.values()]);
+        if (collisions.size) {
+          const message = `Different product paths share category export slugs.\n\n${
+            [...collisions].map(([slug, paths]) => `${slug}:\n${paths.join('\n')}`).join('\n\n')
+          }\n\nAll products are exported using full paths to avoid ambiguity.`;
+          // eslint-disable-next-line no-alert -- acknowledge export collisions before continuing
+          window.alert(message);
+        }
         if (textarea) textarea.value = mode === 'json' ? jsonText : categoriesText;
         if (loadProgress instanceof HTMLElement) loadProgress.hidden = true;
         setBusy(false);

@@ -1,5 +1,6 @@
-import { startCatalogExportImport } from './commerce-catalog-io.js';
+import { categorySlugFromName, startCatalogExportImport } from './commerce-catalog-io.js';
 import { showToast } from './commerce-otp-ui.js';
+import { getApiEnvironment } from './commerce-otp-api.js';
 
 const AEM_BASE = 'https://main--vitamix--aemsites.aem.network';
 const CORS_PROXY = 'https://fcors.org/?url=';
@@ -367,12 +368,23 @@ export function renderProductList(parents, query = '') {
       : '<span class="pim-thumb-placeholder" aria-hidden="true"></span>';
     const categoryTags = productCategories(product).map(({ name, slug }) => {
       const active = slug === categoryFilter ? ' pim-cat-tag-active' : '';
-      const label = slug === categoryFilter
+      let label = slug === categoryFilter
         ? `Clear category filter ${name}` : `Filter by category ${name}`;
+      const expectedSlug = categorySlugFromName(name);
+      const mismatchedSlug = slug !== expectedSlug;
+      let slugNote = '';
+      if (mismatchedSlug) {
+        label += `. Stored slug: ${slug}; generated slug: ${expectedSlug}`;
+        slugNote = ` <span class="pim-cat-slug">[${escapeHtml(slug)}]</span>`;
+      }
+      const warning = mismatchedSlug
+        ? '<span class="pim-cat-slug-warning" aria-hidden="true">!</span> ' : '';
       const colorClass = `pim-cat-tag-i${categoryColorIndex(slug)}`;
-      return `<button type="button" class="pim-cat-tag ${colorClass}${active}"
+      const warningClass = mismatchedSlug ? ' pim-cat-tag-warning' : '';
+      return `<button type="button" class="pim-cat-tag ${colorClass}${active}${warningClass}"
         data-category="${escapeHtml(slug)}" title="${escapeHtml(label)}"
-        >${highlightMatch(name, query)}</button>`;
+        aria-label="${escapeHtml(label)}"
+        >${warning}${highlightMatch(name, query)}${slugNote}</button>`;
     }).join('');
     tr.innerHTML = `
       <td class="pim-col-thumb">${thumbCell}</td>
@@ -526,14 +538,20 @@ export async function init() {
 
     const ioBtn = document.getElementById('catalogExportImportBtn');
     if (ioBtn instanceof HTMLButtonElement) {
+      ioBtn.disabled = getApiEnvironment() !== 'prod';
       ioBtn.addEventListener('click', async () => {
+        if (getApiEnvironment() !== 'prod') {
+          ioBtn.disabled = true;
+          showToast('Export / import is only available in production.', 'error');
+          return;
+        }
         ioBtn.disabled = true;
         try {
           await startCatalogExportImport({ locale: currentLocalePath });
         } catch (err) {
           showToast(err.message || 'Failed to export / import catalog', 'error');
         } finally {
-          ioBtn.disabled = false;
+          ioBtn.disabled = getApiEnvironment() !== 'prod';
         }
       });
     }

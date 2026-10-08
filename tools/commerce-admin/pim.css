@@ -254,6 +254,15 @@ body {
   filter: brightness(0.95);
 }
 
+.pim-cat-slug-warning {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.pim-cat-tag-warning {
+  border-color: #b91c1c;
+}
+
 .pim-cat-tag-i0 {
   background: #dbeafe;
   color: #1e40af;
@@ -621,6 +630,33 @@ body {
   border-collapse: collapse;
   font-size: 13px;
   text-align: left;
+}
+
+.pim-io-category-row-warning {
+  background: #fff4d6;
+}
+
+.pim-io-category-warning {
+  margin-top: 4px;
+  color: #92400e;
+  font-weight: 600;
+}
+
+.pim-io-category-diff-del {
+  padding: 2px 4px;
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.pim-io-category-diff-add {
+  padding: 2px 4px;
+  background: #dcfce7;
+  color: #166534;
+}
+
+.pim-io-category-diff-same {
+  padding: 2px 4px;
+  color: #6d7175;
 }
 
 .pim-io-preview .pim-io-category-table th,
