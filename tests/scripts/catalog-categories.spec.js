@@ -63,6 +63,34 @@ test('renders category cells and keeps price under the price header', async ({ p
   await expect(rows.nth(2).locator('.pim-col-categories')).toHaveText('—');
 });
 
+test('category badges wrap within the wider column without horizontal scrolling', async ({ page }) => {
+  await page.route('https://fcors.org/**', (route) => route.fulfill({
+    json: {
+      data: [{
+        sku: '001',
+        title: 'Alpha',
+        categories: 'All Blenders,Commercial,Accessories,Immersion Blender,Shop Now!',
+        categoriesUrlKey: 'blenders,commercial,accessories,immersion-blending,sale',
+      }],
+    },
+  }));
+  await openCatalog(page);
+  await page.addStyleTag({ content: await readFile('tools/commerce-admin/pim.css', 'utf8') });
+  const layout = await page.locator('.pim-cat-tags').evaluate((element) => ({
+    wrap: getComputedStyle(element).flexWrap,
+    maxWidth: getComputedStyle(element).maxWidth,
+    columnWidth: getComputedStyle(element.parentElement).maxWidth,
+    scrollWidth: element.scrollWidth,
+    clientWidth: element.clientWidth,
+    lines: new Set([...element.children].map((tag) => tag.getBoundingClientRect().top)).size,
+  }));
+  expect(layout.wrap).toBe('wrap');
+  expect(layout.maxWidth).toBe('330px');
+  expect(layout.columnWidth).toBe('330px');
+  expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth);
+  expect(layout.lines).toBeGreaterThan(1);
+});
+
 test('searches categories and supports clicking, clearing, and restoring filters', async ({ page }) => {
   await openCatalog(page);
   await page.locator('#searchInput').fill('blenders');

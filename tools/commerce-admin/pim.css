@@ -220,19 +220,17 @@ body {
 }
 
 .pim-col-categories {
-  width: 220px;
-  max-width: 220px;
+  width: 330px;
+  max-width: 330px;
 }
 
 /* Category tags (same palette as the product detail page) */
 .pim-cat-tags {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 4px;
-  max-width: 220px;
-  overflow-x: auto;
+  max-width: 330px;
   padding-bottom: 2px;
-  scrollbar-width: thin;
 }
 
 .pim-cat-tag {
