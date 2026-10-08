@@ -9,7 +9,7 @@ import { putOrPatchResource } from './commerce-resource-save.js';
 import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
 import { PB_ORG, PB_SITE } from './commerce-pbus-config.js';
 import { showToast } from './commerce-otp-ui.js';
-import { fetchCatalogIndexForLocale, getProductRefFromIndex } from './pim.js';
+import { fetchProductsIndexForLocale, getProductRefFromIndex } from './pim.js';
 
 /** Product JSON edits are production-only (active API env, not staging). */
 function canUseEditMode() {
@@ -418,7 +418,7 @@ async function fetchAvailabilityRows() {
   if (!productSku) throw new Error('The current product does not have a SKU.');
 
   const indexes = await Promise.all(AVAILABILITY_CATALOGS.map(async (catalog) => {
-    const json = await fetchCatalogIndexForLocale(catalog.path);
+    const json = await fetchProductsIndexForLocale(catalog.path);
     const rows = Array.isArray(json) ? json : json?.data;
     if (!Array.isArray(rows)) {
       throw new Error(`Could not read the product index for ${catalog.label}.`);
@@ -824,7 +824,7 @@ async function init() {
   errorEl.classList.remove('active');
 
   try {
-    const indexPromise = fetchCatalogIndexForLocale(getCatalogFromParams())
+    const indexPromise = fetchProductsIndexForLocale(getCatalogFromParams())
       .then((json) => json.data || json)
       .catch(() => []);
     currentProductRef = productRef;
