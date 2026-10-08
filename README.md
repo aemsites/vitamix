@@ -30,6 +30,15 @@ npm run lint
 
 https://{branch}--vitamix--aemsites.aem.page/
 
+## YouTube videos
+
+The Video block and product gallery support YouTube watch links, `youtu.be` links,
+and Shorts links such as `https://www.youtube.com/shorts/VIDEO_ID`.
+Shorts use the standard YouTube embedded player in a 1:1 square container;
+other YouTube links retain the 16:9 landscape layout. Shorts placeholders in the
+Video block also use 1:1. Play-on-click, autoplay, and accessibility behavior
+remain unchanged.
+
 ## Tests
 
 ### Overview
