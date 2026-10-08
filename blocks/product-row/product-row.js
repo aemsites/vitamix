@@ -2,6 +2,7 @@
 import {
   fetchPlaceholders, toClassName, buildBlock, decorateBlock, loadBlock,
 } from '../../scripts/aem.js';
+import loadColorSwatches from '../../scripts/color-swatches.js';
 import { getLocaleAndLanguage, formatPrice, buildVideo } from '../../scripts/scripts.js';
 import {
   createCallouts, createStarRating, fetchReviewsData, getReviewsBySlug, slugFromUrl,
@@ -418,6 +419,7 @@ async function buildProductRowGrid(block, ph, colorOverride) {
 }
 
 export default async function decorate(block) {
+  loadColorSwatches();
   const { locale, language } = getLocaleAndLanguage();
   const ph = await fetchPlaceholders(`/${locale}/${language}/products/config`);
   const colorOverride = getMarketingColor(block);

@@ -1,6 +1,4 @@
 @import url('./gallery.css');
-@import url('../../styles/color-swatches.css');
-
 /* stylelint-disable no-descending-specificity */
 .pdp-wrapper {
   display: flex;
