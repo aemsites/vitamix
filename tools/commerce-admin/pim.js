@@ -80,11 +80,11 @@ export function resolveImageUrlForLocale(localePath, imagePath) {
  * @param {string} localePath
  * @returns {Promise<{ data?: object[] } | object[]>}
  */
-export async function fetchProductsIndexForLocale(localePath) {
+export async function fetchProductsIndexForLocale(localePath, { fresh = false } = {}) {
   const clean = String(localePath || '').replace(/^\/+/, '').replace(/\/+$/, '');
-  const indexUrl = `${AEM_BASE}/${clean}/products/index.json?include=all`;
+  const indexUrl = `${AEM_BASE}/${clean}/products/index.json?include=all${fresh ? `&_=${Date.now()}` : ''}`;
   const url = CORS_PROXY + encodeURIComponent(indexUrl) + CORS_KEY;
-  const response = await fetch(url);
+  const response = await fetch(url, fresh ? { cache: 'no-store' } : {});
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
   }

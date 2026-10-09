@@ -156,10 +156,11 @@ function buildSkuRows(data, catalog) {
  * @param {string} urlKey
  * @returns {Promise<object>}
  */
-async function fetchProductJson(localePath, urlKey) {
-  const url = `${getProductsBaseUrlForLocale(localePath)}${encodeURIComponent(urlKey)}.json`;
+async function fetchProductJson(localePath, urlKey, { fresh = false } = {}) {
+  const suffix = fresh ? `?_=${Date.now()}` : '';
+  const url = `${getProductsBaseUrlForLocale(localePath)}${encodeURIComponent(urlKey)}.json${suffix}`;
   const fetchUrl = CORS_PROXY + encodeURIComponent(url) + CORS_KEY;
-  const response = await fetch(fetchUrl);
+  const response = await fetch(fetchUrl, fresh ? { cache: 'no-store' } : {});
   if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
   const text = (await response.text()).trim();
   if (text.startsWith('Sign in')) throw new Error('Product requires sign-in or is unavailable');
@@ -187,9 +188,9 @@ function parseInventoryQuantity(custom) {
  * @param {Array<string>} urlKeys - unique parent urlKeys to fetch
  * @returns {Promise<Map<string, { managedStock: boolean, inventoryQuantity: number|null }>>}
  */
-async function fetchStockInfoMap(localePath, urlKeys) {
+async function fetchStockInfoMap(localePath, urlKeys, { fresh = false } = {}) {
   const cached = stockInfoCacheByLocale.get(localePath);
-  if (cached) return cached;
+  if (cached && !fresh) return cached;
 
   const map = new Map();
   const queue = [...urlKeys];
@@ -207,7 +208,7 @@ async function fetchStockInfoMap(localePath, urlKeys) {
       const urlKey = queue.shift();
       try {
         // eslint-disable-next-line no-await-in-loop -- bounded by MANAGED_STOCK_CONCURRENCY workers
-        const data = await fetchProductJson(localePath, urlKey);
+        const data = await fetchProductJson(localePath, urlKey, { fresh });
         setStockInfo(data?.sku, data?.custom);
         (data?.variants || []).forEach((v) => setStockInfo(v?.sku, v?.custom));
       } catch {
@@ -602,7 +603,7 @@ function managedInventoryUpdatePreviewLead({ changed, missing, unchanged }) {
 }
 
 /** @param {object[]} entries */
-async function applyManagedInventoryChanges(entries) {
+async function applyManagedInventoryChanges(entries, onApplied) {
   const byPath = new Map();
   entries.forEach((entry) => {
     const { existing } = entry;
@@ -613,7 +614,7 @@ async function applyManagedInventoryChanges(entries) {
     byPath.get(path).push(entry);
   });
 
-  await Promise.all([...byPath.entries()].map(async ([path, productEntries]) => {
+  const updates = [...byPath.entries()].map(async ([path, productEntries]) => {
     const product = await fetchCatalogProduct(path);
     if (!product) throw new Error(`Product not found: ${path}`);
     productEntries.forEach(({ configRow, existing, changedKeys }) => {
@@ -635,12 +636,18 @@ async function applyManagedInventoryChanges(entries) {
       }
     });
     await putOrPatchResource(catalogApiPath(path), product);
-  }));
-
-  entries.forEach(({ configRow, existing, changedKeys }) => {
-    if (changedKeys.has('availability')) existing.availability = configRow.availability;
-    if (changedKeys.has('managedStock')) existing.managedStock = configRow.managedStock;
+    const pdpUrl = new URL(product.url || path, 'https://www.vitamix.com');
+    pdpUrl.protocol = 'https:';
+    pdpUrl.host = 'www.vitamix.com';
+    onApplied?.(pdpUrl.href);
+    productEntries.forEach(({ configRow, existing, changedKeys }) => {
+      if (changedKeys.has('availability')) existing.availability = configRow.availability;
+      if (changedKeys.has('managedStock')) existing.managedStock = configRow.managedStock;
+    });
   });
+  const results = await Promise.allSettled(updates);
+  const failed = results.find((result) => result.status === 'rejected');
+  if (failed) throw failed.reason;
 }
 
 function openInventoryExportDialog() {
@@ -727,6 +734,10 @@ function openManagedInventoryUpdateDialog() {
           currently loaded for this locale. Nothing is written until you select inventory changes.
           <a href="https://da.live/sheet#/aemsites/vitamix/us/en_us/products/config/inventory" target="_blank" rel="noopener">Edit and preview inventory sheet</a>.</p>
         <div class="inv-export-status" data-inv-update-status hidden></div>
+        <section data-inv-changed-pdps hidden aria-live="polite">
+          <h3 class="inv-dialog-title">Changed production PDPs</h3>
+          <ul data-inv-changed-pdp-links></ul>
+        </section>
         <p class="inv-field-hint" data-inv-update-lead></p>
         <div class="inv-table-wrap pim-list-wrapper" data-inv-update-table></div>
       </div>
@@ -745,6 +756,7 @@ function openManagedInventoryUpdateDialog() {
   const btnChange = /** @type {HTMLButtonElement | null} */ (dialog.querySelector('[data-inv-update-change]'));
   const btnRefresh = /** @type {HTMLButtonElement | null} */ (dialog.querySelector('[data-inv-update-refresh]'));
   let shownEntries = [];
+  const changedPdpUrls = new Set();
 
   const setStatus = (msg, tone = 'error') => {
     if (!(statusEl instanceof HTMLElement)) return;
@@ -768,6 +780,10 @@ function openManagedInventoryUpdateDialog() {
   const prevBodyOverflow = document.body.style.overflow;
   dialog.addEventListener('close', () => {
     document.body.style.overflow = prevBodyOverflow;
+    if (changedPdpUrls.size) {
+      stockInfoCacheByLocale.clear();
+      loadIndex({ fresh: true });
+    }
   }, { once: true });
 
   btnCancel?.addEventListener('click', dismiss);
@@ -866,7 +882,15 @@ function openManagedInventoryUpdateDialog() {
     btnChange.textContent = 'Changing status…';
     setStatus('');
     try {
-      await applyManagedInventoryChanges(selected);
+      await applyManagedInventoryChanges(selected, (url) => {
+        changedPdpUrls.add(url);
+        const section = dialog.querySelector('[data-inv-changed-pdps]');
+        const list = dialog.querySelector('[data-inv-changed-pdp-links]');
+        section.hidden = false;
+        list.innerHTML = [...changedPdpUrls].map((pdpUrl) => (
+          `<li><a href="${escapeHtml(pdpUrl)}" target="_blank" rel="noopener">${escapeHtml(pdpUrl)}</a></li>`
+        )).join('');
+      });
       showToast(
         `Applied ${selected.length} inventory change${selected.length === 1 ? '' : 's'}`,
         'success',
@@ -887,7 +911,7 @@ function openManagedInventoryUpdateDialog() {
   runUpdate();
 }
 
-async function loadIndex() {
+async function loadIndex({ fresh = false } = {}) {
   const loading = document.getElementById('loading');
   const loadingText = loading.querySelector('p');
   const content = document.getElementById('content');
@@ -903,7 +927,7 @@ async function loadIndex() {
       ? INVENTORY_CATALOGS
       : INVENTORY_CATALOGS.filter((catalog) => catalog.path === currentLocalePath);
     const loaded = await Promise.all(catalogs.map(async (catalog) => {
-      const json = await fetchProductsIndexForLocale(catalog.path);
+      const json = await fetchProductsIndexForLocale(catalog.path, { fresh });
       return { catalog, rows: buildSkuRows(json.data || json, catalog) };
     }));
     allSkuRows = loaded.flatMap((entry) => entry.rows);
@@ -915,7 +939,7 @@ async function loadIndex() {
       // Every row's urlKey points at its parent product page (simple products point at themselves).
       const productUrlKeys = rows.map((row) => row.urlKey).filter(Boolean);
       const uniqueProductUrlKeys = [...new Set(productUrlKeys)];
-      const stockInfoBySku = await fetchStockInfoMap(catalog.path, uniqueProductUrlKeys);
+      const stockInfoBySku = await fetchStockInfoMap(catalog.path, uniqueProductUrlKeys, { fresh });
       return rows.map((row) => {
         const stockInfo = stockInfoBySku.get(row.sku);
         return {
