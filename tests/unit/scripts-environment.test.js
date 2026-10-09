@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { describe, it } from 'node:test';
+import { afterEach, describe, it } from 'node:test';
 import { runInNewContext } from 'node:vm';
 
 // scripts/scripts.js bootstraps the page at import time, so it cannot be imported in
@@ -112,6 +112,75 @@ describe('PayPal client ID', () => {
     const sandboxIds = new Set(Object.values(ids.sandbox));
     Object.entries(ids.production).forEach(([locale, id]) => {
       assert.ok(!sandboxIds.has(id), `production client ID for "${locale}" is a sandbox ID`);
+    });
+  });
+});
+
+// The public keys (PayPal client ID, reCAPTCHA, Affirm) are chosen with isProdHost, while
+// the Commerce API origin is chosen by commerce-config.js. They must agree on every host,
+// otherwise a stage key is paired with the production API (or the reverse).
+describe('API origin and environment keys agree', () => {
+  const PROD_API = 'https://api.adobecommerce.live/';
+  const HOSTS = [
+    'www.vitamix.com',
+    'vitamix.com',
+    'test.vitamix.com',
+    'uat.vitamix.com',
+    'stage.vitamix.com',
+    'integration.vitamix.com',
+    'main--vitamix--aemsites.aem.network',
+    'main--vitamix--aemsites.aem.page',
+    'main--vitamix--aemsites.aem.live',
+    'localhost',
+    '127.0.0.1',
+    'www.vitamix.com.example.com',
+    'evilvitamix.com',
+  ];
+
+  afterEach(() => {
+    delete globalThis.window.CommerceConfig;
+  });
+
+  /** Loads the real commerce-config.js for a host (hostname is read at import time). */
+  async function apiOriginFor(host) {
+    globalThis.window.location = new URL(`https://${host}/us/en_us/`);
+    globalThis.window.CommerceConfig = { org: 'aemsites', site: 'vitamix' };
+    // The query string bypasses the unit-test loader's commerce-config.js mock and gives
+    // each host its own module instance.
+    const { getConfig } = await import(`../../scripts/commerce-config.js?host=${host}`);
+    return getConfig().apiOrigin;
+  }
+
+  it('routes only the canonical hosts to the production API', async () => {
+    assert.equal(await apiOriginFor('www.vitamix.com'), `${PROD_API}aemsites/sites/vitamix`);
+    assert.equal(await apiOriginFor('vitamix.com'), `${PROD_API}aemsites/sites/vitamix`);
+    assert.equal(
+      await apiOriginFor('test.vitamix.com'),
+      'https://api-stage.adobecommerce.live/aemsites/sites/vitamix',
+    );
+  });
+
+  it('uses the production API exactly when isProdHost is true', async () => {
+    // Sequential on purpose: each import reads window.location when it evaluates.
+    const origins = await HOSTS.reduce(async (previous, host) => {
+      const acc = await previous;
+      acc.push(await apiOriginFor(host));
+      return acc;
+    }, Promise.resolve([]));
+    HOSTS.forEach((host, i) => {
+      assert.equal(origins[i].startsWith(PROD_API), evaluate(host).isProdHost, host);
+    });
+  });
+
+  it('treats the same hosts as non-production for gift-with-purchase overrides', () => {
+    const gwp = readFileSync(new URL('../../scripts/gift-with-purchase.js', import.meta.url), 'utf8');
+    const fn = gwp.match(/function isNonProdHost\(\) \{[\s\S]*?\n\}/);
+    assert.ok(fn, 'expected isNonProdHost() in scripts/gift-with-purchase.js');
+    HOSTS.forEach((hostname) => {
+      const isNonProdHost = runInNewContext(`${fn[0]}; isNonProdHost();`, {
+        window: { location: { hostname } },
+      });
+      assert.equal(isNonProdHost, !evaluate(hostname).isProdHost, hostname);
     });
   });
 });
