@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Product assets</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <link rel="stylesheet" href="./app.css">
+    <script src="./app.js" type="module"></script>
+  </head>
+  <body>
+    <div class="app-container">
+      <header class="app-header">
+        <label class="app-search">
+          <span class="visually-hidden">Search products</span>
+          <input type="search" placeholder="Search products or colors" autocomplete="off" spellcheck="false" autofocus/>
+        </label>
+        <p class="app-summary" aria-live="polite">Loading products…</p>
+        <button type="button" class="app-add" disabled>+ Add product</button>
+      </header>
+      <div class="app-error pa-error" aria-live="polite" hidden></div>
+      <div class="app-table">
+        <div class="app-row app-row-head" aria-hidden="true">
+          <span>Product</span>
+          <span>Variants</span>
+          <span>Images</span>
+        </div>
+      </div>
+      <p class="app-no-results" hidden>No products match your search.</p>
+    </div>
+
+    <dialog class="app-dialog" aria-labelledby="app-dialog-title">
+      <form method="dialog" class="app-form" novalidate>
+        <header class="app-dialog-head">
+          <h2 id="app-dialog-title">Add product</h2>
+          <button type="button" class="app-dialog-close" aria-label="Close">×</button>
+        </header>
+        <div class="app-dialog-body">
+          <label class="app-field">
+            <span>Product slug</span>
+            <input name="slug" type="text" placeholder="e.g. ascent-x5" autocomplete="off" spellcheck="false" required/>
+          </label>
+          <p class="app-field-note" aria-live="polite"></p>
+        </div>
+        <footer class="app-dialog-foot">
+          <button type="button" class="app-dialog-cancel secondary">Cancel</button>
+          <button type="submit" class="app-dialog-create">Create</button>
+        </footer>
+      </form>
+    </dialog>
+  </body>
+</html>

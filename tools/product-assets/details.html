@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Product assets</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <link rel="stylesheet" href="./details.css">
+    <script src="./details.js" type="module"></script>
+  </head>
+  <body>
+    <div class="details-container">
+      <nav class="details-nav">
+        <a class="details-back" href="app.html">← All products</a>
+        <div class="details-savebar" hidden>
+          <span class="details-savebar-text" aria-live="polite">Unsaved changes</span>
+          <button type="button" class="details-discard secondary">Discard</button>
+          <button type="button" class="details-save">Save</button>
+        </div>
+        <a class="details-da" target="_blank" rel="noopener" hidden>Open folder</a>
+      </nav>
+      <header class="details-header">
+        <h1 class="details-title"></h1>
+        <p class="details-meta" aria-live="polite">Loading…</p>
+        <nav class="details-locales" aria-label="Open in product admin" hidden></nav>
+      </header>
+      <div class="details-error pa-error" aria-live="polite" hidden></div>
+      <p class="details-hint" hidden>Drag images to reorder them, or onto another group to move them to that color. Click images to select them (Shift+click for a range) and drag them together. Hover an image and click Edit to change its label, video and markets. Drop images, folders or .zip files on a group to add them, or anywhere else to sort them by folder name (e.g. <code>white/</code>).</p>
+      <div class="details-groups"></div>
+      <button type="button" class="details-add-variant secondary" hidden>+ Add variants</button>
+    </div>
+
+    <dialog class="details-dialog details-variant-dialog" aria-labelledby="details-variant-title">
+      <header class="details-dialog-head">
+        <h2 id="details-variant-title">Add variants</h2>
+        <button type="button" class="details-dialog-close" aria-label="Close">×</button>
+      </header>
+      <div class="details-variant-body">
+        <input type="search" placeholder="Search colors…" aria-label="Search colors" autocomplete="off"/>
+        <div class="details-variant-list"></div>
+      </div>
+      <footer class="details-dialog-foot">
+        <span class="details-variant-count" aria-live="polite"></span>
+        <button type="button" class="details-variant-done">Done</button>
+      </footer>
+    </dialog>
+
+    <dialog class="details-dialog" aria-labelledby="details-dialog-title">
+      <form method="dialog" class="details-form">
+        <header class="details-dialog-head">
+          <h2 id="details-dialog-title">Edit image</h2>
+          <button type="button" class="details-dialog-close" aria-label="Close">×</button>
+        </header>
+        <div class="details-dialog-body">
+          <a class="details-dialog-preview" target="_blank" rel="noopener" title="Open full size">
+            <img alt=""/>
+          </a>
+          <div class="details-dialog-fields">
+            <p class="details-dialog-path"></p>
+            <label class="details-field">
+              <span>Label</span>
+              <input name="label" type="text" autocomplete="off"/>
+            </label>
+            <label class="details-field">
+              <span>Video URL (YouTube)</span>
+              <input name="video" type="text" inputmode="url" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off"/>
+              <span class="details-field-error" aria-live="polite"></span>
+            </label>
+            <img class="details-video-preview" alt="Video thumbnail" hidden/>
+            <fieldset class="details-field details-markets">
+              <legend>Markets</legend>
+              <div class="details-market-options"></div>
+              <span class="details-field-help">None selected = shown in all markets.</span>
+            </fieldset>
+          </div>
+        </div>
+        <footer class="details-dialog-foot">
+          <button type="button" class="details-dialog-delete danger">Delete image</button>
+          <button type="button" class="details-dialog-cancel secondary">Cancel</button>
+          <button type="submit" class="details-dialog-apply">Apply</button>
+        </footer>
+      </form>
+    </dialog>
+  </body>
+</html>

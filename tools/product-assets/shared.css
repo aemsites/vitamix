@@ -1,0 +1,182 @@
+@import url('../translate/shared.css');
+
+body {
+  align-items: flex-start;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.pa-error {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  color: #bf2600;
+  background: #ffebe6;
+  font-size: 14px;
+}
+
+.pa-thumb {
+  position: relative;
+  display: block;
+  flex: none;
+  width: 72px;
+  height: 72px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  overflow: hidden;
+}
+
+.pa-thumb > img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.pa-thumb.broken {
+  background: repeating-linear-gradient(45deg, #ffebe6 0 6px, #fff 6px 12px);
+}
+
+.pa-thumb.broken > img {
+  visibility: hidden;
+}
+
+.pa-video {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgb(0 0 0 / 70%);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.pa-markets {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  display: flex;
+  gap: 3px;
+}
+
+.pa-market {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 70%);
+  color: #fff;
+  font-size: 5px;
+  font-weight: 700;
+  line-height: 1;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px #fff, 0 1px 2px rgb(0 0 0 / 30%);
+}
+
+/* flag SVGs have rounded corners baked in; overscale so the circle is fully filled */
+.pa-markets .pa-market > img {
+  display: block;
+  flex: none;
+  width: 180%;
+  height: 180%;
+  object-fit: cover;
+}
+
+/* the VR icon is a round globe, not a flag; show it whole */
+.pa-markets .pa-market-vr {
+  background: #fff;
+}
+
+.pa-markets .pa-market-vr > img {
+  width: 100%;
+  height: 100%;
+}
+
+button {
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 9px 16px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--primary);
+  color: #fff;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+button:hover {
+  background: var(--primary-dark);
+}
+
+button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+button.secondary {
+  background: #fff;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+button.secondary:hover {
+  background: var(--bg);
+}
+
+button.danger {
+  background: #fff;
+  color: #bf2600;
+  border: 1px solid #f3b6a6;
+}
+
+button.danger:hover {
+  background: #ffebe6;
+  border-color: #bf2600;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.pa-swatch {
+  display: inline-block;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  box-shadow: inset 0 0 0 2px #fff;
+
+  /* hatched fallback flags colors missing from the color-swatches config */
+  background: var(--swatch, repeating-linear-gradient(45deg, #ccc 0 3px, #fff 3px 6px));
+}
+
+.status {
+  justify-self: start;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.status.error {
+  color: #bf2600;
+  background: #ffebe6;
+}

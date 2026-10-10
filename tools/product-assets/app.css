@@ -1,0 +1,260 @@
+@import url('./shared.css');
+
+.app-container {
+  width: 100%;
+  max-width: 1200px;
+}
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: -16px -16px 16px;
+  padding: 16px;
+  background: var(--bg);
+}
+
+.app-search {
+  flex: 1;
+}
+
+.app-search input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 15px;
+  color: var(--text);
+  background: #fff;
+}
+
+.app-search input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+.app-summary {
+  flex: none;
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.app-add {
+  flex: none;
+  white-space: nowrap;
+}
+
+/* ---------- add product dialog ---------- */
+
+.app-dialog {
+  width: min(480px, calc(100vw - 32px));
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius);
+  box-shadow: 0 20px 60px rgb(0 0 0 / 25%);
+  color: var(--text);
+}
+
+.app-dialog::backdrop {
+  background: rgb(15 20 30 / 45%);
+}
+
+.app-dialog-head,
+.app-dialog-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+}
+
+.app-dialog-head {
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+}
+
+.app-dialog-head h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.app-dialog-close {
+  padding: 2px 8px;
+  background: none;
+  color: var(--muted);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.app-dialog-close:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.app-dialog-body {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+}
+
+.app-field {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.app-field > input[type="text"] {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text);
+}
+
+.app-field > input[type="text"]:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+.app-field-note {
+  min-height: 18px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.app-field-note.error {
+  color: #bf2600;
+}
+
+.app-dialog-foot {
+  justify-content: flex-end;
+  border-top: 1px solid var(--border);
+}
+
+.app-table {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.app-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(120px, 1fr) minmax(0, 3fr);
+  gap: 16px;
+  align-items: center;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  color: inherit;
+  text-decoration: none;
+}
+
+.app-row.enter {
+  animation: app-row-in 0.2s ease-out;
+}
+
+a.app-row:hover,
+a.app-row:focus-visible {
+  background: #f8faff;
+  outline: none;
+}
+
+a.app-row:focus-visible {
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+
+.app-row-head {
+  border-top: 0;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+@keyframes app-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+.app-product {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.app-slug {
+  font-weight: 600;
+  color: var(--primary);
+  overflow-wrap: anywhere;
+}
+
+a.app-row:hover .app-slug {
+  text-decoration: underline;
+}
+
+.app-slug mark {
+  background: #fff3a3;
+  color: inherit;
+  border-radius: 2px;
+}
+
+.app-meta,
+.app-empty {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.app-images,
+.app-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-swatches .pa-swatch.match {
+  outline: 2px solid #f5c400;
+  outline-offset: 2px;
+}
+
+.app-more {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.app-no-results {
+  margin: 16px 0;
+  color: var(--muted);
+  text-align: center;
+}
+
+@media (width <= 720px) {
+  .app-header {
+    flex-wrap: wrap;
+  }
+
+  .app-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .app-row-head {
+    display: none;
+  }
+}
