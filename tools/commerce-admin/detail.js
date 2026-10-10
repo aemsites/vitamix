@@ -9,6 +9,7 @@ import { putOrPatchResource } from './commerce-resource-save.js';
 import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
 import { PB_ORG, PB_SITE } from './commerce-pbus-config.js';
 import { showToast } from './commerce-otp-ui.js';
+import { startProductImageSync } from './product-image-sync.js';
 import { fetchProductsIndexForLocale, getProductRefFromIndex } from './pim.js';
 
 /** Product JSON edits are production-only (active API env, not staging). */
@@ -124,8 +125,8 @@ function renderPrice(price) {
   return renderValue('Price', value);
 }
 
-function renderImages(images) {
-  if (!Array.isArray(images)) return '';
+function renderImages(images, canEdit = false) {
+  if (!Array.isArray(images) && !canEdit) return '';
   const list = Array.isArray(images) ? images : [];
   const items = list.map((img) => {
     const src = resolveImageUrl(img.url || img);
@@ -136,6 +137,7 @@ function renderImages(images) {
   return `<div class="pim-detail-section">
     <div class="pim-detail-section-head">
       <h3 class="pim-detail-section-title">Images</h3>
+      ${canEdit ? '<button type="button" class="pim-io-open-btn" id="productUpdateImagesBtn">Update images</button>' : ''}
     </div>
     <div class="pim-detail-gallery">${items.join('')}</div>
   </div>`;
@@ -304,7 +306,7 @@ function renderProduct(data, indexByUrlKey = {}, canEdit = false) {
         ${priceBlock}
       </div>
     </div>`,
-    renderImages(data.images),
+    renderImages(data.images, canEdit),
     data.options && data.options.length ? renderOptions(data.options) : '',
     renderVariants(data.variants, canEdit),
     renderCategories(data.custom?.categories),
@@ -862,6 +864,33 @@ async function init() {
         refreshDetailContent();
       });
     }
+
+    content.addEventListener('click', async (event) => {
+      const imagesBtn = event.target instanceof Element
+        && event.target.closest('#productUpdateImagesBtn');
+      if (!(imagesBtn instanceof HTMLButtonElement) || imagesBtn.disabled) return;
+      if (!canUseEditMode() || !editMode || !currentProductData) return;
+      imagesBtn.disabled = true;
+      try {
+        const product = {
+          ...currentProductData,
+          path: currentProductData.path || getCatalogProductPath(currentProductRef),
+        };
+        await startProductImageSync({
+          product,
+          urlKey: pathToUrlKey(product.path),
+          previewSrc: resolveImageUrl,
+          onApplied: (updated) => {
+            currentProductData = updated;
+            refreshDetailContent();
+          },
+        });
+      } catch (err) {
+        showToast(err.message || 'Failed to update images', 'error');
+      } finally {
+        imagesBtn.disabled = false;
+      }
+    });
 
     const ioBtn = document.getElementById('productExportImportBtn');
     if (ioBtn instanceof HTMLButtonElement) {
