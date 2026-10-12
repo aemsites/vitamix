@@ -14,7 +14,9 @@ import {
   formatInstantInEastern,
   isoToEasternDatetimeLocal,
 } from './commerce-eastern-time.js';
-import { apiFetch, getApiEnvironment, getAuthState } from './commerce-otp-api.js';
+import {
+  apiFetch, getApiEnvironment, getAuthState, commerceExportFilename,
+} from './commerce-otp-api.js';
 import waitForCommerceAuthReady from './commerce-wait-auth-ready.js';
 import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
 import { createDetailModalHeaderShell } from './commerce-detail-modal-json.js';
@@ -2774,7 +2776,7 @@ function downloadCouponExportJson(text) {
   if (!raw.trim()) throw new Error('Nothing to download — the JSON array is empty.');
   const stamp = new Date().toISOString().slice(0, 10);
   const market = state.marketFilter === 'all' ? 'all' : state.marketFilter;
-  const filename = `coupons-${market}-${stamp}.json`;
+  const filename = commerceExportFilename(`coupons-${market}-${stamp}.json`);
   const blob = new Blob([raw], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

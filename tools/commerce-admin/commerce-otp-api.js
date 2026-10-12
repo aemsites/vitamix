@@ -43,6 +43,14 @@ export function getApiEnvironment() {
   return 'stage';
 }
 
+export function commerceExportFilename(filename) {
+  const extensionIndex = filename.lastIndexOf('.');
+  const suffix = `-${getApiEnvironment()}`;
+  return extensionIndex > 0
+    ? `${filename.slice(0, extensionIndex)}${suffix}${filename.slice(extensionIndex)}`
+    : `${filename}${suffix}`;
+}
+
 /** Build an admin link pinned to the active API environment, preserving other URL state. */
 export function commerceAdminHref(href) {
   const url = new URL(href, window.location.href);

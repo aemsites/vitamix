@@ -16,7 +16,7 @@ import {
   normalizeProductPath,
 } from './commerce-catalog-io.js';
 import { putOrPatchResource } from './commerce-resource-save.js';
-import { commerceAdminHref } from './commerce-otp-api.js';
+import { commerceAdminHref, commerceExportFilename } from './commerce-otp-api.js';
 
 const CORS_PROXY = 'https://fcors.org/?url=';
 const CORS_KEY = '&key=Mg23N96GgR8O3NjU';
@@ -370,7 +370,7 @@ function downloadInventoryTsv(text) {
   const blob = new Blob([text], { type: 'text/tab-separated-values;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const stamp = new Date().toISOString().slice(0, 10);
-  const filename = `vitamix-inventory-${currentLocalePath.replace(/\//g, '-')}-${stamp}.tsv`;
+  const filename = commerceExportFilename(`vitamix-inventory-${currentLocalePath.replace(/\//g, '-')}-${stamp}.tsv`);
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;

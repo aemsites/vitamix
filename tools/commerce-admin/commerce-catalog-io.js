@@ -2,7 +2,7 @@
  * ProductBus catalog JSON, category TSV, and product-list export / import,
  * shared by product detail and the catalog overview.
  */
-import { apiFetch } from './commerce-otp-api.js';
+import { apiFetch, commerceExportFilename } from './commerce-otp-api.js';
 import { putOrPatchResource } from './commerce-resource-save.js';
 import { PB_ORG, PB_SITE } from './commerce-pbus-config.js';
 import { escapeHtml, showToast } from './commerce-otp-ui.js';
@@ -569,14 +569,15 @@ function downloadJson(text, filename, contentType = 'application/json') {
   const blob = new Blob([raw], { type: contentType });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
+  const exportFilename = commerceExportFilename(filename);
   a.href = url;
-  a.download = filename;
+  a.download = exportFilename;
   a.rel = 'noopener';
   document.body.appendChild(a);
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
-  return filename;
+  return exportFilename;
 }
 
 async function applyImportedProducts(items, onProgress) {
