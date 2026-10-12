@@ -205,6 +205,18 @@ body {
   min-width: 100px;
 }
 
+.pim-col-path {
+  min-width: 160px;
+  max-width: 240px;
+  overflow-wrap: anywhere;
+}
+
+td.pim-col-path {
+  color: #6d7175;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+}
+
 .pim-col-variants {
   width: 80px;
 }
@@ -552,6 +564,29 @@ body {
   resize: vertical;
   background: #fafafa;
   color: #202223;
+}
+
+.pim-io-list-controls:not([hidden]) {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.pim-io-list-controls label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pim-io-list-controls input,
+.pim-io-list-controls select {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #e1e3e5;
+  border-radius: 6px;
+  background: #fff;
+  color: #202223;
+  font: inherit;
 }
 
 .pim-io-status {

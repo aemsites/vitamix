@@ -7,11 +7,10 @@ import {
   collectCategorySlugsFromIndexRows,
   fetchProductsIndexForLocale,
   getParentProducts,
-  getUrlKeyFromProduct,
+  getProductPathFromIndex,
   getVariantProducts,
   resolveImageUrlForLocale,
 } from './pim.js';
-import { productUrlToCatalogPath } from './price-rules-api.js';
 import { highlightMatch } from './search-highlight.js';
 
 export const PILL_THUMB_PLACEHOLDER = '<span class="ps-pill-thumb-placeholder" aria-hidden="true"></span>';
@@ -49,14 +48,7 @@ export const PILL_THUMB_PLACEHOLDER = '<span class="ps-pill-thumb-placeholder" a
  * @returns {string}
  */
 export function catalogPathForProduct(localePath, product) {
-  const rawUrl = product?.url;
-  if (typeof rawUrl === 'string' && rawUrl.trim().startsWith('/')) {
-    const normalized = productUrlToCatalogPath(rawUrl.trim());
-    if (normalized) return normalized;
-  }
-  const urlKey = getUrlKeyFromProduct(product);
-  const clean = String(localePath || '').replace(/^\/+/, '').replace(/\/+$/, '');
-  return `/${clean}/products/${urlKey}`;
+  return getProductPathFromIndex(product, localePath);
 }
 
 /**

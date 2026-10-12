@@ -16,6 +16,7 @@ import {
   normalizeProductPath,
 } from './commerce-catalog-io.js';
 import { putOrPatchResource } from './commerce-resource-save.js';
+import { commerceAdminHref } from './commerce-otp-api.js';
 
 const CORS_PROXY = 'https://fcors.org/?url=';
 const CORS_KEY = '&key=Mg23N96GgR8O3NjU';
@@ -1026,7 +1027,7 @@ function init() {
     const row = e.target.closest('tr.pim-row');
     if (!row || !row.dataset.urlkey) return;
     const catalog = row.localePath ? `catalog=${encodeURIComponent(row.localePath)}&` : '';
-    window.location.href = `product-detail.html?${catalog}product=${encodeURIComponent(row.dataset.urlkey)}`;
+    window.location.href = commerceAdminHref(`product-detail.html?${catalog}product=${encodeURIComponent(row.dataset.urlkey)}`);
   });
   document.getElementById('productList').addEventListener('keydown', (e) => {
     const row = e.target.closest('tr.pim-row');
@@ -1034,7 +1035,7 @@ function init() {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       const catalog = row.localePath ? `catalog=${encodeURIComponent(row.localePath)}&` : '';
-      window.location.href = `product-detail.html?${catalog}product=${encodeURIComponent(row.dataset.urlkey)}`;
+      window.location.href = commerceAdminHref(`product-detail.html?${catalog}product=${encodeURIComponent(row.dataset.urlkey)}`);
     }
   });
 

@@ -4,7 +4,7 @@
  * Data comes only from ProductBus; failed loads show errors and empty lists.
  */
 import waitForCommerceAuthReady from './commerce-wait-auth-ready.js';
-import { apiFetch } from './commerce-otp-api.js';
+import { apiFetch, commerceAdminHref } from './commerce-otp-api.js';
 import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
 import { createDetailModalHeaderCloseAndJson } from './commerce-detail-modal-json.js';
 import { mountCrossEnvCopyInToolbar } from './commerce-promote-production.js';
@@ -3930,7 +3930,7 @@ function renderPromotionsListPanel() {
 }
 
 function renderMockBanner() {
-  const couponsLink = '<a href="coupons.html">Open Coupons</a> for code-based discounts (R2 / ProductBus API).';
+  const couponsLink = `<a href="${escapeHtml(commerceAdminHref('coupons.html'))}">Open Coupons</a> for code-based discounts (R2 / ProductBus API).`;
   const cartLine = PR_APP_MODE !== 'promotions'
     ? '<strong>Cart rules</strong> load from <code>GET …/price-rules/cart</code> as a JSON array (helix-commerce-api).'
     : '';
@@ -3981,7 +3981,7 @@ function renderRulesPanel() {
   return `<h2 class="pr-section-title">${escapeHtml(heading)}</h2>
     ${renderCartRulesOverview()}
     <p class="pr-section-hint" style="margin-top:16px">Coupon <strong>programs</strong> (types, codes, batches) live in
-      <a href="coupons.html">Coupons</a> — ProductBus <code>…/coupons/types</code> and <code>…/coupons</code>.</p>`;
+      <a href="${escapeHtml(commerceAdminHref('coupons.html'))}">Coupons</a> — ProductBus <code>…/coupons/types</code> and <code>…/coupons</code>.</p>`;
 }
 
 /** Cart rules page (`cart-rules.html`): overview only; the page title is the main heading. */

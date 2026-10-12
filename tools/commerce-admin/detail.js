@@ -1,4 +1,6 @@
-import { apiFetch, getApiBase, getApiEnvironment } from './commerce-otp-api.js';
+import {
+  apiFetch, getApiBase, getApiEnvironment, commerceAdminHref,
+} from './commerce-otp-api.js';
 import {
   catalogApiPath,
   fetchCatalogProduct,
@@ -174,7 +176,7 @@ function renderLinkedProducts(paths, indexByUrlKey, sectionTitle) {
     const product = indexByUrlKey[urlKey];
     const catalog = getCatalogFromParams();
     const productRef = product ? getProductRefFromIndex(product, catalog) : urlKey;
-    const detailHref = `product-detail.html?catalog=${encodeURIComponent(catalog)}&product=${encodeURIComponent(productRef)}`;
+    const detailHref = commerceAdminHref(`product-detail.html?catalog=${encodeURIComponent(catalog)}&product=${encodeURIComponent(productRef)}`);
     const name = product ? (product.title || product.name || product.sku || urlKey) : urlKey;
     const image = product?.image || product?.images?.[0]?.url || product?.images?.[0];
     const imgSrc = image ? resolveIndexImageUrl(image) : '';
@@ -389,7 +391,7 @@ function openDeleteProductDialog(productPath) {
         throw new Error(result?.message || result?.reason || 'The API did not delete this product.');
       }
       showToast(`Deleted ${normalizedPath}`);
-      window.location.assign(`catalog.html?catalog=${encodeURIComponent(getCatalogFromParams())}`);
+      window.location.assign(commerceAdminHref(`catalog.html?catalog=${encodeURIComponent(getCatalogFromParams())}`));
     } catch (err) {
       statusEl.textContent = err.message || 'Failed to delete product';
       input.disabled = false;
@@ -850,7 +852,7 @@ async function init() {
     loading.classList.remove('active');
     toolbar.style.display = 'flex';
     const backLink = toolbar.querySelector('.pim-detail-back-link');
-    if (backLink) backLink.href = `catalog.html?catalog=${encodeURIComponent(getCatalogFromParams())}`;
+    if (backLink) backLink.href = commerceAdminHref(`catalog.html?catalog=${encodeURIComponent(getCatalogFromParams())}`);
 
     if (editCheckbox instanceof HTMLInputElement) {
       applyEditModeToggle(editCheckbox);

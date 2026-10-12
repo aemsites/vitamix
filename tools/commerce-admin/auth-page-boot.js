@@ -9,7 +9,6 @@ import {
   verifyCommerceApiAccess,
   logoutCommerceSession,
   scheduleCommerceAuthExpiry,
-  PRODUCTBUS_STAGE_SESSION_KEY,
 } from './commerce-otp-api.js';
 import { mountCommerceOtpLogin } from './commerce-otp-login.js';
 import { PB_ORG, PB_SITE } from './commerce-pbus-config.js';
@@ -136,13 +135,6 @@ async function ensureCommerceAuth() {
     root.removeAttribute('aria-hidden');
     await proceed();
   };
-
-  const stageParam = new URLSearchParams(window.location.search).get('stage');
-  if (stageParam === 'true') {
-    sessionStorage.removeItem(PRODUCTBUS_STAGE_SESSION_KEY);
-  } else if (stageParam === 'false') {
-    sessionStorage.setItem(PRODUCTBUS_STAGE_SESSION_KEY, 'false');
-  }
 
   window.addEventListener('commerce-admin:sign-out', () => {
     logoutCommerceSession(PB_ORG, PB_SITE).then(() => {

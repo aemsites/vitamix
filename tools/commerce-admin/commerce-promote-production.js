@@ -37,7 +37,7 @@ async function readError(resp) {
 
 /**
  * Direction config from the active env: which env we write to and how to label the flow.
- * `stageParam` is the `?stage=` value that opens the target env in a new tab (see auth-page-boot).
+ * `stageParam` is the `?stage=` value that opens the target env in a new tab (see commerce-otp-api).
  *
  * @returns {null | { active: 'stage'|'prod', target: 'stage'|'prod', verb: string,
  *   verbPast: string, targetLabel: string, targetLower: string, sourceLabel: string,

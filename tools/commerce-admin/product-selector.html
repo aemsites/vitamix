@@ -15,7 +15,10 @@
     </main>
     <script type="module">
       import { mountProductSelector } from './product-selector.js';
+      import { commerceAdminHref } from './commerce-otp-api.js';
 
+      const backLink = document.querySelector('.ps-demo-back a');
+      backLink.href = commerceAdminHref(backLink.href);
       mountProductSelector(document.getElementById('selector-mount'));
     </script>
   </body>

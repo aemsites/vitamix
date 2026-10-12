@@ -43,14 +43,64 @@ export function getApiEnvironment() {
   return 'stage';
 }
 
-/** Persist prod vs stage and drop custom API URL override so requests match the selection. */
-export function setApiEnvironment(env) {
+/** Build an admin link pinned to the active API environment, preserving other URL state. */
+export function commerceAdminHref(href) {
+  const url = new URL(href, window.location.href);
+  url.searchParams.set('stage', getApiEnvironment() === 'prod' ? 'false' : 'true');
+  return url.href;
+}
+
+function writeApiEnvironmentUrl(env, history) {
+  const url = new URL(window.location.href);
+  url.searchParams.set('stage', env === 'prod' ? 'false' : 'true');
+  if (url.href === window.location.href) return;
+  if (history === 'push') {
+    window.history.pushState(window.history.state, '', url);
+  } else {
+    window.history.replaceState(window.history.state, '', url);
+  }
+}
+
+/** Persist prod vs stage, update URL history, and drop any custom API URL override. */
+export function setApiEnvironment(env, { history = 'push' } = {}) {
   localStorage.removeItem('productbus-api-url');
   if (env === 'prod') {
     sessionStorage.setItem(PRODUCTBUS_STAGE_SESSION_KEY, 'false');
   } else {
     sessionStorage.removeItem(PRODUCTBUS_STAGE_SESSION_KEY);
   }
+  writeApiEnvironmentUrl(env, history);
+  window.dispatchEvent(new CustomEvent('commerce-admin:environment-change'));
+}
+
+function environmentFromUrl() {
+  const stage = new URLSearchParams(window.location.search).get('stage');
+  if (stage === 'true') return 'stage';
+  if (stage === 'false') return 'prod';
+  return null;
+}
+
+// Resolve deep links before any importing module reads auth or chooses an API host.
+if (typeof window !== 'undefined' && window.location.pathname.startsWith('/tools/commerce-admin/')) {
+  const env = environmentFromUrl();
+  if (env) {
+    setApiEnvironment(env, { history: 'replace' });
+  } else {
+    writeApiEnvironmentUrl(getApiEnvironment(), 'replace');
+  }
+
+  const restoreEnvironment = (event) => {
+    const next = environmentFromUrl();
+    if (!next || next === getApiEnvironment()) return;
+    // Reload before page-specific history handlers can fetch with the previous environment.
+    event.stopImmediatePropagation();
+    setApiEnvironment(next, { history: 'replace' });
+    window.location.reload();
+  };
+  window.addEventListener('popstate', restoreEnvironment, { capture: true });
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted) restoreEnvironment(event);
+  });
 }
 
 /** localStorage key for ProductBus JWT + profile (separate per API host). */

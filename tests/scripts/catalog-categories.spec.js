@@ -55,9 +55,9 @@ test('renders category cells and keeps price under the price header', async ({ p
   await openCatalog(page);
   const rows = page.locator('#productGrid tr');
   await expect(rows).toHaveCount(4);
-  await expect(rows.first().locator('td')).toHaveCount(7);
+  await expect(rows.first().locator('td')).toHaveCount(8);
   await expect(rows.first().locator('.pim-cat-tag')).toHaveText(['Blenders', 'Home']);
-  await expect(rows.first().locator('td').nth(6)).toHaveText('100');
+  await expect(rows.first().locator('td').nth(7)).toHaveText('100');
   await expect(rows.nth(1).locator('.pim-cat-tag')).toHaveText('Blenders');
   await expect(rows.nth(3).locator('.pim-col-categories')).toHaveText('accessories');
   await expect(rows.nth(2).locator('.pim-col-categories')).toHaveText('—');

@@ -3,7 +3,9 @@
  * Top app bar: hub brand or "← Commerce Admin", user trigger + menu (sign out, placeholders).
  * Expects #commerce-admin-app-header. Run after auth-page-boot.js (module order in HTML).
  */
-import { getAuthState, getApiEnvironment, setApiEnvironment } from './commerce-otp-api.js';
+import {
+  getAuthState, getApiEnvironment, setApiEnvironment, commerceAdminHref,
+} from './commerce-otp-api.js';
 import { PB_ORG, PB_SITE } from './commerce-pbus-config.js';
 import { escapeHtml } from './commerce-otp-ui.js';
 
@@ -46,7 +48,7 @@ export function mountCommerceAdminHeader() {
   if (!slot) return;
 
   const variant = headerVariant();
-  const home = homeHref();
+  const home = commerceAdminHref(homeHref());
   const pageTitle = pageTitleAttr();
   const auth = getAuthState(PB_ORG, PB_SITE);
   const email = typeof auth?.email === 'string' && auth.email.trim() ? auth.email.trim() : '';
@@ -113,6 +115,19 @@ export function mountCommerceAdminHeader() {
       window.location.reload();
     });
   }
+
+  const syncEnvironment = () => {
+    applyApiEnvHeaderClass(slot);
+    if (envSelect) envSelect.value = getApiEnvironment();
+    document.querySelectorAll('a[href]').forEach((link) => {
+      const url = new URL(link.href);
+      if (url.origin === window.location.origin && url.pathname.startsWith('/tools/commerce-admin/')) {
+        link.href = commerceAdminHref(link.href);
+      }
+    });
+  };
+  syncEnvironment();
+  window.addEventListener('commerce-admin:environment-change', syncEnvironment);
 
   const syncMenuHidden = () => {
     if (!menu) return;

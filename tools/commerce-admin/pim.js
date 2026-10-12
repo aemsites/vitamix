@@ -1,6 +1,9 @@
-import { categorySlugFromName, startCatalogExportImport } from './commerce-catalog-io.js';
+import {
+  categorySlugFromName, normalizeProductPath, startCatalogExportImport,
+} from './commerce-catalog-io.js';
 import { showToast } from './commerce-otp-ui.js';
-import { getApiEnvironment } from './commerce-otp-api.js';
+import { getApiEnvironment, commerceAdminHref } from './commerce-otp-api.js';
+import { productUrlToCatalogPath } from './price-rules-api.js';
 
 const AEM_BASE = 'https://main--vitamix--aemsites.aem.network';
 const CORS_PROXY = 'https://fcors.org/?url=';
@@ -76,19 +79,37 @@ export function resolveImageUrlForLocale(localePath, imagePath) {
 }
 
 /**
- * Fetch products index for a locale (same CORS proxy + index.json?include=all as catalog).
+ * Fetch and merge regular and commercial indexes for a locale.
  * @param {string} localePath
  * @returns {Promise<{ data?: object[] } | object[]>}
  */
 export async function fetchProductsIndexForLocale(localePath, { fresh = false } = {}) {
   const clean = String(localePath || '').replace(/^\/+/, '').replace(/\/+$/, '');
-  const indexUrl = `${AEM_BASE}/${clean}/products/index.json?include=all${fresh ? `&_=${Date.now()}` : ''}`;
-  const url = CORS_PROXY + encodeURIComponent(indexUrl) + CORS_KEY;
-  const response = await fetch(url, fresh ? { cache: 'no-store' } : {});
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-  }
-  return response.json();
+  const suffix = fresh ? `&_=${Date.now()}` : '';
+  const indexes = await Promise.all(['products', 'products/commercial'].map(async (directory) => {
+    const indexUrl = `${AEM_BASE}/${clean}/${directory}/index.json?include=all${suffix}`;
+    const url = CORS_PROXY + encodeURIComponent(indexUrl) + CORS_KEY;
+    const response = await fetch(url, fresh ? { cache: 'no-store' } : {});
+    if (!response.ok) {
+      throw new Error(`Failed to load ${indexUrl}: HTTP ${response.status}: ${response.statusText}`);
+    }
+    const json = await response.json();
+    const rows = Array.isArray(json) ? json : json.data;
+    if (!Array.isArray(rows)) throw new Error(`Invalid product index: ${indexUrl}`);
+    return rows.map((product) => ({
+      ...product,
+      path: normalizeProductPath(
+        productUrlToCatalogPath(product.path) || productUrlToCatalogPath(product.url)
+        || `/${clean}/${directory}/${getUrlKeyFromProduct(product)}`,
+      ),
+    }));
+  }));
+  const unique = new Map();
+  indexes.flat().forEach((product) => {
+    const key = `${product.path}|${product.sku || ''}`;
+    if (!unique.has(key)) unique.set(key, product);
+  });
+  return { data: [...unique.values()] };
 }
 
 /**
@@ -263,6 +284,11 @@ export function getUrlKeyFromProduct(p) {
 }
 
 export function getProductRefFromIndex(p, localePath) {
+  const catalogPath = productUrlToCatalogPath(p.path);
+  const catalogPrefix = `/${localePath}/products/`;
+  if (catalogPath.startsWith(catalogPrefix)) {
+    return normalizeProductPath(catalogPath).slice(catalogPrefix.length);
+  }
   if (p.url) {
     try {
       const prefix = `/${localePath}/products/`;
@@ -275,11 +301,19 @@ export function getProductRefFromIndex(p, localePath) {
   return getUrlKeyFromProduct(p);
 }
 
+export function getProductPathFromIndex(product, localePath = currentLocalePath) {
+  const path = productUrlToCatalogPath(product.path) || productUrlToCatalogPath(product.url);
+  if (path) return normalizeProductPath(path);
+  const clean = String(localePath || '').replace(/^\/+|\/+$/g, '');
+  return `/${clean}/products/${getProductRefFromIndex(product, clean)}`;
+}
+
 function enrichForSort(p) {
   return {
     ...p,
     _variants: getVariantCount(p.variantSkus),
     _priceNum: p.price != null ? Number(p.price) : NaN,
+    _path: getProductPathFromIndex(p),
   };
 }
 
@@ -287,6 +321,7 @@ function compare(a, b, key) {
   let sortKey = key;
   if (key === 'variants') sortKey = '_variants';
   else if (key === 'price') sortKey = '_priceNum';
+  else if (key === 'path') sortKey = '_path';
   const av = a[sortKey];
   const bv = b[sortKey];
   if (av == null && bv == null) return 0;
@@ -316,6 +351,7 @@ function matchesQuery(product, q) {
     || availability.includes(term)
     || priceStr.includes(term)
     || categories.includes(term)
+    || getProductPathFromIndex(product).toLowerCase().includes(term)
   );
 }
 
@@ -390,6 +426,7 @@ export function renderProductList(parents, query = '') {
       <td class="pim-col-thumb">${thumbCell}</td>
       <td class="pim-col-product pim-cell-title">${highlightMatch(title, query)}</td>
       <td class="pim-col-sku pim-cell-sku">${highlightMatch(product.sku || '', query)}</td>
+      <td class="pim-col-path">${highlightMatch(getProductPathFromIndex(product), query)}</td>
       <td class="pim-col-variants pim-cell-variants">${variantCount > 0 ? variantCount : '—'}</td>
       <td class="pim-col-availability">
         <span class="pim-card-availability ${availabilityClass}">${highlightMatch(availability, query)}</span>
@@ -523,7 +560,7 @@ export async function init() {
       const row = e.target.closest('tr.pim-row');
       if (!row || !row.dataset.product) return;
       const catalog = currentLocalePath ? `catalog=${encodeURIComponent(currentLocalePath)}&` : '';
-      window.location.href = `product-detail.html?${catalog}product=${encodeURIComponent(row.dataset.product)}`;
+      window.location.href = commerceAdminHref(`product-detail.html?${catalog}product=${encodeURIComponent(row.dataset.product)}`);
     });
     document.getElementById('productList').addEventListener('keydown', (e) => {
       if (e.target.closest('.pim-cat-tag')) return;
@@ -532,7 +569,7 @@ export async function init() {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         const catalog = currentLocalePath ? `catalog=${encodeURIComponent(currentLocalePath)}&` : '';
-        window.location.href = `product-detail.html?${catalog}product=${encodeURIComponent(row.dataset.product)}`;
+        window.location.href = commerceAdminHref(`product-detail.html?${catalog}product=${encodeURIComponent(row.dataset.product)}`);
       }
     });
 

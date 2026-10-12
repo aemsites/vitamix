@@ -1967,7 +1967,7 @@ function couponFormOptionsSectionHtml() {
     couponFormOptionRow(
       'cp-form-apply-to-sale',
       'Calculate discount from sale price',
-      'Which price the discount amount is based on. Unchecked uses regular price (default) and the cheaper of sale vs coupon wins per line; checked stacks the discount on the current sale price.',
+      'Which price the discount amount is based on. Checked by default for new coupons, this stacks the discount on the current sale price. Unchecked uses regular price and the cheaper of sale vs coupon wins per line.',
     ),
     'data-cp-discount-only',
   ));
@@ -3286,6 +3286,7 @@ function openNewCouponDialog() {
       await openCouponDetailModal();
     },
     async (dlg) => {
+      dlg.querySelector('#cp-form-apply-to-sale').checked = true;
       dlg.querySelector('#cp-form-stackable').checked = true;
       dlg.querySelector('#cp-form-manual').checked = true;
       const yearEl = dlg.querySelector('#cp-new-year');
