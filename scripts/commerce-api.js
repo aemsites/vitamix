@@ -298,11 +298,12 @@ export async function cancelPayment(orderId, idempotencyKey) {
  * @param {string} path - API path relative to config.apiOrigin
  * @param {object|null} body - Request payload; omitted when null
  * @param {string} method - HTTP verb (GET, POST, PATCH, etc.)
+ * @param {Record<string, string>} [extraHeaders] - Additional request headers
  * @returns {Promise<object>} Parsed JSON response body
  * @throws {CommerceApiError} If the response status is not 2xx
  */
-async function request(path, body, method) {
-  const headers = {};
+async function request(path, body, method, extraHeaders = {}) {
+  const headers = { ...extraHeaders };
   if (body !== null) headers['Content-Type'] = 'application/json';
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -332,12 +333,28 @@ async function request(path, body, method) {
 }
 
 /**
+ * Header carrying the PayPal session capability returned by createPayPalSession.
+ * The Commerce API requires it on session PATCH/GET (HCA-01).
+ */
+const PAYPAL_SESSION_HEADER = 'x-paypal-session';
+
+/**
+ * @param {string} [sessionToken]
+ * @returns {Record<string, string>} the capability header, or nothing without a token
+ */
+function paypalSessionHeaders(sessionToken) {
+  return sessionToken ? { [PAYPAL_SESSION_HEADER]: sessionToken } : {};
+}
+
+/**
  * Creates a PayPal order via the commerce API session endpoint.
  * Called in the PayPal SDK's createOrder callback before a shipping address is known.
+ * The response includes `sessionToken`, the capability for later session calls and
+ * PayPal Express payment initiation (absent from APIs that predate it).
  *
  * @param {Array<object>} items - Cart line items in API format
  * @param {object} config - Commerce config with getLocale(), getLanguage(), currency
- * @returns {Promise<{paypalOrderId: string}>}
+ * @returns {Promise<{paypalOrderId: string, sessionToken?: string}>}
  * @throws {CommerceApiError}
  */
 export async function createPayPalSession(items, config) {
@@ -360,11 +377,18 @@ export async function createPayPalSession(items, config) {
  * @param {string} paypalOrderId - PayPal order ID from createPayPalSession
  * @param {object} data - Patch payload ({ type, address?, items?,
  *   selectedOptionId?, total?, taxAmount?, shippingRate? })
+ * @param {string} [sessionToken] - Capability from createPayPalSession; sent as
+ *   `x-paypal-session` when present
  * @returns {Promise<object>} API response
  * @throws {CommerceApiError}
  */
-export async function patchPayPalSession(paypalOrderId, data) {
-  return request(`/payments/paypal/session/${paypalOrderId}`, data, 'PATCH');
+export async function patchPayPalSession(paypalOrderId, data, sessionToken) {
+  return request(
+    `/payments/paypal/session/${paypalOrderId}`,
+    data,
+    'PATCH',
+    paypalSessionHeaders(sessionToken),
+  );
 }
 
 /**
@@ -374,16 +398,23 @@ export async function patchPayPalSession(paypalOrderId, data) {
  * @param {string} paypalOrderId - PayPal order ID from createPayPalSession
  * @param {string} [country] - Store country code for provider config resolution
  * @param {string} [locale] - Store locale for provider config resolution
+ * @param {string} [sessionToken] - Capability from createPayPalSession; sent as
+ *   `x-paypal-session` when present (never in the URL)
  * @returns {Promise<{payer: object, shippingAddress: object,
  *   selectedOptionId: string|undefined}>}
  * @throws {CommerceApiError}
  */
-export async function getPayPalSession(paypalOrderId, country, locale) {
+export async function getPayPalSession(paypalOrderId, country, locale, sessionToken) {
   const params = new URLSearchParams();
   if (country) params.set('country', country);
   if (locale) params.set('locale', locale);
   const qs = params.size ? `?${params}` : '';
-  return request(`/payments/paypal/session/${paypalOrderId}${qs}`, null, 'GET');
+  return request(
+    `/payments/paypal/session/${paypalOrderId}${qs}`,
+    null,
+    'GET',
+    paypalSessionHeaders(sessionToken),
+  );
 }
 
 /**

@@ -33,8 +33,12 @@ async function handleCreateOrder(callbacks, deps) {
   const config = callbacks.getConfig();
   const state = callbacks.getState();
   const cart = callbacks.getCart();
-  const { paypalOrderId } = await deps.createPayPalSessionFn(cart.getItemsForAPI(), config);
+  const { paypalOrderId, sessionToken } = await deps.createPayPalSessionFn(
+    cart.getItemsForAPI(),
+    config,
+  );
   state.paypalSessionId = paypalOrderId;
+  state.paypalSessionToken = sessionToken;
   return paypalOrderId;
 }
 
@@ -62,7 +66,7 @@ async function handleShippingAddressChange(data, actions, closureState, callback
         zip: data.shippingAddress.postalCode,
       },
       items: cart.getItemsForAPI(),
-    });
+    }, state.paypalSessionToken);
     if (!result.shippingMethods?.length) {
       return actions.reject(data.errors.ADDRESS_ERROR);
     }
@@ -109,7 +113,7 @@ async function handleShippingOptionsChange(data, actions, closureState, callback
     total: method.total,
     taxAmount: method.taxAmount,
     shippingRate: method.rate,
-  });
+  }, state.paypalSessionToken);
   const countryCode = closureState.lastShippingAddress?.countryCode?.toLowerCase();
   const preview = await callbacks.previewOrderDirect(withPayPalExpressContext({
     items: cart.getItemsForAPI(),
@@ -135,7 +139,10 @@ async function handleShippingOptionsChange(data, actions, closureState, callback
 async function handleApprove(callbacks, deps) {
   try {
     const state = callbacks.getState();
-    const session = await deps.getPayPalSessionFn(state.paypalSessionId);
+    const session = await deps.getPayPalSessionFn(
+      state.paypalSessionId,
+      state.paypalSessionToken,
+    );
     const cart = callbacks.getCart();
     const config = callbacks.getConfig();
     const accountEmail = deps.isLoggedInFn?.() ? deps.getUserFn?.()?.email : '';
@@ -180,7 +187,12 @@ async function handleApprove(callbacks, deps) {
       fraudToken,
       'paypal-express',
       'paypal',
-      { paypalOrderId: state.paypalSessionId },
+      {
+        paypalOrderId: state.paypalSessionId,
+        ...(state.paypalSessionToken
+          ? { paypalSessionToken: state.paypalSessionToken }
+          : {}),
+      },
     ));
     const outcome = resolveExpressOutcome(result);
     if (outcome === 'review') {
@@ -850,5 +862,78 @@ test.describe('stub fallback', () => {
     expect(result).toBe('sdk');
     expect(sdkCalled).toBe(true);
     expect(stubCalled).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PayPal session capability (HCA-01)
+// ---------------------------------------------------------------------------
+
+test.describe('PayPal session capability (HCA-01)', () => {
+  const SESSION = {
+    payer: { firstName: 'John', lastName: 'Doe', email: 'john@example.com' },
+    shippingAddress: {
+      address1: '123 Main St', city: 'Los Angeles', state: 'CA', zip: '90210', country: 'us',
+    },
+    selectedOptionId: 'std',
+  };
+
+  test('stores sessionToken from createPayPalSession in state', async () => {
+    const state = makeState({ paypalSessionId: undefined });
+    const deps = {
+      createPayPalSessionFn: async () => ({ paypalOrderId: 'PP-1', sessionToken: 'cap-1' }),
+    };
+    await handleCreateOrder(makeCallbacks(state), deps);
+    expect(state.paypalSessionToken).toBe('cap-1');
+  });
+
+  test('passes the token to the address and option PATCHes and the approval GET', async () => {
+    const state = makeState({ paypalSessionToken: 'cap-1' });
+    const tokens = [];
+    const methods = [{
+      id: 'std', total: '10.00', taxAmount: '0', rate: '0',
+    }];
+    const deps = {
+      patchPayPalSessionFn: async (id, payload, token) => {
+        tokens.push([payload.type, token]);
+        return { shippingMethods: methods };
+      },
+      getPayPalSessionFn: async (id, token) => {
+        tokens.push(['get', token]);
+        return SESSION;
+      },
+    };
+    const closureState = { lastShippingMethods: [], lastShippingAddress: null };
+    const callbacks = makeCallbacks(state);
+    await handleShippingAddressChange({
+      shippingAddress: { countryCode: 'US', state: 'CA', postalCode: '90210' },
+      errors: { ADDRESS_ERROR: 'ADDRESS_ERROR' },
+    }, makeActions(), closureState, callbacks, deps);
+    await handleShippingOptionsChange({
+      selectedShippingOption: { id: 'std' },
+      errors: { METHOD_UNAVAILABLE: 'METHOD_UNAVAILABLE' },
+    }, makeActions(), closureState, callbacks, deps);
+    await handleApprove(callbacks, deps);
+    expect(tokens).toEqual([['address', 'cap-1'], ['option', 'cap-1'], ['get', 'cap-1']]);
+  });
+
+  test('passes paypalSessionToken to initiatePayment when present', async () => {
+    const state = makeState({ paypalSessionId: 'PP-1', paypalSessionToken: 'cap-1' });
+    let capturedArgs;
+    const callbacks = makeCallbacks(state, {
+      initiatePayment: async (...args) => { capturedArgs = args; return { status: 'completed' }; },
+    });
+    await handleApprove(callbacks, { getPayPalSessionFn: async () => SESSION });
+    expect(capturedArgs[5]).toEqual({ paypalOrderId: 'PP-1', paypalSessionToken: 'cap-1' });
+  });
+
+  test('omits paypalSessionToken when the API returned none', async () => {
+    const state = makeState({ paypalSessionId: 'PP-1' });
+    let capturedArgs;
+    const callbacks = makeCallbacks(state, {
+      initiatePayment: async (...args) => { capturedArgs = args; return { status: 'completed' }; },
+    });
+    await handleApprove(callbacks, { getPayPalSessionFn: async () => SESSION });
+    expect(capturedArgs[5]).toEqual({ paypalOrderId: 'PP-1' });
   });
 });

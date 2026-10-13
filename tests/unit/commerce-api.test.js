@@ -8,7 +8,7 @@ import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   getOrder, estimateShipping, estimatePrice, estimateExpressCheckout, parsePreview,
-  normalizeCouponCode, createOrder,
+  normalizeCouponCode, createOrder, patchPayPalSession, getPayPalSession,
 } from '../../scripts/commerce-api.js';
 import { setAffiliateCode } from '../../scripts/commerce/coupon-state.js';
 import { __setLocale, __resetScripts } from './mocks/scripts.mjs';
@@ -341,4 +341,35 @@ test('createOrder: omits custom data when there is no affiliate code', async () 
   await createOrder(orderBody);
   assert.ok(!('custom' in JSON.parse(lastInit.body)));
   assert.deepEqual(orderBody, { items: [] });
+});
+
+// --- PayPal session capability (HCA-01) ---------------------------------------
+
+test('patchPayPalSession: sends x-paypal-session when a token is given', async () => {
+  mockFetch(200, { ok: true });
+  await patchPayPalSession('PP-1', { type: 'option' }, 'cap-1');
+  assert.equal(lastInit.method, 'PATCH');
+  assert.equal(lastInit.headers['x-paypal-session'], 'cap-1');
+  assert.equal(lastInit.headers['Content-Type'], 'application/json');
+});
+
+test('patchPayPalSession: omits x-paypal-session without a token', async () => {
+  mockFetch(200, { ok: true });
+  await patchPayPalSession('PP-1', { type: 'option' });
+  assert.equal('x-paypal-session' in lastInit.headers, false);
+});
+
+test('getPayPalSession: sends x-paypal-session and keeps the token out of the URL', async () => {
+  mockFetch(200, { payer: {} });
+  await getPayPalSession('PP-1', 'us', 'en_us', 'cap-1');
+  assert.equal(lastInit.method, 'GET');
+  assert.equal(lastInit.headers['x-paypal-session'], 'cap-1');
+  assert.ok(!lastUrl.includes('cap-1'));
+  assert.ok(lastUrl.includes('country=us'));
+});
+
+test('getPayPalSession: omits x-paypal-session without a token', async () => {
+  mockFetch(200, { payer: {} });
+  await getPayPalSession('PP-1', 'us', 'en_us');
+  assert.equal('x-paypal-session' in lastInit.headers, false);
 });
