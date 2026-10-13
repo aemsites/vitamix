@@ -927,6 +927,36 @@ test.describe('Edge Checkout', () => {
         .toContain(affiliateCode);
       console.log('✓ Affiliate coupon survives a non-coupon estimate failure');
     });
+
+    test('shows a not-eligible affiliate code in the checkout summary', async ({ page }) => {
+      await page.addInitScript((cartKey) => {
+        localStorage.setItem(cartKey, JSON.stringify({
+          version: 1,
+          items: [{
+            sku: 'summary-test-sku',
+            quantity: 1,
+            price: '549.99',
+            name: 'Summary Test Product',
+            path: '/us/en_us/products/ascent-x2',
+            url: '/us/en_us/products/ascent-x2',
+            image: '/media_placeholder.png',
+          }],
+        }));
+      }, CART_KEY_US);
+      await page.route('**/estimate/price', (route) => route.fulfill(
+        rejectWith('ADOBE_COMMERCE_COUPON_PRODUCT_NOT_ELIGIBLE'),
+      ));
+      await page.goto(buildProductUrl('/us/en_us/order/checkout', currentBranch, {
+        cart: 'edge', COUPON: affiliateCode, cjevent: 'e2e-click',
+      }));
+
+      const summary = page.locator('.order-summary').first();
+      await expect(summary.locator('.coupon-notice'))
+        .toHaveText('Product not eligible for affiliate discount.', { timeout: 30000 });
+      await expect(summary.locator('.coupon-pill-ineligible')).toContainText(affiliateCode);
+      await expect(summary.locator('.order-summary-coupon-error')).toBeHidden();
+      console.log('✓ Checkout summary shows the not-eligible affiliate code');
+    });
   });
 
   // ─── Minicart interactions ────────────────────────────────────────────────────
