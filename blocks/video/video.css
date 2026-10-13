@@ -4,9 +4,13 @@
   margin: 24px auto;
 }
 
+.video.youtube-short {
+  --video-aspect-ratio: 1 / 1;
+}
+
 .video[data-embed-loaded='false']:not(.placeholder) {
   /* reserve an approximate space to avoid extensive layout shifts */
-  aspect-ratio: 16 / 9;
+  aspect-ratio: var(--video-aspect-ratio, 16 / 9);
 }
 
 .video > div {
@@ -20,7 +24,7 @@
 
 .video .video-placeholder {
   width: 100%;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: var(--video-aspect-ratio, 16 / 9);
   position: relative;
 }
 

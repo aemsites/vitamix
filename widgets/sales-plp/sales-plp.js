@@ -1,4 +1,5 @@
 import { loadCSS, fetchPlaceholders } from '../../scripts/aem.js';
+import loadColorSwatches from '../../scripts/color-swatches.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 import { lookupProducts, createProductCard } from '../../blocks/plp/plp.js';
 
@@ -41,6 +42,7 @@ export default async function decorate(widget) {
 
   // Load PLP block styles so product cards match the PLP block
   loadCSS(`${window.hlx?.codeBasePath || ''}/blocks/plp/plp.css`);
+  loadColorSwatches();
 
   const resultsEl = widget.querySelector('.plp-results');
   const countEl = widget.querySelector('#sales-plp-results-count');

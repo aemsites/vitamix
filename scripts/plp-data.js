@@ -21,6 +21,16 @@ const CALLOUT_TIERS = {
 export const PLP_DATASETS = ['blenders', 'accessories', 'commercial'];
 
 /**
+ * Missing availability is not considered out of stock; every SKU must be unavailable.
+ * @param {Object} product - Parsed product-index data
+ * @returns {boolean}
+ */
+export function isIndexProductOutOfStock(product) {
+  const skus = product.variants?.length ? product.variants : [product];
+  return skus.every((sku) => sku.availability && sku.availability !== 'InStock');
+}
+
+/**
  * Classifies authored badge text into an existing callout type (and its tier).
  * @param {string} badge - Raw badge text from plp-data's Badges column
  * @returns {string}
@@ -73,11 +83,17 @@ function calloutFromBadge(badge, copy) {
  * Builds callouts from plp-data's Badges column, plus an automatic Sale badge when the
  * product's current price is below its regular price. Title and collections
  * are not used. Capped to 2.
+ * When enabled, an out-of-stock badge replaces all other callouts for unavailable products.
  * @param {Object} product - Product data object with `badge` from plp-data
  * @param {Object} copy - Localized copy object with badge labels (sale, new, bestSeller, bundleSave, exclusive, topRated, limitedEdition)
+ * @param {Object} [options]
+ * @param {boolean} [options.showOutOfStock=false] - Replace callouts when all SKUs are unavailable
  * @returns {Array<{type: string, label: string, tier: string}>}
  */
-export function getProductCallouts(product, copy) {
+export function getProductCallouts(product, copy, { showOutOfStock = false } = {}) {
+  if (showOutOfStock && isIndexProductOutOfStock(product)) {
+    return [{ type: 'outOfStock', label: copy.outOfStock, tier: 'info' }];
+  }
   const callouts = [];
   const badge = (product.badge || '').trim();
   const authored = badge ? calloutFromBadge(badge, copy) : null;
@@ -96,12 +112,13 @@ export function getProductCallouts(product, copy) {
  * Builds the badge/callout overlay for a product card.
  * @param {Object} product - Product data object
  * @param {Object} copy - Localized copy object with badge labels
+ * @param {Object} [options] - Options passed to getProductCallouts
  * @returns {HTMLDivElement} `.product-badges` wrapper containing one `.product-badge` per callout
  */
-export function createCallouts(product, copy) {
+export function createCallouts(product, copy, options = {}) {
   const wrap = document.createElement('div');
   wrap.className = 'product-badges';
-  getProductCallouts(product, copy).forEach(({
+  getProductCallouts(product, copy, options).forEach(({
     type, label, tier,
   }) => {
     const badge = document.createElement('span');

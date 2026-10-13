@@ -127,6 +127,35 @@ test('updateItem throws when sku is not in the cart', () => {
   assert.throws(() => cart.updateItem('missing', 1), /not found/);
 });
 
+// --- updateItemPrice --------------------------------------------------------
+
+test('updateItemPrice reprices, persists, and dispatches action="price"', () => {
+  const cart = new Cart();
+  cart.addItem(sampleItem({ sku: 'bundle', price: '899.95' }));
+  globalThis.__events.length = 0;
+  assert.equal(cart.updateItemPrice('bundle', '949.95'), true);
+  assert.equal(cart.items[0].price, '949.95');
+  assert.equal(JSON.parse(localStorage.getItem(STORAGE_KEY)).items[0].price, '949.95');
+  assert.equal(globalThis.__events.filter((e) => e.detail.action === 'price').length, 1);
+});
+
+test('updateItemPrice is a no-op (no event) when the price already matches', () => {
+  const cart = new Cart();
+  cart.addItem(sampleItem({ sku: 'bundle', price: '949.95' }));
+  globalThis.__events.length = 0;
+  assert.equal(cart.updateItemPrice('bundle', '949.95'), false);
+  assert.equal(globalThis.__events.length, 0);
+});
+
+test('updateItemPrice ignores unknown SKUs, invalid prices, and gift lines', () => {
+  const cart = new Cart();
+  cart.addItem(sampleItem({ sku: 'gift', price: '0', custom: { giftWithPurchase: true } }));
+  assert.equal(cart.updateItemPrice('missing', '1.00'), false);
+  assert.equal(cart.updateItemPrice('gift', 'abc'), false);
+  assert.equal(cart.updateItemPrice('gift', '5.00'), false);
+  assert.equal(cart.items[0].price, '0');
+});
+
 // --- removeItem -------------------------------------------------------------
 
 test('removeItem removes the entry', () => {

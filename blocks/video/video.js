@@ -16,6 +16,7 @@ const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)
  */
 export function embedYoutube(url, autoplay, background, ariaLabel = '') {
   const usp = new URLSearchParams(url.search);
+  const isShort = url.pathname.startsWith('/shorts/');
   let suffix = '';
   if (background || autoplay) {
     const suffixParams = {
@@ -32,10 +33,12 @@ export function embedYoutube(url, autoplay, background, ariaLabel = '') {
   const embed = url.pathname;
   if (url.origin.includes('youtu.be')) {
     [, vid] = url.pathname.split('/');
+  } else if (isShort) {
+    vid = encodeURIComponent(url.pathname.split('/')[2]);
   }
 
   const temp = document.createElement('div');
-  temp.innerHTML = `<div style="left: 0; width: 100%; height: 0; position: relative; padding-bottom: 56.25%;"${background ? ' aria-hidden="true"' : ''}>
+  temp.innerHTML = `<div style="left: 0; width: 100%; height: 0; position: relative; padding-bottom: ${isShort ? 100 : 56.25}%;"${background ? ' aria-hidden="true"' : ''}>
       <iframe src="https://www.youtube.com${vid ? `/embed/${vid}?rel=0&v=${vid}${suffix}` : embed}" style="border: 0; top: 0; left: 0; width: 100%; height: 100%; position: absolute;"
       allow="autoplay; fullscreen; picture-in-picture; encrypted-media; accelerometer; gyroscope; picture-in-picture" allowfullscreen="" scrolling="no" loading="lazy"></iframe>
     </div>`;
@@ -146,6 +149,8 @@ const loadVideoEmbed = (block, link, autoplay, background, ariaLabel = '') => {
 export default async function decorate(block) {
   const placeholder = block.querySelector('picture');
   const link = block.querySelector('a[href]');
+  const url = new URL(link.href);
+  block.classList.toggle('youtube-short', /^(?:www\.|m\.)?youtube\.com$/.test(url.hostname) && url.pathname.startsWith('/shorts/'));
   const label = block.textContent.replace(link.textContent, '').trim();
   block.textContent = '';
   block.dataset.embedLoaded = false;

@@ -9,7 +9,9 @@ import { createModal } from '../modal/modal.js';
  * @returns {boolean}
  */
 function isVideo(el) {
-  return el.href.startsWith('https://www.youtube.com/watch?v=') || el.href.startsWith('https://youtu.be/');
+  return el.href.startsWith('https://www.youtube.com/watch?v=')
+    || el.href.startsWith('https://youtu.be/')
+    || /^https:\/\/(?:www\.|m\.)?youtube\.com\/shorts\/[^/?#]+/.test(el.href);
 }
 
 /**

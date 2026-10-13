@@ -8,9 +8,9 @@ import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   getOrder, estimateShipping, estimatePrice, estimateExpressCheckout, parsePreview,
-  normalizeCouponCode, createOrder, patchPayPalSession, getPayPalSession,
+  createOrder, patchPayPalSession, getPayPalSession,
 } from '../../scripts/commerce-api.js';
-import { setAffiliateCode } from '../../scripts/commerce/coupon-state.js';
+import { normalizeCouponCode, setAffiliateCode, getCouponRequestFields } from '../../scripts/commerce/coupon-state.js';
 import { __setLocale, __resetScripts } from './mocks/scripts.mjs';
 
 const API_ORIGIN = 'https://api.test.com/test-org/sites/test-site';
@@ -372,4 +372,15 @@ test('getPayPalSession: omits x-paypal-session without a token', async () => {
   mockFetch(200, { payer: {} });
   await getPayPalSession('PP-1', 'us', 'en_us');
   assert.equal('x-paypal-session' in lastInit.headers, false);
+});
+
+test('createOrder: sends a lone affiliate coupon as an array with the affiliate code', async () => {
+  localStorage.setItem('auth_token', FUTURE_JWT);
+  setAffiliateCode('06-AFFILIATE');
+  mockFetch(200, { order: {} });
+  await createOrder({ items: [], ...getCouponRequestFields() });
+  const body = JSON.parse(lastInit.body);
+  assert.deepEqual(body.couponCode, ['06-AFFILIATE']);
+  assert.deepEqual(body.couponSource, ['auto']);
+  assert.equal(body.custom.affiliateCode, '06-AFFILIATE');
 });

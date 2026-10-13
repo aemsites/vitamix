@@ -8,18 +8,20 @@ import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 import { initIDMe, syncIDMeVisibility } from '../../scripts/commerce/idme.js';
 import {
   getCoupons, getManualCoupon, getAutoCoupons, setManualCoupon, removeCoupon,
-  getCouponRequestFields, clearCoupons,
+  getCouponRequestFields, clearCoupons, getCouponErrorCode, updateAffiliateStatus,
 } from '../../scripts/commerce/coupon-state.js';
 import { renderCouponPills, renderCouponStatus, couponCodeFromDiscount } from '../../scripts/commerce/coupon-ui.js';
 
 const LOCAL_STRINGS = {
   'en-us': {
     removeCoupon: 'Remove coupon',
+    affiliateNotEligible: 'Product not eligible for affiliate discount.',
     couponRejectedInvalid: 'isn\'t a valid coupon code.',
     couponRejectedNotCombinable: 'can\'t be combined with your other offers.',
   },
   'fr-ca': {
     removeCoupon: 'Retirer le coupon',
+    affiliateNotEligible: 'Produit non admissible au rabais d\'affiliation.',
     couponRejectedInvalid: 'n\'est pas un code promo valide.',
     couponRejectedNotCombinable: 'ne peut pas être combiné avec vos autres offres.',
   },
@@ -36,7 +38,6 @@ const COUPON_ERROR_MESSAGES = {
     coupon_minimum_not_met: 'Your order total doesn\'t meet the minimum required for this coupon.',
     coupon_product_not_eligible: 'No items in your cart are eligible for this coupon.',
     coupon_manual_entry_rejected: 'This coupon cannot be entered manually.',
-    unauthorized: 'Please sign in to use this coupon.',
     default: 'This coupon code could not be applied.',
   },
   'fr-ca': {
@@ -49,7 +50,6 @@ const COUPON_ERROR_MESSAGES = {
     coupon_minimum_not_met: 'Le total de votre commande est inférieur au minimum requis pour ce coupon.',
     coupon_product_not_eligible: 'Aucun article de votre panier n\'est éligible à ce coupon.',
     coupon_manual_entry_rejected: 'Ce coupon ne peut pas être saisi manuellement.',
-    unauthorized: 'Veuillez vous connecter pour utiliser ce coupon.',
     default: 'Ce code promo n\'a pas pu être appliqué.',
   },
 };
@@ -262,7 +262,7 @@ export default async function decorate(block) {
     document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
   };
 
-  // Removable pills for auto/verified coupons; the input only holds the manual one.
+  // Pills for auto/verified coupons; the input only holds the manual one.
   const renderPills = () => renderCouponPills(pillsEl, getAutoCoupons(), (code) => {
     removeCoupon(code);
     document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
@@ -334,6 +334,9 @@ export default async function decorate(block) {
   // Renders per-code rejection feedback and rolls back an invalid manual code so
   // it is not persisted or left in the input.
   const handleCouponStatus = (couponStatus) => {
+    updateAffiliateStatus(couponStatus);
+    renderPills();
+    syncIDMeVisibility();
     renderCouponStatus(statusEl, couponStatus, s);
     const manual = getManualCoupon();
     if (!manual) return;
@@ -418,14 +421,15 @@ export default async function decorate(block) {
       handleCouponStatus(estimate.couponStatus);
     } catch (err) {
       if (requestId !== priceEstimateRequest) return;
-      // Only the single-string (legacy) contract throws a 422 for a bad coupon;
-      // array input is tolerant. Drop the lone coupon and surface the error.
-      if (getCoupons().length <= 1) {
+      // Only a single-string coupon fails the request with a 422. Drop it and
+      // surface the error; other failures keep the coupon so it is retried.
+      const errorCode = getCouponErrorCode(err);
+      if (errorCode && typeof couponCode === 'string') {
         clearCoupons();
         discountInput.value = '';
         discountsEl.innerHTML = '';
         discountsEl.hidden = true;
-        couponErrorEl.textContent = getCouponErrorMessage(err?.errorHeader);
+        couponErrorEl.textContent = getCouponErrorMessage(errorCode);
         couponErrorEl.hidden = false;
         renderPills();
       } else {
@@ -458,7 +462,7 @@ export default async function decorate(block) {
       setManualCoupon(code);
       document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
     } catch (err) {
-      couponErrorEl.textContent = getCouponErrorMessage(err?.errorHeader);
+      couponErrorEl.textContent = getCouponErrorMessage(getCouponErrorCode(err));
       couponErrorEl.hidden = false;
     } finally {
       discountApply.disabled = false;

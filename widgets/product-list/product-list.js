@@ -2,11 +2,13 @@
 import {
   fetchPlaceholders, loadCSS, toClassName, createOptimizedPicture,
 } from '../../scripts/aem.js';
+import loadColorSwatches from '../../scripts/color-swatches.js';
 import { formatPrice, buildVideo } from '../../scripts/scripts.js';
 import { loadFragment } from '../../blocks/fragment/fragment.js';
 import addToCompare, { isInStoredCompare, getHeaderCompareHref } from '../../scripts/add-to-compare.js';
 import { createCallouts, createStarRating } from '../../scripts/plp-data.js';
 import lookupProductListProducts, { getWidgetLocaleAndLanguage, getFacetDefinitions } from './products.js';
+import createProductCta from './product-cta.js';
 
 const marketingFragmentCache = new Map();
 
@@ -261,24 +263,13 @@ function createProductPrice(product, ph, copy) {
   return price;
 }
 
-function createProductCta(product, copy) {
-  const wrap = document.createElement('p');
-  wrap.className = 'product-list-widget-cta button-container';
-  const link = document.createElement('a');
-  link.href = product.url || '#';
-  link.className = 'button link';
-  link.textContent = copy.shopNow;
-  wrap.appendChild(link);
-  return wrap;
-}
-
 function createProductListCard(product, ph, copy, activeColorSlug) {
   const card = document.createElement('div');
   card.className = 'product-list-widget-product-card';
   card.setAttribute('role', 'listitem');
 
   const imageWrap = createProductImage();
-  imageWrap.append(createCallouts(product, copy), createCompareButton(product, copy));
+  imageWrap.append(createCallouts(product, copy, { showOutOfStock: true }), createCompareButton(product, copy));
 
   const title = createProductTitle(product);
   const colors = createProductColors(product, copy, (variant, swatch) => {
@@ -964,7 +955,7 @@ export default async function decorate(widget) {
   widget.productListBaseConfig = { ...baseConfig };
 
   loadCSS(`${window.hlx?.codeBasePath || ''}/widgets/product-list/product-list.css`);
-  loadCSS(`${window.hlx?.codeBasePath || ''}/styles/color-swatches.css`);
+  loadColorSwatches();
 
   const toolbar = widget.querySelector('.product-list-toolbar');
   const filtersTrigger = widget.querySelector('.product-list-filters-trigger');

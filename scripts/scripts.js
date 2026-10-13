@@ -107,10 +107,21 @@ export const FORMS_ENDPOINT = isProdHost
   ? ''
   : 'https://main--vitamix--aemsites.aem.network';
 
+// Public PayPal REST client IDs per environment. The PayPal SDK derives its environment
+// from the ID (a sandbox ID opens www.sandbox.paypal.com), so each ID must belong to the
+// same PayPal REST app as the clientId/clientSecret the Commerce API uses for that
+// environment. Production is only the canonical host (see isProdHost).
 const PAYPAL_CLIENT_IDS = {
-  us: 'AaBQdCVqIp15uFQaHrJmTUDBZ-xJrOYPs99NtZ-iLN5oij-ustZq304ikTHJKwqqSL4yN0v9GLireQLN',
-  ca: 'AVlGkhsI0_EFNFx8jnRsv0dSROcLzzLYtTdMoNieyjZeAWlIXdFpocB6eyhHvuDOZ3F2YFmQDkLE03Rp',
+  production: {
+    us: 'AXEZkJYX0uhAkORSHXQZpFbuGcZavyp13sVXuZKuL0OE2Ogtg-YXPftgHw8EUpSRW6xbdFzb9bJFihdE',
+    ca: 'Adh1NWHQFx0BRj-GC_mtv1qLLk9UGao-NWmxL4Qa-bG_jq69vahZHZzhp6QNfCi5m_LpbjDv4lSjOBfu',
+  },
+  sandbox: {
+    us: 'AaBQdCVqIp15uFQaHrJmTUDBZ-xJrOYPs99NtZ-iLN5oij-ustZq304ikTHJKwqqSL4yN0v9GLireQLN',
+    ca: 'AVlGkhsI0_EFNFx8jnRsv0dSROcLzzLYtTdMoNieyjZeAWlIXdFpocB6eyhHvuDOZ3F2YFmQDkLE03Rp',
+  },
 };
+const paypalClientIds = PAYPAL_CLIENT_IDS[isProdHost ? 'production' : 'sandbox'];
 const siteLocale = window.location.pathname.split('/').filter(Boolean)[0] || 'us';
 
 window.CommerceConfig = {
@@ -121,7 +132,7 @@ window.CommerceConfig = {
     '/scripts/cart-compatibility.js',
   ],
   paypal: {
-    clientId: PAYPAL_CLIENT_IDS[siteLocale] ?? PAYPAL_CLIENT_IDS.us,
+    clientId: paypalClientIds[siteLocale] ?? paypalClientIds.us,
     intent: 'authorize',
     orderReview: { express: true, checkout: true },
   },
@@ -330,7 +341,12 @@ export function getCookies() {
   return cookieMap;
 }
 
+let affiliateCouponHandled = false;
+
 function setAffiliateCoupon() {
+  // decorateMain also runs for fragments; handle the URL params once per page.
+  if (affiliateCouponHandled) return;
+  affiliateCouponHandled = true;
   const urlParams = new URLSearchParams(window.location.search);
   const { cjdata, cjevent, COUPON } = Object.fromEntries(urlParams);
 

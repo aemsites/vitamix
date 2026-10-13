@@ -467,13 +467,14 @@ export default async function decorate(block) {
   // When the cart changes mid-checkout, invalidate stale estimates and
   // re-fetch shipping rates before previewing. Some shipping providers issue
   // quantity/weight-specific method ids, so reusing the previous id can make
-  // the preview request invalid after a quantity change.
-  document.addEventListener('cart:change', () => {
+  // the preview request invalid after a quantity change. Price syncs are
+  // re-previewed by the caller that triggered them.
+  document.addEventListener('cart:change', (e) => {
     if (cart.itemCount === 0) return;
     state.currentEstimateToken = null;
     state.currentEstimatePayload = null;
     state.currentPreview = null;
-    if (state.selectedShippingMethodId) {
+    if (state.selectedShippingMethodId && e.detail?.action !== 'price') {
       refreshShipping();
     }
   });
