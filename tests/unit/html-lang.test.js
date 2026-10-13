@@ -54,8 +54,8 @@ describe('document language', () => {
     assert.equal(htmlLang('/mx/en_us/'), 'en-MX');
   });
 
-  it('tags the VR English store (served from /vr/en_us) as en-US since VR is not a country', () => {
-    assert.equal(htmlLang('/vr/en_us/'), 'en-US');
+  it('tags the VR English store (served from /vr/en_us) as en since VR is not a country', () => {
+    assert.equal(htmlLang('/vr/en_us/'), 'en');
   });
 
   it('defaults to en-US when the path has no locale or language', () => {
