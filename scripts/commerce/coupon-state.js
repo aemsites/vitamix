@@ -20,6 +20,40 @@ const COUPONS_KEY = 'checkout_coupons';
 const LEGACY_CODE_KEY = 'checkout_coupon_code';
 const LEGACY_SOURCE_KEY = 'checkout_coupon_source';
 const AFFILIATE_CODE_KEY = 'checkout_affiliate_code';
+const AFFILIATE_INELIGIBLE_KEY = 'checkout_affiliate_ineligible';
+
+// Characters the Commerce API accepts in a coupon code. The `+` is valid but was
+// absent from the historical coupon import (which uppercased and mapped every
+// other special char — `*`, `#`, etc. — to `_` via /[^A-Z0-9\-_]/g), so codes at
+// rest never contain it. We normalize the same way here but keep `+` in the set,
+// so a `+` a shopper types is sent through unchanged while legacy special chars
+// still collapse to `_` and match the imported codes.
+const COUPON_NON_CHARSET = /[^A-Z0-9\-_+]/g;
+
+/**
+ * Normalizes a coupon code to the API-accepted character set: uppercased, with
+ * any character outside [A-Z0-9-_+] replaced by `_`. Mirrors the historical
+ * import so shopper-entered codes match what is stored. Display values are left
+ * untouched — only the value sent to the API is normalized.
+ *
+ * @param {string} raw - The coupon code as entered/displayed
+ * @returns {string}
+ */
+export function normalizeCouponCode(raw) {
+  return String(raw).toUpperCase().replace(COUPON_NON_CHARSET, '_');
+}
+
+/** Coupon rejection codes with a dedicated shopper-facing message. */
+export const COUPON_ERROR_CODES = new Set([
+  'coupon_invalid_format', 'coupon_not_found', 'coupon_inactive', 'coupon_expired',
+  'coupon_exhausted', 'coupon_country_mismatch', 'coupon_minimum_not_met',
+  'coupon_product_not_eligible', 'coupon_manual_entry_rejected', 'unauthorized',
+]);
+
+/** Rejection code for a coupon that applies to no item in the cart. */
+export const COUPON_PRODUCT_NOT_ELIGIBLE = 'coupon_product_not_eligible';
+
+const API_ERROR_PREFIX = 'ADOBE_COMMERCE_';
 
 /** Max coupons accepted by the API. Enforced client-side to avoid a 400. */
 export const MAX_COUPONS = 5;
@@ -207,7 +241,9 @@ export function getCouponRequestFields() {
  */
 export function setAffiliateCode(code) {
   const trimmed = (code || '').trim();
-  if (trimmed) sessionStorage.setItem(AFFILIATE_CODE_KEY, trimmed);
+  if (!trimmed) return;
+  sessionStorage.setItem(AFFILIATE_CODE_KEY, trimmed);
+  sessionStorage.removeItem(AFFILIATE_INELIGIBLE_KEY);
 }
 
 /**
@@ -224,6 +260,92 @@ export function getAffiliateCode() {
 /** Clears the affiliate coupon code. */
 export function clearAffiliateCode() {
   sessionStorage.removeItem(AFFILIATE_CODE_KEY);
+  sessionStorage.removeItem(AFFILIATE_INELIGIBLE_KEY);
+}
+
+/**
+ * @param {string} code
+ * @returns {boolean} Whether `code` is the recorded affiliate coupon code
+ */
+export function isAffiliateCode(code) {
+  const affiliateCode = getAffiliateCode();
+  return !!affiliateCode && !!code
+    && normalizeCouponCode(code.trim()) === normalizeCouponCode(affiliateCode);
+}
+
+/**
+ * Removes the affiliate coupon from the coupon list after it was rejected, and
+ * keeps it on display as a not-eligible code. The affiliate code itself is
+ * still sent with the order.
+ */
+export function markAffiliateIneligible() {
+  setCoupons(getCoupons().filter((c) => !isAffiliateCode(c.code)));
+  sessionStorage.setItem(AFFILIATE_INELIGIBLE_KEY, 'true');
+}
+
+/**
+ * @returns {string} The affiliate code to display as not eligible, or ''
+ */
+export function getIneligibleAffiliateCode() {
+  try {
+    if (!sessionStorage.getItem(AFFILIATE_INELIGIBLE_KEY)) return '';
+  } catch {
+    return '';
+  }
+  return getAffiliateCode();
+}
+
+/**
+ * Hides the not-eligible affiliate code from display. The affiliate code is
+ * still sent with the order.
+ */
+export function dismissIneligibleAffiliate() {
+  sessionStorage.removeItem(AFFILIATE_INELIGIBLE_KEY);
+}
+
+/**
+ * Resolves a Commerce API error to a coupon rejection code (e.g.
+ * `coupon_not_found`), or null when the error is not a coupon rejection.
+ * @param {{body?: {code?: string}, code?: string, errorHeader?: string}} err
+ * @returns {string|null}
+ */
+export function getCouponErrorCode(err) {
+  const apiCode = err?.body?.code || err?.code || '';
+  if (apiCode.startsWith(API_ERROR_PREFIX)) {
+    const key = apiCode.slice(API_ERROR_PREFIX.length).toLowerCase();
+    if (COUPON_ERROR_CODES.has(key)) return key;
+  }
+  return COUPON_ERROR_CODES.has(err?.errorHeader) ? err.errorHeader : null;
+}
+
+/**
+ * Drops a lone coupon rejected with `errorCode`. An affiliate coupon that does
+ * not apply to the cart stays on display as not eligible instead.
+ * @param {string} errorCode - Coupon rejection code from getCouponErrorCode
+ * @returns {boolean} Whether the rejected coupon was the not-eligible affiliate
+ */
+export function dropRejectedCoupon(errorCode) {
+  const [lone] = getCoupons();
+  if (errorCode === COUPON_PRODUCT_NOT_ELIGIBLE && isAffiliateCode(lone?.code)) {
+    markAffiliateIneligible();
+    return true;
+  }
+  clearCoupons();
+  return false;
+}
+
+/**
+ * Handles `couponStatus[]` from a multi-coupon response: a rejected affiliate
+ * coupon is removed from the list and kept on display as not eligible.
+ * @param {Array<{code: string, status: string}>} couponStatus
+ * @returns {boolean} Whether the affiliate coupon was marked not eligible
+ */
+export function handleAffiliateStatus(couponStatus) {
+  const rejected = (couponStatus || []).some(
+    (e) => e?.status === 'rejected_invalid' && isAffiliateCode(e.code),
+  );
+  if (rejected) markAffiliateIneligible();
+  return rejected;
 }
 
 /**

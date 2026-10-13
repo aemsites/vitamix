@@ -14,6 +14,13 @@ import {
   setAffiliateCode,
   getAffiliateCode,
   clearAffiliateCode,
+  isAffiliateCode,
+  markAffiliateIneligible,
+  getIneligibleAffiliateCode,
+  dismissIneligibleAffiliate,
+  getCouponErrorCode,
+  dropRejectedCoupon,
+  handleAffiliateStatus,
 } from '../../scripts/commerce/coupon-state.js';
 
 beforeEach(() => globalThis.__resetTestState());
@@ -147,4 +154,95 @@ test('setAffiliateCode ignores blank codes', () => {
   setAffiliateCode('06-FIRST');
   setAffiliateCode('  ');
   assert.equal(getAffiliateCode(), '06-FIRST');
+});
+
+test('getCouponErrorCode maps API error codes to coupon rejection codes', () => {
+  assert.equal(
+    getCouponErrorCode({ body: { code: 'ADOBE_COMMERCE_COUPON_PRODUCT_NOT_ELIGIBLE' }, errorHeader: 'coupon not applicable' }),
+    'coupon_product_not_eligible',
+  );
+  assert.equal(getCouponErrorCode({ code: 'ADOBE_COMMERCE_COUPON_EXPIRED' }), 'coupon_expired');
+  assert.equal(getCouponErrorCode({ body: { code: 'ADOBE_COMMERCE_UNAUTHORIZED' } }), 'unauthorized');
+  assert.equal(getCouponErrorCode({ errorHeader: 'coupon_not_found' }), 'coupon_not_found');
+});
+
+test('getCouponErrorCode returns null for non-coupon failures', () => {
+  assert.equal(getCouponErrorCode(new Error('fetch failed')), null);
+  assert.equal(getCouponErrorCode({ status: 500, body: { code: 'ADOBE_COMMERCE_INTERNAL' } }), null);
+  assert.equal(getCouponErrorCode(undefined), null);
+});
+
+test('isAffiliateCode compares normalized codes', () => {
+  assert.equal(isAffiliateCode('06-AFF'), false);
+  setAffiliateCode('06-aff');
+  assert.equal(isAffiliateCode('06-AFF'), true);
+  assert.equal(isAffiliateCode(' 06-aff '), true);
+  assert.equal(isAffiliateCode('SAVE10'), false);
+});
+
+test('dropRejectedCoupon keeps a not-eligible affiliate coupon on display', () => {
+  setAffiliateCode('06-AFF');
+  addCoupon('06-AFF', 'auto');
+  assert.equal(dropRejectedCoupon('coupon_product_not_eligible'), true);
+  assert.deepEqual(getCoupons(), []);
+  assert.deepEqual(getCouponRequestFields(), {});
+  assert.equal(getIneligibleAffiliateCode(), '06-AFF');
+  assert.equal(getAffiliateCode(), '06-AFF');
+});
+
+test('dropRejectedCoupon clears other rejections without the affiliate display', () => {
+  setAffiliateCode('06-AFF');
+  addCoupon('06-AFF', 'auto');
+  assert.equal(dropRejectedCoupon('coupon_expired'), false);
+  assert.deepEqual(getCoupons(), []);
+  assert.equal(getIneligibleAffiliateCode(), '');
+
+  addCoupon('SAVE10');
+  assert.equal(dropRejectedCoupon('coupon_product_not_eligible'), false);
+  assert.deepEqual(getCoupons(), []);
+  assert.equal(getIneligibleAffiliateCode(), '');
+});
+
+test('handleAffiliateStatus removes a rejected affiliate coupon from a multi-coupon list', () => {
+  setAffiliateCode('06-AFF');
+  setCoupons([{ code: '06-AFF', source: 'auto' }, { code: 'SAVE10', source: 'manual' }]);
+  assert.equal(handleAffiliateStatus([
+    { code: '06-AFF', status: 'rejected_invalid' },
+    { code: 'SAVE10', status: 'applied' },
+  ]), true);
+  assert.deepEqual(getCoupons(), [{ code: 'SAVE10', source: 'manual' }]);
+  assert.equal(getIneligibleAffiliateCode(), '06-AFF');
+});
+
+test('handleAffiliateStatus ignores other rejected codes', () => {
+  setAffiliateCode('06-AFF');
+  setCoupons([{ code: '06-AFF', source: 'auto' }, { code: '06-OTHER', source: 'auto' }]);
+  assert.equal(handleAffiliateStatus([
+    { code: '06-AFF', status: 'applied' },
+    { code: '06-OTHER', status: 'rejected_invalid' },
+  ]), false);
+  assert.equal(getCoupons().length, 2);
+  assert.equal(getIneligibleAffiliateCode(), '');
+});
+
+test('dismissing the not-eligible display keeps the affiliate code', () => {
+  setAffiliateCode('06-AFF');
+  markAffiliateIneligible();
+  dismissIneligibleAffiliate();
+  assert.equal(getIneligibleAffiliateCode(), '');
+  assert.equal(getAffiliateCode(), '06-AFF');
+});
+
+test('landing with an affiliate code again resets the not-eligible display', () => {
+  setAffiliateCode('06-AFF');
+  markAffiliateIneligible();
+  setAffiliateCode('06-AFF');
+  assert.equal(getIneligibleAffiliateCode(), '');
+});
+
+test('clearAffiliateCode clears the not-eligible display', () => {
+  setAffiliateCode('06-AFF');
+  markAffiliateIneligible();
+  clearAffiliateCode();
+  assert.equal(getIneligibleAffiliateCode(), '');
 });

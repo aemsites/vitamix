@@ -12,7 +12,8 @@ import { initIDMe, syncIDMeVisibility } from '../../scripts/commerce/idme.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 import {
   getCoupons, getManualCoupon, getAutoCoupons, setManualCoupon, removeCoupon,
-  getCouponRequestFields, clearCoupons,
+  getCouponRequestFields, getIneligibleAffiliateCode, dismissIneligibleAffiliate,
+  getCouponErrorCode, dropRejectedCoupon, handleAffiliateStatus,
 } from '../../scripts/commerce/coupon-state.js';
 import { renderCouponPills, renderCouponStatus, couponCodeFromDiscount } from '../../scripts/commerce/coupon-ui.js';
 
@@ -26,6 +27,7 @@ const LOCAL_STRINGS = {
     applied: 'Code saved',
     discountPending: 'Applied at checkout',
     removeCoupon: 'Remove coupon',
+    affiliateNotEligible: 'Product not eligible for affiliate discount.',
     couponRejectedInvalid: 'isn\'t a valid coupon code.',
     couponRejectedNotCombinable: 'can\'t be combined with your other offers.',
   },
@@ -36,6 +38,7 @@ const LOCAL_STRINGS = {
     applied: 'Code sauvegardé',
     discountPending: 'Appliqué à la caisse',
     removeCoupon: 'Retirer le coupon',
+    affiliateNotEligible: 'Produit non admissible au rabais d\'affiliation.',
     couponRejectedInvalid: 'n\'est pas un code promo valide.',
     couponRejectedNotCombinable: 'ne peut pas être combiné avec vos autres offres.',
   },
@@ -69,12 +72,6 @@ const COUPON_ERROR_MESSAGES = {
     default: 'Ce code promo n\'a pas pu être appliqué.',
   },
 };
-
-const COUPON_ERRORS = new Set([
-  'coupon_invalid_format', 'coupon_not_found', 'coupon_inactive', 'coupon_expired',
-  'coupon_exhausted', 'coupon_country_mismatch', 'coupon_minimum_not_met',
-  'coupon_product_not_eligible', 'coupon_manual_entry_rejected', 'unauthorized',
-]);
 
 function getStrings() {
   const config = getConfig();
@@ -240,10 +237,23 @@ export default async function decorate(block) {
   };
 
   // Removable pills for auto/verified coupons; the input only holds the manual one.
-  const renderPills = () => renderCouponPills(pillsEl, getAutoCoupons(), (code) => {
-    removeCoupon(code);
-    document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
-  }, s);
+  // A not-eligible affiliate code is shown too, but is not sent as a coupon.
+  const renderPills = () => {
+    const ineligible = getIneligibleAffiliateCode();
+    const pills = [
+      ...getAutoCoupons(),
+      ...(ineligible ? [{ code: ineligible, ineligible: true }] : []),
+    ];
+    renderCouponPills(pillsEl, pills, (code, isIneligible) => {
+      if (isIneligible) {
+        dismissIneligibleAffiliate();
+        renderPills();
+        return;
+      }
+      removeCoupon(code);
+      document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
+    }, s);
+  };
 
   // A remove button appears only on the manual coupon's row; auto coupons are
   // removed via their pill.
@@ -306,6 +316,11 @@ export default async function decorate(block) {
   // Renders per-code rejection feedback and rolls back an invalid manual code so
   // it is not persisted or left in the input.
   const handleCouponStatus = (couponStatus) => {
+    if (handleAffiliateStatus(couponStatus)) {
+      // Re-estimate without the affiliate coupon so later requests match.
+      renderPills();
+      document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
+    }
     renderCouponStatus(statusEl, couponStatus, s);
     const manual = getManualCoupon();
     if (!manual) return;
@@ -358,15 +373,17 @@ export default async function decorate(block) {
       if (requestId !== priceEstimateRequest) return;
       // Only the single-string (legacy) contract throws a 422 for a bad coupon;
       // array input is tolerant. Drop the lone coupon and surface the error.
-      if (getCoupons().length <= 1) {
-        clearCoupons();
+      // Other failures keep the coupon so it is retried.
+      const errorCode = getCouponErrorCode(err);
+      if (errorCode && getCoupons().length <= 1) {
+        const affiliateIneligible = dropRejectedCoupon(errorCode);
         discountInput.value = '';
         discountsEl.innerHTML = '';
         discountsEl.hidden = true;
         renderCouponStatus(statusEl, [], s);
         updateTotals();
-        couponErrorEl.textContent = getCouponErrorMessage(err?.errorHeader);
-        couponErrorEl.hidden = false;
+        couponErrorEl.textContent = getCouponErrorMessage(errorCode);
+        couponErrorEl.hidden = affiliateIneligible;
         renderPills();
         document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
       } else {
@@ -410,7 +427,7 @@ export default async function decorate(block) {
       syncIDMeVisibility();
       document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
     } catch (err) {
-      couponErrorEl.textContent = getCouponErrorMessage(err?.errorHeader);
+      couponErrorEl.textContent = getCouponErrorMessage(getCouponErrorCode(err));
       couponErrorEl.hidden = false;
     } finally {
       discountApply.disabled = false;
@@ -458,14 +475,15 @@ export default async function decorate(block) {
       } catch (err) {
         // A 422 coupon error only occurs on the single-string (legacy) contract;
         // array input is tolerant. Drop the lone coupon and surface the error.
-        if (COUPON_ERRORS.has(err?.errorHeader) && getCoupons().length <= 1) {
-          clearCoupons();
+        const errorCode = getCouponErrorCode(err);
+        if (errorCode && getCoupons().length <= 1) {
+          const affiliateIneligible = dropRejectedCoupon(errorCode);
           discountInput.value = '';
           discountsEl.innerHTML = '';
           discountsEl.hidden = true;
           renderPills();
-          couponErrorEl.textContent = getCouponErrorMessage(err.errorHeader);
-          couponErrorEl.hidden = false;
+          couponErrorEl.textContent = getCouponErrorMessage(errorCode);
+          couponErrorEl.hidden = affiliateIneligible;
           document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
         }
         throw err;

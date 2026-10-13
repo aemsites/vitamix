@@ -2,7 +2,9 @@ import { estimateShipping, previewOrder } from '../../scripts/commerce-api.js';
 import { previewWithPriceSync } from '../../scripts/commerce/price-correction.js';
 import { formatPrice } from '../../scripts/commerce-config.js';
 import { getStandardCheckoutContext } from '../../scripts/checkout-context.js';
-import { getCoupons, getCouponRequestFields, clearCoupons } from '../../scripts/commerce/coupon-state.js';
+import {
+  getCoupons, getCouponRequestFields, getCouponErrorCode, dropRejectedCoupon,
+} from '../../scripts/commerce/coupon-state.js';
 import { wireRadioTabNav } from './checkout-form.js';
 
 /**
@@ -175,19 +177,19 @@ export async function updatePreview(form, cart, state, config) {
     state.currentPreview = preview;
     document.dispatchEvent(new CustomEvent('checkout:preview', { detail: { preview } }));
   } catch (err) {
-    const COUPON_ERRORS = new Set([
-      'coupon_invalid_format', 'coupon_not_found', 'coupon_inactive', 'coupon_expired',
-      'coupon_exhausted', 'coupon_country_mismatch', 'coupon_minimum_not_met',
-      'coupon_product_not_eligible', 'coupon_manual_entry_rejected', 'unauthorized',
-    ]);
-    const couponError = COUPON_ERRORS.has(err?.errorHeader) ? err.errorHeader : null;
+    const couponError = getCouponErrorCode(err);
     // A 422 coupon error only occurs on the single-string (legacy) contract;
     // array input is tolerant and reports invalid codes via couponStatus. Only
     // drop the coupon in the single-coupon case so multi-coupon state survives.
+    let affiliateIneligible = false;
     if (couponError && getCoupons().length <= 1) {
-      clearCoupons();
+      affiliateIneligible = dropRejectedCoupon(couponError);
     }
-    document.dispatchEvent(new CustomEvent('checkout:preview', { detail: { preview: null, couponError } }));
+    document.dispatchEvent(new CustomEvent('checkout:preview', {
+      detail: { preview: null, couponError, affiliateIneligible },
+    }));
+    // Re-run shipping and preview without the not-eligible affiliate coupon.
+    if (affiliateIneligible) document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
   }
 }
 
