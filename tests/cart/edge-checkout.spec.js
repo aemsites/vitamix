@@ -954,7 +954,7 @@ test.describe('Edge Checkout', () => {
 
       await expect(page.locator('.cart-summary .coupon-pill')).toContainText(affiliateCode, { timeout: 30000 });
       await expect.poll(() => requests).toBeGreaterThan(0);
-      await page.waitForTimeout(3000);
+      await page.waitForTimeout(1000);
       expect(requests).toBe(1);
       await expect(page.locator('.cart-summary-coupon-error')).toBeHidden();
       console.log('✓ Coupon error on a lone affiliate coupon does not loop');

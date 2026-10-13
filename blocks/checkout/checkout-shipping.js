@@ -177,12 +177,11 @@ export async function updatePreview(form, cart, state, config) {
     state.currentPreview = preview;
     document.dispatchEvent(new CustomEvent('checkout:preview', { detail: { preview } }));
   } catch (err) {
-    const couponError = getCouponErrorCode(err);
     // Only a single-string coupon fails the request with a 422; array input
-    // reports rejected codes via couponStatus.
-    if (couponError && typeof orderBody.couponCode === 'string') {
-      clearCoupons();
-    }
+    // reports rejected codes via couponStatus. The error is reported only when
+    // the coupon was dropped.
+    const couponError = typeof orderBody.couponCode === 'string' ? getCouponErrorCode(err) : null;
+    if (couponError) clearCoupons();
     document.dispatchEvent(new CustomEvent('checkout:preview', { detail: { preview: null, couponError } }));
   }
 }
