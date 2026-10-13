@@ -21,20 +21,12 @@ const LEGACY_CODE_KEY = 'checkout_coupon_code';
 const LEGACY_SOURCE_KEY = 'checkout_coupon_source';
 const AFFILIATE_CODE_KEY = 'checkout_affiliate_code';
 
-// Characters the Commerce API accepts in a coupon code. The `+` is valid but was
-// absent from the historical coupon import (which uppercased and mapped every
-// other special char — `*`, `#`, etc. — to `_` via /[^A-Z0-9\-_]/g), so codes at
-// rest never contain it. We normalize the same way here but keep `+` in the set,
-// so a `+` a shopper types is sent through unchanged while legacy special chars
-// still collapse to `_` and match the imported codes.
+// Chars outside the API coupon charset are replaced with `_`.
 const COUPON_NON_CHARSET = /[^A-Z0-9\-_+]/g;
 
 /**
- * Normalizes a coupon code to the API-accepted character set: uppercased, with
- * any character outside [A-Z0-9-_+] replaced by `_`. Mirrors the historical
- * import so shopper-entered codes match what is stored. Display values are left
- * untouched — only the value sent to the API is normalized.
- *
+ * Normalizes a coupon code for the API: uppercased, with any character outside
+ * [A-Z0-9-_+] replaced by `_`. Display values are left untouched.
  * @param {string} raw - The coupon code as entered/displayed
  * @returns {string}
  */
@@ -43,10 +35,10 @@ export function normalizeCouponCode(raw) {
 }
 
 /** Coupon rejection codes with a dedicated shopper-facing message. */
-export const COUPON_ERROR_CODES = new Set([
+const COUPON_ERROR_CODES = new Set([
   'coupon_invalid_format', 'coupon_not_found', 'coupon_inactive', 'coupon_expired',
   'coupon_exhausted', 'coupon_country_mismatch', 'coupon_minimum_not_met',
-  'coupon_product_not_eligible', 'coupon_manual_entry_rejected', 'unauthorized',
+  'coupon_product_not_eligible', 'coupon_manual_entry_rejected',
 ]);
 
 const API_ERROR_PREFIX = 'ADOBE_COMMERCE_';
@@ -257,7 +249,7 @@ export function getManualCoupon() {
 }
 
 /**
- * The auto/verified coupons (drive the removable pills).
+ * The auto/verified coupons (drive the coupon pills).
  * @returns {Array<{code: string, source: 'auto'}>}
  */
 export function getAutoCoupons() {
@@ -266,18 +258,16 @@ export function getAutoCoupons() {
 
 /**
  * Builds the `couponCode`/`couponSource` request fields for an order/estimate
- * body. A single coupon is sent as a scalar (preserving the legacy single-string
- * contract, incl. its 422 behaviour); multiple coupons are sent as index-aligned
- * arrays. A manual source is omitted for the single-coupon case (the API treats
- * an omitted source as 'manual'); the multi-coupon array always sends an explicit
- * source per code so the two arrays stay parallel.
+ * body. A single non-affiliate coupon is sent as a scalar (a rejected code
+ * fails the request with a 422); otherwise the codes are sent as index-aligned
+ * arrays (rejected codes are reported in `couponStatus`). A manual source is
+ * omitted for the scalar case (the API treats an omitted source as 'manual').
  * @returns {{ couponCode?: string|string[], couponSource?: string|string[] }}
  */
 export function getCouponRequestFields() {
   const coupons = getCoupons();
   if (!coupons.length) return {};
-  // The affiliate coupon is always sent as an array so a rejection is reported
-  // in couponStatus instead of failing the request.
+  // Affiliate code is always sent as an array.
   if (coupons.length === 1 && !isAffiliateCode(coupons[0].code)) {
     const [only] = coupons;
     return {

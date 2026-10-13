@@ -938,6 +938,28 @@ test.describe('Edge Checkout', () => {
       console.log('✓ Affiliate coupon survives a non-coupon estimate failure');
     });
 
+    test('does not clear or re-request a lone affiliate coupon on a coupon error', async ({ page }) => {
+      await seedCartSummary(page);
+      let requests = 0;
+      await page.route('**/estimate/price', (route) => {
+        requests += 1;
+        return route.fulfill({
+          status: 422,
+          contentType: 'application/json',
+          headers: { 'x-error': 'coupon not applicable', 'x-error-code': 'ADOBE_COMMERCE_COUPON_NOT_FOUND' },
+          body: JSON.stringify({ code: 'ADOBE_COMMERCE_COUPON_NOT_FOUND', message: 'coupon not applicable' }),
+        });
+      });
+      await page.goto(affiliateUrl());
+
+      await expect(page.locator('.cart-summary .coupon-pill')).toContainText(affiliateCode, { timeout: 30000 });
+      await expect.poll(() => requests).toBeGreaterThan(0);
+      await page.waitForTimeout(3000);
+      expect(requests).toBe(1);
+      await expect(page.locator('.cart-summary-coupon-error')).toBeHidden();
+      console.log('✓ Coupon error on a lone affiliate coupon does not loop');
+    });
+
     test('shows a not-eligible affiliate code in the checkout summary', async ({ page }) => {
       await page.addInitScript((cartKey) => {
         localStorage.setItem(cartKey, JSON.stringify({

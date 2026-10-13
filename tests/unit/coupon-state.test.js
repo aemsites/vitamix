@@ -164,13 +164,14 @@ test('getCouponErrorCode maps API error codes to coupon rejection codes', () => 
     'coupon_product_not_eligible',
   );
   assert.equal(getCouponErrorCode({ code: 'ADOBE_COMMERCE_COUPON_EXPIRED' }), 'coupon_expired');
-  assert.equal(getCouponErrorCode({ body: { code: 'ADOBE_COMMERCE_UNAUTHORIZED' } }), 'unauthorized');
   assert.equal(getCouponErrorCode({ errorHeader: 'coupon_not_found' }), 'coupon_not_found');
 });
 
 test('getCouponErrorCode returns null for non-coupon failures', () => {
   assert.equal(getCouponErrorCode(new Error('fetch failed')), null);
   assert.equal(getCouponErrorCode({ status: 500, body: { code: 'ADOBE_COMMERCE_INTERNAL' } }), null);
+  assert.equal(getCouponErrorCode({ status: 401, body: { code: 'ADOBE_COMMERCE_UNAUTHORIZED' } }), null);
+  assert.equal(getCouponErrorCode({ errorHeader: 'unauthorized' }), null);
   assert.equal(getCouponErrorCode(undefined), null);
 });
 

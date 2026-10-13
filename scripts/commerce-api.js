@@ -6,8 +6,6 @@ import { logApiError, logNetworkError } from './operations-log.js';
 import { getAffiliateCode, normalizeCouponCode } from './commerce/coupon-state.js';
 import { applyPriceCorrection } from './commerce/price-correction.js';
 
-export { normalizeCouponCode };
-
 /**
  * Error thrown when the Commerce API returns a non-2xx response.
  * Carries the HTTP status code and the parsed response body so callers

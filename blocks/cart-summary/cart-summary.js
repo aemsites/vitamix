@@ -54,7 +54,6 @@ const COUPON_ERROR_MESSAGES = {
     coupon_minimum_not_met: 'Your order total doesn\'t meet the minimum required for this coupon.',
     coupon_product_not_eligible: 'No items in your cart are eligible for this coupon.',
     coupon_manual_entry_rejected: 'This coupon cannot be entered manually.',
-    unauthorized: 'Please sign in to use this coupon.',
     default: 'This coupon code could not be applied.',
   },
   'fr-ca': {
@@ -67,7 +66,6 @@ const COUPON_ERROR_MESSAGES = {
     coupon_minimum_not_met: 'Le total de votre commande est inférieur au minimum requis pour ce coupon.',
     coupon_product_not_eligible: 'Aucun article de votre panier n\'est éligible à ce coupon.',
     coupon_manual_entry_rejected: 'Ce coupon ne peut pas être saisi manuellement.',
-    unauthorized: 'Veuillez vous connecter pour utiliser ce coupon.',
     default: 'Ce code promo n\'a pas pu être appliqué.',
   },
 };
@@ -354,11 +352,10 @@ export default async function decorate(block) {
       handleCouponStatus(estimate.couponStatus);
     } catch (err) {
       if (requestId !== priceEstimateRequest) return;
-      // Only the single-string (legacy) contract throws a 422 for a bad coupon;
-      // array input is tolerant. Drop the lone coupon and surface the error.
-      // Other failures keep the coupon so it is retried.
+      // Only a single-string coupon fails the request with a 422. Drop it and
+      // surface the error; other failures keep the coupon so it is retried.
       const errorCode = getCouponErrorCode(err);
-      if (errorCode && getCoupons().length <= 1) {
+      if (errorCode && typeof couponCode === 'string') {
         clearCoupons();
         discountInput.value = '';
         discountsEl.innerHTML = '';
@@ -456,10 +453,10 @@ export default async function decorate(block) {
         state.currentPreview = result;
         return result;
       } catch (err) {
-        // A 422 coupon error only occurs on the single-string (legacy) contract;
-        // array input is tolerant. Drop the lone coupon and surface the error.
+        // Only a single-string coupon fails the request with a 422. Drop it and
+        // surface the error.
         const errorCode = getCouponErrorCode(err);
-        if (errorCode && getCoupons().length <= 1) {
+        if (errorCode && typeof estimatePayload.couponCode === 'string') {
           clearCoupons();
           discountInput.value = '';
           discountsEl.innerHTML = '';

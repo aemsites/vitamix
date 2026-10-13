@@ -3,7 +3,7 @@ import { previewWithPriceSync } from '../../scripts/commerce/price-correction.js
 import { formatPrice } from '../../scripts/commerce-config.js';
 import { getStandardCheckoutContext } from '../../scripts/checkout-context.js';
 import {
-  getCoupons, getCouponRequestFields, getCouponErrorCode, clearCoupons,
+  getCouponRequestFields, getCouponErrorCode, clearCoupons,
 } from '../../scripts/commerce/coupon-state.js';
 import { wireRadioTabNav } from './checkout-form.js';
 
@@ -178,10 +178,9 @@ export async function updatePreview(form, cart, state, config) {
     document.dispatchEvent(new CustomEvent('checkout:preview', { detail: { preview } }));
   } catch (err) {
     const couponError = getCouponErrorCode(err);
-    // A 422 coupon error only occurs on the single-string (legacy) contract;
-    // array input is tolerant and reports invalid codes via couponStatus. Only
-    // drop the coupon in the single-coupon case so multi-coupon state survives.
-    if (couponError && getCoupons().length <= 1) {
+    // Only a single-string coupon fails the request with a 422; array input
+    // reports rejected codes via couponStatus.
+    if (couponError && typeof orderBody.couponCode === 'string') {
       clearCoupons();
     }
     document.dispatchEvent(new CustomEvent('checkout:preview', { detail: { preview: null, couponError } }));
