@@ -2104,7 +2104,7 @@ async function checkSchedule() {
 async function loadEager(doc) {
   registerErrorLogging();
   const { locale, language } = getLocaleAndLanguage();
-  document.documentElement.lang = language ? language.split('_')[0] : 'en';
+  document.documentElement.lang = getLocaleAndLanguage(true, true).language;
 
   const localeKey = `${locale}/${language}`;
   // Edge checkout is enabled only for locale+language pairs in EDGE_CHECKOUT_LOCALES.
