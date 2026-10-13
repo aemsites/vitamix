@@ -824,7 +824,8 @@ test.describe('Edge Checkout', () => {
     });
 
     /**
-     * Fulfills /estimate/price with a coupon status per submitted code.
+     * Builds an /estimate/price response with a coupon status per submitted code.
+     * @param {string|string[]} codes Submitted coupon code(s)
      * @param {string[]} applied Codes reported as applied; all others are rejected
      */
     const priceResponse = (codes, applied = []) => ({
