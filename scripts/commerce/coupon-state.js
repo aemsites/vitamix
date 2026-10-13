@@ -292,7 +292,10 @@ export function getIneligibleAffiliateCode() {
   } catch {
     return '';
   }
-  return getAffiliateCode();
+  const code = getAffiliateCode();
+  // Shown as a regular coupon while it is still in the coupon list.
+  if (!code || getCoupons().some((c) => isAffiliateCode(c.code))) return '';
+  return code;
 }
 
 /**

@@ -341,7 +341,12 @@ export function getCookies() {
   return cookieMap;
 }
 
+let affiliateCouponHandled = false;
+
 function setAffiliateCoupon() {
+  // decorateMain also runs for fragments; handle the URL params once per page.
+  if (affiliateCouponHandled) return;
+  affiliateCouponHandled = true;
   const urlParams = new URLSearchParams(window.location.search);
   const { cjdata, cjevent, COUPON } = Object.fromEntries(urlParams);
 

@@ -246,3 +246,10 @@ test('clearAffiliateCode clears the not-eligible display', () => {
   clearAffiliateCode();
   assert.equal(getIneligibleAffiliateCode(), '');
 });
+
+test('the not-eligible display is suppressed while the affiliate coupon is in the list', () => {
+  setAffiliateCode('06-AFF');
+  markAffiliateIneligible();
+  addCoupon('06-AFF', 'auto');
+  assert.equal(getIneligibleAffiliateCode(), '');
+});
