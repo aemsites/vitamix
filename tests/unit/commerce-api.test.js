@@ -8,9 +8,9 @@ import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   getOrder, estimateShipping, estimatePrice, estimateExpressCheckout, parsePreview,
-  normalizeCouponCode, createOrder,
+  createOrder,
 } from '../../scripts/commerce-api.js';
-import { setAffiliateCode } from '../../scripts/commerce/coupon-state.js';
+import { normalizeCouponCode, setAffiliateCode, getCouponRequestFields } from '../../scripts/commerce/coupon-state.js';
 import { __setLocale, __resetScripts } from './mocks/scripts.mjs';
 
 const API_ORIGIN = 'https://api.test.com/test-org/sites/test-site';
@@ -341,4 +341,15 @@ test('createOrder: omits custom data when there is no affiliate code', async () 
   await createOrder(orderBody);
   assert.ok(!('custom' in JSON.parse(lastInit.body)));
   assert.deepEqual(orderBody, { items: [] });
+});
+
+test('createOrder: sends a lone affiliate coupon as an array with the affiliate code', async () => {
+  localStorage.setItem('auth_token', FUTURE_JWT);
+  setAffiliateCode('06-AFFILIATE');
+  mockFetch(200, { order: {} });
+  await createOrder({ items: [], ...getCouponRequestFields() });
+  const body = JSON.parse(lastInit.body);
+  assert.deepEqual(body.couponCode, ['06-AFFILIATE']);
+  assert.deepEqual(body.couponSource, ['auto']);
+  assert.equal(body.custom.affiliateCode, '06-AFFILIATE');
 });

@@ -1,5 +1,7 @@
 import { getMetadata } from '../aem.js';
-import { addCoupon, getAutoCoupons, AUTO_COUPON_SOURCE } from './coupon-state.js';
+import {
+  addCoupon, getAutoCoupons, isAffiliateCode, isAffiliateIneligible, AUTO_COUPON_SOURCE,
+} from './coupon-state.js';
 
 const isProd = window.location.hostname === 'www.vitamix.com';
 const IDME_CLIENT_ID = isProd ? '566879020d6a5533db11a112e307aed3' : 'f05216080667a3fb48ef1aed700d7b5f';
@@ -25,8 +27,9 @@ function buildIDMeAuthUrl(callbackUrl) {
   })}`;
 }
 
+// An affiliate coupon that does not apply to the cart keeps verification available.
 function hasIDMeCoupon() {
-  return getAutoCoupons().length > 0;
+  return getAutoCoupons().some((c) => !(isAffiliateCode(c.code) && isAffiliateIneligible()));
 }
 
 export function syncIDMeVisibility() {
