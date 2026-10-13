@@ -3,7 +3,8 @@ import { getToken } from './auth-api.js';
 import { mintRecaptchaToken, RECAPTCHA_ACTIONS, RECAPTCHA_HEADER } from './recaptcha.js';
 import { getLocaleAndLanguage, loggedFetch } from './scripts.js';
 import { logApiError, logNetworkError } from './operations-log.js';
-import { getAffiliateCode } from './commerce/coupon-state.js';
+import { getAffiliateCode, normalizeCouponCode } from './commerce/coupon-state.js';
+import { applyPriceCorrection } from './commerce/price-correction.js';
 
 /**
  * Error thrown when the Commerce API returns a non-2xx response.
@@ -11,33 +12,13 @@ import { getAffiliateCode } from './commerce/coupon-state.js';
  * can inspect the error detail without re-parsing the response.
  */
 class CommerceApiError extends Error {
-  constructor(status, body, errorHeader) {
+  constructor(status, body, errorHeader, errorCode) {
     super(body?.message || `API error ${status}`);
     this.status = status;
     this.body = body;
     this.errorHeader = errorHeader || null;
+    this.code = body?.code || errorCode || null;
   }
-}
-
-// Characters the Commerce API accepts in a coupon code. The `+` is valid but was
-// absent from the historical coupon import (which uppercased and mapped every
-// other special char — `*`, `#`, etc. — to `_` via /[^A-Z0-9\-_]/g), so codes at
-// rest never contain it. We normalize the same way here but keep `+` in the set,
-// so a `+` a shopper types is sent through unchanged while legacy special chars
-// still collapse to `_` and match the imported codes.
-const COUPON_NON_CHARSET = /[^A-Z0-9\-_+]/g;
-
-/**
- * Normalizes a coupon code to the API-accepted character set: uppercased, with
- * any character outside [A-Z0-9-_+] replaced by `_`. Mirrors the historical
- * import so shopper-entered codes match what is stored. Display values are left
- * untouched — only the value sent to the API is normalized.
- *
- * @param {string} raw - The coupon code as entered/displayed
- * @returns {string}
- */
-export function normalizeCouponCode(raw) {
-  return String(raw).toUpperCase().replace(COUPON_NON_CHARSET, '_');
 }
 
 /**
@@ -109,7 +90,7 @@ async function post(path, body, recaptchaAction) {
     logApiError({
       method: 'POST', path, status: resp.status, responseBody: data, requestBody: payload,
     });
-    throw new CommerceApiError(resp.status, data, resp.headers.get('x-error'));
+    throw new CommerceApiError(resp.status, data, resp.headers.get('x-error'), resp.headers.get('x-error-code'));
   }
   return data;
 }
@@ -146,7 +127,7 @@ export async function estimateShipping(country, state, items, couponCode, coupon
 /**
  * Validates a coupon code and returns the resulting discounts without requiring
  * a shipping method. Backed by POST /estimate/price — throws CommerceApiError
- * with errorHeader set to the coupon error code on any validation failure.
+ * on any coupon validation failure (see getCouponErrorCode).
  *
  * @param {string} country - ISO 3166-1 alpha-2 country code (e.g. 'us', 'ca')
  * @param {Array} items - Cart items in API format
@@ -205,7 +186,13 @@ export async function estimateExpressCheckout(country, state, zip, items, contex
  * @throws {CommerceApiError}
  */
 export async function previewOrder(orderBody) {
-  return post('/orders/preview', orderBody, RECAPTCHA_ACTIONS.ORDERS_PREVIEW);
+  try {
+    return await post('/orders/preview', orderBody, RECAPTCHA_ACTIONS.ORDERS_PREVIEW);
+  } catch (err) {
+    // Sync cart prices with the price returned in the error, if any.
+    if (applyPriceCorrection(err)) err.cartRepriced = true;
+    throw err;
+  }
 }
 
 /**
@@ -326,7 +313,7 @@ async function request(path, body, method) {
     logApiError({
       method, path, status: resp.status, responseBody: data, requestBody: body,
     });
-    throw new CommerceApiError(resp.status, data, resp.headers.get('x-error'));
+    throw new CommerceApiError(resp.status, data, resp.headers.get('x-error'), resp.headers.get('x-error-code'));
   }
   return data;
 }

@@ -1,41 +1,54 @@
 /**
  * Shared DOM helpers for the multi-coupon entry UI, used by the cart-summary and
- * order-summary blocks: removable pills for auto/verified (ID.me / affiliate)
+ * order-summary blocks: pills for auto/verified (ID.me / affiliate)
  * coupons, and per-code rejection messages from the response `couponStatus[]`.
  */
-import { getStatusMessage } from './coupon-state.js';
+import { getStatusMessage, isAffiliateCode, isAffiliateIneligible } from './coupon-state.js';
 
 /**
- * Renders one removable pill per auto/verified coupon into `container` (hidden
- * when there are none). Auto coupons are removed here rather than from the text
- * input, which only ever holds the manual coupon.
+ * Renders one pill per auto/verified coupon into `container` (hidden when there
+ * are none). Auto coupons are removed here rather than from the text input,
+ * which only ever holds the manual coupon. The affiliate coupon cannot be
+ * removed, and is shown with a notice when it does not apply to the cart.
  * @param {HTMLElement} container
  * @param {Array<{code: string}>} autoCoupons
  * @param {(code: string) => void} onRemove
- * @param {{removeCoupon?: string}} [strings]
+ * @param {{removeCoupon?: string, affiliateNotEligible?: string}} [strings]
  */
 export function renderCouponPills(container, autoCoupons, onRemove, strings = {}) {
   if (!container) return;
   container.innerHTML = '';
   container.hidden = autoCoupons.length === 0;
+  let notice = null;
   autoCoupons.forEach(({ code }) => {
+    const affiliate = isAffiliateCode(code);
+    const ineligible = affiliate && isAffiliateIneligible();
     const pill = document.createElement('span');
-    pill.className = 'coupon-pill';
+    pill.className = ineligible ? 'coupon-pill coupon-pill-ineligible' : 'coupon-pill';
 
     const label = document.createElement('span');
     label.className = 'coupon-pill-label';
     label.textContent = code;
+    pill.append(label);
 
-    const remove = document.createElement('button');
-    remove.type = 'button';
-    remove.className = 'coupon-pill-remove';
-    remove.setAttribute('aria-label', `${strings.removeCoupon || 'Remove coupon'} ${code}`);
-    remove.textContent = '×';
-    remove.addEventListener('click', () => onRemove(code));
-
-    pill.append(label, remove);
+    if (!affiliate) {
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'coupon-pill-remove';
+      remove.setAttribute('aria-label', `${strings.removeCoupon || 'Remove coupon'} ${code}`);
+      remove.textContent = '×';
+      remove.addEventListener('click', () => onRemove(code));
+      pill.append(remove);
+    }
     container.appendChild(pill);
+
+    if (ineligible && strings.affiliateNotEligible) {
+      notice = document.createElement('p');
+      notice.className = 'coupon-notice';
+      notice.textContent = strings.affiliateNotEligible;
+    }
   });
+  if (notice) container.appendChild(notice);
 }
 
 /**
@@ -53,6 +66,8 @@ export function renderCouponStatus(container, couponStatus, strings = {}) {
   container.innerHTML = '';
   (couponStatus || [])
     .filter((entry) => entry?.status && entry.status !== 'applied')
+    // A rejected affiliate code is shown with its own notice (renderCouponPills).
+    .filter((entry) => !(entry.status === 'rejected_invalid' && isAffiliateCode(entry.code)))
     .forEach(({ code, status }) => {
       const message = getStatusMessage(status, strings);
       if (!message) return;

@@ -14,6 +14,7 @@ import resolvePaymentFailureMessage from '../../scripts/payment-failure.js';
 import { getStandardCheckoutContext } from '../../scripts/checkout-context.js';
 import { isEstimateExpiringSoon } from '../../scripts/estimate-token.js';
 import { getCouponRequestFields } from '../../scripts/commerce/coupon-state.js';
+import { previewWithPriceSync } from '../../scripts/commerce/price-correction.js';
 
 export { validateLinkIntegrity, isEstimateExpiringSoon };
 
@@ -224,7 +225,12 @@ export function initOrder(form, cart, state, config, strings) {
       // preview is invisible to the user; if totals changed we surface the
       // updated amounts via the returned preview state.
       if (isEstimateExpiringSoon(orderBody.estimateToken)) {
-        const refreshed = await callbacks.previewOrderDirect(orderBody);
+        const refreshed = await previewWithPriceSync(
+          callbacks.previewOrderDirect,
+          () => ({ ...orderBody, items: cart.getItemsForAPI() }),
+        );
+        // eslint-disable-next-line no-param-reassign
+        orderBody.items = cart.getItemsForAPI();
         // eslint-disable-next-line no-param-reassign
         orderBody.estimateToken = refreshed.estimateToken;
       }

@@ -14,6 +14,7 @@ import {
 } from './apple-pay-context.js';
 import { expressPayloadMatchesCart } from '../checkout-context.js';
 import { getCouponRequestFields } from '../commerce/coupon-state.js';
+import { previewWithPriceSync } from '../commerce/price-correction.js';
 
 const APPLE_PAY_SDK_URL = 'https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js';
 
@@ -116,8 +117,9 @@ function startExpressSession(btn, config, callbacks) {
         // onshippingmethodselected when the shopper changes method) keeps
         // state.currentEstimatePayload in sync with the selected address on every
         // change. Mirrors the PayPal express flow's onShippingAddressChange.
-        const preview = await callbacks.previewOrderDirect(
-          buildApplePayExpressPreviewPayload(
+        const preview = await previewWithPriceSync(
+          callbacks.previewOrderDirect,
+          () => buildApplePayExpressPreviewPayload(
             cart,
             String(defaultMethod.id),
             bcp47,
@@ -152,8 +154,9 @@ function startExpressSession(btn, config, callbacks) {
 
     session.onshippingmethodselected = async (e) => {
       try {
-        const previewResult = await callbacks.previewOrderDirect(
-          buildApplePayExpressPreviewPayload(
+        const previewResult = await previewWithPriceSync(
+          callbacks.previewOrderDirect,
+          () => buildApplePayExpressPreviewPayload(
             cart,
             e.shippingMethod.identifier,
             bcp47,

@@ -66,19 +66,6 @@ function titleFromUrl(pathname) {
   return slug.split('-').map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w)).join(' ');
 }
 
-/**
- * Whether every sku (color variant, or the product itself when it has none) is out of stock,
- * so the product should be dropped from the listing entirely rather than just flagged on its
- * swatches. A sku with no availability data is treated as in stock (nothing explicitly says
- * otherwise), so this only excludes products where every sku is confirmed unavailable.
- * @param {Object} product
- * @returns {boolean}
- */
-function isFullyOutOfStock(product) {
-  const skus = (product.variants && product.variants.length) ? product.variants : [product];
-  return skus.every((sku) => sku.availability && sku.availability !== 'InStock');
-}
-
 function pathnameFromUrl(rawUrl) {
   try {
     return new URL(rawUrl, window.location.origin).pathname;
@@ -129,6 +116,8 @@ function buildMarketingCardItem(row, facetDefs) {
  *
  * The product list and its facets come from plp-data-{dataset}.json; each row is augmented
  * with image/price/variants/etc. from products/index.json when a matching product is found there.
+ * Products are included regardless of stock availability.
+ * Rows with an optional Status column set to "hidden" are excluded.
  * Rows that point at /fragments/ are kept as marketing cards (content loaded separately).
  * @param {Object} config - Filter criteria (only known facet keys are applied)
  * @param {Object} facets - Optional object to populate with facet counts
@@ -153,6 +142,7 @@ export default async function lookupProductListProducts(config = {}, facets = {}
     const indexBySlug = buildProductIndexBySlug(data, locale, language);
 
     const parents = plpRows
+      .filter((row) => (row.Status || '').trim().toLowerCase() !== 'hidden')
       .map((row) => {
         const rowUrl = (row.Product || '').trim();
         if (!rowUrl) return null;
@@ -178,8 +168,7 @@ export default async function lookupProductListProducts(config = {}, facets = {}
         });
         return product;
       })
-      .filter((product) => product
-        && (product.isMarketing || (!!product.image && !isFullyOutOfStock(product))));
+      .filter((product) => product && (product.isMarketing || !!product.image));
 
     window.productListWidgetIndexByDataset[plpDataset] = { parents, facetDefs };
   }
