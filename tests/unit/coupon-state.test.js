@@ -173,6 +173,8 @@ test('getCouponErrorCode returns null for non-coupon failures', () => {
   assert.equal(getCouponErrorCode({ status: 401, body: { code: 'ADOBE_COMMERCE_UNAUTHORIZED' } }), null);
   assert.equal(getCouponErrorCode({ errorHeader: 'unauthorized' }), null);
   assert.equal(getCouponErrorCode(undefined), null);
+  assert.equal(getCouponErrorCode({ name: 'AbortError', code: 20 }), null);
+  assert.equal(getCouponErrorCode({ body: { code: 400 }, code: 'ADOBE_COMMERCE_COUPON_EXPIRED' }), 'coupon_expired');
 });
 
 test('isAffiliateCode compares normalized codes', () => {

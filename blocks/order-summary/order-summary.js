@@ -336,6 +336,7 @@ export default async function decorate(block) {
   const handleCouponStatus = (couponStatus) => {
     updateAffiliateStatus(couponStatus);
     renderPills();
+    syncIDMeVisibility();
     renderCouponStatus(statusEl, couponStatus, s);
     const manual = getManualCoupon();
     if (!manual) return;

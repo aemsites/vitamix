@@ -306,7 +306,7 @@ export function isAffiliateIneligible() {
  * @returns {string|null}
  */
 export function getCouponErrorCode(err) {
-  const apiCode = err?.body?.code || err?.code || '';
+  const apiCode = [err?.body?.code, err?.code].find((c) => typeof c === 'string') || '';
   if (apiCode.startsWith(API_ERROR_PREFIX)) {
     const key = apiCode.slice(API_ERROR_PREFIX.length).toLowerCase();
     if (COUPON_ERROR_CODES.has(key)) return key;

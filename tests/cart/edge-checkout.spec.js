@@ -863,6 +863,7 @@ test.describe('Edge Checkout', () => {
       await expect(page.locator('.cart-summary-coupon-error')).toBeHidden();
       await expect(page.locator('.cart-summary .coupon-status')).toBeHidden();
       expect(requests[0]).toEqual([affiliateCode]);
+      await expect(page.locator('.cart-summary .idme-verify')).toBeVisible();
       console.log('✓ Not-eligible affiliate code is displayed without a remove action');
     });
 
