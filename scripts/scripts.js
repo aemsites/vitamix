@@ -2104,7 +2104,9 @@ async function checkSchedule() {
 async function loadEager(doc) {
   registerErrorLogging();
   const { locale, language } = getLocaleAndLanguage();
-  document.documentElement.lang = getLocaleAndLanguage(true, true).language;
+  // VR (the international store) is not a country, so it has no region of its own.
+  const region = locale === 'vr' ? 'US' : locale.toUpperCase();
+  document.documentElement.lang = `${language.split('_')[0]}-${region}`;
 
   const localeKey = `${locale}/${language}`;
   // Edge checkout is enabled only for locale+language pairs in EDGE_CHECKOUT_LOCALES.
