@@ -1,18 +1,18 @@
 /**
  * Shared DOM helpers for the multi-coupon entry UI, used by the cart-summary and
- * order-summary blocks: removable pills for auto/verified (ID.me / affiliate)
+ * order-summary blocks: pills for auto/verified (ID.me / affiliate)
  * coupons, and per-code rejection messages from the response `couponStatus[]`.
  */
-import { getStatusMessage, isAffiliateCode } from './coupon-state.js';
+import { getStatusMessage, isAffiliateCode, isAffiliateIneligible } from './coupon-state.js';
 
 /**
- * Renders one removable pill per auto/verified coupon into `container` (hidden
- * when there are none). Auto coupons are removed here rather than from the text
- * input, which only ever holds the manual coupon. An `ineligible` entry is shown
- * with a notice that it does not discount the cart.
+ * Renders one pill per auto/verified coupon into `container` (hidden when there
+ * are none). Auto coupons are removed here rather than from the text input,
+ * which only ever holds the manual coupon. The affiliate coupon cannot be
+ * removed, and is shown with a notice when it does not apply to the cart.
  * @param {HTMLElement} container
- * @param {Array<{code: string, ineligible?: boolean}>} autoCoupons
- * @param {(code: string, ineligible: boolean) => void} onRemove
+ * @param {Array<{code: string}>} autoCoupons
+ * @param {(code: string) => void} onRemove
  * @param {{removeCoupon?: string, affiliateNotEligible?: string}} [strings]
  */
 export function renderCouponPills(container, autoCoupons, onRemove, strings = {}) {
@@ -20,22 +20,26 @@ export function renderCouponPills(container, autoCoupons, onRemove, strings = {}
   container.innerHTML = '';
   container.hidden = autoCoupons.length === 0;
   let notice = null;
-  autoCoupons.forEach(({ code, ineligible = false }) => {
+  autoCoupons.forEach(({ code }) => {
+    const affiliate = isAffiliateCode(code);
+    const ineligible = affiliate && isAffiliateIneligible();
     const pill = document.createElement('span');
     pill.className = ineligible ? 'coupon-pill coupon-pill-ineligible' : 'coupon-pill';
 
     const label = document.createElement('span');
     label.className = 'coupon-pill-label';
     label.textContent = code;
+    pill.append(label);
 
-    const remove = document.createElement('button');
-    remove.type = 'button';
-    remove.className = 'coupon-pill-remove';
-    remove.setAttribute('aria-label', `${strings.removeCoupon || 'Remove coupon'} ${code}`);
-    remove.textContent = '×';
-    remove.addEventListener('click', () => onRemove(code, ineligible));
-
-    pill.append(label, remove);
+    if (!affiliate) {
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'coupon-pill-remove';
+      remove.setAttribute('aria-label', `${strings.removeCoupon || 'Remove coupon'} ${code}`);
+      remove.textContent = '×';
+      remove.addEventListener('click', () => onRemove(code));
+      pill.append(remove);
+    }
     container.appendChild(pill);
 
     if (ineligible && strings.affiliateNotEligible) {

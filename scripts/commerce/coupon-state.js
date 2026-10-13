@@ -20,7 +20,6 @@ const COUPONS_KEY = 'checkout_coupons';
 const LEGACY_CODE_KEY = 'checkout_coupon_code';
 const LEGACY_SOURCE_KEY = 'checkout_coupon_source';
 const AFFILIATE_CODE_KEY = 'checkout_affiliate_code';
-const AFFILIATE_INELIGIBLE_KEY = 'checkout_affiliate_ineligible';
 
 // Characters the Commerce API accepts in a coupon code. The `+` is valid but was
 // absent from the historical coupon import (which uppercased and mapped every
@@ -49,9 +48,6 @@ export const COUPON_ERROR_CODES = new Set([
   'coupon_exhausted', 'coupon_country_mismatch', 'coupon_minimum_not_met',
   'coupon_product_not_eligible', 'coupon_manual_entry_rejected', 'unauthorized',
 ]);
-
-/** Rejection code for a coupon that applies to no item in the cart. */
-export const COUPON_PRODUCT_NOT_ELIGIBLE = 'coupon_product_not_eligible';
 
 const API_ERROR_PREFIX = 'ADOBE_COMMERCE_';
 
@@ -112,13 +108,53 @@ function syncLegacyScalars(list) {
   }
 }
 
+let affiliateIneligible = false;
+
 /**
- * Returns the ordered coupon list. Falls back to the legacy scalar keys when
- * the array key is absent, so a coupon written by an older code path (affiliate
- * URL param, test seed) is still honoured.
+ * Records the coupon code an affiliate link was landed with. It stays in the
+ * coupon list for the session and is sent with the order whether or not it
+ * applies.
+ * @param {string} code
+ */
+export function setAffiliateCode(code) {
+  const trimmed = (code || '').trim();
+  if (trimmed) sessionStorage.setItem(AFFILIATE_CODE_KEY, trimmed);
+}
+
+/**
+ * @returns {string} The affiliate coupon code, or '' when none was recorded
+ */
+export function getAffiliateCode() {
+  try {
+    return sessionStorage.getItem(AFFILIATE_CODE_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+/** Clears the affiliate coupon code. */
+export function clearAffiliateCode() {
+  sessionStorage.removeItem(AFFILIATE_CODE_KEY);
+  affiliateIneligible = false;
+}
+
+/**
+ * @param {string} code
+ * @returns {boolean} Whether `code` is the recorded affiliate coupon code
+ */
+export function isAffiliateCode(code) {
+  const affiliateCode = getAffiliateCode();
+  return !!affiliateCode && !!code
+    && normalizeCouponCode(code.trim()) === normalizeCouponCode(affiliateCode);
+}
+
+/**
+ * Reads the stored coupon list. Falls back to the legacy scalar keys when the
+ * array key is absent, so a coupon written by an older code path (affiliate URL
+ * param, test seed) is still honoured.
  * @returns {Array<{code: string, source: 'auto'|'manual'}>}
  */
-export function getCoupons() {
+function readStoredCoupons() {
   const raw = sessionStorage.getItem(COUPONS_KEY);
   if (raw) {
     try {
@@ -132,6 +168,26 @@ export function getCoupons() {
     return normalize([{ code, source: sessionStorage.getItem(LEGACY_SOURCE_KEY) }]);
   }
   return [];
+}
+
+/**
+ * Returns the ordered coupon list. The affiliate coupon code, when recorded,
+ * is always included as an auto coupon.
+ * @returns {Array<{code: string, source: 'auto'|'manual'}>}
+ */
+export function getCoupons() {
+  const coupons = readStoredCoupons();
+  const affiliateCode = getAffiliateCode();
+  if (!affiliateCode) return coupons;
+  const index = coupons.findIndex((c) => isAffiliateCode(c.code));
+  if (index >= 0) {
+    coupons[index] = { ...coupons[index], source: AUTO_COUPON_SOURCE };
+    return coupons;
+  }
+  return [
+    ...coupons.slice(0, MAX_COUPONS - 1),
+    { code: affiliateCode, source: AUTO_COUPON_SOURCE },
+  ];
 }
 
 /**
@@ -220,7 +276,9 @@ export function getAutoCoupons() {
 export function getCouponRequestFields() {
   const coupons = getCoupons();
   if (!coupons.length) return {};
-  if (coupons.length === 1) {
+  // The affiliate coupon is always sent as an array so a rejection is reported
+  // in couponStatus instead of failing the request.
+  if (coupons.length === 1 && !isAffiliateCode(coupons[0].code)) {
     const [only] = coupons;
     return {
       couponCode: only.code,
@@ -234,76 +292,21 @@ export function getCouponRequestFields() {
 }
 
 /**
- * Records the coupon code an affiliate link was landed with. Kept separately
- * from the coupon list so it is still reported when the coupon itself is
- * removed or does not apply to the order.
- * @param {string} code
+ * Records whether the affiliate coupon applied, from a pricing response's
+ * `couponStatus[]`. Responses without an entry for it leave the state as is.
+ * @param {Array<{code: string, status: string}>} couponStatus
  */
-export function setAffiliateCode(code) {
-  const trimmed = (code || '').trim();
-  if (!trimmed) return;
-  sessionStorage.setItem(AFFILIATE_CODE_KEY, trimmed);
-  sessionStorage.removeItem(AFFILIATE_INELIGIBLE_KEY);
+export function updateAffiliateStatus(couponStatus) {
+  const entry = (couponStatus || []).find((e) => isAffiliateCode(e?.code));
+  if (entry) affiliateIneligible = entry.status === 'rejected_invalid';
 }
 
 /**
- * @returns {string} The affiliate coupon code, or '' when none was recorded
+ * @returns {boolean} Whether the last pricing response rejected the affiliate
+ *   coupon as not applicable to the cart
  */
-export function getAffiliateCode() {
-  try {
-    return sessionStorage.getItem(AFFILIATE_CODE_KEY) || '';
-  } catch {
-    return '';
-  }
-}
-
-/** Clears the affiliate coupon code. */
-export function clearAffiliateCode() {
-  sessionStorage.removeItem(AFFILIATE_CODE_KEY);
-  sessionStorage.removeItem(AFFILIATE_INELIGIBLE_KEY);
-}
-
-/**
- * @param {string} code
- * @returns {boolean} Whether `code` is the recorded affiliate coupon code
- */
-export function isAffiliateCode(code) {
-  const affiliateCode = getAffiliateCode();
-  return !!affiliateCode && !!code
-    && normalizeCouponCode(code.trim()) === normalizeCouponCode(affiliateCode);
-}
-
-/**
- * Removes the affiliate coupon from the coupon list after it was rejected, and
- * keeps it on display as a not-eligible code. The affiliate code itself is
- * still sent with the order.
- */
-export function markAffiliateIneligible() {
-  setCoupons(getCoupons().filter((c) => !isAffiliateCode(c.code)));
-  sessionStorage.setItem(AFFILIATE_INELIGIBLE_KEY, 'true');
-}
-
-/**
- * @returns {string} The affiliate code to display as not eligible, or ''
- */
-export function getIneligibleAffiliateCode() {
-  try {
-    if (!sessionStorage.getItem(AFFILIATE_INELIGIBLE_KEY)) return '';
-  } catch {
-    return '';
-  }
-  const code = getAffiliateCode();
-  // Shown as a regular coupon while it is still in the coupon list.
-  if (!code || getCoupons().some((c) => isAffiliateCode(c.code))) return '';
-  return code;
-}
-
-/**
- * Hides the not-eligible affiliate code from display. The affiliate code is
- * still sent with the order.
- */
-export function dismissIneligibleAffiliate() {
-  sessionStorage.removeItem(AFFILIATE_INELIGIBLE_KEY);
+export function isAffiliateIneligible() {
+  return affiliateIneligible && !!getAffiliateCode();
 }
 
 /**
@@ -319,36 +322,6 @@ export function getCouponErrorCode(err) {
     if (COUPON_ERROR_CODES.has(key)) return key;
   }
   return COUPON_ERROR_CODES.has(err?.errorHeader) ? err.errorHeader : null;
-}
-
-/**
- * Drops a lone coupon rejected with `errorCode`. An affiliate coupon that does
- * not apply to the cart stays on display as not eligible instead.
- * @param {string} errorCode - Coupon rejection code from getCouponErrorCode
- * @returns {boolean} Whether the rejected coupon was the not-eligible affiliate
- */
-export function dropRejectedCoupon(errorCode) {
-  const [lone] = getCoupons();
-  if (errorCode === COUPON_PRODUCT_NOT_ELIGIBLE && isAffiliateCode(lone?.code)) {
-    markAffiliateIneligible();
-    return true;
-  }
-  clearCoupons();
-  return false;
-}
-
-/**
- * Handles `couponStatus[]` from a multi-coupon response: a rejected affiliate
- * coupon is removed from the list and kept on display as not eligible.
- * @param {Array<{code: string, status: string}>} couponStatus
- * @returns {boolean} Whether the affiliate coupon was marked not eligible
- */
-export function handleAffiliateStatus(couponStatus) {
-  const rejected = (couponStatus || []).some(
-    (e) => e?.status === 'rejected_invalid' && isAffiliateCode(e.code),
-  );
-  if (rejected) markAffiliateIneligible();
-  return rejected;
 }
 
 /**

@@ -818,96 +818,107 @@ test.describe('Edge Checkout', () => {
   test.describe('Affiliate Coupon Display @desktop', () => {
     const cartPath = '/us/en_us/order/cart';
     const affiliateCode = '06-AFFTEST';
-    const affiliateUrl = () => buildProductUrl(cartPath, currentBranch, {
+    const notEligible = 'Product not eligible for affiliate discount.';
+    const affiliateUrl = (path = cartPath) => buildProductUrl(path, currentBranch, {
       cart: 'edge', COUPON: affiliateCode, cjevent: 'e2e-click',
     });
-    const rejectWith = (code) => ({
-      status: 422,
+
+    /**
+     * Fulfills /estimate/price with a coupon status per submitted code.
+     * @param {string[]} applied Codes reported as applied; all others are rejected
+     */
+    const priceResponse = (codes, applied = []) => ({
+      status: 200,
       contentType: 'application/json',
-      headers: { 'x-error': 'coupon not applicable', 'x-error-code': code },
-      body: JSON.stringify({ code, message: 'coupon not applicable' }),
+      body: JSON.stringify({
+        subtotal: 549.99,
+        discounts: applied.map((code) => ({
+          id: `coupon:${code}`, source: 'coupon', name: code, amount: 10,
+        })),
+        orderDiscountTotal: applied.length * 10,
+        couponStatus: [].concat(codes).map((code) => ({
+          code, status: applied.includes(code) ? 'applied' : 'rejected_invalid',
+        })),
+      }),
     });
 
     test.use({ viewport: { width: 1280, height: 720 } });
 
     test('shows a not-eligible affiliate code as a pill with a notice', async ({ page }) => {
       await seedCartSummary(page);
-      await page.route('**/estimate/price', (route) => route.fulfill(
-        rejectWith('ADOBE_COMMERCE_COUPON_PRODUCT_NOT_ELIGIBLE'),
-      ));
+      const requests = [];
+      await page.route('**/estimate/price', (route) => {
+        const { couponCode } = route.request().postDataJSON();
+        requests.push(couponCode);
+        return route.fulfill(priceResponse(couponCode));
+      });
       await page.goto(affiliateUrl());
 
       const pill = page.locator('.cart-summary .coupon-pill-ineligible');
       await expect(pill).toBeVisible({ timeout: 30000 });
       await expect(pill).toContainText(affiliateCode);
-      await expect(page.locator('.cart-summary .coupon-notice'))
-        .toHaveText('Product not eligible for affiliate discount.');
+      await expect(pill.locator('.coupon-pill-remove')).toHaveCount(0);
+      await expect(page.locator('.cart-summary .coupon-notice')).toHaveText(notEligible);
       await expect(page.locator('.cart-summary-coupon-error')).toBeHidden();
-
-      const stored = await page.evaluate(() => ({
-        coupons: sessionStorage.getItem('checkout_coupons'),
-        affiliateCode: sessionStorage.getItem('checkout_affiliate_code'),
-      }));
-      expect(stored.coupons).toBeNull();
-      expect(stored.affiliateCode).toBe(affiliateCode);
-
-      await pill.locator('.coupon-pill-remove').click();
-      await expect(pill).toBeHidden();
-      await expect(page.locator('.cart-summary .coupon-notice')).toBeHidden();
-      expect(await page.evaluate(() => sessionStorage.getItem('checkout_affiliate_code')))
-        .toBe(affiliateCode);
-      console.log('✓ Not-eligible affiliate code is displayed, dismissible, and retained');
+      await expect(page.locator('.cart-summary .coupon-status')).toBeHidden();
+      expect(requests[0]).toEqual([affiliateCode]);
+      console.log('✓ Not-eligible affiliate code is displayed without a remove action');
     });
 
-    test('shows the specific error for other affiliate coupon rejections', async ({ page }) => {
+    test('retries the affiliate code when the cart changes', async ({ page }) => {
       await seedCartSummary(page);
-      await page.route('**/estimate/price', (route) => route.fulfill(
-        rejectWith('ADOBE_COMMERCE_COUPON_EXPIRED'),
-      ));
+      let eligible = false;
+      await page.route('**/estimate/price', (route) => {
+        const { couponCode } = route.request().postDataJSON();
+        return route.fulfill(priceResponse(couponCode, eligible ? [affiliateCode] : []));
+      });
       await page.goto(affiliateUrl());
+      await expect(page.locator('.cart-summary .coupon-notice'))
+        .toHaveText(notEligible, { timeout: 30000 });
+
+      eligible = true;
+      await page.evaluate(() => document.dispatchEvent(new CustomEvent('cart:change')));
+
+      await expect(page.locator('.cart-summary .coupon-notice')).toBeHidden();
+      await expect(page.locator('.cart-summary .coupon-pill-ineligible')).toHaveCount(0);
+      await expect(page.locator('.cart-summary .coupon-pill')).toContainText(affiliateCode);
+      await expect(page.locator('.cart-summary-discount-item').first()).toContainText(affiliateCode);
+      console.log('✓ Affiliate code applies once the cart becomes eligible');
+    });
+
+    test('keeps sending a rejected affiliate code alongside other coupons', async ({ page }) => {
+      await seedCartSummary(page, 'SAVE10');
+      const requests = [];
+      await page.route('**/estimate/price', (route) => {
+        const { couponCode } = route.request().postDataJSON();
+        requests.push(couponCode);
+        return route.fulfill(priceResponse(couponCode, ['SAVE10']));
+      });
+      await page.goto(affiliateUrl());
+
+      await expect(page.locator('.cart-summary .coupon-notice'))
+        .toHaveText(notEligible, { timeout: 30000 });
+      await expect(page.locator('.cart-summary .coupon-status')).toBeHidden();
+      await page.evaluate(() => document.dispatchEvent(new CustomEvent('cart:change')));
+      await expect.poll(() => requests.length).toBeGreaterThan(1);
+      requests.forEach((codes) => expect(codes).toEqual(['SAVE10', affiliateCode]));
+      console.log('✓ Rejected affiliate code is still sent on later requests');
+    });
+
+    test('shows the specific error for other coupon rejections', async ({ page }) => {
+      await seedCartSummary(page, 'SAVE10');
+      await page.route('**/estimate/price', (route) => route.fulfill({
+        status: 422,
+        contentType: 'application/json',
+        headers: { 'x-error': 'coupon not applicable', 'x-error-code': 'ADOBE_COMMERCE_COUPON_EXPIRED' },
+        body: JSON.stringify({ code: 'ADOBE_COMMERCE_COUPON_EXPIRED', message: 'coupon not applicable' }),
+      }));
+      await page.goto(buildProductUrl(cartPath, currentBranch, { cart: 'edge' }));
 
       const error = page.locator('.cart-summary-coupon-error');
       await expect(error).toBeVisible({ timeout: 30000 });
       await expect(error).toHaveText('This coupon code has expired.');
-      await expect(page.locator('.cart-summary .coupon-pill-ineligible')).toHaveCount(0);
-      console.log('✓ Expired affiliate coupon shows the expired message');
-    });
-
-    test('drops a rejected affiliate code from multi-coupon requests', async ({ page }) => {
-      await seedCartSummary(page);
-      await page.addInitScript(() => {
-        sessionStorage.setItem('checkout_coupons', JSON.stringify([{ code: 'SAVE10', source: 'manual' }]));
-      });
-      const requests = [];
-      await page.route('**/estimate/price', (route) => {
-        const body = route.request().postDataJSON();
-        requests.push(body.couponCode);
-        const codes = [].concat(body.couponCode);
-        return route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            subtotal: 549.99,
-            discounts: [{
-              id: 'coupon:SAVE10', source: 'coupon', name: 'SAVE10', amount: 10,
-            }],
-            orderDiscountTotal: 10,
-            ...(codes.length > 1 ? {
-              couponStatus: codes.map((code) => ({
-                code, status: code === 'SAVE10' ? 'applied' : 'rejected_invalid',
-              })),
-            } : {}),
-          }),
-        });
-      });
-      await page.goto(affiliateUrl());
-
-      await expect(page.locator('.cart-summary .coupon-notice'))
-        .toHaveText('Product not eligible for affiliate discount.', { timeout: 30000 });
-      await expect(page.locator('.cart-summary .coupon-status')).toBeHidden();
-      await expect.poll(() => requests.at(-1)).toBe('SAVE10');
-      expect(requests[0]).toEqual(['SAVE10', affiliateCode]);
-      console.log('✓ Rejected affiliate code is shown but no longer sent');
+      console.log('✓ Expired coupon shows the expired message');
     });
 
     test('keeps the affiliate coupon when the estimate fails for other reasons', async ({ page }) => {
@@ -923,8 +934,6 @@ test.describe('Edge Checkout', () => {
       await expect(pill).toBeVisible({ timeout: 30000 });
       await expect(pill).not.toHaveClass(/coupon-pill-ineligible/);
       await expect(page.locator('.cart-summary-coupon-error')).toBeHidden();
-      expect(await page.evaluate(() => sessionStorage.getItem('checkout_coupons')))
-        .toContain(affiliateCode);
       console.log('✓ Affiliate coupon survives a non-coupon estimate failure');
     });
 
@@ -944,16 +953,14 @@ test.describe('Edge Checkout', () => {
         }));
       }, CART_KEY_US);
       await page.route('**/estimate/price', (route) => route.fulfill(
-        rejectWith('ADOBE_COMMERCE_COUPON_PRODUCT_NOT_ELIGIBLE'),
+        priceResponse(route.request().postDataJSON().couponCode),
       ));
-      await page.goto(buildProductUrl('/us/en_us/order/checkout', currentBranch, {
-        cart: 'edge', COUPON: affiliateCode, cjevent: 'e2e-click',
-      }));
+      await page.goto(affiliateUrl('/us/en_us/order/checkout'));
 
       const summary = page.locator('.order-summary').first();
-      await expect(summary.locator('.coupon-notice'))
-        .toHaveText('Product not eligible for affiliate discount.', { timeout: 30000 });
+      await expect(summary.locator('.coupon-notice')).toHaveText(notEligible, { timeout: 30000 });
       await expect(summary.locator('.coupon-pill-ineligible')).toContainText(affiliateCode);
+      await expect(summary.locator('.coupon-pill-ineligible .coupon-pill-remove')).toHaveCount(0);
       await expect(summary.locator('.order-summary-coupon-error')).toBeHidden();
       console.log('✓ Checkout summary shows the not-eligible affiliate code');
     });

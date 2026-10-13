@@ -8,8 +8,7 @@ import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 import { initIDMe, syncIDMeVisibility } from '../../scripts/commerce/idme.js';
 import {
   getCoupons, getManualCoupon, getAutoCoupons, setManualCoupon, removeCoupon,
-  getCouponRequestFields, getIneligibleAffiliateCode, dismissIneligibleAffiliate,
-  getCouponErrorCode, dropRejectedCoupon, handleAffiliateStatus,
+  getCouponRequestFields, clearCoupons, getCouponErrorCode, updateAffiliateStatus,
 } from '../../scripts/commerce/coupon-state.js';
 import { renderCouponPills, renderCouponStatus, couponCodeFromDiscount } from '../../scripts/commerce/coupon-ui.js';
 
@@ -265,24 +264,11 @@ export default async function decorate(block) {
     document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
   };
 
-  // Removable pills for auto/verified coupons; the input only holds the manual one.
-  // A not-eligible affiliate code is shown too, but is not sent as a coupon.
-  const renderPills = () => {
-    const ineligible = getIneligibleAffiliateCode();
-    const pills = [
-      ...getAutoCoupons(),
-      ...(ineligible ? [{ code: ineligible, ineligible: true }] : []),
-    ];
-    renderCouponPills(pillsEl, pills, (code, isIneligible) => {
-      if (isIneligible) {
-        dismissIneligibleAffiliate();
-        renderPills();
-        return;
-      }
-      removeCoupon(code);
-      document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
-    }, s);
-  };
+  // Pills for auto/verified coupons; the input only holds the manual one.
+  const renderPills = () => renderCouponPills(pillsEl, getAutoCoupons(), (code) => {
+    removeCoupon(code);
+    document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
+  }, s);
 
   // A remove button appears only on the manual coupon's row; auto coupons are
   // removed via their pill.
@@ -350,11 +336,8 @@ export default async function decorate(block) {
   // Renders per-code rejection feedback and rolls back an invalid manual code so
   // it is not persisted or left in the input.
   const handleCouponStatus = (couponStatus) => {
-    if (handleAffiliateStatus(couponStatus)) {
-      // Re-estimate without the affiliate coupon so later requests match.
-      renderPills();
-      document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
-    }
+    updateAffiliateStatus(couponStatus);
+    renderPills();
     renderCouponStatus(statusEl, couponStatus, s);
     const manual = getManualCoupon();
     if (!manual) return;
@@ -444,15 +427,13 @@ export default async function decorate(block) {
       // Other failures keep the coupon so it is retried.
       const errorCode = getCouponErrorCode(err);
       if (errorCode && getCoupons().length <= 1) {
-        const affiliateIneligible = dropRejectedCoupon(errorCode);
+        clearCoupons();
         discountInput.value = '';
         discountsEl.innerHTML = '';
         discountsEl.hidden = true;
         couponErrorEl.textContent = getCouponErrorMessage(errorCode);
-        couponErrorEl.hidden = affiliateIneligible;
+        couponErrorEl.hidden = false;
         renderPills();
-        // Refresh shipping and preview so they no longer include the coupon.
-        if (affiliateIneligible) document.dispatchEvent(new CustomEvent('checkout:coupon-apply'));
       } else {
         showPendingDiscounts();
       }
@@ -600,16 +581,10 @@ export default async function decorate(block) {
 
   document.addEventListener('checkout:preview', (e) => {
     summaryContent?.classList.remove('loading');
-    const { preview, couponError, affiliateIneligible } = e.detail || {};
+    const { preview, couponError } = e.detail || {};
     hasOrderPreview = Boolean(preview);
     if (!preview) renderEstimatedTotals();
     renderPills();
-
-    if (affiliateIneligible) {
-      // Shown as a not-eligible pill; checkout re-runs the preview without it.
-      couponErrorEl.hidden = true;
-      return;
-    }
 
     if (couponError) {
       // checkout-shipping already cleared a lone (single-string) coupon; reflect
