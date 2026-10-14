@@ -10,6 +10,9 @@ import { cleanFileName, readDrop } from './files.js';
 
 const SWATCH_CONFIG = '/us/en_us/products/config/color-swatches.json';
 const COLUMNS = ['Path', 'Video', 'Label', 'Category', 'Subcategory', 'Market'];
+/** Sheet column marking the product's social sharing (og:image) image. */
+const OG_COLUMN = 'og-image';
+const isOgImage = (row) => /^(true|yes|x|1)$/i.test(rowField(row, OG_COLUMN));
 const UPLOAD_CONCURRENCY = 4;
 
 /** Returns the 11-char video id for youtube.com/watch, youtu.be, /shorts, /embed and /live URLs. */
@@ -80,6 +83,8 @@ function toast(message, type = 'success') {
   const videoError = dialog.querySelector('.details-field-error');
   const videoPreview = dialog.querySelector('.details-video-preview');
   const marketOptions = dialog.querySelector('.details-market-options');
+  const ogInput = form.elements.og;
+  const ogHelp = dialog.querySelector('.details-og-help');
 
   if (query) back.href = `app.html?q=${encodeURIComponent(query)}`;
   title.textContent = slug || 'No product selected';
@@ -347,6 +352,7 @@ function toast(message, type = 'success') {
     const media = el('div', 'details-item-media');
     figure.draggable = true;
     figure.classList.toggle('selected', selected.has(row));
+    figure.classList.toggle('og', isOgImage(row));
     figure.classList.toggle('changed', isEdited(row) || isMoved(row));
     if (isMoved(row)) figure.title = `Moved from ${savedPath.get(row)}`;
     itemRow.set(figure, row);
@@ -356,7 +362,7 @@ function toast(message, type = 'success') {
     const button = el('button', 'details-item-btn');
     button.type = 'button';
     button.setAttribute('aria-pressed', String(selected.has(row)));
-    button.setAttribute('aria-label', `Select ${label}${added ? ' (new, not saved)' : ''}. Shift+click selects a range, E edits, Alt+Arrow keys reorder.`);
+    button.setAttribute('aria-label', `Select ${label}${isOgImage(row) ? ' (social sharing image)' : ''}${added ? ' (new, not saved)' : ''}. Shift+click selects a range, E edits, Alt+Arrow keys reorder.`);
     const thumb = client.buildThumb(slug, row, { src: added?.url });
     thumb.querySelectorAll('img').forEach((img) => { img.draggable = false; });
     button.append(thumb);
@@ -415,11 +421,17 @@ function toast(message, type = 'success') {
     edit.setAttribute('aria-label', `Edit ${label}`);
     edit.addEventListener('click', () => openEditor(figure));
 
-    media.append(button, edit);
+    const badges = el('span', 'details-badges');
+    media.append(button, edit, badges);
     figure.append(media);
+    if (isOgImage(row)) {
+      const og = el('span', 'details-og', 'Social');
+      og.title = 'Social sharing image (og-image)';
+      badges.append(og);
+    }
     if (added) {
       figure.classList.add('added');
-      media.append(el('span', 'details-new', 'New'));
+      badges.append(el('span', 'details-new', 'New'));
       const remove = el('button', 'details-remove', '×');
       remove.type = 'button';
       remove.title = 'Remove (not saved yet)';
@@ -753,6 +765,12 @@ function toast(message, type = 'success') {
     const toggles = options.map((m) => buildMarketToggle(m, rowMarketList.includes(m)));
     marketOptions.replaceChildren(...toggles);
 
+    ogInput.checked = isOgImage(row);
+    const currentOg = currentRows().find((r) => r !== row && isOgImage(r));
+    ogHelp.textContent = currentOg
+      ? `Replaces ${rowPath(currentOg)} as the social sharing image.`
+      : 'Used as the og:image when the product page is shared.';
+
     dialog.showModal();
     labelInput.focus();
   };
@@ -773,9 +791,22 @@ function toast(message, type = 'success') {
     if (!sameSet(markets, rowMarkets(row))) {
       setRowField(row, 'Market', markets.map((m) => m.toUpperCase()).join(','));
     }
-    const next = buildItem(row);
-    editing.replaceWith(next);
-    editing = next;
+    if (ogInput.checked !== isOgImage(row)) {
+      // one social image per product; every row gets the column so the sheet stays rectangular
+      const rows = currentRows();
+      rows.forEach((r) => setRowField(r, OG_COLUMN, ''));
+      if (ogInput.checked) setRowField(row, OG_COLUMN, 'true');
+      else if (!JSON.parse(savedJson).some((r) => OG_COLUMN in r)) {
+        // nothing picked and the saved sheet never had the column: drop it again
+        rows.forEach((r) => delete r[OG_COLUMN]);
+      }
+      render();
+      editing = [...groupsEl.querySelectorAll('.details-item')].find((f) => itemRow.get(f) === row);
+    } else {
+      const next = buildItem(row);
+      editing.replaceWith(next);
+      editing = next;
+    }
     updateDirty();
   });
 
