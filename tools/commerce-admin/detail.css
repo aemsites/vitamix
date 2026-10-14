@@ -929,6 +929,20 @@
   background: #f6f6f7;
 }
 
+.pim-sync-card-selected {
+  border-color: #008060;
+}
+
+.pim-sync-card-meta {
+  align-self: flex-start;
+  padding: 2px 4px;
+  border-radius: 4px;
+  background: #d1fae5;
+  color: #065f46;
+  font-size: 11px;
+  font-weight: 600;
+}
+
 .pim-sync-card-img {
   width: 100%;
   height: 100%;

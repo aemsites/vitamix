@@ -91,22 +91,16 @@ function splitSheetPath(rel) {
   };
 }
 
-function rowMarkets(row) {
-  return rowField(row, 'Market', 'market')
-    .split(',')
-    .map((m) => m.trim().toUpperCase())
-    .filter(Boolean);
+function rowMarket(row) {
+  return rowField(row, 'Market', 'market').toUpperCase();
 }
 
-/**
- * Rows with no Market are visible everywhere; otherwise the comma-separated
- * Market list must include the current market.
- */
+/** Rows with no Market are visible everywhere; otherwise Market must match the current market. */
 function marketAllowed(row, market) {
-  const rowMkts = rowMarkets(row);
-  if (!rowMkts.length) return true;
+  const rowMkt = rowMarket(row);
+  if (!rowMkt) return true;
   if (!market) return true;
-  return rowMkts.includes(market.toUpperCase());
+  return rowMkt === market.toUpperCase();
 }
 
 /** Derives the storefront market (e.g. `US`/`CA`) from a catalog path like `/ca/en_us/...`. */
@@ -166,10 +160,14 @@ function mediaList(entries) {
  */
 export function planImageSync(product, rows, urlKey, market) {
   const byColor = new Map();
+  let metaImage;
   (Array.isArray(rows) ? rows : []).forEach((row) => {
     if (!marketAllowed(row, market)) return;
     const parsed = mediaFromRow(row, urlKey);
     if (!parsed) return;
+    if (!metaImage && rowField(row, 'og-image').toLowerCase() === 'true') {
+      metaImage = parsed.media.url;
+    }
     const list = byColor.get(parsed.colorSlug) || [];
     list.push(parsed);
     byColor.set(parsed.colorSlug, list);
@@ -206,6 +204,7 @@ export function planImageSync(product, rows, urlKey, market) {
 
   const nextProduct = JSON.parse(JSON.stringify(product));
   delete nextProduct.internal;
+  if (metaImage) nextProduct.metaImage = metaImage;
   nextProduct.images = productImages;
   nextProduct.variants = variants.map((variant, i) => ({
     ...JSON.parse(JSON.stringify(variant)),
@@ -217,6 +216,7 @@ export function planImageSync(product, rows, urlKey, market) {
 
   return {
     nextProduct,
+    metaImage,
     productImages,
     variantPlans,
     unmatched,
@@ -262,25 +262,28 @@ function previewUrl(item, resolvePreviewUrl) {
   return m.url || '';
 }
 
-function mediaCardHtml(item, resolvePreviewUrl) {
+export function mediaCardHtml(item, resolvePreviewUrl, metaImage) {
   const m = asMedia(item);
   const src = previewUrl(m, resolvePreviewUrl);
   const video = videoOf(m);
   const label = m?.label || '';
+  const isMetaImage = Boolean(metaImage && m?.url === metaImage);
   const img = src
-    ? `<button type="button" class="pim-sync-card-zoom" data-pim-sync-zoom="${escapeHtml(src)}"
-      data-pim-sync-zoom-label="${escapeHtml(label)}" aria-label="View larger image${label ? `: ${escapeHtml(label)}` : ''}">
-      <img src="${escapeHtml(src)}" alt="" loading="lazy" class="pim-sync-card-img" /></button>`
+    ? `<img src="${escapeHtml(src)}" alt="" loading="lazy" class="pim-sync-card-img" />`
     : '<span class="pim-sync-card-missing">No preview</span>';
   const videoBadge = video ? '<span class="pim-sync-card-video">Video</span>' : '';
-  return `<figure class="pim-sync-card">
+  const metaBadge = isMetaImage
+    ? '<span class="pim-sync-card-meta" title="Selected by og-image">Meta image</span>'
+    : '';
+  const labelHtml = label ? `<span class="pim-sync-card-label">${escapeHtml(label)}</span>` : '';
+  return `<figure class="pim-sync-card${isMetaImage ? ' pim-sync-card-selected' : ''}">
     <div class="pim-sync-card-media">${img}${videoBadge}</div>
-    ${label ? `<figcaption class="pim-sync-card-cap"><span class="pim-sync-card-label">${escapeHtml(label)}</span></figcaption>` : ''}
+    ${metaBadge || labelHtml ? `<figcaption class="pim-sync-card-cap">${metaBadge}${labelHtml}</figcaption>` : ''}
   </figure>`;
 }
 
-function groupHtml(title, sku, images, resolvePreviewUrl, extra = '') {
-  const cards = (images || []).map((m) => mediaCardHtml(m, resolvePreviewUrl)).join('');
+function groupHtml(title, sku, images, resolvePreviewUrl, extra = '', metaImage) {
+  const cards = (images || []).map((m) => mediaCardHtml(m, resolvePreviewUrl, metaImage)).join('');
   const empty = cards || extra
     ? ''
     : '<p class="pim-sync-group-empty">No images in this group.</p>';
@@ -293,63 +296,13 @@ function groupHtml(title, sku, images, resolvePreviewUrl, extra = '') {
   </section>`;
 }
 
-function openImageLightbox(src, label) {
-  const lightbox = document.createElement('dialog');
-  lightbox.className = 'pim-sync-lightbox';
-  lightbox.setAttribute('aria-label', label || 'Image preview');
-  lightbox.innerHTML = `<button type="button" class="pim-sync-lightbox-close" aria-label="Close">×</button>
-    <img src="${escapeHtml(src)}" alt="${escapeHtml(label)}" class="pim-sync-lightbox-img" />
-    ${label ? `<p class="pim-sync-lightbox-label">${escapeHtml(label)}</p>` : ''}`;
-  const close = () => {
-    if (lightbox.open) lightbox.close();
-    lightbox.remove();
-  };
-  lightbox.querySelector('.pim-sync-lightbox-close').addEventListener('click', close);
-  lightbox.addEventListener('click', (e) => {
-    if (e.target === lightbox) close();
-  });
-  wireDialogEscapeDismiss(lightbox, close);
-  document.body.appendChild(lightbox);
-  lightbox.showModal();
-}
-
-async function openPlanDialog(loadPlan, resolvePreviewUrl, onConfirm) {
-  const dialog = document.createElement('dialog');
-  dialog.className = 'pim-sync-dialog';
-  dialog.innerHTML = `<div class="pim-sync-dialog-head">
-    <h2 class="pim-sync-dialog-title">Update images</h2>
-    <p role="status">Loading new images for preview…</p>
-    </div>`;
-  document.body.appendChild(dialog);
-  dialog.showModal();
-  let plan;
-  try {
-    plan = await loadPlan();
-  } catch (err) {
-    if (!dialog.open) {
-      dialog.remove();
-      return false;
-    }
-    dialog.innerHTML = `<div class="pim-sync-dialog-head">
-      <h2 class="pim-sync-dialog-title">Update images</h2>
-      <p role="alert">${escapeHtml(err.message || 'Failed to load image preview')}</p>
-      </div><div class="pim-sync-dialog-footer">
-      <button type="button" class="pim-btn-cancel">Close</button></div>`;
-    await new Promise((resolve) => {
-      dialog.querySelector('button').addEventListener('click', () => dialog.close());
-      dialog.addEventListener('close', resolve, { once: true });
-    });
-    dialog.remove();
-    return false;
-  }
-  if (!dialog.open) {
-    dialog.remove();
-    return false;
-  }
+function openPlanDialog(plan, resolvePreviewUrl, onConfirm) {
   return new Promise((resolve) => {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'pim-sync-dialog';
     const unmatchedHtml = plan.unmatched.length
       ? plan.unmatched.map((g) => {
-        const cards = g.images.map((m) => mediaCardHtml(m, resolvePreviewUrl)).join('');
+        const cards = g.images.map((m) => mediaCardHtml(m, resolvePreviewUrl, plan.metaImage)).join('');
         return `<section class="pim-sync-group pim-sync-group-warn">
           <h3 class="pim-sync-group-title">Unmatched folder · ${escapeHtml(g.colorSlug)}</h3>
           <p class="pim-sync-group-empty">No variant color option matches this folder. These files will not be written.</p>
@@ -362,12 +315,12 @@ async function openPlanDialog(loadPlan, resolvePreviewUrl, onConfirm) {
 
     dialog.innerHTML = `
       <div class="pim-sync-dialog-head">
-        <h2 class="pim-sync-dialog-title">Update images</h2>
+        <h2 class="pim-sync-dialog-title">Sync images</h2>
         <p class="pim-sync-dialog-lead">Galleries from DAM <code>images.json</code>. Confirm replaces product and variant images through the catalog API.</p>
         <p class="pim-sync-dialog-summary">${escapeHtml(summary)}</p>
       </div>
       <div class="pim-sync-dialog-body">
-        ${groupHtml('Product', '', plan.productImages, resolvePreviewUrl)}
+        ${groupHtml('Product', '', plan.productImages, resolvePreviewUrl, '', plan.metaImage)}
         ${plan.variantPlans.map((g) => groupHtml(
     g.label,
     g.sku,
@@ -376,13 +329,14 @@ async function openPlanDialog(loadPlan, resolvePreviewUrl, onConfirm) {
     g.unmatched
       ? '<p class="pim-sync-group-empty">No matching color folder in images.json. This variant will have no images.</p>'
       : '',
+    plan.metaImage,
   )).join('')}
         ${unmatchedHtml}
       </div>
       <p class="pim-sync-dialog-error" hidden></p>
       <div class="pim-sync-dialog-footer">
         <button type="button" class="pim-btn-cancel" data-pim-sync-cancel>Cancel</button>
-        <button type="button" class="pim-btn-save" data-pim-sync-confirm>Update images</button>
+        <button type="button" class="pim-btn-save" data-pim-sync-confirm>Confirm sync</button>
       </div>`;
 
     const errEl = dialog.querySelector('.pim-sync-dialog-error');
@@ -397,14 +351,7 @@ async function openPlanDialog(loadPlan, resolvePreviewUrl, onConfirm) {
 
     cancelBtn.addEventListener('click', () => finish(false));
     dialog.addEventListener('click', (e) => {
-      if (e.target === dialog) {
-        finish(false);
-        return;
-      }
-      const zoom = e.target instanceof Element && e.target.closest('[data-pim-sync-zoom]');
-      if (zoom) {
-        openImageLightbox(zoom.dataset.pimSyncZoom, zoom.dataset.pimSyncZoomLabel || '');
-      }
+      if (e.target === dialog) finish(false);
     });
     wireDialogEscapeDismiss(dialog, () => finish(false));
 
@@ -422,6 +369,9 @@ async function openPlanDialog(loadPlan, resolvePreviewUrl, onConfirm) {
         cancelBtn.disabled = false;
       }
     });
+
+    document.body.appendChild(dialog);
+    dialog.showModal();
   });
 }
 
@@ -438,24 +388,21 @@ export async function startProductImageSync({
 }) {
   if (!product || !urlKey) throw new Error('Missing product');
   const catalogPath = product.path || '';
-  const saved = await openPlanDialog(async () => {
-    const [rows, catalogProduct] = await Promise.all([
-      fetchImageSheet(urlKey),
-      fetchCatalogProduct(catalogPath),
-    ]);
-    const base = catalogProduct || JSON.parse(JSON.stringify(product));
-    delete base.internal;
-    if (!base.path && catalogPath) {
-      base.path = catalogPath.startsWith('/') ? catalogPath : `/${catalogPath}`;
-    }
-    if (!base.path) {
-      throw new Error('Product is missing a catalog path; cannot write via the commerce API.');
-    }
-    const market = marketFromCatalogPath(base.path);
-    return planImageSync(base, rows, urlKey, market);
-  }, previewSrc, async (nextProduct) => {
+  const [rows, catalogProduct] = await Promise.all([
+    fetchImageSheet(urlKey),
+    fetchCatalogProduct(catalogPath).catch(() => null),
+  ]);
+  const base = catalogProduct || JSON.parse(JSON.stringify(product));
+  delete base.internal;
+  if (!base.path && catalogPath) base.path = catalogPath.startsWith('/') ? catalogPath : `/${catalogPath}`;
+  if (!base.path) {
+    throw new Error('Product is missing a catalog path; cannot write via the commerce API.');
+  }
+  const market = marketFromCatalogPath(base.path);
+  const plan = planImageSync(base, rows, urlKey, market);
+  const saved = await openPlanDialog(plan, previewSrc, async (nextProduct) => {
     await putOrPatchResource(catalogApiPath(nextProduct.path), nextProduct);
-    showToast('Images updated');
+    showToast('Images synced');
     if (typeof onApplied === 'function') onApplied(nextProduct);
   });
   return saved;
