@@ -282,7 +282,7 @@ export function mediaCardHtml(item, resolvePreviewUrl, metaImage) {
   </figure>`;
 }
 
-function groupHtml(title, sku, images, resolvePreviewUrl, extra = '', metaImage) {
+function groupHtml(title, sku, images, resolvePreviewUrl, extra = '', metaImage = '') {
   const cards = (images || []).map((m) => mediaCardHtml(m, resolvePreviewUrl, metaImage)).join('');
   const empty = cards || extra
     ? ''

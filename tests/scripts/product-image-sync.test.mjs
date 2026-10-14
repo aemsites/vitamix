@@ -53,7 +53,9 @@ test('missing, false and out-of-market markers preserve the existing social imag
 
 test('preview marks the selected social image even with a transformed preview URL', () => {
   const plan = planImageSync(product, [
-    { Path: 'black/social.jpg', 'og-image': true, Video: 'video.mp4', Label: 'Social & video' },
+    {
+      Path: 'black/social.jpg', 'og-image': true, Video: 'video.mp4', Label: 'Social & video',
+    },
   ], 'blender', 'US');
   const html = mediaCardHtml(plan.variantPlans[0].images[0], () => '/preview.jpg', plan.metaImage);
   assert.match(html, /pim-sync-card-selected/);
@@ -66,10 +68,16 @@ test('preview marks the selected social image even with a transformed preview UR
 test('preview does not mark unselected images or an existing override without og-image', () => {
   const plan = planImageSync(product, [{ Path: product.metaImage }], 'blender', 'US');
   assert.equal(plan.metaImage, undefined);
-  assert.doesNotMatch(mediaCardHtml(plan.productImages[0], undefined, plan.metaImage),
-    /Meta image|pim-sync-card-selected/);
-  assert.doesNotMatch(mediaCardHtml({ url: '/other.jpg' }, undefined, '/selected.jpg'),
-    /Meta image|pim-sync-card-selected/);
-  assert.match(mediaCardHtml({ url: '/selected.jpg' }, undefined, '/selected.jpg'),
-    /<figcaption[^>]*>.*Meta image/);
+  assert.doesNotMatch(
+    mediaCardHtml(plan.productImages[0], undefined, plan.metaImage),
+    /Meta image|pim-sync-card-selected/,
+  );
+  assert.doesNotMatch(
+    mediaCardHtml({ url: '/other.jpg' }, undefined, '/selected.jpg'),
+    /Meta image|pim-sync-card-selected/,
+  );
+  assert.match(
+    mediaCardHtml({ url: '/selected.jpg' }, undefined, '/selected.jpg'),
+    /<figcaption[^>]*>.*Meta image/,
+  );
 });
