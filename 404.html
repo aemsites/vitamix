@@ -83,6 +83,10 @@
       a.textContent = a.href;
       section.appendChild(a);
     })();
+
+    if (window.location.pathname.includes('/sales/order/view/order_id/')) {
+      window.location.href = `${window.location.pathname.split('/sales/order/view/order_id/')[0]}/order-status`;
+    };
   </script>
   <footer></footer>
   <script>
