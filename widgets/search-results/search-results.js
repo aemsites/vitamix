@@ -280,6 +280,27 @@ function filterBySearch(index, searchTerm) {
   }).map((item) => ({ ...item, searchTerm: term }));
 }
 
+const productPathChecks = new Map();
+
+/**
+ * Keep product results only when their same-origin page responds with HTTP 200.
+ * @param {Array<Object>} results
+ * @returns {Promise<Array<Object>>}
+ */
+async function filterAvailableProducts(results) {
+  const availability = await Promise.all(results.map((item) => {
+    if (item.type !== 'product') return true;
+    if (!item.path || !item.path.startsWith('/')) return false;
+    if (!productPathChecks.has(item.path)) {
+      productPathChecks.set(item.path, fetch(item.path)
+        .then((response) => response.status === 200)
+        .catch(() => false));
+    }
+    return productPathChecks.get(item.path);
+  }));
+  return results.filter((item, index) => availability[index]);
+}
+
 /**
  * Type order for tie-break: product > manual > recipe > article > query
  * (lower = higher priority).
@@ -646,7 +667,7 @@ function buildSearchFiltering(container, config = {}, copy = {}) {
 
   const runSearch = async (filterConfig = config, updateURLState = true) => {
     const index = await loadSearchIndex();
-    let results = filterBySearch(index, filterConfig.search || '');
+    let results = await filterAvailableProducts(filterBySearch(index, filterConfig.search || ''));
     const typeCounts = {};
     results.forEach((item) => {
       typeCounts[item.type] = (typeCounts[item.type] || 0) + 1;
