@@ -136,7 +136,7 @@ const CORS_KEY = '&key=Mg23N96GgR8O3NjU';
 const INDEX_TTL = 10 * 60 * 1000;
 
 export function productAdminUrl(locale, slug) {
-  const params = new URLSearchParams({ catalog: locale, product: slug });
+  const params = new URLSearchParams({ catalog: locale, product: slug, stage: 'false' });
   return `${PRODUCT_ADMIN}?${params}`;
 }
 
