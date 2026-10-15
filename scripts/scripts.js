@@ -1290,17 +1290,24 @@ export async function loggedFetch(input, init) {
         try {
           data = JSON.parse(text);
         } catch { /* noop */ }
+        // Sanitize diagnostic copies only; the actual request keeps its credentials.
         let requestBody = init?.body;
         try {
-          requestBody = JSON.parse(requestBody);
+          requestBody = JSON.parse(requestBody, (key, value) => (
+            key === 'paypalSessionToken' ? '[REDACTED]' : value
+          ));
         } catch { /* noop */ }
+        const requestHeaders = {};
+        new Headers(init?.headers).forEach((value, name) => {
+          requestHeaders[name] = name === 'authorization' ? '[REDACTED]' : value;
+        });
 
         /* eslint-disable no-console */
         console.group(`Error response from: ${input.toString()}`);
         console.error(JSON.stringify({
           status: response.status,
           method: init?.method ?? 'GET',
-          requestHeaders: init?.headers,
+          requestHeaders,
           requestBody,
           responseBody: data,
           xError,
