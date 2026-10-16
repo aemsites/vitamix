@@ -298,6 +298,41 @@ td.pim-col-path {
   color: #9d174d;
 }
 
+.pim-cat-tag-i5 {
+  background: #cffafe;
+  color: #155e75;
+}
+
+.pim-cat-tag-i6 {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.pim-cat-tag-i7 {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.pim-cat-tag-i8 {
+  background: #ecfccb;
+  color: #3f6212;
+}
+
+.pim-cat-tag-i9 {
+  background: #ffe4e6;
+  color: #9f1239;
+}
+
+.pim-cat-tag-i10 {
+  background: #ccfbf1;
+  color: #115e59;
+}
+
+.pim-cat-tag-i11 {
+  background: #f1f5f9;
+  color: #334155;
+}
+
 .pim-cat-tag.pim-cat-tag-active {
   border-color: currentcolor;
 }

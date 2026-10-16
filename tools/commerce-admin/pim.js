@@ -4,6 +4,7 @@ import {
 import { showToast } from './commerce-otp-ui.js';
 import { getApiEnvironment, commerceAdminHref } from './commerce-otp-api.js';
 import { productUrlToCatalogPath } from './price-rules-api.js';
+import { categoryColorClass } from './commerce-category.js';
 
 const AEM_BASE = 'https://main--vitamix--aemsites.aem.network';
 const CORS_PROXY = 'https://fcors.org/?url=';
@@ -268,15 +269,13 @@ function productCategories(p) {
     .sort(byName);
 }
 
-function categoryColorIndex(slug) {
-  let hash = 0;
-  for (let i = 0; i < slug.length; i += 1) hash = (hash * 31 + slug.charCodeAt(i)) % 9973;
-  return hash % 5;
-}
-
 function categoryNameForSlug(slug) {
   const match = allParents.map(productCategories).flat().find((c) => c.slug === slug);
   return match ? match.name : slug;
+}
+
+export function getProductCreateContext() {
+  return { locale: currentLocalePath, categories: allParents.flatMap(productCategories) };
 }
 
 export function getUrlKeyFromProduct(p) {
@@ -415,7 +414,7 @@ export function renderProductList(parents, query = '') {
       }
       const warning = mismatchedSlug
         ? '<span class="pim-cat-slug-warning" aria-hidden="true">!</span> ' : '';
-      const colorClass = `pim-cat-tag-i${categoryColorIndex(slug)}`;
+      const colorClass = categoryColorClass(name);
       const warningClass = mismatchedSlug ? ' pim-cat-tag-warning' : '';
       return `<button type="button" class="pim-cat-tag ${colorClass}${active}${warningClass}"
         data-category="${escapeHtml(slug)}" title="${escapeHtml(label)}"
@@ -521,6 +520,12 @@ export async function init() {
     updateUrlParams({ [CATALOG_PARAM]: currentLocalePath });
     loadIndex();
   });
+
+  const createBtn = document.getElementById('productCreateBtn');
+  if (createBtn) {
+    createBtn.disabled = getApiEnvironment() !== 'prod';
+    createBtn.title = createBtn.disabled ? 'Product creation is only available in production.' : '';
+  }
 
   try {
     updateUrlParams({ [CATALOG_PARAM]: currentLocalePath });

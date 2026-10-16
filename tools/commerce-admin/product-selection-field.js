@@ -163,6 +163,9 @@ export async function hydrateProductScopePills(container, options) {
  *   localePath: string;
  *   products: string;
  *   categories: string;
+ *   productsOnly?: boolean;
+ *   fixedLocale?: boolean;
+ *   validateSelection?: (selection: { products: string; categories: string }) => Promise<void>;
  * }} options
  * @returns {Promise<{ products: string; categories: string } | null>}
  */
@@ -182,6 +185,7 @@ export function openProductSelectorModal(options) {
       <div class="ps-modal-inner">
         <h2 class="ps-modal-title"></h2>
         <div class="ps-modal-body"></div>
+        <p class="ps-modal-error" role="alert" hidden></p>
         <div class="ps-modal-actions">
           <button type="button" class="ps-modal-btn" data-ps-modal-cancel>Cancel</button>
           <button type="button" class="ps-modal-btn ps-modal-btn-primary" data-ps-modal-apply>Apply</button>
@@ -221,16 +225,34 @@ export function openProductSelectorModal(options) {
     selectorApi = mountProductSelector(selectorHost, {
       productsInput,
       categoriesInput,
-      localePath: localePathForProductSelector(localePath),
+      localePath: options.fixedLocale ? localePath : localePathForProductSelector(localePath),
       syncUrl: false,
+      productsOnly: options.productsOnly,
+      fixedLocale: options.fixedLocale,
     });
 
     dialog.querySelector('[data-ps-modal-cancel]')?.addEventListener('click', () => finish(null));
-    dialog.querySelector('[data-ps-modal-apply]')?.addEventListener('click', () => {
-      finish({
-        products: productsInput.value,
-        categories: categoriesInput.value,
-      });
+    const apply = dialog.querySelector('[data-ps-modal-apply]');
+    const selectionError = dialog.querySelector('.ps-modal-error');
+    apply?.addEventListener('click', async () => {
+      const selection = { products: productsInput.value, categories: categoriesInput.value };
+      apply.disabled = true;
+      bodyEl.inert = true;
+      selectionError.hidden = true;
+      try {
+        if (options.validateSelection) {
+          apply.textContent = 'Checking…';
+          await options.validateSelection(selection);
+        }
+        finish(selection);
+      } catch (err) {
+        selectionError.textContent = err.message || 'Could not validate the selection.';
+        selectionError.hidden = false;
+      } finally {
+        apply.disabled = false;
+        bodyEl.inert = false;
+        apply.textContent = 'Apply';
+      }
     });
     dialog.addEventListener('click', (e) => {
       if (e.target === dialog) finish(null);

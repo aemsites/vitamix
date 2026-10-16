@@ -30,6 +30,10 @@ npm run lint
 
 https://{branch}--vitamix--aemsites.aem.page/
 
+## Commerce Admin
+
+See the [Commerce Admin documentation](tools/commerce-admin/README.md) for catalog product creation.
+
 ## Tests
 
 ### Overview

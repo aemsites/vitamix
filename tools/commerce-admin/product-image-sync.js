@@ -83,6 +83,7 @@ function rowField(row, ...keys) {
 
 function splitSheetPath(rel) {
   const clean = String(rel || '').replace(/^\/+/, '').trim();
+  if (/^https?:\/\//i.test(clean)) return { colorSlug: '', filePath: clean };
   const slash = clean.indexOf('/');
   if (slash === -1) return { colorSlug: '', filePath: clean };
   return {
@@ -95,12 +96,12 @@ function rowMarket(row) {
   return rowField(row, 'Market', 'market').toUpperCase();
 }
 
-/** Rows with no Market are visible everywhere; otherwise Market must match the current market. */
+/** Rows with no Market are global; otherwise the market must appear in the row's market list. */
 function marketAllowed(row, market) {
   const rowMkt = rowMarket(row);
   if (!rowMkt) return true;
   if (!market) return true;
-  return rowMkt === market.toUpperCase();
+  return rowMkt.split(/[,\s;]+/).includes(market.toUpperCase());
 }
 
 /** Derives the storefront market (e.g. `US`/`CA`) from a catalog path like `/ca/en_us/...`. */
@@ -224,9 +225,9 @@ export function planImageSync(product, rows, urlKey, market) {
   };
 }
 
-async function fetchImageSheet(urlKey) {
+export async function fetchImageSheet(urlKey) {
   const sheetUrl = `${ASSETS_ORIGIN}/assets/products/${encodeURIComponent(urlKey)}/images.json`;
-  const resp = await fetch(fcorsUrl(sheetUrl));
+  const resp = await fetch(fcorsUrl(sheetUrl), { cache: 'no-store' });
   if (resp.status === 404) {
     throw new Error(`No images.json at /assets/products/${urlKey}/`);
   }
@@ -242,7 +243,13 @@ async function fetchImageSheet(urlKey) {
   } catch {
     throw new Error('images.json was not valid JSON');
   }
-  return Array.isArray(json.data) ? json.data : [];
+  const sheet = [json, json?.data, ...Object.values(json || {})]
+    .find((candidate) => Array.isArray(candidate?.data));
+  if (!sheet) throw new Error('images.json must contain an image data array.');
+  if (Number(sheet.total) > sheet.data.length) {
+    throw new Error('images.json is incomplete; publish the complete image manifest first.');
+  }
+  return sheet.data;
 }
 
 async function fetchCatalogProduct(productPath) {

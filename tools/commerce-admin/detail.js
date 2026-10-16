@@ -12,6 +12,7 @@ import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
 import { PB_ORG, PB_SITE } from './commerce-pbus-config.js';
 import { showToast } from './commerce-otp-ui.js';
 import { startProductImageSync } from './product-image-sync.js';
+import { categoryColorClass } from './commerce-category.js';
 import { fetchProductsIndexForLocale, getProductRefFromIndex } from './pim.js';
 
 /** Product JSON edits are production-only (active API env, not staging). */
@@ -148,10 +149,9 @@ function renderImages(images, canEdit = false) {
 
 function renderCategories(categories) {
   if (!Array.isArray(categories) || categories.length === 0) return '';
-  const colorIndex = (i) => i % 5;
-  const tags = categories.map((c, i) => {
+  const tags = categories.map((c) => {
     const name = c.name || c.url_key || '';
-    const colorClass = `pim-detail-tag-i${colorIndex(i)}`;
+    const colorClass = categoryColorClass(name);
     return `<span class="pim-detail-tag pim-detail-tag-cat ${colorClass}">${escapeHtml(name)}</span>`;
   }).join('');
   return `<div class="pim-detail-section"><h3 class="pim-detail-section-title">Categories</h3><div class="pim-detail-tags">${tags}</div></div>`;

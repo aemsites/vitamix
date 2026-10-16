@@ -111,6 +111,7 @@ export function mountProductSelector(container, options = {}) {
   } = options;
 
   const syncUrl = options.syncUrl !== false && typeof window !== 'undefined';
+  const productsOnly = options.productsOnly === true;
 
   /** @type {Set<string>} */
   let selectedProducts = new Set(parseCommaList(productsInput?.value));
@@ -140,7 +141,7 @@ export function mountProductSelector(container, options = {}) {
   /** @type {string[]} */
   let categorySlugs = [];
 
-  let filterMode = /** @type {PickerFilter} */ ('all');
+  let filterMode = /** @type {PickerFilter} */ (productsOnly ? 'products' : 'all');
   let searchQuery = '';
   let loading = false;
   let loadError = '';
@@ -199,6 +200,20 @@ export function mountProductSelector(container, options = {}) {
   const filterTabs = root.querySelectorAll('.ps-filter-tab');
   const clearAllBtn = root.querySelector('[data-clear="all"]');
 
+  if (options.fixedLocale) {
+    if (![...indexSelect.options].some((option) => option.value === localePath)) {
+      indexSelect.add(new Option(localePath, localePath));
+    }
+    indexSelect.hidden = true;
+    root.querySelector('.ps-index-label').hidden = true;
+  }
+  if (productsOnly) {
+    selectedCategories.clear();
+    root.querySelector('.ps-filter-tabs').hidden = true;
+    root.querySelector('.ps-panel-selection').setAttribute('aria-label', 'Selected products');
+    pickerEl.setAttribute('aria-label', 'Matching products');
+    searchEl.placeholder = 'Filter by product name, SKU, or path…';
+  }
   indexSelect.value = localePath;
 
   function currentUrlState() {
@@ -271,6 +286,10 @@ export function mountProductSelector(container, options = {}) {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return true;
     const name = productDisplayName(product).toLowerCase();
+    if (productsOnly) {
+      return [name, product.sku, catalogPathForProduct(localePath, product)]
+        .some((text) => String(text || '').toLowerCase().includes(q));
+    }
     return name.includes(q);
   }
 
@@ -517,6 +536,8 @@ export function mountProductSelector(container, options = {}) {
     const skuCount = scopeContext?.variantSkuEntries?.length ?? 0;
     if (filterMode === 'skus') {
       statusEl.textContent = `${skuCount} SKUs`;
+    } else if (productsOnly) {
+      statusEl.textContent = `${parentProducts.length} products`;
     } else {
       statusEl.textContent = `${parentProducts.length} products · ${categorySlugs.length} categories`;
     }

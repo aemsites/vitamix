@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="commerce-auth.css" />
     <link rel="stylesheet" href="pim.css" />
     <link rel="stylesheet" href="commerce-admin-chrome.css" />
+    <link rel="stylesheet" href="product-create.css" />
   </head>
   <body class="commerce-admin-body" data-commerce-header="subpage" data-commerce-header-page="Catalog">
     <div id="commerce-admin-auth-root" aria-live="polite">
@@ -45,6 +46,7 @@
             <option value="vr/en_us">Rest of World EN</option>
           </select>
           <span class="pim-count" id="productCount">0 products</span>
+          <button type="button" class="pim-io-open-btn" id="productCreateBtn" disabled>Add new product</button>
           <button type="button" class="pim-io-open-btn" id="catalogExportImportBtn" disabled>Export / import…</button>
         </div>
 
@@ -70,5 +72,6 @@
     <script type="module" src="auth-page-boot.js"></script>
     <script type="module" src="commerce-admin-header.js"></script>
     <script type="module" src="pim.js"></script>
+    <script type="module" src="product-create.js"></script>
   </body>
 </html>
