@@ -161,14 +161,6 @@ export function getProductName() {
 }
 
 /**
- * @param {string} productName
- * @returns {string}
- */
-export function buildProductId(productName) {
-  return `;${productName};;;;`;
-}
-
-/**
  * @param {number|string} value
  * @returns {string}
  */
@@ -186,6 +178,17 @@ export function formatAnalyticsMoney(value) {
   const num = Number(value);
   if (Number.isNaN(num)) return '0.00';
   return num.toFixed(2);
+}
+
+/**
+ * Adobe Analytics products string for prodView: ;{name};{price};;;
+ * @param {string} productName
+ * @param {number|string} [price]
+ * @returns {string}
+ */
+export function buildProductId(productName, price) {
+  const priceSegment = price !== undefined && price !== null && price !== '' ? `$${formatAnalyticsMoney(price)}` : '';
+  return `;${productName};${priceSegment};;;`;
 }
 
 /**
