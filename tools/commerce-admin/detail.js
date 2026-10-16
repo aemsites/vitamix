@@ -459,8 +459,20 @@ async function fetchAvailabilityRows() {
       productPath,
       sku: product.sku,
       name: product.name || product.sku,
+      field: 'availability',
       availability: product.availability || '',
     });
+    if (product.custom && Object.hasOwn(product.custom, 'parentAvailability')) {
+      rows.push({
+        catalog: catalog.label,
+        locale: catalog.path,
+        productPath,
+        sku: product.sku,
+        name: product.name || product.sku,
+        field: 'custom.parentAvailability',
+        availability: product.custom.parentAvailability || '',
+      });
+    }
     (Array.isArray(product.variants) ? product.variants : []).forEach((variant) => {
       rows.push({
         catalog: catalog.label,
@@ -468,6 +480,7 @@ async function fetchAvailabilityRows() {
         productPath,
         sku: variant.sku,
         name: variant.name || variant.color || variant.sku,
+        field: 'availability',
         availability: variant.availability || '',
       });
     });
@@ -488,14 +501,17 @@ function availabilityStateOptions(current) {
 
 function availabilityRowHtml(row, index) {
   const state = row.availability || '';
+  const itemLabel = row.field === 'custom.parentAvailability'
+    ? `${row.sku} · custom.parentAvailability`
+    : row.sku || '—';
   return `<tr data-availability-row="${index}">
-    <td class="pim-availability-select-col"><input type="checkbox" data-availability-select aria-label="Select ${escapeHtml(row.name)} (${escapeHtml(row.sku)}) in ${escapeHtml(row.catalog)}" /></td>
-    <td><span class="pim-availability-item-name">${escapeHtml(row.name || row.sku)}</span><span class="pim-availability-item-sku">${escapeHtml(row.sku || '—')}</span></td>
+    <td class="pim-availability-select-col"><input type="checkbox" data-availability-select aria-label="Select ${escapeHtml(row.name)} (${escapeHtml(itemLabel)}) in ${escapeHtml(row.catalog)}" /></td>
+    <td><span class="pim-availability-item-name">${escapeHtml(row.name || row.sku)}</span><span class="pim-availability-item-sku">${escapeHtml(itemLabel)}</span></td>
     <td>${escapeHtml(row.catalog)}</td>
     <td><span class="pim-card-availability pim-availability-state ${state.toLowerCase()}">${escapeHtml(state || '—')}</span></td>
     <td class="pim-availability-target-cell">
       <span class="pim-availability-diff-arrow" aria-hidden="true">→</span>
-      <select class="pim-availability-target-select ${state.toLowerCase()}" data-availability-target aria-label="Target availability for ${escapeHtml(row.sku)}">${availabilityStateOptions(state)}</select>
+      <select class="pim-availability-target-select ${state.toLowerCase()}" data-availability-target aria-label="Target ${escapeHtml(row.field)} for ${escapeHtml(row.sku)} in ${escapeHtml(row.catalog)}">${availabilityStateOptions(state)}</select>
     </td>
   </tr>`;
 }
@@ -529,6 +545,13 @@ async function saveAvailabilityChanges(changes, onSaved) {
     const product = await fetchCatalogProduct(group.path);
     if (!product) throw new Error(`Product not found: ${group.path}`);
     group.changes.forEach((change) => {
+      if (change.field === 'custom.parentAvailability') {
+        if (!product.custom || !Object.hasOwn(product.custom, 'parentAvailability')) {
+          throw new Error(`custom.parentAvailability was not found in ${group.path}.`);
+        }
+        product.custom.parentAvailability = change.targetAvailability;
+        return;
+      }
       const target = normalizeAvailabilitySku(change.sku) === normalizeAvailabilitySku(product.sku)
         ? product
         : (product.variants || []).find((variant) => (
@@ -564,7 +587,7 @@ function openAvailabilityDialog() {
     <div class="pim-availability-dialog-inner">
       <header class="pim-availability-dialog-header">
         <h2 class="pim-availability-dialog-title">Edit availability</h2>
-        <p>Choose availability changes for this product and its variants in US (en_us) and Canada (en_us and fr_ca).</p>
+        <p>Choose availability changes for this product and its variants in US (en_us) and Canada (en_us and fr_ca). Existing custom.parentAvailability properties are listed separately.</p>
       </header>
       <p class="pim-availability-dialog-status" data-availability-status role="status">Loading product availability…</p>
       <div class="pim-availability-dialog-table-wrap">
@@ -704,7 +727,7 @@ function openAvailabilityDialog() {
         ({ path, product, changes: productChanges }) => {
           productChanges.forEach((change) => {
             const index = rows.findIndex((row) => (
-              row.productPath === path && row.sku === change.sku
+              row.productPath === path && row.sku === change.sku && row.field === change.field
             ));
             if (index < 0) return;
             rows[index].availability = change.targetAvailability;
@@ -824,6 +847,27 @@ async function init() {
     return;
   }
 
+  const catalog = getCatalogFromParams();
+  const catalogSelect = document.getElementById('productCatalogSelect');
+  if (catalogSelect instanceof HTMLSelectElement) {
+    if (![...catalogSelect.options].some((option) => option.value === catalog)) {
+      catalogSelect.add(new Option(catalog, catalog));
+    }
+    catalogSelect.value = catalog;
+    catalogSelect.addEventListener('change', () => {
+      const ref = normalizeProductPath(currentProductRef || productRef);
+      const prefix = `/${catalog}/products/`;
+      const relativeRef = ref.startsWith(prefix) ? ref.slice(prefix.length) : ref.replace(/^\/+/, '');
+      const url = new URL(window.location.href);
+      url.searchParams.set(CATALOG_PARAM, catalogSelect.value);
+      url.searchParams.set('product', relativeRef);
+      window.location.assign(commerceAdminHref(url.href));
+    });
+  }
+  toolbar.style.display = 'flex';
+  const backLink = toolbar.querySelector('.pim-detail-back-link');
+  if (backLink) backLink.href = commerceAdminHref(`catalog.html?catalog=${encodeURIComponent(catalog)}`);
+
   loading.classList.add('active');
   content.innerHTML = '';
   errorEl.classList.remove('active');
@@ -851,10 +895,6 @@ async function init() {
     currentProductData = JSON.parse(JSON.stringify(data));
     currentIndexByUrlKey = buildIndexByUrlKey(indexData);
     loading.classList.remove('active');
-    toolbar.style.display = 'flex';
-    const backLink = toolbar.querySelector('.pim-detail-back-link');
-    if (backLink) backLink.href = commerceAdminHref(`catalog.html?catalog=${encodeURIComponent(getCatalogFromParams())}`);
-
     if (editCheckbox instanceof HTMLInputElement) {
       applyEditModeToggle(editCheckbox);
       editCheckbox.addEventListener('change', () => {

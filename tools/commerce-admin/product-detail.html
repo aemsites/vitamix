@@ -20,11 +20,20 @@
       <div class="pim-detail-toolbar" id="toolbar" style="display: none;">
         <a href="catalog.html" class="pim-detail-back-link">← Back to products</a>
         <div class="pim-detail-toolbar-right">
+          <label for="productCatalogSelect">Catalog</label>
+          <select id="productCatalogSelect" class="pim-index-select" aria-label="Product catalog locale">
+            <option value="us/en_us">US</option>
+            <option value="ca/en_us">Canada EN</option>
+            <option value="ca/fr_ca">Canada FR</option>
+            <option value="mx/en_us">Mexico EN</option>
+            <option value="mx/es_mx">Mexico ES</option>
+            <option value="vr/en_us">Rest of World EN</option>
+          </select>
           <button type="button" class="pim-io-open-btn" id="productExportImportBtn" hidden>Export / import…</button>
           <label class="pim-edit-toggle" for="editModeCheckbox">
             <span class="pim-edit-toggle-label">Edit mode</span>
             <span class="pim-edit-toggle-track">
-              <input type="checkbox" id="editModeCheckbox" class="pim-edit-toggle-input" />
+              <input type="checkbox" id="editModeCheckbox" class="pim-edit-toggle-input" disabled />
               <span class="pim-edit-toggle-thumb"></span>
             </span>
           </label>

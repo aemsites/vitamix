@@ -5,6 +5,7 @@
 
 .pim-detail-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
@@ -13,8 +14,10 @@
 
 .pim-detail-toolbar-right {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
+  font-size: 14px;
 }
 
 .pim-detail-back-link {
