@@ -26,6 +26,7 @@ const CATALOG_PARAM = 'catalog';
 const DEFAULT_CATALOG = 'us/en_us';
 const AVAILABILITY_CATALOGS = [
   { path: 'us/en_us', label: 'US · en_us' },
+  { path: 'ca/en_us', label: 'CA · en_us' },
   { path: 'ca/fr_ca', label: 'CA · fr_ca' },
 ];
 const AVAILABILITY_STATES = [
@@ -472,7 +473,7 @@ async function fetchAvailabilityRows() {
     });
   });
   if (!rows.length) {
-    throw new Error(`Product SKU ${currentProductData.sku} was not found in either catalog.`);
+    throw new Error(`Product SKU ${currentProductData.sku} was not found in any catalog.`);
   }
   return { rows, missingCatalogs };
 }
@@ -563,7 +564,7 @@ function openAvailabilityDialog() {
     <div class="pim-availability-dialog-inner">
       <header class="pim-availability-dialog-header">
         <h2 class="pim-availability-dialog-title">Edit availability</h2>
-        <p>Choose availability changes for this product and its variants in US (en_us) and Canada (fr_ca).</p>
+        <p>Choose availability changes for this product and its variants in US (en_us) and Canada (en_us and fr_ca).</p>
       </header>
       <p class="pim-availability-dialog-status" data-availability-status role="status">Loading product availability…</p>
       <div class="pim-availability-dialog-table-wrap">
@@ -755,7 +756,7 @@ function openAvailabilityDialog() {
     rows = loadedRows;
     body.innerHTML = rows.map(availabilityRowHtml).join('');
     status.textContent = missingCatalogs.length
-      ? `Not found in ${missingCatalogs.join(' and ')}. You can still update the catalog shown below.`
+      ? `Not found in ${missingCatalogs.join(' and ')}. You can still update the catalogs shown below.`
       : '';
     loading = false;
     updateApplyState();
