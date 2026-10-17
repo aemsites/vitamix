@@ -199,12 +199,12 @@ function buildIngredientsHtml(ingredients) {
 const KJ_PER_KCAL = 4.184;
 
 function getNutrientNumericValue(nutrientEl) {
-  const valueImposedStr = nutrientEl.querySelector('ValueImposed')?.textContent.trim() || '0';
+  const valueImposedStr = nutrientEl.querySelector('ValueImposed')?.textContent.trim();
   const valueStr = nutrientEl.querySelector('Value')?.textContent.trim() || '0';
   const valueImposed = parseFloat(valueImposedStr);
   const value = parseFloat(valueStr);
   return {
-    num: valueImposed > 0 ? valueImposed : value,
+    num: Number.isFinite(valueImposed) ? valueImposed : value,
     unit: nutrientEl.querySelector('Unit')?.textContent.trim() || '',
     isDecimal: (nutrientEl.querySelector('Format')?.textContent.trim() || '#,##0').includes('0.00'),
   };
