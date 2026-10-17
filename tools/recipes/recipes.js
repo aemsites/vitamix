@@ -809,6 +809,11 @@ function calcMenuIsNewerThanIndex(calcDateUpdated, indexDateUpdated) {
   return calcTimestamp > indexTimestamp;
 }
 
+function recipeNeedsSync(status, calcDateUpdated, indexEntry) {
+  if (status?.toLowerCase() === 'deleted') return Boolean(indexEntry);
+  return calcMenuIsNewerThanIndex(calcDateUpdated, indexEntry?.['date-updated'] || '');
+}
+
 function buildListUrlParams(overrides = {}) {
   const params = { ...getQueryParams(), ...overrides };
   const searchParams = new URLSearchParams();
@@ -2109,8 +2114,8 @@ export async function displayResults(data, rawXml) {
         importedCount += 1;
       }
       if (lastWeekView) {
-        const indexDate = indexEntriesByNumber.get(number.toUpperCase())?.['date-updated'] || '';
-        if (calcMenuIsNewerThanIndex(recipe.getAttribute('DateUpdated'), indexDate)) {
+        const indexEntry = indexEntriesByNumber.get(number.toUpperCase());
+        if (recipeNeedsSync(recipe.getAttribute('Status'), recipe.getAttribute('DateUpdated'), indexEntry)) {
           needsSyncCount += 1;
         }
       }
@@ -2149,7 +2154,7 @@ export async function displayResults(data, rawXml) {
       const indexEntry = indexEntriesByNumber.get(number.toUpperCase());
       const indexDateUpdated = indexEntry?.['date-updated'] || '';
       const needsSync = lastWeekView
-        ? calcMenuIsNewerThanIndex(dateUpdated, indexDateUpdated)
+        ? recipeNeedsSync(status, dateUpdated, indexEntry)
         : false;
       const thumbnail = recipeThumbnails.get(number);
       const imageUrl = thumbnail?.url || '';
