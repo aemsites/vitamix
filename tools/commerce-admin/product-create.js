@@ -903,12 +903,11 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
       type: variants.length ? 'configurable' : 'simple',
       brand: 'Vitamix',
       availability: 'OutOfStock',
-      metadata: { robots: 'noindex' },
+      metadata: { robots: 'noindex', visibility: 'embargoed' },
       itemCondition: condition,
       ...tax,
       ...physical(),
       custom: {
-        visibility: 'protected',
         categories: [...selectedCategories].map((key) => ({ ...categoryChoices.get(key) })),
         ...Object.fromEntries(BUTTON_SETTINGS.map((setting) => [
           setting, field(setting).checked ? 'Yes' : 'No',
