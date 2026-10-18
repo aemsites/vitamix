@@ -79,7 +79,8 @@ Without color folders the product is simple. The wizard does not edit asset stru
 Review galleries, supply the product name, distinct simple-product/variant SKUs
 and prices, then review the complete JSON before creating. Color names and
 variant names are derived automatically from the product name and color. All products
-and variants start `OutOfStock`, with product `metadata.robots` set to `noindex`.
+and variants start `OutOfStock`, with product `metadata.robots` set to `noindex` and
+`custom.visibility` set to `protected`.
 These settings do not make the product private. Authored page metadata can override
 catalog metadata. No catalog write happens before final confirmation; create-only
 requests reject existing paths instead of overwriting them.

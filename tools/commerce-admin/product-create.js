@@ -888,7 +888,6 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
       price: { ...price },
       availability: 'OutOfStock',
       itemCondition: condition,
-      ...tax,
       ...physical(),
     }));
     const sku = variants.length ? value('urlKey') : value('sku');
@@ -909,6 +908,7 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
       ...tax,
       ...physical(),
       custom: {
+        visibility: 'protected',
         categories: [...selectedCategories].map((key) => ({ ...categoryChoices.get(key) })),
         ...Object.fromEntries(BUTTON_SETTINGS.map((setting) => [
           setting, field(setting).checked ? 'Yes' : 'No',
@@ -1079,8 +1079,7 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
             if (!response.ok) {
               throw new Error(response.headers.get('x-error') || `Create failed (HTTP ${response.status}): ${await response.text()}`);
             }
-            const result = await response.json();
-            if (result.product?.status !== 201) {
+            if (response.status !== 201) {
               throw new Error(
                 `${product.path}: The API did not confirm creation. Check the catalog before retrying.`,
               );
