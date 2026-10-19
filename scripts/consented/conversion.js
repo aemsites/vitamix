@@ -17,7 +17,7 @@ import { debugLog, debugWarn, parseStorageJson } from './instrumentation/shared.
 // consented.js keeps its own gtag() module-scoped (never assigns window.gtag),
 // so this module pushes to the shared window.dataLayer the same way.
 window.dataLayer = window.dataLayer || [];
-function gtag(...args) { window.dataLayer.push(args); }
+function gtag() { window.dataLayer.push(arguments); }
 
 /**
  * Reads the checkout confirmation snapshot written before the payment
