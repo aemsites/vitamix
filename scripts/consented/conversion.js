@@ -17,7 +17,7 @@ import { debugLog, debugWarn, parseStorageJson } from './instrumentation/shared.
 // consented.js keeps its own gtag() module-scoped (never assigns window.gtag),
 // so this module pushes to the shared window.dataLayer the same way.
 window.dataLayer = window.dataLayer || [];
-function gtag(...args) { window.dataLayer.push(args); }
+function gtag() { window.dataLayer.push(arguments); } // eslint-disable-line prefer-rest-params
 
 /**
  * Reads the checkout confirmation snapshot written before the payment
@@ -119,6 +119,29 @@ if (!summary) {
 
   debugLog('Conversion tags firing', {
     orderId, orderTotal, currency, quantity,
+  });
+
+  // Google Ads – Shop purchase conversion
+  if (email) gtag('set', 'user_data', { email });
+  gtag('event', 'conversion', {
+    send_to: 'AW-1070742187/81ltCJu3x5MBEKv1yP4D',
+    value: Number(orderTotal),
+    currency,
+    transaction_id: orderId,
+  });
+  // End Google Ads
+
+  // GA4 purchase
+  gtag('event', 'purchase', {
+    send_to: 'G-XJB3SPQE38',
+    transaction_id: orderId,
+    value: Number(orderTotal),
+    currency,
+    items: items.map((item) => ({
+      item_id: item.sku,
+      price: item.price,
+      quantity: item.quantity,
+    })),
   });
 
   // TikTok Pixel
