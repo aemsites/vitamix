@@ -8,6 +8,7 @@ import { PB_ORG, PB_SITE } from './commerce-pbus-config.js';
 import { escapeHtml, showToast } from './commerce-otp-ui.js';
 import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
 import { jsonDiffLines, jsonEqual, renderJsonDiffHtml } from './commerce-json-diff.js';
+import { createJsonTree } from './commerce-json-tree.js';
 
 const FETCH_CONCURRENCY = 6;
 const WRITE_CONCURRENCY = 4;
@@ -767,6 +768,7 @@ export function openCatalogExportImportDialog({
             </div>` : ''}
             <label class="pim-sr-only" for="pim-io-json" data-pim-io-label>Product JSON</label>
             <textarea id="pim-io-json" class="pim-io-textarea" spellcheck="false" rows="16">${escapeHtml(initialJson)}</textarea>
+            ${locale ? '' : '<div data-pim-io-tree hidden></div>'}
           </div>
           <div data-pim-io-pane="preview" hidden>
             <h2 class="pim-io-title">Import preview</h2>
@@ -776,6 +778,7 @@ export function openCatalogExportImportDialog({
           <div class="pim-io-status" data-pim-io-status hidden></div>
         </div>
         <div class="pim-io-actions">
+          ${locale ? '' : '<label class="pim-io-editor-toggle"><input type="checkbox" data-pim-io-editor /> Editor view</label>'}
           <button type="button" class="pim-io-btn" data-pim-io-cancel>Cancel</button>
           <button type="button" class="pim-io-btn" data-pim-io-back hidden>Back</button>
           <button type="button" class="pim-io-btn" data-pim-io-preview ${locale ? 'hidden' : ''}>Preview import</button>
@@ -793,6 +796,10 @@ export function openCatalogExportImportDialog({
     const loadLabel = dialog.querySelector('[data-pim-io-load-label]');
     const loadBar = dialog.querySelector('[data-pim-io-load-bar]');
     const textarea = /** @type {HTMLTextAreaElement | null} */ (dialog.querySelector('#pim-io-json'));
+    const editorToggle = dialog.querySelector('[data-pim-io-editor]');
+    const editorLabel = dialog.querySelector('.pim-io-editor-toggle');
+    const treeHost = dialog.querySelector('[data-pim-io-tree]');
+    let tree;
     const leadEl = dialog.querySelector('[data-pim-io-preview-lead]');
     const listHost = dialog.querySelector('[data-pim-io-preview-list]');
     const hintEl = dialog.querySelector('.pim-io-hint');
@@ -838,11 +845,50 @@ export function openCatalogExportImportDialog({
       statusEl.classList.toggle('pim-io-status-ok', tone !== 'error');
     };
 
+    const syncTree = () => {
+      if (editorToggle instanceof HTMLInputElement && editorToggle.checked && tree && textarea) {
+        textarea.value = `${JSON.stringify(tree.read(), null, 2)}\n`;
+      }
+    };
+
+    editorToggle?.addEventListener('change', () => {
+      const showEditor = editorToggle.checked;
+      try {
+        if (showEditor) {
+          const parsed = JSON.parse(textarea.value);
+          if (!tree || JSON.stringify(tree.read()) !== JSON.stringify(parsed)) {
+            tree = createJsonTree(parsed, () => {
+              try {
+                syncTree();
+                setStatus('');
+              } catch (err) {
+                setStatus(err.message);
+              }
+            });
+          }
+          treeHost.replaceChildren(tree.element);
+        } else {
+          // Validate before leaving so invalid edits cannot silently restore stale JSON.
+          textarea.value = `${JSON.stringify(tree.read(), null, 2)}\n`;
+        }
+        textarea.hidden = editorToggle.checked;
+        treeHost.hidden = !editorToggle.checked;
+        setStatus('');
+      } catch (err) {
+        editorToggle.checked = !showEditor;
+        setStatus(`Cannot switch view: ${err.message}`);
+      }
+    });
+
     const setBusy = (busy, label) => {
       [btnPreview, btnSave, btnImport, btnBack, updateLoad].forEach((btn) => {
         if (btn instanceof HTMLButtonElement) btn.disabled = busy;
       });
       if (textarea) textarea.disabled = busy;
+      if (editorToggle instanceof HTMLInputElement) editorToggle.disabled = busy;
+      treeHost?.querySelectorAll('input, textarea, select, button').forEach((control) => {
+        control.disabled = busy;
+      });
       choicePane?.querySelectorAll('button').forEach((btn) => { btn.disabled = busy; });
       dialog.querySelectorAll('.pim-io-list-controls input, .pim-io-list-controls select')
         .forEach((control) => { control.disabled = busy; });
@@ -850,6 +896,7 @@ export function openCatalogExportImportDialog({
     };
 
     const showJsonPane = () => {
+      if (editorLabel) editorLabel.hidden = false;
       if (choicePane instanceof HTMLElement) choicePane.hidden = true;
       if (jsonPane instanceof HTMLElement) jsonPane.hidden = false;
       if (previewPane instanceof HTMLElement) previewPane.hidden = true;
@@ -988,6 +1035,7 @@ export function openCatalogExportImportDialog({
     });
 
     const showPreviewPane = (parsed) => {
+      if (editorLabel) editorLabel.hidden = true;
       const {
         bodies, toAdd, toUpdate, skipped,
       } = parsed;
@@ -1050,10 +1098,13 @@ export function openCatalogExportImportDialog({
     dialog.addEventListener('click', (e) => {
       if (e.target === dialog) dismiss(false);
     });
-    wireDialogEscapeDismiss(dialog, () => dismiss(false));
+    wireDialogEscapeDismiss(
+      dialog, () => dismiss(false), '.pim-json-field input, .pim-json-field textarea',
+    );
 
     btnSave?.addEventListener('click', () => {
       try {
+        syncTree();
         const extension = {
           json: '.json', categories: '.tsv', lists: '.txt', update: '.txt',
         }[mode];
@@ -1073,6 +1124,7 @@ export function openCatalogExportImportDialog({
 
     btnPreview?.addEventListener('click', async () => {
       try {
+        syncTree();
         if (mode === 'categories' || mode === 'lists' || mode === 'update') {
           let rows;
           if (mode === 'update') {

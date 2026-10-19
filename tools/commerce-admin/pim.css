@@ -624,6 +624,156 @@ td.pim-col-path {
   font: inherit;
 }
 
+.pim-io-textarea[hidden] {
+  display: none;
+}
+
+.pim-io-editor-toggle:not([hidden]) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: auto;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.pim-json-tree {
+  padding: 10px;
+  border: 1px solid #e1e3e5;
+  border-radius: 6px;
+  background: #fafafa;
+  font-size: 13px;
+}
+
+.pim-json-search {
+  box-sizing: border-box;
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border: 1px solid #c9cccf;
+  border-radius: 4px;
+  background: #fff;
+  color: #202223;
+  font: inherit;
+}
+
+.pim-json-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0;
+}
+
+.pim-json-field {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.pim-json-field:has(textarea),
+.pim-json-field:has(input:not([hidden])) {
+  flex: 1 1 160px;
+}
+
+.pim-json-field input,
+.pim-json-field textarea {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  padding: 6px;
+  border: 1px solid #c9cccf;
+  border-radius: 4px;
+  background: #fff;
+  color: #202223;
+  font: inherit;
+}
+
+.pim-json-field [hidden] {
+  display: none;
+}
+
+.pim-json-text,
+.pim-json-icon {
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.pim-json-text {
+  max-width: 100%;
+  padding: 4px 6px;
+  text-align: left;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.pim-json-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 4px;
+  color: #6d7175;
+  flex-shrink: 0;
+}
+
+.pim-json-add {
+  width: auto;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.pim-json-add[hidden] {
+  display: none;
+}
+
+.pim-json-text:hover,
+.pim-json-icon:hover,
+.pim-json-text:focus-visible,
+.pim-json-icon:focus-visible {
+  background: #e8eaeb;
+}
+
+.pim-json-field-dirty .pim-json-text,
+.pim-json-dirty {
+  background: #fff1cc;
+  color: #684900;
+}
+
+.pim-json-row > .pim-json-field:has(input) .pim-json-text {
+  font-weight: 600;
+}
+
+.pim-json-dirty {
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.pim-json-field textarea {
+  resize: vertical;
+  min-height: 32px;
+}
+
+.pim-json-children {
+  margin: 6px 0 8px 6px;
+  padding-left: 10px;
+  border-left: 1px solid #d5d8da;
+}
+
+.pim-json-node summary[hidden] {
+  display: none;
+}
+
+.pim-json-toggle[aria-expanded="true"] svg {
+  transform: rotate(90deg);
+}
+
 .pim-io-status {
   margin: 10px 0 0;
   padding: 10px 12px;

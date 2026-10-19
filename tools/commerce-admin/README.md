@@ -1,5 +1,34 @@
 # Commerce Admin
 
+## Editing product JSON
+
+On product detail, use **Export / import...** in edit mode. The **Editor view**
+checkbox in the modal footer switches from raw JSON to a collapsible tree.
+Search property names above the tree to highlight matches and hide unrelated
+branches. Matching parents keep all their children visible and editable.
+Matching nested properties reveal their ancestors. Clearing search restores the
+full tree and its previous expansion state; filtering never removes JSON data.
+Object and array properties start collapsed; search automatically expands matches.
+Opening an array expands all its child branches, without numeric index labels.
+Expand or collapse using the chevron after the parent name. Add controls appear
+only while the parent is expanded. Array items stay
+expanded without their own chevron or a separate Properties/Items heading.
+Click a property name or value to edit it; editing boxes stay hidden otherwise.
+Click away to finish, or press Escape to cancel the current edit. Changed fields
+are highlighted and marked **Modified**; new entries are marked **Added**.
+Use **Add property** or **Add item** (document-plus icon) to add entries,
+and the trash icon to remove them.
+Array elements do not show an **Add property** button. **Add item** copies the
+first existing item's properties and nested structure with all scalar values
+blank. If all items are removed, the original first item remains the template;
+arrays that started empty add a blank string.
+New values start as strings. Existing numbers and booleans keep their types,
+without a type selector; existing objects and arrays retain their structure.
+Switching back preserves the edited JSON. Duplicate names within an object and
+invalid numbers must be corrected before switching back, downloading, or
+previewing an import. **Preview import** and **Download** use the edited tree;
+changes are not saved to the catalog until the existing import confirmation.
+
 ## Creating catalog products
 
 In Commerce Admin's production catalog, select **Add new product**. The modal

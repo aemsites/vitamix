@@ -5,12 +5,14 @@
  *
  * @param {HTMLDialogElement} dialog
  * @param {() => void} onDismiss — typically `dialog.close()` or your close+remove helper
+ * @param {string} [editSelector] controls that handle Escape to cancel an inline edit
  */
-export function wireDialogEscapeDismiss(dialog, onDismiss) {
+export function wireDialogEscapeDismiss(dialog, onDismiss, editSelector = '') {
   dialog.addEventListener(
     'keydown',
     (e) => {
       if (e.key !== 'Escape') return;
+      if (editSelector && e.target instanceof Element && e.target.matches(editSelector)) return;
       e.preventDefault();
       e.stopPropagation();
       onDismiss();
