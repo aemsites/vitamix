@@ -17,7 +17,7 @@ import { debugLog, debugWarn, parseStorageJson } from './instrumentation/shared.
 // consented.js keeps its own gtag() module-scoped (never assigns window.gtag),
 // so this module pushes to the shared window.dataLayer the same way.
 window.dataLayer = window.dataLayer || [];
-function gtag() { window.dataLayer.push(arguments); }
+function gtag() { window.dataLayer.push(arguments); } // eslint-disable-line prefer-rest-params
 
 /**
  * Reads the checkout confirmation snapshot written before the payment
