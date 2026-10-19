@@ -241,6 +241,7 @@ if (!document.getElementById('cjapitag')) {
 await loadScript('https://www.googletagmanager.com/gtag/js?id=AW-992994739');
 gtag('js', new Date());
 gtag('config', 'AW-992994739');
+gtag('config', 'AW-1070742187', { allow_enhanced_conversions: true });
 
 
 
