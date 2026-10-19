@@ -121,6 +121,29 @@ if (!summary) {
     orderId, orderTotal, currency, quantity,
   });
 
+  // Google Ads – Shop purchase conversion
+  if (email) gtag('set', 'user_data', { email });
+  gtag('event', 'conversion', {
+    send_to: 'AW-1070742187/81ltCJu3x5MBEKv1yP4D',
+    value: Number(orderTotal),
+    currency,
+    transaction_id: orderId,
+  });
+  // End Google Ads
+
+  // GA4 purchase
+  gtag('event', 'purchase', {
+    send_to: 'G-XJB3SPQE38',
+    transaction_id: orderId,
+    value: Number(orderTotal),
+    currency,
+    items: items.map((item) => ({
+      item_id: item.sku,
+      price: item.price,
+      quantity: item.quantity,
+    })),
+  });
+
   // TikTok Pixel
   /* eslint-disable */
   (function (w, d, t) {
