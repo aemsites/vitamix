@@ -1,0 +1,39 @@
+body.embargo-gated {
+  display: block;
+}
+
+body.embargo-gated > :not(.embargo-gate) {
+  display: none;
+}
+
+dialog.embargo-gate {
+  box-sizing: border-box;
+  width: min(90vw, 400px);
+  padding: 24px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--color-background);
+  color: var(--color-text);
+}
+
+dialog.embargo-gate::backdrop {
+  background: rgb(0 0 0 / 60%);
+}
+
+dialog.embargo-gate form {
+  display: grid;
+  gap: 16px;
+}
+
+dialog.embargo-gate input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 12px;
+  font: inherit;
+}
+
+dialog.embargo-gate h2,
+dialog.embargo-gate p {
+  margin: 0;
+}

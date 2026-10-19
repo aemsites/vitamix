@@ -2111,6 +2111,10 @@ async function checkSchedule() {
 async function loadEager(doc) {
   registerErrorLogging();
   const { locale, language } = getLocaleAndLanguage();
+  if (getMetadata('visibility').trim().toLowerCase() === 'embargoed') {
+    const { default: checkEmbargoGate } = await import('./embargo-gate.js');
+    await checkEmbargoGate(`/${locale}/${language}`);
+  }
   const lang = language.split('_')[0];
   // VR (the international store) is not a country, so its lang has no region.
   document.documentElement.lang = locale === 'vr' ? lang : `${lang}-${locale.toUpperCase()}`;
