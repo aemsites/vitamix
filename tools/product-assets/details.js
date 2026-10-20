@@ -241,15 +241,32 @@ function toast(message, type = 'success') {
 
   /* ---------- selection ---------- */
 
+  function buildMarketToggle(market, pressed) {
+    const toggle = el('button', 'details-market');
+    toggle.type = 'button';
+    toggle.dataset.market = market;
+    toggle.setAttribute('aria-label', market.toUpperCase());
+    toggle.setAttribute('aria-pressed', String(pressed));
+    toggle.append(buildMarkets([market]), el('span', null, market.toUpperCase()));
+    toggle.addEventListener('click', () => {
+      toggle.setAttribute('aria-pressed', String(toggle.getAttribute('aria-pressed') !== 'true'));
+    });
+    return toggle;
+  }
+
   let selected = new Set();
   let lastSelected = null;
   const selectionBar = el('div', 'details-selection');
   selectionBar.hidden = true;
   selectionBar.setAttribute('role', 'status');
   const selectionCount = el('span');
+  const selectionMarkets = el('div', 'details-market-options');
+  selectionMarkets.setAttribute('role', 'group');
+  selectionMarkets.setAttribute('aria-label', 'Markets for selected images');
+  selectionMarkets.title = 'Apply markets to selected images. None selected = all markets.';
   const selectionClear = el('button', 'secondary', 'Clear');
   selectionClear.type = 'button';
-  selectionBar.append(selectionCount, selectionClear);
+  selectionBar.append(selectionCount, selectionMarkets, selectionClear);
   document.body.append(selectionBar);
 
   function updateSelection() {
@@ -260,7 +277,32 @@ function toast(message, type = 'success') {
     });
     selectionBar.hidden = !selected.size;
     selectionCount.textContent = `${plural(selected.size, 'image')} selected · drag one to move them all`;
+    const markets = [...selected].map(rowMarkets);
+    const common = markets.length && markets.every((m) => sameSet(m, markets[0])) ? markets[0] : [];
+    const options = [...new Set([...MARKETS, ...markets.flat()])];
+    const toggles = [...selectionMarkets.querySelectorAll('button')];
+    if (!sameSet(options, toggles.map((b) => b.dataset.market))) {
+      selectionMarkets.replaceChildren(...options.map((m) => buildMarketToggle(m, false)));
+    }
+    selectionMarkets.querySelectorAll('button').forEach((toggle) => {
+      toggle.setAttribute('aria-pressed', String(common.includes(toggle.dataset.market)));
+      toggle.disabled = saving;
+    });
+    selectionClear.disabled = saving;
   }
+
+  selectionMarkets.addEventListener('click', (e) => {
+    if (saving || !e.target.closest('button')) return;
+    const markets = [...selectionMarkets.querySelectorAll('[aria-pressed="true"]')]
+      .map((b) => b.dataset.market);
+    selected.forEach((row) => {
+      if (!sameSet(markets, rowMarkets(row))) {
+        setRowField(row, 'Market', markets.map((m) => m.toUpperCase()).join(','));
+      }
+    });
+    render();
+    updateDirty();
+  });
 
   function clearSelection() {
     selected = new Set();
@@ -603,6 +645,7 @@ function toast(message, type = 'success') {
       groupsEl.append(section);
     });
     addVariantBtn.hidden = false;
+    updateSelection();
   };
 
   function setup(rows) {
@@ -736,18 +779,6 @@ function toast(message, type = 'success') {
     if (id) videoPreview.src = `https://i.ytimg.com/vi/${id}/mqdefault.jpg`;
   }
 
-  function buildMarketToggle(market, pressed) {
-    const toggle = el('button', 'details-market');
-    toggle.type = 'button';
-    toggle.dataset.market = market;
-    toggle.setAttribute('aria-pressed', String(pressed));
-    toggle.append(buildMarkets([market]), el('span', null, market.toUpperCase()));
-    toggle.addEventListener('click', () => {
-      toggle.setAttribute('aria-pressed', String(toggle.getAttribute('aria-pressed') !== 'true'));
-    });
-    return toggle;
-  }
-
   openEditor = (figure) => {
     editing = figure;
     const row = itemRow.get(figure);
@@ -807,6 +838,7 @@ function toast(message, type = 'success') {
       editing.replaceWith(next);
       editing = next;
     }
+    updateSelection();
     updateDirty();
   });
 
@@ -839,6 +871,7 @@ function toast(message, type = 'success') {
   async function save() {
     if (saving || savebar.hidden) return;
     saving = true;
+    updateSelection();
     saveBtn.disabled = true;
     discardBtn.disabled = true;
     saveBtn.textContent = 'Saving…';
@@ -853,7 +886,7 @@ function toast(message, type = 'success') {
       // move files first so new uploads can reuse freed names, then upload, then write the sheet
       const moves = rows.filter(isMoved).map((row) => ({ row, from: savedPath.get(row) }));
       const movedFrom = moves.map((m) => m.from);
-      const movedTo = moves.map((m) => rowPath(m.row));
+      const publishErrors = [];
       let moved = 0;
       while (moves.length) {
         saveBtn.textContent = `Moving ${moved + 1}/${moved + moves.length}…`;
@@ -872,12 +905,15 @@ function toast(message, type = 'success') {
         // eslint-disable-next-line no-await-in-loop
         await client.moveAsset(slug, from, rowPath(row));
         savedPath.set(row, rowPath(row));
+        saveBtn.textContent = `Publishing moved image ${moved + 1}…`;
+        // eslint-disable-next-line no-await-in-loop
+        publishErrors.push(...await client.publishAssets(slug, [rowPath(row)]));
         moved += 1;
       }
 
       const uploads = rows.filter((row) => pending.has(row));
       let done = 0;
-      const progress = () => { saveBtn.textContent = `Uploading ${done}/${uploads.length}…`; };
+      const progress = () => { saveBtn.textContent = `Saving and publishing ${done}/${uploads.length}…`; };
       if (uploads.length) progress();
       const queue = [...uploads];
       const workers = Math.min(UPLOAD_CONCURRENCY, queue.length);
@@ -890,6 +926,8 @@ function toast(message, type = 'success') {
             await client.uploadAsset(slug, rowPath(row), entry.file);
             entry.uploaded = true;
           }
+          // eslint-disable-next-line no-await-in-loop
+          publishErrors.push(...await client.publishAssets(slug, [rowPath(row)]));
           done += 1;
           progress();
         }
@@ -897,23 +935,19 @@ function toast(message, type = 'success') {
 
       saveBtn.textContent = 'Saving…';
       doc = await client.saveImagesSheet(slug, latest, rows);
+      saveBtn.textContent = 'Publishing images.json…';
+      publishErrors.push(...await client.publishAssets(slug, ['images.json']));
       // delete files only once the sheet no longer references them
-      const removals = [...deleted.values()].filter(Boolean);
+      const retainedPaths = new Set(rows.map(rowPath));
+      const removals = [...deleted.values()].filter((p) => p && !retainedPaths.has(p));
       setup(JSON.parse(JSON.stringify(rows)));
       saveBtn.textContent = 'Deleting…';
       const results = await Promise.allSettled(removals.map((p) => client.deleteAsset(slug, p)));
       const failed = results.filter((r) => r.status === 'rejected');
-      // publish new/moved files before images.json so the live sheet never points at
-      // unpublished images, then take moved/deleted files off preview and live
-      const toPublish = [...uploads.map(rowPath), ...movedTo];
       const stepProgress = (label) => (n, total) => { saveBtn.textContent = `${label} ${n}/${total}…`; };
-      saveBtn.textContent = 'Publishing…';
-      const publishErrors = [
-        ...await client.publishAssets(slug, toPublish, stepProgress('Publishing')),
-      ];
-      saveBtn.textContent = 'Publishing images.json…';
-      publishErrors.push(...await client.publishAssets(slug, ['images.json']));
-      publishErrors.push(...await client.unpublishAssets(slug, [...movedFrom, ...removals], stepProgress('Unpublishing')));
+      const obsolete = [...new Set([...movedFrom, ...removals])]
+        .filter((p) => !retainedPaths.has(p));
+      publishErrors.push(...await client.unpublishAssets(slug, obsolete, stepProgress('Unpublishing')));
 
       const finished = [
         uploads.length && `uploaded ${plural(uploads.length, 'image')}`,
@@ -934,6 +968,7 @@ function toast(message, type = 'success') {
       toast(error.message, 'error');
     } finally {
       saving = false;
+      updateSelection();
       saveBtn.disabled = false;
       discardBtn.disabled = false;
       saveBtn.textContent = 'Save';
@@ -949,7 +984,7 @@ function toast(message, type = 'success') {
     }
   });
   window.addEventListener('beforeunload', (e) => {
-    if (savebar.hidden) return;
+    if (savebar.hidden && !saving) return;
     e.preventDefault();
     e.returnValue = '';
   });

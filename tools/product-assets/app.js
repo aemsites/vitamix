@@ -198,6 +198,10 @@ function highlight(node, text, query) {
     try {
       // an empty images.json creates the folder, so the product shows up in this list
       await client.saveImagesSheet(slug, null, []);
+      const publishErrors = await client.publishAssets(slug, ['images.json']);
+      if (publishErrors.length) {
+        throw new Error(`Product saved to DA, but preview/publish failed: ${publishErrors.join('; ')}`);
+      }
       existing.add(slug);
       const href = new URL('details.html', window.location.href);
       href.searchParams.set('product', slug);

@@ -306,8 +306,10 @@
   bottom: 20px;
   left: 20px;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
+  max-width: calc(100vw - 40px);
   padding: 8px 8px 8px 16px;
   border-radius: 999px;
   background: #1f2329;
@@ -323,6 +325,10 @@
 .details-selection button {
   padding: 4px 12px;
   border-radius: 999px;
+}
+
+.details-selection > span {
+  flex: 1 1 220px;
 }
 
 .details-item figcaption {
