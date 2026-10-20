@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Place Order</title>
+  <link rel="stylesheet" type="text/css" href="hpp-styles-v14.css" />
+  <link rel="stylesheet" type="text/css" href="style.css" />
+</head>
+<body>
+  <div class="page-container" id="container">
+    <header id="header" role="banner">
+      <img alt="Vitamix" src="vitamix-logo.svg">
+    </header>
+    <div class="content" id="content">
+      <div class="main" id="shipping" role="main">
+        <div class="l-wrap g-row">
+          <div class="l-full-width">
+            <nav aria-label="checkout steps">
+              <ol class="steps list-horizontal">
+                <li class="is-current">
+                  <span class="checkout-steps-link" aria-label="Shipping Details">
+                    <span class="checkout-steps-icon steps__count" aria-hidden="true">1</span>
+                    <span class="checkout-steps-page steps__label" aria-hidden="true">Shipping Details</span>
+                  </span>
+                </li>
+                <li class="is-current">
+                  <span class="checkout-steps-link" aria-label="Payment Method">
+                    <span class="checkout-steps-icon steps__count" aria-hidden="true">2</span>
+                    <span class="checkout-steps-page steps__label" aria-hidden="true">Payment Method</span>
+                  </span>
+                </li>
+                <li class="is-current">
+                  <span class="checkout-steps-link" aria-label="Place Order">
+                    <span class="checkout-steps-icon steps__count" aria-hidden="true">3</span>
+                    <span class="checkout-steps-page steps__label" aria-hidden="true">Place Order</span>
+                  </span>
+                </li>
+              </ol>
+            </nav>
+          </div>
+          <div class="l-full-width">
+            [[FORM INSERT]]
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
