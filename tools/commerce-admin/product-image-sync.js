@@ -226,8 +226,12 @@ export function planImageSync(product, rows, urlKey, market) {
 }
 
 export async function fetchImageSheet(urlKey) {
-  const sheetUrl = `${ASSETS_ORIGIN}/assets/products/${encodeURIComponent(urlKey)}/images.json`;
-  const resp = await fetch(fcorsUrl(sheetUrl), { cache: 'no-store' });
+  const sheetUrl = new URL(
+    `/assets/products/${encodeURIComponent(urlKey)}/images.json`,
+    ASSETS_ORIGIN,
+  );
+  sheetUrl.searchParams.set('_cacheBust', String(Date.now()));
+  const resp = await fetch(fcorsUrl(sheetUrl.toString()), { cache: 'no-store' });
   if (resp.status === 404) {
     throw new Error(`No images.json at /assets/products/${urlKey}/`);
   }
