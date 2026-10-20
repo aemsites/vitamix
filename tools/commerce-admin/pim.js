@@ -5,6 +5,7 @@ import { showToast } from './commerce-otp-ui.js';
 import { getApiEnvironment, commerceAdminHref } from './commerce-otp-api.js';
 import { productUrlToCatalogPath } from './price-rules-api.js';
 import { categoryColorClass } from './commerce-category.js';
+import { revalidateCatalogIndex } from './commerce-catalog-revalidate.js';
 
 const AEM_BASE = 'https://main--vitamix--aemsites.aem.network';
 const CORS_PROXY = 'https://fcors.org/?url=';
@@ -84,13 +85,16 @@ export function resolveImageUrlForLocale(localePath, imagePath) {
  * @param {string} localePath
  * @returns {Promise<{ data?: object[] } | object[]>}
  */
-export async function fetchProductsIndexForLocale(localePath, { fresh = false } = {}) {
+export async function fetchProductsIndexForLocale(localePath) {
   const clean = String(localePath || '').replace(/^\/+/, '').replace(/\/+$/, '');
-  const suffix = fresh ? `&_=${Date.now()}` : '';
+  const suffix = `&_=${Date.now()}`;
   const indexes = await Promise.all(['products', 'products/commercial'].map(async (directory) => {
     const indexUrl = `${AEM_BASE}/${clean}/${directory}/index.json?include=all${suffix}`;
     const url = CORS_PROXY + encodeURIComponent(indexUrl) + CORS_KEY;
-    const response = await fetch(url, fresh ? { cache: 'no-store' } : {});
+    const response = await fetch(url, {
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-cache' },
+    });
     if (!response.ok) {
       throw new Error(`Failed to load ${indexUrl}: HTTP ${response.status}: ${response.statusText}`);
     }
@@ -110,7 +114,7 @@ export async function fetchProductsIndexForLocale(localePath, { fresh = false } 
     const key = `${product.path}|${product.sku || ''}`;
     if (!unique.has(key)) unique.set(key, product);
   });
-  return { data: [...unique.values()] };
+  return { data: await revalidateCatalogIndex([...unique.values()], clean) };
 }
 
 /**

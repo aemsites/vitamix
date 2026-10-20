@@ -788,7 +788,7 @@ function loadProductionIndex(locale, category) {
   const key = `${locale}:${category}`;
   if (!state.productionIndexes.has(key)) {
     const folder = category === 'commercial' ? 'commercial/' : '';
-    const url = `${STOREFRONT_ORIGIN}/${locale}/products/${folder}index.json?include=all`;
+    const url = `${STOREFRONT_ORIGIN}/${locale}/products/${folder}index.json?include=all&_=${Date.now()}`;
     const request = fetchProductionUrl(url).then(async (resp) => {
       if (!resp.ok) throw new Error(`Index HTTP ${resp.status}`);
       const json = await resp.json();

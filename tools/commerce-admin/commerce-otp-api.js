@@ -8,6 +8,7 @@
  */
 
 import { showToast } from './commerce-otp-ui.js';
+import { trackCatalogWrite } from './commerce-catalog-pending.js';
 
 /** Seconds before JWT `exp` to treat the token as expired (clock skew). */
 const AUTH_EXPIRY_SKEW_SEC = 30;
@@ -449,5 +450,8 @@ export async function apiFetch(org, site, path, options = {}) {
     throw new Error(errorMsg);
   }
 
+  if (response.ok && ['PUT', 'PATCH', 'POST', 'DELETE'].includes(method.toUpperCase())) {
+    trackCatalogWrite(base, org, site, path);
+  }
   return response;
 }

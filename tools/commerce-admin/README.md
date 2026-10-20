@@ -1,5 +1,26 @@
 # Commerce Admin
 
+## Recent catalog changes and index freshness
+
+Every catalog index request bypasses the browser cache and includes a cache-busting
+query parameter in the URL sent through fcors. The local fcors implementation has
+no explicit response cache, but forwards upstream cache headers.
+
+Successful ProductBus catalog writes (including creation, imports, image sync,
+availability changes, production promotion and deletion) record the product path
+and update time in `sessionStorage`, scoped by API host, organization and site.
+Each locale index load directly re-fetches its pending products without browser
+caching and patches parent/variant index rows, including new or removed products.
+Unrelated products are not fetched. Failed direct reads surface an error rather
+than silently displaying a stale index; the product remains pending for retry.
+
+Pending entries are removed only when the unpatched index matches the direct
+product's index fields and variant membership. Non-indexed fields cannot be
+compared against an index. Console messages prefixed `[commerce-admin]` report
+each revalidation's path, elapsed seconds since the last write, whether the index
+has caught up, and failures. The list survives navigation and reloads in this tab
+until convergence or the browser session ends.
+
 ## Editing product JSON
 
 On product detail, use **Export / import...** in edit mode. The **Editor view**
