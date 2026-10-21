@@ -21,6 +21,8 @@ import { validateField } from './checkout-validation.js';
 import { formStateKey, saveFormState, restoreFormState } from './checkout-session-state.js';
 import { logOperation, getCheckoutId } from '../../scripts/operations-log.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { isLoggedIn } from '../../scripts/auth-api.js';
+import { warmRecaptchaOnInteraction } from '../../scripts/recaptcha.js';
 import {
   prefillDefaultShippingAddress,
   watchCustomerAddressPrefill,
@@ -221,6 +223,11 @@ export default async function decorate(block) {
   }
 
   block.innerHTML = '';
+
+  // Shipping previews and order creation need a reCAPTCHA token (signed-out
+  // shoppers only). Start the SDK download on the first interaction so a slow
+  // connection has a head start; LCP is final by then.
+  if (!isLoggedIn()) warmRecaptchaOnInteraction();
 
   logOperation('checkout-start', {
     checkoutId: getCheckoutId(),
