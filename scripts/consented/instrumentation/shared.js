@@ -189,16 +189,18 @@ export function formatAnalyticsMoney(value) {
 }
 
 /**
- * Adobe Analytics checkout products string segment: ;{name};{qty};{lineTotal};;
+ * Adobe Analytics checkout products string segment: ;{name};{qty};{lineTotal};; or ;{name};{qty};{lineTotal};{color};;
  * @param {string} name
  * @param {number|string} qty
  * @param {number|string} unitPrice
+ * @param {string} [color] selected purchase color
  * @returns {string}
  */
-export function buildCheckoutProductLine(name, qty, unitPrice) {
+export function buildCheckoutProductLine(name, qty, unitPrice, color = '') {
   const quantity = formatAnalyticsQuantity(qty);
   const lineTotal = formatAnalyticsMoney(Number(qty) * Number(unitPrice));
-  return `;${name};${quantity};${lineTotal};;`;
+  const colorField = color ? `${color.replace(/[;,|]/g, ' ')};;` : ';';
+  return `;${name};${quantity};${lineTotal};${colorField}`;
 }
 
 /**
@@ -231,14 +233,19 @@ export function normalizeCartItem(item) {
 
 /**
  * @param {object} item
- * @returns {{ name: string, qty: number, unitPrice: number }|null}
+ * @returns {{ name: string, qty: number, unitPrice: number, color: string }|null}
  */
 export function normalizePurchaseLineItem(item) {
   const name = `${item?.name || item?.productName || item?.title || item?.sku || ''}`.trim();
   const qty = Number(item.quantity ?? 0);
   const unitPrice = Number(item.price?.final ?? item.price ?? 0);
+  const color = String(
+    item.variant || item.selectedOptions?.find((option) => option.id === 'color')?.value || '',
+  ).trim();
   if (!name || qty <= 0) return null;
-  return { name, qty, unitPrice };
+  return {
+    name, qty, unitPrice, color,
+  };
 }
 
 /**
