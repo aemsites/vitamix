@@ -189,7 +189,7 @@ export function formatAnalyticsMoney(value) {
 }
 
 /**
- * Adobe Analytics checkout products string segment: ;{name};{qty};{lineTotal};; or ;{name};{qty};{lineTotal};{color};;
+ * Adobe Analytics checkout products string segment: ;{name};{qty};{lineTotal};{color};;
  * @param {string} name
  * @param {number|string} qty
  * @param {number|string} unitPrice
