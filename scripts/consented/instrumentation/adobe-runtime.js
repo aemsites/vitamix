@@ -20,6 +20,31 @@ function applyTrackingConfig(tracker) {
   tracker.ssl = true;
 }
 
+function applyProductColorConfig(tracker) {
+  const isPurchase = String(tracker.events || '').split(',')
+    .some((event) => event.split('=')[0] === 'purchase');
+  const purchaseColors = isPurchase
+    ? (window.digitalData?.transaction?.item || [])
+      .flatMap((item) => (item.productInfo?.productString || '').split(','))
+      .map((line) => (line.split(';')[4] || '').trim())
+      .filter(Boolean)
+    : [];
+  const color = isPurchase
+    ? [...new Set(purchaseColors)].join(',')
+    : window.digitalData?.product?.[0]?.productInfo?.color;
+  tracker.eVar30 = color || '';
+  if (!color || !tracker.linkTrackVars) {
+    return;
+  }
+  const linkTrackVars = tracker.linkTrackVars.split(',')
+    .map((variable) => variable.trim())
+    .filter((variable) => variable && variable !== 'None');
+  if (!linkTrackVars.includes('eVar30')) {
+    linkTrackVars.push('eVar30');
+  }
+  tracker.linkTrackVars = linkTrackVars.join(',');
+}
+
 /**
  * Register s.doPlugins so tracking servers and ssl are set before each Launch beacon.
  * Chains with any existing doPlugins from Launch (set doPlugins only once per tracker).
@@ -30,6 +55,7 @@ function ensureDoPlugins(tracker) {
   if (!tracker || typeof tracker !== 'object') {
     return;
   }
+  tracker.usePlugins = true;
   if (tracker.doPlugins?.vitamixEds === true) {
     return;
   }
@@ -43,6 +69,7 @@ function ensureDoPlugins(tracker) {
       previousDoPlugins.call(this);
     }
     applyTrackingConfig(this);
+    applyProductColorConfig(this);
   }
   vitamixEdsDoPlugins.vitamixEds = true;
   tracker.doPlugins = vitamixEdsDoPlugins;
@@ -505,7 +532,7 @@ export async function pushProductEvent(eventName, productID, { waitForBeacon = f
 
 /**
  * Merge the selected variant color into digitalData.product[0].productInfo (Adobe
- * Launch eVar15 data source), preserving any other productInfo fields already set
+ * Analytics eVar30 data source), preserving any other productInfo fields already set
  * (e.g. productID). Does not trigger a Launch event.
  * @param {string} color Human-readable selected color (e.g. "Polar White")
  * @returns {void}
@@ -525,7 +552,7 @@ export function setDigitalDataProductColor(color) {
 /**
  * Merge the selected variant color into digitalData.product[0].productInfo and
  * trigger a Launch direct-call rule so the color is sent on its own beacon
- * (Adobe eVar15 data source). Used for explicit color swatch selection.
+ * (Adobe eVar30 data source). Used for explicit color swatch selection.
  * @param {string} eventName Launch direct-call identifier (e.g. variantSelect)
  * @param {string} color Human-readable selected color (e.g. "Polar White")
  * @param {{ waitForBeacon?: boolean }} [options]
