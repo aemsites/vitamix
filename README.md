@@ -32,6 +32,18 @@ https://{branch}--vitamix--aemsites.aem.page/
 
 ## Tests
 
+### PDP series picker
+
+Between Compare and Share, the PDP displays an alphabetized product picker when
+`custom.categories` contains a `url_key` ending in `-series`. Products are matched
+by that exact category slug in the localized product index.
+Cards show the product image, name, current price, and color links when variants
+are available. The current product is outlined and marked with `aria-current`.
+The list scrolls horizontally on narrow screens. A fixed-height skeleton reserves
+space before the index loads, without blocking the purchase controls. The same
+space is retained for a single-product series or a visible error message if the
+index fails; failures are also logged.
+
 ### Overview
 
 This project uses Playwright for end-to-end testing. The tests verify that key elements exist and function correctly across different product configurations.

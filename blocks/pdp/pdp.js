@@ -6,6 +6,7 @@ import renderAddToCart from './add-to-cart.js';
 import renderGallery from './gallery.js';
 import renderSpecs from './specification-tabs.js';
 import renderPricing from './pricing.js';
+import renderSeriesProducts from './series-products.js';
 import { renderAlert } from './alert.js';
 // eslint-disable-next-line import/no-cycle
 import { renderOptions, onOptionChange, updateFreeGiftVisibility } from './options.js';
@@ -377,6 +378,7 @@ export default async function decorate(block) {
   const freeGiftContainer = await renderFreeGift();
   const freeShippingContainer = renderFreeShipping(ph, offers);
   const shareContainer = renderShare(ph);
+  const seriesProductsContainer = renderSeriesProducts(ph, jsonLdData);
 
   buyBox.append(
     pricingContainer,
@@ -385,6 +387,7 @@ export default async function decorate(block) {
     addToCartContainer,
     compareContainer,
     freeShippingContainer || '',
+    seriesProductsContainer || '',
     shareContainer,
   );
 
