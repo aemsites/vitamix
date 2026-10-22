@@ -136,6 +136,7 @@ function formatIngredientLine(ingredient) {
   const quantityMetric = ingredient.querySelector('Quantity_Metric')?.textContent.trim() || '';
   const unitMetric = ingredient.querySelector('Unit_Metric')?.textContent.trim() || '';
   const name = ingredient.querySelector('Name')?.textContent.trim() || '';
+  const complement = ingredient.querySelector('Complement')?.textContent.trim() || '';
   const preparation = ingredient.querySelector('Preparation')?.textContent.trim() || '';
   const alternativeIngredient = ingredient.querySelector('AlternativeIngredient')?.textContent.trim() || '';
 
@@ -161,9 +162,10 @@ function formatIngredientLine(ingredient) {
     ingredientStr += `(${formatQuantityDisplay(quantityMetric, metricNum)} ${unitMetric})`;
   }
 
-  if (name) {
+  const ingredientName = [complement, name].filter(Boolean).join(' ');
+  if (ingredientName) {
     if (ingredientStr) ingredientStr += ' ';
-    ingredientStr += name;
+    ingredientStr += ingredientName;
   }
 
   if (alternativeIngredient) {
