@@ -2,13 +2,14 @@ import { loadFragment } from '../../blocks/fragment/fragment.js';
 import {
   getWidgetLocaleAndLanguage,
   loadAllProductTypes,
-  PLP_DATASETS,
+  PRODUCT_LIST_DATASETS as PLP_DATASETS,
 } from './products.js';
 
 const DATASET_LABELS = {
   blenders: 'Blenders',
   accessories: 'Accessories',
   commercial: 'Commercial',
+  household: 'Household',
 };
 
 function resolveHighlightsFragmentPath(highlights) {

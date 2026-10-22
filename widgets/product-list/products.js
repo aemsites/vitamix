@@ -12,10 +12,11 @@ const FACET_LABEL_OVERRIDES = {
 };
 
 export { PLP_DATASETS };
+export const PRODUCT_LIST_DATASETS = [...PLP_DATASETS, 'household'];
 const DEFAULT_PLP_DATASET = 'blenders';
 
 function normalizePlpDataset(dataset) {
-  return PLP_DATASETS.includes(dataset) ? dataset : DEFAULT_PLP_DATASET;
+  return PRODUCT_LIST_DATASETS.includes(dataset) ? dataset : DEFAULT_PLP_DATASET;
 }
 
 /**
@@ -121,7 +122,7 @@ function buildMarketingCardItem(row, facetDefs) {
  * Rows that point at /fragments/ are kept as marketing cards (content loaded separately).
  * @param {Object} config - Filter criteria (only known facet keys are applied)
  * @param {Object} facets - Optional object to populate with facet counts
- * @param {string} [dataset] - Which plp-data-{dataset}.json to load; defaults to 'blenders'
+ * @param {string} [dataset] - Dataset to load; 'household' combines blenders and accessories. Defaults to 'blenders'.
  * @returns {Promise<Array<Object>>} Filtered products
  */
 export default async function lookupProductListProducts(config = {}, facets = {}, dataset = DEFAULT_PLP_DATASET) {
@@ -130,10 +131,12 @@ export default async function lookupProductListProducts(config = {}, facets = {}
 
   window.productListWidgetIndexByDataset = window.productListWidgetIndexByDataset || {};
   if (!window.productListWidgetIndexByDataset[plpDataset]) {
-    const [plpRows, reviewsRows] = await Promise.all([
-      fetchPlpData(locale, language, plpDataset),
+    const datasets = plpDataset === 'household' ? ['blenders', 'accessories'] : [plpDataset];
+    const [plpRowsByDataset, reviewsRows] = await Promise.all([
+      Promise.all(datasets.map((source) => fetchPlpData(locale, language, source))),
       fetchReviewsData(locale, language),
     ]);
+    const plpRows = plpRowsByDataset.flat();
     const facetDefs = getFacetDefsFromRows(plpRows);
     const reviewsBySlug = getReviewsBySlug(reviewsRows);
     const badgesBySlug = getBadgesBySlug(plpRows);
@@ -213,8 +216,8 @@ export default async function lookupProductListProducts(config = {}, facets = {}
 
 /**
  * Loads the facet definitions (key + display label) dynamically discovered from
- * every "* Facet" column in plp-data-{dataset}.json.
- * @param {string} [dataset] - Which plp-data-{dataset}.json to load; defaults to 'blenders'
+ * every "* Facet" column in the selected dataset(s).
+ * @param {string} [dataset] - Dataset to load; 'household' combines blenders and accessories. Defaults to 'blenders'.
  * @returns {Promise<Array<{rawKey: string, label: string, key: string}>>}
  */
 export async function getFacetDefinitions(dataset) {
@@ -228,7 +231,7 @@ export async function getFacetDefinitions(dataset) {
 /**
  * Loads all distinct productType facet values from plp-data-{dataset}.json (sourced from
  * the "Type Facet" column, displayed as "Product Type").
- * @param {string} [dataset] - Which plp-data-{dataset}.json to load; defaults to 'blenders'
+ * @param {string} [dataset] - Dataset to load; 'household' combines blenders and accessories. Defaults to 'blenders'.
  * @returns {Promise<string[]>}
  */
 export async function loadAllProductTypes(dataset) {
