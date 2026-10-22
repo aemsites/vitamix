@@ -209,7 +209,11 @@
   margin-top: 20px;
 }
 
-.product-create-bundle:has(input[name="virtualBundle"]:checked),
+.product-create-bundle-choice {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
 .product-create-options-section:has(input[name="showOptions"]:checked),
 .product-create-advanced:has(input[name="advancedSettings"]:checked) {
   padding: 12px;
@@ -217,10 +221,28 @@
   border-radius: 6px;
 }
 
-.product-create-bundle [data-bundle-editor],
+[data-virtual-bundle-settings],
 #product-create-option-fields,
 #product-create-advanced-fields {
   margin-top: 12px;
+}
+
+[data-bundle-derived-details] {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #f8fafc;
+}
+
+[data-bundle-derived-details] h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+[data-bundle-derived-details] ul {
+  margin: 0;
+  padding-left: 18px;
 }
 
 .product-create-bundle-toggle,
@@ -250,6 +272,13 @@
   flex: 1;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.product-create-bundle-component-detail {
+  display: block;
+  margin-top: 4px;
+  color: #6d7175;
+  font-size: 12px;
 }
 
 .product-create-bundle-thumb {

@@ -62,15 +62,43 @@ screen. Country flags identify the currency; price inputs format as currency whe
 leaving the field. All variants and language catalogs in a country share these
 prices. The entered price is saved as both regular and final price.
 Only the SKU is entered per variant, shared across all markets.
-The Buttons screen provides compact, independently selectable chips for `addToCart`,
+The regular-product Settings screen provides compact, independently selectable chips for `addToCart`,
 `comingSoon`, `findDealer`, `findLocally` and `retired`. `addToCart` starts selected
 (`Yes`); the other flags start unselected (`No`). Availability still starts OutOfStock.
 They are stored as strings in the parent product's `custom` object for every
-selected catalog, not on variants, and shown in the final review.
-On the same screen, **Virtual Bundle** opens the coupon product picker in
-products-only mode. Select one of each component: it must exist in every selected
-catalog and either be simple or have a unique matching variant for every bundle
-color, without additional option dimensions. Nested bundles are not supported.
+selected catalog and its variants, and shown in the final review.
+On the first screen, a plain **Virtual Bundle** checkbox selects the wizard flow:
+
+| Step | Regular product | Virtual bundle |
+| --- | --- | --- |
+| 1 | Product assets | Product assets |
+| 2 | Product details & pricing | Bundle components |
+| 3 | Settings | Bundle details & pricing |
+| 4 | Review & create | Review & create |
+
+Bundle components are selected before entering details. The bundle details screen
+suggests the union of component categories, summed catalog prices per country,
+the URL key as the parent SKU, and URL-key-plus-color variant SKUs. The suggested
+product name joins the selected product names with ` + `. These
+suggestions are editable. Returning to
+components preserves edits, while untouched price suggestions refresh from the
+new selection. Bundle buttons default to addToCart Yes and the other flags No;
+condition is New, with no promo text or warranty options.
+Step 3 also shows component allocations and calculated parent tax and weight.
+Allocations list every catalog's component SKUs, colors, full tax classifications
+and allocated amounts based on the entered overall bundle price. Color rows are
+alternatives, not additional components to sum. Allocations refresh when the
+bundle price is changed.
+Component rows show catalog, color, SKU, tax classification and source weight.
+Weight totals count one variant per component for each bundle color, not all
+alternative colors together. Each bundle variant receives its color's total;
+the parent uses the largest color total. Missing component weights are shown as
+incomplete rather than saved as a partial total. Component weights are used for
+calculation only and are not added to the API's `bundleItems` records.
+The bundle picker uses the coupon product picker in products-only mode. Select one
+of each component: it must exist in every selected catalog and either be simple
+or have a unique matching variant for every bundle color, without additional
+option dimensions. Nested bundles are not supported.
 Compatibility is checked against ProductBus when applying the selection and again
 before review; incompatible selections are rejected with the catalog and reason.
 The wizard saves `type: "bundle"`, `custom.type: "bundle"` and `bundleItems`,
@@ -79,13 +107,12 @@ price is used as its proportional weight; its allocated price is the same for al
 colors. Cent rounding is distributed so component prices exactly equal the
 entered bundle price in each country. Component SKUs and tax classifications
 are retained, and the review shows their allocations.
-Selected bundle rows show compact product thumbnails and allocated prices for
-each selected country. Allocations refresh when components are removed or the
-settings screen is revisited after changing country prices.
+Selected bundle rows show compact product thumbnails and source catalog prices.
+Allocations on the details screen refresh after country prices change.
 The settings screen starts with an optional tax-classification picklist and weight.
 Its 62 fixed tax combinations come from the US production catalog export dated
 2026-10-16; selecting one writes `taxCode`, `taxData.UDF10` and `taxData.UDF11` on
-the parent and every variant. Weight is optional, defaults to pounds, and writes
+the parent. Weight is optional, defaults to pounds, and writes
 both `weight` and `shippingDimensions.weight` on the parent and every variant.
 The optional `custom.promoButton` text field appears inside a compact grey `promo:`
 badge on the same wrapping row as the other button controls.
@@ -107,7 +134,9 @@ cards with round flags and included locales. Other fields are available under
 **Detailed summary**. The **JSON** button to the left of Cancel swaps the summary
 for the complete catalog payload array; **Summary** switches back.
 Select existing category chips or add a named category on the second screen;
-the selection is applied to every created catalog entry. Existing category URL
+the selection is applied to every created catalog entry. Configurable variants
+also receive their own `custom` object with the same categories, button settings,
+promo text, options and bundle type as the parent. Existing category URL
 keys are retained, and new category URL keys are derived from their names.
 Category chips in the catalog, product detail and creation wizard share a
 12-color palette selected by a case-insensitive hash of the category name,

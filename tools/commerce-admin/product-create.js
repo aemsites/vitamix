@@ -15,7 +15,7 @@ import { OPTION_PRESETS, TAX_PRESETS } from './product-create-presets.js';
 
 const ASSETS_APP = 'https://da.live/app/aemsites/vitamix/tools/product-assets/app?ref=product-assets';
 const LOCALES = ['us/en_us', 'ca/en_us', 'ca/fr_ca', 'mx/en_us', 'mx/es_mx', 'vr/en_us'];
-const STEPS = ['Product assets', 'Product & pricing', 'Buttons', 'Review & create'];
+const STEPS = ['Product assets', 'Product & pricing', 'Settings', 'Review & create'];
 const BUTTON_SETTINGS = ['addToCart', 'comingSoon', 'findDealer', 'findLocally', 'retired'];
 const MARKET_CURRENCIES = {
   us: 'USD', ca: 'CAD', mx: 'MXN', vr: 'USD',
@@ -44,6 +44,38 @@ function priceCents(amount) {
   return rounded;
 }
 
+function shippingWeight(row, label) {
+  const weight = row?.shippingDimensions?.weight || row?.weight;
+  if (!weight) return undefined;
+  if (!Number.isFinite(weight.value) || weight.value < 0
+    || !['kg', 'g', 'lb', 'oz'].includes(weight.unit)) {
+    throw new Error(`${label}: Product has an invalid shipping weight.`);
+  }
+  return { value: weight.value, unit: weight.unit };
+}
+
+function weightInKg(weight) {
+  if (!weight) return undefined;
+  const multipliers = {
+    kg: 1,
+    g: 0.001,
+    lb: 0.45359237,
+    oz: 0.0283495231,
+  };
+  return weight.value * multipliers[weight.unit];
+}
+
+function weightFromKg(kg, unit = 'lb') {
+  if (!Number.isFinite(kg) || kg < 0) return undefined;
+  const divisors = {
+    kg: 1,
+    g: 0.001,
+    lb: 0.45359237,
+    oz: 0.0283495231,
+  };
+  return { value: Number((kg / divisors[unit]).toFixed(4)), unit };
+}
+
 function bundleComponent(product, catalogPlan, currency) {
   const label = product.name || product.sku;
   if (product.bundleItems?.length || product.type === 'bundle' || product.custom?.type === 'bundle') {
@@ -53,6 +85,7 @@ function bundleComponent(product, catalogPlan, currency) {
     throw new Error(`${label}: A component needs a SKU, name and price in ${currency}.`);
   }
   const weight = priceCents(product.price?.final);
+  const parentShippingWeight = shippingWeight(product, label);
   const taxFields = (row) => ({
     ...(row.taxCode != null ? { taxCode: row.taxCode } : {}),
     ...(row.taxData != null ? { taxData: row.taxData } : {}),
@@ -62,7 +95,11 @@ function bundleComponent(product, catalogPlan, currency) {
       throw new Error(`${label}: Only simple products or products with matching color variants are compatible.`);
     }
     return {
-      weight, sku: product.sku, name: product.name, ...taxFields(product),
+      weight,
+      shippingWeight: parentShippingWeight,
+      sku: product.sku,
+      name: product.name,
+      ...taxFields(product),
     };
   }
   if (!catalogPlan.variantPlans.length) {
@@ -82,6 +119,7 @@ function bundleComponent(product, catalogPlan, currency) {
       sku: variant.sku,
       name: variant.name || `${product.name} ${parentColor}`,
       options: [{ id: 'color', name: parentColor }],
+      shippingWeight: shippingWeight(variant, label) || parentShippingWeight,
       ...taxFields(product),
       ...taxFields(variant),
     };
@@ -105,14 +143,81 @@ function pricedBundleItems(components, amount) {
   });
   const remaining = Number(total - cents.reduce((value, share) => value + share, 0n));
   remainders.slice(0, remaining).forEach(({ index }) => { cents[index] += 1n; });
-  return components.map(({ weight, preview, ...component }, index) => {
+  return components.map(({
+    weight, preview, shippingWeight: componentWeight, ...component
+  }, index) => {
     const share = cents[index];
     const final = `${share / 100n}.${String(share % 100n).padStart(2, '0')}`;
     const price = { final, regular: final };
     return component.variants
-      ? { variants: component.variants.map((variant) => ({ ...variant, price: { ...price } })) }
+      ? {
+        variants: component.variants.map(({ shippingWeight: variantWeight, ...variant }) => ({
+          ...variant, price: { ...price },
+        })),
+      }
       : { ...component, price };
   });
+}
+
+function componentRows(component) {
+  return component.variants || [component];
+}
+
+function deriveBundleTaxFromComponents(components) {
+  const rows = components.flatMap(componentRows)
+    .filter((row) => row.taxCode || row.taxData);
+  if (!rows.length) return {};
+  const unique = new Map();
+  rows.forEach((row) => {
+    const signature = JSON.stringify({
+      taxCode: row.taxCode || null,
+      taxData: row.taxData || null,
+    });
+    unique.set(signature, row);
+  });
+  if (unique.size !== 1) return {};
+  const [row] = unique.values();
+  return {
+    ...(row.taxCode ? { taxCode: row.taxCode } : {}),
+    ...(row.taxData ? { taxData: row.taxData } : {}),
+  };
+}
+
+function bundleWeightTotals(components) {
+  const colors = [...new Set(components.flatMap((component) => (
+    component.variants?.map((variant) => variant.options[0].name) || []
+  )))];
+  return (colors.length ? colors : ['']).map((color) => {
+    const rows = components.map((component) => (
+      component.variants
+        ? component.variants.find((variant) => variant.options[0].name === color)
+        : component
+    ));
+    const complete = rows.length > 0 && rows.every((row) => row?.shippingWeight);
+    return {
+      color,
+      kg: complete ? rows.reduce((sum, row) => sum + weightInKg(row.shippingWeight), 0) : undefined,
+    };
+  });
+}
+
+function deriveBundleWeightFromComponents(components, unit, color) {
+  const totals = bundleWeightTotals(components);
+  if (totals.some((total) => total.kg === undefined)) return {};
+  const kg = color === undefined
+    ? Math.max(...totals.map((total) => total.kg))
+    : totals.find((total) => total.color === color)?.kg;
+  const weight = weightFromKg(kg, unit);
+  if (!weight) return {};
+  return { weight, shippingDimensions: { weight: { ...weight } } };
+}
+
+function bundleTaxLabel(row) {
+  const fields = [
+    row.taxCode,
+    ...Object.entries(row.taxData || {}).map(([key, value]) => `${key}: ${value}`),
+  ].filter(Boolean);
+  return fields.length ? fields.join(' / ') : 'Not set';
 }
 
 function bundleSummary(product) {
@@ -318,6 +423,9 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
           ${input('URL key', 'urlKey', 'required pattern="[a-z0-9]+(-[a-z0-9]+)*" maxlength="200"')}
           <label>Placement<select name="placement"><option value="">Household</option><option value="commercial/">Commercial</option></select></label>
         </div>
+        <div class="product-create-bundle product-create-bundle-choice">
+          <label class="product-create-bundle-toggle"><input type="checkbox" name="virtualBundle"> Virtual Bundle</label>
+        </div>
         <fieldset class="product-create-catalogs">
           <legend>Catalogs</legend>
           <p>Select one or more countries. Canada includes English and French; Mexico includes English and Spanish.</p>
@@ -344,6 +452,7 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
         <p data-assets-status role="status"></p><div data-assets-preview></div>
       </section>
       <section data-step="1" hidden>
+        <div data-product-details>
         <div class="product-create-fields">
           ${input('Product name', 'name', 'required')}
           <label data-product-sku>Product SKU<input name="sku" required></label>
@@ -363,8 +472,10 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
         <p>Colors and galleries come from Product Assets. To change structure, go Back,
           update and publish the assets, then Check again. SKUs are shared across all markets.
           Variant names and URLs are generated automatically.</p>
+        </div>
       </section>
       <section data-step="2" hidden>
+        <div data-standard-settings>
         <div class="product-create-fields product-create-tax">
           <label>Tax classification<select name="taxPreset">
             <option value="">Not set</option>
@@ -388,13 +499,6 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
           <label class="product-create-promo">promo:
             <input name="promoButton" aria-label="Promotional button text">
           </label>
-        </div>
-        <div class="product-create-bundle">
-          <label class="product-create-bundle-toggle"><input type="checkbox" name="virtualBundle"> Virtual Bundle</label>
-          <div data-bundle-editor hidden>
-            <div data-bundle-products></div>
-            <button type="button" data-bundle-pick>Add products…</button>
-          </div>
         </div>
         <div class="product-create-options-section">
           <label class="product-create-options-toggle"><input type="checkbox" name="showOptions"
@@ -420,6 +524,14 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
             </div>
           </div>
         </div>
+        </div>
+        <div data-virtual-bundle-settings hidden>
+          <h3>Virtual Bundle Products</h3>
+          <div data-bundle-products></div>
+          <button type="button" data-bundle-pick>Add products…</button>
+        </div>
+        <div data-bundle-pricing hidden></div>
+        <div data-bundle-derived-details hidden></div>
       </section>
       <section data-step="3" hidden>
         <div data-review></div>
@@ -443,6 +555,8 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
   const preview = dialog.querySelector('[data-assets-preview]');
   const status = dialog.querySelector('[data-assets-status]');
   const assetsHelp = dialog.querySelector('[data-assets-help]');
+  const details = dialog.querySelector('[data-product-details]');
+  const bundleEditor = dialog.querySelector('[data-virtual-bundle-settings]');
   const field = (name) => form.elements.namedItem(name);
   const value = (name) => field(name).value.trim();
   const selectedLocales = () => {
@@ -461,6 +575,9 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
   let plans = new Map();
   let checkedRows;
   const detailDrafts = new Map();
+  const detailSuggestions = new Map();
+  let suggestedCategoryKeys = new Set();
+  let categorySuggestionSignature = '';
   const categoryChoices = new Map(categories.map((category) => [
     category.name.trim().toLowerCase(),
     { name: category.name, url_key: category.slug || categorySlugFromName(category.name) },
@@ -538,6 +655,7 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
             preview: {
               name: product.name,
               image: image ? resolveImageUrlForLocale(catalog, image) : '',
+              categories: product.custom?.categories || [],
             },
           };
         } catch (err) {
@@ -564,7 +682,10 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
         const market = catalog.split('/')[0];
         if (markets.has(market) || !items.length) return;
         markets.add(market);
-        prices.set(market, pricedBundleItems(items, priceAmount(value(`price-${market}`))));
+        const priceField = field(`price-${market}`);
+        if (priceField?.value) {
+          prices.set(market, pricedBundleItems(items, priceAmount(priceField.value)));
+        }
       });
     } catch (err) {
       prices.clear();
@@ -574,27 +695,98 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
       const component = components[index];
       const name = component?.preview?.name || suffix;
       const image = component?.preview?.image;
-      const amounts = [...prices].map(([market, items]) => {
-        const item = items[index];
-        const amount = (item.variants?.[0] || item).price.final;
-        const currency = MARKET_CURRENCIES[market];
-        const formatted = new Intl.NumberFormat('en-US', { style: 'currency', currency })
-          .format(Number(amount));
-        return `<span>${escapeHtml(market.toUpperCase())} ${escapeHtml(currency)} ${escapeHtml(formatted)}</span>`;
+      const catalogPrices = selectedLocales().map((catalog) => {
+        const item = bundleComponents.get(catalog)?.[index];
+        if (!item) return '';
+        const currency = MARKET_CURRENCIES[catalog.split('/')[0]];
+        return `<span>${escapeHtml(catalog)}: ${escapeHtml(currency)} ${(item.weight / 100).toFixed(2)}</span>`;
+      }).join('');
+      const componentDetails = selectedLocales().map((catalog) => {
+        const item = bundleComponents.get(catalog)?.[index];
+        if (!item) return '';
+        return componentRows(item).map((row) => {
+          const weight = row.shippingWeight;
+          const weightLabel = weight ? `${weight.value} ${weight.unit}` : 'Not set';
+          const color = row.options?.[0]?.name;
+          return `<span class="product-create-bundle-component-detail">
+            ${escapeHtml(catalog)}${color ? ` / ${escapeHtml(color)}` : ''}
+            &middot; SKU: ${escapeHtml(row.sku)}
+            &middot; Weight: ${escapeHtml(weightLabel)}
+            &middot; Tax: ${escapeHtml(bundleTaxLabel(row))}
+          </span>`;
+        }).join('');
       }).join('');
       return `<div class="product-create-bundle-item">
         ${image ? `<img class="product-create-bundle-thumb" src="${escapeHtml(image)}" alt="" width="36" height="36" loading="lazy">`
     : '<span class="product-create-bundle-thumb product-create-bundle-no-image" aria-label="No product image"></span>'}
-        <span class="product-create-bundle-item-label">${escapeHtml(name)}</span>
-        <span class="product-create-bundle-prices">${amounts}</span>
+        <span class="product-create-bundle-item-label">${escapeHtml(name)}${componentDetails}</span>
+        <span class="product-create-bundle-prices">${catalogPrices}</span>
         <button type="button" class="product-create-bundle-remove" data-bundle-remove="${index}" aria-label="Remove ${escapeHtml(name)}">Remove</button></div>`;
     }).join('');
+    dialog.querySelector('[data-bundle-pricing]').innerHTML = bundlePaths.length
+      ? `<h3>Component allocations & tax classifications</h3>${selectedLocales().map((catalog) => {
+        const market = catalog.split('/')[0];
+        const sourceItems = bundleComponents.get(catalog);
+        if (!sourceItems?.length || !prices.has(market)) return '';
+        const amount = priceAmount(value(`price-${market}`));
+        const items = pricedBundleItems(sourceItems, amount);
+        const currency = MARKET_CURRENCIES[market];
+        return `<section><h4>${escapeHtml(catalog)} &mdash; ${escapeHtml(currency)} ${escapeHtml(amount)}</h4>
+          <ul>${items.map((item, index) => {
+    const { name } = sourceItems[index].preview;
+    return componentRows(item).map((row) => {
+      const color = row.options?.[0]?.name;
+      return `<li>${escapeHtml(name)}${color ? ` / ${escapeHtml(color)}` : ''}
+        &middot; SKU: ${escapeHtml(row.sku)}
+        &middot; Allocated: ${escapeHtml(currency)} ${escapeHtml(row.price.final)}
+        <div>Tax: ${escapeHtml(bundleTaxLabel(row))}</div></li>`;
+    }).join('');
+  }).join('')}</ul></section>`;
+      }).join('')}` : '';
     dialog.querySelector('[data-bundle-pick]').textContent = bundlePaths.length
       ? 'Edit products…' : 'Add products…';
+    const derived = selectedLocales().map((catalog) => {
+      const items = bundleComponents.get(catalog) || [];
+      if (!items.length) return '';
+      const tax = deriveBundleTaxFromComponents(items);
+      const physical = deriveBundleWeightFromComponents(items, 'lb');
+      const taxLabel = tax.taxCode || tax.taxData
+        ? bundleTaxLabel(tax) : 'Mixed or unset component tax classifications';
+      const weightLabel = physical.weight
+        ? `${physical.weight.value} ${physical.weight.unit}`
+        : 'Incomplete: component weights missing';
+      const totals = bundleWeightTotals(items).map(({ color, kg }) => {
+        const weight = weightFromKg(kg);
+        return `${color ? `${color}: ` : ''}${weight ? `${weight.value} ${weight.unit}` : 'Incomplete: component weights missing'}`;
+      }).join('; ');
+      return `<li><strong>${escapeHtml(catalog)}:</strong> Tax ${escapeHtml(taxLabel)}
+        &middot; Parent weight: ${escapeHtml(weightLabel)}
+        <div>${escapeHtml(totals)}</div></li>`;
+    }).filter(Boolean).join('');
+    dialog.querySelector('[data-bundle-derived-details]').innerHTML = derived
+      ? `<h4>Calculated parent settings</h4><ul>${derived}</ul>`
+      : '';
+  }
+
+  function updateStepTwoMode() {
+    const bundle = field('virtualBundle').checked;
+    dialog.querySelector(`[data-step="${bundle ? 2 : 1}"]`).prepend(details);
+    dialog.querySelector('[data-step="1"]').append(bundleEditor);
+    dialog.querySelector('[data-standard-settings]').hidden = bundle;
+    bundleEditor.hidden = !bundle;
+    dialog.querySelector('[data-bundle-pricing]').hidden = !bundle;
+    dialog.querySelector('[data-bundle-derived-details]').hidden = !bundle;
+    if (bundle && step > 0) renderBundleProducts();
   }
 
   field('virtualBundle').addEventListener('change', () => {
-    dialog.querySelector('[data-bundle-editor]').hidden = !field('virtualBundle').checked;
+    if (!field('virtualBundle').checked) {
+      bundlePaths = [];
+      bundleComponents = new Map();
+      dialog.querySelector('[data-bundle-products]').innerHTML = '';
+      dialog.querySelector('[data-bundle-derived-details]').innerHTML = '';
+    }
+    updateStepTwoMode();
   });
   field('advancedSettings').addEventListener('change', () => {
     const enabled = field('advancedSettings').checked;
@@ -724,7 +916,10 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
     dialog.querySelectorAll('[data-step]').forEach((section) => {
       section.hidden = Number(section.dataset.step) !== step;
     });
-    dialog.querySelector('[data-progress]').textContent = `Step ${step + 1} of ${STEPS.length}: ${STEPS[step]}`;
+    updateStepTwoMode();
+    const bundleSteps = ['Product assets', 'Bundle components', 'Bundle details & pricing', 'Review & create'];
+    const stepLabel = field('virtualBundle').checked ? bundleSteps[step] : STEPS[step];
+    dialog.querySelector('[data-progress]').textContent = `Step ${step + 1} of ${STEPS.length}: ${stepLabel}`;
     back.hidden = step === 0;
     next.textContent = step === 3 ? 'Create product' : 'Next';
     next.disabled = step === 0 && !plan;
@@ -734,9 +929,11 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
     dialog.querySelector('[data-review]').hidden = false;
     dialog.querySelector('[data-review-json]').hidden = true;
     error.hidden = true;
-    if (step === 2 && bundlePaths.length) renderBundleProducts();
     dialog.querySelector('.product-create-body').scrollTop = 0;
-    dialog.querySelector(`[data-step="${step}"] input, [data-step="${step}"] select, [data-next]`).focus();
+    const section = dialog.querySelector(`[data-step="${step}"]`);
+    const focusTarget = [...section.querySelectorAll('input, select, button')]
+      .find((item) => !item.closest('[hidden]')) || next;
+    focusTarget.focus();
   }
 
   function dismiss() {
@@ -788,6 +985,25 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
   }
 
   function populateDetails() {
+    const bundle = field('virtualBundle').checked;
+    if (bundle) {
+      const categoriesFromComponents = [...bundleComponents.values()].flatMap((components) => (
+        components.flatMap((component) => component.preview.categories)
+      ));
+      const signature = JSON.stringify(categoriesFromComponents);
+      if (signature !== categorySuggestionSignature) {
+        suggestedCategoryKeys.forEach((key) => selectedCategories.delete(key));
+        suggestedCategoryKeys = new Set();
+        categoriesFromComponents.forEach((category) => {
+          const key = category.name.trim().toLowerCase();
+          categoryChoices.set(key, { ...category });
+          if (!selectedCategories.has(key)) suggestedCategoryKeys.add(key);
+          selectedCategories.add(key);
+        });
+        categorySuggestionSignature = signature;
+        renderCategoryChoices();
+      }
+    }
     if (value('placement') === 'commercial/') {
       if (!categoryChoices.has('commercial')) {
         categoryChoices.set('commercial', { name: 'Commercial', url_key: 'commercial' });
@@ -800,8 +1016,8 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
     )));
     const configurable = [...plans.values()]
       .every((candidate) => candidate.variantPlans.length > 0);
-    dialog.querySelector('[data-product-sku]').hidden = configurable;
-    field('sku').required = !configurable;
+    dialog.querySelector('[data-product-sku]').hidden = configurable && !bundle;
+    field('sku').required = !configurable || bundle;
     const markets = [...new Set(selectedLocales().map((catalog) => catalog.split('/')[0]))];
     dialog.querySelector('[data-prices]').innerHTML = markets.map((market) => `
       <fieldset class="product-create-price" data-market="${market}">
@@ -816,15 +1032,40 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
         input(`${colorLabel(color)} SKU`, `sku-${color}`, 'required')
       )).join('')}</div>`
       : '';
-    dialog.querySelectorAll('[data-step="1"] input').forEach((item) => {
-      item.value = detailDrafts.get(`${value('urlKey')}/${item.name}`) || '';
+    details.querySelectorAll('input').forEach((item) => {
+      const key = `${value('urlKey')}/${bundle ? 'bundle' : 'regular'}/${item.name}`;
+      let suggestion = '';
+      if (bundle) {
+        if (item.name === 'name') {
+          suggestion = (bundleComponents.values().next().value || [])
+            .map((component) => component.preview.name).join(' + ');
+        }
+        if (item.name === 'sku') suggestion = value('urlKey');
+        if (item.name.startsWith('sku-')) suggestion = `${value('urlKey')}-${item.name.slice(4)}`;
+        if (item.dataset.currency) {
+          const market = item.name.slice('price-'.length);
+          const components = bundleComponents.get(selectedLocales().find(
+            (catalog) => catalog.startsWith(`${market}/`),
+          )) || [];
+          suggestion = (components.reduce((sum, component) => sum + component.weight, 0) / 100)
+            .toFixed(2);
+        }
+      }
+      const draft = detailDrafts.get(key);
+      item.value = draft !== undefined && draft !== detailSuggestions.get(key) ? draft : suggestion;
       if (item.dataset.currency) formatPrice(item);
+      const previousValue = item.value;
+      item.value = suggestion;
+      if (item.dataset.currency) formatPrice(item);
+      detailSuggestions.set(key, item.value);
+      item.value = previousValue;
     });
   }
 
   function rememberDetails() {
-    dialog.querySelectorAll('[data-step="1"] input').forEach((item) => {
-      detailDrafts.set(`${value('urlKey')}/${item.name}`, item.value);
+    details.querySelectorAll('input').forEach((item) => {
+      const mode = field('virtualBundle').checked ? 'bundle' : 'regular';
+      detailDrafts.set(`${value('urlKey')}/${mode}/${item.name}`, item.value);
     });
   }
 
@@ -844,7 +1085,8 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
   }
 
   function validateStep() {
-    if (step === 1 && !field('newCategory').hidden && value('newCategory')) {
+    const detailsStep = field('virtualBundle').checked ? 2 : 1;
+    if (step === detailsStep && !field('newCategory').hidden && value('newCategory')) {
       showError('Press Enter to add the new category before continuing.');
       field('newCategory').focus();
       return false;
@@ -863,23 +1105,41 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
 
   function buildProduct(catalog) {
     const catalogPlan = plans.get(catalog);
+    const isVirtualBundle = field('virtualBundle').checked;
     const market = catalog.split('/')[0];
     const amount = priceAmount(value(`price-${market}`));
     const price = { currency: MARKET_CURRENCIES[market], final: amount, regular: amount };
     const url = `https://www.vitamix.com${path(catalog)}`;
-    const taxPreset = value('taxPreset') === '' ? undefined : TAX_PRESETS[Number(value('taxPreset'))];
-    const tax = taxPreset
-      ? { taxCode: taxPreset.taxCode, taxData: { ...taxPreset.taxData } } : {};
-    const condition = value('itemCondition');
+    const taxPreset = !isVirtualBundle && value('taxPreset') !== '' ? TAX_PRESETS[Number(value('taxPreset'))] : undefined;
+    const manualTax = taxPreset
+      ? { taxCode: taxPreset.taxCode, taxData: { ...taxPreset.taxData } }
+      : {};
+    const condition = isVirtualBundle ? 'NewCondition' : value('itemCondition');
     const weightValue = value('weight');
-    if (weightValue && (!Number.isFinite(Number(weightValue)) || Number(weightValue) < 0)) {
+    if (!isVirtualBundle && weightValue
+      && (!Number.isFinite(Number(weightValue)) || Number(weightValue) < 0)) {
       throw new Error('Enter a valid non-negative weight.');
     }
-    const physical = () => {
+    const manualPhysical = () => {
       if (!weightValue) return {};
       const weight = { value: Number(weightValue), unit: value('weightUnit') };
       return { weight, shippingDimensions: { weight: { ...weight } } };
     };
+    const custom = {
+      categories: [...selectedCategories].map((key) => ({ ...categoryChoices.get(key) })),
+      ...Object.fromEntries(BUTTON_SETTINGS.map((setting) => [
+        setting, (isVirtualBundle ? setting === 'addToCart' : field(setting).checked) ? 'Yes' : 'No',
+      ])),
+      ...(field('virtualBundle').checked ? { type: 'bundle' } : {}),
+      ...(!isVirtualBundle && value('promoButton') ? { promoButton: value('promoButton') } : {}),
+      ...(catalogOptions.get(catalog)?.length
+        ? { options: catalogOptions.get(catalog).map((option) => ({ ...option })) } : {}),
+    };
+    const components = isVirtualBundle ? bundleComponents.get(catalog) : undefined;
+    const derivedTax = isVirtualBundle ? deriveBundleTaxFromComponents(components || []) : {};
+    const derivedPhysical = isVirtualBundle ? deriveBundleWeightFromComponents(components || [], 'lb') : {};
+    const tax = isVirtualBundle ? derivedTax : manualTax;
+    const physical = isVirtualBundle ? derivedPhysical : manualPhysical();
     const variants = catalogPlan.nextProduct.variants.map((variant, i) => ({
       ...variant,
       sku: value(`sku-${catalogPlan.variantPlans[i].colorSlug}`),
@@ -887,10 +1147,17 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
       url: `${url}?color=${catalogPlan.variantPlans[i].colorSlug}`,
       price: { ...price },
       availability: 'OutOfStock',
+      custom: {
+        ...custom,
+        categories: custom.categories.map((category) => ({ ...category })),
+        ...(custom.options ? { options: custom.options.map((option) => ({ ...option })) } : {}),
+      },
       itemCondition: condition,
-      ...physical(),
+      ...(isVirtualBundle
+        ? deriveBundleWeightFromComponents(components || [], 'lb', variant.options[0].value)
+        : physical),
     }));
-    const sku = variants.length ? value('urlKey') : value('sku');
+    const sku = variants.length && !isVirtualBundle ? value('urlKey') : value('sku');
     const skus = [sku, ...variants.map((variant) => variant.sku)];
     if (new Set(skus).size !== skus.length) throw new Error('Product and variant SKUs must be distinct.');
     const result = {
@@ -906,17 +1173,8 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
       metadata: { robots: 'noindex', visibility: 'embargoed' },
       itemCondition: condition,
       ...tax,
-      ...physical(),
-      custom: {
-        categories: [...selectedCategories].map((key) => ({ ...categoryChoices.get(key) })),
-        ...Object.fromEntries(BUTTON_SETTINGS.map((setting) => [
-          setting, field(setting).checked ? 'Yes' : 'No',
-        ])),
-        ...(field('virtualBundle').checked ? { type: 'bundle' } : {}),
-        ...(value('promoButton') ? { promoButton: value('promoButton') } : {}),
-        ...(catalogOptions.get(catalog)?.length
-          ? { options: catalogOptions.get(catalog).map((option) => ({ ...option })) } : {}),
-      },
+      ...physical,
+      custom,
       price,
     };
     if (variants.length) {
@@ -931,8 +1189,7 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
     } else {
       delete result.variants;
     }
-    if (field('virtualBundle').checked) {
-      const components = bundleComponents.get(catalog);
+    if (isVirtualBundle) {
       if (!components?.length) throw new Error(`${catalog}: Select compatible bundle products.`);
       const componentSkus = components.flatMap((component) => (
         component.variants || [component]
@@ -990,7 +1247,10 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
     if (event.target.dataset.currency) event.target.setCustomValidity('');
   });
   form.addEventListener('focusout', (event) => {
-    if (event.target.dataset.currency) formatPrice(event.target);
+    if (event.target.dataset.currency) {
+      formatPrice(event.target);
+      if (field('virtualBundle').checked) renderBundleProducts();
+    }
   });
   form.addEventListener('focusin', (event) => {
     if (!event.target.dataset.currency || !event.target.value) return;
@@ -1008,8 +1268,8 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
   wireDialogEscapeDismiss(dialog, dismiss);
   dialog.addEventListener('cancel', (event) => { event.preventDefault(); dismiss(); });
   back.addEventListener('click', () => {
-    if (saving || created.size) return;
-    if (step === 1) rememberDetails();
+    if (saving || preparing || created.size) return;
+    if (details.closest('[data-step]').dataset.step === String(step)) rememberDetails();
     changeStep(step - 1);
   });
   form.addEventListener('submit', async (event) => {
@@ -1018,16 +1278,32 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
     error.hidden = true;
     if (step === 0) {
       if (!plan) return;
-      populateDetails();
+      if (!field('virtualBundle').checked) populateDetails();
       changeStep(1);
     } else if (step === 1) {
+      preparing = true;
+      next.disabled = true;
+      back.disabled = true;
+      const componentScreen = dialog.querySelector('[data-step="1"]');
+      componentScreen.inert = true;
       try {
-        dialog.querySelectorAll('[data-currency]').forEach(formatPrice);
-        if (!validateStep()) return;
-        rememberDetails();
+        if (field('virtualBundle').checked) {
+          bundleComponents = await loadBundleComponents(bundlePaths);
+          if (!dialog.isConnected) return;
+          populateDetails();
+        } else {
+          details.querySelectorAll('[data-currency]').forEach(formatPrice);
+          if (!validateStep()) return;
+          rememberDetails();
+        }
         changeStep(2);
       } catch (err) {
         showError(err.message);
+      } finally {
+        preparing = false;
+        componentScreen.inert = false;
+        next.disabled = false;
+        back.disabled = false;
       }
     } else if (step === 2) {
       preparing = true;
@@ -1037,8 +1313,11 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
       const settings = dialog.querySelector('[data-step="2"]');
       settings.inert = true;
       try {
-        catalogOptions = await loadCatalogOptions();
+        catalogOptions = field('virtualBundle').checked ? new Map() : await loadCatalogOptions();
         if (field('virtualBundle').checked) {
+          details.querySelectorAll('[data-currency]').forEach(formatPrice);
+          if (!validateStep()) return;
+          rememberDetails();
           bundleComponents = await loadBundleComponents(bundlePaths);
         }
         if (!dialog.isConnected) return;

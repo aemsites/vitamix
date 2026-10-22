@@ -893,6 +893,11 @@ async function init() {
     const indexData = await indexPromise;
     currentProductRef = normalizeProductPath(data.path || getCatalogProductPath(currentProductRef));
     currentProductData = JSON.parse(JSON.stringify(data));
+    const productionLink = document.getElementById('productProductionLink');
+    if (productionLink instanceof HTMLAnchorElement) {
+      productionLink.href = `https://www.vitamix.com${getCatalogProductPath(currentProductRef)}`;
+      productionLink.hidden = false;
+    }
     currentIndexByUrlKey = buildIndexByUrlKey(indexData);
     loading.classList.remove('active');
     if (editCheckbox instanceof HTMLInputElement) {

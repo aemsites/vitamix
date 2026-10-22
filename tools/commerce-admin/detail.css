@@ -30,6 +30,19 @@
   text-decoration: underline;
 }
 
+.pim-production-link {
+  color: #2c2c2e;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.pim-production-link:hover,
+.pim-production-link:focus-visible {
+  text-decoration: underline;
+}
+
 .pim-edit-toggle {
   display: inline-flex;
   align-items: center;
