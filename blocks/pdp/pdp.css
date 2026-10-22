@@ -511,8 +511,9 @@ a.button.pdp-find-dealer-button.emphasis {
   cursor: pointer;
 }
 
+/* Matches the rendered Bazaarvoice rating summary (stars + "Write a review") to avoid CLS */
 .pdp-reviews-summary-placeholder {
-  min-height: 22.5px;
+  min-height: 42px;
 }
 
 .pdp-reviews-container {
@@ -570,6 +571,129 @@ a.button.pdp-find-dealer-button.emphasis {
   width: 1.2em;
   height: 1.2em;
   margin-right: var(--spacing-s)
+}
+
+.pdp-series-products {
+  min-width: 0;
+}
+
+.pdp-series-products h2 {
+  margin: 0 0 12px;
+  font-size: var(--body-size-s);
+  font-weight: var(--weight-medium);
+}
+
+.pdp .pdp-series-list {
+  display: flex;
+  box-sizing: border-box;
+  height: 216px;
+  gap: 12px;
+  overflow-x: auto;
+  list-style: none;
+  margin: 0;
+  padding: 4px 4px 12px;
+  scroll-snap-type: x proximity;
+}
+
+.pdp-series-card {
+  position: relative;
+  display: flex;
+  flex: 0 0 116px;
+  flex-direction: column;
+  border: 1px solid var(--color-gray-400);
+  border-radius: 12px;
+  background: var(--color-white);
+  scroll-snap-align: start;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.pdp-series-card:hover {
+  border-color: var(--color-charcoal);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 8%);
+}
+
+.pdp-series-card.is-selected {
+  border-color: var(--color-charcoal);
+  box-shadow: 0 0 0 2px var(--color-charcoal);
+}
+
+.pdp-series-skeleton {
+  background:
+    linear-gradient(var(--color-gray-300), var(--color-gray-300)) 0 0 / 100% 114px no-repeat,
+    linear-gradient(var(--color-gray-300), var(--color-gray-300)) 10px 124px / calc(100% - 20px) 14px no-repeat,
+    linear-gradient(var(--color-gray-300), var(--color-gray-300)) 10px 174px / 50% 14px no-repeat;
+}
+
+.pdp-series-error {
+  align-self: center;
+  font-size: var(--body-size-s);
+  color: var(--color-text);
+}
+
+.pdp-series-product:any-link {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  border-radius: 11px;
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.pdp-series-product img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  flex-shrink: 0;
+  object-fit: contain;
+  border-radius: 11px 11px 0 0;
+}
+
+.pdp-series-name {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  margin: 8px 10px 0;
+  font-size: var(--body-size-s);
+  line-height: 1.3;
+}
+
+.pdp-series-price {
+  margin: auto 10px 8px;
+  padding-top: 4px;
+  font-size: var(--body-size-s);
+}
+
+/* Overlaid on the image so swatches never add card height */
+.pdp-series-colors {
+  position: absolute;
+  top: 82px;
+  left: 4px;
+  right: 4px;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.pdp-series-swatch {
+  display: block;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--color-white);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--color-gray-500);
+  pointer-events: auto;
+}
+
+.pdp-series-product:focus-visible,
+.pdp-series-swatch:focus-visible {
+  outline: 2px solid var(--color-charcoal);
+  outline-offset: 2px;
 }
 
 .pdp-share-container {
