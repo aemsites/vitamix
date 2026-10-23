@@ -7,7 +7,7 @@ import { test, expect } from '@playwright/test';
  * scripts/commerce-api.js imports auth-api.js and recaptcha.js, which in
  * turn import aem.js — a browser-only module that sets window.hlx at load
  * time and cannot be imported in the Node test runner. This mirrors the
- * pattern used in pricing.spec.js and recaptcha.spec.js.
+ * pattern used in pricing.spec.js.
  *
  * Keep these copies in sync with the real implementations.
  */

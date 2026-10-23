@@ -1,6 +1,11 @@
 import { getConfig } from './commerce-config.js';
 import { getToken } from './auth-api.js';
-import { mintRecaptchaToken, RECAPTCHA_ACTIONS, RECAPTCHA_HEADER } from './recaptcha.js';
+import {
+  mintRecaptchaTokenDetailed,
+  RECAPTCHA_ACTIONS,
+  RECAPTCHA_HEADER,
+  RECAPTCHA_RETRY_MINT_TIMEOUT_MS,
+} from './recaptcha.js';
 import { getLocaleAndLanguage, loggedFetch } from './scripts.js';
 import { logApiError, logNetworkError } from './operations-log.js';
 import { getAffiliateCode, normalizeCouponCode } from './commerce/coupon-state.js';
@@ -34,6 +39,27 @@ export function getCustomerTimezone() {
   }
 }
 
+/** API error code for every reCAPTCHA rejection (403). */
+const RECAPTCHA_FAILED_CODE = 'ADOBE_COMMERCE_RECAPTCHA_FAILED';
+
+/**
+ * reCAPTCHA rejection reasons that get one retry with a fresh token:
+ * `token_required` (the browser could not mint a token in time) and `invalid`
+ * (Google rejected the token, e.g. BROWSER_ERROR, which Google documents as
+ * retriable). Low scores and action/hostname mismatches are never retried.
+ */
+const RETRYABLE_RECAPTCHA_REASONS = new Set(['token_required', 'invalid']);
+
+/**
+ * Whether an error thrown by this module is a reCAPTCHA rejection.
+ * @param {*} err
+ * @returns {boolean}
+ */
+export function isRecaptchaError(err) {
+  return err?.code === RECAPTCHA_FAILED_CODE
+    || Boolean(err?.errorHeader?.toLowerCase().includes('recaptcha'));
+}
+
 /**
  * Makes an authenticated POST request to the Commerce API.
  * Attaches a Bearer token from localStorage if one is present, so orders
@@ -41,6 +67,11 @@ export function getCustomerTimezone() {
  * When `recaptchaAction` is provided AND no Bearer token is available,
  * mints a reCAPTCHA Enterprise token and attaches it as `X-Recaptcha-Token`.
  * Bypass if authenticated.
+ *
+ * If the API rejects the request with a retryable reCAPTCHA failure, mints a
+ * fresh token and sends the request once more. This is safe for every gated
+ * endpoint because the API checks reCAPTCHA before any side effect. Mint
+ * diagnostics (never the token) are attached to the error log.
  *
  * @param {string} path - API path relative to ORDERS_API_ORIGIN (e.g. '/orders')
  * @param {Object} body - Request payload, serialised as JSON
@@ -53,9 +84,12 @@ async function post(path, body, recaptchaAction) {
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  if (recaptchaAction && !token) {
-    const recaptchaToken = await mintRecaptchaToken(recaptchaAction);
-    if (recaptchaToken) headers[RECAPTCHA_HEADER] = recaptchaToken;
+  const useRecaptcha = Boolean(recaptchaAction) && !token;
+  let recaptcha;
+  if (useRecaptcha) {
+    const minted = await mintRecaptchaTokenDetailed(recaptchaAction);
+    if (minted.token) headers[RECAPTCHA_HEADER] = minted.token;
+    recaptcha = minted.diagnostics;
   }
 
   // Normalize the coupon code to the API charset at the single request boundary,
@@ -71,24 +105,42 @@ async function post(path, body, recaptchaAction) {
     payload = { ...body, couponCode: couponCode.map(normalizeCouponCode) };
   }
 
-  let resp;
-  let data;
-  try {
-    resp = await loggedFetch(`${getConfig().apiOrigin}${path}`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload),
+  const send = async () => {
+    try {
+      const resp = await loggedFetch(`${getConfig().apiOrigin}${path}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      });
+      return { resp, data: await resp.json() };
+    } catch (err) {
+      logNetworkError({
+        method: 'POST', path, error: err, requestBody: payload,
+      });
+      throw err;
+    }
+  };
+
+  let { resp, data } = await send();
+
+  const rejectedReason = data?.details?.reason;
+  if (useRecaptcha && resp.status === 403 && data?.code === RECAPTCHA_FAILED_CODE
+    && RETRYABLE_RECAPTCHA_REASONS.has(rejectedReason)) {
+    const retry = await mintRecaptchaTokenDetailed(recaptchaAction, {
+      timeoutMs: RECAPTCHA_RETRY_MINT_TIMEOUT_MS,
     });
-    data = await resp.json();
-  } catch (err) {
-    logNetworkError({
-      method: 'POST', path, error: err, requestBody: payload,
-    });
-    throw err;
+    recaptcha = { ...recaptcha, rejectedReason, retry: retry.diagnostics };
+    // Without a fresh token the retry would fail the same way, so only resend
+    // when one was minted.
+    if (retry.token) {
+      headers[RECAPTCHA_HEADER] = retry.token;
+      ({ resp, data } = await send());
+    }
   }
+
   if (!resp.ok) {
     logApiError({
-      method: 'POST', path, status: resp.status, responseBody: data, requestBody: payload,
+      method: 'POST', path, status: resp.status, responseBody: data, requestBody: payload, recaptcha,
     });
     throw new CommerceApiError(resp.status, data, resp.headers.get('x-error'), resp.headers.get('x-error-code'));
   }

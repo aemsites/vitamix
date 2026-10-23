@@ -10,6 +10,8 @@ import paypal from '../../scripts/payments/paypal.js';
 import { getActiveProviders } from '../checkout/checkout-payment.js';
 import { initIDMe, syncIDMeVisibility } from '../../scripts/commerce/idme.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { isLoggedIn } from '../../scripts/auth-api.js';
+import { warmRecaptchaOnInteraction } from '../../scripts/recaptcha.js';
 import {
   getCoupons, getManualCoupon, getAutoCoupons, setManualCoupon, removeCoupon,
   getCouponRequestFields, clearCoupons, getCouponErrorCode, updateAffiliateStatus,
@@ -513,6 +515,10 @@ export default async function decorate(block) {
   if (available.length) {
     available.forEach((p) => p.renderExpressButton(expressContainer, callbacks));
     expressSection.hidden = false;
+    // Express previews need a reCAPTCHA token (signed-out shoppers only). Start
+    // the SDK download on the first interaction so a slow connection has a
+    // head start before the wallet sheet asks for one; LCP is final by then.
+    if (!isLoggedIn()) warmRecaptchaOnInteraction();
   }
 
   if (getLocaleAndLanguage().locale === 'us') {
