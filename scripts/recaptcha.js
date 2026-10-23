@@ -61,8 +61,14 @@ const EXECUTE_RETRY_DELAY_MS = 300;
  * Events that mark the visitor's first interaction. Browsers stop recording
  * Largest Contentful Paint once the user taps, scrolls, or presses a key, so
  * starting the SDK download after one of these cannot affect LCP.
+ *
+ * Only real input counts: `scroll` is deliberately excluded because it also
+ * fires for browser scroll restoration and programmatic scrolls (anchors,
+ * scrollIntoView), which do not end LCP. Touch scrolling starts with
+ * `pointerdown`, keyboard scrolling with `keydown`, and mouse-wheel scrolling
+ * with `wheel`.
  */
-const WARM_EVENTS = ['pointerdown', 'keydown', 'scroll'];
+const WARM_EVENTS = ['pointerdown', 'keydown', 'wheel'];
 
 /**
  * Stable failure reasons reported in mint diagnostics.
@@ -169,8 +175,8 @@ export function loadRecaptchaSdk(siteKey = RECAPTCHA_SITE_KEY) {
 }
 
 /**
- * Start downloading the SDK on the visitor's first tap, key press, or scroll,
- * so a token is ready sooner at checkout without touching LCP. Idempotent;
+ * Start downloading the SDK on the visitor's first tap, key press, or mouse
+ * wheel, so a token is ready sooner at checkout without touching LCP. Idempotent;
  * load failures are ignored here because the next mint retries the load and
  * reports the failure.
  *

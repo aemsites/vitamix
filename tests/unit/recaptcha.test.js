@@ -327,7 +327,8 @@ test('warm: waits for the first interaction before loading the SDK', async () =>
 
   warmRecaptchaOnInteraction(SITE_KEY);
 
-  assert.deepEqual([...listeners.keys()].sort(), ['keydown', 'pointerdown', 'scroll']);
+  assert.deepEqual([...listeners.keys()].sort(), ['keydown', 'pointerdown', 'wheel']);
+  assert.equal(listeners.has('scroll'), false, 'scroll also fires without user input (restoration, anchors)');
   listeners.forEach(({ opts }) => {
     assert.equal(opts.capture, true);
     assert.equal(opts.passive, true);
@@ -340,11 +341,11 @@ test('warm: the first interaction loads the SDK once and removes every listener'
   const { listeners, removed } = installFakeWindowEvents();
 
   warmRecaptchaOnInteraction(SITE_KEY);
-  listeners.get('scroll').fn();
+  listeners.get('wheel').fn();
 
   assert.equal(scripts.length, 1);
   assert.equal(listeners.size, 0);
-  assert.deepEqual(removed.map((r) => r.type).sort(), ['keydown', 'pointerdown', 'scroll']);
+  assert.deepEqual(removed.map((r) => r.type).sort(), ['keydown', 'pointerdown', 'wheel']);
   removed.forEach(({ opts }) => assert.equal(opts.capture, true));
 });
 
