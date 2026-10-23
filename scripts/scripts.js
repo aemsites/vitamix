@@ -2246,10 +2246,11 @@ async function loadLazy(doc) {
   swapIcons(main);
   autolinkModals(document);
 
+  // The sidekick sync button is temporarily disabled. The sync modal code
+  // (tools/sidekick/sync/sync.js) is intentionally left in place so it can be re-enabled.
   const syncSku = async () => {
-    // eslint-disable-next-line import/no-unresolved
-    const { openSyncModal } = await import('https://main--vitamix--aemsites.aem.page/tools/sidekick/sync/sync.js');
-    await openSyncModal();
+    // eslint-disable-next-line no-alert
+    window.alert('Please reach out in slack to update a product');
   };
 
   const loadQuickEdit = async (...args) => {
