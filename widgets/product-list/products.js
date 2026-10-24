@@ -120,6 +120,8 @@ function buildMarketingCardItem(row, facetDefs) {
  * Products are included regardless of stock availability.
  * Rows with an optional Status column set to "hidden" are excluded.
  * Rows that point at /fragments/ are kept as marketing cards (content loaded separately).
+ * Household rows are patched by product slug using plp-data-household.json before
+ * building products and facets; only supplied columns override the combined rows.
  * @param {Object} config - Filter criteria (only known facet keys are applied)
  * @param {Object} facets - Optional object to populate with facet counts
  * @param {string} [dataset] - Dataset to load; 'household' combines blenders and accessories. Defaults to 'blenders'.
@@ -136,7 +138,17 @@ export default async function lookupProductListProducts(config = {}, facets = {}
       Promise.all(datasets.map((source) => fetchPlpData(locale, language, source))),
       fetchReviewsData(locale, language),
     ]);
-    const plpRows = plpRowsByDataset.flat();
+    let plpRows = plpRowsByDataset.flat();
+    if (plpDataset === 'household') {
+      const patches = await fetchPlpData(locale, language, 'household');
+      const patchesBySlug = new Map(patches
+        .filter((row) => (row.Product || '').trim())
+        .map((row) => [slugFromUrl(row.Product.trim()), row]));
+      plpRows = plpRows.map((row) => ({
+        ...row,
+        ...patchesBySlug.get(slugFromUrl((row.Product || '').trim())),
+      }));
+    }
     const facetDefs = getFacetDefsFromRows(plpRows);
     const reviewsBySlug = getReviewsBySlug(reviewsRows);
     const badgesBySlug = getBadgesBySlug(plpRows);
