@@ -289,6 +289,13 @@ test('discards localStorage with mismatched version', () => {
   assert.equal(cart.items.length, 0);
 });
 
+test('recovers from a null localStorage payload', () => {
+  localStorage.setItem(STORAGE_KEY, 'null');
+  const cart = new Cart();
+  assert.deepEqual(cart.items, []);
+  assert.deepEqual(JSON.parse(localStorage.getItem(STORAGE_KEY)).items, []);
+});
+
 test('restore is a no-op when localStorage is empty', () => {
   const cart = new Cart();
   assert.equal(cart.items.length, 0);

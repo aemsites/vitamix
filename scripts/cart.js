@@ -45,7 +45,7 @@ export class Cart {
     if (!stored) return null;
 
     const parsed = JSON.parse(stored);
-    if (parsed.version !== Cart.STORAGE_VERSION) {
+    if (parsed?.version !== Cart.STORAGE_VERSION) {
       localStorage.removeItem(Cart.STORAGE_KEY);
       return null;
     }
