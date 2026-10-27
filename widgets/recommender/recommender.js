@@ -40,7 +40,8 @@ function findRecommendation(rows, questions, selections) {
   rows.forEach((row) => {
     let score = 0;
     const matches = questions.every(({ name }) => {
-      const criterion = normalize(row[name]);
+      const key = Object.keys(row).find((column) => column.trim() === name);
+      const criterion = normalize(key ? row[key] : '');
       if (!criterion) return true;
       if (criterion !== normalize(selections[name])) return false;
       score += 1;
@@ -52,6 +53,44 @@ function findRecommendation(rows, questions, selections) {
     }
   });
   return best?.Recommendation;
+}
+
+function buildDecisionTree(questions, rows, selections = {}, questionIndex = 0) {
+  if (questionIndex === questions.length) {
+    const url = findRecommendation(rows, questions, selections);
+    return url ? { type: 'result', url, signature: `result:${url}` } : null;
+  }
+
+  const question = questions[questionIndex];
+  const options = question.answers
+    .map((answer, answerIndex) => {
+      selections[question.name] = answer.label;
+      const child = buildDecisionTree(questions, rows, selections, questionIndex + 1);
+      delete selections[question.name];
+      return child ? { answerIndex, child } : null;
+    })
+    .filter(Boolean);
+
+  if (!options.length) return null;
+  if (options.every(({ child }) => child.signature === options[0].child.signature)) {
+    return options[0].child;
+  }
+
+  const signature = JSON.stringify([
+    questionIndex,
+    options.map(({ answerIndex, child }) => [answerIndex, child.signature]),
+  ]);
+  return {
+    type: 'question',
+    questionIndex,
+    options,
+    signature,
+  };
+}
+
+function getDecisionTreeDepth(node) {
+  if (node.type === 'result') return 0;
+  return 1 + Math.max(...node.options.map(({ child }) => getDecisionTreeDepth(child)));
 }
 
 /**
@@ -90,12 +129,14 @@ function buildQuestion(question, index) {
     const id = `recommender-q${index + 1}-a${i + 1}`;
     const label = document.createElement('label');
     label.htmlFor = id;
+    label.dataset.answerIndex = i;
 
     const input = document.createElement('input');
     input.type = 'radio';
     input.id = id;
     input.name = `recommender-q${index + 1}`;
     input.value = answer.label;
+    input.dataset.answerIndex = i;
 
     const text = document.createElement('span');
     text.className = 'text';
@@ -237,6 +278,11 @@ export default async function decorate(widget) {
   }
 
   const { questions, recommendations } = data;
+  const decisionTree = buildDecisionTree(questions, recommendations);
+  if (!decisionTree) {
+    widget.dataset.stage = 'error';
+    return;
+  }
   // fetched up front so the result renders without a delay
   const productsLoaded = loadProducts().catch(() => null);
   const quizEl = widget.querySelector('.quiz');
@@ -245,39 +291,41 @@ export default async function decorate(widget) {
   const prevBtn = widget.querySelector('.prev');
   const nextBtn = widget.querySelector('.next');
   const nextLabel = nextBtn.textContent;
-  const total = questions.length;
+  const total = Math.max(getDecisionTreeDepth(decisionTree), 1);
 
   const fieldsets = questions.map(buildQuestion);
   quizEl.append(...fieldsets);
   widget.querySelector('.step-total').textContent = total;
   progressEl.max = total;
 
-  let currentStep = 1;
+  let currentNode = decisionTree;
+  let trail = [];
+  let pendingSelection = null;
+  let renderVersion = 0;
+
+  const pushAnswers = () => {
+    const url = new URL(window.location.href);
+    questions.forEach(({ name }) => url.searchParams.delete(name));
+    trail.forEach(({ node, answerIndex }) => {
+      const question = questions[node.questionIndex];
+      url.searchParams.set(question.name, question.answers[answerIndex].label);
+    });
+    if (url.href !== window.location.href) {
+      window.history.pushState(window.history.state, '', url);
+    }
+  };
 
   const updateNext = () => {
-    nextBtn.disabled = !fieldsets[currentStep - 1].querySelector('input:checked');
+    const fieldset = fieldsets[currentNode.questionIndex];
+    const selected = fieldset.querySelector('input:checked');
+    const selectedIndex = selected ? Number(selected.dataset.answerIndex) : -1;
+    const option = currentNode.options.find(({ answerIndex }) => answerIndex === selectedIndex);
+    nextBtn.disabled = !option;
+    nextBtn.textContent = option?.child.type === 'result' ? 'See My Recommendation' : nextLabel;
   };
 
-  const showStep = (step, focus = true) => {
-    currentStep = step;
-    fieldsets.forEach((fs) => { fs.hidden = true; });
-    const fieldset = fieldsets[step - 1];
-    fieldset.hidden = false;
-    if (focus) fieldset.focus();
-
-    progressEl.value = step - 1;
-    stepLabelEl.textContent = step;
-    prevBtn.hidden = step === 1;
-    nextBtn.textContent = step === total ? 'See My Recommendation' : nextLabel;
-    updateNext();
-  };
-
-  const showResults = async () => {
-    const selections = {};
-    fieldsets.forEach((fs) => {
-      selections[fs.dataset.question] = fs.querySelector('input:checked')?.value;
-    });
-    const href = toHref(findRecommendation(recommendations, questions, selections));
+  const showResults = async (url, version) => {
+    const href = toHref(url);
     if (!href) {
       widget.dataset.stage = 'error';
       return;
@@ -285,6 +333,7 @@ export default async function decorate(widget) {
 
     nextBtn.disabled = true;
     const products = await productsLoaded;
+    if (version !== renderVersion) return;
     const { pathname } = new URL(href, window.location.origin);
     const product = pathname.includes('/products/') && products?.bySlug[slugFromUrl(pathname)];
     const productEl = widget.querySelector('.results .product');
@@ -303,23 +352,99 @@ export default async function decorate(widget) {
     widget.querySelector('.results h2').focus();
   };
 
+  const showNode = (node, focus = true) => {
+    renderVersion += 1;
+    currentNode = node;
+    fieldsets.forEach((fs) => { fs.hidden = true; });
+    if (node.type === 'result') {
+      showResults(node.url, renderVersion);
+      return;
+    }
+
+    widget.dataset.stage = 'quiz';
+    const { questionIndex, options } = node;
+    const fieldset = fieldsets[questionIndex];
+    fieldset.hidden = false;
+    fieldset.querySelectorAll('input').forEach((input) => {
+      input.checked = false;
+      input.closest('label').hidden = true;
+    });
+    options.forEach(({ answerIndex }) => {
+      const input = fieldset.querySelector(`input[data-answer-index="${answerIndex}"]`);
+      input.closest('label').hidden = false;
+    });
+    if (pendingSelection !== null) {
+      const input = fieldset.querySelector(`input[data-answer-index="${pendingSelection}"]`);
+      const optionIsAvailable = options.some(
+        ({ answerIndex }) => answerIndex === pendingSelection,
+      );
+      if (input && optionIsAvailable) input.checked = true;
+      pendingSelection = null;
+    }
+    if (focus) fieldset.focus();
+
+    const step = trail.length + 1;
+    progressEl.value = step - 1;
+    stepLabelEl.textContent = step;
+    prevBtn.hidden = trail.length === 0;
+    updateNext();
+  };
+
+  const restoreAnswers = (focus = true) => {
+    const params = new URL(window.location.href).searchParams;
+    trail = [];
+    pendingSelection = null;
+    let node = decisionTree;
+    while (node.type === 'question') {
+      const question = questions[node.questionIndex];
+      const answer = params.get(question.name);
+      if (answer === null) break;
+      const option = node.options.find(
+        ({ answerIndex }) => normalize(question.answers[answerIndex].label) === normalize(answer),
+      );
+      if (!option) break;
+      trail.push({ node, answerIndex: option.answerIndex });
+      node = option.child;
+    }
+    showNode(node, focus);
+  };
+
   nextBtn.addEventListener('click', () => {
-    if (currentStep === total) showResults();
-    else showStep(currentStep + 1);
+    const fieldset = fieldsets[currentNode.questionIndex];
+    const selected = fieldset.querySelector('input:checked');
+    const selectedIndex = selected ? Number(selected.dataset.answerIndex) : -1;
+    const option = currentNode.options.find(({ answerIndex }) => answerIndex === selectedIndex);
+    if (!option) return;
+    trail.push({ node: currentNode, answerIndex: selectedIndex });
+    pushAnswers();
+    showNode(option.child);
   });
 
-  prevBtn.addEventListener('click', () => showStep(currentStep - 1));
+  prevBtn.addEventListener('click', () => {
+    const previous = trail.pop();
+    if (!previous) return;
+    pendingSelection = previous.answerIndex;
+    pushAnswers();
+    showNode(previous.node);
+  });
 
   widget.querySelector('button[type="reset"]').addEventListener('click', () => {
     widget.querySelectorAll('input:checked').forEach((input) => { input.checked = false; });
+    trail = [];
+    pendingSelection = null;
+    pushAnswers();
     widget.dataset.stage = 'quiz';
-    showStep(1);
+    showNode(decisionTree);
   });
 
   widget.addEventListener('change', (e) => {
-    if (e.target.closest('fieldset')) updateNext();
+    if (e.target.closest('fieldset') && currentNode.type === 'question') {
+      updateNext();
+    }
   });
 
+  window.addEventListener('popstate', () => restoreAnswers());
+
   widget.dataset.stage = 'quiz';
-  showStep(1, false);
+  restoreAnswers(false);
 }
