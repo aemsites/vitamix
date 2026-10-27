@@ -1,228 +1,88 @@
-import { toClassName, createOptimizedPicture, fetchPlaceholders } from '../../scripts/aem.js';
-import { applyImgColor, getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { createOptimizedPicture } from '../../scripts/aem.js';
 
 /**
- * Sets multiple attributes on an element.
- * @param {HTMLElement} el - Element
- * @param {Object} attrs - Key-value pairs of attributes
- */
-function setAttributes(el, attrs) {
-  Object.entries(attrs).forEach(([attr, value]) => {
-    el.setAttribute(attr, value);
-  });
-}
-
-/**
- * Extracts hotspot configuration from block rows.
+ * Extracts feature content and percentage coordinates from block rows.
  * @param {Array<HTMLElement>} rows - Array of row elements
- * @returns {Array<Object>} Array of hotspot config objects
+ * @returns {Array<Object>} Array of feature config objects
  */
 function configureHotspots(rows) {
   const config = [];
   rows.forEach((row) => {
-    const [coords, popover] = row.children;
-    if (coords && popover) {
-      let title = '';
-      if (popover.querySelector('strong')) {
-        title = popover.querySelector('strong').textContent.trim();
-      } else {
-        title = popover.textContent.trim().split(' ').slice(0, 3).join(' ')
-          .trim();
-      }
-      const thisConfig = {
-        title,
-        id: toClassName(title),
-        popover: popover.innerHTML.trim(),
-      };
-      const [x, y] = coords.textContent.split(',').map((c) => parseInt(c, 10));
-      if (x && y) {
-        // include coordinates for positioned hotspots
-        config.push({ ...thisConfig, x, y });
-      } else config.push(thisConfig);
-    }
+    const [coords, content] = row.children;
+    const title = content && content.querySelector('p strong');
+    if (!coords || !title || !title.textContent.trim()) return;
+
+    const values = coords.textContent.trim().split(',');
+    const [x, y] = values.map((value) => Number(value.trim()));
+    const positioned = values.length === 2 && values.every((value) => value.trim())
+      && [x, y].every((value) => Number.isFinite(value) && value >= 0 && value <= 100);
+    config.push({ title, content, ...(positioned ? { x, y } : {}) });
   });
   return config;
 }
 
 /**
- * Positions hotspot buttons based on the current size of the SVG.
+ * Highlights a feature and its corresponding hotspot.
  * @param {HTMLElement} block - Block element
+ * @param {string} id - Feature ID
  */
-function positionHotspots(block) {
-  const wrapper = block.querySelector('.svg-wrapper');
-  const svg = wrapper.querySelector('svg');
-  const svgWidth = parseInt(svg.getAttribute('width'), 10);
-  const svgHeight = parseInt(svg.getAttribute('height'), 10);
-
-  // get current rendered size
-  const rect = svg.getBoundingClientRect();
-  const wrapperW = wrapper.clientWidth; // visible width
-  const isScaled = window.matchMedia('(min-width: 700px)').matches;
-  const offsetX = isScaled ? Math.max(0, (rect.width - wrapperW) / 2) : 0;
-
-  // calculate scale based on rendered vs. original size
-  const scaleX = rect.width / svgWidth;
-  const scaleY = rect.height / svgHeight;
-  const buttons = block.querySelectorAll('button[data-x][data-y]');
-  buttons.forEach((b) => {
-    const [x, y] = [b.dataset.x, b.dataset.y].map((coord) => parseInt(coord, 10));
-
-    // convert to current rendered pixels
-    const left = Math.round(x * scaleX - offsetX); // subtract crop
-    const top = Math.round(y * scaleY); // no vertical crop
-    b.style.top = `${top}px`;
-    b.style.left = `${left}px`;
+function selectHotspot(block, id) {
+  block.querySelectorAll('.features > li').forEach((feature) => {
+    feature.setAttribute('aria-current', feature.id === id);
+  });
+  block.querySelectorAll('button.hs').forEach((button) => {
+    button.setAttribute('aria-pressed', button.getAttribute('aria-controls') === id);
   });
 }
 
 /**
- * Arranges hotspots without coordinates into a staging grid for editing.
+ * Creates a numbered hotspot button for a positioned feature.
  * @param {HTMLElement} block - Block element
+ * @param {Object} feature - Feature config
+ * @param {number} index - Feature index
+ * @param {string} id - Feature ID
+ * @returns {HTMLButtonElement} Hotspot button
  */
-function stageInvalidHotspots(block) {
-  const svg = block.querySelector('svg');
-  const svgWidth = parseInt(svg.getAttribute('width'), 10);
-  const svgHeight = parseInt(svg.getAttribute('height'), 10);
-  const rect = svg.getBoundingClientRect();
-  const scaleX = rect.width / svgWidth;
-  const scaleY = rect.height / svgHeight;
+function buildHotspot(block, feature, index, id) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'hs';
+  button.dataset.x = feature.x;
+  button.dataset.y = feature.y;
+  button.style.left = `${feature.x}%`;
+  button.style.top = `${feature.y}%`;
+  button.setAttribute('aria-controls', id);
+  button.setAttribute('aria-label', feature.title.textContent.trim());
+  button.setAttribute('aria-pressed', false);
 
-  // define safe frame boundaries to keep hotspots visible and accessible (in rendered pixels)
-  const SAFE = {
-    left: 96,
-    right: rect.width - 96,
-    top: 32,
-    bottom: rect.height - 32,
+  const number = document.createElement('span');
+  number.textContent = index + 1;
+  number.setAttribute('aria-hidden', true);
+  button.append(number);
+
+  const select = () => {
+    if (block.dataset.editing !== 'true') selectHotspot(block, id);
   };
-
-  const BTN = 64; // touch target size (rendered px)
-  const GAP = 16; // spacing between buttons
-  const PAD = 4; // inner padding inside the safe frame
-  const STEP = BTN + GAP; // total space needed per button
-  const SHIFT = Math.round(STEP / 2); // stagger offset for odd columns
-
-  // rows that fit in a given column; odd columns lose space due to SHIFT
-  const usableHeight = Math.max(0, rect.height - (SAFE.top * 2));
-  const rowsForCol = (col) => {
-    const loss = (col % 2 === 1) ? SHIFT : 0;
-    return Math.max(1, Math.floor((usableHeight - loss) / STEP));
-  };
-
-  let col = 0;
-  let row = 0;
-
-  // wrap if needed based on this column's capacity
-  const nextPos = () => {
-    const capacity = rowsForCol(col);
-    if (row >= capacity) { row = 0; col += 1; }
-
-    const isOdd = col % 2 === 1;
-    const top = Math.round(SAFE.top + PAD + (isOdd ? SHIFT : 0) + row * STEP);
-    const left = Math.round(SAFE.left + PAD + col * STEP);
-
-    row += 1; // advance for next button
-    return { top, left };
-  };
-
-  block.querySelectorAll('button[data-x][data-y]').forEach((btn) => {
-    const [x, y] = [btn.dataset.x, btn.dataset.y].map((coord) => parseInt(coord, 10));
-
-    if (!x || !y) {
-      // stage buttons that don't have valid coordinates
-      const { top, left } = nextPos();
-      btn.style.top = `${top}px`;
-      btn.style.left = `${left}px`;
-      btn.setAttribute('data-unplaced', true);
-      btn.title = btn.getAttribute('aria-controls').split('-').join(' ').trim();
-    } else {
-      const pxX = x * scaleX;
-      const pxY = y * scaleY;
-      // mark buttons that are outside the safe frame
-      if (pxX < SAFE.left || pxX > SAFE.right || pxY < SAFE.top || pxY > SAFE.bottom) {
-        btn.setAttribute('data-unplaced', 'true');
-        btn.title = `${(btn.getAttribute('aria-controls').split('-').join(' ')).trim()} hotspot`;
-      }
-    }
+  button.addEventListener('mouseenter', () => {
+    if (window.matchMedia('(hover: hover)').matches) select();
   });
+  button.addEventListener('focus', select);
+  button.addEventListener('click', select);
+  return button;
 }
 
 /**
- * Creates hotspot button elements and adds them to block.
- * @param {HTMLElement} block - Block element
- * @param {Array<Object>} config - Array of hotspot config objects
+ * Copies percentage coordinates to the clipboard.
+ * @param {HTMLButtonElement} tooltip - Coordinate copy button
  */
-function buildHotspots(block, config) {
-  const svgWrapper = block.querySelector('.svg-wrapper');
-  config.forEach((c) => {
-    const button = document.createElement('button');
-    setAttributes(button, {
-      type: 'button',
-      class: 'button hs',
-      'data-x': c.x,
-      'data-y': c.y,
-      popovertarget: c.id,
-      'aria-controls': c.id,
-      'aria-label': `Toggle ${c.title} hotspot`,
-    });
-    button.innerHTML = '<i class="glyph glyph-plus"></i>';
-    svgWrapper.append(button);
-  });
-}
-
-/**
- * Positions a popover element relative to its associated button.
- * @param {HTMLElement} popover - Popover element
- * @param {HTMLElement} button - Associated button element
- */
-function positionPopover(popover, button) {
-  const rect = button.getBoundingClientRect();
-
-  // calculate horizontal center of the button
-  const cx = rect.left + (rect.width / 2);
-  // position at button's top edge (accounting for scroll)
-  const top = Math.round(rect.top + window.scrollY);
-  // center horizontally on button (accounting for scroll)
-  const left = Math.round(cx + window.scrollX);
-
-  popover.style.top = `${top}px`;
-  popover.style.left = `${left}px`;
-}
-
-/**
- * Creates popover elements for each hotspot and adds them to block.
- * @param {HTMLElement} block - Block element
- * @param {Array<Object>} config - Array of hotspot config objects
- */
-function buildPopovers(block, config) {
-  const svgWrapper = block.querySelector('.svg-wrapper');
-  config.forEach((c) => {
-    const popover = document.createElement('div');
-    setAttributes(popover, {
-      id: c.id,
-      popover: 'auto',
-    });
-    svgWrapper.append(popover);
-    // populate content dynamically on first toggle
-    popover.addEventListener('toggle', () => {
-      popover.innerHTML = c.popover;
-    }, { once: true });
-    const button = block.querySelector(`[popovertarget="${c.id}"]`);
-    popover.addEventListener('toggle', (e) => {
-      button.setAttribute('aria-expanded', e.newState === 'open');
-      // position popover relative to its button when opened
-      if (e.newState === 'open') positionPopover(popover, button);
-    });
-  });
-}
-
-/**
- * Copies coordinates to clipboard.
- * @param {HTMLElement} tooltip - Tooltip element
- */
-function copyCoords(tooltip) {
-  navigator.clipboard.writeText(tooltip.dataset.coords).catch(() => {});
-  tooltip.classList.add('copied');
-  setTimeout(() => tooltip.classList.remove('copied'), 3000);
+async function copyCoords(tooltip) {
+  try {
+    await navigator.clipboard.writeText(tooltip.dataset.coords);
+    tooltip.dataset.copied = true;
+    tooltip.textContent = `Copied ${tooltip.dataset.coords}`;
+  } catch {
+    tooltip.dataset.copied = false;
+  }
 }
 
 /**
@@ -230,252 +90,211 @@ function copyCoords(tooltip) {
  * @returns {boolean} `true` if editing enabled, `false` otherwise
  */
 function editingEnabled() {
-  // only enable editing on non-production domains
   const editable = ['.page', '.live', '.network'];
   const { hostname, searchParams } = new URL(window.location.href);
   if (hostname === 'localhost') return true;
-  return editable.some((e) => hostname.endsWith(e)) && searchParams.get('edit') === 'hotspot';
+  return editable.some((domain) => hostname.endsWith(domain)) && searchParams.get('edit') === 'hotspot';
 }
 
 /**
- * Enables editing mode for hotspot positioning.
+ * Enables drag positioning and copying percentage coordinates in preview.
  * @param {HTMLElement} block - Block element
  */
 function enableEditing(block) {
-  const svgWrapper = block.querySelector('.svg-wrapper');
-  stageInvalidHotspots(block);
+  const wrapper = block.querySelector('.img-wrapper');
+  const hotspots = wrapper.querySelector('.hotspots');
+  const tooltip = document.createElement('button');
+  tooltip.type = 'button';
+  tooltip.className = 'tooltip';
+  tooltip.hidden = true;
+  tooltip.setAttribute('aria-label', 'Copy hotspot coordinates');
+  tooltip.addEventListener('click', () => copyCoords(tooltip));
 
-  // create live coordinates tooltip
-  const tooltip = document.createElement('div');
-  setAttributes(tooltip, {
-    class: 'tooltip',
-    role: 'button',
-    tabIndex: -1,
-    'aria-hidden': true,
-  });
-  svgWrapper.prepend(tooltip);
-  tooltip.addEventListener('click', () => {
-    copyCoords(tooltip);
-  });
-
-  // create editing mode toggle button
   const toggle = document.createElement('button');
-  setAttributes(toggle, {
-    type: 'button',
-    class: 'button edit',
-    'aria-label': 'Toggle editing mode',
-    'aria-pressed': false,
-  });
+  toggle.type = 'button';
+  toggle.className = 'button edit';
   toggle.textContent = 'Edit Hotspots';
-  block.prepend(toggle);
+  toggle.setAttribute('aria-pressed', false);
   toggle.addEventListener('click', () => {
-    const pressed = toggle.getAttribute('aria-pressed') === 'true';
-    toggle.setAttribute('aria-pressed', !pressed);
-    block.dataset.editing = !pressed;
-    tooltip.setAttribute('aria-hidden', true);
-    toggle.textContent = pressed ? 'Edit Hotspots' : 'Editing Hotspots';
+    const editing = toggle.getAttribute('aria-pressed') !== 'true';
+    toggle.setAttribute('aria-pressed', editing);
+    block.dataset.editing = editing;
+    tooltip.hidden = true;
+    toggle.textContent = editing ? 'Editing Hotspots' : 'Edit Hotspots';
   });
+  wrapper.append(toggle, tooltip);
 
-  const svg = block.querySelector('svg');
-  const svgWidth = parseInt(svg.getAttribute('width'), 10);
-  const svgHeight = parseInt(svg.getAttribute('height'), 10);
+  let dragging = null;
+  const move = (event) => {
+    if (!dragging || event.pointerId !== dragging.pointerId) return;
+    const { button } = dragging;
+    const rect = wrapper.getBoundingClientRect();
+    const imageRect = hotspots.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
 
-  let dragging = null; // the button being dragged
+    const halfWidth = Math.min(button.offsetWidth / 2, rect.width / 2);
+    const halfHeight = Math.min(button.offsetHeight / 2, rect.height / 2);
+    const x = Math.max(halfWidth, Math.min(rect.width - halfWidth, event.clientX - rect.left));
+    const y = Math.max(halfHeight, Math.min(rect.height - halfHeight, event.clientY - rect.top));
+    button.dataset.x = Math.round(((rect.left + x - imageRect.left) / imageRect.width) * 1000) / 10;
+    button.dataset.y = Math.round(((rect.top + y - imageRect.top) / imageRect.height) * 1000) / 10;
+    button.style.left = `${button.dataset.x}%`;
+    button.style.top = `${button.dataset.y}%`;
+    tooltip.dataset.coords = `${button.dataset.x},${button.dataset.y}`;
+    tooltip.textContent = tooltip.dataset.coords;
+    tooltip.dataset.copied = false;
+    tooltip.hidden = false;
+  };
 
-  // start dragging when pointer is pressed on a hotspot button
-  block.addEventListener('pointerdown', (e) => {
-    const editing = block.dataset.editing === 'true';
-    if (!editing) return;
-
-    const clicked = e.target.closest('[popovertarget]');
-    if (!clicked) return;
-
-    // capture all pointer events to this button during drag
-    clicked.setPointerCapture(e.pointerId);
-    clicked.setAttribute('aria-dragging', true);
-    dragging = clicked;
-    tooltip.setAttribute('aria-hidden', true);
-  });
-
-  // update position as pointer moves
-  block.addEventListener('pointermove', (e) => {
-    if (!dragging) return;
-
-    const open = block.querySelector('[popover]:popover-open');
-    if (open) open.hidePopover();
-
-    const rect = svg.getBoundingClientRect();
-    // define safe frame to keep hotspots visible and accessible
-    const SAFE = {
-      left: 96,
-      right: rect.width - 96,
-      top: 32,
-      bottom: rect.height - 32,
-    };
-    // utility to constrain value within min/max bounds
-    const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
-
-    // calculate pointer position relative to SVG element
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const xClamped = clamp(Math.round(x), SAFE.left, SAFE.right);
-    const yClamped = clamp(Math.round(y), SAFE.top, SAFE.bottom);
-
-    // position button under pointer, clamped to safe frame boundaries
-    dragging.style.top = `${yClamped}px`;
-    dragging.style.left = `${xClamped}px`;
-
-    // update coordinates tooltip display
-    const ttx = Math.round((xClamped / rect.width) * svgWidth);
-    const tty = Math.round((yClamped / rect.height) * svgHeight);
-    tooltip.setAttribute('aria-hidden', false);
-    tooltip.textContent = `${ttx},${tty}`;
-    tooltip.style.left = `${xClamped + 32}px`; // offset tooltip slightly
-    tooltip.style.top = `${yClamped - 12}px`;
-  });
-
-  // finalize position when pointer is released
-  block.addEventListener('pointerup', (e) => {
-    if (!dragging) return;
-
-    // get current rendered position (in screen pixels)
-    const renderedX = parseInt(dragging.style.left, 10);
-    const renderedY = parseInt(dragging.style.top, 10);
-
-    // convert rendered position back to SVG coordinate space
-    const rect = svg.getBoundingClientRect();
-    const svgX = Math.round((renderedX / rect.width) * svgWidth);
-    const svgY = Math.round((renderedY / rect.height) * svgHeight);
-    dragging.dataset.x = svgX;
-    dragging.dataset.y = svgY;
-    tooltip.dataset.coords = `${svgX},${svgY}`;
-
-    copyCoords(tooltip);
-
-    // clean up drag state
-    dragging.releasePointerCapture?.(e.pointerId);
-    dragging.removeAttribute('aria-dragging');
-    dragging.setAttribute('data-unplaced', 'false');
+  const finish = (event, cancelled = false) => {
+    if (!dragging || event.pointerId !== dragging.pointerId) return;
+    const { button, x, y } = dragging;
+    if (cancelled) {
+      button.dataset.x = x;
+      button.dataset.y = y;
+      button.style.left = `${x}%`;
+      button.style.top = `${y}%`;
+      tooltip.hidden = true;
+    } else {
+      move(event);
+      copyCoords(tooltip);
+    }
     dragging = null;
+    delete button.dataset.dragging;
+    if (button.hasPointerCapture(event.pointerId)) button.releasePointerCapture(event.pointerId);
+  };
+
+  wrapper.addEventListener('pointerdown', (event) => {
+    if (block.dataset.editing !== 'true' || dragging || event.button !== 0) return;
+    const button = event.target.closest('button.hs');
+    if (!button) return;
+    event.preventDefault();
+    dragging = {
+      button, pointerId: event.pointerId, x: button.dataset.x, y: button.dataset.y,
+    };
+    button.dataset.dragging = true;
+    button.setPointerCapture(event.pointerId);
+    move(event);
   });
+  wrapper.addEventListener('pointermove', move);
+  wrapper.addEventListener('pointerup', (event) => finish(event));
+  wrapper.addEventListener('pointercancel', (event) => finish(event, true));
+  wrapper.addEventListener('lostpointercapture', (event) => finish(event, true));
 }
 
 /**
- * Activates the hotspot "explore" mode.
- * @param {HTMLElement} block - Block element
- * @param {HTMLButtonElement} button - Expand button
- * @param {Object} ph - Placeholders object
+ * Builds the image wrapper and its crop-aware hotspot layer.
+ * @param {HTMLImageElement} img - Authored image
+ * @returns {HTMLElement} Image wrapper
  */
-function toggleExplore(block, button, ph) {
-  block.dataset.explore = true;
-  button.disabled = true;
-  button.textContent = ph.swipeToExplore || 'Swipe to Explore';
-  const svgWrapper = block.querySelector('.svg-wrapper');
-  svgWrapper.scrollTo({
-    left: (svgWrapper.scrollWidth / 2) - (svgWrapper.clientWidth / 2),
-    behavior: 'smooth',
+function decorateImage(img) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'img-wrapper';
+  const picture = createOptimizedPicture(img.src, img.alt, img.loading === 'eager');
+  const optimizedImg = picture.querySelector('img');
+  ['width', 'height'].forEach((attribute) => {
+    if (img.hasAttribute(attribute)) {
+      optimizedImg.setAttribute(attribute, img.getAttribute(attribute));
+    }
   });
-  svgWrapper.addEventListener('scroll', () => {
-    button.style.left = `calc(1ch + ${svgWrapper.scrollLeft}px)`;
+  wrapper.append(picture);
+  const hotspots = document.createElement('div');
+  hotspots.className = 'hotspots';
+  wrapper.append(hotspots);
+  const setImageRatio = () => {
+    const width = optimizedImg.naturalWidth || Number(img.getAttribute('width'));
+    const height = optimizedImg.naturalHeight || Number(img.getAttribute('height'));
+    if (width && height) wrapper.style.setProperty('--image-ratio', width / height);
+  };
+  setImageRatio();
+  optimizedImg.addEventListener('load', setImageRatio);
+  const resize = new ResizeObserver(([entry]) => {
+    const { width, height } = entry.contentRect;
+    if (width && height) wrapper.style.setProperty('--frame-ratio', width / height);
   });
+  resize.observe(wrapper);
+  return wrapper;
 }
 
 /**
- * Builds and prepends the "Click to Explore" button for mobile
- * @param {HTMLElement} block - Block element
+ * Moves introduction content into a caption and decorates its eyebrow.
+ * @param {HTMLElement} introCell - Authored introduction cell
+ * @returns {HTMLElement} Caption element
  */
-async function buildExpand(block) {
-  const { locale, language } = getLocaleAndLanguage();
-  const ph = await fetchPlaceholders(`/${locale}/${language}`);
+function decorateCaption(cell) {
+  const caption = document.createElement('div');
+  caption.className = 'caption';
+  if (cell) caption.append(...cell.childNodes);
+  const heading = caption.querySelector('h1, h2, h3, h4, h5, h6');
+  const eyebrow = heading && heading.previousElementSibling;
+  if (eyebrow && eyebrow.tagName === 'P' && !eyebrow.querySelector('img, a[href]')) {
+    eyebrow.classList.add('eyebrow');
+    heading.dataset.eyebrow = eyebrow.textContent.trim();
+  }
+  return caption;
+}
 
-  const svgWrapper = block.querySelector('.svg-wrapper');
-  const button = document.createElement('button');
-  setAttributes(button, {
-    type: 'button',
-    class: 'button expand',
+/**
+ * Builds the feature list and its corresponding hotspot buttons.
+ * @param {HTMLElement} block - Block element
+ * @param {Array<HTMLElement>} rows - Authored feature rows
+ * @param {HTMLElement} hotspots - Hotspot positioning layer
+ * @param {boolean} editable - Whether position editing is available
+ * @param {HTMLElement} caption - Decorated caption
+ * @returns {HTMLOListElement} Feature list
+ */
+function decorateFeatures(block, rows, hotspots, editable, caption) {
+  const config = configureHotspots(rows);
+  const heading = caption.querySelector('h1, h2, h3, h4, h5, h6');
+  const headingLevel = heading ? Number(heading.tagName.slice(1)) + 1 : 7;
+  const features = document.createElement('ol');
+  features.className = 'features';
+  const instance = [...document.querySelectorAll('.hotspot')].indexOf(block) + 1;
+  config.forEach((feature, i) => {
+    const item = document.createElement('li');
+    item.id = `hotspot-${instance}-feature-${i + 1}`;
+    const select = () => {
+      if (block.dataset.editing !== 'true') selectHotspot(block, item.id);
+    };
+    item.addEventListener('mouseenter', () => {
+      if (window.matchMedia('(hover: hover)').matches) select();
+    });
+    item.addEventListener('click', select);
+    if (editable && feature.x === undefined) {
+      feature.x = 50;
+      feature.y = ((i + 1) / (config.length + 1)) * 100;
+    }
+    if (feature.x !== undefined) hotspots.append(buildHotspot(block, feature, i, item.id));
+
+    const title = document.createElement(headingLevel <= 6 ? `h${headingLevel}` : 'p');
+    title.className = 'feature-title';
+    if (headingLevel > 6) {
+      title.setAttribute('role', 'heading');
+      title.setAttribute('aria-level', headingLevel);
+    }
+    title.append(...feature.title.childNodes);
+    feature.title.closest('p').remove();
+    const content = document.createElement('div');
+    content.append(title, ...feature.content.childNodes);
+    item.append(content);
+    features.append(item);
   });
-  button.textContent = ph.clickToExplore || 'Click to Explore';
-  button.addEventListener('click', () => {
-    toggleExplore(block, button, ph);
-  });
-  svgWrapper.prepend(button);
+  return features;
 }
 
 export default function decorate(block) {
-  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const [background, ...rows] = block.children;
+  const [imageCell, introCell] = background ? background.children : [];
+  const img = imageCell && imageCell.querySelector('img');
+  if (!img) return;
 
-  const hotspots = [...block.children];
-  const bg = hotspots.shift();
-  const [imgWrapper, caption] = bg.children;
+  const editable = editingEnabled();
+  const wrapper = decorateImage(img);
+  const caption = decorateCaption(introCell);
+  const features = decorateFeatures(block, rows, wrapper.querySelector('.hotspots'), editable, caption);
 
-  const config = configureHotspots(hotspots);
-
-  // wrap image in svg to enable absolute positioning of hotspots
-  if (imgWrapper) {
-    const img = imgWrapper.querySelector('img[src]');
-    const { width, height } = img;
-    const svg = document.createElementNS(SVG_NS, 'svg');
-    setAttributes(svg, {
-      width,
-      height,
-      viewBox: `0 0 ${width} ${height}`,
-    });
-    const svgWrapper = document.createElement('div');
-    svgWrapper.className = 'svg-wrapper';
-    svgWrapper.append(svg);
-
-    // create optimized image element within SVG
-    const image = document.createElementNS(SVG_NS, 'image');
-    const picture = createOptimizedPicture(img.src, '', false, [{ width: '2000' }]);
-    setAttributes(image, {
-      href: picture.querySelector('img').src,
-      x: 0,
-      y: 0,
-      width,
-      height,
-    });
-    svg.appendChild(image);
-
-    if (caption && caption.textContent.trim()) {
-      applyImgColor(block);
-      caption.classList.add('caption');
-      block.replaceChildren(caption, svgWrapper);
-    } else {
-      block.replaceChildren(svgWrapper);
-    }
-  }
-
-  // build and position hotspots
-  if (imgWrapper && config.length > 0) {
-    const resize = new ResizeObserver(() => {
-      const rect = block.getBoundingClientRect();
-
-      // only initialize and position when block is visible
-      if (rect.width > 0) {
-        if (!block.dataset.hotspots) {
-          buildHotspots(block, config);
-          block.dataset.hotspots = true;
-          buildPopovers(block, config);
-          buildExpand(block);
-          if (editingEnabled()) enableEditing(block);
-        }
-
-        // update hotspot positions on every resize
-        positionHotspots(block);
-
-        if (block.dataset.explore === 'true' && window.matchMedia('(min-width: 700px)').matches) {
-          const wrapper = block.querySelector('.svg-wrapper');
-          wrapper.scrollTo({ left: 0, behavior: 'smooth' });
-        }
-
-        // reposition any open popover to stay aligned with its button
-        const openPopover = block.querySelector('[popover]:popover-open');
-        if (openPopover) {
-          const button = block.querySelector(`[popovertarget="${openPopover.id}"]`);
-          positionPopover(openPopover, button);
-        }
-      }
-    });
-    resize.observe(block);
-  }
+  block.replaceChildren(wrapper, features);
+  if (caption.textContent.trim()) block.prepend(caption);
+  if (features.firstElementChild) selectHotspot(block, features.firstElementChild.id);
+  if (editable && wrapper.querySelector('button.hs')) enableEditing(block);
 }

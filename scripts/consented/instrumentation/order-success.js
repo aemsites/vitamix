@@ -168,7 +168,7 @@ export function buildOrderSuccessProductString(items = []) {
     .filter(shouldTrackPurchaseLine)
     .map(normalizePurchaseLineItem)
     .filter(Boolean)
-    .map((item) => buildCheckoutProductLine(item.name, item.qty, item.unitPrice));
+    .map((item) => buildCheckoutProductLine(item.name, item.qty, item.unitPrice, item.color));
   return buildCheckoutProductId(lines);
 }
 

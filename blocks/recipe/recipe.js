@@ -446,6 +446,8 @@ export default async function decorate(block) {
 
         if (nutritionSection) {
           nutritionSection.parentElement.insertBefore(containerSection, nutritionSection);
+        } else {
+          recipeToolbar.after(containerSection);
         }
       }
     } catch (error) {

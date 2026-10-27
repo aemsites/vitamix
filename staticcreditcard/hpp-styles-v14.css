@@ -1,0 +1,120 @@
+#header {
+	background-color: #fafafa;
+}
+#header img {
+	display: block;
+	margin: 0 auto;
+	padding-top: 20px;
+	width: 200px;
+}
+.page-container {
+    background-color: #fafafa;
+}
+.steps {
+    max-width: 400px;
+    margin: 0 auto 20px;
+    text-align: center;
+}
+@media (min-width: 1025px) {
+	.steps {
+		max-width: 600px;
+	}
+}
+div table {
+    border-collapse: collapse;
+    margin: 0 auto;
+    max-width: 300px;
+	table-layout: fixed
+}
+table tr {
+	display: block;
+	margin-bottom: 20px
+}
+table td {
+	overflow: auto;
+	display: table;
+	width: 300px!important
+}
+table label {
+	display: inline;
+}
+table select {
+	display: inline;
+}
+table input {
+	color: #707372;
+	padding: 4px 8px;
+	width: 100%
+}
+table #cresecure_cc_expires_month {
+	margin-right: 10px
+}
+table #cancelButton {
+	background-color: transparent;
+	border: 1px solid #333f48;
+	color: #333f48;
+	display: block;
+	font-size: 14px;
+	font-weight: 500;
+	max-width: 300px;
+	padding: 9px 20px;
+	text-align: center;
+	transition: all .2s ease;
+	white-space: normal;
+	width: 100%
+}
+table .submitButton {
+	background-color: #333f48;
+	border: 1px solid #333f48;
+	color: #fff;
+	display: block;
+	font-size: 14px;
+	font-weight: 500;
+	max-width: 300px;
+	padding: 9px 20px;
+	text-align: center;
+	transition: all .2s ease;
+	white-space: normal;
+	width: 100%
+}
+td[height] {
+	background-color: transparent
+}
+#paymentButtons td[height] {
+	height: 20px
+}
+.total_amount {
+    text-align: center;
+    border: 2px solid #c6d3dc;
+    background-color: #DBE9F3;
+	margin: 0 auto;
+	max-width: 300px;
+    padding: 5px;
+}
+.total_amount label {
+    font-size: 15px;
+    font-weight: bold;
+}
+.total_amount input {
+    background-color: #DBE9F3;
+    border: none;
+    color: #383838;
+    cursor: default;
+    display: block;
+    font-size: 22px;
+    font-weight: bold;
+    margin: 0 auto;
+    max-width: 300px;
+    padding: 4px 8px;
+    pointer-events: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    text-align: center;
+    width: 100%;
+}
+.error_message {
+    background-color: transparent !important;
+    color: #e11f3b !important;
+}

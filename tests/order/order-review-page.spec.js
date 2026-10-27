@@ -219,6 +219,112 @@ test.describe('Order review page (display-only)', () => {
     });
   });
 
+  test.describe('Line item layout', () => {
+    // A long product name is the worst case for the item column.
+    const LONG_NAME_ORDER = {
+      ...MOCK_ORDER,
+      items: [
+        {
+          sku: 'silicone-blender-spatula',
+          name: 'Silicone Blender Spatula',
+          quantity: 1,
+          price: { final: 19.95 },
+        },
+        {
+          sku: 'ascent-x5-smart-blender',
+          name: 'Ascent® X5 Smart Blender with Programs',
+          quantity: 2,
+          price: { final: 1049.95 },
+        },
+      ],
+    };
+
+    // Returns a description of every pair of boxes that intersect on a line item row.
+    // The item name is measured with a Range so text that overflows a collapsed
+    // grid column is still counted (its element box would be ~0px wide).
+    const findOverlaps = (page) => page.evaluate(() => {
+      const box = (rect) => ({
+        left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
+      });
+      const overlap = (a, b) => a.left < b.right - 0.5 && b.left < a.right - 0.5
+        && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
+      const problems = [];
+      document.querySelectorAll('.order-review-item:not(.order-review-item-head)').forEach((row, i) => {
+        const name = row.querySelector('.order-review-item-name');
+        const range = document.createRange();
+        range.selectNodeContents(name);
+        const cells = {
+          name: box(range.getBoundingClientRect()),
+          price: box(row.querySelector('.order-review-col-price').getBoundingClientRect()),
+          qty: box(row.querySelector('.order-review-col-qty').getBoundingClientRect()),
+          subtotal: box(row.querySelector('.order-review-col-subtotal').getBoundingClientRect()),
+        };
+        const keys = Object.keys(cells);
+        keys.forEach((a, ai) => keys.slice(ai + 1).forEach((b) => {
+          if (overlap(cells[a], cells[b])) problems.push(`row ${i}: ${a} overlaps ${b}`);
+        }));
+      });
+      const card = document.querySelector('.order-review-items');
+      if (card.scrollWidth > card.clientWidth) problems.push('items card overflows horizontally');
+      return problems;
+    });
+
+    // 390 = phone; 960 = two-column layout where the main column is narrow too;
+    // 1280 = desktop with the full four-column row.
+    [390, 960, 1280].forEach((width) => {
+      test(`line items do not overlap at ${width}px wide`, async ({ page }) => {
+        await setupReviewMocks(page, {
+          getOrder: async (route) => {
+            if (route.request().method() !== 'GET') { await route.continue(); return; }
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({ order: LONG_NAME_ORDER }),
+            });
+          },
+        });
+        await page.setViewportSize({ width, height: 900 });
+        await gotoReview(page, baseUrl);
+
+        await expect(page.locator('.order-review-items')).toBeVisible({ timeout: 15000 });
+        await expect(page.locator('.order-review-item:not(.order-review-item-head)')).toHaveCount(2);
+        expect(await findOverlaps(page)).toEqual([]);
+        console.log(`✓ No line item overlap at ${width}px`);
+      });
+    });
+
+    test('narrow card swaps the column header for per-cell labels', async ({ page }) => {
+      await setupReviewMocks(page);
+      await page.setViewportSize({ width: 390, height: 900 });
+      await gotoReview(page, baseUrl);
+
+      await expect(page.locator('.order-review-items')).toBeVisible({ timeout: 15000 });
+      await expect(page.locator('.order-review-item-head')).toBeHidden();
+      const row = page.locator('.order-review-item:not(.order-review-item-head)').first();
+      await expect(row.locator('.order-review-col-price')).toHaveAttribute('data-label', 'Price');
+      await expect(row.locator('.order-review-col-qty')).toHaveAttribute('data-label', 'Qty');
+      await expect(row.locator('.order-review-col-subtotal')).toHaveAttribute('data-label', 'Subtotal');
+      const label = await row.locator('.order-review-col-price')
+        .evaluate((node) => getComputedStyle(node, '::before').content);
+      expect(label).toBe('"Price"');
+      console.log('✓ Narrow card shows per-cell labels instead of the header');
+    });
+
+    test('wide card keeps the column header and hides per-cell labels', async ({ page }) => {
+      await setupReviewMocks(page);
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await gotoReview(page, baseUrl);
+
+      await expect(page.locator('.order-review-items')).toBeVisible({ timeout: 15000 });
+      await expect(page.locator('.order-review-item-head')).toBeVisible();
+      const row = page.locator('.order-review-item:not(.order-review-item-head)').first();
+      const label = await row.locator('.order-review-col-price')
+        .evaluate((node) => getComputedStyle(node, '::before').content);
+      expect(label).toBe('none');
+      console.log('✓ Wide card keeps the column header');
+    });
+  });
+
   test.describe('Actions', () => {
     test('Complete order → confirm endpoint (with idempotencyKey) → order-complete', async ({ page }) => {
       let confirmBody = null;

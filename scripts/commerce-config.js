@@ -1,13 +1,11 @@
 const { hostname } = window.location;
 
 function resolveApiOrigin(org, site) {
-  const isProduction = !hostname.endsWith('.aem.page')
-    && !hostname.endsWith('.aem.live')
-    && !hostname.endsWith('.aem.network')
-    && hostname !== 'localhost'
-    && !hostname.startsWith('127.')
-    && !hostname.startsWith('integration.')
-    && !hostname.startsWith('uat.');
+  // Production is only the canonical apex/www host, the same rule as isProdHost in
+  // scripts.js. Every other host (uat/test/integration subdomains, aem.page/live/network
+  // previews, localhost) uses the stage API, so API routing always agrees with the
+  // environment-specific public keys (PayPal client ID, reCAPTCHA, Affirm).
+  const isProduction = hostname === 'www.vitamix.com' || hostname === 'vitamix.com';
   const base = isProduction
     ? 'https://api.adobecommerce.live'
     : 'https://api-stage.adobecommerce.live';

@@ -385,6 +385,23 @@
   color: var(--commerce-color-error);
 }
 
+/* Affiliate code that does not discount the cart */
+.coupon-pill-ineligible {
+  background: var(--commerce-color-warning-bg);
+  border-color: var(--commerce-color-warning-border);
+}
+
+.coupon-notice {
+  flex-basis: 100%;
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--commerce-color-warning-bg);
+  border: 1px solid var(--commerce-color-warning-border);
+  border-radius: var(--commerce-radius-badge);
+  color: var(--commerce-color-warning);
+  font-size: var(--commerce-font-size-sm);
+}
+
 /* Per-code rejection feedback from couponStatus */
 .coupon-status {
   flex-basis: 100%;

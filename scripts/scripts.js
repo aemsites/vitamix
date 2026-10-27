@@ -58,7 +58,7 @@ function registerErrorLogging() {
 // Locale+language pairs enabled for edge checkout.
 // Format: '<locale>/<language>' (e.g., 'ca/fr_ca'). Add pairs as each region goes live.
 // Keep this empty to use Adobe Commerce by default in every environment.
-const EDGE_CHECKOUT_LOCALES = ['ca/fr_ca', 'ca/en_us'];
+const EDGE_CHECKOUT_LOCALES = ['ca/fr_ca', 'ca/en_us', 'us/en_us'];
 export const EDGE_CHECKOUT_OVERRIDE_STORAGE_KEY = 'edgeCheckout';
 
 /**
@@ -107,10 +107,21 @@ export const FORMS_ENDPOINT = isProdHost
   ? ''
   : 'https://main--vitamix--aemsites.aem.network';
 
+// Public PayPal REST client IDs per environment. The PayPal SDK derives its environment
+// from the ID (a sandbox ID opens www.sandbox.paypal.com), so each ID must belong to the
+// same PayPal REST app as the clientId/clientSecret the Commerce API uses for that
+// environment. Production is only the canonical host (see isProdHost).
 const PAYPAL_CLIENT_IDS = {
-  us: 'AaBQdCVqIp15uFQaHrJmTUDBZ-xJrOYPs99NtZ-iLN5oij-ustZq304ikTHJKwqqSL4yN0v9GLireQLN',
-  ca: 'AVlGkhsI0_EFNFx8jnRsv0dSROcLzzLYtTdMoNieyjZeAWlIXdFpocB6eyhHvuDOZ3F2YFmQDkLE03Rp',
+  production: {
+    us: 'AXEZkJYX0uhAkORSHXQZpFbuGcZavyp13sVXuZKuL0OE2Ogtg-YXPftgHw8EUpSRW6xbdFzb9bJFihdE',
+    ca: 'Adh1NWHQFx0BRj-GC_mtv1qLLk9UGao-NWmxL4Qa-bG_jq69vahZHZzhp6QNfCi5m_LpbjDv4lSjOBfu',
+  },
+  sandbox: {
+    us: 'AaBQdCVqIp15uFQaHrJmTUDBZ-xJrOYPs99NtZ-iLN5oij-ustZq304ikTHJKwqqSL4yN0v9GLireQLN',
+    ca: 'AVlGkhsI0_EFNFx8jnRsv0dSROcLzzLYtTdMoNieyjZeAWlIXdFpocB6eyhHvuDOZ3F2YFmQDkLE03Rp',
+  },
 };
+const paypalClientIds = PAYPAL_CLIENT_IDS[isProdHost ? 'production' : 'sandbox'];
 const siteLocale = window.location.pathname.split('/').filter(Boolean)[0] || 'us';
 
 window.CommerceConfig = {
@@ -121,7 +132,7 @@ window.CommerceConfig = {
     '/scripts/cart-compatibility.js',
   ],
   paypal: {
-    clientId: PAYPAL_CLIENT_IDS[siteLocale] ?? PAYPAL_CLIENT_IDS.us,
+    clientId: paypalClientIds[siteLocale] ?? paypalClientIds.us,
     intent: 'authorize',
     orderReview: { express: true, checkout: true },
   },
@@ -330,7 +341,12 @@ export function getCookies() {
   return cookieMap;
 }
 
+let affiliateCouponHandled = false;
+
 function setAffiliateCoupon() {
+  // decorateMain also runs for fragments; handle the URL params once per page.
+  if (affiliateCouponHandled) return;
+  affiliateCouponHandled = true;
   const urlParams = new URLSearchParams(window.location.search);
   const { cjdata, cjevent, COUPON } = Object.fromEntries(urlParams);
 
@@ -1274,17 +1290,24 @@ export async function loggedFetch(input, init) {
         try {
           data = JSON.parse(text);
         } catch { /* noop */ }
+        // Sanitize diagnostic copies only; the actual request keeps its credentials.
         let requestBody = init?.body;
         try {
-          requestBody = JSON.parse(requestBody);
+          requestBody = JSON.parse(requestBody, (key, value) => (
+            key === 'paypalSessionToken' ? '[REDACTED]' : value
+          ));
         } catch { /* noop */ }
+        const requestHeaders = {};
+        new Headers(init?.headers).forEach((value, name) => {
+          requestHeaders[name] = name === 'authorization' ? '[REDACTED]' : value;
+        });
 
         /* eslint-disable no-console */
         console.group(`Error response from: ${input.toString()}`);
         console.error(JSON.stringify({
           status: response.status,
           method: init?.method ?? 'GET',
-          requestHeaders: init?.headers,
+          requestHeaders,
           requestBody,
           responseBody: data,
           xError,
@@ -2088,7 +2111,13 @@ async function checkSchedule() {
 async function loadEager(doc) {
   registerErrorLogging();
   const { locale, language } = getLocaleAndLanguage();
-  document.documentElement.lang = language ? language.split('_')[0] : 'en';
+  if (getMetadata('visibility').trim().toLowerCase() === 'embargoed') {
+    const { default: checkEmbargoGate } = await import('./embargo-gate.js');
+    await checkEmbargoGate(`/${locale}/${language}`);
+  }
+  const lang = language.split('_')[0];
+  // VR (the international store) is not a country, so its lang has no region.
+  document.documentElement.lang = locale === 'vr' ? lang : `${lang}-${locale.toUpperCase()}`;
 
   const localeKey = `${locale}/${language}`;
   // Edge checkout is enabled only for locale+language pairs in EDGE_CHECKOUT_LOCALES.

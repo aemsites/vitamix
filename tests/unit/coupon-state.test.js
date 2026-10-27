@@ -14,9 +14,16 @@ import {
   setAffiliateCode,
   getAffiliateCode,
   clearAffiliateCode,
+  isAffiliateCode,
+  updateAffiliateStatus,
+  isAffiliateIneligible,
+  getCouponErrorCode,
 } from '../../scripts/commerce/coupon-state.js';
 
-beforeEach(() => globalThis.__resetTestState());
+beforeEach(() => {
+  globalThis.__resetTestState();
+  clearAffiliateCode();
+});
 
 test('setCoupons de-duplicates case-insensitively, keeping the first occurrence', () => {
   const stored = setCoupons([
@@ -133,18 +140,98 @@ test('getStatusMessage maps rejected statuses and is empty for applied', () => {
   assert.equal(getStatusMessage('applied', strings), '');
 });
 
-test('affiliate code is kept when the coupon list is cleared', () => {
+test('the affiliate coupon stays in the list when coupons are cleared or removed', () => {
   addCoupon('06-AFFILIATE', 'auto');
   setAffiliateCode(' 06-AFFILIATE ');
   clearCoupons();
-  assert.deepEqual(getCoupons(), []);
-  assert.equal(getAffiliateCode(), '06-AFFILIATE');
+  assert.deepEqual(getCoupons(), [{ code: '06-AFFILIATE', source: 'auto' }]);
+  removeCoupon('06-AFFILIATE');
+  assert.deepEqual(getCoupons(), [{ code: '06-AFFILIATE', source: 'auto' }]);
   clearAffiliateCode();
   assert.equal(getAffiliateCode(), '');
+  assert.deepEqual(getCoupons(), []);
 });
 
 test('setAffiliateCode ignores blank codes', () => {
   setAffiliateCode('06-FIRST');
   setAffiliateCode('  ');
   assert.equal(getAffiliateCode(), '06-FIRST');
+});
+
+test('getCouponErrorCode maps API error codes to coupon rejection codes', () => {
+  assert.equal(
+    getCouponErrorCode({ body: { code: 'ADOBE_COMMERCE_COUPON_PRODUCT_NOT_ELIGIBLE' }, errorHeader: 'coupon not applicable' }),
+    'coupon_product_not_eligible',
+  );
+  assert.equal(getCouponErrorCode({ code: 'ADOBE_COMMERCE_COUPON_EXPIRED' }), 'coupon_expired');
+  assert.equal(getCouponErrorCode({ errorHeader: 'coupon_not_found' }), 'coupon_not_found');
+});
+
+test('getCouponErrorCode returns null for non-coupon failures', () => {
+  assert.equal(getCouponErrorCode(new Error('fetch failed')), null);
+  assert.equal(getCouponErrorCode({ status: 500, body: { code: 'ADOBE_COMMERCE_INTERNAL' } }), null);
+  assert.equal(getCouponErrorCode({ status: 401, body: { code: 'ADOBE_COMMERCE_UNAUTHORIZED' } }), null);
+  assert.equal(getCouponErrorCode({ errorHeader: 'unauthorized' }), null);
+  assert.equal(getCouponErrorCode(undefined), null);
+  assert.equal(getCouponErrorCode({ name: 'AbortError', code: 20 }), null);
+  assert.equal(getCouponErrorCode({ body: { code: 400 }, code: 'ADOBE_COMMERCE_COUPON_EXPIRED' }), 'coupon_expired');
+});
+
+test('isAffiliateCode compares normalized codes', () => {
+  assert.equal(isAffiliateCode('06-AFF'), false);
+  setAffiliateCode('06-aff');
+  assert.equal(isAffiliateCode('06-AFF'), true);
+  assert.equal(isAffiliateCode(' 06-aff '), true);
+  assert.equal(isAffiliateCode('SAVE10'), false);
+});
+
+test('getCoupons adds the affiliate code as an auto coupon', () => {
+  setCoupons([{ code: 'SAVE10', source: 'manual' }]);
+  setAffiliateCode('06-AFF');
+  assert.deepEqual(getCoupons(), [
+    { code: 'SAVE10', source: 'manual' },
+    { code: '06-AFF', source: 'auto' },
+  ]);
+  assert.deepEqual(getAutoCoupons(), [{ code: '06-AFF', source: 'auto' }]);
+  assert.equal(getManualCoupon(), 'SAVE10');
+});
+
+test('getCoupons keeps the stored position of the affiliate code and marks it auto', () => {
+  setCoupons([{ code: '06-aff', source: 'manual' }, { code: 'SAVE10', source: 'manual' }]);
+  setAffiliateCode('06-AFF');
+  assert.deepEqual(getCoupons(), [
+    { code: '06-aff', source: 'auto' },
+    { code: 'SAVE10', source: 'manual' },
+  ]);
+});
+
+test('getCoupons keeps the affiliate code when the list is full', () => {
+  setCoupons(['A1', 'A2', 'A3', 'A4', 'A5'].map((code) => ({ code, source: 'manual' })));
+  setAffiliateCode('06-AFF');
+  const coupons = getCoupons();
+  assert.equal(coupons.length, 5);
+  assert.deepEqual(coupons.at(-1), { code: '06-AFF', source: 'auto' });
+});
+
+test('getCouponRequestFields sends a lone affiliate coupon as an array', () => {
+  setAffiliateCode('06-AFF');
+  assert.deepEqual(getCouponRequestFields(), { couponCode: ['06-AFF'], couponSource: ['auto'] });
+});
+
+test('updateAffiliateStatus tracks whether the affiliate coupon applied', () => {
+  setAffiliateCode('06-AFF');
+  assert.equal(isAffiliateIneligible(), false);
+  updateAffiliateStatus([{ code: '06-AFF', status: 'rejected_invalid' }]);
+  assert.equal(isAffiliateIneligible(), true);
+  updateAffiliateStatus([{ code: 'SAVE10', status: 'applied' }]);
+  assert.equal(isAffiliateIneligible(), true);
+  updateAffiliateStatus([{ code: '06-aff', status: 'applied' }]);
+  assert.equal(isAffiliateIneligible(), false);
+});
+
+test('isAffiliateIneligible is false without an affiliate code', () => {
+  setAffiliateCode('06-AFF');
+  updateAffiliateStatus([{ code: '06-AFF', status: 'rejected_invalid' }]);
+  clearAffiliateCode();
+  assert.equal(isAffiliateIneligible(), false);
 });

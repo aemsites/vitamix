@@ -286,9 +286,11 @@ export function logError(scope, error, extra = {}) {
  * @param {number} info.status - HTTP status code.
  * @param {*} info.responseBody - Parsed response body.
  * @param {*} info.requestBody - Request body (will be anonymized).
+ * @param {Object} [info.recaptcha] - reCAPTCHA mint diagnostics for gated
+ *   calls (failure reason, timings, retry outcome). Never contains the token.
  */
 export function logApiError({
-  method, path, status, responseBody, requestBody,
+  method, path, status, responseBody, requestBody, recaptcha,
 }) {
   logOperation('error', {
     kind: 'api',
@@ -297,6 +299,7 @@ export function logApiError({
     status,
     responseBody,
     requestBody: anonymize(requestBody),
+    ...(recaptcha ? { recaptcha } : {}),
   });
 }
 

@@ -217,6 +217,32 @@ test('logApiError: logs error action with anonymized request body', () => {
   assert.deepEqual(body.responseBody, { message: 'bad' });
   assert.deepEqual(body.requestBody, { country: 'us' });
   assert.equal(body.requestBody.customer, undefined);
+  assert.equal('recaptcha' in body, false, 'no recaptcha key unless diagnostics are passed');
+});
+
+test('logApiError: includes reCAPTCHA mint diagnostics when provided', () => {
+  captureFetch();
+  const recaptcha = {
+    minted: false,
+    failure: 'load-timeout',
+    elapsedMs: 10002,
+    sdkWarm: false,
+    executeAttempts: 0,
+    rejectedReason: 'token_required',
+    retry: {
+      minted: false, failure: 'load-timeout', elapsedMs: 8001, sdkWarm: false, executeAttempts: 0,
+    },
+  };
+  logApiError({
+    method: 'POST',
+    path: '/orders/preview',
+    status: 403,
+    responseBody: { code: 'ADOBE_COMMERCE_RECAPTCHA_FAILED' },
+    requestBody: { country: 'us' },
+    recaptcha,
+  });
+  const body = JSON.parse(lastInit.body);
+  assert.deepEqual(body.recaptcha, recaptcha);
 });
 
 // --- logNetworkError --------------------------------------------------------

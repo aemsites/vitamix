@@ -135,6 +135,43 @@ describe('ID.me checkout integration', () => {
     assert.equal(inserted[0].element.hidden, false);
   });
 
+  it('keeps ID.me available while the affiliate coupon does not apply', async () => {
+    const {
+      setAffiliateCode, updateAffiliateStatus, addCoupon, clearAffiliateCode,
+    } = await import('../../scripts/commerce/coupon-state.js');
+    setAffiliateCode('06-AFF');
+    const { inserted, insertAfterEl } = installIDMeDom();
+    const { initIDMe, syncIDMeVisibility } = await importIDMe();
+
+    initIDMe(insertAfterEl);
+    assert.equal(inserted[0].element.hidden, true);
+
+    updateAffiliateStatus([{ code: '06-AFF', status: 'rejected_invalid' }]);
+    syncIDMeVisibility();
+    assert.equal(inserted[0].element.hidden, false);
+
+    addCoupon('IDME10', 'auto');
+    syncIDMeVisibility();
+    assert.equal(inserted[0].element.hidden, true);
+
+    clearAffiliateCode();
+  });
+
+  it('hides ID.me while an applied affiliate coupon is present', async () => {
+    const {
+      setAffiliateCode, updateAffiliateStatus, clearAffiliateCode,
+    } = await import('../../scripts/commerce/coupon-state.js');
+    setAffiliateCode('06-AFF');
+    updateAffiliateStatus([{ code: '06-AFF', status: 'applied' }]);
+    const { inserted, insertAfterEl } = installIDMeDom();
+    const { initIDMe } = await importIDMe();
+
+    initIDMe(insertAfterEl);
+    assert.equal(inserted[0].element.hidden, true);
+
+    clearAffiliateCode();
+  });
+
   it('opens ID.me in a popup and applies the returned coupon in the opener', async () => {
     const { anchor, inserted, insertAfterEl } = installIDMeDom();
     const popupWindow = {

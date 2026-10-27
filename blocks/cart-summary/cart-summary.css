@@ -511,6 +511,23 @@ dialog.paypal-not-configured-dialog::backdrop {
   color: var(--commerce-color-error);
 }
 
+/* Affiliate code that does not discount the cart */
+.cart-summary .coupon-pill-ineligible {
+  background: var(--commerce-color-warning-bg);
+  border-color: var(--commerce-color-warning-border);
+}
+
+.cart-summary .coupon-notice {
+  flex-basis: 100%;
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--commerce-color-warning-bg);
+  border: 1px solid var(--commerce-color-warning-border);
+  border-radius: var(--commerce-radius-badge);
+  color: var(--commerce-color-warning);
+  font-size: var(--commerce-font-size-sm);
+}
+
 /* Per-code rejection feedback from couponStatus */
 .cart-summary .coupon-status {
   flex-basis: 100%;

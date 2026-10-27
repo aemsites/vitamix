@@ -1,6 +1,7 @@
 import {
   estimateExpressCheckout,
   getCustomerTimezone,
+  isRecaptchaError,
   parsePreview,
   validateApplePayMerchant,
 } from '../commerce-api.js';
@@ -14,8 +15,21 @@ import {
 } from './apple-pay-context.js';
 import { expressPayloadMatchesCart } from '../checkout-context.js';
 import { getCouponRequestFields } from '../commerce/coupon-state.js';
+import { previewWithPriceSync } from '../commerce/price-correction.js';
 
 const APPLE_PAY_SDK_URL = 'https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js';
+
+const RECAPTCHA_ERROR_FALLBACK = 'Unable to complete checkout. Please refresh the page and try again.';
+
+/**
+ * Message shown on the page when the reCAPTCHA security check fails during an
+ * Apple Pay session.
+ * @param {Object} callbacks
+ * @returns {string}
+ */
+function recaptchaErrorMessage(callbacks) {
+  return callbacks.strings?.errorRecaptcha || RECAPTCHA_ERROR_FALLBACK;
+}
 
 async function loadSdk() {
   if (document.querySelector(`script[src="${APPLE_PAY_SDK_URL}"]`)) return;
@@ -116,8 +130,9 @@ function startExpressSession(btn, config, callbacks) {
         // onshippingmethodselected when the shopper changes method) keeps
         // state.currentEstimatePayload in sync with the selected address on every
         // change. Mirrors the PayPal express flow's onShippingAddressChange.
-        const preview = await callbacks.previewOrderDirect(
-          buildApplePayExpressPreviewPayload(
+        const preview = await previewWithPriceSync(
+          callbacks.previewOrderDirect,
+          () => buildApplePayExpressPreviewPayload(
             cart,
             String(defaultMethod.id),
             bcp47,
@@ -140,7 +155,15 @@ function startExpressSession(btn, config, callbacks) {
             { label: 'Shipping', amount: String(shippingRate) },
           ],
         });
-      } catch {
+      } catch (err) {
+        if (isRecaptchaError(err)) {
+          // A failed security check is not an address problem. Showing
+          // "address unserviceable" sends shoppers into futile address
+          // retries, so close the sheet and explain on the page instead.
+          session.abort();
+          callbacks.showError(recaptchaErrorMessage(callbacks));
+          return;
+        }
         session.completeShippingContactSelection({
           errors: [new window.ApplePayError('addressUnserviceable')],
           newTotal: { label: config.site || 'Store', amount: '0.00' },
@@ -152,8 +175,9 @@ function startExpressSession(btn, config, callbacks) {
 
     session.onshippingmethodselected = async (e) => {
       try {
-        const previewResult = await callbacks.previewOrderDirect(
-          buildApplePayExpressPreviewPayload(
+        const previewResult = await previewWithPriceSync(
+          callbacks.previewOrderDirect,
+          () => buildApplePayExpressPreviewPayload(
             cart,
             e.shippingMethod.identifier,
             bcp47,
@@ -172,9 +196,11 @@ function startExpressSession(btn, config, callbacks) {
             { label: 'Shipping', amount: String(shippingRate) },
           ],
         });
-      } catch {
+      } catch (err) {
         session.abort();
-        callbacks.showError(callbacks.strings?.errorApplePayGeneric || 'Unable to process your order. Please try a different address or payment method.');
+        callbacks.showError(isRecaptchaError(err)
+          ? recaptchaErrorMessage(callbacks)
+          : (callbacks.strings?.errorApplePayGeneric || 'Unable to process your order. Please try a different address or payment method.'));
       }
     };
 

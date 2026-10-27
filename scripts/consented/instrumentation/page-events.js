@@ -82,7 +82,7 @@ let variantChangeTrackingInstalled = false;
 /**
  * Listen for PDP color swatch clicks and fire a variantSelect beacon with the
  * chosen color merged into digitalData.product[0].productInfo.color (Adobe
- * Launch eVar15 data source). The page-load default/deep-linked color is
+ * Analytics eVar30 data source). The page-load default/deep-linked color is
  * covered separately by fireProdView() reading window.selectedVariant.
  * @returns {void}
  */

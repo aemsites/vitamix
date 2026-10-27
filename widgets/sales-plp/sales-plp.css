@@ -1,5 +1,3 @@
-@import url('../../styles/color-swatches.css');
-
 /* Sales PLP widget – reuses plp-results grid (see blocks/plp/plp.css) */
 .sales-plp-wrapper .sales-plp {
   padding: var(--spacing-m, 1rem) 0;

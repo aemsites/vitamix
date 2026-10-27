@@ -21,6 +21,8 @@ import { validateField } from './checkout-validation.js';
 import { formStateKey, saveFormState, restoreFormState } from './checkout-session-state.js';
 import { logOperation, getCheckoutId } from '../../scripts/operations-log.js';
 import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import { isLoggedIn } from '../../scripts/auth-api.js';
+import { warmRecaptchaOnInteraction } from '../../scripts/recaptcha.js';
 import {
   prefillDefaultShippingAddress,
   watchCustomerAddressPrefill,
@@ -221,6 +223,11 @@ export default async function decorate(block) {
   }
 
   block.innerHTML = '';
+
+  // Shipping previews and order creation need a reCAPTCHA token (signed-out
+  // shoppers only). Start the SDK download on the first interaction so a slow
+  // connection has a head start; LCP is final by then.
+  if (!isLoggedIn()) warmRecaptchaOnInteraction();
 
   logOperation('checkout-start', {
     checkoutId: getCheckoutId(),
@@ -467,13 +474,14 @@ export default async function decorate(block) {
   // When the cart changes mid-checkout, invalidate stale estimates and
   // re-fetch shipping rates before previewing. Some shipping providers issue
   // quantity/weight-specific method ids, so reusing the previous id can make
-  // the preview request invalid after a quantity change.
-  document.addEventListener('cart:change', () => {
+  // the preview request invalid after a quantity change. Price syncs are
+  // re-previewed by the caller that triggered them.
+  document.addEventListener('cart:change', (e) => {
     if (cart.itemCount === 0) return;
     state.currentEstimateToken = null;
     state.currentEstimatePayload = null;
     state.currentPreview = null;
-    if (state.selectedShippingMethodId) {
+    if (state.selectedShippingMethodId && e.detail?.action !== 'price') {
       refreshShipping();
     }
   });
