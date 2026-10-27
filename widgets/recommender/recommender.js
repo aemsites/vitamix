@@ -1,8 +1,6 @@
-import { createOptimizedPicture, fetchPlaceholders } from '../../scripts/aem.js';
-import { getLocaleAndLanguage, formatPrice } from '../../scripts/scripts.js';
-import {
-  fetchProductIndex, buildProductIndexBySlug, slugFromUrl, createStarRating,
-} from '../../scripts/plp-data.js';
+import { fetchPlaceholders } from '../../scripts/aem.js';
+import { getLocaleAndLanguage, formatPrice, getOfferPricing } from '../../scripts/scripts.js';
+import { createStarRating } from '../../scripts/plp-data.js';
 
 const normalize = (value) => (value || '').trim().toLowerCase();
 
@@ -158,16 +156,78 @@ function buildQuestion(question, index) {
 }
 
 /**
- * Loads the product index and placeholders used to render the recommended product card.
- * @returns {Promise<{ bySlug: Object, ph: Object }>}
+ * Loads only the recommended page, using its Product JSON-LD and Open Graph metadata.
+ * @param {string} href - Recommended product URL
+ * @returns {Promise<Object>} Product card data
  */
-async function loadProducts() {
-  const { locale, language } = getLocaleAndLanguage();
-  const [data, ph] = await Promise.all([
-    fetchProductIndex(locale, language),
-    fetchPlaceholders(`/${locale}/${language}/products/config`),
-  ]);
-  return { bySlug: buildProductIndexBySlug(data, locale, language), ph };
+async function loadProduct(href) {
+  const { hostname } = window.location;
+  const isProd = hostname === 'vitamix.com' || hostname.endsWith('.vitamix.com')
+    || hostname.endsWith('.aem.network');
+  const networkOrigin = 'https://main--vitamix--aemsites.aem.network';
+  const pageUrl = new URL(href, window.location.href);
+  if (!isProd) {
+    pageUrl.protocol = 'https:';
+    pageUrl.host = new URL(networkOrigin).host;
+    pageUrl.port = '';
+  }
+  const requestUrl = isProd
+    ? pageUrl.href
+    : `https://fcors.org/?url=${encodeURIComponent(pageUrl.href)}&key=Mg23N96GgR8O3NjU`;
+  const response = await fetch(requestUrl);
+  if (!response.ok) throw new Error(`Failed to load recommended product: ${response.status}`);
+  const doc = new DOMParser().parseFromString(await response.text(), 'text/html');
+  const metadata = (name) => doc.querySelector(`meta[property="${name}"], meta[name="${name}"]`)
+    ?.content.trim();
+  let product;
+  doc.querySelectorAll('script[type="application/ld+json"]').forEach((script) => {
+    if (product) return;
+    const parsed = JSON.parse(script.textContent);
+    const candidates = (Array.isArray(parsed) ? parsed : [parsed])
+      .flatMap((node) => (Array.isArray(node?.['@graph']) ? node['@graph'] : [node]));
+    product = candidates.find((node) => node && (
+      node['@type'] === 'Product'
+      || (Array.isArray(node['@type']) && node['@type'].includes('Product'))
+    ));
+  });
+  const title = product?.name || metadata('og:title') || doc.title.trim();
+  if (!title) throw new Error('Recommended product page has no title');
+  const offers = product?.offers;
+  const variants = (Array.isArray(offers) ? offers : [offers])
+    .filter(Boolean)
+    .map((offer) => ({
+      ...getOfferPricing(offer),
+      price: Number(offer.price ?? offer.lowPrice),
+      currency: offer.priceCurrency,
+    }))
+    .filter((offer) => Number.isFinite(offer.price) && offer.price > 0);
+  const lowest = variants.reduce(
+    (best, offer) => (!best || offer.price < best.price ? offer : best),
+    null,
+  );
+  const image = metadata('og:image');
+  const imageBase = isProd ? new URL(response.url || pageUrl.href) : pageUrl;
+  const imageUrl = image ? new URL(image, imageBase) : null;
+  if (imageUrl && !['http:', 'https:'].includes(imageUrl.protocol)) {
+    throw new Error('Recommended product page has an invalid og:image URL');
+  }
+  if (imageUrl && !isProd) {
+    imageUrl.protocol = 'https:';
+    imageUrl.host = pageUrl.host;
+    imageUrl.port = '';
+  }
+  return {
+    url: href,
+    title,
+    description: product?.description || metadata('og:description') || metadata('description'),
+    image: imageUrl?.href,
+    price: lowest?.price,
+    regularPrice: lowest?.regular,
+    currency: lowest?.currency,
+    variants,
+    reviewCount: product?.aggregateRating?.reviewCount || product?.aggregateRating?.ratingCount,
+    ratingValue: product?.aggregateRating?.ratingValue,
+  };
 }
 
 function createPrice(product, ph) {
@@ -207,12 +267,12 @@ function createProductCard(product, ph) {
   imageLink.className = 'image';
   imageLink.href = product.url;
   imageLink.tabIndex = -1;
-  const src = product.image || product.variants?.find((v) => v.image)?.image;
-  if (src) {
-    imageLink.append(createOptimizedPicture(src, product.title, false, [
-      { media: '(min-width: 600px)', width: '1200' },
-      { width: '750' },
-    ]));
+  if (product.image) {
+    const image = document.createElement('img');
+    image.src = product.image;
+    image.alt = product.title;
+    image.loading = 'lazy';
+    imageLink.append(image);
   }
 
   const info = document.createElement('div');
@@ -238,7 +298,12 @@ function createProductCard(product, ph) {
     info.append(description);
   }
 
-  if (product.price) info.append(createPrice(product, ph));
+  if (product.price) {
+    info.append(createPrice(product, {
+      ...ph,
+      currencyCode: product.currency || ph.currencyCode,
+    }));
+  }
 
   const cta = document.createElement('p');
   cta.className = 'button-wrapper';
@@ -283,8 +348,7 @@ export default async function decorate(widget) {
     widget.dataset.stage = 'error';
     return;
   }
-  // fetched up front so the result renders without a delay
-  const productsLoaded = loadProducts().catch(() => null);
+  const productPages = new Map();
   const quizEl = widget.querySelector('.quiz');
   const progressEl = widget.querySelector('progress');
   const stepLabelEl = widget.querySelector('.step-label');
@@ -332,14 +396,27 @@ export default async function decorate(widget) {
     }
 
     nextBtn.disabled = true;
-    const products = await productsLoaded;
+    let result;
+    try {
+      if (!productPages.has(href)) {
+        const { locale, language } = getLocaleAndLanguage();
+        productPages.set(href, Promise.all([
+          loadProduct(href),
+          fetchPlaceholders(`/${locale}/${language}/products/config`),
+        ]));
+      }
+      result = await productPages.get(href);
+    } catch (error) {
+      productPages.delete(href);
+      // eslint-disable-next-line no-console
+      console.error('Unable to load recommended product card', href, error);
+    }
     if (version !== renderVersion) return;
-    const { pathname } = new URL(href, window.location.origin);
-    const product = pathname.includes('/products/') && products?.bySlug[slugFromUrl(pathname)];
+    const [product, ph] = result || [];
     const productEl = widget.querySelector('.results .product');
     const fallbackEl = widget.querySelector('.results .fallback');
     if (product) {
-      productEl.replaceChildren(createProductCard(product, products.ph));
+      productEl.replaceChildren(createProductCard(product, ph));
     } else {
       productEl.replaceChildren();
       fallbackEl.querySelector('a').href = href;
