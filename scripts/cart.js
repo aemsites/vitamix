@@ -1,4 +1,5 @@
 import { getConfig } from './commerce-config.js';
+import { getStorage, isStorageAvailable } from './safe-storage.js';
 
 function deepEqual(a, b) {
   if (a === b) return true;
@@ -41,12 +42,15 @@ export class Cart {
   }
 
   static #getStoredItems() {
-    const stored = localStorage.getItem(Cart.STORAGE_KEY);
+    // Falls back to page-view-scoped memory when the browser blocks storage,
+    // so importing the cart never breaks pages that don't need it.
+    const storage = getStorage();
+    const stored = storage.getItem(Cart.STORAGE_KEY);
     if (!stored) return null;
 
     const parsed = JSON.parse(stored);
     if (parsed.version !== Cart.STORAGE_VERSION) {
-      localStorage.removeItem(Cart.STORAGE_KEY);
+      storage.removeItem(Cart.STORAGE_KEY);
       return null;
     }
     return parsed.items;
@@ -66,8 +70,10 @@ export class Cart {
 
   #persistNow() {
     const expires = new Date(Date.now() + 30 * 864e5).toUTCString();
-    document.cookie = `${Cart.COUNT_COOKIE}=${this.visibleItemCount}; expires=${expires}; path=/`;
-    localStorage.setItem(Cart.STORAGE_KEY, JSON.stringify(this));
+    try {
+      document.cookie = `${Cart.COUNT_COOKIE}=${this.visibleItemCount}; expires=${expires}; path=/`;
+    } catch { /* opaque-origin documents throw on cookie access */ }
+    getStorage().setItem(Cart.STORAGE_KEY, JSON.stringify(this));
   }
 
   #dispatchChange(action, item = undefined) {
@@ -94,6 +100,15 @@ export class Cart {
   flush() {
     this.#refresh();
     this.#persistNow();
+  }
+
+  /**
+   * False when the browser blocks site data: the cart then only lives for the
+   * current page view and is lost on navigation.
+   */
+  // eslint-disable-next-line class-methods-use-this
+  get isPersistent() {
+    return isStorageAvailable();
   }
 
   get items() {

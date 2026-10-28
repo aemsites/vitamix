@@ -28,3 +28,10 @@ export async function loadCSS() {}
 export function createOptimizedPicture() {
   return {};
 }
+
+/** Captured sampleRUM calls: `[checkpoint, data]` tuples. */
+export const __rumCalls = [];
+
+export function sampleRUM(checkpoint, data) {
+  __rumCalls.push([checkpoint, data]);
+}
