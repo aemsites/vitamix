@@ -189,7 +189,7 @@
             </div>
 
             <div class="ognm-blender-recommender__question__buttons">
-              <button :disabled="((screen != 2 || question != 2) ? 'disabled' : false)" type="button" class="atom-button">
+              <button :disabled="((screen != 2 || question != 2) ? 'disabled' : false)" x-on:click="goPrev()" type="button" class="atom-button">
                 <span x-html="language[currentLanguage].questions.prevButton">
                 </span>
               </button>
@@ -235,7 +235,7 @@
             </div>
 
             <div class="ognm-blender-recommender__question__buttons">
-              <button :disabled="((screen != 2 || question != 3) ? 'disabled' : false)" type="button" class="atom-button">
+              <button :disabled="((screen != 2 || question != 3) ? 'disabled' : false)" x-on:click="goPrev()" type="button" class="atom-button">
                 <span x-html="language[currentLanguage].questions.prevButton">
                 </span>
               </button>
@@ -281,7 +281,7 @@
             </div>
 
             <div class="ognm-blender-recommender__question__buttons">
-              <button :disabled="((screen != 2 || question != 4) ? 'disabled' : false)" type="button" class="atom-button">
+              <button :disabled="((screen != 2 || question != 4) ? 'disabled' : false)" x-on:click="goPrev()" type="button" class="atom-button">
                 <span x-html="language[currentLanguage].questions.prevButton">
                 </span>
               </button>
