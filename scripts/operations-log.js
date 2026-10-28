@@ -262,8 +262,46 @@ export function isIgnoredErrorSource(source) {
 }
 
 /**
+ * User agents of self-identified crawlers, scrapers and headless browsers.
+ * Classification only (UAs are trivially spoofed); used solely to drop the
+ * fetch/import failures below.
+ */
+const BOT_USER_AGENT = /bot|spider|crawler|slurp|scraper|headless/i;
+
+/**
+ * Browser wording for a failed network request or a failed dynamic import
+ * (Chrome/Edge, Safari, Firefox). Matched against the whole message so app
+ * errors that merely mention "fetch" are kept.
+ * @type {RegExp[]}
+ */
+const FETCH_OR_IMPORT_FAILURES = [
+  /^Failed to fetch$/i,
+  /^Load failed$/i,
+  /^NetworkError when attempting to fetch resource\.?$/i,
+  /^Failed to fetch dynamically imported module\b/i,
+  /^Importing a module script failed\.?$/i,
+  /^error loading dynamically imported module\b/i,
+];
+
+/**
+ * Whether an error is a fetch/import failure reported by a bot. Crawlers often
+ * block or abandon sub-resource and module loads, so these are noise; the same
+ * failures from real browsers are kept because they can reveal a missing
+ * resource. Fails open (keeps logging) when the user agent is unavailable.
+ * @param {*} message - The error message.
+ * @returns {boolean}
+ */
+function isBotFetchOrImportFailure(message) {
+  const userAgent = typeof navigator === 'undefined' ? undefined : navigator?.userAgent;
+  if (typeof userAgent !== 'string' || !BOT_USER_AGENT.test(userAgent)) return false;
+  const text = String(message ?? '').trim();
+  return FETCH_OR_IMPORT_FAILURES.some((re) => re.test(text));
+}
+
+/**
  * Logs a generic (non-API) error. Errors originating from browser extensions or
- * an ignored source prefix (see {@link isIgnoredErrorSource}) are dropped.
+ * an ignored source prefix (see {@link isIgnoredErrorSource}), and fetch/import
+ * failures reported by bots (see {@link isBotFetchOrImportFailure}), are dropped.
  * @param {string} scope - Where it happened, e.g. 'checkout-order' or 'global'.
  * @param {*} error - An Error or error-like value.
  * @param {Object} [extra] - Extra non-PII context.
@@ -274,6 +312,7 @@ export function logError(scope, error, extra = {}) {
   // frame — for unhandled rejections only the stack carries the source.
   const stackSource = parseTopFrame(details.stack).fileName;
   if (isIgnoredErrorSource(details.fileName) || isIgnoredErrorSource(stackSource)) return;
+  if (isBotFetchOrImportFailure(details.message)) return;
   logOperation('error', { scope, ...details });
 }
 
