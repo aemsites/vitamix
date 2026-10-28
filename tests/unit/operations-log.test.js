@@ -4,7 +4,7 @@
  * Run with `npm run test:unit`. Uses the shared fetch mock and Web Storage
  * shims from setup.mjs. `window.location` is set per-test for origin checks.
  */
-import { test, beforeEach } from 'node:test';
+import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   logOperation, getCheckoutId, clearCheckoutId, anonymize, logApiError, logNetworkError, logError,
@@ -27,6 +27,23 @@ function captureFetch() {
 function setHostname(hostname, pathname = '/us/en_us/products/ascent-x5') {
   globalThis.window.location = { hostname, origin: `https://${hostname}`, pathname };
 }
+
+// Node exposes a configurable `navigator` global (userAgent "Node.js/<v>");
+// tests override it per case and restore the original afterwards.
+const realNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+
+function setUserAgent(userAgent) {
+  Object.defineProperty(globalThis, 'navigator', {
+    value: userAgent === undefined ? undefined : { userAgent },
+    configurable: true,
+    writable: true,
+  });
+}
+
+afterEach(() => {
+  if (realNavigator) Object.defineProperty(globalThis, 'navigator', realNavigator);
+  else delete globalThis.navigator;
+});
 
 beforeEach(() => {
   lastUrl = undefined;
@@ -383,4 +400,94 @@ test('logError: retains stack frames past the old 5-line cap', () => {
   const body = JSON.parse(lastInit.body);
   assert.ok(body.stack.includes('fn8'), 'frame past line 5 should be retained');
   assert.ok(body.stack.includes(':9:3'), 'line numbers should be preserved');
+});
+
+// --- bot/scraper fetch & import failures -------------------------------------
+
+const UA = {
+  baidu: 'Mozilla/5.0 (compatible; Baiduspider-render/2.0; +http://www.baidu.com/search/spider.html)',
+  yisou: 'YisouSpider',
+  storebot: 'Mozilla/5.0 (X11; Linux x86_64; Storebot-Google/1.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36',
+  chrome: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36',
+};
+
+/** A Chrome dynamic-import failure: the URL is in the message, the stack has no frames. */
+function importFailure(url = 'https://www.vitamix.com/scripts/gift-with-purchase.js') {
+  const err = new TypeError(`Failed to fetch dynamically imported module: ${url}`);
+  err.stack = `TypeError: ${err.message}`;
+  return err;
+}
+
+test('logError: drops a failed dynamic import from a bot user agent', () => {
+  captureFetch();
+  setUserAgent(UA.baidu);
+  logError('unhandledrejection', importFailure());
+  assert.equal(lastUrl, undefined, 'bot import failure must not be sent');
+});
+
+test('logError: drops a failed fetch from a bot user agent', () => {
+  captureFetch();
+  setUserAgent(UA.yisou);
+  const err = new TypeError('Failed to fetch');
+  err.stack = 'TypeError: Failed to fetch\n    at fetchSheet (https://www.vitamix.com/widgets/locator/locator.js:36:24)';
+  logError('unhandledrejection', err);
+  assert.equal(lastUrl, undefined, 'bot fetch failure must not be sent');
+});
+
+test('logError: drops Safari and Firefox fetch/import wording from a bot user agent', () => {
+  setUserAgent(UA.storebot);
+  [
+    'Load failed',
+    'NetworkError when attempting to fetch resource.',
+    'Importing a module script failed.',
+    'error loading dynamically imported module: https://www.vitamix.com/blocks/modal/modal.js',
+  ].forEach((message) => {
+    lastUrl = undefined;
+    captureFetch();
+    logError('unhandledrejection', { message });
+    assert.equal(lastUrl, undefined, `"${message}" from a bot must not be sent`);
+  });
+});
+
+test('logError: still logs a failed dynamic import from a normal browser', () => {
+  captureFetch();
+  setUserAgent(UA.chrome);
+  logError('unhandledrejection', importFailure());
+  assert.equal(lastUrl, `https://main--vitamix--aemsites.aem.network${PATH}`);
+  assert.match(JSON.parse(lastInit.body).message, /gift-with-purchase\.js$/);
+});
+
+test('logError: still logs non-fetch errors from a bot user agent', () => {
+  captureFetch();
+  setUserAgent(UA.storebot);
+  logError('modal', new Error('Modal fragment failed to load: /us/en_us/nav/modals/search'));
+  assert.equal(JSON.parse(lastInit.body).scope, 'modal');
+});
+
+test('logError: an app error that only mentions fetch is not a fetch failure', () => {
+  captureFetch();
+  setUserAgent(UA.storebot);
+  logError('order', new Error('Failed to fetch order ord-1'));
+  assert.equal(JSON.parse(lastInit.body).message, 'Failed to fetch order ord-1');
+});
+
+test('logError: logs fetch/import failures when the user agent is unavailable', () => {
+  captureFetch();
+  setUserAgent(undefined);
+  logError('unhandledrejection', importFailure());
+  assert.equal(lastUrl, `https://main--vitamix--aemsites.aem.network${PATH}`);
+});
+
+test('logApiError and logNetworkError: still log API failures from a bot user agent', () => {
+  setUserAgent(UA.storebot);
+  captureFetch();
+  logApiError({
+    method: 'POST', path: '/orders', status: 403, responseBody: { code: 'ADOBE_COMMERCE_RECAPTCHA_FAILED' },
+  });
+  assert.equal(JSON.parse(lastInit.body).status, 403);
+  lastInit = undefined;
+  logNetworkError({ method: 'POST', path: '/estimate/shipping', error: new TypeError('Failed to fetch') });
+  const body = JSON.parse(lastInit.body);
+  assert.equal(body.kind, 'network');
+  assert.equal(body.message, 'Failed to fetch');
 });
