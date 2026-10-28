@@ -4,6 +4,7 @@ import {
 } from '../../scripts/scripts.js';
 import { getConfig } from '../../scripts/commerce-config.js';
 import { logOperation, logError } from '../../scripts/operations-log.js';
+import { isStorageAvailable } from '../../scripts/safe-storage.js';
 
 /**
  * Renders "Find Locally" button container.
@@ -514,6 +515,17 @@ export default function renderAddToCart(ph, block, parent) {
 
   // add quantity container to main add to cart container
   addToCartContainer.appendChild(quantityContainer);
+
+  // The cart needs site data. When the browser blocks it, items can't survive
+  // navigation to the cart, so tell the shopper how to fix it.
+  if (!isStorageAvailable()) {
+    const notice = document.createElement('p');
+    notice.classList.add('pdp-storage-blocked');
+    notice.setAttribute('role', 'alert');
+    notice.textContent = ph.storageBlocked
+      || 'Your browser is blocking cookies and site data for this site, so items can\'t be kept in your cart. Please allow cookies and site data, then reload the page.';
+    addToCartContainer.appendChild(notice);
+  }
 
   // Saleable commercial products keep the dealer CTA as a secondary action.
   // Gate on isCommercial so non-commercial products (e.g. bundles) that carry
