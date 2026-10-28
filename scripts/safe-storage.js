@@ -38,13 +38,36 @@ function memoryStorage(type) {
   };
 }
 
+const PROBE_KEY = '__storage_probe__';
+
+/** @type {Map<string, boolean>} Cached usability per storage type. */
+const availability = new Map();
+
 /**
+ * Round-trips a value through the store. Some restricted contexts expose the
+ * store but throw on use (e.g. `QuotaExceededError` on every write), so
+ * property access alone isn't enough.
  * @param {'localStorage'|'sessionStorage'} type
- * @returns {boolean} false when accessing the store throws or it is missing.
+ * @throws when the store is missing or any operation fails.
+ */
+function roundTrip(type) {
+  const store = window[type];
+  if (!store) throw new Error(`${type} is not available`);
+  store.setItem(PROBE_KEY, PROBE_KEY);
+  const ok = store.getItem(PROBE_KEY) === PROBE_KEY;
+  store.removeItem(PROBE_KEY);
+  if (!ok) throw new Error(`${type} did not retain a written value`);
+}
+
+/**
+ * Non-caching, non-reporting usability check (for diagnostics).
+ * @param {'localStorage'|'sessionStorage'} type
+ * @returns {boolean}
  */
 function probe(type) {
   try {
-    return !!window[type];
+    roundTrip(type);
+    return true;
   } catch {
     return false;
   }
@@ -115,32 +138,62 @@ function reportBlocked(type, error) {
 }
 
 /**
- * Returns the requested Web Storage, or a page-view-scoped in-memory fallback
- * when the browser blocks access.
- * @param {'localStorage'|'sessionStorage'} [type]
- * @returns {Storage}
+ * @param {'localStorage'|'sessionStorage'} type
+ * @param {*} error
  */
-export function getStorage(type = 'localStorage') {
-  try {
-    const store = window[type];
-    if (store) return store;
-  } catch (error) {
-    reportBlocked(type, error);
-  }
-  return memoryStorage(type);
+function markUnavailable(type, error) {
+  availability.set(type, false);
+  reportBlocked(type, error);
 }
 
 /**
  * Whether the requested Web Storage is usable (persists across page loads).
+ * Checked once per page view, and flipped to false if a later operation fails.
  * @param {'localStorage'|'sessionStorage'} [type]
  * @returns {boolean}
  */
 export function isStorageAvailable(type = 'localStorage') {
-  return probe(type);
+  if (!availability.has(type)) {
+    try {
+      roundTrip(type);
+      availability.set(type, true);
+    } catch (error) {
+      markUnavailable(type, error);
+    }
+  }
+  return availability.get(type);
+}
+
+/**
+ * Returns a store backed by the requested Web Storage, falling back to a
+ * page-view-scoped in-memory store when the browser blocks access or an
+ * operation fails. Writes that fail land in memory, so the latest value is
+ * still readable for the rest of the page view.
+ * @param {'localStorage'|'sessionStorage'} [type]
+ * @returns {Pick<Storage, 'getItem'|'setItem'|'removeItem'>}
+ */
+export function getStorage(type = 'localStorage') {
+  const memory = memoryStorage(type);
+  const run = (op, fallback) => {
+    if (isStorageAvailable(type)) {
+      try {
+        return op(window[type]);
+      } catch (error) {
+        markUnavailable(type, error);
+      }
+    }
+    return fallback(memory);
+  };
+  return {
+    getItem: (key) => run((s) => s.getItem(key), (m) => m.getItem(key)),
+    setItem: (key, value) => run((s) => s.setItem(key, value), (m) => m.setItem(key, value)),
+    removeItem: (key) => run((s) => s.removeItem(key), (m) => m.removeItem(key)),
+  };
 }
 
 /** Test-only: reset the once-per-page report flag and memory stores. */
 export function resetSafeStorageForTests() {
   reported = false;
   memoryStores.clear();
+  availability.clear();
 }

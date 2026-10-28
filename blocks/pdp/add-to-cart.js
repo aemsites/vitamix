@@ -7,6 +7,26 @@ import { logOperation, logError } from '../../scripts/operations-log.js';
 import { isStorageAvailable } from '../../scripts/safe-storage.js';
 
 /**
+ * Shows (once) the notice that the cart can't be used while the browser blocks
+ * cookies and site data.
+ * @param {Object} ph - Placeholders object
+ * @param {HTMLElement} container - Add to cart container
+ * @returns {HTMLElement} The notice element
+ */
+function showStorageBlockedNotice(ph, container) {
+  let notice = container.querySelector('.pdp-storage-blocked');
+  if (!notice) {
+    notice = document.createElement('p');
+    notice.classList.add('pdp-storage-blocked');
+    notice.setAttribute('role', 'alert');
+    notice.textContent = ph.storageBlocked
+      || 'Your browser is blocking cookies and site data for this site, so items can\'t be kept in your cart. Please allow cookies and site data, then reload the page.';
+    container.appendChild(notice);
+  }
+  return notice;
+}
+
+/**
  * Renders "Find Locally" button container.
  * @param {Object} ph - Placeholders object
  * @param {HTMLElement} block - PDP block element
@@ -314,6 +334,15 @@ export default function renderAddToCart(ph, block, parent) {
 
   // add click event handler for add to cart functionality
   addToCartButton.addEventListener('click', async () => {
+    // Without site data the item would be lost as soon as the shopper leaves
+    // the page (including the mobile redirect to the cart), so don't add it;
+    // point them at the notice instead.
+    if (!isStorageAvailable()) {
+      const notice = showStorageBlockedNotice(ph, addToCartContainer);
+      notice.scrollIntoView?.({ block: 'nearest' });
+      return;
+    }
+
     // update button state to show loading
     addToCartButton.textContent = ph.adding || 'Adding...';
     addToCartButton.disabled = true;
@@ -459,6 +488,12 @@ export default function renderAddToCart(ph, block, parent) {
         // cart page so the user gets clear feedback that the item was added.
         // Flush first so the cart page always receives the latest shared
         // localStorage snapshot before navigation.
+        // Storage can also fail mid-add (e.g. quota): stay on the PDP so the
+        // in-memory item isn't lost to the navigation.
+        if (!isStorageAvailable()) {
+          showStorageBlockedNotice(ph, addToCartContainer);
+          return;
+        }
         if (window.innerWidth < 900) {
           cartApi.flush();
           const { locale, language } = getLocaleAndLanguage();
@@ -518,14 +553,7 @@ export default function renderAddToCart(ph, block, parent) {
 
   // The cart needs site data. When the browser blocks it, items can't survive
   // navigation to the cart, so tell the shopper how to fix it.
-  if (!isStorageAvailable()) {
-    const notice = document.createElement('p');
-    notice.classList.add('pdp-storage-blocked');
-    notice.setAttribute('role', 'alert');
-    notice.textContent = ph.storageBlocked
-      || 'Your browser is blocking cookies and site data for this site, so items can\'t be kept in your cart. Please allow cookies and site data, then reload the page.';
-    addToCartContainer.appendChild(notice);
-  }
+  if (!isStorageAvailable()) showStorageBlockedNotice(ph, addToCartContainer);
 
   // Saleable commercial products keep the dealer CTA as a secondary action.
   // Gate on isCommercial so non-commercial products (e.g. bundles) that carry
