@@ -7,8 +7,8 @@ import { logOperation, logError } from '../../scripts/operations-log.js';
 import { isStorageAvailable } from '../../scripts/safe-storage.js';
 
 /**
- * Shows (once) the notice that the cart can't be used while the browser blocks
- * cookies and site data.
+ * Shows (once) the notice that the cart can't be saved. Covers both blocked
+ * site data and full site storage, since either makes storage unusable.
  * @param {Object} ph - Placeholders object
  * @param {HTMLElement} container - Add to cart container
  * @returns {HTMLElement} The notice element
@@ -20,7 +20,7 @@ function showStorageBlockedNotice(ph, container) {
     notice.classList.add('pdp-storage-blocked');
     notice.setAttribute('role', 'alert');
     notice.textContent = ph.storageBlocked
-      || 'Your browser is blocking cookies and site data for this site, so items can\'t be kept in your cart. Please allow cookies and site data, then reload the page.';
+      || 'We couldn\'t save your cart in this browser. Please make sure cookies and site data are allowed for this site and that its storage isn\'t full (clearing this site\'s data can help), then reload the page.';
     container.appendChild(notice);
   }
   return notice;
@@ -488,14 +488,16 @@ export default function renderAddToCart(ph, block, parent) {
         // cart page so the user gets clear feedback that the item was added.
         // Flush first so the cart page always receives the latest shared
         // localStorage snapshot before navigation.
-        // Storage can also fail mid-add (e.g. quota): stay on the PDP so the
-        // in-memory item isn't lost to the navigation.
+        const redirectToCart = window.innerWidth < 900;
+        if (redirectToCart) cartApi.flush();
+
+        // Storage can also fail mid-add or during the flush (e.g. quota):
+        // stay on the PDP so the in-memory item isn't lost to the navigation.
         if (!isStorageAvailable()) {
           showStorageBlockedNotice(ph, addToCartContainer);
           return;
         }
-        if (window.innerWidth < 900) {
-          cartApi.flush();
+        if (redirectToCart) {
           const { locale, language } = getLocaleAndLanguage();
           window.location.href = `/${locale}/${language}/order/cart`;
           isRedirecting = true;
