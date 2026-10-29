@@ -5,22 +5,7 @@ import {
   getHiddenContainers,
 } from '../../blocks/recipe/recipe-containers.js';
 import { fetchPlaceholders, loadCSS } from '../../scripts/aem.js';
-import { getLocaleAndLanguage } from '../../scripts/scripts.js';
-
-/**
- * Load widget copy from the widget's local JSON (same name as the script).
- * @param {string} lang - Language key (e.g. en, fr)
- * @returns {Promise<Object>} Copy for that language (flat key-value)
- */
-async function loadWidgetCopy(lang) {
-  const scriptPath = new URL(import.meta.url).pathname;
-  const jsonPath = scriptPath.replace(/\.js$/, '.json');
-  const url = `${window.hlx?.codeBasePath || ''}${jsonPath}`;
-  const resp = await fetch(url);
-  const data = await resp.json();
-  const key = data[lang] ? lang : 'en';
-  return data[key] || {};
-}
+import { getLocaleAndLanguage, loadWidgetCopy } from '../../scripts/scripts.js';
 
 /**
  * Parses raw recipe data from index and transforms values.
@@ -1230,7 +1215,7 @@ async function init() {
     const { locale, language } = getLocaleAndLanguage();
     const lang = (language || 'en_us').split('_')[0];
     const [copy, placeholders] = await Promise.all([
-      loadWidgetCopy(lang),
+      loadWidgetCopy(import.meta.url, lang),
       fetchPlaceholders(`/${locale}/${language}`),
     ]);
     const hiddenContainers = getHiddenContainers(placeholders);

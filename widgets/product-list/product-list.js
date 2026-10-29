@@ -3,7 +3,7 @@ import {
   fetchPlaceholders, loadCSS, toClassName, createOptimizedPicture,
 } from '../../scripts/aem.js';
 import loadColorSwatches from '../../scripts/color-swatches.js';
-import { formatPrice, buildVideo } from '../../scripts/scripts.js';
+import { formatPrice, buildVideo, loadWidgetCopy } from '../../scripts/scripts.js';
 import { loadFragment } from '../../blocks/fragment/fragment.js';
 import addToCompare, { isInStoredCompare, getHeaderCompareHref } from '../../scripts/add-to-compare.js';
 import { createCallouts, createStarRating } from '../../scripts/plp-data.js';
@@ -56,21 +56,6 @@ const COLOR_ORDER = {
   'brushed-gold': 5,
   cream: 5,
 };
-
-/**
- * Load widget copy from the widget's local JSON.
- * @param {string} lang - Language key (e.g. en, fr)
- * @returns {Promise<Object>} Copy for that language
- */
-async function loadWidgetCopy(lang) {
-  const scriptPath = new URL(import.meta.url).pathname;
-  const jsonPath = scriptPath.replace(/\.js$/, '.json');
-  const url = `${window.hlx?.codeBasePath || ''}${jsonPath}`;
-  const resp = await fetch(url);
-  const data = await resp.json();
-  const key = data[lang] ? lang : 'en';
-  return data[key] || {};
-}
 
 function hasVariants(product) {
   return product.variants && product.variants.length > 0;
@@ -946,7 +931,7 @@ export default async function decorate(widget) {
   delete widget.dataset.show;
   const { locale, language } = getWidgetLocaleAndLanguage();
   const lang = (language || 'en_us').split('_')[0];
-  const copy = await loadWidgetCopy(lang);
+  const copy = await loadWidgetCopy(import.meta.url, lang);
   const ph = await fetchPlaceholders(`/${locale}/${language}/products/config`);
   widget.productListDataset = widget.dataset.dataset || 'blenders';
   setFacetDefinitions(await getFacetDefinitions(widget.productListDataset));
