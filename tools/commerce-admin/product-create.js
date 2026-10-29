@@ -12,11 +12,11 @@ import { openProductSelectorModal } from './product-selection-field.js';
 import { parseCommaList } from './product-selector.js';
 import { getProductCreateContext, resolveImageUrlForLocale } from './pim.js';
 import { OPTION_PRESETS, TAX_PRESETS } from './product-create-presets.js';
+import { BUTTON_SETTINGS, renderProductButtons } from './product-buttons.js';
 
 const ASSETS_APP = 'https://da.live/app/aemsites/vitamix/tools/product-assets/app?ref=product-assets';
 const LOCALES = ['us/en_us', 'ca/en_us', 'ca/fr_ca', 'mx/en_us', 'mx/es_mx', 'vr/en_us'];
 const STEPS = ['Product assets', 'Product & pricing', 'Settings', 'Review & create'];
-const BUTTON_SETTINGS = ['addToCart', 'comingSoon', 'findDealer', 'findLocally', 'retired'];
 const MARKET_CURRENCIES = {
   us: 'USD', ca: 'CAD', mx: 'MXN', vr: 'USD',
 };
@@ -492,10 +492,7 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
           </select></label>
         </div>
         <div class="product-create-buttons">
-          ${BUTTON_SETTINGS.map((setting) => `<label class="product-create-button-toggle">
-            <input type="checkbox" name="${setting}"${setting === 'addToCart' ? ' checked' : ''}>
-            <span>${setting}</span>
-          </label>`).join('')}
+          ${renderProductButtons({ addToCart: 'Yes' })}
           <label class="product-create-promo">promo:
             <input name="promoButton" aria-label="Promotional button text">
           </label>

@@ -23,6 +23,20 @@ until convergence or the browser session ends.
 
 ## Editing product JSON
 
+In edit mode, **Custom > Edit** opens the same Yes/No button chips used by product
+creation: `addToCart`, `comingSoon`, `findDealer`, `findLocally`, and `retired`.
+The inline `promo:` badge also edits `custom.promoButton`; clearing it removes
+the property. A non-empty value highlights the badge, as in product creation.
+Save applies changed flags and promo text to the current catalog's parent product
+and every variant, creating variant `custom` objects when needed. Other custom
+fields are preserved; Cancel discards the changes.
+
+In product-detail edit mode, the **Visibility** switch above Delete product saves
+the current catalog product immediately. **Embargoed** sets `metadata.visibility`
+to `embargoed` and `metadata.robots` to `noindex`. **Visible** removes both keys
+to use page defaults. Other metadata is preserved. This does not change stock
+availability or update other catalogs.
+
 On product detail, use **Export / import...** in edit mode. The **Editor view**
 checkbox in the modal footer switches from raw JSON to a collapsible tree.
 Search property names above the tree to highlight matches and hide unrelated

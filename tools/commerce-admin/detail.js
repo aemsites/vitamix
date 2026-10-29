@@ -13,6 +13,7 @@ import { PB_ORG, PB_SITE } from './commerce-pbus-config.js';
 import { showToast } from './commerce-otp-ui.js';
 import { startProductImageSync } from './product-image-sync.js';
 import { categoryColorClass } from './commerce-category.js';
+import { BUTTON_SETTINGS, renderProductButtons } from './product-buttons.js';
 import { fetchProductsIndexForLocale, getProductRefFromIndex } from './pim.js';
 
 /** Product JSON edits are production-only (active API env, not staging). */
@@ -213,17 +214,107 @@ function formatCustomCellValue(key, v) {
   return escapeHtml(String(v));
 }
 
-function renderCustom(custom) {
-  if (!custom) return '';
+function renderCustom(custom, canEdit = false) {
+  if (!custom && !canEdit) return '';
   const obj = custom && typeof custom === 'object' ? custom : {};
   const skipKeys = ['categories', 'resources', 'crosssellSkus', 'relatedSkus'];
   const entries = Object.entries(obj).filter(([k, v]) => v != null && v !== '' && !skipKeys.includes(k));
-  if (entries.length === 0) return '';
+  if (entries.length === 0 && !canEdit) return '';
   const rows = entries.map(([k, v]) => {
     const val = formatCustomCellValue(k, v);
     return `<tr><td class="pim-detail-custom-key">${escapeHtml(k)}</td><td class="pim-detail-custom-val">${val}</td></tr>`;
   }).join('');
-  return `<div class="pim-detail-section"><h3 class="pim-detail-section-title">Custom</h3><table class="pim-detail-custom-table"><tbody>${rows}</tbody></table></div>`;
+  return `<div class="pim-detail-section">
+    <div class="pim-custom-heading"><h3 class="pim-detail-section-title">Custom</h3>
+      ${canEdit ? '<button type="button" class="pim-io-open-btn" data-custom-edit>Edit</button>' : ''}
+    </div>
+    <table class="pim-detail-custom-table"><tbody>${rows}</tbody></table></div>`;
+}
+
+function openCustomButtonsDialog() {
+  if (!canUseEditMode() || !editMode) return;
+  const initial = { ...currentProductData.custom };
+  const productPath = normalizeProductPath(
+    currentProductData.path || getCatalogProductPath(currentProductRef),
+  );
+  const dialog = document.createElement('dialog');
+  dialog.className = 'pim-delete-dialog';
+  dialog.setAttribute('aria-labelledby', 'customButtonsTitle');
+  dialog.innerHTML = `<form class="pim-delete-dialog-inner">
+    <h2 id="customButtonsTitle" class="pim-delete-dialog-title">Custom buttons</h2>
+    <div class="product-create-buttons">${renderProductButtons(initial)}
+      <label class="product-create-promo${initial.promoButton ? ' product-create-promo-selected' : ''}">promo:
+        <input name="promoButton" aria-label="Promotional button text">
+      </label>
+    </div>
+    <p role="status" aria-live="polite"></p>
+    <div class="pim-delete-dialog-actions">
+      <button type="button" class="pim-delete-dialog-cancel">Cancel</button>
+      <button type="submit" class="pim-io-open-btn">Save</button>
+    </div>
+  </form>`;
+  const form = dialog.querySelector('form');
+  const status = dialog.querySelector('[role="status"]');
+  const promoInput = form.elements.namedItem('promoButton');
+  promoInput.value = initial.promoButton || '';
+  promoInput.addEventListener('input', () => {
+    promoInput.closest('.product-create-promo')
+      .classList.toggle('product-create-promo-selected', Boolean(promoInput.value.trim()));
+  });
+  let saving = false;
+  const dismiss = () => {
+    if (saving) return;
+    dialog.close();
+    dialog.remove();
+  };
+  dialog.querySelector('[type="button"]').addEventListener('click', dismiss);
+  wireDialogEscapeDismiss(dialog, dismiss);
+  dialog.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    dismiss();
+  });
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (saving || !canUseEditMode() || !editMode) return;
+    const changes = BUTTON_SETTINGS.filter((setting) => (
+      form.elements.namedItem(setting).checked !== (initial[setting] === 'Yes')
+    )).map((setting) => [setting, form.elements.namedItem(setting).checked ? 'Yes' : 'No']);
+    const promo = promoInput.value.trim();
+    const promoChanged = promo !== (initial.promoButton || '');
+    if (!changes.length && !promoChanged) {
+      dismiss();
+      return;
+    }
+    saving = true;
+    [...form.elements].forEach((element) => { element.disabled = true; });
+    status.textContent = 'Saving custom buttons...';
+    try {
+      const product = await fetchCatalogProduct(productPath);
+      if (!product) throw new Error(`Product not found: ${productPath}`);
+      [product, ...(product.variants || [])].forEach((row) => {
+        row.custom = { ...row.custom, ...Object.fromEntries(changes) };
+        if (promoChanged) {
+          if (promo) row.custom.promoButton = promo;
+          else delete row.custom.promoButton;
+        }
+      });
+      await putOrPatchResource(catalogApiPath(productPath), product);
+      currentProductData = product;
+      refreshDetailContent();
+      saving = false;
+      dismiss();
+      showToast('Custom buttons saved.', 'success');
+    } catch (err) {
+      status.textContent = err.message || 'Failed to save custom buttons.';
+      showToast(status.textContent, 'error');
+    } finally {
+      saving = false;
+      [...form.elements].forEach((element) => { element.disabled = false; });
+    }
+  });
+  document.body.appendChild(dialog);
+  dialog.showModal();
+  dialog.querySelector('input').focus();
 }
 
 function variantImageEntries(images) {
@@ -294,6 +385,24 @@ function renderDeleteProduct(productPath, canDelete) {
   </section>`;
 }
 
+function renderVisibility(data, canEdit) {
+  if (!canEdit) return '';
+  const embargoed = data.metadata?.visibility === 'embargoed';
+  return `<section class="pim-visibility-section">
+    <h2>Visibility</h2>
+    <label class="pim-edit-toggle">
+      <span>Embargoed</span>
+      <span class="pim-edit-toggle-track">
+        <input type="checkbox" class="pim-edit-toggle-input" data-pim-visibility
+          role="switch" aria-label="Product visible" ${embargoed ? '' : 'checked'}>
+        <span class="pim-edit-toggle-thumb"></span>
+      </span>
+      <span>Visible</span>
+    </label>
+    <p data-pim-visibility-status role="status" aria-live="polite"></p>
+  </section>`;
+}
+
 function renderProduct(data, indexByUrlKey = {}, canEdit = false) {
   const priceBlock = renderPrice(data.price);
   const sections = [
@@ -316,10 +425,11 @@ function renderProduct(data, indexByUrlKey = {}, canEdit = false) {
     renderResources(data.custom?.resources),
     renderLinkedProducts(data.custom?.crosssellSkus, indexByUrlKey, 'Cross-sell'),
     renderLinkedProducts(data.custom?.relatedSkus, indexByUrlKey, 'Related products'),
-    renderCustom(data.custom),
+    renderCustom(data.custom, canEdit),
     (data.metadata && Object.keys(data.metadata).length > 0)
       ? `<div class="pim-detail-section"><h3 class="pim-detail-section-title">Raw metadata</h3><pre class="pim-detail-raw">${escapeHtml(JSON.stringify(data.metadata, null, 2))}</pre></div>`
       : '',
+    renderVisibility(data, canEdit),
     renderDeleteProduct(
       normalizeProductPath(data.path || getCatalogProductPath(currentProductRef)),
       canEdit,
@@ -798,6 +908,45 @@ function attachDeleteProductHandler() {
   content.querySelectorAll('[data-availability-edit]').forEach((button) => {
     button.addEventListener('click', openAvailabilityDialog);
   });
+  content.querySelector('[data-custom-edit]')?.addEventListener('click', openCustomButtonsDialog);
+  const visibilitySwitch = content.querySelector('[data-pim-visibility]');
+  if (visibilitySwitch instanceof HTMLInputElement) {
+    visibilitySwitch.addEventListener('change', async () => {
+      const visible = visibilitySwitch.checked;
+      const status = content.querySelector('[data-pim-visibility-status]');
+      const editCheckbox = document.getElementById('editModeCheckbox');
+      visibilitySwitch.disabled = true;
+      editCheckbox.disabled = true;
+      status.textContent = 'Saving visibility...';
+      try {
+        const productPath = normalizeProductPath(
+          currentProductData.path || getCatalogProductPath(currentProductRef),
+        );
+        const product = await fetchCatalogProduct(productPath);
+        if (!product) throw new Error(`Product not found: ${productPath}`);
+        const metadata = { ...product.metadata };
+        if (visible) {
+          delete metadata.robots;
+          delete metadata.visibility;
+        } else {
+          metadata.robots = 'noindex';
+          metadata.visibility = 'embargoed';
+        }
+        product.metadata = metadata;
+        await putOrPatchResource(catalogApiPath(productPath), product);
+        currentProductData = product;
+        refreshDetailContent();
+        showToast(visible ? 'Product is now visible.' : 'Product is now embargoed.', 'success');
+      } catch (err) {
+        visibilitySwitch.checked = !visible;
+        status.textContent = err.message || 'Failed to save visibility.';
+        showToast(status.textContent, 'error');
+      } finally {
+        visibilitySwitch.disabled = false;
+        applyEditModeToggle(editCheckbox);
+      }
+    });
+  }
   const deleteBtn = content.querySelector('[data-pim-delete-product]');
   if (deleteBtn instanceof HTMLButtonElement) {
     deleteBtn.addEventListener('click', () => {

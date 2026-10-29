@@ -147,62 +147,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.product-create-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-}
-
-.product-create-promo {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border: 1px solid #c9cccf;
-  border-radius: 6px;
-  background: #f1f5f9;
-  color: #6d7175;
-  font-size: 12px;
-}
-
-.product-create-button-toggle {
-  position: relative;
-  cursor: pointer;
-}
-
-.product-create-button-toggle input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  opacity: 0;
-}
-
-.product-create-button-toggle span {
-  display: block;
-  padding: 4px 10px;
-  border: 1px solid #c9cccf;
-  border-radius: 6px;
-  background: #f1f5f9;
-  color: #6d7175;
-  font-size: 12px;
-}
-
-.product-create-button-toggle input:checked + span,
-.product-create-promo-selected {
-  border-color: #2563eb;
-  background: #eef3fd;
-  color: #1e40af;
-  font-weight: 600;
-  box-shadow: inset 0 0 0 1px #2563eb;
-}
-
-.product-create-button-toggle input:focus-visible + span {
-  outline: 2px solid #2563eb;
-  outline-offset: 2px;
-}
-
 .product-create-bundle,
 .product-create-options-section,
 .product-create-advanced {
@@ -591,21 +535,6 @@
 
 .product-create-review-catalog + .product-create-review-catalog {
   border-top: 1px solid #dce1e6;
-}
-
-.product-create-dialog .product-create-promo input {
-  width: 120px;
-  padding: 0 4px;
-  border: 0;
-  border-radius: 2px;
-  background: transparent;
-  color: #202223;
-  font-size: 12px;
-}
-
-.product-create-promo input:focus-visible {
-  outline: 2px solid #2563eb;
-  outline-offset: 2px;
 }
 
 @media (width <= 600px) {

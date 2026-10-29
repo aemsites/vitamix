@@ -1,4 +1,12 @@
 /* Detail view – back link and layout */
+.pim-custom-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
 .pim-detail-main {
   padding-top: 16px;
 }
@@ -415,6 +423,17 @@
   border: 1px solid #e1e3e5;
   border-radius: 8px;
   padding: 24px;
+}
+
+.pim-visibility-section {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid #c9cccf;
+}
+
+.pim-visibility-section h2 {
+  margin: 0 0 12px;
+  font-size: 1rem;
 }
 
 .pim-delete-product {
