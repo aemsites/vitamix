@@ -189,6 +189,16 @@ r.parentNode.insertBefore(t,r)}}
 pintrk('load', '2621075961855'); pintrk('page');
 // End of Pinterest Tag
 
+// OpenAI Measurement Pixel (US only)
+if (pathname.startsWith('/us/en_us/')) {
+  window.oaiq = window.oaiq || function () {
+    (window.oaiq.q = window.oaiq.q || []).push(arguments);
+  };
+  window.oaiq('init', { pixelId: 'LEcZwKFjd4d3hhUqz2tJaf' });
+  loadScript('https://bzrcdn.openai.com/sdk/oaiq.min.js');
+}
+// End OpenAI Measurement Pixel
+
 /* eslint-enable */
 
 // LinkedIn Insight Tag
