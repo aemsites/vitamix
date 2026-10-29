@@ -326,8 +326,6 @@ main .section.banner > div {
 }
 
 main .nav-banner {
-  display: flex;
-  align-items: center;
   border-bottom: var(--border-m) solid var(--color-white);
   padding: var(--spacing-60);
   background-color: var(--color-charcoal);
@@ -335,6 +333,11 @@ main .nav-banner {
   font-size: var(--detail-size-l);
   text-align: center;
   transition: background-color 180ms ease, color 180ms ease;
+}
+
+main .nav-banner-carousel {
+  display: flex;
+  align-items: center;
 }
 
 main .nav-banner-content {

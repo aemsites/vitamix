@@ -1599,11 +1599,13 @@ export function findCurrentAlertBanners(banners, date = window.simulateDate || n
 export function renderAlertBanners(element, banners) {
   element.replaceChildren();
   element.classList.remove('nav-banner-light', 'nav-banner-dark');
+  const isCarousel = banners.length > 1;
+  element.classList.toggle('nav-banner-carousel', isCarousel);
   element.style.backgroundColor = '';
   if (!banners.length) return;
 
-  const content = document.createElement('div');
-  content.className = 'nav-banner-content';
+  const content = document.createElement(isCarousel ? 'div' : 'p');
+  if (isCarousel) content.className = 'nav-banner-content';
   content.setAttribute('aria-live', 'polite');
   content.setAttribute('aria-atomic', 'true');
   let index = 0;
@@ -1624,7 +1626,7 @@ export function renderAlertBanners(element, banners) {
     }
   };
 
-  if (banners.length > 1) {
+  if (isCarousel) {
     const createControl = (direction, label) => {
       const button = document.createElement('button');
       button.type = 'button';
