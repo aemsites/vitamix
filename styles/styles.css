@@ -332,6 +332,64 @@ main .nav-banner {
   color: var(--color-gray-100);
   font-size: var(--detail-size-l);
   text-align: center;
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+main .nav-banner-carousel {
+  display: flex;
+  align-items: center;
+}
+
+main .nav-banner-content {
+  flex: 1;
+  min-width: 0;
+}
+
+main .nav-banner-content > :first-child {
+  margin-top: 0;
+}
+
+main .nav-banner-content > :last-child {
+  margin-bottom: 0;
+}
+
+main .nav-banner button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+main .nav-banner button::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-top: 1px solid currentcolor;
+  border-right: 1px solid currentcolor;
+  transform: rotate(45deg);
+}
+
+main .nav-banner .nav-banner-previous::before {
+  transform: rotate(-135deg);
+}
+
+main .nav-banner button:focus-visible {
+  outline: 2px solid currentcolor;
+  outline-offset: -4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  main .nav-banner {
+    transition: none;
+  }
 }
 
 /* stylelint-disable-next-line no-descending-specificity */

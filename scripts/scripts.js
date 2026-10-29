@@ -1493,6 +1493,7 @@ function parseScheduleDates(startEl, endEl) {
  *   Column 2: End datetime (e.g., "12/31/2025 11:59pm")
  *   Column 3: Content
  *   Column 4: Color
+ *   Column 5: Optional numeric priority (lower numbers appear first)
  * Defaults to Eastern time (EST/EDT based on whether DST is in effect for that date).
  * @param {HTMLElement} block - The DOM element containing alert banner rows as children.
  * @returns {Array<Object>} Array of parsed banner objects with properties:
@@ -1500,12 +1501,19 @@ function parseScheduleDates(startEl, endEl) {
 export function parseAlertBanners(block) {
   const rows = [...block.children];
   return rows.map((row) => {
-    const [startEl, endEl, content, colorEl] = [...row.children];
+    const [startEl, endEl, content, colorEl, priorityEl] = [...row.children];
     const color = colorEl.textContent.trim();
+    const priorityText = priorityEl?.textContent.trim();
+    const priority = priorityText ? Number(priorityText) : null;
+    if (priorityText && !Number.isFinite(priority)) {
+      // eslint-disable-next-line no-console
+      console.warn('Invalid alert banner priority:', priorityText);
+    }
     return {
       ...parseScheduleDates(startEl, endEl),
       content,
       color,
+      priority: Number.isFinite(priority) ? priority : null,
     };
   });
 }
@@ -1570,6 +1578,78 @@ export function findCurrentScheduledItem(items, date = window.simulateDate || ne
     }
   });
   return bestItem;
+}
+
+/**
+ * Selects active prioritized banners in ascending order, preserving authored order for ties.
+ * Without priorities, retains the legacy last-active-row selection.
+ */
+export function findCurrentAlertBanners(banners, date = window.simulateDate || new Date()) {
+  const prioritized = banners.filter((banner) => banner.valid
+    && currentPastFuture(banner.start, banner.end, date) === 'current'
+    && Number.isFinite(banner.priority));
+  if (prioritized.length) return prioritized.sort((a, b) => a.priority - b.priority);
+  const fallback = findCurrentScheduledItem(banners, date);
+  return fallback ? [fallback] : [];
+}
+
+/**
+ * Renders the same manually navigated banner in the storefront and scheduling preview.
+ */
+export function renderAlertBanners(element, banners) {
+  element.replaceChildren();
+  element.classList.remove('nav-banner-light', 'nav-banner-dark');
+  const isCarousel = banners.length > 1;
+  element.classList.toggle('nav-banner-carousel', isCarousel);
+  element.style.backgroundColor = '';
+  if (!banners.length) return;
+
+  const content = document.createElement(isCarousel ? 'div' : 'p');
+  if (isCarousel) content.className = 'nav-banner-content';
+  content.setAttribute('aria-live', 'polite');
+  content.setAttribute('aria-atomic', 'true');
+  let index = 0;
+  let contentAnimation = null;
+  const showBanner = () => {
+    const selected = banners[index];
+    const clone = selected.content.cloneNode(true);
+    content.replaceChildren(...clone.childNodes);
+    element.classList.remove('nav-banner-light', 'nav-banner-dark');
+    element.style.backgroundColor = '';
+    if (selected.color) {
+      const value = getComputedStyle(document.documentElement)
+        .getPropertyValue(`--color-${selected.color}`).trim();
+      if (value) {
+        element.style.backgroundColor = `var(--color-${selected.color})`;
+        element.classList.add(`nav-banner-${getTextColor(value)}`);
+      }
+    }
+  };
+
+  if (isCarousel) {
+    const createControl = (direction, label) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `nav-banner-${direction < 0 ? 'previous' : 'next'}`;
+      button.setAttribute('aria-label', label);
+      button.addEventListener('click', () => {
+        contentAnimation?.cancel();
+        index = (index + direction + banners.length) % banners.length;
+        showBanner();
+        if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          contentAnimation = content.animate([
+            { transform: `translateX(${direction * 32}px)`, opacity: 0 },
+            { transform: 'translateX(0)', opacity: 1 },
+          ], { duration: 220, easing: 'ease-out' });
+        }
+      });
+      return button;
+    };
+    element.append(createControl(-1, 'Previous banner'), content, createControl(1, 'Next banner'));
+  } else {
+    element.append(content);
+  }
+  showBanner();
 }
 
 /**
@@ -1654,6 +1734,7 @@ export function formatDuration(ms) {
  * @param {Date} [date=new Date()] - Reference date for the "now" marker
  * @param {Function} [onDateChange=null] - Callback when date is changed via drag (receives newDate)
  * @param {Function} [onPreviewChange=null] - Callback when selected item changes
+ * @param {Function} [selectItem=findCurrentScheduledItem] - Scheduled item selection strategy
  * @returns {HTMLElement} Timeline container element
  */
 export function createTimeline(
@@ -1662,6 +1743,7 @@ export function createTimeline(
   date = new Date(),
   onDateChange = null,
   onPreviewChange = null,
+  selectItem = findCurrentScheduledItem,
 ) {
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const container = document.createElement('div');
@@ -1845,7 +1927,7 @@ export function createTimeline(
       const updateBarColors = (newDate) => {
         if (!barsCache) return null;
 
-        let newBestIdx = -1;
+        const newBestIdx = visibleItems.indexOf(selectItem(items, newDate));
 
         // Update bar classes
         for (let i = 0; i < barsCache.length; i += 1) {
@@ -1859,10 +1941,6 @@ export function createTimeline(
           bar.classList.toggle('timeline-bar-past', state === 'past');
           bar.classList.toggle('timeline-bar-current', state === 'current');
           bar.classList.toggle('timeline-bar-future', state === 'future');
-
-          if (state === 'current') {
-            newBestIdx = i;
-          }
         }
 
         // Update selected class only if changed
@@ -2003,23 +2081,12 @@ async function loadNavBanner(main) {
     const block = dom.querySelector('.alert-banners');
 
     const banners = parseAlertBanners(block);
-    const selectedBanner = findCurrentScheduledItem(banners);
+    const selectedBanners = findCurrentAlertBanners(banners);
 
-    if (selectedBanner && selectedBanner.content) {
+    if (selectedBanners.length) {
       const banner = document.createElement('aside');
       banner.className = 'nav-banner';
-      const p = document.createElement('p');
-      p.append(...selectedBanner.content.childNodes);
-      banner.append(p);
-      // apply custom color
-      if (selectedBanner.color) {
-        const styles = getComputedStyle(document.documentElement);
-        const value = styles.getPropertyValue(`--color-${selectedBanner.color}`).trim();
-        if (value) {
-          banner.style.backgroundColor = `var(--color-${selectedBanner.color})`;
-          banner.classList.add(`nav-banner-${getTextColor(value)}`);
-        }
-      }
+      renderAlertBanners(banner, selectedBanners);
       main.prepend(banner);
     }
   } catch (e) {
