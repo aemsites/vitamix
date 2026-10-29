@@ -1156,6 +1156,29 @@ export async function openModal(href) {
 }
 
 /**
+ * Loads a widget's localized copy from the JSON file next to its script.
+ * @param {string} widgetUrl - The widget module's `import.meta.url`
+ * @param {string} lang - Language code, e.g. 'en'
+ * @returns {Promise<Object>} Copy for `lang` (falls back to 'en'), or `{}` on failure
+ */
+export async function loadWidgetCopy(widgetUrl, lang) {
+  const copyPath = new URL(widgetUrl).pathname.replace(/\.js$/, '.json');
+  try {
+    const resp = await fetch(`${window.hlx?.codeBasePath || ''}${copyPath}`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    return data[lang] || data.en || {};
+  } catch (error) {
+    // Log and continue; widgets fall back to their default copy.
+    logError('widget-copy', new Error(`Widget copy failed to load: ${copyPath}`), {
+      copyPath,
+      cause: error?.message || String(error),
+    });
+    return {};
+  }
+}
+
+/**
  * Finds the clicked modal link, including when the click originated inside a shadow root.
  * @param {Event} e - Click event
  * @returns {HTMLAnchorElement|null} The modal link or null

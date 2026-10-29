@@ -1,22 +1,7 @@
 /* eslint-disable max-len */
 
 import { loadCSS } from '../../scripts/aem.js';
-import { getLocaleAndLanguage } from '../../scripts/scripts.js';
-
-/**
- * Load widget copy from the widget's local JSON (same name as the script).
- * @param {string} lang - Language key (e.g. en, fr)
- * @returns {Promise<Object>} Copy for that language (flat key-value)
- */
-async function loadWidgetCopy(lang) {
-  const scriptPath = new URL(import.meta.url).pathname;
-  const jsonPath = scriptPath.replace(/\.js$/, '.json');
-  const url = `${window.hlx?.codeBasePath || ''}${jsonPath}`;
-  const resp = await fetch(url);
-  const data = await resp.json();
-  const key = data[lang] ? lang : 'en';
-  return data[key] || {};
-}
+import { getLocaleAndLanguage, loadWidgetCopy } from '../../scripts/scripts.js';
 
 /**
  * Parses a publication date string (MM.DD.YYYY) into a Date object.
@@ -592,7 +577,7 @@ async function init() {
   if (articleCenter) {
     const { language } = getLocaleAndLanguage();
     const lang = (language || 'en_us').split('_')[0];
-    const copy = await loadWidgetCopy(lang);
+    const copy = await loadWidgetCopy(import.meta.url, lang);
 
     // Move existing H1 into article-center if it exists
     const existingH1 = document.querySelector('main h1');

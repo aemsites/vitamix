@@ -1,19 +1,4 @@
-import { getLocaleAndLanguage } from '../../scripts/scripts.js';
-
-/**
- * Load widget copy from local JSON (same basename as this script).
- * @param {string} lang - Language key (en, fr, es)
- * @returns {Promise<Object>}
- */
-async function loadWidgetCopy(lang) {
-  const scriptPath = new URL(import.meta.url).pathname;
-  const jsonPath = scriptPath.replace(/\.js$/, '.json');
-  const url = `${window.hlx?.codeBasePath || ''}${jsonPath}`;
-  const resp = await fetch(url);
-  const data = await resp.json();
-  const key = data[lang] ? lang : 'en';
-  return data[key] || {};
-}
+import { getLocaleAndLanguage, loadWidgetCopy } from '../../scripts/scripts.js';
 
 function useFcors() {
   const { hostname } = window.location;
@@ -668,7 +653,7 @@ export default async function decorate(widget) {
 
   const { language } = getLocaleAndLanguage();
   const lang = (language || 'en_us').split('_')[0];
-  const copy = await loadWidgetCopy(lang);
+  const copy = await loadWidgetCopy(import.meta.url, lang);
 
   const searchHint = copy.search || 'Search';
   const goLabel = copy.go || 'Go';
