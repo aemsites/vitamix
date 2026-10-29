@@ -284,5 +284,17 @@ if (!summary) {
   }, 500);
   // End tvScientific purchase pixel
 
+  // OpenAI purchase conversion (US only; base pixel loaded in consented.js)
+  if (window.location.pathname.startsWith('/us/en_us/')) {
+    window.oaiq?.('measure', 'order_created', {
+      type: 'contents',
+      amount: Math.round(summary.orderTotal * 100),
+      currency,
+    }, {
+      event_id: orderId,
+    });
+  }
+  // End OpenAI purchase conversion
+
   debugLog('Conversion tags fired');
 }
