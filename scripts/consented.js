@@ -1,9 +1,9 @@
 import { loadScript } from './aem.js';
 import './consented/newsletter.js';
+import loadLegacyClientLibraries from './consented/legacy/client-libraries.js';
 import {
   configureAnalyticsTrackingServers,
   ensureAnalyticsTrackingConfigured,
-  getDeploymentEnv,
   initDigitalDataPage,
   initInstrumentation,
   bootstrapEarlyTracking,
@@ -29,40 +29,10 @@ trackLogin();
 trackSocialEvents();
 trackFormEvents();
 
-// add delayed functionality here
-window.config = {
-  POOLID: 'us-east-1:d54ecd7d-db6e-456d-bf35-d26346122a63',
-  REGION: 'us-east-1',
-  BOTID: 'JBPXLTC0LW',
-  BOTALIASID: 'HUKYDI5LGI',
-};
-
-window.adobeDataLayer = window.adobeDataLayer || [];
-
-const currentEnvironment = document.createElement('div');
-currentEnvironment.classList.add('currentEnvironment');
-currentEnvironment.dataset.deploymentEnv = getDeploymentEnv();
-currentEnvironment.dataset.templatePath = '/conf/vitamix/settings/wcm/templates/default-page';
-document.body.appendChild(currentEnvironment);
-
-const chatbot = document.createElement('div');
-chatbot.id = 'chatbot-container';
-document.body.appendChild(chatbot);
+// Load AEM-hosted client libraries kept outside this codebase.
+const currentEnvironment = await loadLegacyClientLibraries();
 
 let metaPixelId = 2138559226702249;
-
-if (window.location.hostname !== 'uat.vitamix.com') {
-  loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-chatbot.lc-dd65664b07118365206104c205ccc20e-lc.min.js');
-} else {
-  loadScript('https://uat.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-chatbot.lc-0714245cb61f874967f99f575877978f-lc.min.js');
-}
-loadScript('https://www.vitamix.com/etc.clientlibs/core/wcm/components/commons/site/clientlibs/container.lc-0a6aff292f5cc42142779cde92054524-lc.min.js');
-
-await loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-library.lc-259cf15444c5fe1f89e5c54df7b6e1e9-lc.min.js');
-await loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-analytics.lc-26814920488a848ff91c1f425646d010-lc.min.js');
-// Patch AppMeasurement trackers (smetrics/ssl) as soon as clientlib-analytics loads.
-configureAnalyticsTrackingServers();
-loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-base.lc-daf5b8dac79e9cf7cb1c0b30d8372e7a-lc.min.js');
 
 const launchConfigByEnv = {
   prod: {
@@ -237,7 +207,7 @@ tdl.identify();
 // which adds this same tag if it is not already present.
 if (!document.getElementById('cjapitag')) {
     (function(a,b,c,d){
-        var cookieUrl = encodeURIComponent("https://www.vitamix.com/us/en_us/cookie/index/index");
+        var cookieUrl = encodeURIComponent("https://www.vitamix.com/us/en_us/cookie-statement");
         a='https://www.mczbf.com/tags/11931/tag.js?cookieUrl='+cookieUrl;
         b=document;c='script';d=b.createElement(c);d.src=a;
         d.type='text/java'+c;d.async=true;
