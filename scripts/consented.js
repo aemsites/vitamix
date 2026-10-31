@@ -29,7 +29,7 @@ trackLogin();
 trackSocialEvents();
 trackFormEvents();
 
-// Load AEM-hosted client libraries kept outside this codebase.
+// Load the legacy AEM client libraries from the local legacy directory.
 const currentEnvironment = await loadLegacyClientLibraries();
 
 let metaPixelId = 2138559226702249;

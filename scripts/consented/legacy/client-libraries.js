@@ -5,7 +5,7 @@ import {
 } from '../instrumentation/index.js';
 
 /**
- * Load AEM-hosted client libraries that remain external to this codebase.
+ * Load legacy AEM client libraries vendored in this directory.
  * @returns {Promise<HTMLElement>}
  */
 export default async function loadLegacyClientLibraries() {
@@ -29,16 +29,16 @@ export default async function loadLegacyClientLibraries() {
   document.body.appendChild(chatbot);
 
   if (window.location.hostname !== 'uat.vitamix.com') {
-    loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-chatbot.lc-dd65664b07118365206104c205ccc20e-lc.min.js');
+    loadScript(new URL('./chatbot.min.js', import.meta.url).href);
   } else {
-    loadScript('https://uat.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-chatbot.lc-0714245cb61f874967f99f575877978f-lc.min.js');
+    loadScript(new URL('./chatbot-uat.min.js', import.meta.url).href);
   }
-  loadScript('https://www.vitamix.com/etc.clientlibs/core/wcm/components/commons/site/clientlibs/container.lc-0a6aff292f5cc42142779cde92054524-lc.min.js');
+  loadScript(new URL('./container.min.js', import.meta.url).href);
 
-  await loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-library.lc-259cf15444c5fe1f89e5c54df7b6e1e9-lc.min.js');
-  await loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-analytics.lc-26814920488a848ff91c1f425646d010-lc.min.js');
+  await loadScript(new URL('./library.min.js', import.meta.url).href);
+  await loadScript(new URL('./analytics.min.js', import.meta.url).href);
   configureAnalyticsTrackingServers();
-  loadScript('https://www.vitamix.com/etc.clientlibs/vitamix/clientlibs/clientlib-base.lc-daf5b8dac79e9cf7cb1c0b30d8372e7a-lc.min.js');
+  loadScript(new URL('./base.min.js', import.meta.url).href);
 
   return currentEnvironment;
 }
