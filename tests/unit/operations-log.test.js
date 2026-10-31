@@ -449,6 +449,39 @@ test('logError: drops Safari and Firefox fetch/import wording from a bot user ag
   });
 });
 
+test('logError: drops a wrapped fetch failure (extra.cause) from a bot user agent', () => {
+  setUserAgent(UA.baidu);
+  ['HTTP 503', 'HTTP 404', 'Failed to fetch'].forEach((cause) => {
+    lastUrl = undefined;
+    captureFetch();
+    const copyPath = '/widgets/product-list/product-list.json';
+    logError('widget-copy', new Error(`Widget copy failed to load: ${copyPath}`), { copyPath, cause });
+    assert.equal(lastUrl, undefined, `widget copy "${cause}" from a bot must not be sent`);
+  });
+});
+
+test('logError: drops a wrapped fetch failure (Error.cause) from a bot user agent', () => {
+  captureFetch();
+  setUserAgent(UA.baidu);
+  logError('widget-copy', new Error('Widget copy failed to load', { cause: new Error('HTTP 503') }));
+  assert.equal(lastUrl, undefined);
+});
+
+test('logError: still logs a wrapped fetch failure from a normal browser', () => {
+  captureFetch();
+  setUserAgent(UA.chrome);
+  const copyPath = '/widgets/product-list/product-list.json';
+  logError('widget-copy', new Error(`Widget copy failed to load: ${copyPath}`), { copyPath, cause: 'HTTP 503' });
+  assert.equal(JSON.parse(lastInit.body).cause, 'HTTP 503');
+});
+
+test('logError: still logs a bot error whose cause is not a fetch failure', () => {
+  captureFetch();
+  setUserAgent(UA.baidu);
+  logError('widget-copy', new Error('Widget copy failed to load: /x.json'), { cause: 'Unexpected token < in JSON at position 0' });
+  assert.equal(JSON.parse(lastInit.body).scope, 'widget-copy');
+});
+
 test('logError: still logs a failed dynamic import from a normal browser', () => {
   captureFetch();
   setUserAgent(UA.chrome);
