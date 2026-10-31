@@ -237,7 +237,7 @@ tdl.identify();
 // which adds this same tag if it is not already present.
 if (!document.getElementById('cjapitag')) {
     (function(a,b,c,d){
-        var cookieUrl = encodeURIComponent("https://www.vitamix.com/us/en_us/cookie/index/index");
+        var cookieUrl = encodeURIComponent("https://www.vitamix.com/us/en_us/cookie-statement");
         a='https://www.mczbf.com/tags/11931/tag.js?cookieUrl='+cookieUrl;
         b=document;c='script';d=b.createElement(c);d.src=a;
         d.type='text/java'+c;d.async=true;
