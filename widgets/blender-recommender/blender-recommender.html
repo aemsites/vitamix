@@ -125,7 +125,7 @@
 
                       <label class="atom-large-toggle-box__label" :for="'q1-'+index">
                         <div class="atom-large-toggle-box__label__inner">
-                          <img class="atom-large-toggle-box__label__icon" aria-hidden="true" :src="'https://www.vitamix.com'+choice[3]" :aria-label="choice[1]" />
+                          <img class="atom-large-toggle-box__label__icon" aria-hidden="true" :src="choice[3]" :aria-label="choice[1]" />
                           <span class="atom-large-toggle-box__label__text">
                             <span class="atom-large-toggle-box__label__name" x-html="choice[1]">
                             </span>
@@ -220,7 +220,7 @@
 
                       <label class="atom-large-toggle-box__label" :for="'q3-'+index">
                         <div class="atom-large-toggle-box__label__inner">
-                          <img class="atom-large-toggle-box__label__icon" aria-hidden="true" :src="'https://www.vitamix.com'+choice[3]" :aria-label="choice[1]" />
+                          <img class="atom-large-toggle-box__label__icon" aria-hidden="true" :src="choice[3]" :aria-label="choice[1]" />
                           <span class="atom-large-toggle-box__label__text">
                             <span class="atom-large-toggle-box__label__name" x-html="choice[1]">
                             </span>
@@ -266,7 +266,7 @@
 
                       <label class="atom-large-toggle-box__label" :for="'q4-'+index">
                         <div class="atom-large-toggle-box__label__inner">
-                          <img class="atom-large-toggle-box__label__icon" aria-hidden="true" :src="'https://www.vitamix.com'+choice[3]" :aria-label="choice[1]" />
+                          <img class="atom-large-toggle-box__label__icon" aria-hidden="true" :src="choice[3]" :aria-label="choice[1]" />
                           <span class="atom-large-toggle-box__label__text">
                             <span class="atom-large-toggle-box__label__name" x-html="choice[1]">
                             </span>
@@ -406,7 +406,7 @@
       </div>
     </div>
 
-    <img class="ognm-blender-recommender__vortex-bg" src="https://www.vitamix.com/content/dam/vitamix/home/design-system/illustration/vortex-gray-medium.svg" alt="Watermark Image of Blender Blade" />
+    <img class="ognm-blender-recommender__vortex-bg" :src="resourceBase + 'images/vortex-gray-medium.svg'" alt="Watermark Image of Blender Blade" />
 
 
     <div class="ognm-blender-recommender__loader">
@@ -593,7 +593,7 @@
             <div class="ognm-cardlist-icons__card">
               <div class="ognm-cardlist-icons__card__inner">
                 <div class="ognm-cardlist-icons__card__image">
-                  <img class="ognm-cardlist-icons__card__image__img" :src="iconItem.icon + '?v=11-1-2023'" :alt="'Icon for ' + iconItem.title" />
+                  <img class="ognm-cardlist-icons__card__image__img" :src="iconItem.icon" :alt="'Icon for ' + iconItem.title" />
                 </div>
                 <div class="ognm-cardlist-icons__card__name atom-eyebrow atom-eyebrow--mega atom-resp-adjusted">
                   <span x-html="iconItem.title">
@@ -654,14 +654,14 @@
                   <div class="elmt-icon-items">
                     <div class="atom-icon-item">
                       <div class="atom-icon-item__icon">
-                        <img class="atom-icon-item__icon__img" src="https://www.vitamix.com/content/dam/vitamix/home/design-system/icon/difficulty.svg" aria-label="Levels Icon" />
+                        <img class="atom-icon-item__icon__img" :src="resourceBase + 'images/difficulty.svg'" aria-label="Levels Icon" />
                       </div>
                       <span class="atom-icon-item__label" x-html="language[currentLanguage].recipeSection.items[0].difficulty">
                       </span>
                     </div>
                     <div class="atom-icon-item">
                       <div class="atom-icon-item__icon">
-                        <img class="atom-icon-item__icon__img" src="https://www.vitamix.com/content/dam/vitamix/home/design-system/icon/time.svg" aria-label="Clock Icon" />
+                        <img class="atom-icon-item__icon__img" :src="resourceBase + 'images/time.svg'" aria-label="Clock Icon" />
                       </div>
                       <span class="atom-icon-item__label" x-html="language[currentLanguage].recipeSection.items[0].time">
                       </span>
@@ -699,14 +699,14 @@
                         <div class="elmt-icon-items">
                           <div class="atom-icon-item">
                             <div class="atom-icon-item__icon">
-                              <img class="atom-icon-item__icon__img" src="https://www.vitamix.com/content/dam/vitamix/home/design-system/icon/difficulty.svg" aria-label="Levels Icon" />
+                              <img class="atom-icon-item__icon__img" :src="resourceBase + 'images/difficulty.svg'" aria-label="Levels Icon" />
                             </div>
                             <span class="atom-icon-item__label" x-html="recipeItem.difficulty">
                             </span>
                           </div>
                           <div class="atom-icon-item">
                             <div class="atom-icon-item__icon">
-                              <img class="atom-icon-item__icon__img" src="https://www.vitamix.com/content/dam/vitamix/home/design-system/icon/time.svg" aria-label="Clock Icon" />
+                              <img class="atom-icon-item__icon__img" :src="resourceBase + 'images/time.svg'" aria-label="Clock Icon" />
                             </div>
                             <span class="atom-icon-item__label" x-html="recipeItem.time">Temps</span>
                           </div>
