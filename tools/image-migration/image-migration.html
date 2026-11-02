@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Image Migration</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="data:,">
+    <script src="https://da.live/nx/utils/sdk.js" type="module"></script>
+    <script src="https://da.live/nx/public/sl/components.js" type="module"></script>
+    <script src="/tools/image-migration/image-migration.js" type="module"></script>
+    <link rel="stylesheet" href="/tools/image-migration/image-migration.css">
+  </head>
+  <body class="image-migration">
+    <section>
+      <h1>Image Migration</h1>
+      <p>Crawls a section of your site to find images matching a specific source URL. Move those images into DA and either rewrite the image URLs or create draft copies of pages with updated references.</p>
+      <form>
+        <fieldset>
+          <legend>Source</legend>
+          <div class="field">
+            <label for="crawl-path">Crawl path</label>
+            <sl-input id="crawl-path" type="text" placeholder="/path" list="crawl-path-list"></sl-input>
+            <datalist id="crawl-path-list"></datalist>
+            <p>Path within your site to scan for pages. Leave empty to scan the entire site.</p>
+          </div>
+          <div class="field">
+            <label for="url-filter">Image URL filter</label>
+            <sl-input id="url-filter" type="text" placeholder="/content/dam" list="url-filter-list"></sl-input>
+            <datalist id="url-filter-list"></datalist>
+            <p>Substring to match against image src (e.g., domain, path segment, or both).</p>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Destination</legend>
+          <div class="field">
+            <label for="path-prefix">Path prefix to replace</label>
+            <sl-input id="path-prefix" type="text" placeholder="/content/dam" list="path-prefix-list"></sl-input>
+            <datalist id="path-prefix-list"></datalist>
+            <p>Portion of the image path to replace. Leave empty to keep the full path.</p>
+          </div>
+          <div class="field">
+            <label for="dest-path">Replace with</label>
+            <sl-input id="dest-path" type="text" placeholder="/media" list="dest-path-list"></sl-input>
+            <datalist id="dest-path-list"></datalist>
+            <p>DA path to replace the prefix above.</p>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Output mode</legend>
+          <div class="field">
+            <div class="mode-toggle">
+              <label for="mode-draft">
+                <input type="radio" name="output-mode" id="mode-draft" value="draft" checked>
+                <span>Draft</span>
+              </label>
+              <label for="mode-overwrite">
+                <input type="radio" name="output-mode" id="mode-overwrite" value="overwrite">
+                <span>Overwrite</span>
+              </label>
+            </div>
+            <p id="mode-description"></p>
+          </div>
+          <div class="field" id="draft-folder-row">
+            <label for="draft-folder">Draft folder</label>
+            <sl-input id="draft-folder" type="text" placeholder="/drafts/username" list="draft-folder-list"></sl-input>
+            <datalist id="draft-folder-list"></datalist>
+            <p>Path where draft pages are saved.</p>
+          </div>
+        </fieldset>
+        <div class="button-wrapper">
+          <sl-button class="primary outline" id="scan">Scan Pages for Image Matches</sl-button>
+          <sl-button class="primary outline" id="preview">Preview Paths to be Changed</sl-button>
+          <sl-button class="accent" id="run">Run Migration</sl-button>
+        </div>
+      </form>
+      <div class="results-container">
+        <div class="result scan" aria-hidden="true">
+          <div class="header">
+            <p>Pages with matching images - <span id="scan-count"></span></p>
+            <p>Time - <span id="scan-time">0.00s</span></p>
+          </div>
+          <div class="rows"></div>
+          <p class="empty" aria-hidden="true">No matching images found.</p>
+        </div>
+        <div class="result preview" aria-hidden="true">
+          <div class="header">
+            <p>Images to be imported - <span id="preview-count">0</span></p>
+            <p>Time - <span id="preview-time">0.00s</span></p>
+            <sl-button class="primary outline" id="toggle-origin">Toggle origin view</sl-button>
+          </div>
+          <div class="rows"></div>
+          <p class="empty" aria-hidden="true">No matching images found.</p>
+        </div>
+        <div class="result run" aria-hidden="true">
+          <div class="stats">
+            <div class="stat" data-filter="remaining">
+              <p>Remaining</p>
+              <p id="run-remaining">0</p>
+            </div>
+            <div class="stat error" data-filter="error">
+              <p>Errors</p>
+              <p id="run-errors">0</p>
+            </div>
+            <div class="stat success" data-filter="success">
+              <p>Success</p>
+              <p id="run-success">0</p>
+            </div>
+            <div class="stat" data-filter="total">
+              <p>Total</p>
+              <p id="run-total">0</p>
+            </div>
+          </div>
+          <div class="rows"></div>
+        </div>
+      </div>
+    </section>
+  </body>
+</html>
