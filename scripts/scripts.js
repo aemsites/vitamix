@@ -58,7 +58,7 @@ function registerErrorLogging() {
 // Locale+language pairs enabled for edge checkout.
 // Format: '<locale>/<language>' (e.g., 'ca/fr_ca'). Add pairs as each region goes live.
 // Keep this empty to use Adobe Commerce by default in every environment.
-const EDGE_CHECKOUT_LOCALES = ['ca/fr_ca', 'ca/en_us'];
+const EDGE_CHECKOUT_LOCALES = ['ca/fr_ca', 'ca/en_us', 'us/en_us'];
 export const EDGE_CHECKOUT_OVERRIDE_STORAGE_KEY = 'edgeCheckout';
 
 /**
@@ -94,7 +94,10 @@ export function isEdgeCheckoutOverrideEnabled(localeKey) {
   return getEdgeCheckoutOverrideLocales().includes(localeKey.toLowerCase());
 }
 
-export const isProdHost = hostname.includes('vitamix.com');
+// Production is only the canonical apex/www host. Environment subdomains such as
+// uat.vitamix.com, test.vitamix.com, or stage.vitamix.com must NOT be treated as
+// production, otherwise they pick up production public API keys/endpoints.
+export const isProdHost = hostname === 'www.vitamix.com' || hostname === 'vitamix.com';
 
 // Affirm public API key — safe to expose client-side (used for PDP promo widgets).
 // Checkout gets its key from the server's checkout object so it always matches the
@@ -104,10 +107,21 @@ export const FORMS_ENDPOINT = isProdHost
   ? ''
   : 'https://main--vitamix--aemsites.aem.network';
 
+// Public PayPal REST client IDs per environment. The PayPal SDK derives its environment
+// from the ID (a sandbox ID opens www.sandbox.paypal.com), so each ID must belong to the
+// same PayPal REST app as the clientId/clientSecret the Commerce API uses for that
+// environment. Production is only the canonical host (see isProdHost).
 const PAYPAL_CLIENT_IDS = {
-  us: 'AaBQdCVqIp15uFQaHrJmTUDBZ-xJrOYPs99NtZ-iLN5oij-ustZq304ikTHJKwqqSL4yN0v9GLireQLN',
-  ca: 'AVlGkhsI0_EFNFx8jnRsv0dSROcLzzLYtTdMoNieyjZeAWlIXdFpocB6eyhHvuDOZ3F2YFmQDkLE03Rp',
+  production: {
+    us: 'AXEZkJYX0uhAkORSHXQZpFbuGcZavyp13sVXuZKuL0OE2Ogtg-YXPftgHw8EUpSRW6xbdFzb9bJFihdE',
+    ca: 'Adh1NWHQFx0BRj-GC_mtv1qLLk9UGao-NWmxL4Qa-bG_jq69vahZHZzhp6QNfCi5m_LpbjDv4lSjOBfu',
+  },
+  sandbox: {
+    us: 'AaBQdCVqIp15uFQaHrJmTUDBZ-xJrOYPs99NtZ-iLN5oij-ustZq304ikTHJKwqqSL4yN0v9GLireQLN',
+    ca: 'AVlGkhsI0_EFNFx8jnRsv0dSROcLzzLYtTdMoNieyjZeAWlIXdFpocB6eyhHvuDOZ3F2YFmQDkLE03Rp',
+  },
 };
+const paypalClientIds = PAYPAL_CLIENT_IDS[isProdHost ? 'production' : 'sandbox'];
 const siteLocale = window.location.pathname.split('/').filter(Boolean)[0] || 'us';
 
 window.CommerceConfig = {
@@ -118,7 +132,7 @@ window.CommerceConfig = {
     '/scripts/cart-compatibility.js',
   ],
   paypal: {
-    clientId: PAYPAL_CLIENT_IDS[siteLocale] ?? PAYPAL_CLIENT_IDS.us,
+    clientId: paypalClientIds[siteLocale] ?? paypalClientIds.us,
     intent: 'authorize',
     orderReview: { express: true, checkout: true },
   },
@@ -327,7 +341,12 @@ export function getCookies() {
   return cookieMap;
 }
 
+let affiliateCouponHandled = false;
+
 function setAffiliateCoupon() {
+  // decorateMain also runs for fragments; handle the URL params once per page.
+  if (affiliateCouponHandled) return;
+  affiliateCouponHandled = true;
   const urlParams = new URLSearchParams(window.location.search);
   const { cjdata, cjevent, COUPON } = Object.fromEntries(urlParams);
 
@@ -1137,6 +1156,29 @@ export async function openModal(href) {
 }
 
 /**
+ * Loads a widget's localized copy from the JSON file next to its script.
+ * @param {string} widgetUrl - The widget module's `import.meta.url`
+ * @param {string} lang - Language code, e.g. 'en'
+ * @returns {Promise<Object>} Copy for `lang` (falls back to 'en'), or `{}` on failure
+ */
+export async function loadWidgetCopy(widgetUrl, lang) {
+  const copyPath = new URL(widgetUrl).pathname.replace(/\.js$/, '.json');
+  try {
+    const resp = await fetch(`${window.hlx?.codeBasePath || ''}${copyPath}`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    return data[lang] || data.en || {};
+  } catch (error) {
+    // Log and continue; widgets fall back to their default copy.
+    logError('widget-copy', new Error(`Widget copy failed to load: ${copyPath}`), {
+      copyPath,
+      cause: error?.message || String(error),
+    });
+    return {};
+  }
+}
+
+/**
  * Finds the clicked modal link, including when the click originated inside a shadow root.
  * @param {Event} e - Click event
  * @returns {HTMLAnchorElement|null} The modal link or null
@@ -1271,17 +1313,24 @@ export async function loggedFetch(input, init) {
         try {
           data = JSON.parse(text);
         } catch { /* noop */ }
+        // Sanitize diagnostic copies only; the actual request keeps its credentials.
         let requestBody = init?.body;
         try {
-          requestBody = JSON.parse(requestBody);
+          requestBody = JSON.parse(requestBody, (key, value) => (
+            key === 'paypalSessionToken' ? '[REDACTED]' : value
+          ));
         } catch { /* noop */ }
+        const requestHeaders = {};
+        new Headers(init?.headers).forEach((value, name) => {
+          requestHeaders[name] = name === 'authorization' ? '[REDACTED]' : value;
+        });
 
         /* eslint-disable no-console */
         console.group(`Error response from: ${input.toString()}`);
         console.error(JSON.stringify({
           status: response.status,
           method: init?.method ?? 'GET',
-          requestHeaders: init?.headers,
+          requestHeaders,
           requestBody,
           responseBody: data,
           xError,
@@ -1444,6 +1493,7 @@ function parseScheduleDates(startEl, endEl) {
  *   Column 2: End datetime (e.g., "12/31/2025 11:59pm")
  *   Column 3: Content
  *   Column 4: Color
+ *   Column 5: Optional numeric priority (lower numbers appear first)
  * Defaults to Eastern time (EST/EDT based on whether DST is in effect for that date).
  * @param {HTMLElement} block - The DOM element containing alert banner rows as children.
  * @returns {Array<Object>} Array of parsed banner objects with properties:
@@ -1451,12 +1501,19 @@ function parseScheduleDates(startEl, endEl) {
 export function parseAlertBanners(block) {
   const rows = [...block.children];
   return rows.map((row) => {
-    const [startEl, endEl, content, colorEl] = [...row.children];
+    const [startEl, endEl, content, colorEl, priorityEl] = [...row.children];
     const color = colorEl.textContent.trim();
+    const priorityText = priorityEl?.textContent.trim();
+    const priority = priorityText ? Number(priorityText) : null;
+    if (priorityText && !Number.isFinite(priority)) {
+      // eslint-disable-next-line no-console
+      console.warn('Invalid alert banner priority:', priorityText);
+    }
     return {
       ...parseScheduleDates(startEl, endEl),
       content,
       color,
+      priority: Number.isFinite(priority) ? priority : null,
     };
   });
 }
@@ -1521,6 +1578,78 @@ export function findCurrentScheduledItem(items, date = window.simulateDate || ne
     }
   });
   return bestItem;
+}
+
+/**
+ * Selects active prioritized banners in ascending order, preserving authored order for ties.
+ * Without priorities, retains the legacy last-active-row selection.
+ */
+export function findCurrentAlertBanners(banners, date = window.simulateDate || new Date()) {
+  const prioritized = banners.filter((banner) => banner.valid
+    && currentPastFuture(banner.start, banner.end, date) === 'current'
+    && Number.isFinite(banner.priority));
+  if (prioritized.length) return prioritized.sort((a, b) => a.priority - b.priority);
+  const fallback = findCurrentScheduledItem(banners, date);
+  return fallback ? [fallback] : [];
+}
+
+/**
+ * Renders the same manually navigated banner in the storefront and scheduling preview.
+ */
+export function renderAlertBanners(element, banners) {
+  element.replaceChildren();
+  element.classList.remove('nav-banner-light', 'nav-banner-dark');
+  const isCarousel = banners.length > 1;
+  element.classList.toggle('nav-banner-carousel', isCarousel);
+  element.style.backgroundColor = '';
+  if (!banners.length) return;
+
+  const content = document.createElement(isCarousel ? 'div' : 'p');
+  if (isCarousel) content.className = 'nav-banner-content';
+  content.setAttribute('aria-live', 'polite');
+  content.setAttribute('aria-atomic', 'true');
+  let index = 0;
+  let contentAnimation = null;
+  const showBanner = () => {
+    const selected = banners[index];
+    const clone = selected.content.cloneNode(true);
+    content.replaceChildren(...clone.childNodes);
+    element.classList.remove('nav-banner-light', 'nav-banner-dark');
+    element.style.backgroundColor = '';
+    if (selected.color) {
+      const value = getComputedStyle(document.documentElement)
+        .getPropertyValue(`--color-${selected.color}`).trim();
+      if (value) {
+        element.style.backgroundColor = `var(--color-${selected.color})`;
+        element.classList.add(`nav-banner-${getTextColor(value)}`);
+      }
+    }
+  };
+
+  if (isCarousel) {
+    const createControl = (direction, label) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `nav-banner-${direction < 0 ? 'previous' : 'next'}`;
+      button.setAttribute('aria-label', label);
+      button.addEventListener('click', () => {
+        contentAnimation?.cancel();
+        index = (index + direction + banners.length) % banners.length;
+        showBanner();
+        if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          contentAnimation = content.animate([
+            { transform: `translateX(${direction * 32}px)`, opacity: 0 },
+            { transform: 'translateX(0)', opacity: 1 },
+          ], { duration: 220, easing: 'ease-out' });
+        }
+      });
+      return button;
+    };
+    element.append(createControl(-1, 'Previous banner'), content, createControl(1, 'Next banner'));
+  } else {
+    element.append(content);
+  }
+  showBanner();
 }
 
 /**
@@ -1605,6 +1734,7 @@ export function formatDuration(ms) {
  * @param {Date} [date=new Date()] - Reference date for the "now" marker
  * @param {Function} [onDateChange=null] - Callback when date is changed via drag (receives newDate)
  * @param {Function} [onPreviewChange=null] - Callback when selected item changes
+ * @param {Function} [selectItem=findCurrentScheduledItem] - Scheduled item selection strategy
  * @returns {HTMLElement} Timeline container element
  */
 export function createTimeline(
@@ -1613,6 +1743,7 @@ export function createTimeline(
   date = new Date(),
   onDateChange = null,
   onPreviewChange = null,
+  selectItem = findCurrentScheduledItem,
 ) {
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const container = document.createElement('div');
@@ -1796,7 +1927,7 @@ export function createTimeline(
       const updateBarColors = (newDate) => {
         if (!barsCache) return null;
 
-        let newBestIdx = -1;
+        const newBestIdx = visibleItems.indexOf(selectItem(items, newDate));
 
         // Update bar classes
         for (let i = 0; i < barsCache.length; i += 1) {
@@ -1810,10 +1941,6 @@ export function createTimeline(
           bar.classList.toggle('timeline-bar-past', state === 'past');
           bar.classList.toggle('timeline-bar-current', state === 'current');
           bar.classList.toggle('timeline-bar-future', state === 'future');
-
-          if (state === 'current') {
-            newBestIdx = i;
-          }
         }
 
         // Update selected class only if changed
@@ -1954,23 +2081,12 @@ async function loadNavBanner(main) {
     const block = dom.querySelector('.alert-banners');
 
     const banners = parseAlertBanners(block);
-    const selectedBanner = findCurrentScheduledItem(banners);
+    const selectedBanners = findCurrentAlertBanners(banners);
 
-    if (selectedBanner && selectedBanner.content) {
+    if (selectedBanners.length) {
       const banner = document.createElement('aside');
       banner.className = 'nav-banner';
-      const p = document.createElement('p');
-      p.append(...selectedBanner.content.childNodes);
-      banner.append(p);
-      // apply custom color
-      if (selectedBanner.color) {
-        const styles = getComputedStyle(document.documentElement);
-        const value = styles.getPropertyValue(`--color-${selectedBanner.color}`).trim();
-        if (value) {
-          banner.style.backgroundColor = `var(--color-${selectedBanner.color})`;
-          banner.classList.add(`nav-banner-${getTextColor(value)}`);
-        }
-      }
+      renderAlertBanners(banner, selectedBanners);
       main.prepend(banner);
     }
   } catch (e) {
@@ -2085,7 +2201,13 @@ async function checkSchedule() {
 async function loadEager(doc) {
   registerErrorLogging();
   const { locale, language } = getLocaleAndLanguage();
-  document.documentElement.lang = language ? language.split('_')[0] : 'en';
+  if (getMetadata('visibility').trim().toLowerCase() === 'embargoed') {
+    const { default: checkEmbargoGate } = await import('./embargo-gate.js');
+    await checkEmbargoGate(`/${locale}/${language}`);
+  }
+  const lang = language.split('_')[0];
+  // VR (the international store) is not a country, so its lang has no region.
+  document.documentElement.lang = locale === 'vr' ? lang : `${lang}-${locale.toUpperCase()}`;
 
   const localeKey = `${locale}/${language}`;
   // Edge checkout is enabled only for locale+language pairs in EDGE_CHECKOUT_LOCALES.

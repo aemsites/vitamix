@@ -9,7 +9,9 @@ import { createModal } from '../modal/modal.js';
  * @returns {boolean}
  */
 function isVideo(el) {
-  return el.href.startsWith('https://www.youtube.com/watch?v=') || el.href.startsWith('https://youtu.be/');
+  return el.href.startsWith('https://www.youtube.com/watch?v=')
+    || el.href.startsWith('https://youtu.be/')
+    || /^https:\/\/(?:www\.|m\.)?youtube\.com\/shorts\/[^/?#]+/.test(el.href);
 }
 
 /**
@@ -126,15 +128,15 @@ export default function renderGallery(block, variants) {
       return clone;
     });
 
-    // grab fallback images
-    const fallbackImages = block.querySelectorAll('.img-wrapper');
-    const fallbackVideos = block.querySelectorAll('.video-wrapper');
+    // collect fallback images and videos in their authored order
+    const fallbackMedia = block.querySelectorAll('.img-wrapper, .video-wrapper');
 
     // store clones for reset functionality
-    window.defaultProductImages = Array.from(fallbackImages).map((img) => img.cloneNode(true));
+    window.defaultProductImages = Array.from(block.querySelectorAll('.img-wrapper'))
+      .map((img) => img.cloneNode(true));
 
-    // append slides from images
-    [...variantImages, ...fallbackImages, ...fallbackVideos].forEach((el) => {
+    // append variant images, followed by fallback media in authored order
+    [...variantImages, ...fallbackMedia].forEach((el) => {
       const { source } = el.dataset;
       const slide = buildSlide(el, source);
       if (slide) {

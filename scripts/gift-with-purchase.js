@@ -32,13 +32,7 @@ const ENDPOINT_OVERRIDE_KEY = 'vitamix.priceRulesUrl';
 /** Mirrors the prod-host check in commerce-config.js. */
 function isNonProdHost() {
   const { hostname } = window.location;
-  return hostname.endsWith('.aem.page')
-    || hostname.endsWith('.aem.live')
-    || hostname.endsWith('.aem.network')
-    || hostname === 'localhost'
-    || hostname.startsWith('127.')
-    || hostname.startsWith('integration.')
-    || hostname.startsWith('uat.');
+  return hostname !== 'www.vitamix.com' && hostname !== 'vitamix.com';
 }
 
 function readLocalStorage(key) {

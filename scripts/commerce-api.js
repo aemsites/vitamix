@@ -3,7 +3,7 @@ import { getToken } from './auth-api.js';
 import { mintRecaptchaToken, RECAPTCHA_ACTIONS, RECAPTCHA_HEADER } from './recaptcha.js';
 import { getLocaleAndLanguage, loggedFetch } from './scripts.js';
 import { logApiError, logNetworkError } from './operations-log.js';
-import { getAffiliateCode } from './commerce/coupon-state.js';
+import { getAffiliateCode, normalizeCouponCode } from './commerce/coupon-state.js';
 import { applyPriceCorrection } from './commerce/price-correction.js';
 
 /**
@@ -12,33 +12,13 @@ import { applyPriceCorrection } from './commerce/price-correction.js';
  * can inspect the error detail without re-parsing the response.
  */
 class CommerceApiError extends Error {
-  constructor(status, body, errorHeader) {
+  constructor(status, body, errorHeader, errorCode) {
     super(body?.message || `API error ${status}`);
     this.status = status;
     this.body = body;
     this.errorHeader = errorHeader || null;
+    this.code = body?.code || errorCode || null;
   }
-}
-
-// Characters the Commerce API accepts in a coupon code. The `+` is valid but was
-// absent from the historical coupon import (which uppercased and mapped every
-// other special char — `*`, `#`, etc. — to `_` via /[^A-Z0-9\-_]/g), so codes at
-// rest never contain it. We normalize the same way here but keep `+` in the set,
-// so a `+` a shopper types is sent through unchanged while legacy special chars
-// still collapse to `_` and match the imported codes.
-const COUPON_NON_CHARSET = /[^A-Z0-9\-_+]/g;
-
-/**
- * Normalizes a coupon code to the API-accepted character set: uppercased, with
- * any character outside [A-Z0-9-_+] replaced by `_`. Mirrors the historical
- * import so shopper-entered codes match what is stored. Display values are left
- * untouched — only the value sent to the API is normalized.
- *
- * @param {string} raw - The coupon code as entered/displayed
- * @returns {string}
- */
-export function normalizeCouponCode(raw) {
-  return String(raw).toUpperCase().replace(COUPON_NON_CHARSET, '_');
 }
 
 /**
@@ -110,7 +90,7 @@ async function post(path, body, recaptchaAction) {
     logApiError({
       method: 'POST', path, status: resp.status, responseBody: data, requestBody: payload,
     });
-    throw new CommerceApiError(resp.status, data, resp.headers.get('x-error'));
+    throw new CommerceApiError(resp.status, data, resp.headers.get('x-error'), resp.headers.get('x-error-code'));
   }
   return data;
 }
@@ -147,7 +127,7 @@ export async function estimateShipping(country, state, items, couponCode, coupon
 /**
  * Validates a coupon code and returns the resulting discounts without requiring
  * a shipping method. Backed by POST /estimate/price — throws CommerceApiError
- * with errorHeader set to the coupon error code on any validation failure.
+ * on any coupon validation failure (see getCouponErrorCode).
  *
  * @param {string} country - ISO 3166-1 alpha-2 country code (e.g. 'us', 'ca')
  * @param {Array} items - Cart items in API format
@@ -305,11 +285,12 @@ export async function cancelPayment(orderId, idempotencyKey) {
  * @param {string} path - API path relative to config.apiOrigin
  * @param {object|null} body - Request payload; omitted when null
  * @param {string} method - HTTP verb (GET, POST, PATCH, etc.)
+ * @param {Record<string, string>} [extraHeaders] - Additional request headers
  * @returns {Promise<object>} Parsed JSON response body
  * @throws {CommerceApiError} If the response status is not 2xx
  */
-async function request(path, body, method) {
-  const headers = {};
+async function request(path, body, method, extraHeaders = {}) {
+  const headers = { ...extraHeaders };
   if (body !== null) headers['Content-Type'] = 'application/json';
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -333,18 +314,34 @@ async function request(path, body, method) {
     logApiError({
       method, path, status: resp.status, responseBody: data, requestBody: body,
     });
-    throw new CommerceApiError(resp.status, data, resp.headers.get('x-error'));
+    throw new CommerceApiError(resp.status, data, resp.headers.get('x-error'), resp.headers.get('x-error-code'));
   }
   return data;
 }
 
 /**
+ * Header carrying the PayPal session capability returned by createPayPalSession.
+ * The Commerce API requires it on session PATCH/GET (HCA-01).
+ */
+const PAYPAL_SESSION_HEADER = 'x-paypal-session';
+
+/**
+ * @param {string} [sessionToken]
+ * @returns {Record<string, string>} the capability header, or nothing without a token
+ */
+function paypalSessionHeaders(sessionToken) {
+  return sessionToken ? { [PAYPAL_SESSION_HEADER]: sessionToken } : {};
+}
+
+/**
  * Creates a PayPal order via the commerce API session endpoint.
  * Called in the PayPal SDK's createOrder callback before a shipping address is known.
+ * The response includes `sessionToken`, the capability for later session calls and
+ * PayPal Express payment initiation (absent from APIs that predate it).
  *
  * @param {Array<object>} items - Cart line items in API format
  * @param {object} config - Commerce config with getLocale(), getLanguage(), currency
- * @returns {Promise<{paypalOrderId: string}>}
+ * @returns {Promise<{paypalOrderId: string, sessionToken?: string}>}
  * @throws {CommerceApiError}
  */
 export async function createPayPalSession(items, config) {
@@ -367,11 +364,18 @@ export async function createPayPalSession(items, config) {
  * @param {string} paypalOrderId - PayPal order ID from createPayPalSession
  * @param {object} data - Patch payload ({ type, address?, items?,
  *   selectedOptionId?, total?, taxAmount?, shippingRate? })
+ * @param {string} [sessionToken] - Capability from createPayPalSession; sent as
+ *   `x-paypal-session` when present
  * @returns {Promise<object>} API response
  * @throws {CommerceApiError}
  */
-export async function patchPayPalSession(paypalOrderId, data) {
-  return request(`/payments/paypal/session/${paypalOrderId}`, data, 'PATCH');
+export async function patchPayPalSession(paypalOrderId, data, sessionToken) {
+  return request(
+    `/payments/paypal/session/${paypalOrderId}`,
+    data,
+    'PATCH',
+    paypalSessionHeaders(sessionToken),
+  );
 }
 
 /**
@@ -381,16 +385,23 @@ export async function patchPayPalSession(paypalOrderId, data) {
  * @param {string} paypalOrderId - PayPal order ID from createPayPalSession
  * @param {string} [country] - Store country code for provider config resolution
  * @param {string} [locale] - Store locale for provider config resolution
+ * @param {string} [sessionToken] - Capability from createPayPalSession; sent as
+ *   `x-paypal-session` when present (never in the URL)
  * @returns {Promise<{payer: object, shippingAddress: object,
  *   selectedOptionId: string|undefined}>}
  * @throws {CommerceApiError}
  */
-export async function getPayPalSession(paypalOrderId, country, locale) {
+export async function getPayPalSession(paypalOrderId, country, locale, sessionToken) {
   const params = new URLSearchParams();
   if (country) params.set('country', country);
   if (locale) params.set('locale', locale);
   const qs = params.size ? `?${params}` : '';
-  return request(`/payments/paypal/session/${paypalOrderId}${qs}`, null, 'GET');
+  return request(
+    `/payments/paypal/session/${paypalOrderId}${qs}`,
+    null,
+    'GET',
+    paypalSessionHeaders(sessionToken),
+  );
 }
 
 /**

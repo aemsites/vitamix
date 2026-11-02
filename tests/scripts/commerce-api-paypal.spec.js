@@ -31,8 +31,8 @@ class CommerceApiError extends Error {
  * @param {string} method
  * @param {{ apiOrigin: string, token: string|null, fetchFn: Function }} deps
  */
-async function request(path, body, method, { apiOrigin, token, fetchFn }) {
-  const headers = {};
+async function request(path, body, method, { apiOrigin, token, fetchFn }, extraHeaders = {}) {
+  const headers = { ...extraHeaders };
   if (body !== null) headers['Content-Type'] = 'application/json';
   if (token) headers.Authorization = `Bearer ${token}`;
   const resp = await fetchFn(`${apiOrigin}${path}`, {
@@ -56,12 +56,28 @@ async function createPayPalSession(items, config, deps) {
   }, 'POST', deps);
 }
 
-async function patchPayPalSession(paypalOrderId, data, deps) {
-  return request(`/payments/paypal/session/${paypalOrderId}`, data, 'PATCH', deps);
+function paypalSessionHeaders(sessionToken) {
+  return sessionToken ? { 'x-paypal-session': sessionToken } : {};
 }
 
-async function getPayPalSession(paypalOrderId, deps) {
-  return request(`/payments/paypal/session/${paypalOrderId}`, null, 'GET', deps);
+async function patchPayPalSession(paypalOrderId, data, deps, sessionToken) {
+  return request(
+    `/payments/paypal/session/${paypalOrderId}`,
+    data,
+    'PATCH',
+    deps,
+    paypalSessionHeaders(sessionToken),
+  );
+}
+
+async function getPayPalSession(paypalOrderId, deps, sessionToken) {
+  return request(
+    `/payments/paypal/session/${paypalOrderId}`,
+    null,
+    'GET',
+    deps,
+    paypalSessionHeaders(sessionToken),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -275,5 +291,36 @@ test.describe('request helper', () => {
     const { deps, getCapture } = makeCapturingDeps({ responseBody: {} });
     await getPayPalSession(PAYPAL_ORDER_ID, deps);
     expect(getCapture().init.headers['X-Recaptcha-Token']).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PayPal session capability (HCA-01)
+// ---------------------------------------------------------------------------
+
+test.describe('PayPal session capability header (HCA-01)', () => {
+  test('patchPayPalSession sends x-paypal-session when a token is given', async () => {
+    const { deps, getCapture } = makeCapturingDeps({ responseBody: { ok: true } });
+    await patchPayPalSession(PAYPAL_ORDER_ID, { type: 'option' }, deps, 'cap-1');
+    expect(getCapture().init.headers['x-paypal-session']).toBe('cap-1');
+  });
+
+  test('patchPayPalSession omits x-paypal-session without a token', async () => {
+    const { deps, getCapture } = makeCapturingDeps({ responseBody: { ok: true } });
+    await patchPayPalSession(PAYPAL_ORDER_ID, { type: 'option' }, deps);
+    expect('x-paypal-session' in getCapture().init.headers).toBe(false);
+  });
+
+  test('getPayPalSession sends x-paypal-session and keeps it out of the URL', async () => {
+    const { deps, getCapture } = makeCapturingDeps({ responseBody: {} });
+    await getPayPalSession(PAYPAL_ORDER_ID, deps, 'cap-1');
+    expect(getCapture().init.headers['x-paypal-session']).toBe('cap-1');
+    expect(getCapture().url).not.toContain('cap-1');
+  });
+
+  test('getPayPalSession omits x-paypal-session without a token', async () => {
+    const { deps, getCapture } = makeCapturingDeps({ responseBody: {} });
+    await getPayPalSession(PAYPAL_ORDER_ID, deps);
+    expect('x-paypal-session' in getCapture().init.headers).toBe(false);
   });
 });

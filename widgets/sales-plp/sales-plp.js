@@ -1,21 +1,7 @@
 import { loadCSS, fetchPlaceholders } from '../../scripts/aem.js';
-import { getLocaleAndLanguage } from '../../scripts/scripts.js';
+import loadColorSwatches from '../../scripts/color-swatches.js';
+import { getLocaleAndLanguage, loadWidgetCopy } from '../../scripts/scripts.js';
 import { lookupProducts, createProductCard } from '../../blocks/plp/plp.js';
-
-/**
- * Load widget copy from the widget's local JSON.
- * @param {string} lang - Language key (e.g. en, fr)
- * @returns {Promise<Object>} Copy for that language
- */
-async function loadWidgetCopy(lang) {
-  const scriptPath = new URL(import.meta.url).pathname;
-  const jsonPath = scriptPath.replace(/\.js$/, '.json');
-  const url = `${window.hlx?.codeBasePath || ''}${jsonPath}`;
-  const resp = await fetch(url);
-  const data = await resp.json();
-  const key = data[lang] ? lang : 'en';
-  return data[key] || {};
-}
 
 /**
  * Returns true if the product is on sale (has a lower price than regular).
@@ -36,11 +22,12 @@ function isOnSale(product) {
 export default async function decorate(widget) {
   const { locale, language } = getLocaleAndLanguage();
   const lang = (language || 'en_us').split('_')[0];
-  const copy = await loadWidgetCopy(lang);
+  const copy = await loadWidgetCopy(import.meta.url, lang);
   const ph = await fetchPlaceholders(`/${locale}/${language}/products/config`);
 
   // Load PLP block styles so product cards match the PLP block
   loadCSS(`${window.hlx?.codeBasePath || ''}/blocks/plp/plp.css`);
+  loadColorSwatches();
 
   const resultsEl = widget.querySelector('.plp-results');
   const countEl = widget.querySelector('#sales-plp-results-count');

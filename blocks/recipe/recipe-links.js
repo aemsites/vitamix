@@ -36,8 +36,16 @@ function findTitleMatches(text, titles) {
       const idx = text.indexOf(title, start);
       if (idx === -1) break;
       const end = idx + title.length;
+      const previousCodeUnit = text.charCodeAt(idx - 1);
+      const previousIndex = previousCodeUnit >= 0xDC00 && previousCodeUnit <= 0xDFFF
+        ? idx - 2
+        : idx - 1;
+      const hasWordBoundaryBefore = previousIndex < 0
+        || !/[\p{L}\p{M}\p{N}_]/u.test(String.fromCodePoint(text.codePointAt(previousIndex)));
+      const hasWordBoundaryAfter = end >= text.length
+        || !/[\p{L}\p{M}\p{N}_]/u.test(String.fromCodePoint(text.codePointAt(end)));
       const overlaps = matches.some((match) => idx < match.end && end > match.start);
-      if (!overlaps) {
+      if (hasWordBoundaryBefore && hasWordBoundaryAfter && !overlaps) {
         matches.push({ start: idx, end, path });
       }
       start = idx + title.length;

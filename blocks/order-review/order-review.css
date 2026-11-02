@@ -238,6 +238,14 @@
 }
 
 /* ── Items list (static) ────────────────────────────────────────── */
+
+/* Size the line-item layout off the card's own width, not the viewport: the card
+   is narrow on phones AND in the two-column layout just above 900px, and the
+   four-column row below needs ~460px to fit. */
+.order-review-items {
+  container: order-review-items / inline-size;
+}
+
 .order-review-item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 80px 48px 90px;
@@ -319,6 +327,40 @@
   margin: 2px 0 0;
   color: var(--commerce-color-success);
   font-size: var(--commerce-font-size-xs);
+}
+
+/* Narrow card: the item column would collapse to a sliver and the item lead
+   (image + name) would overflow onto the Price column. Give the lead its own
+   row and lay price / qty / subtotal out beneath it; the column header is
+   replaced by a per-cell label (data-label, localized in the block JS). */
+@container order-review-items (width < 460px) {
+  .order-review-item-head {
+    display: none;
+  }
+
+  .order-review-item {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .order-review-item-lead {
+    grid-column: 1 / -1;
+  }
+
+  .order-review-item .order-review-col-price {
+    text-align: left;
+  }
+
+  .order-review-item [data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 2px;
+    color: var(--commerce-color-text-muted);
+    font-size: var(--commerce-font-size-xs);
+    font-weight: normal;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
 }
 
 /* ── Order-total summary (right column) ─────────────────────────── */

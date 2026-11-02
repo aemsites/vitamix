@@ -1,7 +1,8 @@
 import {
   fetchPlaceholders, loadCSS, toClassName,
 } from '../../scripts/aem.js';
-import { formatPrice } from '../../scripts/scripts.js';
+import loadColorSwatches from '../../scripts/color-swatches.js';
+import { formatPrice, loadWidgetCopy } from '../../scripts/scripts.js';
 import {
   getCompareSlug, getStoredCompareSlugs, setStoredCompareItems, MAX_COMPARE_ITEMS,
 } from '../../scripts/add-to-compare.js';
@@ -15,21 +16,6 @@ const COMPARE_PARAM = 'compare-products';
 
 /** Sentinel for a comparison-feature bullet with no ":value" part (a plain included feature). */
 const CHECK_VALUE = ':check:';
-
-/**
- * Load widget copy from the widget's local JSON.
- * @param {string} lang - Language key (e.g. en, fr)
- * @returns {Promise<Object>} Copy for that language
- */
-async function loadWidgetCopy(lang) {
-  const scriptPath = new URL(import.meta.url).pathname;
-  const jsonPath = scriptPath.replace(/\.js$/, '.json');
-  const url = `${window.hlx?.codeBasePath || ''}${jsonPath}`;
-  const resp = await fetch(url);
-  const data = await resp.json();
-  const key = data[lang] ? lang : 'en';
-  return data[key] || {};
-}
 
 /**
  * Reads comparison slugs from the query param, accepting legacy paths and absolute URLs.
@@ -618,11 +604,11 @@ function renderAddTrigger(container, candidates, currentProducts, ph, copy) {
 export default async function decorate(widget) {
   const { locale, language } = getWidgetLocaleAndLanguage();
   const lang = (language || 'en_us').split('_')[0];
-  const copy = await loadWidgetCopy(lang);
+  const copy = await loadWidgetCopy(import.meta.url, lang);
   const ph = await fetchPlaceholders(`/${locale}/${language}/products/config`);
 
   loadCSS(`${window.hlx?.codeBasePath || ''}/widgets/compare-products/compare-products.css`);
-  loadCSS(`${window.hlx?.codeBasePath || ''}/styles/color-swatches.css`);
+  loadColorSwatches();
 
   const gridEl = widget.querySelector('.compare-products-widget-grid');
   const addSectionEl = widget.querySelector('.compare-products-widget-add-section');

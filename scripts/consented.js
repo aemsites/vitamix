@@ -189,6 +189,16 @@ r.parentNode.insertBefore(t,r)}}
 pintrk('load', '2621075961855'); pintrk('page');
 // End of Pinterest Tag
 
+// OpenAI Measurement Pixel (US only)
+if (pathname.startsWith('/us/en_us/')) {
+  window.oaiq = window.oaiq || function () {
+    (window.oaiq.q = window.oaiq.q || []).push(arguments);
+  };
+  window.oaiq('init', { pixelId: 'LEcZwKFjd4d3hhUqz2tJaf' });
+  loadScript('https://bzrcdn.openai.com/sdk/oaiq.min.js');
+}
+// End OpenAI Measurement Pixel
+
 /* eslint-enable */
 
 // LinkedIn Insight Tag
@@ -241,6 +251,7 @@ if (!document.getElementById('cjapitag')) {
 await loadScript('https://www.googletagmanager.com/gtag/js?id=AW-992994739');
 gtag('js', new Date());
 gtag('config', 'AW-992994739');
+gtag('config', 'AW-1070742187', { allow_enhanced_conversions: true });
 
 
 

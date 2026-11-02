@@ -1,20 +1,5 @@
 import { loadCSS } from '../../scripts/aem.js';
-import { getLocaleAndLanguage } from '../../scripts/scripts.js';
-
-/**
- * Load widget copy from the widget's local JSON (same name as the script).
- * @param {string} lang - Language key (e.g. en, fr)
- * @returns {Promise<Object>} Copy for that language (flat key-value)
- */
-async function loadWidgetCopy(lang) {
-  const scriptPath = new URL(import.meta.url).pathname;
-  const jsonPath = scriptPath.replace(/\.js$/, '.json');
-  const url = `${window.hlx?.codeBasePath || ''}${jsonPath}`;
-  const resp = await fetch(url);
-  const data = await resp.json();
-  const key = data[lang] ? lang : 'en';
-  return data[key] || {};
-}
+import { getLocaleAndLanguage, loadWidgetCopy } from '../../scripts/scripts.js';
 
 /**
  * Normalize a single article from the articles query index.
@@ -278,6 +263,27 @@ function filterBySearch(index, searchTerm) {
     const tagsMatch = tags.some((tag) => normalizeForSearch(String(tag)).includes(termNorm));
     return titleMatch || descMatch || authorMatch || tagsMatch;
   }).map((item) => ({ ...item, searchTerm: term }));
+}
+
+const productPathChecks = new Map();
+
+/**
+ * Keep product results only when their same-origin page responds with HTTP 200.
+ * @param {Array<Object>} results
+ * @returns {Promise<Array<Object>>}
+ */
+async function filterAvailableProducts(results) {
+  const availability = await Promise.all(results.map((item) => {
+    if (item.type !== 'product') return true;
+    if (!item.path || !item.path.startsWith('/')) return false;
+    if (!productPathChecks.has(item.path)) {
+      productPathChecks.set(item.path, fetch(item.path)
+        .then((response) => response.status === 200)
+        .catch(() => false));
+    }
+    return productPathChecks.get(item.path);
+  }));
+  return results.filter((item, index) => availability[index]);
 }
 
 /**
@@ -646,7 +652,7 @@ function buildSearchFiltering(container, config = {}, copy = {}) {
 
   const runSearch = async (filterConfig = config, updateURLState = true) => {
     const index = await loadSearchIndex();
-    let results = filterBySearch(index, filterConfig.search || '');
+    let results = await filterAvailableProducts(filterBySearch(index, filterConfig.search || ''));
     const typeCounts = {};
     results.forEach((item) => {
       typeCounts[item.type] = (typeCounts[item.type] || 0) + 1;
@@ -751,7 +757,7 @@ async function init() {
 
   const { language } = getLocaleAndLanguage();
   const lang = (language || 'en_us').split('_')[0];
-  const copy = await loadWidgetCopy(lang);
+  const copy = await loadWidgetCopy(import.meta.url, lang);
 
   const existingH1 = document.querySelector('main h1');
   if (existingH1 && !container.contains(existingH1)) {

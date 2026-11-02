@@ -1,6 +1,4 @@
 @import url('./gallery.css');
-@import url('../../styles/color-swatches.css');
-
 /* stylelint-disable no-descending-specificity */
 .pdp-wrapper {
   display: flex;
@@ -186,6 +184,12 @@
 
 .add-to-cart button:hover {
   background-color: #2B333A;
+}
+
+.add-to-cart .pdp-storage-blocked {
+  margin: var(--spacing-80) 0 0;
+  color: var(--color-red);
+  font-size: var(--body-size-s);
 }
 
 .add-to-cart button[aria-disabled="true"] {

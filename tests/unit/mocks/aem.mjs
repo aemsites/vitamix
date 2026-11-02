@@ -24,3 +24,14 @@ export function getMetadata(name) {
 export async function loadScript() {}
 // eslint-disable-next-line no-empty-function
 export async function loadCSS() {}
+
+export function createOptimizedPicture() {
+  return {};
+}
+
+/** Captured sampleRUM calls: `[checkpoint, data]` tuples. */
+export const __rumCalls = [];
+
+export function sampleRUM(checkpoint, data) {
+  __rumCalls.push([checkpoint, data]);
+}

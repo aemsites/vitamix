@@ -507,6 +507,10 @@ export default async function decorate(block) {
       const priceEl = el('span', 'order-review-col-price', priceText);
       const qtyEl = el('span', 'order-review-col-qty', String(item.quantity ?? ''));
       const subtotalEl = el('span', 'order-review-col-subtotal', subtotalText);
+      // Labels shown by CSS when the card is too narrow for the column header.
+      priceEl.dataset.label = s.reviewColPrice;
+      qtyEl.dataset.label = s.reviewColQty;
+      subtotalEl.dataset.label = s.reviewColSubtotal;
       if (line.isFree) {
         priceEl.classList.add('order-review-free');
         subtotalEl.classList.add('order-review-free');

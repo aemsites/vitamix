@@ -4,6 +4,27 @@ import {
 } from '../../scripts/scripts.js';
 import { getConfig } from '../../scripts/commerce-config.js';
 import { logOperation, logError } from '../../scripts/operations-log.js';
+import { isStorageAvailable } from '../../scripts/safe-storage.js';
+
+/**
+ * Shows (once) the notice that the cart can't be saved. Covers both blocked
+ * site data and full site storage, since either makes storage unusable.
+ * @param {Object} ph - Placeholders object
+ * @param {HTMLElement} container - Add to cart container
+ * @returns {HTMLElement} The notice element
+ */
+function showStorageBlockedNotice(ph, container) {
+  let notice = container.querySelector('.pdp-storage-blocked');
+  if (!notice) {
+    notice = document.createElement('p');
+    notice.classList.add('pdp-storage-blocked');
+    notice.setAttribute('role', 'alert');
+    notice.textContent = ph.storageBlocked
+      || 'We couldn\'t save your cart in this browser. Please make sure cookies and site data are allowed for this site and that its storage isn\'t full (clearing this site\'s data can help), then reload the page.';
+    container.appendChild(notice);
+  }
+  return notice;
+}
 
 /**
  * Renders "Find Locally" button container.
@@ -313,6 +334,15 @@ export default function renderAddToCart(ph, block, parent) {
 
   // add click event handler for add to cart functionality
   addToCartButton.addEventListener('click', async () => {
+    // Without site data the item would be lost as soon as the shopper leaves
+    // the page (including the mobile redirect to the cart), so don't add it;
+    // point them at the notice instead.
+    if (!isStorageAvailable()) {
+      const notice = showStorageBlockedNotice(ph, addToCartContainer);
+      notice.scrollIntoView?.({ block: 'nearest' });
+      return;
+    }
+
     // update button state to show loading
     addToCartButton.textContent = ph.adding || 'Adding...';
     addToCartButton.disabled = true;
@@ -458,8 +488,16 @@ export default function renderAddToCart(ph, block, parent) {
         // cart page so the user gets clear feedback that the item was added.
         // Flush first so the cart page always receives the latest shared
         // localStorage snapshot before navigation.
-        if (window.innerWidth < 900) {
-          cartApi.flush();
+        const redirectToCart = window.innerWidth < 900;
+        if (redirectToCart) cartApi.flush();
+
+        // Storage can also fail mid-add or during the flush (e.g. quota):
+        // stay on the PDP so the in-memory item isn't lost to the navigation.
+        if (!isStorageAvailable()) {
+          showStorageBlockedNotice(ph, addToCartContainer);
+          return;
+        }
+        if (redirectToCart) {
           const { locale, language } = getLocaleAndLanguage();
           window.location.href = `/${locale}/${language}/order/cart`;
           isRedirecting = true;
@@ -514,6 +552,10 @@ export default function renderAddToCart(ph, block, parent) {
 
   // add quantity container to main add to cart container
   addToCartContainer.appendChild(quantityContainer);
+
+  // The cart needs site data. When the browser blocks it, items can't survive
+  // navigation to the cart, so tell the shopper how to fix it.
+  if (!isStorageAvailable()) showStorageBlockedNotice(ph, addToCartContainer);
 
   // Saleable commercial products keep the dealer CTA as a secondary action.
   // Gate on isCommercial so non-commercial products (e.g. bundles) that carry

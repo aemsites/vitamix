@@ -184,8 +184,15 @@ export default {
         const config = callbacks.getConfig();
         const cart = callbacks.getCart();
         const state = callbacks.getState();
-        const { paypalOrderId } = await createPayPalSession(cart.getItemsForAPI(), config);
+        const { paypalOrderId, sessionToken } = await createPayPalSession(
+          cart.getItemsForAPI(),
+          config,
+        );
         state.paypalSessionId = paypalOrderId;
+        // Capability for this PayPal order (HCA-01): sent on every later session call
+        // and on payment initiation. Undefined against an API that does not return one,
+        // in which case those calls send nothing extra.
+        state.paypalSessionToken = sessionToken;
         return paypalOrderId;
       },
 
@@ -210,7 +217,7 @@ export default {
             },
             items: cart.getItemsForAPI(),
             ...getCouponRequestFields(),
-          });
+          }, state.paypalSessionToken);
           if (!result.shippingMethods?.length) {
             return actions.reject(data.errors.ADDRESS_ERROR);
           }
@@ -256,7 +263,7 @@ export default {
           total: method.total,
           taxAmount: method.taxAmount,
           shippingRate: method.rate,
-        });
+        }, state.paypalSessionToken);
         const countryCode = lastShippingAddress?.countryCode?.toLowerCase();
         const preview = await callbacks.previewOrderDirect(withPayPalExpressContext({
           items: cart.getItemsForAPI(),
@@ -294,6 +301,7 @@ export default {
             state.paypalSessionId,
             config.getLocale(),
             getLocaleAndLanguage(false, true).language,
+            state.paypalSessionToken,
           );
           const customerTimezone = getCustomerTimezone();
           // When signed in, the order owner is the commerce account. PayPal may
@@ -336,7 +344,12 @@ export default {
             fraudToken,
             'paypal-express',
             'paypal',
-            { paypalOrderId: state.paypalSessionId },
+            {
+              paypalOrderId: state.paypalSessionId,
+              ...(state.paypalSessionToken
+                ? { paypalSessionToken: state.paypalSessionToken }
+                : {}),
+            },
           ));
           const outcome = resolveExpressOutcome(result);
           if (outcome === 'review') {

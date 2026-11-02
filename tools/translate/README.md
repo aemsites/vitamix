@@ -129,6 +129,7 @@ Defines block columns that must **not** be translated. `block name` is the block
 | alert-banners | 1 |
 | alert-banners | 2 |
 | alert-banners | 4 |
+| alert-banners | 5 |
 
 ---
 

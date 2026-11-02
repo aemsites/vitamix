@@ -21,6 +21,28 @@ const LEGACY_CODE_KEY = 'checkout_coupon_code';
 const LEGACY_SOURCE_KEY = 'checkout_coupon_source';
 const AFFILIATE_CODE_KEY = 'checkout_affiliate_code';
 
+// Chars outside the API coupon charset are replaced with `_`.
+const COUPON_NON_CHARSET = /[^A-Z0-9\-_+]/g;
+
+/**
+ * Normalizes a coupon code for the API: uppercased, with any character outside
+ * [A-Z0-9-_+] replaced by `_`. Display values are left untouched.
+ * @param {string} raw - The coupon code as entered/displayed
+ * @returns {string}
+ */
+export function normalizeCouponCode(raw) {
+  return String(raw).toUpperCase().replace(COUPON_NON_CHARSET, '_');
+}
+
+/** Coupon rejection codes with a dedicated shopper-facing message. */
+const COUPON_ERROR_CODES = new Set([
+  'coupon_invalid_format', 'coupon_not_found', 'coupon_inactive', 'coupon_expired',
+  'coupon_exhausted', 'coupon_country_mismatch', 'coupon_minimum_not_met',
+  'coupon_product_not_eligible', 'coupon_manual_entry_rejected',
+]);
+
+const API_ERROR_PREFIX = 'ADOBE_COMMERCE_';
+
 /** Max coupons accepted by the API. Enforced client-side to avoid a 400. */
 export const MAX_COUPONS = 5;
 /** Source value marking a storefront auto/verified coupon (ID.me / affiliate). */
@@ -78,13 +100,53 @@ function syncLegacyScalars(list) {
   }
 }
 
+let affiliateIneligible = false;
+
 /**
- * Returns the ordered coupon list. Falls back to the legacy scalar keys when
- * the array key is absent, so a coupon written by an older code path (affiliate
- * URL param, test seed) is still honoured.
+ * Records the coupon code an affiliate link was landed with. It stays in the
+ * coupon list for the session and is sent with the order whether or not it
+ * applies.
+ * @param {string} code
+ */
+export function setAffiliateCode(code) {
+  const trimmed = (code || '').trim();
+  if (trimmed) sessionStorage.setItem(AFFILIATE_CODE_KEY, trimmed);
+}
+
+/**
+ * @returns {string} The affiliate coupon code, or '' when none was recorded
+ */
+export function getAffiliateCode() {
+  try {
+    return sessionStorage.getItem(AFFILIATE_CODE_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+/** Clears the affiliate coupon code. */
+export function clearAffiliateCode() {
+  sessionStorage.removeItem(AFFILIATE_CODE_KEY);
+  affiliateIneligible = false;
+}
+
+/**
+ * @param {string} code
+ * @returns {boolean} Whether `code` is the recorded affiliate coupon code
+ */
+export function isAffiliateCode(code) {
+  const affiliateCode = getAffiliateCode();
+  return !!affiliateCode && !!code
+    && normalizeCouponCode(code.trim()) === normalizeCouponCode(affiliateCode);
+}
+
+/**
+ * Reads the stored coupon list. Falls back to the legacy scalar keys when the
+ * array key is absent, so a coupon written by an older code path (affiliate URL
+ * param, test seed) is still honoured.
  * @returns {Array<{code: string, source: 'auto'|'manual'}>}
  */
-export function getCoupons() {
+function readStoredCoupons() {
   const raw = sessionStorage.getItem(COUPONS_KEY);
   if (raw) {
     try {
@@ -98,6 +160,26 @@ export function getCoupons() {
     return normalize([{ code, source: sessionStorage.getItem(LEGACY_SOURCE_KEY) }]);
   }
   return [];
+}
+
+/**
+ * Returns the ordered coupon list. The affiliate coupon code, when recorded,
+ * is always included as an auto coupon.
+ * @returns {Array<{code: string, source: 'auto'|'manual'}>}
+ */
+export function getCoupons() {
+  const coupons = readStoredCoupons();
+  const affiliateCode = getAffiliateCode();
+  if (!affiliateCode) return coupons;
+  const index = coupons.findIndex((c) => isAffiliateCode(c.code));
+  if (index >= 0) {
+    coupons[index] = { ...coupons[index], source: AUTO_COUPON_SOURCE };
+    return coupons;
+  }
+  return [
+    ...coupons.slice(0, MAX_COUPONS - 1),
+    { code: affiliateCode, source: AUTO_COUPON_SOURCE },
+  ];
 }
 
 /**
@@ -167,7 +249,7 @@ export function getManualCoupon() {
 }
 
 /**
- * The auto/verified coupons (drive the removable pills).
+ * The auto/verified coupons (drive the coupon pills).
  * @returns {Array<{code: string, source: 'auto'}>}
  */
 export function getAutoCoupons() {
@@ -176,17 +258,17 @@ export function getAutoCoupons() {
 
 /**
  * Builds the `couponCode`/`couponSource` request fields for an order/estimate
- * body. A single coupon is sent as a scalar (preserving the legacy single-string
- * contract, incl. its 422 behaviour); multiple coupons are sent as index-aligned
- * arrays. A manual source is omitted for the single-coupon case (the API treats
- * an omitted source as 'manual'); the multi-coupon array always sends an explicit
- * source per code so the two arrays stay parallel.
+ * body. A single non-affiliate coupon is sent as a scalar (a rejected code
+ * fails the request with a 422); otherwise the codes are sent as index-aligned
+ * arrays (rejected codes are reported in `couponStatus`). A manual source is
+ * omitted for the scalar case (the API treats an omitted source as 'manual').
  * @returns {{ couponCode?: string|string[], couponSource?: string|string[] }}
  */
 export function getCouponRequestFields() {
   const coupons = getCoupons();
   if (!coupons.length) return {};
-  if (coupons.length === 1) {
+  // Affiliate code is always sent as an array.
+  if (coupons.length === 1 && !isAffiliateCode(coupons[0].code)) {
     const [only] = coupons;
     return {
       couponCode: only.code,
@@ -200,30 +282,36 @@ export function getCouponRequestFields() {
 }
 
 /**
- * Records the coupon code an affiliate link was landed with. Kept separately
- * from the coupon list so it is still reported when the coupon itself is
- * removed or does not apply to the order.
- * @param {string} code
+ * Records whether the affiliate coupon applied, from a pricing response's
+ * `couponStatus[]`. Responses without an entry for it leave the state as is.
+ * @param {Array<{code: string, status: string}>} couponStatus
  */
-export function setAffiliateCode(code) {
-  const trimmed = (code || '').trim();
-  if (trimmed) sessionStorage.setItem(AFFILIATE_CODE_KEY, trimmed);
+export function updateAffiliateStatus(couponStatus) {
+  const entry = (couponStatus || []).find((e) => isAffiliateCode(e?.code));
+  if (entry) affiliateIneligible = entry.status === 'rejected_invalid';
 }
 
 /**
- * @returns {string} The affiliate coupon code, or '' when none was recorded
+ * @returns {boolean} Whether the last pricing response rejected the affiliate
+ *   coupon as not applicable to the cart
  */
-export function getAffiliateCode() {
-  try {
-    return sessionStorage.getItem(AFFILIATE_CODE_KEY) || '';
-  } catch {
-    return '';
-  }
+export function isAffiliateIneligible() {
+  return affiliateIneligible && !!getAffiliateCode();
 }
 
-/** Clears the affiliate coupon code. */
-export function clearAffiliateCode() {
-  sessionStorage.removeItem(AFFILIATE_CODE_KEY);
+/**
+ * Resolves a Commerce API error to a coupon rejection code (e.g.
+ * `coupon_not_found`), or null when the error is not a coupon rejection.
+ * @param {{body?: {code?: string}, code?: string, errorHeader?: string}} err
+ * @returns {string|null}
+ */
+export function getCouponErrorCode(err) {
+  const apiCode = [err?.body?.code, err?.code].find((c) => typeof c === 'string') || '';
+  if (apiCode.startsWith(API_ERROR_PREFIX)) {
+    const key = apiCode.slice(API_ERROR_PREFIX.length).toLowerCase();
+    if (COUPON_ERROR_CODES.has(key)) return key;
+  }
+  return COUPON_ERROR_CODES.has(err?.errorHeader) ? err.errorHeader : null;
 }
 
 /**

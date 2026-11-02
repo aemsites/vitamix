@@ -6,6 +6,8 @@
 
 import { loadCSS, loadScript } from '../../scripts/aem.js';
 
+const resourceBase = new URL('./resources/', import.meta.url).href;
+
 /* eslint-disable */
 window.alpineJsBlenderRecommender = (paramLang = 0, paramPrice = 0) => {
     return {
@@ -47,9 +49,9 @@ window.alpineJsBlenderRecommender = (paramLang = 0, paramPrice = 0) => {
           },
           choices: {
             q1: [
-              ['q1_durability', 'Durable & Simple', 'It&rsquo;s powerful, reliable, and has basic features', '/content/dam/vitamix/home/design-system/illustration/durable.svg'],
-              ['q1_convenience', 'Convenience', 'Automatic blending programs are important to me', '/content/dam/vitamix/home/design-system/illustration/convenience.svg'],
-              ['q1_style', 'Style & Premium Features', 'Premium color options, attachment compatibility, and the most advanced Blending Programs', '/content/dam/vitamix/home/design-system/illustration/stylish.svg']
+              ['q1_durability', 'Durable & Simple', 'It&rsquo;s powerful, reliable, and has basic features', resourceBase + 'images/durable.svg'],
+              ['q1_convenience', 'Convenience', 'Automatic blending programs are important to me', resourceBase + 'images/convenience.svg'],
+              ['q1_style', 'Style & Premium Features', 'Premium color options, attachment compatibility, and the most advanced Blending Programs', resourceBase + 'images/stylish.svg']
             ],
             q2: [
               ['q2_smoothies', 'Smoothies'],
@@ -69,13 +71,13 @@ window.alpineJsBlenderRecommender = (paramLang = 0, paramPrice = 0) => {
               ['q2_smoothiebowls', 'Smoothie Bowls'],
             ],
             q3: [
-              ['q3_self', 'Just Me', '', '/content/dam/vitamix/home/design-system/illustration/individual.svg'],
-              ['q3_2-4', '2-4 Individuals', '', '/content/dam/vitamix/home/design-system/illustration/2-4.svg'],
-              ['q3_4+', '4+ Individuals', '', '/content/dam/vitamix/home/design-system/illustration/4+.svg'],
+              ['q3_self', 'Just Me', '', resourceBase + 'images/individual.svg'],
+              ['q3_2-4', '2-4 Individuals', '', resourceBase + 'images/2-4.svg'],
+              ['q3_4+', '4+ Individuals', '', resourceBase + 'images/4-plus.svg'],
             ],
             q4: [
-              ['q4_colors', 'I Want a Variety of Color Options', '', '/content/dam/vitamix/home/design-system/illustration/color-variety.svg'],
-              ['q4_basic', 'I Prefer Basic Colors', '', '/content/dam/vitamix/home/design-system/illustration/color-basic.svg'],
+              ['q4_colors', 'I Want a Variety of Color Options', '', resourceBase + 'images/color-variety.svg'],
+              ['q4_basic', 'I Prefer Basic Colors', '', resourceBase + 'images/color-basic.svg'],
             ]
           },
           results: {
@@ -100,14 +102,14 @@ window.alpineJsBlenderRecommender = (paramLang = 0, paramPrice = 0) => {
             ctaText: 'Why Buy a Vitamix',
             ctaLink: '/why-vitamix',
             items: [
-              { title: 'Free Shipping', desc: 'Free Shipping for All Blenders & Containers', icon: 'https://www.vitamix.com/content/dam/vitamix/home/design-system/illustration/free-shipping.svg' },
-              { title: 'Take it For a Spin', desc: 'We know you&rsquo;ll love our blenders so we offer a 60-day worry-free trial period.', icon: 'https://www.vitamix.com/content/dam/vitamix/home/design-system/illustration/60-day-trial.svg' },
-              { title: 'Flexible Payment', desc: 'Choose how to pay at your own pace. Affirm helps start blending sooner.', icon: 'https://www.vitamix.com/content/dam/vitamix/home/design-system/illustration/affirm.svg' },
-              { title: 'Automatic Registration', desc: '', icon: 'https://www.vitamix.com/content/dam/vitamix/home/design-system/illustration/auto-registration.svg' },
-              { title: 'Industry Leading Support', desc: 'We offer a wide range of support options to Vitamix customers, from full warranties to on-call Vitamix experts to blending tips, guides, and recipes.', icon: 'https://www.vitamix.com/content/dam/vitamix/home/design-system/illustration/support.svg' },
-              { title: 'Expert Customer Service', desc: 'Our customer care team consists of trained Vitamix experts who can help troubleshoot issues, and even suggest new recipes to try.', icon: 'https://www.vitamix.com/content/dam/vitamix/home/design-system/illustration/customer-service.svg' },
-              { title: 'Free Shipping on Repairs', desc: 'If your machine is ever in need of repair, we&rsquo;ll pay for shipping both ways.', icon: 'https://www.vitamix.com/content/dam/vitamix/home/design-system/illustration/shipping-repairs.svg' },
-              { title: 'Less Than 2% Sent in for Repair', desc: 'Our products are built to last, even when blending the toughest ingredients.', icon: 'https://www.vitamix.com/content/dam/vitamix/home/design-system/illustration/percentage-repaired.svg' },
+              { title: 'Free Shipping', desc: 'Free Shipping for All Blenders & Containers', icon: resourceBase + 'images/free-shipping.svg' },
+              { title: 'Take it For a Spin', desc: 'We know you&rsquo;ll love our blenders so we offer a 60-day worry-free trial period.', icon: resourceBase + 'images/60-day-trial.svg' },
+              { title: 'Flexible Payment', desc: 'Choose how to pay at your own pace. Affirm helps start blending sooner.', icon: resourceBase + 'images/affirm.svg' },
+              { title: 'Automatic Registration', desc: '', icon: resourceBase + 'images/auto-registration.svg' },
+              { title: 'Industry Leading Support', desc: 'We offer a wide range of support options to Vitamix customers, from full warranties to on-call Vitamix experts to blending tips, guides, and recipes.', icon: resourceBase + 'images/support.svg' },
+              { title: 'Expert Customer Service', desc: 'Our customer care team consists of trained Vitamix experts who can help troubleshoot issues, and even suggest new recipes to try.', icon: resourceBase + 'images/customer-service.svg' },
+              { title: 'Free Shipping on Repairs', desc: 'If your machine is ever in need of repair, we&rsquo;ll pay for shipping both ways.', icon: resourceBase + 'images/shipping-repairs.svg' },
+              { title: 'Less Than 2% Sent in for Repair', desc: 'Our products are built to last, even when blending the toughest ingredients.', icon: resourceBase + 'images/percentage-repaired.svg' },
             ]
           },
           recipeSection: {
@@ -117,10 +119,10 @@ window.alpineJsBlenderRecommender = (paramLang = 0, paramPrice = 0) => {
             ctaLink: '/recipes',
             articleCTAText: 'View Recipe',
             items: [
-              { eyebrow: 'Appetizers', title: 'Sweet and Sour Cucumber and Watermelon Salad', difficulty: 'Intermediate', time: '15 Minutes', image: 'https://www.vitamix.com/content/dam/vitamix/migration/media/other/images/s/Sweet-and-Sour-Cucumber-and-Watermelon-Salad.jpg' },
-              { eyebrow: 'Appetizers', title: 'Recipe 2', difficulty: 'Intermediate', time: '15 Minutes', image: 'https://www.vitamix.com/content/dam/vitamix/migration/media/other/images/s/Sweet-and-Sour-Cucumber-and-Watermelon-Salad.jpg' },
-              { eyebrow: 'Appetizers', title: 'Recipe 3', difficulty: 'Intermediate', time: '15 Minutes', image: 'https://www.vitamix.com/content/dam/vitamix/migration/media/other/images/s/Sweet-and-Sour-Cucumber-and-Watermelon-Salad.jpg' },
-              { eyebrow: 'Appetizers', title: 'Recipe 4', difficulty: 'Intermediate', time: '15 Minutes', image: 'https://www.vitamix.com/content/dam/vitamix/migration/media/other/images/s/Sweet-and-Sour-Cucumber-and-Watermelon-Salad.jpg' },
+              { eyebrow: 'Appetizers', title: 'Sweet and Sour Cucumber and Watermelon Salad', difficulty: 'Intermediate', time: '15 Minutes', image: resourceBase + 'images/sweet-and-sour-cucumber-and-watermelon-salad.jpg' },
+              { eyebrow: 'Appetizers', title: 'Recipe 2', difficulty: 'Intermediate', time: '15 Minutes', image: resourceBase + 'images/sweet-and-sour-cucumber-and-watermelon-salad.jpg' },
+              { eyebrow: 'Appetizers', title: 'Recipe 3', difficulty: 'Intermediate', time: '15 Minutes', image: resourceBase + 'images/sweet-and-sour-cucumber-and-watermelon-salad.jpg' },
+              { eyebrow: 'Appetizers', title: 'Recipe 4', difficulty: 'Intermediate', time: '15 Minutes', image: resourceBase + 'images/sweet-and-sour-cucumber-and-watermelon-salad.jpg' },
 
             ]
           },
@@ -128,15 +130,15 @@ window.alpineJsBlenderRecommender = (paramLang = 0, paramPrice = 0) => {
             eyebrow: 'We Have You Covered',
             title: 'Up To a 10-Year Full Warranty',
             desc: 'Our full warranties cover parts, performance, and return shipping both ways. Since fewer than 2% of the products in the U.S. currently under warranty have been returned to us for service, it&rsquo;s the best warranty you&rsquo;ll probably never need.',
-            image1: 'https://www.vitamix.com/content/dam/vitamix/home/design-system/component/ognm-merchandising-banner-two-image/warranty-10-years.svg',
+            image1: resourceBase + 'images/warranty-10-years.svg',
             image1Alt: '10 Year Warranty',
-            image2: 'https://www.vitamix.com/content/dam/vitamix/home/design-system/component/ognm-merchandising-banner-two-image/knockout-replacement-warranty-banner-sq-2@2x.jpg',
+            image2: resourceBase + 'images/knockout-replacement-warranty-banner-sq-2-2x.jpg',
             image2Alt: 'Image of 3 Blenders'
           },
           articleSection: {
             items: [
-              { eyebrow: '11.10.2022', title: 'How We Built a Better Blender', desc: 'Get an inside look at what sets Vitamix blenders apart. Among people who like to cook, or are interested in chef-quality…', ctaText: 'Read More', link: '/articles/how-we-built-a-better-blender', image: 'https://www.vitamix.com/content/dam/vitamix/home/design-system/component/ognm-cardlist-articles-featured/better-blender-article-sml.jpg' },
-              { eyebrow: '03.10.2023', title: 'Pay at Your Own Pace', desc: 'Next time you&rsquo;re shopping with us, just select Affirm at checkout and choose how you want to pay — from 4 interest-free…', ctaText: 'Read More', link: '/about-affirm', image: 'https://www.vitamix.com/content/dam/vitamix/home/design-system/component/ognm-cardlist-articles-featured/payment-plans-article-sml.jpg' },
+              { eyebrow: '11.10.2022', title: 'How We Built a Better Blender', desc: 'Get an inside look at what sets Vitamix blenders apart. Among people who like to cook, or are interested in chef-quality…', ctaText: 'Read More', link: '/articles/how-we-built-a-better-blender', image: resourceBase + 'images/better-blender-article-sml.jpg' },
+              { eyebrow: '03.10.2023', title: 'Pay at Your Own Pace', desc: 'Next time you&rsquo;re shopping with us, just select Affirm at checkout and choose how you want to pay — from 4 interest-free…', ctaText: 'Read More', link: '/about-affirm', image: resourceBase + 'images/payment-plans-article-sml.jpg' },
             ]
           },
           reviews: [
@@ -184,9 +186,9 @@ window.alpineJsBlenderRecommender = (paramLang = 0, paramPrice = 0) => {
           },
           choices: {
             q1: [
-              ['q1_durability', 'Durable et simple', 'Il est puissant, fiable et possède des fonctionnalités de base', '/content/dam/vitamix/home/design-system/illustration/durable.svg'],
-              ['q1_convenience', 'Commodité', 'Les programmes de mélange automatique sont importants pour moi', '/content/dam/vitamix/home/design-system/illustration/convenience.svg'],
-              ['q1_style', 'Style et fonctionnalités premium', 'Options de couleurs de qualité supérieure, compatibilité avec les accessoires et les programmes de mélange les plus avancés', '/content/dam/vitamix/home/design-system/illustration/stylish.svg']
+              ['q1_durability', 'Durable et simple', 'Il est puissant, fiable et possède des fonctionnalités de base', resourceBase + 'images/durable.svg'],
+              ['q1_convenience', 'Commodité', 'Les programmes de mélange automatique sont importants pour moi', resourceBase + 'images/convenience.svg'],
+              ['q1_style', 'Style et fonctionnalités premium', 'Options de couleurs de qualité supérieure, compatibilité avec les accessoires et les programmes de mélange les plus avancés', resourceBase + 'images/stylish.svg']
             ],
             q2: [
               ['q2_smoothies', 'Smoothies'],
@@ -206,13 +208,13 @@ window.alpineJsBlenderRecommender = (paramLang = 0, paramPrice = 0) => {
               ['q2_smoothiebowls', 'Bols à smoothies'],
             ],
             q3: [
-              ['q3_self', 'Juste moi', '', '/content/dam/vitamix/home/design-system/illustration/individual.svg'],
-              ['q3_2-4', '2 à 4 personnes', '', '/content/dam/vitamix/home/design-system/illustration/2-4.svg'],
-              ['q3_4+', 'Plus de 4 personnes', '', '/content/dam/vitamix/home/design-system/illustration/4+.svg'],
+              ['q3_self', 'Juste moi', '', resourceBase + 'images/individual.svg'],
+              ['q3_2-4', '2 à 4 personnes', '', resourceBase + 'images/2-4.svg'],
+              ['q3_4+', 'Plus de 4 personnes', '', resourceBase + 'images/4-plus.svg'],
             ],
             q4: [
-              ['q4_colors', 'Je veux une variété d&rsquo;options', '', '/content/dam/vitamix/home/design-system/illustration/color-variety.svg'],
-              ['q4_basic', 'Je préfère les couleurs de base', '', '/content/dam/vitamix/home/design-system/illustration/color-basic.svg'],
+              ['q4_colors', 'Je veux une variété d&rsquo;options', '', resourceBase + 'images/color-variety.svg'],
+              ['q4_basic', 'Je préfère les couleurs de base', '', resourceBase + 'images/color-basic.svg'],
             ]
           },
           results: {
@@ -237,14 +239,14 @@ window.alpineJsBlenderRecommender = (paramLang = 0, paramPrice = 0) => {
             ctaText: 'Pourquoi acheter chez Vitamix?',
             ctaLink: '/why-vitamix',
             items: [
-              { title: 'Livraison gratuite', desc: 'Livraison gratuite pour tous les mélangeurs et récipients', icon: 'https://www.vitamix.com/content/dam/vitamix/home/design-system/illustration/free-shipping.svg' },
-              { title: 'Prend le comme une occasion de changement', desc: 'Nous savons que vous allez adorer nos mélangeurs, nous offrons donc une période d&rsquo;essai de jours sans souci.', icon: 'https://www.vitamix.com/content/dam/vitamix/home/design-system/illustration/60-day-trial.svg' },
-              { title: 'Avantage flexible du paiement', desc: 'Choisissez comment payer à votre rythme. Affirm aide à commencer à mélanger plus tôt.', icon: 'https://www.vitamix.com/content/dam/vitamix/home/design-system/illustration/affirm.svg' },
-              { title: 'Enregistrement automatique', desc: '', icon: 'https://www.vitamix.com/content/dam/vitamix/home/design-system/illustration/auto-registration.svg' },
-              { title: 'Un soutien de premier plan dans l&rsquo;industrie', desc: 'Chez Vitamix, nous sommes là pour vous, que ce soit en vous offrant des garanties complètes ou en mettant à votre disposition des experts Vitamix, ou encore en vous donnant des conseils, des guides et des recettes pour mélanger comme un pro.', icon: 'https://www.vitamix.com/content/dam/vitamix/home/design-system/illustration/support.svg' },
-              { title: 'Service à la clientèle expert', desc: 'Notre équipe de service à la clientèle se compose d&rsquo;experts Vitamix formés qui peuvent vous aider à résoudre les problèmes, et même suggérer de nouvelles recettes à essayer.', icon: 'https://www.vitamix.com/content/dam/vitamix/home/design-system/illustration/customer-service.svg' },
-              { title: 'Livraison gratuite sur les réparations', desc: 'Si votre appareil a besoin d&rsquo;être réparé, nous paierons les deux modes d&rsquo;expédition.', icon: 'https://www.vitamix.com/content/dam/vitamix/home/design-system/illustration/shipping-repairs.svg' },
-              { title: 'Moins de 2 % d&rsquo;articles envoyés pour réparation', desc: 'Nos produits sont conçus pour durer, même en mélangeant les ingrédients les plus coriaces.', icon: 'https://www.vitamix.com/content/dam/vitamix/home/design-system/illustration/percentage-repaired.svg' },
+              { title: 'Livraison gratuite', desc: 'Livraison gratuite pour tous les mélangeurs et récipients', icon: resourceBase + 'images/free-shipping.svg' },
+              { title: 'Prend le comme une occasion de changement', desc: 'Nous savons que vous allez adorer nos mélangeurs, nous offrons donc une période d&rsquo;essai de jours sans souci.', icon: resourceBase + 'images/60-day-trial.svg' },
+              { title: 'Avantage flexible du paiement', desc: 'Choisissez comment payer à votre rythme. Affirm aide à commencer à mélanger plus tôt.', icon: resourceBase + 'images/affirm.svg' },
+              { title: 'Enregistrement automatique', desc: '', icon: resourceBase + 'images/auto-registration.svg' },
+              { title: 'Un soutien de premier plan dans l&rsquo;industrie', desc: 'Chez Vitamix, nous sommes là pour vous, que ce soit en vous offrant des garanties complètes ou en mettant à votre disposition des experts Vitamix, ou encore en vous donnant des conseils, des guides et des recettes pour mélanger comme un pro.', icon: resourceBase + 'images/support.svg' },
+              { title: 'Service à la clientèle expert', desc: 'Notre équipe de service à la clientèle se compose d&rsquo;experts Vitamix formés qui peuvent vous aider à résoudre les problèmes, et même suggérer de nouvelles recettes à essayer.', icon: resourceBase + 'images/customer-service.svg' },
+              { title: 'Livraison gratuite sur les réparations', desc: 'Si votre appareil a besoin d&rsquo;être réparé, nous paierons les deux modes d&rsquo;expédition.', icon: resourceBase + 'images/shipping-repairs.svg' },
+              { title: 'Moins de 2 % d&rsquo;articles envoyés pour réparation', desc: 'Nos produits sont conçus pour durer, même en mélangeant les ingrédients les plus coriaces.', icon: resourceBase + 'images/percentage-repaired.svg' },
             ]
           },
           recipeSection: {
@@ -254,10 +256,10 @@ window.alpineJsBlenderRecommender = (paramLang = 0, paramPrice = 0) => {
             ctaLink: '/recipes',
             articleCTAText: 'Voir la Recette',
             items: [
-              { eyebrow: 'Appetizers', title: 'Sweet and Sour Cucumber and Watermelon Salad', difficulty: 'Intermediate', time: '15 Minutes', image: 'https://www.vitamix.com/content/dam/vitamix/migration/media/other/images/s/Sweet-and-Sour-Cucumber-and-Watermelon-Salad.jpg' },
-              { eyebrow: 'Appetizers', title: 'Recipe 2', difficulty: 'Intermediate', time: '15 Minutes', image: 'https://www.vitamix.com/content/dam/vitamix/migration/media/other/images/s/Sweet-and-Sour-Cucumber-and-Watermelon-Salad.jpg' },
-              { eyebrow: 'Appetizers', title: 'Recipe 3', difficulty: 'Intermediate', time: '15 Minutes', image: 'https://www.vitamix.com/content/dam/vitamix/migration/media/other/images/s/Sweet-and-Sour-Cucumber-and-Watermelon-Salad.jpg' },
-              { eyebrow: 'Appetizers', title: 'Recipe 4', difficulty: 'Intermediate', time: '15 Minutes', image: 'https://www.vitamix.com/content/dam/vitamix/migration/media/other/images/s/Sweet-and-Sour-Cucumber-and-Watermelon-Salad.jpg' },
+              { eyebrow: 'Appetizers', title: 'Sweet and Sour Cucumber and Watermelon Salad', difficulty: 'Intermediate', time: '15 Minutes', image: resourceBase + 'images/sweet-and-sour-cucumber-and-watermelon-salad.jpg' },
+              { eyebrow: 'Appetizers', title: 'Recipe 2', difficulty: 'Intermediate', time: '15 Minutes', image: resourceBase + 'images/sweet-and-sour-cucumber-and-watermelon-salad.jpg' },
+              { eyebrow: 'Appetizers', title: 'Recipe 3', difficulty: 'Intermediate', time: '15 Minutes', image: resourceBase + 'images/sweet-and-sour-cucumber-and-watermelon-salad.jpg' },
+              { eyebrow: 'Appetizers', title: 'Recipe 4', difficulty: 'Intermediate', time: '15 Minutes', image: resourceBase + 'images/sweet-and-sour-cucumber-and-watermelon-salad.jpg' },
 
             ]
           },
@@ -265,15 +267,15 @@ window.alpineJsBlenderRecommender = (paramLang = 0, paramPrice = 0) => {
             eyebrow: 'NOUS AVONS CE QU&rsquo;IL VOUS FAUT',
             title: 'Garantie complète de 10 ans',
             desc: 'Notre garantie complète couvre les pièces, la performance et les frais de port aller-retour. Moins de 2 % des appareils garantis aux États-Unis ont été retournés à des fins d&rsquo;entretien. C&rsquo;est donc une garantie optimale dont vous n&rsquo;aurez probablement jamais besoin.',
-            image1: 'https://www.vitamix.com/content/dam/vitamix/home/design-system/component/ognm-merchandising-banner-two-image/warranty-10-years.svg',
+            image1: resourceBase + 'images/warranty-10-years.svg',
             image1Alt: '10 Year Warranty',
-            image2: 'https://www.vitamix.com/content/dam/vitamix/home/design-system/component/ognm-merchandising-banner-two-image/knockout-replacement-warranty-banner-sq-2@2x.jpg',
+            image2: resourceBase + 'images/knockout-replacement-warranty-banner-sq-2-2x.jpg',
             image2Alt: 'Image of 3 Blenders'
           },
           articleSection: {
             items: [
-              { eyebrow: '11.10.2022', title: 'Comment nous avons conçu un meilleur mélangeur', desc: 'Découvrez de l&rsquo;intérieur ce qui distingue les blenders Vitamix. Parmi les personnes qui aiment cuisiner ou qui s&rsquo;intéressent à la', ctaText: 'Lire Davantage', link: '/articles/how-we-built-a-better-blender', image: 'https://www.vitamix.com/content/dam/vitamix/home/design-system/component/ognm-cardlist-articles-featured/better-blender-article-sml.jpg' },
-              { eyebrow: '03.10.2023', title: 'Paiement à Votre Rythme', desc: 'La prochaine fois que vous ferez vos achats chez nous, il vous suffira de sélectionner Affirm à la caisse et de choisir votre mod', ctaText: 'Lire Davantage', link: '/about-affirm', image: 'https://www.vitamix.com/content/dam/vitamix/home/design-system/component/ognm-cardlist-articles-featured/payment-plans-article-sml.jpg' },
+              { eyebrow: '11.10.2022', title: 'Comment nous avons conçu un meilleur mélangeur', desc: 'Découvrez de l&rsquo;intérieur ce qui distingue les blenders Vitamix. Parmi les personnes qui aiment cuisiner ou qui s&rsquo;intéressent à la', ctaText: 'Lire Davantage', link: '/articles/how-we-built-a-better-blender', image: resourceBase + 'images/better-blender-article-sml.jpg' },
+              { eyebrow: '03.10.2023', title: 'Paiement à Votre Rythme', desc: 'La prochaine fois que vous ferez vos achats chez nous, il vous suffira de sélectionner Affirm à la caisse et de choisir votre mod', ctaText: 'Lire Davantage', link: '/about-affirm', image: resourceBase + 'images/payment-plans-article-sml.jpg' },
             ]
           },
           reviews: [
@@ -287,8 +289,8 @@ window.alpineJsBlenderRecommender = (paramLang = 0, paramPrice = 0) => {
       ],
 
       // UI Vars
+      resourceBase,
       baseURl: window.location.href,
-      timestamp: new Date().valueOf(),
       initialized: false,
       minHeight: 0,
       compact: false,
@@ -455,9 +457,14 @@ window.alpineJsBlenderRecommender = (paramLang = 0, paramPrice = 0) => {
       },
 
       fetchWeightedItems: async function () {
-        let response = await fetch('https://www.vitamix.com/content/dam/vitamix/files/blender-recommender-' + this.getLanguageSuffix() + '.json?=' + this.timestamp);
+        let response = await fetch(resourceBase + 'blender-recommender-' + this.getLanguageSuffix() + '.json');
+        if (!response.ok) {
+          throw new Error('Unable to load blender recommendations: HTTP ' + response.status);
+        }
         let responseJSON = await response.json();
         responseJSON.forEach((item, index) => {
+          item.primary_img = new URL(item.primary_img, resourceBase).href;
+          item.second_img = new URL(item.second_img, resourceBase).href;
           item.calculatedScore = 0;
           // Show em all if this column in the spreadsheet is not present
           if (typeof item.show_us == 'undefined') {
@@ -691,5 +698,4 @@ window.alpineJsBlenderRecommender = (paramLang = 0, paramPrice = 0) => {
     alpineJsBlenderRecommender(window.location.pathname.includes('/fr_') ? 1 : 0, 1);
   });
 
-  loadCSS('https://www.vitamix.com/content/dam/vitamix/client-library/css/design-system.min.css?q=1765483391');
-  loadCSS('https://www.vitamix.com/content/dam/vitamix/client-library/css/design-system.min.css?v=1699551075845');
+  loadCSS(resourceBase + 'design-system.min.css');

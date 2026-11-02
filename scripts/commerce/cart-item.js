@@ -196,13 +196,17 @@ export default function buildCartItem(item, {
     clearQtyLimit();
   }
 
+  // Quantity last committed to the cart. The input's own value can't serve as
+  // the baseline: on a typed `change` event it already holds the new quantity,
+  // so comparing against it would swallow the update.
+  let committedQty = Number(item.quantity);
+
   const handleQtyChange = (newQty) => {
     if (newQty < 1) {
       onRemove(item.sku);
       el.remove();
       return;
     }
-    const currentQty = +qtyInput.value;
     const clamped = Math.min(newQty, maxQty);
     const exceededMax = hasMaxQty && newQty > maxQty;
     qtyInput.value = clamped;
@@ -212,7 +216,10 @@ export default function buildCartItem(item, {
     } else {
       clearQtyLimit();
     }
-    if (clamped !== currentQty) onQtyChange(item.sku, clamped);
+    if (clamped !== committedQty) {
+      committedQty = clamped;
+      onQtyChange(item.sku, clamped);
+    }
   };
 
   el.querySelector('.qty-dec').addEventListener('click', () => handleQtyChange(+qtyInput.value - 1));

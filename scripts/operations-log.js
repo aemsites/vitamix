@@ -262,8 +262,47 @@ export function isIgnoredErrorSource(source) {
 }
 
 /**
+ * User agents of self-identified crawlers, scrapers and headless browsers.
+ * Classification only (UAs are trivially spoofed); used solely to drop the
+ * fetch/import failures below.
+ */
+const BOT_USER_AGENT = /bot|spider|crawler|slurp|scraper|headless/i;
+
+/**
+ * Wording for a failed network request or dynamic import, including a bare
+ * `HTTP <status>`. Matched against the whole message.
+ * @type {RegExp[]}
+ */
+const FETCH_OR_IMPORT_FAILURES = [
+  /^HTTP \d{3}$/,
+  /^Failed to fetch$/i,
+  /^Load failed$/i,
+  /^NetworkError when attempting to fetch resource\.?$/i,
+  /^Failed to fetch dynamically imported module\b/i,
+  /^Importing a module script failed\.?$/i,
+  /^error loading dynamically imported module\b/i,
+];
+
+/**
+ * Whether an error is a fetch/import failure reported by a bot.
+ * @param {...*} messages - Error message and/or cause; any match counts.
+ * @returns {boolean}
+ */
+function isBotFetchOrImportFailure(...messages) {
+  const userAgent = typeof navigator === 'undefined' ? undefined : navigator?.userAgent;
+  if (typeof userAgent !== 'string' || !BOT_USER_AGENT.test(userAgent)) return false;
+  return messages.some((message) => {
+    if (message === undefined || message === null) return false;
+    const text = String(message).trim();
+    return FETCH_OR_IMPORT_FAILURES.some((re) => re.test(text));
+  });
+}
+
+/**
  * Logs a generic (non-API) error. Errors originating from browser extensions or
- * an ignored source prefix (see {@link isIgnoredErrorSource}) are dropped.
+ * an ignored source prefix (see {@link isIgnoredErrorSource}), and fetch/import
+ * failures reported by bots (see {@link isBotFetchOrImportFailure}), are dropped.
+ * Wrapped failures are matched on `extra.cause` or the Error's `cause`.
  * @param {string} scope - Where it happened, e.g. 'checkout-order' or 'global'.
  * @param {*} error - An Error or error-like value.
  * @param {Object} [extra] - Extra non-PII context.
@@ -274,6 +313,8 @@ export function logError(scope, error, extra = {}) {
   // frame — for unhandled rejections only the stack carries the source.
   const stackSource = parseTopFrame(details.stack).fileName;
   if (isIgnoredErrorSource(details.fileName) || isIgnoredErrorSource(stackSource)) return;
+  const cause = details.cause ?? error?.cause;
+  if (isBotFetchOrImportFailure(details.message, cause?.message ?? cause)) return;
   logOperation('error', { scope, ...details });
 }
 

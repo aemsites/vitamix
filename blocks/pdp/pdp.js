@@ -1,6 +1,7 @@
 import {
   loadScript, toClassName, getMetadata, fetchPlaceholders,
 } from '../../scripts/aem.js';
+import loadColorSwatches from '../../scripts/color-swatches.js';
 import renderAddToCart from './add-to-cart.js';
 import renderGallery from './gallery.js';
 import renderSpecs from './specification-tabs.js';
@@ -351,6 +352,7 @@ function hasAddToCartButton(container) {
  * @param {Element} block - The PDP block element
  */
 export default async function decorate(block) {
+  loadColorSwatches();
   const { jsonLdData, variants } = window;
   const { custom, offers } = jsonLdData;
   const { locale, language } = getLocaleAndLanguage();
