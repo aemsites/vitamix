@@ -1165,15 +1165,19 @@ export async function loadWidgetCopy(widgetUrl, lang) {
   const copyPath = new URL(widgetUrl).pathname.replace(/\.js$/, '.json');
   try {
     const resp = await fetch(`${window.hlx?.codeBasePath || ''}${copyPath}`);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    if (!resp.ok) {
+      // Only a missing file is actionable; other failures fall back to default copy.
+      if (resp.status === 404) {
+        logError('widget-copy', new Error(`Widget copy failed to load: ${copyPath}`), {
+          copyPath,
+          cause: `HTTP ${resp.status}`,
+        });
+      }
+      return {};
+    }
     const data = await resp.json();
     return data[lang] || data.en || {};
-  } catch (error) {
-    // Log and continue; widgets fall back to their default copy.
-    logError('widget-copy', new Error(`Widget copy failed to load: ${copyPath}`), {
-      copyPath,
-      cause: error?.message || String(error),
-    });
+  } catch {
     return {};
   }
 }
