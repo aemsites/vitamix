@@ -310,7 +310,9 @@ function isValidTimestamp(value) {
 }
 
 function syncStatusCell(o, query) {
-  const { syncError, syncedAt } = o;
+  /* List entries carry sync fields top-level; single-order GET bodies nest them under `custom`. */
+  const syncError = o.syncError ?? o.custom?.syncError;
+  const syncedAt = o.syncedAt ?? o.custom?.syncedAt;
   if (syncError != null) {
     const text = typeof syncError === 'object' ? JSON.stringify(syncError) : String(syncError);
     return `<span class="orders-badge orders-badge-danger">${highlightMatch(text, query)}</span>`;
