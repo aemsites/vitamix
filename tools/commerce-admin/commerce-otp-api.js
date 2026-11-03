@@ -21,6 +21,13 @@ export const STAGE_API_BASE = 'https://api-stage.adobecommerce.live';
 /** Session key: value `'false'` means production; absent or other means staging. */
 export const PRODUCTBUS_STAGE_SESSION_KEY = 'productbus-stage';
 
+const API_RELOAD_SESSION_KEY = 'commerce-admin:last-reload';
+const isReload = typeof window !== 'undefined'
+  && window.performance.getEntriesByType('navigation')[0]?.type === 'reload';
+if (isReload) {
+  sessionStorage.setItem(API_RELOAD_SESSION_KEY, String(Date.now()));
+}
+
 /** Same fcors proxy as PIM / detail (temporary until Adobe API allows this origin). */
 const CORS_PROXY = 'https://fcors.org/?url=';
 const CORS_KEY = '&key=Mg23N96GgR8O3NjU';
@@ -397,7 +404,16 @@ export async function apiFetch(org, site, path, options = {}) {
   const env = envOverride === 'prod' || envOverride === 'stage' ? envOverride : activeEnv;
   const crossEnv = env !== activeEnv;
   const base = apiBaseForEnv(env);
-  const targetUrl = `${base}/${org}/sites/${site}/${path}`;
+  const method = String(fetchOptions.method || 'GET');
+  let targetUrl = `${base}/${org}/sites/${site}/${path}`;
+  const lastReload = sessionStorage.getItem(API_RELOAD_SESSION_KEY);
+  if (lastReload && ['GET', 'HEAD'].includes(method.toUpperCase())) {
+    const url = new URL(targetUrl);
+    // Bust upstream/proxy caches as well as bypassing the browser's HTTP cache.
+    url.searchParams.set('_', lastReload);
+    targetUrl = url.href;
+    if (isReload) fetchOptions.cache = 'no-store';
+  }
   const fetchUrl = `${CORS_PROXY}${encodeURIComponent(targetUrl)}${CORS_KEY}`;
 
   const raw = readAuthRaw(org, site, env);
@@ -426,7 +442,6 @@ export async function apiFetch(org, site, path, options = {}) {
     headers.Authorization = `Bearer ${auth.token}`;
   }
 
-  const method = String(fetchOptions.method || 'GET');
   const roles = Array.isArray(auth?.roles) ? auth.roles.join(',') : String(auth?.roles ?? '');
   const htmlOk = document.documentElement.classList.contains('commerce-admin-auth-ok');
   console.log(`[commerce-admin] apiFetch method=${method} path=${path} apiEnv=${env} hasBearer=${Boolean(auth?.token)} htmlAuthOk=${htmlOk} roles=${roles}`);

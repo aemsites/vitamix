@@ -1,5 +1,16 @@
 # Commerce Admin
 
+## API reload freshness
+
+Reloading any Commerce Admin page records a timestamp in `sessionStorage`.
+All Commerce API reads (`GET` and `HEAD`) include that timestamp as a cache-busting
+query parameter in the upstream URL sent through fcors. The timestamp persists
+across navigation in the tab until the next reload, which invalidates previous
+browser, proxy and upstream cache entries. Reads on the reloaded document also
+bypass the browser cache. This covers orders, details, customer-order searches,
+journals and admin access checks, as well as reads on other admin pages.
+Before the first reload, caching is unchanged. API writes are unchanged.
+
 ## Recent catalog changes and index freshness
 
 Every catalog index request bypasses the browser cache and includes a cache-busting
