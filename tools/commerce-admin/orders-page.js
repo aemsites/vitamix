@@ -277,6 +277,32 @@ function resolveOrderId(payload) {
   return rawId != null ? String(rawId).trim() : '';
 }
 
+/**
+ * Fill list-entry fields missing from a full single-order body, derived the same way the API
+ * derives the list index metadata (subtotal from line items, total from `payment.amount`, …).
+ */
+function withListEntryFields(order) {
+  const isBlank = (v) => v == null || String(v).trim() === '';
+  const items = Array.isArray(order.items) ? order.items : [];
+  const derived = {
+    email: order.customer?.email,
+    itemCount: items.length,
+    subtotal: items.reduce(
+      (sum, item) => sum + (Number(item?.price?.final) || 0) * (item?.quantity ?? 1),
+      0,
+    ).toFixed(2),
+    total: order.payment?.amount,
+    paymentMethod: order.payment?.method,
+    syncedAt: order.custom?.syncedAt,
+    syncError: order.custom?.syncError,
+  };
+  const out = { ...order };
+  Object.entries(derived).forEach(([k, v]) => {
+    if (isBlank(out[k]) && !isBlank(v)) out[k] = v;
+  });
+  return out;
+}
+
 function getOrderNodeForDisplay(payload) {
   if (payload?.order && typeof payload.order === 'object') return payload.order;
   if (payload && typeof payload === 'object') return payload;
@@ -2052,7 +2078,7 @@ async function init() {
     const resp = await apiFetch(PB_ORG, PB_SITE, `orders/${encodeURIComponent(id)}`, { method: 'GET' });
     if (!resp.ok) throw new Error(await readRespError(resp));
     const node = getOrderNodeForDisplay(await resp.json());
-    return node ? [node] : [];
+    return node ? [withListEntryFields(node)] : [];
   }
 
   async function fetchOrdersByEmailLookup(email) {
