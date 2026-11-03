@@ -1004,6 +1004,8 @@ function decorateFullWidthBlocks(main) {
  * @param {HTMLElement} main The main container element
  */
 function decorateButtons(main) {
+  if (getMetadata('button-decoration') === 'disabled') return;
+
   main.querySelectorAll('p a[href]').forEach((a) => {
     if (a.closest('[data-button-decoration="disabled"]')) return;
     a.title = a.title || a.textContent;
@@ -1060,8 +1062,10 @@ function decorateEyebrows(main) {
   // Disable auto eyebrows if the page is a PDP
   const metaSku = document.querySelector('meta[name="sku"]');
   if (metaSku) return;
+  if (getMetadata('eyebrow-decoration') === 'disabled') return;
 
   main.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach((h) => {
+    if (h.closest('[data-eyebrow-decoration="disabled"]')) return;
     const beforeH = h.previousElementSibling;
     if (beforeH && beforeH.tagName === 'P') {
       const beforeP = beforeH.previousElementSibling;
