@@ -282,4 +282,5 @@ const isOrderConfirmation = /\/order\/complete\/?$/.test(pathname);
 
 if (isOrderConfirmation) {
   import('./consented/conversion.js');
+  import('./consented/instrumentation/ads-manager/openai.js');
 }
