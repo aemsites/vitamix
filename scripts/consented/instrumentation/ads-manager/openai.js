@@ -50,12 +50,12 @@ function buildOrderCreatedEvent(context) {
       name: String(item?.name || item?.productName || item?.sku || '').trim(),
       content_type: 'product',
       quantity: Number.isFinite(quantity) ? Math.floor(quantity) : 0,
-      // The OpenAI SDK validates amount fields as integers.
+      amount: Number.isFinite(price) ? Math.round(price) : 0,
     };
   }).filter((item) => item.id && item.quantity > 0);
 
   if (!contents.length) return null;
-
+  const amount = preview?.total ? Number(preview.total) : 0;
   const currency = String(
     order.currencyCode || preview.currencyCode || order.currency || preview.currency || 'USD',
   ).toUpperCase();
@@ -65,8 +65,9 @@ function buildOrderCreatedEvent(context) {
     orderId,
     eventProps: {
       type: 'contents',
+      amount,
+      contents,
       currency,
-      contents: contents,
     },
   };
 }
