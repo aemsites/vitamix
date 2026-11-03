@@ -32,6 +32,20 @@ https://{branch}--vitamix--aemsites.aem.page/
 
 ## Tests
 
+### Adobe Analytics purchase tracking
+
+Purchase tracking waits up to 30 seconds for Adobe Launch on the order confirmation
+page. After Launch loads, instrumentation initialization retries the retained
+`order:confirmed` context even if the earlier wait expired. Concurrent attempts
+are guarded so they do not send duplicate purchases. Consent is still required;
+this retries initialization, not delivery of an already-sent beacon.
+
+Run the purchase-tracking regression tests with:
+
+```bash
+node --import=./tests/unit/setup.mjs --test tests/unit/order-success.test.js
+```
+
 ### Overview
 
 This project uses Playwright for end-to-end testing. The tests verify that key elements exist and function correctly across different product configurations.
