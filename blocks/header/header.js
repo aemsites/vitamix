@@ -22,9 +22,19 @@ const EDGE_CART_PATH = () => {
   return `/${locale}/${language}/order/cart`;
 };
 
-const MAGENTO_CART_PATH = () => {
-  const { locale, language } = getLocaleAndLanguage();
-  return `/${locale}/${language}/checkout/cart`;
+/**
+ * Legacy cart URL derived from the authored cart link, so it keeps the authored host and store.
+ * @param {string} href Authored cart link
+ * @returns {string}
+ */
+const MAGENTO_CART_HREF = (href) => {
+  const url = new URL(href, window.location.href);
+  url.pathname = url.pathname.replace(/\/order\/cart\/?$/, '/checkout/cart');
+  if (url.hostname !== 'vitamix.com' && !url.hostname.endsWith('.vitamix.com')) {
+    url.protocol = 'https:';
+    url.host = 'www.vitamix.com';
+  }
+  return url.href;
 };
 
 // media query match that indicates desktop width
@@ -850,7 +860,7 @@ export default async function decorate(block) {
     }
   }
 
-  cartLink.href = window.useEdgeCheckout ? EDGE_CART_PATH() : MAGENTO_CART_PATH();
+  cartLink.href = window.useEdgeCheckout ? EDGE_CART_PATH() : MAGENTO_CART_HREF(cartLink.href);
 
   const openOrRedirect = async (e) => {
     // if already on cart page, do nothing

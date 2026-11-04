@@ -7,7 +7,7 @@ import { runInNewContext } from 'node:vm';
 // the Node test runner. Run the real checkout-mode block from the source instead.
 const source = readFileSync(new URL('../../scripts/scripts.js', import.meta.url), 'utf8');
 const settings = source.match(
-  /^const MAGENTO_CHECKOUT_LOCALES[\s\S]*?\nexport function isEdgeCheckoutOverrideEnabled\([\s\S]*?\n}\n/m,
+  /^const STORE_LOCALES[\s\S]*?\nexport function isEdgeCheckoutOverrideEnabled\([\s\S]*?\n}\n/m,
 );
 const localeFn = source.match(
   /^export function getLocaleAndLanguage\([\s\S]*?\n}\n/m,
@@ -40,7 +40,7 @@ function evaluate(url, stored = null, storageThrows = false) {
 
 describe('scripts.js checkout mode', () => {
   it('finds the checkout-mode block in scripts.js', () => {
-    assert.ok(settings, 'expected MAGENTO_CHECKOUT_LOCALES … isEdgeCheckoutOverrideEnabled');
+    assert.ok(settings, 'expected STORE_LOCALES … isEdgeCheckoutOverrideEnabled');
     assert.ok(localeFn, 'expected getLocaleAndLanguage in scripts.js');
     assert.ok(block, 'expected isEdgeCheckoutEnabled … window.useEdgeCheckout assignment');
   });
@@ -54,6 +54,12 @@ describe('scripts.js checkout mode', () => {
       '/ca/fr_ca/',
       '/',
     ].forEach((path) => assert.equal(evaluate(path), true, path));
+  });
+
+  it('keeps Magento for paths outside a store', () => {
+    ['/drafts/someone/page', '/tools/embed-tester/example.html']
+      .forEach((path) => assert.equal(evaluate(path), false, path));
+    assert.equal(evaluate('/drafts/someone/page?cart=edge'), true);
   });
 
   it('keeps Magento for locales not yet migrated', () => {
