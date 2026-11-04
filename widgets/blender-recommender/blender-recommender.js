@@ -92,6 +92,7 @@ window.alpineJsBlenderRecommender = (paramLang = 0, paramPrice = 0) => {
             summary4: '. And',
             buttonTitle: 'More Details',
             recommendationsTitle: 'Recommended Because',
+            carouselCountSeparator: 'of',
             startoverEyebrow: 'Start Over?',
             startoverTitle: 'Shake Up Your Results',
             startoverButton: 'Restart',
@@ -229,6 +230,7 @@ window.alpineJsBlenderRecommender = (paramLang = 0, paramPrice = 0) => {
             summary4: '. Et ',
             buttonTitle: 'Plus de détails',
             recommendationsTitle: 'Recommandé, car',
+            carouselCountSeparator: 'de',
             startoverEyebrow: 'Recommencer?',
             startoverTitle: 'Bousculez vos résultats',
             startoverButton: 'Repartir',
@@ -638,7 +640,7 @@ window.alpineJsBlenderRecommender = (paramLang = 0, paramPrice = 0) => {
 
       //Carousel
       carouselCurrentPosition: 1,
-      carouselMaxPosition: 3,
+      carouselMaxPosition: 2,
       carouselistWrapWidth: 0,
       carouselLastListWrapWidth: 0,
       carouselItemPosition: 0,

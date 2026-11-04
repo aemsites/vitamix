@@ -43,6 +43,11 @@ container with the site's existing spacing so the first quote is not clipped.
 Desktop scrolling, the panel entrance transition, and the two-second loading
 duration are unchanged.
 
+Mobile results group the arrows with a localized "1 of 2" / "1 de 2" count in a
+polite, atomic status live region. The carousel limit matches its two rendered
+cards. At 768px and above, the count is hidden and the prior arrow layout is
+restored.
+
 VX3 product links use `/products/vx3`; other product and
 article navigation paths are unchanged. The widget determines country and
 language from the page path on both preview and production hosts.

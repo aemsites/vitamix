@@ -21,6 +21,23 @@
   padding: var(--spacing-m);
 }
 
+.blender-recommender .ognm-merchandising-product-mini-feature-inline__prev-next {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  height: auto;
+  margin-bottom: var(--spacing-m);
+}
+
+.blender-recommender .ognm-merchandising-product-mini-feature-inline__prev-next button {
+  position: static;
+}
+
+.blender-recommender .blender-recommender-product-count {
+  color: var(--color-white);
+}
+
 @media (width >= 768px) {
   .blender-recommender .ognm-blender-recommender__awaiting-results__reviews__scroller {
     animation: ognm-blender-recommender__scroller-x 20s linear infinite;
@@ -36,6 +53,20 @@
   .blender-recommender .ognm-blender-recommender__review__inner {
     margin-right: 50px;
     padding: 56px 72px;
+  }
+
+  .blender-recommender .ognm-merchandising-product-mini-feature-inline__prev-next {
+    display: block;
+    height: 0;
+    margin-bottom: 0;
+  }
+
+  .blender-recommender .ognm-merchandising-product-mini-feature-inline__prev-next button {
+    position: absolute;
+  }
+
+  .blender-recommender .blender-recommender-product-count {
+    display: none;
   }
 
   /* stylelint-disable-next-line selector-id-pattern */

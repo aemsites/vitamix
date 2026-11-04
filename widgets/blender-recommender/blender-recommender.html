@@ -479,9 +479,10 @@
           </div>
         </div>
         <div class="ognm-merchandising-product-mini-feature-inline__prev-next">
-          <button x-on:click="$event.preventDefault(); carouselPrev()" class="ognm-merchandising-product-mini-feature-inline__prev-next__prev atom-button atom-button--secondary atom-button--prev" :label="language[currentLanguage].questions.prevButton">
+          <button x-on:click="$event.preventDefault(); carouselPrev()" class="ognm-merchandising-product-mini-feature-inline__prev-next__prev atom-button atom-button--secondary atom-button--prev" :aria-label="language[currentLanguage].questions.prevButton">
           </button>
-          <button x-on:click="$event.preventDefault(); carouselNext()" class="ognm-merchandising-product-mini-feature-inline__prev-next__next atom-button atom-button--secondary atom-button--next" :label="language[currentLanguage].questions.nextButton">
+          <span class="blender-recommender-product-count" role="status" aria-live="polite" aria-atomic="true" x-text="carouselCurrentPosition + ' ' + language[currentLanguage].results.carouselCountSeparator + ' ' + carouselMaxPosition"></span>
+          <button x-on:click="$event.preventDefault(); carouselNext()" class="ognm-merchandising-product-mini-feature-inline__prev-next__next atom-button atom-button--secondary atom-button--next" :aria-label="language[currentLanguage].questions.nextButton">
           </button>
         </div>
         <div class="ognm-merchandising-product-mini-feature-inline__wrap">
