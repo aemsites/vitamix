@@ -1,4 +1,6 @@
 import { loadCSS, fetchPlaceholders } from '../aem.js';
+// eslint-disable-next-line import/no-cycle
+import { getLocaleAndLanguage } from '../scripts.js';
 
 await loadCSS(new URL('./newsletter.css', import.meta.url).href);
 
@@ -37,9 +39,7 @@ function showMinimizedTeaser(text, newsletterLink) {
 async function initNewsletterPrompt() {
   if (localStorage.getItem('newsletter-signed-up') === 'true') return;
 
-  const pathSegments = window.location.pathname.split('/').filter(Boolean);
-  const locale = pathSegments[0] || 'us';
-  const language = pathSegments[1] || 'en_us';
+  const { locale, language } = getLocaleAndLanguage();
   const placeholders = await fetchPlaceholders(`/${locale}/${language}`);
   const minimizedText = placeholders.newsletterMinimized?.trim?.();
 
@@ -49,9 +49,12 @@ async function initNewsletterPrompt() {
     showMinimizedTeaser(minimizedText, newsletterLink);
   }
 
-  if (newsletterLink && !localStorage.getItem('newsletter-signed-up') && !localStorage.getItem('newsletter-popped-up')) {
-    localStorage.setItem('newsletter-popped-up', 'true');
-    setTimeout(() => newsletterLink.click(), 5000);
+  if (newsletterLink && !document.querySelector('main form') && !localStorage.getItem('newsletter-signed-up') && !localStorage.getItem('newsletter-popped-up')) {
+    setTimeout(() => {
+      if (document.querySelector('main form') || localStorage.getItem('newsletter-signed-up') || localStorage.getItem('newsletter-popped-up')) return;
+      localStorage.setItem('newsletter-popped-up', 'true');
+      newsletterLink.click();
+    }, 5000);
   }
 }
 
