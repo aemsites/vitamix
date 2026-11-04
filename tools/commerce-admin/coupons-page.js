@@ -3047,16 +3047,117 @@ async function applyImportedCouponTypes(items, onProgress) {
   return { ok, failed };
 }
 
+function couponMarketFilterLabel() {
+  if (state.marketFilter === 'all') return 'all markets';
+  const hit = COUPON_MARKETS.find((m) => m.key === state.marketFilter);
+  return hit ? hit.label : state.marketFilter.toUpperCase();
+}
+
 function couponExportMarketHint() {
-  const bits = [];
-  if (state.marketFilter === 'all') bits.push('all markets');
-  else {
-    const hit = COUPON_MARKETS.find((m) => m.key === state.marketFilter);
-    bits.push(hit ? hit.label : state.marketFilter.toUpperCase());
-  }
+  const bits = [couponMarketFilterLabel()];
   const q = state.overviewSearch.trim();
   if (q) bits.push(`matching "${q}"`);
   return bits.join(', ');
+}
+
+const SALES_EXCLUSION_STATES = [
+  { value: 'exclude', label: 'Excludes products on sale' },
+  { value: 'include', label: 'Includes products on sale' },
+];
+
+function salesExclusionLabel(value) {
+  return SALES_EXCLUSION_STATES.find((s) => s.value === value)?.label || '—';
+}
+
+/** Product-list coupons have no sales-exclusion setting (the form omits it). */
+function couponIsProductList(row) {
+  const list = row?.discountedProducts ?? row?.discounted_products;
+  return Array.isArray(list) && list.length > 0;
+}
+
+function couponSalesExclusionValue(row) {
+  return couponExcludesOnSaleProducts(row || {}) ? 'exclude' : 'include';
+}
+
+/** One filter per line; blank lines ignored. */
+function parseSalesExclusionFilters(text) {
+  return String(text || '')
+    .split(/\r?\n/)
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+/** No filters lists every coupon in the current market. */
+function couponsMatchingTitleFilters(filters) {
+  return couponsVisibleForMarket()
+    .filter((row) => {
+      if (!filters.length) return true;
+      const name = String(row?.name ?? '').toLowerCase();
+      return filters.some((f) => name.includes(f));
+    })
+    .sort((a, b) => String(a.name ?? '').localeCompare(String(b.name ?? ''), undefined, {
+      sensitivity: 'base', numeric: true,
+    }));
+}
+
+function salesExclusionOptionsHtml(selected) {
+  return SALES_EXCLUSION_STATES.map((s) => (
+    `<option value="${s.value}"${s.value === selected ? ' selected' : ''}>${escapeHtml(s.label)}</option>`
+  )).join('');
+}
+
+/**
+ * @param {object} row
+ * @param {{ checked: boolean, target: string }} sel
+ */
+function salesExclusionRowHtml(row, sel) {
+  const id = couponIdFromRow(row);
+  const name = String(row.name || id || '—');
+  const countries = normalizeCouponCountries(row);
+  const mHtml = countries.length
+    ? countries.map((k) => commerceMarketEmojiHtml(k)).join('')
+    : commerceMarketEmojiHtml(couponMarketPrefixFromId(id));
+  if (couponIsProductList(row)) {
+    return `<tr class="coupons-bulk-row coupons-bulk-row-na" data-cp-bulk-row="${escapeHtml(id)}">
+      <td class="coupons-bulk-select-col"><input type="checkbox" disabled aria-label="${escapeHtml(`${name} is a product-list coupon`)}" /></td>
+      <td><span class="coupons-bulk-name">${escapeHtml(name)}</span><code class="coupons-bulk-id">${escapeHtml(id)}</code></td>
+      <td class="coupons-grid-col-market">${mHtml}</td>
+      <td colspan="2" class="coupons-muted">Not applicable (product-list coupon)</td>
+    </tr>`;
+  }
+  const current = couponSalesExclusionValue(row);
+  const target = sel?.target || current;
+  const changed = target !== current;
+  return `<tr class="coupons-bulk-row${changed ? ' coupons-bulk-row-changed' : ''}" data-cp-bulk-row="${escapeHtml(id)}">
+    <td class="coupons-bulk-select-col"><input type="checkbox" data-cp-bulk-select${sel?.checked ? ' checked' : ''} aria-label="${escapeHtml(`Select ${name}`)}" /></td>
+    <td><span class="coupons-bulk-name">${escapeHtml(name)}</span><code class="coupons-bulk-id">${escapeHtml(id)}</code></td>
+    <td class="coupons-grid-col-market">${mHtml}</td>
+    <td><span class="coupons-bulk-state coupons-bulk-state-${current}">${escapeHtml(salesExclusionLabel(current))}</span></td>
+    <td class="coupons-bulk-target-cell">
+      <span class="coupons-bulk-arrow" aria-hidden="true">→</span>
+      <select class="coupons-bulk-target coupons-bulk-state-${target}" data-cp-bulk-target aria-label="${escapeHtml(`New sales exclusion for ${name}`)}">${salesExclusionOptionsHtml(target)}</select>
+    </td>
+  </tr>`;
+}
+
+/**
+ * Full coupon bodies for the selected rows whose target differs from the current setting.
+ * @param {Map<string, { checked: boolean, target: string }>} selections
+ */
+function salesExclusionChangeBodies(selections) {
+  const byId = new Map(state.coupons.map((row) => [couponIdFromRow(row), row]));
+  const bodies = [];
+  selections.forEach((sel, id) => {
+    const row = byId.get(id);
+    if (!sel.checked || !row || couponIsProductList(row)) return;
+    if (sel.target === couponSalesExclusionValue(row)) return;
+    const body = sanitizeCouponTypeForExport(row);
+    if (!body) return;
+    delete body.exclude_discounted_products;
+    body.excludeDiscountedProducts = sel.target === 'exclude';
+    bodies.push(body);
+  });
+  return bodies;
 }
 
 function openCouponExportImportDialog() {
@@ -3071,8 +3172,21 @@ function openCouponExportImportDialog() {
   dialog.innerHTML = `
     <div class="coupons-dialog-inner">
       <div class="coupons-dialog-scroll" tabindex="-1">
-        <div data-cp-export-pane="json">
-          <h2 class="coupons-dialog-title">Export / import coupons</h2>
+        <div class="pim-io-choice" data-cp-export-pane="choice">
+          <h2 class="coupons-dialog-title pim-io-title">Export / import coupons</h2>
+          <div class="pim-io-choice-options">
+            <button type="button" class="pim-io-choice-option" data-cp-export-mode="json">
+              <strong>Full coupon export / import</strong>
+              <span>Export or import complete coupon programs as JSON (codes omitted).</span>
+            </button>
+            <button type="button" class="pim-io-choice-option" data-cp-export-mode="bulk">
+              <strong>Sales exclusion bulk change</strong>
+              <span>Find coupons by title and change whether they exclude products that are on sale.</span>
+            </button>
+          </div>
+        </div>
+        <div data-cp-export-pane="json" hidden>
+          <h2 class="coupons-dialog-title">Full coupon export / import</h2>
           <p class="coupons-field-hint">JSON array of the <strong>${escapeHtml(String(shown.length))}</strong>
             coupon program${shown.length === 1 ? '' : 's'} currently shown (${escapeHtml(couponExportMarketHint())}).
             Codes are omitted. Download this file; Preview import validates the array and lists
@@ -3080,6 +3194,33 @@ function openCouponExportImportDialog() {
           <label class="pim-sr-only" for="cp-export-json">Coupon types JSON</label>
           <textarea id="cp-export-json" class="coupons-json-input" spellcheck="false" rows="16">${escapeHtml(initialJson)}</textarea>
           <div class="coupons-export-status" data-cp-export-status hidden></div>
+        </div>
+        <div data-cp-export-pane="bulk" hidden>
+          <h2 class="coupons-dialog-title">Sales exclusion bulk change</h2>
+          <p class="coupons-field-hint">Enter one title filter per line. Coupons in
+            ${escapeHtml(couponMarketFilterLabel())}
+            whose title contains any filter (case-insensitive) are listed below. Leave empty to list all coupons.</p>
+          <label class="coupons-bulk-filters-label" for="cp-bulk-filters">Title filters</label>
+          <textarea id="cp-bulk-filters" class="coupons-bulk-filters" spellcheck="false" rows="4" placeholder="black friday&#10;spring sale">${escapeHtml(state.overviewSearch.trim())}</textarea>
+          <p class="coupons-field-hint coupons-bulk-count" data-cp-bulk-count role="status"></p>
+          <div class="coupons-bulk-table-wrap">
+            <table class="coupons-bulk-table" aria-label="Coupons matching title filters">
+              <thead><tr>
+                <th class="coupons-bulk-select-col"><input type="checkbox" data-cp-bulk-select-all aria-label="Select all matching coupons" /></th>
+                <th scope="col">Coupon</th>
+                <th scope="col" class="coupons-grid-col-market">Market</th>
+                <th scope="col">Current sales exclusion</th>
+                <th scope="col" class="coupons-bulk-target-heading">
+                  <select data-cp-bulk-all aria-label="Set new sales exclusion for all matching coupons">
+                    <option value="">Set all to…</option>
+                    ${salesExclusionOptionsHtml('')}
+                  </select>
+                </th>
+              </tr></thead>
+              <tbody data-cp-bulk-rows></tbody>
+            </table>
+          </div>
+          <div class="coupons-export-status" data-cp-bulk-status hidden></div>
         </div>
         <div data-cp-export-pane="preview" hidden>
           <h2 class="coupons-dialog-title">Import preview</h2>
@@ -3090,17 +3231,29 @@ function openCouponExportImportDialog() {
       <div class="coupons-dialog-actions">
         <button type="button" class="coupons-btn" data-cp-cancel>Cancel</button>
         <button type="button" class="coupons-btn" data-cp-export-back hidden>Back</button>
-        <button type="button" class="coupons-btn" data-cp-export-preview>Preview import</button>
-        <button type="button" class="coupons-btn coupons-btn-primary" data-cp-export-save>Download</button>
+        <button type="button" class="coupons-btn" data-cp-export-preview hidden>Preview import</button>
+        <button type="button" class="coupons-btn coupons-btn-primary" data-cp-export-save hidden>Download</button>
         <button type="button" class="coupons-btn coupons-btn-primary" data-cp-export-import hidden>Import</button>
       </div>
     </div>`;
   document.body.appendChild(dialog);
 
-  const jsonPane = dialog.querySelector('[data-cp-export-pane="json"]');
-  const previewPane = dialog.querySelector('[data-cp-export-pane="preview"]');
-  const statusEl = dialog.querySelector('[data-cp-export-status]');
+  const panes = {
+    choice: dialog.querySelector('[data-cp-export-pane="choice"]'),
+    json: dialog.querySelector('[data-cp-export-pane="json"]'),
+    bulk: dialog.querySelector('[data-cp-export-pane="bulk"]'),
+    preview: dialog.querySelector('[data-cp-export-pane="preview"]'),
+  };
+  const statusEls = {
+    json: dialog.querySelector('[data-cp-export-status]'),
+    bulk: dialog.querySelector('[data-cp-bulk-status]'),
+  };
   const textarea = /** @type {HTMLTextAreaElement | null} */ (dialog.querySelector('#cp-export-json'));
+  const filtersInput = /** @type {HTMLTextAreaElement | null} */ (dialog.querySelector('#cp-bulk-filters'));
+  const bulkRows = dialog.querySelector('[data-cp-bulk-rows]');
+  const bulkCount = dialog.querySelector('[data-cp-bulk-count]');
+  const bulkSelectAll = /** @type {HTMLInputElement | null} */ (dialog.querySelector('[data-cp-bulk-select-all]'));
+  const bulkAll = /** @type {HTMLSelectElement | null} */ (dialog.querySelector('[data-cp-bulk-all]'));
   const leadEl = dialog.querySelector('[data-cp-export-preview-lead]');
   const tableHost = dialog.querySelector('[data-cp-export-preview-table]');
   const btnCancel = dialog.querySelector('[data-cp-cancel]');
@@ -3111,8 +3264,16 @@ function openCouponExportImportDialog() {
 
   /** @type {{ body: object, existed: boolean }[]} */
   let pendingImport = [];
+  /** @type {'json' | 'bulk'} pane that feeds the preview */
+  let source = 'json';
+  /** @type {object[]} */
+  let bulkMatches = [];
+  /** Survives filter edits so selections are not lost while refining. */
+  /** @type {Map<string, { checked: boolean, target: string }>} */
+  const bulkSelections = new Map();
 
-  const setStatus = (msg, tone = 'error') => {
+  const setStatus = (msg, tone = 'error', pane = source) => {
+    const statusEl = statusEls[pane];
     if (!(statusEl instanceof HTMLElement)) return;
     if (!msg) {
       statusEl.hidden = true;
@@ -3126,14 +3287,75 @@ function openCouponExportImportDialog() {
     statusEl.classList.toggle('coupons-export-status-ok', tone !== 'error');
   };
 
-  const showJsonPane = () => {
-    if (jsonPane instanceof HTMLElement) jsonPane.hidden = false;
-    if (previewPane instanceof HTMLElement) previewPane.hidden = true;
-    btnBack?.setAttribute('hidden', '');
-    btnPreview?.removeAttribute('hidden');
-    btnSave?.removeAttribute('hidden');
-    btnImport?.setAttribute('hidden', '');
-    pendingImport = [];
+  const toggle = (el, show) => {
+    if (show) el?.removeAttribute('hidden');
+    else el?.setAttribute('hidden', '');
+  };
+
+  const showPane = (name) => {
+    Object.entries(panes).forEach(([key, el]) => {
+      if (el instanceof HTMLElement) el.hidden = key !== name;
+    });
+    toggle(btnBack, name !== 'choice');
+    toggle(btnPreview, name === 'json' || name === 'bulk');
+    toggle(btnSave, name === 'json');
+    if (name !== 'preview') {
+      toggle(btnImport, false);
+      pendingImport = [];
+    }
+  };
+
+  const updateBulkState = () => {
+    const boxes = [...(bulkRows?.querySelectorAll('[data-cp-bulk-select]') || [])];
+    const n = boxes.filter((b) => b.checked).length;
+    if (bulkSelectAll) {
+      bulkSelectAll.checked = boxes.length > 0 && n === boxes.length;
+      bulkSelectAll.indeterminate = n > 0 && n < boxes.length;
+      bulkSelectAll.disabled = !boxes.length;
+    }
+    if (bulkAll) bulkAll.disabled = !boxes.length;
+    const changes = salesExclusionChangeBodies(bulkSelections).length;
+    if (source === 'bulk' && btnPreview instanceof HTMLButtonElement) {
+      btnPreview.disabled = !changes;
+    }
+    if (bulkCount) {
+      const filtered = parseSalesExclusionFilters(filtersInput?.value).length > 0;
+      const m = bulkMatches.length;
+      const bits = [filtered
+        ? `${m} coupon${m === 1 ? '' : 's'} match`
+        : `Showing all ${m} coupon${m === 1 ? '' : 's'}`];
+      if (changes) bits.push(`${changes} selected change${changes === 1 ? '' : 's'}`);
+      bulkCount.textContent = `${bits.join(' · ')}.`;
+    }
+  };
+
+  const renderBulkRows = () => {
+    bulkMatches = couponsMatchingTitleFilters(parseSalesExclusionFilters(filtersInput?.value));
+    if (bulkRows) {
+      bulkRows.innerHTML = bulkMatches.length
+        ? bulkMatches.map((row) => salesExclusionRowHtml(
+          row,
+          bulkSelections.get(couponIdFromRow(row)),
+        )).join('')
+        : '<tr><td colspan="5" class="coupons-empty-cell">No matching coupons.</td></tr>';
+    }
+    if (bulkAll) bulkAll.value = '';
+    updateBulkState();
+  };
+
+  /** @param {HTMLTableRowElement} tr */
+  const syncBulkRow = (tr, { autoCheck = false } = {}) => {
+    const id = tr.dataset.cpBulkRow || '';
+    const row = bulkMatches.find((r) => couponIdFromRow(r) === id);
+    const select = /** @type {HTMLSelectElement | null} */ (tr.querySelector('[data-cp-bulk-target]'));
+    const box = /** @type {HTMLInputElement | null} */ (tr.querySelector('[data-cp-bulk-select]'));
+    if (!row || !select || !box) return;
+    const current = couponSalesExclusionValue(row);
+    const changed = select.value !== current;
+    if (autoCheck) box.checked = changed;
+    select.className = `coupons-bulk-target coupons-bulk-state-${select.value}`;
+    tr.classList.toggle('coupons-bulk-row-changed', changed);
+    bulkSelections.set(id, { checked: box.checked, target: select.value });
   };
 
   const showPreviewPane = (parsed) => {
@@ -3145,11 +3367,7 @@ function openCouponExportImportDialog() {
     pendingImport = bodies
       .filter((body) => toAddSet.has(body) || toUpdateSet.has(body))
       .map((body) => ({ body, existed: toUpdateSet.has(body) }));
-    if (jsonPane instanceof HTMLElement) jsonPane.hidden = true;
-    if (previewPane instanceof HTMLElement) previewPane.hidden = false;
-    btnBack?.removeAttribute('hidden');
-    btnPreview?.setAttribute('hidden', '');
-    btnSave?.setAttribute('hidden', '');
+    showPane('preview');
     if (pendingImport.length) btnImport?.removeAttribute('hidden');
     else btnImport?.setAttribute('hidden', '');
     if (btnImport instanceof HTMLButtonElement) {
@@ -3188,13 +3406,61 @@ function openCouponExportImportDialog() {
 
   btnCancel?.addEventListener('click', dismiss);
   btnBack?.addEventListener('click', () => {
-    showJsonPane();
+    const onPreview = panes.preview instanceof HTMLElement && !panes.preview.hidden;
+    showPane(onPreview ? source : 'choice');
+    if (onPreview && source === 'bulk') updateBulkState();
+    if (btnPreview instanceof HTMLButtonElement && source === 'json') btnPreview.disabled = false;
     setStatus('');
   });
   dialog.addEventListener('click', (e) => {
     if (e.target === dialog) dismiss();
   });
   wireDialogEscapeDismiss(dialog, dismiss);
+
+  dialog.querySelectorAll('[data-cp-export-mode]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      source = btn.getAttribute('data-cp-export-mode') === 'bulk' ? 'bulk' : 'json';
+      showPane(source);
+      if (btnPreview instanceof HTMLButtonElement) btnPreview.disabled = false;
+      if (source === 'bulk') {
+        renderBulkRows();
+        filtersInput?.focus();
+      }
+    });
+  });
+
+  filtersInput?.addEventListener('input', () => {
+    setStatus('', 'error', 'bulk');
+    renderBulkRows();
+  });
+  bulkRows?.addEventListener('change', (e) => {
+    const { target } = e;
+    const tr = target instanceof Element ? target.closest('tr[data-cp-bulk-row]') : null;
+    if (!(tr instanceof HTMLTableRowElement)) return;
+    const isSelect = target instanceof HTMLSelectElement;
+    syncBulkRow(tr, { autoCheck: isSelect });
+    if (isSelect && bulkAll) bulkAll.value = '';
+    updateBulkState();
+  });
+  bulkAll?.addEventListener('change', () => {
+    if (!bulkAll.value) return;
+    bulkRows?.querySelectorAll('tr[data-cp-bulk-row]').forEach((tr) => {
+      const select = tr.querySelector('[data-cp-bulk-target]');
+      if (!(select instanceof HTMLSelectElement)) return;
+      select.value = bulkAll.value;
+      syncBulkRow(/** @type {HTMLTableRowElement} */ (tr), { autoCheck: true });
+    });
+    updateBulkState();
+  });
+  bulkSelectAll?.addEventListener('change', () => {
+    bulkRows?.querySelectorAll('tr[data-cp-bulk-row]').forEach((tr) => {
+      const box = tr.querySelector('[data-cp-bulk-select]');
+      if (!(box instanceof HTMLInputElement)) return;
+      box.checked = bulkSelectAll.checked;
+      syncBulkRow(/** @type {HTMLTableRowElement} */ (tr));
+    });
+    updateBulkState();
+  });
 
   btnSave?.addEventListener('click', () => {
     try {
@@ -3207,6 +3473,18 @@ function openCouponExportImportDialog() {
   });
 
   btnPreview?.addEventListener('click', () => {
+    if (source === 'bulk') {
+      const bodies = salesExclusionChangeBodies(bulkSelections);
+      if (!bodies.length) {
+        setStatus('Select at least one coupon with a new sales exclusion setting.');
+        return;
+      }
+      setStatus('');
+      showPreviewPane({
+        bodies, toAdd: [], toUpdate: bodies, skipped: [],
+      });
+      return;
+    }
     try {
       const parsed = parseCouponImportJson(textarea?.value ?? '');
       setStatus('');
@@ -3229,13 +3507,14 @@ function openCouponExportImportDialog() {
           btnImport.textContent = `Importing… (${n}/${total})`;
         }
       });
+      const total = pendingImport.length;
+      await refreshCouponList();
+      render();
       if (failed.length) {
-        showToast(
-          `Imported ${ok.length} of ${pendingImport.length} — ${failed.length} failed.`,
-          'error',
-        );
+        showToast(`Imported ${ok.length} of ${total} — ${failed.length} failed.`, 'error');
+        showPane(source);
+        if (source === 'bulk') renderBulkRows();
         setStatus(failed.map((f) => `${f.id}: ${f.message}`).join('\n'));
-        showJsonPane();
       } else {
         const nNew = ok.filter((x) => x.action === 'create').length;
         const nUp = ok.filter((x) => x.action === 'update').length;
@@ -3245,8 +3524,6 @@ function openCouponExportImportDialog() {
         showToast(bits.join(', ') || 'Imported', 'success');
         dismiss();
       }
-      await refreshCouponList();
-      render();
     } catch (err) {
       showToast(err?.message || 'Import failed', 'error');
       if (btnImport instanceof HTMLButtonElement) {
@@ -3258,6 +3535,7 @@ function openCouponExportImportDialog() {
     }
   });
 
+  showPane('choice');
   lockCouponsBodyScroll();
   dialog.showModal();
 }
