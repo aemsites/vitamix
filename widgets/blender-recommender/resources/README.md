@@ -34,6 +34,10 @@ submits newsletter subscriptions or calls the production `/bin` endpoint.
 Saved questions and existing visitor names are preserved; reloading during the
 results loader restarts its two-second completion timer.
 
+At widths of 768px and above, the widget stylesheet restores normal word-breaking
+only for the results title, preventing the final "s" from wrapping alone. Mobile
+wrapping and the vendored stylesheet remain unchanged.
+
 VX3 product links use `/products/vx3`; other product and
 article navigation paths are unchanged. The widget determines country and
 language from the page path on both preview and production hosts.

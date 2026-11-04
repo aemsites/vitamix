@@ -2,3 +2,10 @@
   max-width: var(--site-width);
   margin: 0 auto;
 }
+
+@media (width >= 768px) {
+  /* stylelint-disable-next-line selector-id-pattern */
+  .blender-recommender #tmpl-page__blender-recommender01 h1 {
+    word-break: normal;
+  }
+}
