@@ -49,9 +49,12 @@ async function initNewsletterPrompt() {
     showMinimizedTeaser(minimizedText, newsletterLink);
   }
 
-  if (newsletterLink && !localStorage.getItem('newsletter-signed-up') && !localStorage.getItem('newsletter-popped-up')) {
-    localStorage.setItem('newsletter-popped-up', 'true');
-    setTimeout(() => newsletterLink.click(), 5000);
+  if (newsletterLink && !document.querySelector('main form') && !localStorage.getItem('newsletter-signed-up') && !localStorage.getItem('newsletter-popped-up')) {
+    setTimeout(() => {
+      if (document.querySelector('main form') || localStorage.getItem('newsletter-signed-up') || localStorage.getItem('newsletter-popped-up')) return;
+      localStorage.setItem('newsletter-popped-up', 'true');
+      newsletterLink.click();
+    }, 5000);
   }
 }
 
