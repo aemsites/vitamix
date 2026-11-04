@@ -1,4 +1,6 @@
 import { loadCSS, fetchPlaceholders } from '../aem.js';
+// eslint-disable-next-line import/no-cycle
+import { getLocaleAndLanguage } from '../scripts.js';
 
 await loadCSS(new URL('./newsletter.css', import.meta.url).href);
 
@@ -37,9 +39,7 @@ function showMinimizedTeaser(text, newsletterLink) {
 async function initNewsletterPrompt() {
   if (localStorage.getItem('newsletter-signed-up') === 'true') return;
 
-  const pathSegments = window.location.pathname.split('/').filter(Boolean);
-  const locale = pathSegments[0] || 'us';
-  const language = pathSegments[1] || 'en_us';
+  const { locale, language } = getLocaleAndLanguage();
   const placeholders = await fetchPlaceholders(`/${locale}/${language}`);
   const minimizedText = placeholders.newsletterMinimized?.trim?.();
 
