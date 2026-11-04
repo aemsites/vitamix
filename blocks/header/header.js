@@ -30,11 +30,8 @@ const EDGE_CART_PATH = () => {
 const MAGENTO_CART_HREF = (href) => {
   const url = new URL(href, window.location.href);
   url.pathname = url.pathname.replace(/\/order\/cart\/?$/, '/checkout/cart');
-  if (url.hostname !== 'vitamix.com' && !url.hostname.endsWith('.vitamix.com')) {
-    url.protocol = 'https:';
-    url.host = 'www.vitamix.com';
-  }
-  return url.href;
+  if (url.hostname === 'vitamix.com' || url.hostname.endsWith('.vitamix.com')) return url.href;
+  return new URL(`${url.pathname}${url.search}`, 'https://www.vitamix.com').href;
 };
 
 // media query match that indicates desktop width
