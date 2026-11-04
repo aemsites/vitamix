@@ -13,10 +13,10 @@
     <div class="ognm-blender-recommender__contents">
 
       <!-- Start Intro -->
-      <div :class="['ognm-blender-recommender__panel', ((screen == 1) ? ' is-active': '' )]">
+      <div style="display:none !important" :class="['ognm-blender-recommender__panel', ((screen == 1) ? ' is-active': '' )]">
         <div class="ognm-blender-recommender__intro">
 
-          <form x-on:submit="$event.preventDefault(); goNext()" :disabled="((screen != 1) ? 'disabled' : false)" class="ognm-blender-recommender__intro__container elmt-container">
+          <form x-init="$nextTick(() => { if (screen == 1) $el.requestSubmit(); })" x-on:submit="$event.preventDefault(); goNext()" :disabled="((screen != 1) ? 'disabled' : false)" class="ognm-blender-recommender__intro__container elmt-container">
             <svg class="ognm-blender-recommender__intro__icon" width="42px" viewbox="0 0 125.635 125.667" xmlns="http://www.w3.org/2000/svg">
               <path d="M33.859 7.118a59.27 59.27 0 0 0-1.43 43.87 49.86 49.86 0 0 0 27.26 28.62l-.08.33a58.9 58.9 0 0 1-28.31 7.74 45.84 45.84 0 0 1-29.67-10.59 62.9 62.9 0 0 1 .78-31.46c3.91 10.15 9.66 17.12 19.48 21.46l1.71.76-.94-1.61a59.84 59.84 0 0 1-5.61-46.38 63 63 0 0 1 16.81-12.74Zm50.46 104.74c5.61-14 4-30.63-4.42-45.8l-.32-.08c-8.17 19.05-26.75 30.88-48.58 30.88a59.86 59.86 0 0 1-23.86-5 63 63 0 0 0 12.69 16.76 58.67 58.67 0 0 0 16.58 2.39 59.89 59.89 0 0 0 29.85-8l1.6-.94-.75 1.7c-4.35 9.83-11.31 15.58-21.46 19.49a62.94 62.94 0 0 0 31.47.78 47.14 47.14 0 0 0 7.2-12.18Zm39.68-63.23a45.82 45.82 0 0 0-29.66-10.59 58.77 58.77 0 0 0-28.31 7.75c0 .1-.06.21-.08.31a49.92 49.92 0 0 1 27.25 28.63 59.3 59.3 0 0 1-1.43 43.88 63.46 63.46 0 0 0 16.84-12.75 59.92 59.92 0 0 0-5.61-46.38l-.94-1.62 1.7.76c9.82 4.34 15.58 11.31 19.49 21.45a63 63 0 0 0 .75-31.44Zm0 0a45.82 45.82 0 0 0-29.66-10.59 58.77 58.77 0 0 0-28.31 7.75c0 .1-.06.21-.08.31a49.92 49.92 0 0 1 27.25 28.63 59.3 59.3 0 0 1-1.43 43.88 63.46 63.46 0 0 0 16.84-12.75 59.92 59.92 0 0 0-5.61-46.38l-.94-1.62 1.7.76c9.82 4.34 15.58 11.31 19.49 21.45a63 63 0 0 0 .75-31.44Zm-5.43-14.77a63.14 63.14 0 0 0-12.68-16.76 58.83 58.83 0 0 0-16.61-2.39 59.91 59.91 0 0 0-29.83 7.95l-1.61.94.75-1.7c4.35-9.83 11.32-15.58 21.46-19.49a62.75 62.75 0 0 0-31.46-.77 46.69 46.69 0 0 0-7.25 12.22c-5.61 14-4 30.64 4.42 45.8l.31.08c8.17-19.05 26.76-30.88 48.63-30.88a59.94 59.94 0 0 1 23.87 5Z" fill="#A7A9AC" fill-rule="nonzero"></path>
             </svg>
@@ -479,9 +479,10 @@
           </div>
         </div>
         <div class="ognm-merchandising-product-mini-feature-inline__prev-next">
-          <button x-on:click="$event.preventDefault(); carouselPrev()" class="ognm-merchandising-product-mini-feature-inline__prev-next__prev atom-button atom-button--secondary atom-button--prev" :label="language[currentLanguage].questions.prevButton">
+          <button x-on:click="$event.preventDefault(); carouselPrev()" class="ognm-merchandising-product-mini-feature-inline__prev-next__prev atom-button atom-button--secondary atom-button--prev" :aria-label="language[currentLanguage].questions.prevButton">
           </button>
-          <button x-on:click="$event.preventDefault(); carouselNext()" class="ognm-merchandising-product-mini-feature-inline__prev-next__next atom-button atom-button--secondary atom-button--next" :label="language[currentLanguage].questions.nextButton">
+          <span class="blender-recommender-product-count" role="status" aria-live="polite" aria-atomic="true" x-text="carouselCurrentPosition + ' ' + language[currentLanguage].results.carouselCountSeparator + ' ' + carouselMaxPosition"></span>
+          <button x-on:click="$event.preventDefault(); carouselNext()" class="ognm-merchandising-product-mini-feature-inline__prev-next__next atom-button atom-button--secondary atom-button--next" :aria-label="language[currentLanguage].questions.nextButton">
           </button>
         </div>
         <div class="ognm-merchandising-product-mini-feature-inline__wrap">

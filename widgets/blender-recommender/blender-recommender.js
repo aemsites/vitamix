@@ -5,6 +5,7 @@
  */
 
 import { loadCSS, loadScript } from '../../scripts/aem.js';
+import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 const resourceBase = new URL('./resources/', import.meta.url).href;
 
@@ -91,6 +92,7 @@ window.alpineJsBlenderRecommender = (paramLang = 0, paramPrice = 0) => {
             summary4: '. And',
             buttonTitle: 'More Details',
             recommendationsTitle: 'Recommended Because',
+            carouselCountSeparator: 'of',
             startoverEyebrow: 'Start Over?',
             startoverTitle: 'Shake Up Your Results',
             startoverButton: 'Restart',
@@ -228,6 +230,7 @@ window.alpineJsBlenderRecommender = (paramLang = 0, paramPrice = 0) => {
             summary4: '. Et ',
             buttonTitle: 'Plus de détails',
             recommendationsTitle: 'Recommandé, car',
+            carouselCountSeparator: 'de',
             startoverEyebrow: 'Recommencer?',
             startoverTitle: 'Bousculez vos résultats',
             startoverButton: 'Repartir',
@@ -315,8 +318,6 @@ window.alpineJsBlenderRecommender = (paramLang = 0, paramPrice = 0) => {
       emailfieldError: true,
       emailfieldCanShowError: false,
 
-      emailSubmitted: false,
-
       // answer data
       answers: {
         question1: '',
@@ -337,31 +338,33 @@ window.alpineJsBlenderRecommender = (paramLang = 0, paramPrice = 0) => {
         this.loadData();
         this.loadPosition();
         this.setAppHeight();
-        if (this.baseURl.indexOf('vitamix.com') > -1) {
-          // Update English / French
-          if (this.baseURl.indexOf('/en_us') > -1) {
-            this.currentLanguage = 0;
-            this.linkPrefix2 = '/en_us';
-          }
-          else if (this.baseURl.indexOf('/fr_ca') > -1) {
-            this.currentLanguage = 1;
-            this.linkPrefix2 = '/fr_ca';
-          }
-          // Update USA / Canada
-          if (this.baseURl.indexOf('vitamix.com/us/') > -1) {
-            this.pricing = 0;
-            this.modalLeadSource = 'sub-em-modal-us';
-            this.linkPrefix1 = '/us';
-          }
-          else if (this.baseURl.indexOf('vitamix.com/ca/') > -1) {
-            this.pricing = 1;
-            this.modalLeadSource = 'sub-em-modal-ca';
-            this.linkPrefix1 = '/ca';
-          }
+        const { locale: country, language } = getLocaleAndLanguage();
+        // Update English / French
+        if (language == 'en_us') {
+          this.currentLanguage = 0;
+          this.linkPrefix2 = '/en_us';
+        }
+        else if (language == 'fr_ca') {
+          this.currentLanguage = 1;
+          this.linkPrefix2 = '/fr_ca';
+        }
+        // Update USA / Canada
+        if (country == 'us') {
+          this.pricing = 0;
+          this.modalLeadSource = 'sub-em-modal-us';
+          this.linkPrefix1 = '/us';
+        }
+        else if (country == 'ca') {
+          this.pricing = 1;
+          this.modalLeadSource = 'sub-em-modal-ca';
+          this.linkPrefix1 = '/ca';
         }
         this.initialized = true;
 
         this.fetchWeightedItems();
+        if (this.screen == 3 && !this.complete) {
+          this.startResultsTimer();
+        }
 
         setTimeout(() => {
           this.$refs.componentbody.classList.remove('is-loading');
@@ -526,10 +529,6 @@ window.alpineJsBlenderRecommender = (paramLang = 0, paramPrice = 0) => {
             if (false/*this.namefieldError || this.emailfieldError */) {
               window.alert(this.language[this.currentLanguage].intro.submitError);
             } else {
-              if (!this.emailfieldError) {
-                this.submitEmail();
-                this.emailSubmitted = true;
-              }
               this.screen = 2;
             }
             break;
@@ -538,10 +537,7 @@ window.alpineJsBlenderRecommender = (paramLang = 0, paramPrice = 0) => {
               if (this.question >= this.totalQuestions) {
                 this.screen = 3;
                 window.scrollTo({ top: 0, behavior: 'smooth' });
-                setTimeout(() => {
-                  this.complete = true;
-                  this.savePosition();
-                }, 2000);
+                this.startResultsTimer();
               } else {
                 this.question++;
               };
@@ -554,6 +550,13 @@ window.alpineJsBlenderRecommender = (paramLang = 0, paramPrice = 0) => {
           //console.log('Default Action');
         }
         this.savePosition();
+      },
+
+      startResultsTimer() {
+        setTimeout(() => {
+          this.complete = true;
+          this.savePosition();
+        }, 2000);
       },
 
       goPrev() {
@@ -635,36 +638,9 @@ window.alpineJsBlenderRecommender = (paramLang = 0, paramPrice = 0) => {
         this.minHeight = 'min-height: calc(100vh - ' + headerHeight + '); min-height: calc(100dvh - ' + headerHeight + ' );'
       },
 
-      submitEmail() {
-        try {
-          $.ajax({
-            type: "GET",
-            url: "https://www.vitamix.com/bin/vitamix/newslettersubscription",
-            data: {
-              email: this.emailfieldValue,
-              mobile: '',
-              sms_optin: '',
-              lead_source: this.modalLeadSource,
-              actionUrl: this.linkPrefix1 + this.linkPrefix2 + this.modalActionURL,
-              pageUrl: window.location.href
-            },
-            success: function (s) {
-              console.log('Successfully submitted email:\n');
-              console.log(s)
-            },
-            error: function (e) {
-              console.log('Failed to submit email:\n' + e)
-            }
-          })
-        }
-        catch (e) {
-          console.warn('Unable to submit email to endpoint:\n' + e);
-        }
-      },
-
       //Carousel
       carouselCurrentPosition: 1,
-      carouselMaxPosition: 3,
+      carouselMaxPosition: 2,
       carouselistWrapWidth: 0,
       carouselLastListWrapWidth: 0,
       carouselItemPosition: 0,

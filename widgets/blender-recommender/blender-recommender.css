@@ -1,4 +1,82 @@
+/* stylelint-disable selector-class-pattern */
+
 .blender-recommender {
   max-width: var(--site-width);
   margin: 0 auto;
+}
+
+.blender-recommender .ognm-blender-recommender__awaiting-results__reviews__scroller {
+  animation: none;
+  position: relative;
+  width: 100%;
+}
+
+.blender-recommender .ognm-blender-recommender__review {
+  flex: 0 0 100%;
+  width: 100%;
+}
+
+.blender-recommender .ognm-blender-recommender__review__inner {
+  margin-right: 0;
+  padding: var(--spacing-m);
+}
+
+.blender-recommender .ognm-merchandising-product-mini-feature-inline__prev-next {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  height: auto;
+  margin-bottom: var(--spacing-m);
+}
+
+.blender-recommender .ognm-merchandising-product-mini-feature-inline__prev-next button {
+  position: static;
+}
+
+.blender-recommender .blender-recommender-product-count {
+  color: var(--color-white);
+}
+
+/* stylelint-disable-next-line selector-id-pattern */
+.blender-recommender #tmpl-page__blender-recommender01 h1 {
+  font-size: clamp(var(--font-size-400), calc(10vw - 10px), var(--font-size-900));
+  word-break: normal;
+}
+
+@media (width >= 768px) {
+  .blender-recommender .ognm-blender-recommender__awaiting-results__reviews__scroller {
+    animation: ognm-blender-recommender__scroller-x 20s linear infinite;
+    position: absolute;
+    width: auto;
+  }
+
+  .blender-recommender .ognm-blender-recommender__review {
+    flex: 0 0 600px;
+    width: 600px;
+  }
+
+  .blender-recommender .ognm-blender-recommender__review__inner {
+    margin-right: 50px;
+    padding: 56px 72px;
+  }
+
+  .blender-recommender .ognm-merchandising-product-mini-feature-inline__prev-next {
+    display: block;
+    height: 0;
+    margin-bottom: 0;
+  }
+
+  .blender-recommender .ognm-merchandising-product-mini-feature-inline__prev-next button {
+    position: absolute;
+  }
+
+  .blender-recommender .blender-recommender-product-count {
+    display: none;
+  }
+
+  /* stylelint-disable-next-line selector-id-pattern */
+  .blender-recommender #tmpl-page__blender-recommender01 h1 {
+    font-size: 4.6875rem;
+  }
 }
