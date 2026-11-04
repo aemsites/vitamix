@@ -11,6 +11,12 @@ These resources were copied from the public Vitamix site on October 31, 2026:
 - `images/`: question and benefit illustrations, recipe, warranty and article
   images, product images from both feeds, and images referenced by the stylesheet.
 
+The US and Canadian E310 entries in both feeds were refreshed to VX3 from the
+production feeds on November 4, 2026, with its image saved locally as
+`images/vx3.jpg`. Scoring, visibility flags, and companion products were
+preserved. The production Canadian French VX3 entry supplies English benefits;
+the local entry translates them into French using the existing feed's wording.
+
 Image filenames are normalized to lowercase, hyphenated slugs (`4+.svg` becomes
 `4-plus.svg`), and their original DAM and catalog directory structures are
 flattened into `images/`. JSON image paths are relative to this
@@ -23,7 +29,9 @@ stylesheet rules and embedded images are preserved. The vendored stylesheet is
 uses a file-level `stylelint-disable` comment rather than being reformatted.
 
 Alpine.js remains on unpkg, and the newsletter subscription endpoint remains on
-`www.vitamix.com`. Product and article navigation links are unchanged.
+`www.vitamix.com`. VX3 product links use `/products/vx3`; other product and
+article navigation paths are unchanged. The widget determines country and
+language from the page path on both preview and production hosts.
 
 ## Updating
 
