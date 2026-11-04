@@ -28,8 +28,13 @@ The broken `.atom-stars::after` fallback rule that requested
 stylesheet rules and embedded images are preserved. The vendored stylesheet is
 uses a file-level `stylelint-disable` comment rather than being reformatted.
 
-Alpine.js remains on unpkg, and the newsletter subscription endpoint remains on
-`www.vitamix.com`. VX3 product links use `/products/vx3`; other product and
+Alpine.js remains on unpkg. The name and email screen is hidden and automatically
+skipped only when the restored screen is still the intro. The widget no longer
+submits newsletter subscriptions or calls the production `/bin` endpoint.
+Saved questions and existing visitor names are preserved; reloading during the
+results loader restarts its two-second completion timer.
+
+VX3 product links use `/products/vx3`; other product and
 article navigation paths are unchanged. The widget determines country and
 language from the page path on both preview and production hosts.
 
@@ -41,8 +46,8 @@ fields, copy any new product images into `images/`, and replace `primary_img` an
 `second_img` values with `images/<filename>` using slugged filenames. Avoid
 restoring remote asset URLs when refreshing the stylesheet.
 
-Validate local resource references and recommendation behavior with:
-
-```sh
-node --import=./tests/unit/setup.mjs --test tests/unit/blender-recommender.test.js
-```
+There is no dedicated recommender test file in the repository. Validate the quiz
+manually in US English, Canadian English, and Canadian French, including fresh
+sessions, answered-question reloads, Back navigation, and loading-screen reloads.
+Check that product images load locally and no `newslettersubscription` request is
+made. Run the existing repository lint and unit tests before shipping.

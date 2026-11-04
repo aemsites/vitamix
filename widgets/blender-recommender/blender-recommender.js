@@ -316,8 +316,6 @@ window.alpineJsBlenderRecommender = (paramLang = 0, paramPrice = 0) => {
       emailfieldError: true,
       emailfieldCanShowError: false,
 
-      emailSubmitted: false,
-
       // answer data
       answers: {
         question1: '',
@@ -362,6 +360,9 @@ window.alpineJsBlenderRecommender = (paramLang = 0, paramPrice = 0) => {
         this.initialized = true;
 
         this.fetchWeightedItems();
+        if (this.screen == 3 && !this.complete) {
+          this.startResultsTimer();
+        }
 
         setTimeout(() => {
           this.$refs.componentbody.classList.remove('is-loading');
@@ -526,10 +527,6 @@ window.alpineJsBlenderRecommender = (paramLang = 0, paramPrice = 0) => {
             if (false/*this.namefieldError || this.emailfieldError */) {
               window.alert(this.language[this.currentLanguage].intro.submitError);
             } else {
-              if (!this.emailfieldError) {
-                this.submitEmail();
-                this.emailSubmitted = true;
-              }
               this.screen = 2;
             }
             break;
@@ -538,10 +535,7 @@ window.alpineJsBlenderRecommender = (paramLang = 0, paramPrice = 0) => {
               if (this.question >= this.totalQuestions) {
                 this.screen = 3;
                 window.scrollTo({ top: 0, behavior: 'smooth' });
-                setTimeout(() => {
-                  this.complete = true;
-                  this.savePosition();
-                }, 2000);
+                this.startResultsTimer();
               } else {
                 this.question++;
               };
@@ -554,6 +548,13 @@ window.alpineJsBlenderRecommender = (paramLang = 0, paramPrice = 0) => {
           //console.log('Default Action');
         }
         this.savePosition();
+      },
+
+      startResultsTimer() {
+        setTimeout(() => {
+          this.complete = true;
+          this.savePosition();
+        }, 2000);
       },
 
       goPrev() {
@@ -633,33 +634,6 @@ window.alpineJsBlenderRecommender = (paramLang = 0, paramPrice = 0) => {
           console.warn('Failed to Set Header Height: \n' + e);
         }
         this.minHeight = 'min-height: calc(100vh - ' + headerHeight + '); min-height: calc(100dvh - ' + headerHeight + ' );'
-      },
-
-      submitEmail() {
-        try {
-          $.ajax({
-            type: "GET",
-            url: "https://www.vitamix.com/bin/vitamix/newslettersubscription",
-            data: {
-              email: this.emailfieldValue,
-              mobile: '',
-              sms_optin: '',
-              lead_source: this.modalLeadSource,
-              actionUrl: this.linkPrefix1 + this.linkPrefix2 + this.modalActionURL,
-              pageUrl: window.location.href
-            },
-            success: function (s) {
-              console.log('Successfully submitted email:\n');
-              console.log(s)
-            },
-            error: function (e) {
-              console.log('Failed to submit email:\n' + e)
-            }
-          })
-        }
-        catch (e) {
-          console.warn('Unable to submit email to endpoint:\n' + e);
-        }
       },
 
       //Carousel
