@@ -31,6 +31,9 @@ export const TARGET_ORDER_CONFIRM_MBOX = 'orderConfirmPage';
 /** Launch direct-call rule for order confirmation (Magento parity). */
 export const LAUNCH_PURCHASE_EVENT = 'purchase';
 
+const PURCHASE_READINESS_ATTEMPTS = 300;
+const PURCHASE_READINESS_INTERVAL_MS = 100;
+
 /**
  * Order confirmation total for Target params (mirrors order-complete.js).
  * @param {{ subtotal?: number, tax?: number, shippingRate?: number, discounts?: object[] }} params
@@ -359,6 +362,7 @@ function trackOrderConfirmPage(params) {
 
 let orderConfirmTargetFired = false;
 let purchaseFired = false;
+let purchaseInFlight = false;
 let registrationCompleteFired = false;
 let orderPurchaseTrackingRegistered = false;
 
@@ -368,7 +372,7 @@ let orderPurchaseTrackingRegistered = false;
  * @returns {Promise<void>}
  */
 export async function firePurchase(transaction = getPurchaseTransactionData()) {
-  if (purchaseFired) return;
+  if (purchaseFired || purchaseInFlight) return;
 
   if (!hasMarketingConsent()) {
     return;
@@ -379,13 +383,18 @@ export async function firePurchase(transaction = getPurchaseTransactionData()) {
     return;
   }
 
-  debugLog('Adobe Analytics purchase payload', transaction);
-  if (!(await pushPurchaseEvent(transaction, { waitForBeacon: true }))) {
-    debugWarn('Adobe Analytics purchase skipped: Adobe Launch (_satellite) not available');
-    return;
-  }
+  purchaseInFlight = true;
+  try {
+    debugLog('Adobe Analytics purchase payload', transaction);
+    if (!(await pushPurchaseEvent(transaction, { waitForBeacon: true }))) {
+      debugWarn('Adobe Analytics purchase skipped: Adobe Launch (_satellite) not available');
+      return;
+    }
 
-  purchaseFired = true;
+    purchaseFired = true;
+  } finally {
+    purchaseInFlight = false;
+  }
 }
 
 /**
@@ -499,7 +508,7 @@ function trackPurchaseFromContext(context, attempt = 0) {
 
   whenSatelliteReady(() => {
     firePurchase(transaction);
-  }, LAUNCH_PURCHASE_EVENT);
+  }, LAUNCH_PURCHASE_EVENT, PURCHASE_READINESS_ATTEMPTS, PURCHASE_READINESS_INTERVAL_MS);
 }
 
 /**
@@ -534,23 +543,29 @@ export async function fireRegistrationComplete(context) {
 /**
  * Listen for order-complete confirmation before firing purchase.
  * Purchase must run after the page has authoritative order/line-item data,
- * not on the initial Launch page-view beacon.
+ * not on the initial Launch page-view beacon. Replaying the retained context
+ * on later registration retries purchases after Launch finishes loading.
  */
 export function registerOrderPurchaseTracking() {
-  if (orderPurchaseTrackingRegistered || !isOrderSuccessPage()) {
+  if (!isOrderSuccessPage()) {
     return;
   }
-  orderPurchaseTrackingRegistered = true;
+  const firstRegistration = !orderPurchaseTrackingRegistered;
+  if (firstRegistration) {
+    orderPurchaseTrackingRegistered = true;
 
-  document.addEventListener('order:confirmed', (event) => {
-    trackPurchaseFromContext(event.detail);
-    whenSatelliteReady(() => fireRegistrationComplete(event.detail), 'registrationComplete');
-  }, { once: true });
+    document.addEventListener('order:confirmed', (event) => {
+      trackPurchaseFromContext(event.detail);
+      whenSatelliteReady(() => fireRegistrationComplete(event.detail), 'registrationComplete');
+    }, { once: true });
+  }
 
   const pendingContext = window.vitamixEdsAnalytics?.orderConfirmedContext;
   if (pendingContext) {
     trackPurchaseFromContext(pendingContext);
-    whenSatelliteReady(() => fireRegistrationComplete(pendingContext), 'registrationComplete');
+    if (firstRegistration) {
+      whenSatelliteReady(() => fireRegistrationComplete(pendingContext), 'registrationComplete');
+    }
   }
 }
 
@@ -570,7 +585,7 @@ export function trackPurchase(attempt = 0) {
       return;
     }
     firePurchase(transaction);
-  }, LAUNCH_PURCHASE_EVENT);
+  }, LAUNCH_PURCHASE_EVENT, PURCHASE_READINESS_ATTEMPTS, PURCHASE_READINESS_INTERVAL_MS);
 }
 
 /**
