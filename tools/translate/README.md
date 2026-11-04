@@ -6,6 +6,8 @@ Four tools for translating and rolling out localized pages via [DA Live](https:/
 
 ## Tools Overview
 
+DA and AEM API reads bypass the browser HTTP cache (`cache: 'no-store'`) so repeated actions load current source content, translation configuration, folder listings, redirects, and status/version information.
+
 ### 1. Translation Plugin (`plugin.html`)
 
 DA Live editor panel plugin. Translates a text selection in the current document.

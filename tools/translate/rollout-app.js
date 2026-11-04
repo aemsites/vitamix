@@ -106,7 +106,7 @@ function resolveResourcePath(urlStr, context) {
 
     const pathname = url.hash.replace(`#/${context.org}/${context.repo}`, '');
     const listUrl = `${ADMIN_URL}/list/${context.org}/${context.repo}${pathname}`;
-    const resp = await daFetch(listUrl);
+    const resp = await daFetch(listUrl, { cache: 'no-store' });
     if (!resp.ok) {
       folderLoaderErrorMessage.textContent = `Failed to load folder list: ${resp.statusText}`;
       folderLoaderErrorMessage.style.display = 'block';
@@ -423,7 +423,7 @@ function resolveResourcePath(urlStr, context) {
 
       let sourceHtml;
       try {
-        const resp = await daFetch(sourceUrl);
+        const resp = await daFetch(sourceUrl, { cache: 'no-store' });
         if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`);
         sourceHtml = await resp.text();
       } catch (err) {
