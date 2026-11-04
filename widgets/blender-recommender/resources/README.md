@@ -38,6 +38,11 @@ At widths of 768px and above, the widget stylesheet restores normal word-breakin
 only for the results title, preventing the final "s" from wrapping alone. Mobile
 wrapping and the vendored stylesheet remain unchanged.
 
+Below 768px, loading testimonials no longer scroll. Mobile cards fit the
+container with the site's existing spacing so the first quote is not clipped.
+Desktop scrolling, the panel entrance transition, and the two-second loading
+duration are unchanged.
+
 VX3 product links use `/products/vx3`; other product and
 article navigation paths are unchanged. The widget determines country and
 language from the page path on both preview and production hosts.
