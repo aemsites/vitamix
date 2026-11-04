@@ -5,6 +5,7 @@
  */
 
 import { loadCSS, loadScript } from '../../scripts/aem.js';
+import { getLocaleAndLanguage } from '../../scripts/scripts.js';
 
 const resourceBase = new URL('./resources/', import.meta.url).href;
 
@@ -337,27 +338,26 @@ window.alpineJsBlenderRecommender = (paramLang = 0, paramPrice = 0) => {
         this.loadData();
         this.loadPosition();
         this.setAppHeight();
-        if (this.baseURl.indexOf('vitamix.com') > -1) {
-          // Update English / French
-          if (this.baseURl.indexOf('/en_us') > -1) {
-            this.currentLanguage = 0;
-            this.linkPrefix2 = '/en_us';
-          }
-          else if (this.baseURl.indexOf('/fr_ca') > -1) {
-            this.currentLanguage = 1;
-            this.linkPrefix2 = '/fr_ca';
-          }
-          // Update USA / Canada
-          if (this.baseURl.indexOf('vitamix.com/us/') > -1) {
-            this.pricing = 0;
-            this.modalLeadSource = 'sub-em-modal-us';
-            this.linkPrefix1 = '/us';
-          }
-          else if (this.baseURl.indexOf('vitamix.com/ca/') > -1) {
-            this.pricing = 1;
-            this.modalLeadSource = 'sub-em-modal-ca';
-            this.linkPrefix1 = '/ca';
-          }
+        const { locale: country, language } = getLocaleAndLanguage();
+        // Update English / French
+        if (language == 'en_us') {
+          this.currentLanguage = 0;
+          this.linkPrefix2 = '/en_us';
+        }
+        else if (language == 'fr_ca') {
+          this.currentLanguage = 1;
+          this.linkPrefix2 = '/fr_ca';
+        }
+        // Update USA / Canada
+        if (country == 'us') {
+          this.pricing = 0;
+          this.modalLeadSource = 'sub-em-modal-us';
+          this.linkPrefix1 = '/us';
+        }
+        else if (country == 'ca') {
+          this.pricing = 1;
+          this.modalLeadSource = 'sub-em-modal-ca';
+          this.linkPrefix1 = '/ca';
         }
         this.initialized = true;
 
