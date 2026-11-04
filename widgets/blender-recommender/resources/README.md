@@ -47,7 +47,8 @@ loader runs for two seconds and restarts that timer if the page is reloaded.
 Below 768px, loading testimonials are static and fit the container. Results
 display two product cards with arrows and a localized "1 of 2" / "1 de 2" count
 in a polite, atomic status live region. At 768px and above, testimonials scroll,
-the product count is hidden, and the results heading uses normal word-breaking.
+and the product count is hidden. The results heading uses normal word-breaking
+at all widths, with fluid mobile sizing and the original desktop size from 768px.
 
 ## Maintenance
 
