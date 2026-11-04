@@ -55,10 +55,10 @@ function registerErrorLogging() {
   });
 }
 
-// Locale+language pairs enabled for edge checkout.
-// Format: '<locale>/<language>' (e.g., 'ca/fr_ca'). Add pairs as each region goes live.
-// Keep this empty to use Adobe Commerce by default in every environment.
-const EDGE_CHECKOUT_LOCALES = ['ca/fr_ca', 'ca/en_us', 'us/en_us'];
+// Locale+language pairs that still use Adobe Commerce checkout; every other locale uses
+// Edge checkout. Format: '<locale>/<language>' (e.g., 'mx/es_mx'). Remove pairs as each
+// region goes live.
+const MAGENTO_CHECKOUT_LOCALES = ['mx/en_us', 'mx/es_mx', 'vr/en_us'];
 export const EDGE_CHECKOUT_OVERRIDE_STORAGE_KEY = 'edgeCheckout';
 
 /**
@@ -258,6 +258,26 @@ export function getLocaleAndLanguage(forceEnCA = false, bcp47 = false) {
 
   return { locale, language };
 }
+
+/**
+ * Determines whether the current page uses Edge checkout.
+ * `?cart=magento` or `?cart=edge` overrides all other settings (useful for testing).
+ * Otherwise Edge is the default, except for MAGENTO_CHECKOUT_LOCALES that a tester has
+ * not opted in with localStorage.edgeCheckout (e.g. `mx/es_mx,vr/en_us`).
+ *
+ * @returns {boolean}
+ */
+export function isEdgeCheckoutEnabled() {
+  const cartModeParam = new URLSearchParams(window.location.search).get('cart');
+  if (cartModeParam !== null) return cartModeParam !== 'magento';
+  const { locale, language } = getLocaleAndLanguage();
+  const localeKey = `${locale}/${language}`.toLowerCase();
+  return !MAGENTO_CHECKOUT_LOCALES.includes(localeKey)
+    || isEdgeCheckoutOverrideEnabled(localeKey);
+}
+
+// Set at import time so embedded blocks (header, footer), which skip loadPage, see it too.
+window.useEdgeCheckout = isEdgeCheckoutEnabled();
 
 /**
  * Returns the path for an order-flow page (cart, checkout, complete, cancel)
@@ -2216,18 +2236,6 @@ async function loadEager(doc) {
   const lang = language.split('_')[0];
   // VR (the international store) is not a country, so its lang has no region.
   document.documentElement.lang = locale === 'vr' ? lang : `${lang}-${locale.toUpperCase()}`;
-
-  const localeKey = `${locale}/${language}`;
-  // Edge checkout is enabled only for locale+language pairs in EDGE_CHECKOUT_LOCALES.
-  // Testers can persistently opt in to one or more locales with localStorage.edgeCheckout,
-  // for example: `ca/fr_ca,ca/en_us`.
-  window.useEdgeCheckout = EDGE_CHECKOUT_LOCALES.includes(localeKey)
-    || isEdgeCheckoutOverrideEnabled(localeKey);
-  // ?cart=magento or ?cart=edge overrides all other settings (useful for testing)
-  const cartModeParam = new URLSearchParams(window.location.search).get('cart');
-  if (cartModeParam !== null) {
-    window.useEdgeCheckout = cartModeParam !== 'magento';
-  }
 
   /* simulation date */
   const params = new URLSearchParams(window.location.search);

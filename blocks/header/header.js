@@ -22,6 +22,11 @@ const EDGE_CART_PATH = () => {
   return `/${locale}/${language}/order/cart`;
 };
 
+const MAGENTO_CART_PATH = () => {
+  const { locale, language } = getLocaleAndLanguage();
+  return `/${locale}/${language}/checkout/cart`;
+};
+
 // media query match that indicates desktop width
 const isDesktop = window.matchMedia('(width >= 1000px)');
 
@@ -689,8 +694,11 @@ export default async function decorate(block) {
   addMagentoCacheListener(syncHeaderAuthDisplay);
   syncHeaderAuthDisplay();
 
+  // Embedded on another page (aem-embed): keep plain links, no in-page dialogs.
+  const isEmbedded = block.getRootNode() instanceof ShadowRoot;
+
   // --- Auth panel + OTP account drawer (edge checkout mode only) ---
-  if (window.useEdgeCheckout) {
+  if (window.useEdgeCheckout && !isEmbedded) {
     let authPanel = null;
     const ensureAuthPanel = async () => {
       if (authPanel) return authPanel;
@@ -842,10 +850,7 @@ export default async function decorate(block) {
     }
   }
 
-  // change to edge cart link
-  if (window.useEdgeCheckout) {
-    cartLink.href = EDGE_CART_PATH();
-  }
+  cartLink.href = window.useEdgeCheckout ? EDGE_CART_PATH() : MAGENTO_CART_PATH();
 
   const openOrRedirect = async (e) => {
     // if already on cart page, do nothing
@@ -853,8 +858,8 @@ export default async function decorate(block) {
       return;
     }
 
-    // if on mobile or not using edge checkout, redirect to cart page
-    if (!window.useEdgeCheckout || window.innerWidth < 900) {
+    // if on mobile, embedded or not using edge checkout, redirect to cart page
+    if (!window.useEdgeCheckout || isEmbedded || window.innerWidth < 900) {
       return;
     }
 
