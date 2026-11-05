@@ -87,9 +87,6 @@ function renderFindDealer(ph, block) {
  * @param {HTMLElement} container - "Add to Cart" container
  */
 function toggleFixedAddToCart(container) {
-  const rootStyles = getComputedStyle(document.documentElement);
-  const headerHeight = parseInt(rootStyles.getPropertyValue('--header-height'), 10) || 0;
-
   window.addEventListener('scroll', () => {
     // disable fixed behavior on desktop
     if (window.innerWidth >= 900) {
@@ -99,17 +96,10 @@ function toggleFixedAddToCart(container) {
     }
 
     const { scrollY } = window;
-    const offset = Math.max(headerHeight - scrollY, 0);
 
-    // apply or remove "fixed" class and dynamic top offset
+    // apply or remove "fixed" class
     if (scrollY > 0) {
       container.classList.add('fixed');
-
-      if (offset > 0) {
-        container.style.top = `${offset}px`;
-      } else {
-        container.style.removeProperty('top');
-      }
     } else {
       container.classList.remove('fixed');
       container.removeAttribute('style');
