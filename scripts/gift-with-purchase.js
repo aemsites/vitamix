@@ -279,6 +279,8 @@ async function addOneGift(promotion, rule) {
       custom: {
         giftWithPurchase: true,
         promotionId: promotion.id,
+        // Reported to EBS via the order's custom.gwpPromotions (see createOrder).
+        ...(promotion.name ? { promotionName: promotion.name } : {}),
         ...(rule.custom?.regularPrice ? { regularPrice: rule.custom.regularPrice } : {}),
       },
     },
