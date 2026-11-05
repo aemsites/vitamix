@@ -127,7 +127,9 @@ option dimensions. Nested bundles are not supported.
 Compatibility is checked against ProductBus when applying the selection and again
 before review; incompatible selections are rejected with the catalog and reason.
 The wizard saves `type: "bundle"`, `custom.type: "bundle"` and `bundleItems`,
-retaining the asset-derived colors. Each component's current parent catalog final
+retaining the asset-derived colors. It combines all selected component products' `custom.resources` into the
+bundle's `custom.resources`, preserving resource fields from each local catalog.
+Each component's current parent catalog final
 price is used as its proportional weight; its allocated price is the same for all
 colors. Cent rounding is distributed so component prices exactly equal the
 entered bundle price in each country. Component SKUs and tax classifications

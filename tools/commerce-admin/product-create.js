@@ -653,6 +653,7 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
               name: product.name,
               image: image ? resolveImageUrlForLocale(catalog, image) : '',
               categories: product.custom?.categories || [],
+              resources: product.custom?.resources || [],
             },
           };
         } catch (err) {
@@ -1122,17 +1123,21 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
       const weight = { value: Number(weightValue), unit: value('weightUnit') };
       return { weight, shippingDimensions: { weight: { ...weight } } };
     };
+    const components = isVirtualBundle ? bundleComponents.get(catalog) : undefined;
+    const resources = (components || []).flatMap((component) => (
+      component.preview.resources.map((resource) => ({ ...resource }))
+    ));
     const custom = {
       categories: [...selectedCategories].map((key) => ({ ...categoryChoices.get(key) })),
       ...Object.fromEntries(BUTTON_SETTINGS.map((setting) => [
         setting, (isVirtualBundle ? setting === 'addToCart' : field(setting).checked) ? 'Yes' : 'No',
       ])),
       ...(field('virtualBundle').checked ? { type: 'bundle' } : {}),
+      ...(resources.length ? { resources } : {}),
       ...(!isVirtualBundle && value('promoButton') ? { promoButton: value('promoButton') } : {}),
       ...(catalogOptions.get(catalog)?.length
         ? { options: catalogOptions.get(catalog).map((option) => ({ ...option })) } : {}),
     };
-    const components = isVirtualBundle ? bundleComponents.get(catalog) : undefined;
     const derivedTax = isVirtualBundle ? deriveBundleTaxFromComponents(components || []) : {};
     const derivedPhysical = isVirtualBundle ? deriveBundleWeightFromComponents(components || [], 'lb') : {};
     const tax = isVirtualBundle ? derivedTax : manualTax;
