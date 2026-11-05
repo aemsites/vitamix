@@ -148,7 +148,23 @@ function buildQuestion(question, index) {
       text.append(detail);
     }
 
-    label.append(input, text);
+    const selectionCheck = document.createElement('span');
+    selectionCheck.className = 'selection-check';
+    selectionCheck.setAttribute('aria-hidden', 'true');
+    const checkIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    checkIcon.setAttribute('viewBox', '0 0 24 24');
+    checkIcon.setAttribute('focusable', 'false');
+    const checkPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    checkPath.setAttribute('d', 'm5 12.5 4.5 4.5L19 7.5');
+    checkPath.setAttribute('fill', 'none');
+    checkPath.setAttribute('stroke', 'currentColor');
+    checkPath.setAttribute('stroke-width', '3');
+    checkPath.setAttribute('stroke-linecap', 'round');
+    checkPath.setAttribute('stroke-linejoin', 'round');
+    checkIcon.append(checkPath);
+    selectionCheck.append(checkIcon);
+
+    label.append(input, text, selectionCheck);
     options.append(label);
   });
   fieldset.append(options);
@@ -354,11 +370,28 @@ export default async function decorate(widget) {
   const stepLabelEl = widget.querySelector('.step-label');
   const prevBtn = widget.querySelector('.prev');
   const nextBtn = widget.querySelector('.next');
+  const stepsEl = widget.querySelector('.steps');
+  const matchListEl = widget.querySelector('.match-list');
   const nextLabel = nextBtn.textContent;
   const total = Math.max(getDecisionTreeDepth(decisionTree), 1);
 
   const fieldsets = questions.map(buildQuestion);
   quizEl.append(...fieldsets);
+  const stepItems = questions.map((question, index) => {
+    const item = document.createElement('span');
+    item.className = 'step';
+    item.dataset.questionIndex = index;
+    const check = document.createElement('span');
+    check.className = 'step-check';
+    check.setAttribute('aria-hidden', 'true');
+    check.textContent = '\u2713';
+    const label = document.createElement('span');
+    label.className = 'step-text';
+    label.textContent = question.name;
+    item.append(check, label);
+    stepsEl.append(item);
+    return item;
+  });
   widget.querySelector('.step-total').textContent = total;
   progressEl.max = total;
 
@@ -366,6 +399,86 @@ export default async function decorate(widget) {
   let trail = [];
   let pendingSelection = null;
   let renderVersion = 0;
+  let matchRenderVersion = 0;
+
+  const updateSteps = (activeIndex = -1, complete = false) => {
+    stepItems.forEach((item, index) => {
+      const visited = trail.some(({ node }) => node.questionIndex === index);
+      const stepComplete = complete || visited || index < activeIndex;
+      item.classList.toggle('is-current', !complete && index === activeIndex);
+      item.classList.toggle('is-complete', stepComplete);
+      if (!complete && index === activeIndex) item.setAttribute('aria-current', 'step');
+      else item.removeAttribute('aria-current');
+    });
+  };
+
+  const renderMatches = async (version) => {
+    matchRenderVersion += 1;
+    const matchVersion = matchRenderVersion;
+    const selected = Object.fromEntries(trail.map(({ node, answerIndex }) => {
+      const question = questions[node.questionIndex];
+      return [question.name, question.answers[answerIndex].label];
+    }));
+    if (currentNode.type === 'question') {
+      const currentQuestion = questions[currentNode.questionIndex];
+      const checked = fieldsets[currentNode.questionIndex].querySelector('input:checked');
+      if (checked) selected[currentQuestion.name] = checked.value;
+      else delete selected[currentQuestion.name];
+    }
+    const candidates = [];
+    recommendations.forEach((row) => {
+      let score = 0;
+      const matches = Object.entries(selected).every(([name, answer]) => {
+        const key = Object.keys(row).find((column) => column.trim() === name);
+        const criterion = normalize(key ? row[key] : '');
+        if (!criterion) return true;
+        if (criterion !== normalize(answer)) return false;
+        score += 1;
+        return true;
+      });
+      const href = toHref(row.Recommendation);
+      if (matches && href && !candidates.some((candidate) => candidate.href === href)) {
+        candidates.push({ href, score });
+      }
+    });
+    candidates.sort((a, b) => b.score - a.score);
+    const visible = candidates.slice(0, 3);
+
+    const previews = await Promise.all(visible.map(async ({ href }) => {
+      try {
+        if (!productPages.has(href)) {
+          const { locale, language } = getLocaleAndLanguage();
+          productPages.set(href, Promise.all([
+            loadProduct(href),
+            fetchPlaceholders(`/${locale}/${language}/products/config`),
+          ]));
+        }
+        const [product] = await productPages.get(href);
+        return product ? { href, product } : null;
+      } catch (error) {
+        return null;
+      }
+    }));
+    if (version !== renderVersion || matchVersion !== matchRenderVersion) return;
+
+    matchListEl.replaceChildren();
+    previews.filter(Boolean).forEach(({ href, product }) => {
+      const link = document.createElement('a');
+      link.className = 'match';
+      link.href = href;
+      if (product.image) {
+        const image = document.createElement('img');
+        image.src = product.image;
+        image.alt = '';
+        image.loading = 'lazy';
+        link.append(image);
+      }
+      const title = document.createElement('span');
+      title.textContent = product.title;
+      link.append(title);
+      matchListEl.append(link);
+    });
+  };
 
   const pushAnswers = () => {
     const url = new URL(window.location.href);
@@ -426,6 +539,8 @@ export default async function decorate(widget) {
 
     progressEl.value = total;
     widget.dataset.stage = 'results';
+    updateSteps(-1, true);
+    renderMatches(version);
     widget.querySelector('.results h2').focus();
   };
 
@@ -440,15 +555,20 @@ export default async function decorate(widget) {
 
     widget.dataset.stage = 'quiz';
     const { questionIndex, options } = node;
+    updateSteps(questionIndex);
     const fieldset = fieldsets[questionIndex];
+    fieldset.dataset.visibleChoices = options.length;
     fieldset.hidden = false;
     fieldset.querySelectorAll('input').forEach((input) => {
       input.checked = false;
-      input.closest('label').hidden = true;
+      const label = input.closest('label');
+      label.hidden = true;
+      delete label.dataset.visibleIndex;
     });
-    options.forEach(({ answerIndex }) => {
+    options.forEach(({ answerIndex }, visibleIndex) => {
       const input = fieldset.querySelector(`input[data-answer-index="${answerIndex}"]`);
       input.closest('label').hidden = false;
+      input.closest('label').dataset.visibleIndex = visibleIndex;
     });
     if (pendingSelection !== null) {
       const input = fieldset.querySelector(`input[data-answer-index="${pendingSelection}"]`);
@@ -465,6 +585,7 @@ export default async function decorate(widget) {
     stepLabelEl.textContent = step;
     prevBtn.hidden = trail.length === 0;
     updateNext();
+    renderMatches(renderVersion);
   };
 
   const restoreAnswers = (focus = true) => {
@@ -517,6 +638,7 @@ export default async function decorate(widget) {
   widget.addEventListener('change', (e) => {
     if (e.target.closest('fieldset') && currentNode.type === 'question') {
       updateNext();
+      renderMatches(renderVersion);
     }
   });
 
