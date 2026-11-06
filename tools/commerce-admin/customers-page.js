@@ -8,6 +8,7 @@ import { putOrPatchResource } from './commerce-resource-save.js';
 import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
 import { createDetailModalHeaderCloseAndJson } from './commerce-detail-modal-json.js';
 import { openJsonEditDialog } from './commerce-json-edit-dialog.js';
+import { openDeleteCustomerDialog } from './customer-delete.js';
 import { PB_ORG, PB_SITE } from './commerce-pbus-config.js';
 import { escapeHtml, showToast } from './commerce-otp-ui.js';
 import { openOrderById, orderStateBadgeClass, orderMarketBadgeHtml } from './orders-page.js';
@@ -558,7 +559,7 @@ function buildCustomerDetailHumanView(data, orderData, onOpenOrder) {
 function openCustomerDetailModal(
   customerData,
   {
-    email, onRefresh, orders = [], embeddedLabels = [],
+    email, onRefresh, onDeleted, orders = [], embeddedLabels = [],
   } = {},
 ) {
   const dialog = document.createElement('dialog');
@@ -592,6 +593,22 @@ function openCustomerDetailModal(
     dialog.close();
     dialog.remove();
   };
+
+  if (email) {
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'coupons-btn coupons-btn-danger';
+    deleteBtn.textContent = 'Delete customer…';
+    deleteBtn.addEventListener('click', () => {
+      openDeleteCustomerDialog(email, {
+        onDeleted: () => {
+          shut();
+          if (typeof onDeleted === 'function') onDeleted(email);
+        },
+      });
+    });
+    toolbarMain.appendChild(deleteBtn);
+  }
 
   const header = createDetailModalHeaderCloseAndJson({
     bodyHost,
@@ -641,7 +658,7 @@ function openCustomerDetailModal(
   dialog.showModal();
 }
 
-async function viewCustomer(email, rowFallback, onRefresh) {
+async function viewCustomer(email, rowFallback, onRefresh, onDeleted) {
   let data = rowFallback;
   let customerOrders = [];
   try {
@@ -667,7 +684,7 @@ async function viewCustomer(email, rowFallback, onRefresh) {
   const embeddedLabels = orders.length ? [] : embeddedOrderDisplayNumbers(data);
 
   openCustomerDetailModal(data, {
-    email, onRefresh, orders, embeddedLabels,
+    email, onRefresh, onDeleted, orders, embeddedLabels,
   });
 }
 
@@ -687,7 +704,15 @@ function renderNotFound(wrap, email) {
     </div>`;
 }
 
-function renderTable(wrap, displayed, onEditSaved) {
+function renderDeleted(wrap, email) {
+  wrap.innerHTML = `
+    <div class="customers-empty">
+      <h2 class="customers-empty-title">Customer deleted</h2>
+      <p class="customers-empty-text">The profile for <code>${escapeHtml(email)}</code> was removed. Order records are not deleted.</p>
+    </div>`;
+}
+
+function renderTable(wrap, displayed, onEditSaved, onDeleted) {
   wrap.innerHTML = `
     <table class="customers-data-table">
       <thead>
@@ -729,7 +754,7 @@ function renderTable(wrap, displayed, onEditSaved) {
       if (!email) return;
       const fallback = displayed.find((x) => x.email === email) || { email };
       try {
-        await viewCustomer(email, fallback, onEditSaved);
+        await viewCustomer(email, fallback, onEditSaved, onDeleted);
       } catch (err) {
         showToast(err.message || 'Failed to load customer', 'error');
       }
@@ -809,8 +834,12 @@ async function init() {
       const row = { ...customer, email: customer.email || email };
       countEl.textContent = '1 customer';
       const refresh = () => lookup(email, { openDetail: false });
-      renderTable(wrap, [row], refresh);
-      if (openDetail) await viewCustomer(row.email || email, row, refresh);
+      const deleted = (deletedEmail) => {
+        countEl.textContent = '';
+        renderDeleted(wrap, deletedEmail);
+      };
+      renderTable(wrap, [row], refresh, deleted);
+      if (openDetail) await viewCustomer(row.email || email, row, refresh, deleted);
     } catch (err) {
       countEl.textContent = '';
       errEl.hidden = false;

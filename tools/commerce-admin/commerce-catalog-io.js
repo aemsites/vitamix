@@ -117,7 +117,11 @@ export async function fetchCatalogProduct(productPath) {
  * @param {{ requireComplete?: boolean }} [options]
  * @returns {Promise<object[]>}
  */
-export async function fetchCatalogProductsForLocale(locale, onProgress, { requireComplete = false } = {}) {
+export async function fetchCatalogProductsForLocale(
+  locale,
+  onProgress,
+  { requireComplete = false } = {},
+) {
   onProgress?.({ phase: 'listing', found: 0 });
   const summaries = (await listCatalogSummaries(onProgress))
     .filter((row) => productInLocale(row?.path, locale));
@@ -280,7 +284,8 @@ export function parseCategoriesTsv(text) {
 export function catalogProductList(products, { category = '', pathFilter = '', fullPaths = false } = {}) {
   const unique = categoryExportProducts(products);
   const filtered = unique.filter((product) => (
-    (!category || categoryNames(product).some((name) => categoryNameKey(name) === categoryNameKey(category)))
+    (!category || categoryNames(product)
+      .some((name) => categoryNameKey(name) === categoryNameKey(category)))
     && normalizeProductPath(product.path).toLowerCase().includes(pathFilter.trim().toLowerCase())
   ));
   const collisions = categoryExportCollisions(unique);
@@ -295,7 +300,8 @@ export function catalogProductList(products, { category = '', pathFilter = '', f
 
 export function parseProductList(text) {
   const lines = String(text || '').replace(/^\uFEFF/, '').split(/\r?\n/)
-    .map((line) => line.trim()).filter(Boolean);
+    .map((line) => line.trim())
+    .filter(Boolean);
   if (!lines.length) throw new Error('Enter at least one product slug or full path.');
   const rows = parseCategoriesTsv(`${CATEGORY_TSV_HEADER}\n${lines.map((line) => `${line}\t`).join('\n')}`);
   const seen = new Set();
@@ -307,7 +313,8 @@ export function parseProductList(text) {
 }
 
 function withAppendedCategory(product, name, known) {
-  if (categoryNames(product).some((current) => categoryNameKey(current) === categoryNameKey(name))) {
+  const nameKey = categoryNameKey(name);
+  if (categoryNames(product).some((current) => categoryNameKey(current) === nameKey)) {
     return product;
   }
   const current = Array.isArray(product.custom?.categories) ? product.custom.categories : [];
@@ -364,9 +371,8 @@ export function parseCategoryUpdateSheet(payload) {
 }
 
 export function categoryMembershipPreviewRows(rows, category, existingByPath) {
-  const listed = categoryPreviewRows(
-    rows.map((row) => ({ ...row, appendCategory: category })), existingByPath,
-  );
+  const appendRows = rows.map((row) => ({ ...row, appendCategory: category }));
+  const listed = categoryPreviewRows(appendRows, existingByPath);
   const unresolved = listed.filter((row) => row.kind === 'missing' || row.kind === 'ambiguous');
   if (unresolved.length) {
     throw new Error(`Cannot synchronize category membership: unresolved products: ${
@@ -404,9 +410,13 @@ export function categoryPreviewRows(rows, existingByPath) {
     const existing = matches.length === 1 ? matches[0].product : null;
     const before = categoryNames(existing);
     let target;
-    if (row.appendCategory) target = withAppendedCategory(existing || {}, row.appendCategory, known);
-    else if (row.removeCategory) target = withRemovedCategory(existing || {}, row.removeCategory);
-    else target = withCategories(existing || {}, row.categories, known);
+    if (row.appendCategory) {
+      target = withAppendedCategory(existing || {}, row.appendCategory, known);
+    } else if (row.removeCategory) {
+      target = withRemovedCategory(existing || {}, row.removeCategory);
+    } else {
+      target = withCategories(existing || {}, row.categories, known);
+    }
     const beforeCategories = existing?.custom?.categories || [];
     const afterCategories = target.custom.categories;
     const after = categoryNames(target);
@@ -1099,7 +1109,9 @@ export function openCatalogExportImportDialog({
       if (e.target === dialog) dismiss(false);
     });
     wireDialogEscapeDismiss(
-      dialog, () => dismiss(false), '.pim-json-field input, .pim-json-field textarea',
+      dialog,
+      () => dismiss(false),
+      '.pim-json-field input, .pim-json-field textarea',
     );
 
     btnSave?.addEventListener('click', () => {
@@ -1149,9 +1161,15 @@ export function openCatalogExportImportDialog({
           }
           setBusy(true, 'Comparing with catalog…');
           if (mode === 'update') {
-            const products = await fetchCatalogProductsForLocale(locale, undefined, { requireComplete: true });
+            const products = await fetchCatalogProductsForLocale(
+              locale,
+              undefined,
+              { requireComplete: true },
+            );
             liveExisting.clear();
-            products.forEach((product) => liveExisting.set(normalizeProductPath(product.path), product));
+            products.forEach((product) => {
+              liveExisting.set(normalizeProductPath(product.path), product);
+            });
           }
           const knownSlugs = new Set([...liveExisting.values()].map(productSlug));
           const missing = rows.filter((row) => (
@@ -1331,8 +1349,8 @@ export function openCatalogExportImportDialog({
           .map((category) => String(category.name || category.url_key || category.urlKey))
           .sort((a, b) => a.localeCompare(b));
         if (listCategory) {
-          listCategory.innerHTML = '<option value="">All categories</option>'
-            + names.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
+          listCategory.innerHTML = `<option value="">All categories</option>${
+            names.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('')}`;
         }
         const knownOptions = dialog.querySelector('#pim-io-known-categories');
         if (knownOptions) {
