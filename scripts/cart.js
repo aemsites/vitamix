@@ -241,6 +241,27 @@ export class Cart {
   }
 
   /**
+   * Merges `custom` into the custom data of the first entry with the given SKU
+   * that satisfies `matcher`. Dispatches `cart:change` (action `custom`) only
+   * when a value changed.
+   *
+   * @param {string} sku
+   * @param {(item: CartItem) => boolean} matcher
+   * @param {Object} custom
+   * @returns {boolean} true when the entry's custom data changed
+   */
+  updateItemCustom(sku, matcher, custom) {
+    this.#refresh();
+    const item = this.#items.find((i) => i.sku === sku && matcher(i));
+    if (!item) return false;
+    if (Object.entries(custom).every(([key, value]) => item.custom?.[key] === value)) return false;
+    item.custom = { ...item.custom, ...custom };
+    this.#persistNow();
+    this.#dispatchChange('custom', item);
+    return true;
+  }
+
+  /**
    * @param {string} sku
    * @param {string|((item: CartItem) => boolean)} [matcher] Disambiguator when
    *   the same SKU has multiple entries. A string matches `custom.linkedTo`

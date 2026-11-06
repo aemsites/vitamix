@@ -8,7 +8,7 @@ import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   getOrder, estimateShipping, estimatePrice, estimateExpressCheckout, parsePreview,
-  createOrder, patchPayPalSession, getPayPalSession, getGwpPromotions,
+  createOrder, patchPayPalSession, getPayPalSession,
 } from '../../scripts/commerce-api.js';
 import { normalizeCouponCode, setAffiliateCode, getCouponRequestFields } from '../../scripts/commerce/coupon-state.js';
 import { __setLocale, __resetScripts } from './mocks/scripts.mjs';
@@ -341,84 +341,6 @@ test('createOrder: omits custom data when there is no affiliate code', async () 
   await createOrder(orderBody);
   assert.ok(!('custom' in JSON.parse(lastInit.body)));
   assert.deepEqual(orderBody, { items: [] });
-});
-
-// --- createOrder gift-with-purchase promotions ------------------------------
-
-const PRE_HOLIDAY = '(US) Pre-Holiday 2026 GWP';
-const paidLine = { sku: '067891', path: '/us/en_us/products/container', price: { final: '249.95' } };
-const giftLine = (custom) => ({
-  sku: 'scraper',
-  path: '/us/en_us/products/under-blade-scraper',
-  price: { final: '0' },
-  custom: { giftWithPurchase: true, ...custom },
-});
-
-test('getGwpPromotions: returns the promotion name of the gift line', () => {
-  assert.equal(
-    getGwpPromotions([paidLine, giftLine({ promotionId: 'us-pre-holiday-2026-gwp', promotionName: PRE_HOLIDAY })]),
-    PRE_HOLIDAY,
-  );
-});
-
-test('getGwpPromotions: falls back to the promotion id for gifts added without a name', () => {
-  assert.equal(getGwpPromotions([giftLine({ promotionId: 'us-pre-holiday-2026-gwp' })]), 'us-pre-holiday-2026-gwp');
-});
-
-test('getGwpPromotions: joins distinct promotions with | and dedupes repeats', () => {
-  assert.equal(getGwpPromotions([
-    giftLine({ promotionId: 'a', promotionName: 'Promo A' }),
-    giftLine({ promotionId: 'a', promotionName: 'Promo A' }),
-    giftLine({ promotionId: 'b', promotionName: '  Promo B  ' }),
-  ]), 'Promo A|Promo B');
-});
-
-test('getGwpPromotions: replaces the separator inside a name so it stays one entry', () => {
-  assert.equal(getGwpPromotions([giftLine({ promotionName: 'Buy | Get' })]), 'Buy   Get');
-});
-
-test('getGwpPromotions: ignores non-gift lines and gifts with neither name nor id', () => {
-  assert.equal(getGwpPromotions([
-    paidLine,
-    { ...paidLine, custom: { giftWithPurchase: 'yes', promotionName: 'Not a gift' } },
-    giftLine({}),
-  ]), '');
-});
-
-test('getGwpPromotions: returns empty for missing or non-array items', () => {
-  assert.equal(getGwpPromotions(undefined), '');
-  assert.equal(getGwpPromotions(null), '');
-  assert.equal(getGwpPromotions({}), '');
-});
-
-test('createOrder: sends the gift-with-purchase promotions in custom data', async () => {
-  localStorage.setItem('auth_token', FUTURE_JWT);
-  mockFetch(200, { order: {} });
-  await createOrder({ items: [paidLine, giftLine({ promotionId: 'p', promotionName: PRE_HOLIDAY })] });
-  assert.deepEqual(JSON.parse(lastInit.body).custom, { gwpPromotions: PRE_HOLIDAY });
-});
-
-test('createOrder: merges gift promotions with the affiliate code and existing custom data', async () => {
-  localStorage.setItem('auth_token', FUTURE_JWT);
-  setAffiliateCode('06-AFFILIATE');
-  mockFetch(200, { order: {} });
-  const orderBody = {
-    items: [giftLine({ promotionId: 'p', promotionName: PRE_HOLIDAY })],
-    custom: { existing: 'value' },
-  };
-  await createOrder(orderBody);
-  assert.deepEqual(JSON.parse(lastInit.body).custom, {
-    existing: 'value', affiliateCode: '06-AFFILIATE', gwpPromotions: PRE_HOLIDAY,
-  });
-  // the caller's order body is not mutated
-  assert.deepEqual(orderBody.custom, { existing: 'value' });
-});
-
-test('createOrder: omits gwpPromotions when the order has no gift lines', async () => {
-  localStorage.setItem('auth_token', FUTURE_JWT);
-  mockFetch(200, { order: {} });
-  await createOrder({ items: [paidLine], custom: { existing: 'value' } });
-  assert.deepEqual(JSON.parse(lastInit.body).custom, { existing: 'value' });
 });
 
 // --- PayPal session capability (HCA-01) ---------------------------------------

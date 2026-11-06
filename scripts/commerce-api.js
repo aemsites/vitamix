@@ -196,34 +196,6 @@ export async function previewOrder(orderBody) {
 }
 
 /**
- * Separator between gift-with-purchase promotion names in the order's
- * `custom.gwpPromotions` value (order custom values must be strings). Matches
- * the separator EBS shows between promotions.
- */
-export const GWP_PROMOTIONS_SEPARATOR = '|';
-
-/**
- * The gift-with-purchase promotions on an order, for reporting (the EBS sync
- * reads them from `custom.gwpPromotions`). One entry per distinct promotion
- * among the gift lines (`custom.giftWithPurchase`), using the promotion name
- * the gift was added with, or its id for gifts added before names were stored.
- *
- * @param {Array<Object>} [items] - order items, as sent to the API.
- * @returns {string} names joined by {@link GWP_PROMOTIONS_SEPARATOR}, or ''.
- */
-export function getGwpPromotions(items) {
-  const names = [];
-  (Array.isArray(items) ? items : []).forEach((item) => {
-    if (item?.custom?.giftWithPurchase !== true) return;
-    const name = String(item.custom.promotionName || item.custom.promotionId || '')
-      .split(GWP_PROMOTIONS_SEPARATOR).join(' ')
-      .trim();
-    if (name && !names.includes(name)) names.push(name);
-  });
-  return names.join(GWP_PROMOTIONS_SEPARATOR);
-}
-
-/**
  * Places an order. The request body must include the `estimateToken` returned
  * by `previewOrder` to confirm the quoted totals. If the user is logged in,
  * the order is automatically associated with their account via the Bearer token.
@@ -234,18 +206,14 @@ export function getGwpPromotions(items) {
  * @throws {CommerceApiError}
  */
 export async function createOrder(orderBody) {
-  const custom = {};
   // Report the affiliate coupon code on every order, whether or not the coupon
   // was applied. Normalized so it matches the code stored on the order.
   const affiliateCode = getAffiliateCode();
-  if (affiliateCode) custom.affiliateCode = normalizeCouponCode(affiliateCode);
-  // Record the gift-with-purchase promotions so downstream syncs (EBS) can
-  // report them without looking the promotions up.
-  const gwpPromotions = getGwpPromotions(orderBody?.items);
-  if (gwpPromotions) custom.gwpPromotions = gwpPromotions;
-
-  const body = Object.keys(custom).length
-    ? { ...orderBody, custom: { ...orderBody?.custom, ...custom } }
+  const body = affiliateCode
+    ? {
+      ...orderBody,
+      custom: { ...orderBody?.custom, affiliateCode: normalizeCouponCode(affiliateCode) },
+    }
     : orderBody;
   return post('/orders', body, RECAPTCHA_ACTIONS.ORDERS_CREATE);
 }
