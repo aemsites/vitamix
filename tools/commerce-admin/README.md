@@ -190,3 +190,17 @@ and variants start `OutOfStock`, with product `metadata.robots` set to `noindex`
 These settings do not make the product private. Authored page metadata can override
 catalog metadata. No catalog write happens before final confirmation; create-only
 requests reject existing paths instead of overwriting them.
+
+## Deleting customers
+
+On **Customers**, look up an account by email, open it, and choose **Delete customer…**
+(privacy / right-to-erasure requests). The dialog shows the `DELETE customers/{email}`
+call and requires typing the account email before **Delete customer** is enabled.
+The API requires the `admin` role (or `superuser`).
+
+Deleting removes the customer profile, saved addresses and the customer's order-history
+links. **Order records are not deleted**: the name and address stored on past orders
+remain, and the account's orders no longer appear under the customer. Data held in
+other systems (ERP, CRM, email marketing) is unaffected and must be handled through
+the usual process. After a successful delete, the page shows a "Customer deleted"
+notice instead of the customer.
