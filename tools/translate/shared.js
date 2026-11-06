@@ -339,7 +339,10 @@ const FORMAT_RULES = {
 };
 
 const getConfig = async (context, daFetch) => {
-  const resp = await daFetch(`${ADMIN_URL}/source/${context.org}/${context.repo}${CONFIG_PATH}`);
+  const resp = await daFetch(
+    `${ADMIN_URL}/source/${context.org}/${context.repo}${CONFIG_PATH}`,
+    { cache: 'no-store' },
+  );
   if (!resp.ok) {
     return {};
   }
@@ -621,7 +624,7 @@ const withHtmlExt = (path) => (path.endsWith('.html') ? path : `${path}.html`);
 /** Existence + last-modified (from the HEAD response) of a page's DA source. */
 const sourceStatus = async (targetPagePath, context, daFetch) => {
   const url = `${ADMIN_URL}/source/${context.org}/${context.repo}${withHtmlExt(targetPagePath)}`;
-  const resp = await daFetch(url, { method: 'HEAD' });
+  const resp = await daFetch(url, { method: 'HEAD', cache: 'no-store' });
   return {
     exists: resp.ok,
     lastModified: resp.headers.get('last-modified'),
@@ -640,7 +643,10 @@ const REDIRECTS_PATH = '/redirects.json';
  */
 const getRedirects = async (context, daFetch) => {
   try {
-    const resp = await daFetch(`${ADMIN_URL}/source/${context.org}/${context.repo}${REDIRECTS_PATH}`);
+    const resp = await daFetch(
+      `${ADMIN_URL}/source/${context.org}/${context.repo}${REDIRECTS_PATH}`,
+      { cache: 'no-store' },
+    );
     if (!resp.ok) return new Map();
     const json = await resp.json();
     const rows = json?.data || [];
@@ -686,7 +692,7 @@ const bulkStatus = async (paths, context, daFetch) => {
     // eslint-disable-next-line no-await-in-loop
     await wait(JOB_POLL_INTERVAL_MS);
     // eslint-disable-next-line no-await-in-loop
-    const pollResp = await daFetch(job.links.self);
+    const pollResp = await daFetch(job.links.self, { cache: 'no-store' });
     if (!pollResp.ok) throw new Error(`Bulk status poll failed: ${pollResp.status}`);
     // eslint-disable-next-line no-await-in-loop
     job = await pollResp.json();
@@ -696,7 +702,7 @@ const bulkStatus = async (paths, context, daFetch) => {
   const detailsUrl = job.links?.details;
   if (!detailsUrl) return {};
 
-  const detailsResp = await daFetch(detailsUrl);
+  const detailsResp = await daFetch(detailsUrl, { cache: 'no-store' });
   if (!detailsResp.ok) throw new Error(`Bulk status details failed: ${detailsResp.status}`);
   const details = await detailsResp.json();
 
@@ -725,7 +731,7 @@ const hasChangedSinceLastRollout = async (targetPagePath, context, daFetch) => {
   const p = withHtmlExt(targetPagePath);
   const url = `${ADMIN_URL}/versionlist/${context.org}/${context.repo}${p}`;
   try {
-    const resp = await daFetch(url);
+    const resp = await daFetch(url, { cache: 'no-store' });
     if (!resp.ok) return false;
     const entries = await resp.json();
     const anchorIndex = entries.findIndex((entry) => ROLLOUT_ANCHOR_LABELS.has(entry.label));

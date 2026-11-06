@@ -27,6 +27,12 @@
   width: 100%;
 }
 
+.gallery.carousel > ul > li img {
+  display: block;
+  aspect-ratio: 1 / 1;
+  object-fit: contain;
+}
+
 .gallery.carousel nav {
   display: flex;
   align-items: flex-end;

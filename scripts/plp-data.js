@@ -212,7 +212,7 @@ export function getReviewsBySlug(reviewsRows) {
  * Fetches plp-data-{dataset}.json, the source of truth.
  * @param {string} locale
  * @param {string} language
- * @param {string} dataset - One of PLP_DATASETS
+ * @param {string} dataset - One of PLP_DATASETS, or 'household' for product-list patches
  * @returns {Promise<Array<Object>>}
  */
 export async function fetchPlpData(locale, language, dataset) {

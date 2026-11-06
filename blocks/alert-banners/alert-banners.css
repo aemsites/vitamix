@@ -44,7 +44,8 @@ main > .section > div.alert-banners-wrapper {
 
 .alert-banners-date,
 .alert-banners-content,
-.alert-banners-color {
+.alert-banners-color,
+.alert-banners-priority {
   display: inline-block;
   margin-right: 12px;
 }

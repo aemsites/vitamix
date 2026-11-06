@@ -1,8 +1,8 @@
-main > .section:first-of-type {
+main > .section:has(> .hero-wrapper:last-child):has(+ .navigation-container) {
   margin-bottom: 0;
 }
 
-main > .section:first-of-type > div:last-child {
+main > .section:has(+ .navigation-container) > .hero-wrapper:last-child {
   margin-bottom: 0;
 }
 

@@ -70,7 +70,7 @@ const EDIT_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height
 
     const pathname = url.hash.replace(`#/${context.org}/${context.repo}`, '');
     const listUrl = `${ADMIN_URL}/list/${context.org}/${context.repo}${pathname}`;
-    const resp = await daFetch(listUrl);
+    const resp = await daFetch(listUrl, { cache: 'no-store' });
     if (!resp.ok) {
       folderLoaderErrorMessage.textContent = `Failed to load folder list: ${resp.statusText}`;
       folderLoaderErrorMessage.style.display = 'block';
@@ -151,7 +151,7 @@ const EDIT_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height
             sourceUrl += '.html';
           }
 
-          let resp = await daFetch(sourceUrl);
+          let resp = await daFetch(sourceUrl, { cache: 'no-store' });
           if (!resp.ok) {
             updateStatus(listItem, 'error', `Page content cannot be retrieved: (${resp.statusText})`);
             continue;

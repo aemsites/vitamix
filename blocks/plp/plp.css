@@ -443,10 +443,18 @@ main .plp-product-card p {
 
 @media (width >= 800px) {
   .plp.carousel > ul {
+    /* room for the focus outline (width + offset) of the slides at either end of the track,
+       which the scroll container would otherwise clip. The negative margin keeps the slides
+       aligned with the page; scroll-padding keeps the snap positions at multiples of a slide. */
+    --focus-gutter: calc(var(--border-m) * 2);
+
     display: flex;
     justify-content: safe center;
+    margin-inline: calc(-1 * var(--focus-gutter));
+    padding-inline: var(--focus-gutter);
     overflow: scroll clip;
     scroll-behavior: auto;
+    scroll-padding-inline: var(--focus-gutter);
     scroll-snap-type: x mandatory;
   }
 

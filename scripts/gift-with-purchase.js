@@ -3,8 +3,9 @@
  *
  * Keeps free-gift cart lines in sync with the active catalog promotions whose
  * `conditions.minimumSubtotal` is satisfied by the current cart. Lines are
- * marked with `custom.giftWithPurchase: true` and `custom.promotionId`, which
- * also disambiguates removal so a paid copy of the same SKU is never touched.
+ * marked with `custom.giftWithPurchase: true`, `custom.promotionId` and
+ * `custom.promotionName`. The promotion id also disambiguates removal so a paid
+ * copy of the same SKU is never touched.
  *
  * Triggers (wired by `initGWP` and by the cart/checkout blocks):
  *   - `loadLazy` if the cart already has items (restored from localStorage)
@@ -279,11 +280,28 @@ async function addOneGift(promotion, rule) {
       custom: {
         giftWithPurchase: true,
         promotionId: promotion.id,
+        ...(promotion.name ? { promotionName: promotion.name } : {}),
         ...(rule.custom?.regularPrice ? { regularPrice: rule.custom.regularPrice } : {}),
       },
     },
     { allowSeparateEntry: true },
   );
+}
+
+/** Keeps `custom.promotionName` current on gift lines already in the cart. */
+function updateGiftPromotionNames(applicable) {
+  cart.items.filter((item) => item.custom?.giftWithPurchase).forEach((item) => {
+    const { promotionId } = item.custom;
+    const name = applicable.get(`${promotionId}::${item.path}`)?.promotion.name;
+    if (!name || item.custom.promotionName === name) return;
+    cart.updateItemCustom(
+      item.sku,
+      (candidate) => candidate.custom?.giftWithPurchase
+        && candidate.custom?.promotionId === promotionId
+        && candidate.path === item.path,
+      { promotionName: name },
+    );
+  });
 }
 
 function addMissingGifts(applicable) {
@@ -315,6 +333,7 @@ export async function evaluateGWP() {
   isApplyingGWP = true;
   try {
     removeStaleGifts(applicable);
+    updateGiftPromotionNames(applicable);
     await addMissingGifts(applicable);
   } finally {
     isApplyingGWP = false;

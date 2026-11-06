@@ -169,7 +169,7 @@ publishCheckbox.addEventListener('change', () => {
 
     let sourceHtml;
     try {
-      const resp = await daFetch(sourceUrl);
+      const resp = await daFetch(sourceUrl, { cache: 'no-store' });
       if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`);
       sourceHtml = await resp.text();
     } catch (err) {

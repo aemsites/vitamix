@@ -403,6 +403,7 @@
   width: 100%;
   max-width: 104px;
   height: auto;
+  object-fit: contain;
   transition: transform 0.4s;
 }
 

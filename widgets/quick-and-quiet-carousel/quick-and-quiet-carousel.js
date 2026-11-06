@@ -1,18 +1,4 @@
-import { getLocaleAndLanguage } from '../../scripts/scripts.js';
-
-/**
- * Loads widget copy from the co-located JSON file for the given language.
- * @param {string} lang - Language key (e.g. "en", "fr")
- * @returns {Promise<Object>} Copy object for that language
- */
-async function loadWidgetCopy(lang) {
-  const scriptPath = new URL(import.meta.url).pathname;
-  const jsonPath = scriptPath.replace(/\.js$/, '.json');
-  const base = window.hlx && window.hlx.codeBasePath ? window.hlx.codeBasePath : '';
-  const resp = await fetch(`${base}${jsonPath}`);
-  const data = await resp.json();
-  return data[lang] || data.en || {};
-}
+import { getLocaleAndLanguage, loadWidgetCopy } from '../../scripts/scripts.js';
 
 /**
  * Applies the loaded copy to the static slide markup and nav controls.
@@ -53,7 +39,7 @@ function localizeMoreLink(qqc) {
 export default async function decorate(widget) {
   const { language } = getLocaleAndLanguage();
   const lang = (language || 'en_us').split('_')[0];
-  const copy = await loadWidgetCopy(lang);
+  const copy = await loadWidgetCopy(import.meta.url, lang);
 
   const qqc = widget.querySelector('.qqc');
   applyWidgetCopy(qqc, copy);

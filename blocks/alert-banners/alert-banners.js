@@ -1,6 +1,7 @@
 import {
   parseAlertBanners,
-  findCurrentScheduledItem,
+  findCurrentAlertBanners,
+  renderAlertBanners,
   currentPastFuture,
   formatShortDateTime,
   formatDuration,
@@ -10,15 +11,15 @@ import {
 /**
  * Creates a structured list of parsed banner elements with appropriate CSS classes and content.
  * @param {Array<Object>} banners - Array of banner objects
- * @param {Object|null} [bestBanner=null] - The optimal banner to highlight with special styling
+ * @param {Array<Object>} [selectedBanners=[]] - The active banners to highlight
  * @param {Date} [date=new Date()] - Reference date for determining banner status
  * @returns {HTMLUListElement} Unordered list element containing all banner items
  */
-function createParsedBanners(banners, bestBanner = null, date = new Date()) {
+function createParsedBanners(banners, selectedBanners = [], date = new Date()) {
   const list = document.createElement('ul');
   banners.forEach((banner) => {
     const row = document.createElement('li');
-    if (bestBanner === banner) {
+    if (selectedBanners.includes(banner)) {
       row.classList.add('alert-banners-selected');
     }
 
@@ -39,6 +40,10 @@ function createParsedBanners(banners, bestBanner = null, date = new Date()) {
       <div class="alert-banners-content">${banner.content.innerHTML}</div>
       <div class="alert-banners-color">${banner.color}</div>
       `;
+    const priority = document.createElement('div');
+    priority.className = 'alert-banners-priority';
+    priority.textContent = `Priority: ${banner.priority ?? 'Not set'}`;
+    row.append(priority);
   });
   return list;
 }
@@ -74,30 +79,18 @@ export default async function decorateAlertBanners(block) {
   div.append(dtl);
 
   // Track current preview banner to avoid unnecessary DOM updates
-  let currentPreviewBanner = null;
+  let currentPreviewBanners = [];
 
   // Helper to update preview (skips if banner hasn't changed)
-  const setPreview = (selectedBanner) => {
-    if (selectedBanner === currentPreviewBanner) return;
-    currentPreviewBanner = selectedBanner;
+  const setPreview = (selectedBanners) => {
+    if (preview.childNodes.length && selectedBanners.length === currentPreviewBanners.length
+      && selectedBanners.every((banner, index) => banner === currentPreviewBanners[index])) return;
+    currentPreviewBanners = selectedBanners;
 
     preview.className = 'nav-banner alert-banners-preview';
-    preview.style.backgroundColor = '';
-    preview.textContent = '';
+    renderAlertBanners(preview, selectedBanners);
 
-    if (selectedBanner && selectedBanner.content) {
-      const p = document.createElement('p');
-      const contentClone = selectedBanner.content.cloneNode(true);
-      p.append(...contentClone.childNodes);
-      preview.append(p);
-
-      if (selectedBanner.color) {
-        preview.style.backgroundColor = `var(--color-${selectedBanner.color})`;
-        const darkColors = ['charcoal', 'black', 'dark', 'red', 'blue', 'green', 'xanadu', 'moss'];
-        const textClass = darkColors.some((c) => selectedBanner.color.includes(c)) ? 'light' : 'dark';
-        preview.classList.add(`nav-banner-${textClass}`);
-      }
-    } else {
+    if (!selectedBanners.length) {
       preview.classList.add('alert-banners-preview-empty');
       preview.textContent = 'No banner selected for this date';
     }
@@ -107,7 +100,7 @@ export default async function decorateAlertBanners(block) {
   let listItems = [];
 
   // Update list item classes during drag
-  const updateListColors = (newDate, newBestBanner) => {
+  const updateListColors = (newDate, selectedBanners) => {
     listItems.forEach((item, index) => {
       const banner = banners[index];
       if (!banner) return;
@@ -116,33 +109,43 @@ export default async function decorateAlertBanners(block) {
       item.classList.toggle('alert-banners-past', state === 'past');
       item.classList.toggle('alert-banners-current', state === 'current');
       item.classList.toggle('alert-banners-future', state === 'future');
-      item.classList.toggle('alert-banners-selected', banner === newBestBanner);
+      item.classList.toggle('alert-banners-selected', selectedBanners.includes(banner));
     });
   };
 
   // Callback for drag - updates input and list
-  const onDrag = (newDate, newBestBanner) => {
+  const onDrag = (newDate) => {
     dtl.value = newDate.toISOString().slice(0, 16);
-    updateListColors(newDate, newBestBanner);
+    const selectedBanners = findCurrentAlertBanners(banners, newDate);
+    updateListColors(newDate, selectedBanners);
+    setPreview(selectedBanners);
   };
 
   // Full update function (used on initial load and when input changes)
   const updateViews = (simDate) => {
-    const simBestBanner = findCurrentScheduledItem(banners, simDate);
+    const selectedBanners = findCurrentAlertBanners(banners, simDate);
+    const simBestBanner = selectedBanners[0] || null;
 
     // Update datetime input
     dtl.value = simDate.toISOString().slice(0, 16);
 
     // Update preview
-    setPreview(simBestBanner);
+    setPreview(selectedBanners);
 
     // Update timeline
     timelineContainer.textContent = '';
-    timelineContainer.append(createTimeline(banners, simBestBanner, simDate, onDrag, setPreview));
+    timelineContainer.append(createTimeline(
+      banners,
+      simBestBanner,
+      simDate,
+      onDrag,
+      null,
+      (items, date) => findCurrentAlertBanners(items, date)[0] || null,
+    ));
 
     // Update list and cache items
     bannersContainer.textContent = '';
-    bannersContainer.append(createParsedBanners(banners, simBestBanner, simDate));
+    bannersContainer.append(createParsedBanners(banners, selectedBanners, simDate));
     listItems = [...bannersContainer.querySelectorAll('li')];
   };
 

@@ -156,6 +156,40 @@ test('updateItemPrice ignores unknown SKUs, invalid prices, and gift lines', () 
   assert.equal(cart.items[0].price, '0');
 });
 
+// --- updateItemCustom -------------------------------------------------------
+
+test('updateItemCustom merges into the matching entry, persists, and dispatches action="custom"', () => {
+  const cart = new Cart();
+  cart.addItem(sampleItem({ sku: 'gift', custom: { promotionId: 'a' } }));
+  cart.addItem(sampleItem({ sku: 'gift', custom: { promotionId: 'b' } }), { allowSeparateEntry: true });
+  globalThis.__events.length = 0;
+  assert.equal(cart.updateItemCustom('gift', (i) => i.custom?.promotionId === 'b', { promotionName: 'B' }), true);
+  assert.deepEqual(cart.items.map((i) => i.custom), [
+    { promotionId: 'a' },
+    { promotionId: 'b', promotionName: 'B' },
+  ]);
+  assert.deepEqual(JSON.parse(localStorage.getItem(STORAGE_KEY)).items[1].custom, { promotionId: 'b', promotionName: 'B' });
+  assert.equal(globalThis.__events.filter((e) => e.detail.action === 'custom').length, 1);
+});
+
+test('updateItemCustom adds custom data to an entry without any', () => {
+  const cart = new Cart();
+  cart.addItem(sampleItem());
+  assert.equal(cart.updateItemCustom('foo', () => true, { note: 'x' }), true);
+  assert.deepEqual(cart.items[0].custom, { note: 'x' });
+});
+
+test('updateItemCustom is a no-op (no event) when nothing matches or nothing changes', () => {
+  const cart = new Cart();
+  cart.addItem(sampleItem({ custom: { promotionName: 'A' } }));
+  globalThis.__events.length = 0;
+  assert.equal(cart.updateItemCustom('missing', () => true, { promotionName: 'B' }), false);
+  assert.equal(cart.updateItemCustom('foo', () => false, { promotionName: 'B' }), false);
+  assert.equal(cart.updateItemCustom('foo', () => true, { promotionName: 'A' }), false);
+  assert.equal(globalThis.__events.length, 0);
+  assert.deepEqual(cart.items[0].custom, { promotionName: 'A' });
+});
+
 // --- removeItem -------------------------------------------------------------
 
 test('removeItem removes the entry', () => {
