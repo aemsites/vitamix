@@ -207,7 +207,10 @@ function renderRelatedProducts(ph, custom) {
           const title = product.name;
           const image = new URL(product.images[0].url, window.location.href);
           const price = Number(product.price?.final);
-          const priceMarkup = price > 0 ? `<strong>${formatPrice(price, ph)}</strong>` : '';
+          // Same rule as pricing.js: no price when the product can't be added to cart. The
+          // catalog can hold stale non-zero prices on those products, so `> 0` alone isn't enough.
+          const showPrice = product.custom?.addToCart !== 'No' && price > 0;
+          const priceMarkup = showPrice ? `<strong>${formatPrice(price, ph)}</strong>` : '';
           li.innerHTML = `<a href="${product.url}"><img src="${image}?width=750&#x26;format=webply&#x26;optimize=medium" alt="${title}" /><div><p>${title}</p>${priceMarkup}</div></a>`;
           ul.appendChild(li);
         });
