@@ -65,6 +65,14 @@ function renderDetails(ph, features) {
 }
 
 /**
+ * Bazaarvoice deployment locale to load, keyed by site language code. Languages not listed
+ * use their own code. The es_MX deployment only returns Spanish reviews, but the reviews are
+ * written in English, so Spanish MX PDPs would show none. The legacy Magento site loaded the
+ * English en_MX deployment on both MX store views, so the Spanish PDP showed the same reviews.
+ */
+const BV_LOCALE_OVERRIDES = { es_MX: 'en_MX' };
+
+/**
  * Renders the reviews section of the PDP block.
  * @param {Element} block - The PDP block element
  */
@@ -75,8 +83,9 @@ async function renderReviews(ph, block, reviewsId) {
   bazaarvoiceContainer.classList.add('pdp-reviews-container');
   bazaarvoiceContainer.innerHTML = `<div data-bv-show="reviews" data-bv-product-id="${reviewsId}" data-bv-seo="false"></div>`;
 
+  const bvLocale = BV_LOCALE_OVERRIDES[ph.languageCode] || ph.languageCode || 'en_US';
   setTimeout(async () => {
-    await loadScript(`https://apps.bazaarvoice.com/deployments/vitamix/main_site/production/${ph.languageCode || 'en_US'}/bv.js`);
+    await loadScript(`https://apps.bazaarvoice.com/deployments/vitamix/main_site/production/${bvLocale}/bv.js`);
   }, 500);
 
   window.bvCallback = () => { };

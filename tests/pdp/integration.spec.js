@@ -494,6 +494,32 @@ test.describe('PDP Integration Tests', () => {
     });
   });
 
+  test.describe('Reviews locale', () => {
+    // The es_MX Bazaarvoice deployment only returns Spanish reviews, but reviews are written in
+    // English, so Spanish MX PDPs load the English en_MX deployment (as the legacy site did).
+    [
+      ['Spanish MX', '/mx/es_mx/products/ascent-x2', 'en_MX'],
+      ['English MX', '/mx/en_us/products/ascent-x2', 'en_US'],
+      ['US', '/us/en_us/products/ascent-x2', 'en_US'],
+    ].forEach(([name, productPath, bvLocale]) => {
+      test(`${name} PDP loads the ${bvLocale} Bazaarvoice deployment`, async ({ page }) => {
+        const bvScripts = [];
+        await page.route('**/apps.bazaarvoice.com/deployments/**/bv.js', (route) => {
+          bvScripts.push(route.request().url());
+          return route.fulfill({ contentType: 'text/javascript', body: '' });
+        });
+
+        await page.goto(buildProductUrl(productPath, currentBranch));
+        await page.waitForSelector('.pdp');
+
+        await expect.poll(() => bvScripts.length).toBeGreaterThan(0);
+        expect(bvScripts).toEqual([
+          `https://apps.bazaarvoice.com/deployments/vitamix/main_site/production/${bvLocale}/bv.js`,
+        ]);
+      });
+    });
+  });
+
   test.describe('Bundle Product Page', () => {
     const productPath = '/us/en_us/products/5200-legacy-bundle';
 
