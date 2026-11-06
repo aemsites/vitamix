@@ -293,7 +293,7 @@ function updateGiftPromotionNames(applicable) {
   cart.items.filter((item) => item.custom?.giftWithPurchase).forEach((item) => {
     const { promotionId } = item.custom;
     const name = applicable.get(`${promotionId}::${item.path}`)?.promotion.name;
-    if (!name) return;
+    if (!name || item.custom.promotionName === name) return;
     cart.updateItemCustom(
       item.sku,
       (candidate) => candidate.custom?.giftWithPurchase
