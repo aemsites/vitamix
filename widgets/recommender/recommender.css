@@ -113,9 +113,12 @@
   display: block;
 }
 
-.recommender[data-stage='quiz'] > .matches:not([hidden]),
-.recommender[data-stage='results'] > .matches:not([hidden]) {
+.recommender[data-stage='quiz'] > .matches:not([hidden]) {
   display: block;
+}
+
+.recommender[data-stage='results'] > .matches:not([hidden]) {
+  display: none;
 }
 
 /* question options */
@@ -596,6 +599,3 @@
   }
 }
 
-.recommender[data-stage='results'] > .matches {
-  display: none;
-}
