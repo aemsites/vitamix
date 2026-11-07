@@ -371,6 +371,7 @@ export default async function decorate(widget) {
   const prevBtn = widget.querySelector('.prev');
   const nextBtn = widget.querySelector('.next');
   const stepsEl = widget.querySelector('.steps');
+  const matchesEl = widget.querySelector('.matches');
   const matchListEl = widget.querySelector('.match-list');
   const nextLabel = nextBtn.textContent;
   const total = Math.max(getDecisionTreeDepth(decisionTree), 1);
@@ -539,8 +540,8 @@ export default async function decorate(widget) {
 
     progressEl.value = total;
     widget.dataset.stage = 'results';
+    matchesEl.hidden = true;
     updateSteps(-1, true);
-    renderMatches(version);
     widget.querySelector('.results h2').focus();
   };
 
@@ -554,28 +555,30 @@ export default async function decorate(widget) {
     }
 
     widget.dataset.stage = 'quiz';
+    matchesEl.hidden = false;
     const { questionIndex, options } = node;
     updateSteps(questionIndex);
     const fieldset = fieldsets[questionIndex];
-    fieldset.dataset.visibleChoices = options.length;
     fieldset.hidden = false;
     fieldset.querySelectorAll('input').forEach((input) => {
       input.checked = false;
       const label = input.closest('label');
       label.hidden = true;
-      delete label.dataset.visibleIndex;
+      label.classList.remove('is-selected');
     });
-    options.forEach(({ answerIndex }, visibleIndex) => {
+    options.forEach(({ answerIndex }) => {
       const input = fieldset.querySelector(`input[data-answer-index="${answerIndex}"]`);
       input.closest('label').hidden = false;
-      input.closest('label').dataset.visibleIndex = visibleIndex;
     });
     if (pendingSelection !== null) {
       const input = fieldset.querySelector(`input[data-answer-index="${pendingSelection}"]`);
       const optionIsAvailable = options.some(
         ({ answerIndex }) => answerIndex === pendingSelection,
       );
-      if (input && optionIsAvailable) input.checked = true;
+      if (input && optionIsAvailable) {
+        input.checked = true;
+        input.closest('label').classList.add('is-selected');
+      }
       pendingSelection = null;
     }
     if (focus) fieldset.focus();
@@ -636,7 +639,13 @@ export default async function decorate(widget) {
   });
 
   widget.addEventListener('change', (e) => {
-    if (e.target.closest('fieldset') && currentNode.type === 'question') {
+    const fieldset = e.target.closest('fieldset');
+    if (fieldset) {
+      fieldset.querySelectorAll('label').forEach((label) => {
+        label.classList.toggle('is-selected', label.querySelector('input').checked);
+      });
+    }
+    if (fieldset && currentNode.type === 'question') {
       updateNext();
       renderMatches(renderVersion);
     }
