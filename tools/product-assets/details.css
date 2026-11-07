@@ -123,6 +123,34 @@
   height: 18px;
 }
 
+.details-sync-status {
+  font-size: 11px;
+}
+
+.details-locale[data-sync="out-of-sync"] {
+  border-color: #c78500;
+  background: #fff8d6;
+}
+
+.details-locale[data-sync="error"] {
+  border-color: #bf2600;
+  background: #ffebe6;
+}
+
+.details-locale[data-sync="missing"] {
+  opacity: 0.45;
+}
+
+.details-locale[data-sync="missing"] .details-sync-status,
+.details-locale[data-sync="synced"] .details-sync-status {
+  display: none;
+}
+
+.details-recheck {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
 .details-meta,
 .details-empty {
   margin: 0;

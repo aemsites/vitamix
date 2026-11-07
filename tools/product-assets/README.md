@@ -8,14 +8,18 @@ Open at `https://da.live/app/<org>/<repo>/tools/product-assets/app`.
 
 1. Lists every subfolder of `/<org>/<repo>/assets/products/` (each folder is a product slug).
 2. Fetches `/assets/products/<slug>/images.json` from DA for each product, a few at a time, and adds rows in alphabetical order as each one loads.
-3. Each row shows the slug with image/variant counts, one color swatch per variant, and the first 5 images (`+N` for the rest).
+3. Each row shows the slug with image/variant counts, one color swatch per variant, and the first 5 images (`+N` for the rest). A separate **Social image** column shows the selected `og-image`, or "Not selected".
 4. The search bar filters as you type on slug or variant color. Matching text in the slug is highlighted, and matching swatches get a ring. The query is kept in `?q=`.
 5. Clicking a row opens the details view.
 6. **+ Add product** (next to the count) asks for a product slug; it doesn't need to exist in a product catalog yet, so images can be prepared ahead of the product. Input is slugged (lowercase, dashes). Create saves, previews, then publishes an empty `images.json` in `/assets/products/<slug>/` and opens its details page to add images. A preview/publish failure is shown in the dialog instead of navigating away.
 
 ## Details (`details.html?product=<slug>`)
 
-The header links to the product in [product admin](https://product-admin--vitamix--aemsites.aem.live/tools/commerce-admin/catalog.html) for each locale whose product index (`/<locale>/products/index.json`) contains a parent product with the same slug, and **Open folder** opens the product's assets folder in DA. Locale indexes are read through the same CORS proxy as `tools/commerce-admin`, and cached in session storage for 10 minutes.
+The header always links to the product in [product admin](https://product-admin--vitamix--aemsites.aem.live/tools/commerce-admin/catalog.html) for all six locales, and **Open folder** opens the product's assets folder in DA. Up-to-date locales show a regular link without a status label; other links report **Update** or **Check failed**. Missing production pages show a dimmed locale link without a status label. Hover a link for mismatch/error details; clicking any indicator opens that locale's product admin.
+
+Checks make one HTML request per locale to `main--vitamix--aemsites.aem.network` through `fcors.org`. They compare the market-filtered DA rows with the page's ordered product/variant galleries, labels, video links and `og:image`; variant colors come from the same HTML. Images are compared by SHA-256 of their returned bytes after following redirects through the proxy, because product/page media buses can assign different media IDs. Asset images are fetched from `/assets/products/...` on `main--vitamix--aemsites.aem.live`. First-party image requests remove resizing/optimization parameters and use `format=original` on both sides. Byte hashes detect content differences but can also differ if the media buses return differently encoded versions of the same image. Image lookups are shared across locales and limited to four concurrent requests. An unavailable image is a failed check, not a match. Unsaved row edits update comparisons against the loaded production snapshot; new or moved files must be saved/published before their content can be checked. **Recheck** reloads production and image content; saving also rechecks automatically. Checks do not publish or modify production.
+
+First-party product media URLs on `www.vitamix.com` (including `og:image`) are resolved against `.aem.network` for comparison. The public domain can serve a differently encoded image for the same media path, which would otherwise cause a false mismatch.
 
 Shows all images as thumbnails, grouped by variant color. Images without a color folder show first under "All variants". Each variant group has its swatch color as a top border and a light tint of that color as its background.
 

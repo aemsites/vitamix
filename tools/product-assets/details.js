@@ -3,16 +3,16 @@ import DA_SDK from 'https://da.live/nx/utils/sdk.js';
 import loadColorSwatches from '../../scripts/color-swatches.js';
 import {
   MARKETS, PRODUCTS_PATH, buildMarkets, buildSwatch, colorLabel, createClient, el,
-  findProductLocales, groupByColor, isAbsolute, plural, productAdminUrl, rowColor, rowField,
+  LOCALES, groupByColor, isAbsolute, isOgImage, plural, productAdminUrl, rowColor, rowField,
   rowMarkets, rowPath, setRowField, toSlug,
 } from './shared.js';
 import { cleanFileName, readDrop } from './files.js';
+import { compareProduction, createImageFingerprint, loadProduction } from './sync.js';
 
 const SWATCH_CONFIG = '/us/en_us/products/config/color-swatches.json';
 const COLUMNS = ['Path', 'Video', 'Label', 'Category', 'Subcategory', 'Market'];
 /** Sheet column marking the product's social sharing (og:image) image. */
 const OG_COLUMN = 'og-image';
-const isOgImage = (row) => /^(true|yes|x|1)$/i.test(rowField(row, OG_COLUMN));
 const UPLOAD_CONCURRENCY = 4;
 
 /** Returns the 11-char video id for youtube.com/watch, youtu.be, /shorts, /embed and /live URLs. */
@@ -108,23 +108,33 @@ function toast(message, type = 'success') {
   daLink.hidden = false;
 
   const localesEl = document.querySelector('.details-locales');
-  findProductLocales(slug).then((locales) => {
-    if (!locales.length) return;
-    localesEl.replaceChildren(el('span', 'details-locales-label', 'Product admin'), ...locales.map((locale) => {
-      const link = el('a', 'details-locale');
-      link.href = productAdminUrl(locale.path, slug);
-      link.target = '_blank';
-      link.rel = 'noopener';
-      link.title = `Open ${slug} in product admin (${locale.label})`;
-      link.append(buildMarkets([locale.market]), el('span', null, locale.path.split('/')[1]));
-      return link;
-    }));
-    localesEl.hidden = false;
+  const localeEntries = LOCALES.map((locale) => {
+    const link = el('a', 'details-locale');
+    link.href = productAdminUrl(locale.path, slug);
+    link.target = '_blank';
+    link.rel = 'noopener';
+    const status = el('span', 'details-sync-status', 'Checking…');
+    link.append(buildMarkets([locale.market]), el('span', null, locale.path.split('/')[1]), status);
+    return { locale, link, status };
   });
+  const recheck = el('button', 'secondary details-recheck', 'Recheck');
+  recheck.type = 'button';
+  localesEl.replaceChildren(
+    el('span', 'details-locales-label', 'Production / Product admin'),
+    ...localeEntries.map((e) => e.link),
+    recheck,
+  );
+  localesEl.hidden = false;
 
   const loaded = await client.loadImagesSheet(slug);
   if (loaded.error && !loaded.missing) {
     showError(loaded.error);
+    recheck.disabled = true;
+    localeEntries.forEach((entry) => {
+      entry.link.dataset.sync = 'error';
+      entry.status.textContent = 'Check failed';
+      entry.link.title = `${entry.locale.label}: ${loaded.error}\nOpen ${slug} in product admin`;
+    });
     return;
   }
 
@@ -156,6 +166,15 @@ function toast(message, type = 'success') {
   /** Saved rows removed from the sheet: row -> path of its file in DA (deleted on save). */
   let deleted = new Map();
   let saving = false;
+  let productionVersion = 0;
+  let comparisonVersion = 0;
+  let lookupHash = createImageFingerprint();
+
+  function setSyncStatus(entry, state, text, reasons = []) {
+    entry.link.dataset.sync = state;
+    entry.status.textContent = text;
+    entry.link.title = `${entry.locale.label}: ${text}${reasons.length ? `\n${reasons.join('\n')}` : ''}\nOpen ${slug} in product admin`;
+  }
 
   /**
    * Merges the per-color order back into sheet order: each color keeps the slots it occupied,
@@ -175,9 +194,57 @@ function toast(message, type = 'success') {
     return rows;
   }
 
+  async function updateProductionSync() {
+    comparisonVersion += 1;
+    const version = comparisonVersion;
+    const rows = JSON.parse(JSON.stringify(currentRows()));
+    const lookup = lookupHash;
+    await Promise.all(localeEntries.map(async (entry) => {
+      if (!entry.production) return;
+      setSyncStatus(entry, 'checking', 'Checking…');
+      try {
+        const result = await compareProduction(slug, rows, entry.locale, entry.production, lookup);
+        if (version !== comparisonVersion) return;
+        setSyncStatus(entry, result.state, result.text, result.reasons);
+      } catch (error) {
+        if (version !== comparisonVersion) return;
+        setSyncStatus(entry, 'error', 'Check failed', [error.message]);
+        // eslint-disable-next-line no-console
+        console.error(`product-assets: ${entry.locale.path} sync check failed`, error);
+      }
+    }));
+  }
+
   function isMoved(row) {
     return !pending.has(row) && savedPath.has(row) && rowPath(row) !== savedPath.get(row);
   }
+
+  async function refreshProduction() {
+    productionVersion += 1;
+    const version = productionVersion;
+    comparisonVersion += 1;
+    lookupHash = createImageFingerprint();
+    recheck.disabled = true;
+    await Promise.all(localeEntries.map(async (entry) => {
+      entry.production = null;
+      setSyncStatus(entry, 'checking', 'Checking…');
+      try {
+        const production = await loadProduction(slug, entry.locale);
+        if (version !== productionVersion) return;
+        entry.production = production;
+        updateProductionSync();
+      } catch (error) {
+        if (version !== productionVersion) return;
+        setSyncStatus(entry, 'error', 'Check failed', [error.message]);
+        // eslint-disable-next-line no-console
+        console.error(`product-assets: ${entry.locale.path} production load failed`, error);
+      }
+    }));
+    if (version !== productionVersion) return;
+    await updateProductionSync();
+    recheck.disabled = false;
+  }
+  recheck.addEventListener('click', refreshProduction);
 
   /** Field edits other than Path (moves are tracked separately). */
   function isEdited(row) {
@@ -191,6 +258,7 @@ function toast(message, type = 'success') {
     const rows = currentRows();
     const dirty = JSON.stringify(rows) !== savedJson || pending.size > 0 || deleted.size > 0;
     savebar.hidden = !dirty;
+    updateProductionSync();
     if (!dirty) return;
     const edited = rows.filter(isEdited).length;
     const moved = rows.filter(isMoved).length;
@@ -761,6 +829,7 @@ function toast(message, type = 'success') {
   });
 
   setup(JSON.parse(JSON.stringify(client.sheetRows(doc))));
+  refreshProduction();
 
   /* ---------- edit dialog ---------- */
 
@@ -964,6 +1033,7 @@ function toast(message, type = 'success') {
         console.error('product-assets: publish errors', publishErrors);
         toast(`Saved to DA, but ${plural(publishErrors.length, 'preview/publish step')} failed: ${publishErrors[0]}`, 'error');
       }
+      refreshProduction();
     } catch (error) {
       toast(error.message, 'error');
     } finally {

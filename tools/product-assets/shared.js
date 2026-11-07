@@ -75,6 +75,10 @@ export function rowMarkets(row) {
     .filter(Boolean);
 }
 
+export function isOgImage(row) {
+  return /^(true|yes|x|1)$/i.test(rowField(row, 'og-image'));
+}
+
 /** Groups image rows by variant color, keeping first-seen order; shared images use key `''`. */
 export function groupByColor(rows) {
   const groups = new Map();
@@ -130,10 +134,14 @@ export const LOCALES = [
 const PRODUCT_ADMIN = 'https://product-admin--vitamix--aemsites.aem.live/tools/commerce-admin/product-detail.html';
 // The product index is only served by the overlay host, which sends no CORS headers,
 // so it's read through the same proxy as tools/commerce-admin/pim.js.
-const INDEX_BASE = 'https://main--vitamix--aemsites.aem.network';
+export const INDEX_BASE = 'https://main--vitamix--aemsites.aem.network';
 const CORS_PROXY = 'https://fcors.org/?url=';
 const CORS_KEY = '&key=Mg23N96GgR8O3NjU';
 const INDEX_TTL = 10 * 60 * 1000;
+
+export function fcorsUrl(url) {
+  return CORS_PROXY + encodeURIComponent(url) + CORS_KEY;
+}
 
 export function productAdminUrl(locale, slug) {
   const params = new URLSearchParams({ catalog: locale, product: slug, stage: 'false' });
@@ -150,7 +158,7 @@ async function localeProductSlugs(locale) {
     // ignore unreadable cache
   }
   const indexUrl = `${INDEX_BASE}/${locale}/products/index.json?include=all`;
-  const resp = await fetch(CORS_PROXY + encodeURIComponent(indexUrl) + CORS_KEY);
+  const resp = await fetch(fcorsUrl(indexUrl));
   if (!resp.ok) throw new Error(`${locale} index: ${resp.status}`);
   const json = await resp.json();
   const prefix = `/${locale}/products/`;

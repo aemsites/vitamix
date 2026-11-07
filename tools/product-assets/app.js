@@ -4,7 +4,7 @@
 import DA_SDK from 'https://da.live/nx/utils/sdk.js';
 import loadColorSwatches from '../../scripts/color-swatches.js';
 import {
-  PRODUCTS_PATH, buildSwatch, colorLabel, createClient, el, groupByColor, plural, toSlug,
+  PRODUCTS_PATH, buildSwatch, colorLabel, createClient, el, groupByColor, isOgImage, plural, toSlug,
 } from './shared.js';
 
 const MAX_IMAGES = 5;
@@ -106,6 +106,8 @@ function highlight(node, text, query) {
 
     const variants = el('div', 'app-swatches');
     const images = el('div', 'app-images');
+    const social = el('div', 'app-social');
+    social.setAttribute('aria-label', 'Social image');
     const swatches = new Map();
 
     if (error) {
@@ -126,9 +128,11 @@ function highlight(node, text, query) {
       rows.slice(0, MAX_IMAGES).forEach((r) => images.append(client.buildThumb(slug, r)));
       if (rows.length > MAX_IMAGES) images.append(el('span', 'app-more', `+${rows.length - MAX_IMAGES}`));
       if (!rows.length) images.append(el('span', 'app-empty', 'No images'));
+      const socialImage = rows.find(isOgImage);
+      social.append(socialImage ? client.buildThumb(slug, socialImage) : el('span', 'app-empty', 'Not selected'));
     }
 
-    row.append(product, variants, images);
+    row.append(product, variants, images, social);
     return {
       slug, row, name, swatches, error,
     };
