@@ -11,6 +11,21 @@ import { createDetailModalHeaderCloseAndJson } from './commerce-detail-modal-jso
 import { PB_ORG, PB_SITE } from './commerce-pbus-config.js';
 import { escapeHtml, showToast } from './commerce-otp-ui.js';
 import { highlightMatch } from './search-highlight.js';
+import {
+  buildOverlayItems,
+  labelEntries,
+  layoutOverlay,
+  loadOverlaySchedule,
+  localesForMarketKeys,
+  marketsText,
+  overlayLabelsHtml,
+  overlayLayersHtml,
+  overlayListHtml,
+  overlayMarketKeys,
+  parseOverlayMode,
+  placeLabels,
+  wireOverlayHover,
+} from './promotion-overlay.js';
 
 function getUrlParam(key) {
   return new URLSearchParams(window.location.search).get(key) || '';
@@ -654,6 +669,28 @@ export function ordersPerPeriodBuckets(orders, bounds = null, granularity = 'day
   return out;
 }
 
+/**
+ * The chart's time axis as absolute instants: the first bucket's local midnight to the end of the
+ * last bucket. Overlay bars are positioned against this window, so they line up with the bars
+ * whatever time zone their own dates were authored in.
+ *
+ * @param {{ periodStart: string }[]} buckets ascending, as from {@link ordersPerPeriodBuckets}
+ * @param {'day'|'week'} [granularity]
+ * @returns {{ startMs: number, endMs: number } | null} null when there are no buckets
+ */
+export function chartWindowMs(buckets, granularity = 'day') {
+  if (!buckets.length) return null;
+  const parse = (key) => {
+    const [y, m, d] = key.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  };
+  const step = PERIOD_STEP_DAYS[granularity] || 1;
+  return {
+    startMs: parse(buckets[0].periodStart).getTime(),
+    endMs: addDaysLocal(parse(buckets[buckets.length - 1].periodStart), step).getTime(),
+  };
+}
+
 const CHART_MAX_LABELS = 12;
 
 /** Short display label (`Jan 5`) for a `YYYY-MM-DD` period-start day, in the browser's locale. */
@@ -742,7 +779,10 @@ export function ordersPerPeriodChartHtml(buckets, opts = {}) {
       const sv = stateValue(s);
       if (sv <= 0) return '';
       const segPct = Math.max(Math.round((sv / value) * 100), 0);
-      const segLabel = `${chartStateLabel(s.state)}: ${stateValueText(s)}`;
+      /* Segments fill the bar, so their tooltip is the one shown on hover: lead with the period,
+         and give the bar's total when the bar has more than one state. */
+      const total = byState.length > 1 ? ` (${valueText} total)` : '';
+      const segLabel = `${rangeLabel} · ${chartStateLabel(s.state)}: ${stateValueText(s)}${total}`;
       return `<div class="orders-chart-bar-segment" style="height:${segPct}%;`
         + `background:${stateBarColor(s.badgeClass)}" title="${escapeHtml(segLabel)}"></div>`;
     }).join('') : '';
@@ -1933,6 +1973,12 @@ async function init() {
   const groupBySel = document.getElementById('orders-chart-group');
   const metricSel = document.getElementById('orders-chart-metric');
   const chartCanvasEl = document.getElementById('orders-chart-canvas');
+  const overlayShowEl = document.getElementById('orders-overlay-show');
+  const overlayLaunchesEl = document.getElementById('orders-overlay-launches');
+  const overlayTogglesEl = document.getElementById('orders-overlay-toggles');
+  const overlayEl = document.getElementById('orders-chart-overlay');
+  const annotationsEl = document.getElementById('orders-chart-annotations');
+  const chartWrapEl = document.getElementById('orders-chart');
   if (!wrap || !search || !rangeSel || !marketSel || !stateSel || !sortSel) return;
 
   const authed = await waitForCommerceAuthReady(PB_ORG, PB_SITE);
@@ -1951,6 +1997,7 @@ async function init() {
   const initialTo = getUrlParam('to');
   const initialGroupBy = getUrlParam('group');
   const initialMetric = getUrlParam('metric') === 'revenue' ? 'revenue' : 'orders';
+  const initialOverlay = parseOverlayMode(getUrlParam('overlay'));
 
   search.value = initialQ;
   sortSel.value = initialSort;
@@ -2004,6 +2051,7 @@ async function init() {
       to: isCustom ? rangeToInput.value : '',
       group: groupBySel ? groupBySel.value : '',
       metric: metricSel && metricSel.value === 'revenue' ? 'revenue' : '',
+      overlay: currentOverlayMode() === 'promos' ? '' : currentOverlayMode(),
     });
   }
 
@@ -2106,6 +2154,108 @@ async function init() {
     countEl.textContent = '';
   }
 
+  /** `promos` (default), `all` (with launches) or `off`, from the two checkboxes. */
+  function currentOverlayMode() {
+    if (!overlayShowEl || !overlayShowEl.checked) return 'off';
+    return overlayLaunchesEl && !overlayLaunchesEl.checked ? 'promos' : 'all';
+  }
+
+  /** Latest overlay render; a slower, older one must not paint over it. */
+  let overlayRenderToken = 0;
+  /** Last layout drawn, so a resize can redraw the labels without refetching. */
+  let overlayLayout = null;
+  /** The list below the chart stays open across re-renders once opened. */
+  let overlayListOpen = false;
+
+  const labelCanvas = document.createElement('canvas').getContext('2d');
+  function measureLabel(entry) {
+    const family = getComputedStyle(overlayEl).fontFamily;
+    labelCanvas.font = `600 12px ${family}`;
+    let { width } = labelCanvas.measureText(entry.title);
+    labelCanvas.font = `400 12px ${family}`;
+    width += labelCanvas.measureText(` · ${marketsText(entry.item.markets)}`).width;
+    if (entry.item.gifts?.length) width += 84;
+    return width + 12;
+  }
+
+  /**
+   * Remembers whether the list below the chart is open before it is replaced. Read from the
+   * element, not from its `toggle` event, which fires asynchronously and can arrive after a
+   * re-render has already replaced the list.
+   */
+  function rememberListState() {
+    const details = annotationsEl?.querySelector('details.orders-chart-annotations');
+    if (details) overlayListOpen = details.open;
+  }
+
+  function clearOverlay() {
+    rememberListState();
+    overlayLayout = null;
+    if (overlayEl) overlayEl.innerHTML = '';
+    if (annotationsEl) annotationsEl.innerHTML = '';
+    chartCanvasEl?.querySelectorAll('.orders-chart-annot').forEach((n) => n.remove());
+  }
+
+  /** Draws a layout: labels above the chart, bands and lines inside it, the list below it. */
+  function paintOverlay(layout) {
+    const chart = chartCanvasEl.querySelector('.orders-chart');
+    const firstTrack = chart?.querySelector('.orders-chart-bar-track');
+    if (!chart || !firstTrack) return;
+    chart.querySelectorAll('.orders-chart-annot').forEach((n) => n.remove());
+    overlayEl.innerHTML = overlayLabelsHtml(
+      placeLabels(labelEntries(layout), overlayEl.clientWidth, measureLabel),
+    );
+    const { back, front } = overlayLayersHtml(layout);
+    chart.insertAdjacentHTML('afterbegin', back);
+    chart.insertAdjacentHTML('beforeend', front);
+    // Fit the layers to the bars' area: below the chart's top padding, above the date labels.
+    const chartBox = chart.getBoundingClientRect();
+    const trackBox = firstTrack.getBoundingClientRect();
+    chart.querySelectorAll('.orders-chart-annot').forEach((layer) => {
+      Object.assign(layer.style, {
+        top: `${trackBox.top - chartBox.top}px`,
+        height: `${trackBox.height}px`,
+      });
+    });
+    rememberListState();
+    annotationsEl.innerHTML = overlayListHtml(layout, { open: overlayListOpen });
+    overlayLayout = layout;
+  }
+
+  /**
+   * Annotates the chart with promotions, launches and checkout go-lives. Async because the
+   * schedule documents are fetched on first use; it never throws, so the chart is unaffected
+   * when the schedule cannot be read.
+   */
+  async function renderOverlay(buckets, granularity) {
+    if (!overlayEl || !annotationsEl) return;
+    overlayRenderToken += 1;
+    const token = overlayRenderToken;
+    clearOverlay();
+    if (overlayLaunchesEl) overlayLaunchesEl.disabled = !overlayShowEl?.checked;
+    const overlayMode = currentOverlayMode();
+    const win = chartWindowMs(buckets, granularity);
+    const availableKeys = [...marketSel.options].map((o) => o.value).filter(Boolean);
+    const marketKeys = overlayMarketKeys(marketSel.value, availableKeys);
+    if (overlayMode === 'off' || !win || !marketKeys.length) return;
+    try {
+      const { items: rows, failedLocales } = await loadOverlaySchedule(
+        localesForMarketKeys(marketKeys),
+      );
+      if (token !== overlayRenderToken) return;
+      if (overlayTogglesEl) {
+        overlayTogglesEl.title = failedLocales.length
+          ? `Promotion schedule unavailable for ${failedLocales.join(', ')}` : '';
+      }
+      const items = buildOverlayItems(rows, { marketKeys, mode: overlayMode });
+      paintOverlay(layoutOverlay({
+        items, marketKeys, win, filterValue: marketSel.value,
+      }));
+    } catch {
+      if (token === overlayRenderToken) clearOverlay();
+    }
+  }
+
   function applyView() {
     syncMetricAvailability();
     const q = search.value;
@@ -2143,6 +2293,7 @@ async function init() {
         buckets,
         { granularity, metric, currencyCode },
       );
+      renderOverlay(buckets, granularity);
     }
   }
 
@@ -2234,6 +2385,8 @@ async function init() {
       applyAutoGroupBy();
     }
     if (metricSel) metricSel.value = initialMetric;
+    if (overlayShowEl) overlayShowEl.checked = initialOverlay !== 'off';
+    if (overlayLaunchesEl) overlayLaunchesEl.checked = initialOverlay === 'all';
 
     rangeOrders = await fetchOrdersForRange();
     const initialStates = uniqueStates(rangeOrders);
@@ -2262,6 +2415,18 @@ async function init() {
       });
     }
     if (metricSel) metricSel.addEventListener('change', applyView);
+    if (overlayShowEl) overlayShowEl.addEventListener('change', applyView);
+    if (overlayLaunchesEl) overlayLaunchesEl.addEventListener('change', applyView);
+    if (chartWrapEl) {
+      wireOverlayHover(chartWrapEl);
+      let lastWidth = chartWrapEl.clientWidth;
+      new ResizeObserver(() => {
+        const width = chartWrapEl.clientWidth;
+        if (width === lastWidth) return;
+        lastWidth = width;
+        if (overlayLayout) paintOverlay(overlayLayout);
+      }).observe(chartWrapEl);
+    }
     rangeSel.addEventListener('change', () => {
       syncCustomFieldsVisibility();
       if (rangeSel.value === 'custom') seedCustomRangeDefaultsIfEmpty();

@@ -6,6 +6,7 @@ import {
   uniqueMarkets,
   ordersPerPeriodBuckets,
   ordersPerPeriodChartHtml,
+  chartWindowMs,
 } from '../../tools/commerce-admin/orders-page.js';
 
 test.describe('orderMarketKey', () => {
@@ -323,5 +324,92 @@ test.describe('ordersPerPeriodChartHtml', () => {
     ];
     const html = ordersPerPeriodChartHtml(buckets);
     expect(html).not.toContain('(payment completed:');
+  });
+
+  const segmentTitles = (html) => [...html.matchAll(/class="orders-chart-bar-segment"[^>]*title="([^"]*)"/g)]
+    .map((m) => m[1]);
+
+  test('segment tooltips, which are what hovering a bar shows, start with the date', () => {
+    const single = [{
+      periodStart: '2026-10-15',
+      count: 79,
+      amount: 0,
+      byState: [{
+        state: 'payment_completed', badgeClass: 'orders-badge-success', count: 79, amount: 0,
+      }],
+    }];
+    expect(segmentTitles(ordersPerPeriodChartHtml(single)))
+      .toEqual(['Oct 15 · payment completed: 79 orders']);
+
+    const multi = [{
+      periodStart: '2026-03-01',
+      count: 3,
+      amount: 0,
+      byState: [
+        {
+          state: 'payment_completed', badgeClass: 'orders-badge-success', count: 2, amount: 0,
+        },
+        {
+          state: 'payment_cancelled', badgeClass: 'orders-badge-danger', count: 1, amount: 0,
+        },
+      ],
+    }];
+    expect(segmentTitles(ordersPerPeriodChartHtml(multi))).toEqual([
+      'Mar 1 · payment completed: 2 orders (3 orders total)',
+      'Mar 1 · payment cancelled: 1 order (3 orders total)',
+    ]);
+  });
+
+  test('segment tooltips show the week range and revenue when grouped by week', () => {
+    const week = [{
+      periodStart: '2026-01-04',
+      count: 2,
+      amount: 150.5,
+      byState: [{
+        state: 'payment_completed', badgeClass: 'orders-badge-success', count: 2, amount: 150.5,
+      }],
+    }];
+    const [title] = segmentTitles(ordersPerPeriodChartHtml(week, { granularity: 'week', metric: 'revenue', currencyCode: 'USD' }));
+    expect(title).toMatch(/^Jan 4.Jan 10 · payment completed: \$150\.50 USD$/);
+  });
+});
+
+test.describe('chartWindowMs', () => {
+  const local = (y, m, d) => new Date(y, m - 1, d).getTime();
+
+  test('day buckets span the first local midnight to the day after the last bucket', () => {
+    const buckets = ordersPerPeriodBuckets(
+      [],
+      { since: new Date(2026, 9, 8).toISOString(), until: new Date(2026, 10, 9).toISOString() },
+      'day',
+    );
+    expect(buckets).toHaveLength(32);
+    expect(chartWindowMs(buckets, 'day')).toEqual({
+      startMs: local(2026, 10, 8),
+      endMs: local(2026, 11, 9),
+    });
+  });
+
+  test('week buckets run Sunday to the Sunday after the last week', () => {
+    // Oct 7, 2026 is a Wednesday: its Sunday-start week begins Oct 4. Nov 8 is a Sunday.
+    const buckets = ordersPerPeriodBuckets(
+      [],
+      { since: new Date(2026, 9, 7).toISOString(), until: new Date(2026, 10, 9).toISOString() },
+      'week',
+    );
+    expect(chartWindowMs(buckets, 'week')).toEqual({
+      startMs: local(2026, 10, 4),
+      endMs: local(2026, 11, 15),
+    });
+  });
+
+  test('a single bucket spans one day', () => {
+    const win = chartWindowMs([{ periodStart: '2026-11-05' }]);
+    expect(win).toEqual({ startMs: local(2026, 11, 5), endMs: local(2026, 11, 6) });
+  });
+
+  test('is null when there are no buckets', () => {
+    expect(chartWindowMs([])).toBeNull();
+    expect(chartWindowMs([], 'week')).toBeNull();
   });
 });

@@ -204,3 +204,47 @@ remain, and the account's orders no longer appear under the customer. Data held 
 other systems (ERP, CRM, email marketing) is unaffected and must be handled through
 the usual process. After a successful delete, the page shows a "Customer deleted"
 notice instead of the customer.
+
+## Orders chart promotion overlay
+
+The **Orders** chart is annotated with what was running at the time, so a change in volume
+can be read against it:
+
+- **Promotions** are light purple bands behind the bars, labelled above the chart with a
+  short title and their markets (`US · CA`). A free-gift offer that ran with a sale is a
+  "+ free gift" tag on that sale.
+- **Launches** are dashed orange lines at the launch date. They are off by default.
+- **Checkout go-lives** are solid dark lines ("US orders start"). The time before one is
+  striped: that market's orders were not reaching this chart yet (`orders-chart-events.js`).
+- A list below the chart, collapsed by default, repeats everything with dates, markets and
+  the full message. Hovering any part of an annotation highlights all of its parts.
+
+Use the **Promotions** checkbox next to **Show** to hide the annotations and the **Launches**
+checkbox to add launches. The choice is kept in the URL as `overlay=all` (with launches) or
+`overlay=off`.
+
+The annotations are read from the storefront's own schedule documents for the markets in view,
+so nothing is stored by the admin:
+
+- `/{locale}/nav/nav-banners` (the `alert-banners` block): sales and launches.
+- `/{locale}/products/config/free-gifts`: free-gift offers.
+
+Locales are `us/en_us`, `ca/en_us`, `ca/fr_ca` and `mx/es_mx`, chosen by the Market filter.
+The documents are read from the page's own origin (published content on `aem.live`, preview
+content under `aem up`), uncached, once per page load.
+
+- Dates are authored in Eastern time. Bands and lines are positioned by exact instant, so they
+  line up with the day or week bars in any browser time zone.
+- Rows with the same start and end in several markets are one band listing each market. Titles
+  are the first sentence of the message, cut at about 50 characters; hover for the full text.
+- A row is a **sale**, a **launch** (opens with "Now available", "Meet the new",
+  "Introducing", "Nouveau" or "Nouvelle") or **always-on** (no start or end, or longer than 120
+  days, such as the free-shipping banner; never drawn). To override the guess, add a fifth cell
+  to a nav-banners row: `sale`, `launch`, `info` or `hidden`. The storefront ignores extra cells.
+- A promotion with less than six hours inside the chart is not drawn.
+- When another market is enabled in `EDGE_CHECKOUT_LOCALES`, add an entry to
+  `MARKET_LIVE_EVENTS` in `orders-chart-events.js`.
+- If a locale's documents cannot be read, nothing is drawn for them, the reason is logged to the
+  console and shown on the checkboxes' tooltip, and the chart renders as usual.
+
+The loaders are shared with the Promotion Control Center (`promotion-sources.js`).
