@@ -71,7 +71,7 @@
   </main>
   <script>
     (function injectRecipe404Widget() {
-      if (!window.location.pathname.includes('/recipes/')) return;
+      if (!window.location.pathname.toLowerCase().includes('/recipes/')) return;
       var section = document.querySelector('main.error .section');
       if (!section) return;
       var msg = section.querySelector('.error-message');
