@@ -1,6 +1,5 @@
 import { fetchPlaceholders } from '../../scripts/aem.js';
 import { getLocaleAndLanguage, formatPrice, getOfferPricing } from '../../scripts/scripts.js';
-import { createStarRating } from '../../scripts/plp-data.js';
 
 const normalize = (value) => (value || '').trim().toLowerCase();
 
@@ -121,20 +120,22 @@ function buildQuestion(question, index) {
   legend.append(eyebrow, question.detail || question.name);
   fieldset.append(legend);
 
+  const notice = document.createElement('p');
+  notice.className = 'advance-notice';
+  notice.id = `recommender-q${index + 1}-notice`;
+  notice.textContent = 'Choose an answer to continue automatically. Use Tab to move between answers and Enter or Space to choose.';
+  fieldset.setAttribute('aria-describedby', notice.id);
+  fieldset.append(notice);
+
   const options = document.createElement('div');
   options.className = 'options';
   question.answers.forEach((answer, i) => {
-    const id = `recommender-q${index + 1}-a${i + 1}`;
-    const label = document.createElement('label');
-    label.htmlFor = id;
-    label.dataset.answerIndex = i;
-
-    const input = document.createElement('input');
-    input.type = 'radio';
-    input.id = id;
-    input.name = `recommender-q${index + 1}`;
-    input.value = answer.label;
-    input.dataset.answerIndex = i;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'answer';
+    button.dataset.answerIndex = i;
+    button.setAttribute('aria-pressed', 'false');
+    button.setAttribute('aria-describedby', notice.id);
 
     const text = document.createElement('span');
     text.className = 'text';
@@ -164,8 +165,8 @@ function buildQuestion(question, index) {
     checkIcon.append(checkPath);
     selectionCheck.append(checkIcon);
 
-    label.append(input, text, selectionCheck);
-    options.append(label);
+    button.append(text, selectionCheck);
+    options.append(button);
   });
   fieldset.append(options);
   return fieldset;
@@ -275,7 +276,7 @@ function createPrice(product, ph) {
   return price;
 }
 
-function createProductCard(product, ph) {
+function createProductCard(product, ph, answers) {
   const card = document.createElement('div');
   card.className = 'product-card';
 
@@ -291,31 +292,42 @@ function createProductCard(product, ph) {
     imageLink.append(image);
   }
 
-  const info = document.createElement('div');
-  info.className = 'info';
+  const badge = document.createElement('p');
+  badge.className = 'match-badge';
+  badge.textContent = 'Their perfect match';
 
   const title = document.createElement('h3');
   const titleLink = document.createElement('a');
   titleLink.href = product.url;
   titleLink.textContent = product.title;
   title.append(titleLink);
-  info.append(title);
-
-  const rating = createStarRating({
-    reviewCount: parseInt(product.reviewCount, 10) || 0,
-    reviewAverage: parseFloat(product.ratingValue) || 0,
-  });
-  if (rating.children.length) info.append(rating);
+  card.append(imageLink, badge, title);
 
   if (product.description) {
     const description = document.createElement('p');
     description.className = 'description';
     description.textContent = product.description;
-    info.append(description);
+    card.append(description);
+  }
+
+  if (answers.length) {
+    const picks = document.createElement('div');
+    picks.className = 'picks';
+    const heading = document.createElement('p');
+    heading.className = 'picks-heading';
+    heading.textContent = 'Matches your picks';
+    const list = document.createElement('ul');
+    answers.forEach((answer) => {
+      const item = document.createElement('li');
+      item.textContent = answer;
+      list.append(item);
+    });
+    picks.append(heading, list);
+    card.append(picks);
   }
 
   if (product.price) {
-    info.append(createPrice(product, {
+    card.append(createPrice(product, {
       ...ph,
       currencyCode: product.currency || ph.currencyCode,
     }));
@@ -328,9 +340,7 @@ function createProductCard(product, ph) {
   shopNow.href = product.url;
   shopNow.textContent = ph.shopNow || 'Shop Now';
   cta.append(shopNow);
-  info.append(cta);
-
-  card.append(imageLink, info);
+  card.append(cta);
   return card;
 }
 
@@ -366,14 +376,12 @@ export default async function decorate(widget) {
   }
   const productPages = new Map();
   const quizEl = widget.querySelector('.quiz');
-  const progressEl = widget.querySelector('progress');
   const stepLabelEl = widget.querySelector('.step-label');
+  const stepNameEl = widget.querySelector('.step-name');
   const prevBtn = widget.querySelector('.prev');
-  const nextBtn = widget.querySelector('.next');
   const stepsEl = widget.querySelector('.steps');
   const matchesEl = widget.querySelector('.matches');
   const matchListEl = widget.querySelector('.match-list');
-  const nextLabel = nextBtn.textContent;
   const total = Math.max(getDecisionTreeDepth(decisionTree), 1);
 
   const fieldsets = questions.map(buildQuestion);
@@ -381,6 +389,7 @@ export default async function decorate(widget) {
   const stepItems = questions.map((question, index) => {
     const item = document.createElement('span');
     item.className = 'step';
+    item.setAttribute('role', 'img');
     item.dataset.questionIndex = index;
     const check = document.createElement('span');
     check.className = 'step-check';
@@ -394,13 +403,13 @@ export default async function decorate(widget) {
     return item;
   });
   widget.querySelector('.step-total').textContent = total;
-  progressEl.max = total;
 
   let currentNode = decisionTree;
   let trail = [];
   let pendingSelection = null;
   let renderVersion = 0;
   let matchRenderVersion = 0;
+  let advanceTimer = null;
 
   const updateSteps = (activeIndex = -1, complete = false) => {
     stepItems.forEach((item, index) => {
@@ -408,6 +417,7 @@ export default async function decorate(widget) {
       const stepComplete = complete || visited || index < activeIndex;
       item.classList.toggle('is-current', !complete && index === activeIndex);
       item.classList.toggle('is-complete', stepComplete);
+      item.setAttribute('aria-label', `${questions[index].name}${stepComplete ? ', complete' : ''}`);
       if (!complete && index === activeIndex) item.setAttribute('aria-current', 'step');
       else item.removeAttribute('aria-current');
     });
@@ -422,9 +432,11 @@ export default async function decorate(widget) {
     }));
     if (currentNode.type === 'question') {
       const currentQuestion = questions[currentNode.questionIndex];
-      const checked = fieldsets[currentNode.questionIndex].querySelector('input:checked');
-      if (checked) selected[currentQuestion.name] = checked.value;
-      else delete selected[currentQuestion.name];
+      const checked = fieldsets[currentNode.questionIndex].querySelector('.answer[aria-pressed="true"]');
+      if (checked) {
+        const answerIndex = Number(checked.dataset.answerIndex);
+        selected[currentQuestion.name] = currentQuestion.answers[answerIndex].label;
+      } else delete selected[currentQuestion.name];
     }
     const candidates = [];
     recommendations.forEach((row) => {
@@ -493,15 +505,6 @@ export default async function decorate(widget) {
     }
   };
 
-  const updateNext = () => {
-    const fieldset = fieldsets[currentNode.questionIndex];
-    const selected = fieldset.querySelector('input:checked');
-    const selectedIndex = selected ? Number(selected.dataset.answerIndex) : -1;
-    const option = currentNode.options.find(({ answerIndex }) => answerIndex === selectedIndex);
-    nextBtn.disabled = !option;
-    nextBtn.textContent = option?.child.type === 'result' ? 'See My Recommendation' : nextLabel;
-  };
-
   const showResults = async (url, version) => {
     const href = toHref(url);
     if (!href) {
@@ -509,7 +512,6 @@ export default async function decorate(widget) {
       return;
     }
 
-    nextBtn.disabled = true;
     let result;
     try {
       if (!productPages.has(href)) {
@@ -529,8 +531,15 @@ export default async function decorate(widget) {
     const [product, ph] = result || [];
     const productEl = widget.querySelector('.results .product');
     const fallbackEl = widget.querySelector('.results .fallback');
+    const mobileShopEl = widget.querySelector('.mobile-shop');
+    mobileShopEl.hidden = !product;
     if (product) {
-      productEl.replaceChildren(createProductCard(product, ph));
+      const answers = trail.map(({ node, answerIndex }) => (
+        questions[node.questionIndex].answers[answerIndex].label
+      ));
+      productEl.replaceChildren(createProductCard(product, ph, answers));
+      mobileShopEl.href = product.url;
+      mobileShopEl.textContent = ph.shopNow || 'Shop Now';
     } else {
       productEl.replaceChildren();
       fallbackEl.querySelector('a').href = href;
@@ -538,7 +547,6 @@ export default async function decorate(widget) {
     productEl.hidden = !product;
     fallbackEl.hidden = !!product;
 
-    progressEl.value = total;
     widget.dataset.stage = 'results';
     matchesEl.hidden = true;
     updateSteps(-1, true);
@@ -547,6 +555,7 @@ export default async function decorate(widget) {
 
   const showNode = (node, focus = true) => {
     renderVersion += 1;
+    clearTimeout(advanceTimer);
     currentNode = node;
     fieldsets.forEach((fs) => { fs.hidden = true; });
     if (node.type === 'result') {
@@ -560,35 +569,54 @@ export default async function decorate(widget) {
     updateSteps(questionIndex);
     const fieldset = fieldsets[questionIndex];
     fieldset.hidden = false;
-    fieldset.querySelectorAll('input').forEach((input) => {
-      input.checked = false;
-      const label = input.closest('label');
-      label.hidden = true;
-      label.classList.remove('is-selected');
+    fieldset.querySelectorAll('.answer').forEach((button) => {
+      button.setAttribute('aria-pressed', 'false');
+      button.hidden = true;
+      button.classList.remove('is-selected');
     });
     options.forEach(({ answerIndex }) => {
-      const input = fieldset.querySelector(`input[data-answer-index="${answerIndex}"]`);
-      input.closest('label').hidden = false;
+      const button = fieldset.querySelector(`.answer[data-answer-index="${answerIndex}"]`);
+      button.hidden = false;
     });
     if (pendingSelection !== null) {
-      const input = fieldset.querySelector(`input[data-answer-index="${pendingSelection}"]`);
+      const button = fieldset.querySelector(`.answer[data-answer-index="${pendingSelection}"]`);
       const optionIsAvailable = options.some(
         ({ answerIndex }) => answerIndex === pendingSelection,
       );
-      if (input && optionIsAvailable) {
-        input.checked = true;
-        input.closest('label').classList.add('is-selected');
+      if (button && optionIsAvailable) {
+        button.setAttribute('aria-pressed', 'true');
+        button.classList.add('is-selected');
       }
       pendingSelection = null;
     }
     if (focus) fieldset.focus();
 
     const step = trail.length + 1;
-    progressEl.value = step - 1;
     stepLabelEl.textContent = step;
+    stepNameEl.textContent = questions[questionIndex].name;
     prevBtn.hidden = trail.length === 0;
-    updateNext();
     renderMatches(renderVersion);
+  };
+
+  /**
+   * Advances to the next step shortly after an answer is selected,
+   * leaving time for the selection animation to play.
+   */
+  const scheduleAdvance = () => {
+    if (currentNode.type !== 'question') return;
+    const fieldset = fieldsets[currentNode.questionIndex];
+    const selected = fieldset.querySelector('.answer[aria-pressed="true"]');
+    const selectedIndex = selected ? Number(selected.dataset.answerIndex) : -1;
+    const option = currentNode.options.find(({ answerIndex }) => answerIndex === selectedIndex);
+    if (!option) return;
+    clearTimeout(advanceTimer);
+    const version = renderVersion;
+    advanceTimer = setTimeout(() => {
+      if (version !== renderVersion) return;
+      trail.push({ node: currentNode, answerIndex: selectedIndex });
+      pushAnswers();
+      showNode(option.child);
+    }, 400);
   };
 
   const restoreAnswers = (focus = true) => {
@@ -610,17 +638,6 @@ export default async function decorate(widget) {
     showNode(node, focus);
   };
 
-  nextBtn.addEventListener('click', () => {
-    const fieldset = fieldsets[currentNode.questionIndex];
-    const selected = fieldset.querySelector('input:checked');
-    const selectedIndex = selected ? Number(selected.dataset.answerIndex) : -1;
-    const option = currentNode.options.find(({ answerIndex }) => answerIndex === selectedIndex);
-    if (!option) return;
-    trail.push({ node: currentNode, answerIndex: selectedIndex });
-    pushAnswers();
-    showNode(option.child);
-  });
-
   prevBtn.addEventListener('click', () => {
     const previous = trail.pop();
     if (!previous) return;
@@ -630,7 +647,6 @@ export default async function decorate(widget) {
   });
 
   widget.querySelector('button[type="reset"]').addEventListener('click', () => {
-    widget.querySelectorAll('input:checked').forEach((input) => { input.checked = false; });
     trail = [];
     pendingSelection = null;
     pushAnswers();
@@ -638,17 +654,18 @@ export default async function decorate(widget) {
     showNode(decisionTree);
   });
 
-  widget.addEventListener('change', (e) => {
-    const fieldset = e.target.closest('fieldset');
-    if (fieldset) {
-      fieldset.querySelectorAll('label').forEach((label) => {
-        label.classList.toggle('is-selected', label.querySelector('input').checked);
-      });
-    }
-    if (fieldset && currentNode.type === 'question') {
-      updateNext();
-      renderMatches(renderVersion);
-    }
+  quizEl.addEventListener('click', (e) => {
+    const button = e.target.closest('.answer');
+    if (!button || currentNode.type !== 'question') return;
+    const fieldset = fieldsets[currentNode.questionIndex];
+    if (!fieldset.contains(button) || button.hidden) return;
+    fieldset.querySelectorAll('.answer').forEach((answer) => {
+      const selected = answer === button;
+      answer.setAttribute('aria-pressed', String(selected));
+      answer.classList.toggle('is-selected', selected);
+    });
+    renderMatches(renderVersion);
+    scheduleAdvance();
   });
 
   window.addEventListener('popstate', () => restoreAnswers());

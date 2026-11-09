@@ -1,4 +1,9 @@
 <nav class="steps" aria-label="Recommender progress"></nav>
+<div class="step-count progress-summary">
+  <span class="quiz-progress">Step <span class="step-label">1</span> of <span class="step-total">1</span> · <span class="step-name"></span></span>
+  <span class="result-progress">All done · Your match</span>
+  <button type="reset" class="button link start-over">Start over</button>
+</div>
 
 <section class="quiz" aria-live="polite"></section>
 
@@ -16,20 +21,19 @@
 </section>
 
 <section class="matches" aria-label="Current product matches">
-  <p class="matches-label">Matching so far</p>
-  <div class="match-list"></div>
+  <div class="matches-content">
+    <p class="matches-label">Matching so far</p>
+    <div class="match-list"></div>
+  </div>
 </section>
 
 <div class="footer">
-  <progress max="1" value="0" aria-label="Recommender progress"></progress>
   <div data-stage="quiz">
-    <p class="step-count">Question <span class="step-label">1</span> of <span class="step-total">1</span></p>
     <div class="button-wrapper">
       <button type="button" class="button link prev" hidden>← Back</button>
-      <button type="button" class="button emphasis next" disabled>Next</button>
     </div>
   </div>
   <div data-stage="results">
-    <button type="reset" class="button link">Start Over</button>
+    <a class="button emphasis mobile-shop" hidden>Shop Now</a>
   </div>
 </div>
