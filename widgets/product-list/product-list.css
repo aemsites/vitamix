@@ -312,6 +312,10 @@
   cursor: pointer;
 }
 
+.product-list-widget .product-list-widget-dropdown-option[hidden] {
+  display: none;
+}
+
 .product-list-widget .product-list-widget-dropdown-option:hover,
 .product-list-widget .product-list-widget-dropdown-option:focus-visible {
   outline: none;

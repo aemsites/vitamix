@@ -6,7 +6,7 @@ import loadColorSwatches from '../../scripts/color-swatches.js';
 import { formatPrice, buildVideo, loadWidgetCopy } from '../../scripts/scripts.js';
 import { loadFragment } from '../../blocks/fragment/fragment.js';
 import addToCompare, { isInStoredCompare, getHeaderCompareHref } from '../../scripts/add-to-compare.js';
-import { createCallouts, createStarRating } from '../../scripts/plp-data.js';
+import { createCallouts, createStarRating, hasVisiblePrice } from '../../scripts/plp-data.js';
 import lookupProductListProducts, { getWidgetLocaleAndLanguage, getFacetDefinitions } from './products.js';
 import createProductCta from './product-cta.js';
 
@@ -222,7 +222,7 @@ function hasVaryingPrice(product) {
 function createProductPrice(product, ph, copy) {
   const price = document.createElement('p');
   price.className = 'product-list-widget-price';
-  if (!product.price) return price;
+  if (!hasVisiblePrice(product)) return price;
 
   const varyingPrice = hasVaryingPrice(product);
   const amount = document.createElement('span');
@@ -1081,13 +1081,24 @@ export default async function decorate(widget) {
       if (b.isMarketing) return -1;
       return cmp(a, b);
     };
+    // Products without a visible price sort after priced ones in both directions.
+    const byPrice = (dir) => (x, y) => {
+      const px = hasVisiblePrice(x) ? Number(x.price) : null;
+      const py = hasVisiblePrice(y) ? Number(y.price) : null;
+      if (px === null || py === null) return (px === null) - (py === null);
+      return dir * (px - py);
+    };
     const sorts = {
-      'price-asc': (a, b) => byMarketingLast(a, b, (x, y) => Number(x.price) - Number(y.price)),
-      'price-desc': (a, b) => byMarketingLast(a, b, (x, y) => Number(y.price) - Number(x.price)),
+      'price-asc': (a, b) => byMarketingLast(a, b, byPrice(1)),
+      'price-desc': (a, b) => byMarketingLast(a, b, byPrice(-1)),
       'reviews-desc': (a, b) => byMarketingLast(a, b, (x, y) => Number(y.reviewCount) - Number(x.reviewCount)),
     };
     // 'featured' (Most Popular) keeps the row order from plp-data-{dataset}.json as-is.
     if (sorts[sortKey]) results.sort(sorts[sortKey]);
+    const anyPrice = results.some((item) => !item.isMarketing && hasVisiblePrice(item));
+    sortButtons.forEach((btn) => {
+      if (btn.dataset.sort.startsWith('price-')) btn.hidden = !anyPrice;
+    });
     countEls.forEach((el) => { el.textContent = String(results.length); });
     const activeColor = (filterConfig.color || '').split(',')[0].trim();
     await displayResults(results, activeColor ? toClassName(activeColor) : null);
