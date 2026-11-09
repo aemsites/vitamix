@@ -9,8 +9,14 @@ import { PB_ORG, PB_SITE } from '../commerce-pbus-config.js';
 import { getApiEnvironment } from '../commerce-otp-api.js';
 import waitForCommerceAuthReady from '../commerce-wait-auth-ready.js';
 import { easternCivilToUtc, formatInstantInEastern } from '../commerce-eastern-time.js';
+import {
+  contentOrigin,
+  loadNavBanners as loadNavBannersFor,
+  loadFreeGifts as loadFreeGiftsFor,
+  loadPromoSchedule as loadPromoScheduleFor,
+} from '../promotion-sources.js';
 
-const CONTENT_ORIGIN = `https://main--vitamix--aemsites.aem.${getApiEnvironment() === 'prod' ? 'live' : 'page'}`;
+const CONTENT_ORIGIN = contentOrigin();
 const CORS_PROXY = 'https://fcors.org/?url=';
 const CORS_KEY = '&key=Mg23N96GgR8O3NjU';
 const STOREFRONT_ORIGIN = 'https://www.vitamix.com';
@@ -133,54 +139,6 @@ function defaultView(date = new Date()) {
   return { start, end };
 }
 
-/* ---------- parsing (ported from main: scripts/scripts.js) ---------- */
-
-const TIMEZONE_OFFSETS = {
-  EDT: -4, EST: -5, CDT: -5, CST: -6, MDT: -6, MST: -7, PDT: -7, PST: -8,
-};
-
-/**
- * Parses "M/D/YYYY 9am" / "M/D/YYYY 9:30pm [TZ]"; defaults to Eastern time.
- * @param {string} dateStr
- * @returns {Date}
- */
-function parseEasternDateTime(dateStr) {
-  const regex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2})(?::(\d{2}))?(am|pm)(?:\s+([A-Z]{3,4}))?$/i;
-  const match = String(dateStr || '').trim().match(regex);
-  if (!match) throw new Error(`Invalid datetime format: ${dateStr}. Expected format: M/D/YYYY HHam/pm`);
-  const [, mo, d, y, h, mi, ampm, tz] = match;
-  let hours = parseInt(h, 10);
-  if (ampm.toLowerCase() === 'am' && hours === 12) hours = 0;
-  else if (ampm.toLowerCase() === 'pm' && hours !== 12) hours += 12;
-  const minutes = mi ? parseInt(mi, 10) : 0;
-  const month = parseInt(mo, 10);
-  const day = parseInt(d, 10);
-  const year = parseInt(y, 10);
-  if (tz) {
-    const offset = TIMEZONE_OFFSETS[tz.toUpperCase()];
-    if (offset === undefined) throw new Error(`Unsupported timezone: ${tz}`);
-    return new Date(Date.UTC(year, month - 1, day, hours - offset, minutes, 0));
-  }
-  return easternCivilToUtc(year, month, day, hours, minutes, 0);
-}
-
-/** Nav banner cells: empty = open-ended, invalid = throws (row is reported). */
-function parseBannerDate(text) {
-  const trimmed = String(text || '').trim();
-  return trimmed ? parseEasternDateTime(trimmed) : null;
-}
-
-/** Promo schedule cells: same fallback as `checkSchedule()` on main. */
-function parseScheduleDateSafe(dateStr) {
-  if (!dateStr) return null;
-  try {
-    return parseEasternDateTime(dateStr);
-  } catch {
-    const fallback = new Date(dateStr);
-    return Number.isNaN(fallback.getTime()) ? null : fallback;
-  }
-}
-
 /* ---------- loading ---------- */
 
 async function fetchContent(path) {
@@ -193,120 +151,24 @@ async function fetchContent(path) {
   }
 }
 
-function marketForLocale(locale) {
-  return locale.split('/')[0];
-}
-
 function setStatus(key, text, error = false) {
   state.status.set(key, { text, error });
   renderStatus();
 }
 
-async function loadNavBanners(locale) {
-  const key = `nav-banners:${locale}`;
-  const path = `/${locale}/nav/nav-banners`;
-  setStatus(key, `${path}: loading…`);
-  const resp = await fetchContent(`${path}.plain.html`);
-  if (!resp.ok) {
-    setStatus(key, `${path}: HTTP ${resp.status}`, resp.status !== 404);
-    return [];
-  }
-  const dom = new DOMParser().parseFromString(await resp.text(), 'text/html');
-  const block = dom.querySelector('.alert-banners');
-  if (!block) {
-    setStatus(key, `${path}: no alert-banners block found`, true);
-    return [];
-  }
-  const problems = [];
-  const items = [];
-  [...block.children].forEach((row, index) => {
-    const [startEl, endEl, contentEl, colorEl] = [...row.children];
-    const label = contentEl?.textContent.trim().replace(/\s+/g, ' ') || '(empty banner)';
-    try {
-      items.push({
-        source: 'nav-banners',
-        market: marketForLocale(locale),
-        where: locale,
-        label,
-        detail: colorEl?.textContent.trim() ? `color: ${colorEl.textContent.trim()}` : '',
-        start: parseBannerDate(startEl?.textContent),
-        end: parseBannerDate(endEl?.textContent),
-      });
-    } catch (e) {
-      problems.push(`row ${index + 1}: ${e.message}`);
-    }
-  });
-  setStatus(key, `${path}: ${items.length} banners${problems.length ? `; ${problems.join('; ')}` : ''}`, problems.length > 0);
-  return items;
+/** Shared loaders (`../promotion-sources.js`) report progress through this page's status list. */
+const sourceOptions = { fetchContent, onStatus: setStatus };
+
+function loadNavBanners(locale) {
+  return loadNavBannersFor(locale, sourceOptions);
 }
 
-/** Columns per `renderFreeGift()` in blocks/pdp/pdp.js on main. */
-async function loadFreeGifts(locale) {
-  const key = `free-gifts:${locale}`;
-  const path = `/${locale}/products/config/free-gifts`;
-  setStatus(key, `${path}: loading…`);
-  const resp = await fetchContent(`${path}.plain.html`);
-  if (!resp.ok) {
-    setStatus(key, `${path}: HTTP ${resp.status}`, resp.status !== 404);
-    return [];
-  }
-  const dom = new DOMParser().parseFromString(await resp.text(), 'text/html');
-  const block = dom.querySelector('.free-gifts');
-  if (!block) {
-    setStatus(key, `${path}: no free-gifts block found`, true);
-    return [];
-  }
-  const problems = [];
-  const items = [];
-  [...block.children].forEach((row, index) => {
-    const [startEl, endEl, minPriceEl, labelEl, , slugsEl] = [...row.children];
-    const minPrice = (minPriceEl?.textContent || '').trim().replace(/^\$/, '');
-    const slugs = (slugsEl?.textContent || '').split(',').map((s) => s.trim()).filter(Boolean);
-    try {
-      items.push({
-        source: 'free-gifts',
-        market: marketForLocale(locale),
-        where: locale,
-        label: labelEl?.textContent.trim() || '(no label)',
-        detail: [
-          minPrice ? `min price: $${minPrice}` : '',
-          `products: ${slugs.length ? slugs.join(', ') : 'all'}`,
-        ].filter(Boolean).join(' · '),
-        start: parseBannerDate(startEl?.textContent),
-        end: parseBannerDate(endEl?.textContent),
-      });
-    } catch (e) {
-      // The PDP silently skips these rows; surface them here.
-      problems.push(`row ${index + 1}: ${e.message}`);
-    }
-  });
-  setStatus(key, `${path}: ${items.length} gifts${problems.length ? `; ${problems.join('; ')}` : ''}`, problems.length > 0);
-  return items;
+function loadFreeGifts(locale) {
+  return loadFreeGiftsFor(locale, sourceOptions);
 }
 
-async function loadPromoSchedule(locale) {
-  const key = `promo-schedule:${locale}`;
-  const path = `/${locale}/promotions/promo-schedule.json`;
-  setStatus(key, `${path}: loading…`);
-  const resp = await fetchContent(path);
-  if (!resp.ok) {
-    setStatus(key, `${path}: HTTP ${resp.status}`, resp.status !== 404);
-    return [];
-  }
-  const json = await resp.json();
-  const rows = Array.isArray(json?.data) ? json.data : [];
-  const items = rows.map((row) => ({
-    source: 'promo-schedule',
-    market: marketForLocale(locale),
-    where: locale,
-    label: String(row.Promotion || '(no promotion)'),
-    promotion: String(row.Promotion || '').trim(),
-    detail: `/${locale}/promotions/${row.Promotion || ''}`,
-    start: parseScheduleDateSafe(row.Start),
-    end: parseScheduleDateSafe(row.End),
-  }));
-  setStatus(key, `${path}: ${items.length} entries`);
-  return items;
+function loadPromoSchedule(locale) {
+  return loadPromoScheduleFor(locale, sourceOptions);
 }
 
 /** Earliest start / latest end across rule lines; any undated line makes that side open-ended. */

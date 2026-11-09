@@ -61,11 +61,17 @@
               <option value="revenue">Revenue ($)</option>
             </select>
           </div>
+          <div class="orders-filter-field orders-overlay-toggles" id="orders-overlay-toggles" role="group" aria-label="Chart annotations">
+            <label class="orders-overlay-toggle"><input type="checkbox" id="orders-overlay-show" checked /> Promotions</label>
+            <label class="orders-overlay-toggle"><input type="checkbox" id="orders-overlay-launches" /> Launches</label>
+          </div>
         </div>
       </div>
 
       <div id="orders-chart" class="orders-chart-wrap">
+        <div id="orders-chart-overlay" class="orders-chart-overlay"></div>
         <div id="orders-chart-canvas" class="orders-chart-canvas" aria-live="polite"></div>
+        <div id="orders-chart-annotations"></div>
       </div>
 
       <div class="orders-search-row">
