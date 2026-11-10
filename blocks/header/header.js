@@ -785,13 +785,25 @@ export default async function decorate(block) {
         try {
           const dlg = await ensureAccountManagementModal();
           dlg.openModal();
-        } catch {
-          /* fall through to default navigation */
+        } catch (error) {
+          // eslint-disable-next-line no-console
+          console.error('Unable to open account management', error);
+          window.location.assign(accountLink.href);
         }
       }
       /* Legacy Magento session only: follow account href */
     });
   }
+
+  const handleAccountHash = () => {
+    if (window.location.hash !== '#account') return;
+    const url = new URL(window.location.href);
+    url.hash = '';
+    window.history.replaceState(window.history.state, '', url);
+    accountLink.click();
+  };
+  window.addEventListener('hashchange', handleAccountHash);
+  handleAccountHash();
 
   const cartLink = block.querySelector('.icon-cart').parentElement;
 
