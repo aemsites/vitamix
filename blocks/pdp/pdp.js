@@ -254,7 +254,29 @@ function renderShare(ph) {
   return shareContainer;
 }
 
-async function renderFreeGift() {
+/**
+ * Parses the "minimum price" cell of a free-gift row. Accepts "$299.95", "299.95"
+ * or "$1,299.95". A blank cell means the gift has no price threshold (null).
+ * A non-blank value that is not a number throws, so the row is skipped rather
+ * than silently shown on every product.
+ * @param {string} text - The raw cell text
+ * @returns {number|null} The minimum price, or null when there is no threshold
+ */
+function parseMinPrice(text) {
+  const trimmed = (text || '').trim();
+  if (!trimmed) return null;
+  const value = parseFloat(trimmed.replace(/[$,\s]/g, ''));
+  if (Number.isNaN(value)) throw new Error(`Invalid free gift minimum price: ${trimmed}`);
+  return value;
+}
+
+/**
+ * Renders the free gift (GWP) promotion for the PDP, if one is active for this product.
+ * A gift row with a minimum price only applies to products priced at or above it.
+ * @param {Array} offers - The offers from the product JSON-LD (the first offer's price is used)
+ * @returns {Promise<HTMLElement|null>} The free gift container, or null if no gift applies
+ */
+async function renderFreeGift(offers) {
   try {
     /**
      * Parses a datetime string, returning null for empty values (open-ended).
@@ -282,9 +304,6 @@ async function renderFreeGift() {
       return [...gifts.children].map((gift) => {
         const [startDateEl, endDateEl, minPrice, label, body, productSlugsEl] = gift.children;
         try {
-          const minPriceText = minPrice.textContent.startsWith('$')
-            ? minPrice.textContent.slice(1)
-            : minPrice.textContent;
           const labelText = label.textContent;
           const bodyText = body.innerHTML.replaceAll('./media_', './config/media_');
           // Optional trailing column: comma-separated product slugs. Absent/empty = all products.
@@ -296,13 +315,13 @@ async function renderFreeGift() {
             valid: true,
             startDate: parseDateOrNull(startDateEl.textContent),
             endDate: parseDateOrNull(endDateEl.textContent),
-            minPrice: minPriceText,
+            minPrice: parseMinPrice(minPrice.textContent),
             label: labelText,
             body: bodyText,
             productSlugs,
           };
         } catch {
-          // Skip rows with malformed dates
+          // Skip rows with malformed dates or minimum price
           return { valid: false };
         }
       }).filter((gift) => gift.valid);
@@ -312,6 +331,10 @@ async function renderFreeGift() {
     const productSlug = (window.location.pathname.split('/').filter(Boolean).pop() || '')
       .toLowerCase();
 
+    // Gift thresholds are compared against the product's final (sale) price, the same
+    // price that counts toward the cart subtotal. An unknown price never meets a threshold.
+    const price = parseFloat(offers?.[0]?.price);
+
     const findGift = (giftList) => giftList.find((gift) => {
       const today = window.simulateDate || new Date();
       // Null start = open-ended past, null end = open-ended future
@@ -319,7 +342,9 @@ async function renderFreeGift() {
       const beforeEnd = !gift.endDate || today <= gift.endDate;
       const slugMatches = !gift.productSlugs.length
         || gift.productSlugs.includes(productSlug);
-      return afterStart && beforeEnd && slugMatches;
+      // Null minPrice = no threshold. Otherwise hide the gift on products below it.
+      const meetsMinPrice = gift.minPrice === null || price >= gift.minPrice;
+      return afterStart && beforeEnd && slugMatches && meetsMinPrice;
     });
     const gift = findGift(gifts);
     if (gift) {
@@ -386,7 +411,7 @@ export default async function decorate(block) {
   const optionsContainer = renderOptions(ph, block, variants, custom, isParentOutOfStock);
   const addToCartContainer = renderAddToCart(ph, block, jsonLdData);
   const compareContainer = renderCompare(ph, jsonLdData);
-  const freeGiftContainer = await renderFreeGift();
+  const freeGiftContainer = await renderFreeGift(offers);
   const freeShippingContainer = renderFreeShipping(ph, offers);
   const shareContainer = renderShare(ph);
 
