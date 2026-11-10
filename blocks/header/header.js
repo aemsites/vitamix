@@ -691,11 +691,19 @@ export default async function decorate(block) {
 
   // --- Auth panel + OTP account drawer (edge checkout mode only) ---
   if (window.useEdgeCheckout) {
+    const setAccountHash = (open) => {
+      if (!open && window.location.hash !== '#account') return;
+      const url = new URL(window.location.href);
+      url.hash = open ? 'account' : '';
+      window.history.replaceState(window.history.state, '', url);
+    };
+
     let authPanel = null;
     const ensureAuthPanel = async () => {
       if (authPanel) return authPanel;
       const { default: createAuthPanel } = await import('./auth-panel.js');
       authPanel = createAuthPanel();
+      authPanel.dialog.addEventListener('close', () => setAccountHash(false));
       block.append(authPanel.dialog);
       return authPanel;
     };
@@ -749,12 +757,14 @@ export default async function decorate(block) {
 
       accountMgmtDialog.addEventListener('close', () => {
         unlockBodyScroll();
+        setAccountHash(false);
       });
 
       const open = () => {
         lockBodyScroll();
         accountMgmtDialog.showModal();
         accountMgmtDialog.setAttribute('aria-expanded', 'true');
+        setAccountHash(true);
       };
       accountMgmtDialog.openModal = open;
 
@@ -773,11 +783,16 @@ export default async function decorate(block) {
     };
 
     accountLink.addEventListener('click', async (e) => {
+      if (authPanel?.dialog.open || accountMgmtDialog?.open) {
+        e.preventDefault();
+        return;
+      }
       if (!isHeaderAuthSessionActive()) {
         e.preventDefault();
         const panel = await ensureAuthPanel();
         panel.showEmailStep();
         panel.open();
+        setAccountHash(true);
         return;
       }
       if (isLoggedIn()) {
@@ -797,9 +812,6 @@ export default async function decorate(block) {
 
   const handleAccountHash = () => {
     if (window.location.hash !== '#account') return;
-    const url = new URL(window.location.href);
-    url.hash = '';
-    window.history.replaceState(window.history.state, '', url);
     accountLink.click();
   };
   window.addEventListener('hashchange', handleAccountHash);
