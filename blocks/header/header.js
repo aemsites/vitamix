@@ -783,7 +783,7 @@ export default async function decorate(block) {
     };
 
     accountLink.addEventListener('click', async (e) => {
-      if (authPanel?.dialog.open || accountMgmtDialog?.open) {
+      if ((authPanel && authPanel.dialog.open) || (accountMgmtDialog && accountMgmtDialog.open)) {
         e.preventDefault();
         return;
       }
