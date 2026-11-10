@@ -66,3 +66,11 @@ export function getFormSubmissionUrl() {
 }
 
 export const isProdHost = false;
+
+// No-op stubs so blocks/pdp/options.js and its imports can load.
+export function decorateMain() {}
+export function parseEasternDateTime() {}
+export function buildCarousel() {}
+export function formatPrice() {}
+export function getOfferPricing() {}
+export function rebuildIndices() {}

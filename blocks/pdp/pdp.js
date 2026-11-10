@@ -282,9 +282,7 @@ async function renderFreeGift() {
       return [...gifts.children].map((gift) => {
         const [startDateEl, endDateEl, minPrice, label, body, productSlugsEl] = gift.children;
         try {
-          const minPriceText = minPrice.textContent.startsWith('$')
-            ? minPrice.textContent.slice(1)
-            : minPrice.textContent;
+          const minPriceValue = parseFloat(minPrice.textContent.replace(/[^\d.]/g, ''));
           const labelText = label.textContent;
           const bodyText = body.innerHTML.replaceAll('./media_', './config/media_');
           // Optional trailing column: comma-separated product slugs. Absent/empty = all products.
@@ -296,7 +294,7 @@ async function renderFreeGift() {
             valid: true,
             startDate: parseDateOrNull(startDateEl.textContent),
             endDate: parseDateOrNull(endDateEl.textContent),
-            minPrice: minPriceText,
+            minPrice: Number.isFinite(minPriceValue) ? minPriceValue : null,
             label: labelText,
             body: bodyText,
             productSlugs,
@@ -312,6 +310,10 @@ async function renderFreeGift() {
     const productSlug = (window.location.pathname.split('/').filter(Boolean).pop() || '')
       .toLowerCase();
 
+    const maxPrice = Math.max(0, ...(window.jsonLdData?.offers || [])
+      .map((offer) => parseFloat(offer.price))
+      .filter(Number.isFinite));
+
     const findGift = (giftList) => giftList.find((gift) => {
       const today = window.simulateDate || new Date();
       // Null start = open-ended past, null end = open-ended future
@@ -319,12 +321,15 @@ async function renderFreeGift() {
       const beforeEnd = !gift.endDate || today <= gift.endDate;
       const slugMatches = !gift.productSlugs.length
         || gift.productSlugs.includes(productSlug);
-      return afterStart && beforeEnd && slugMatches;
+      // Skip gifts no variant of this product can qualify for on its own.
+      const meetsMinimum = gift.minPrice === null || maxPrice >= gift.minPrice;
+      return afterStart && beforeEnd && slugMatches && meetsMinimum;
     });
     const gift = findGift(gifts);
     if (gift) {
       const freeGiftContainer = document.createElement('div');
       freeGiftContainer.classList.add('pdp-free-gift-container');
+      if (gift.minPrice !== null) freeGiftContainer.dataset.minPrice = gift.minPrice;
       freeGiftContainer.innerHTML = `
         <div class="pdp-free-gift-heading"><span>${gift.label}</span></div>
         <div class="pdp-free-gift-body">
