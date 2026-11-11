@@ -1755,9 +1755,10 @@ async function fetchCodesForCoupon({ append } = {}) {
   const qs = new URLSearchParams();
   qs.set('type', state.selectedCouponId);
   qs.set('limit', '1000');
+  qs.set('_codes', String(Date.now()));
   if (cursorParam) qs.set('cursor', cursorParam);
   const path = `coupons?${qs.toString()}`;
-  const resp = await couponsApiFetch(path, { method: 'GET' });
+  const resp = await couponsApiFetch(path, { method: 'GET', cache: 'no-store' });
   const data = await resp.json();
   const batch = asArray(data, ['codes', 'items', 'data', 'results', 'values', 'generated']);
   const next = data && typeof data === 'object' && data.cursor ? String(data.cursor) : '';
@@ -2326,6 +2327,25 @@ function pickCouponExpires(c) {
   return v != null && String(v).trim() !== '' ? String(v).trim() : '';
 }
 
+function pickCouponUsesPerCustomer(c) {
+  const o = normalizeCouponCodeEntry(c);
+  const v = o.usesPerCustomer ?? o.uses_per_customer ?? o.perCustomerLimit;
+  return v != null && String(v).trim() !== '' ? v : null;
+}
+
+/** Per-code discount override as created by the batch dialog, if present. */
+function pickCouponDiscountOverride(c) {
+  const o = normalizeCouponCodeEntry(c);
+  const ov = o.discountOverride ?? o.discount_override;
+  if (ov && typeof ov === 'object' && ov.discountValue != null) {
+    return {
+      discountType: ov.discountType === 'fixed' ? 'fixed' : 'percentage',
+      discountValue: Number(ov.discountValue),
+    };
+  }
+  return null;
+}
+
 /**
  * Edit dialog: pre-check country toggles from API `countries` (or fallbacks).
  * @param {HTMLDialogElement} dlg
@@ -2404,27 +2424,26 @@ function renderCodesSection() {
     return '<p class="coupons-empty">Select a coupon to show its codes.</p>';
   }
   const rows = state.codes.length
-    ? state.codes.map((raw) => {
-      const c = normalizeCouponCodeEntry(raw);
+    ? state.codes.map((raw, i) => {
       const codeStr = pickCouponCodeString(raw);
       const code = escapeHtml(codeStr || '—');
-      const active = c.active !== false && c.active !== 'false';
-      const { used, limit } = pickCouponUsageParts(raw);
+      const { used } = pickCouponUsageParts(raw);
       const usedCount = Number(used);
       const isUsed = Number.isFinite(usedCount) && usedCount > 0;
-      const usage = `${used ?? '—'} / ${limit ?? '∞'}`;
-      const expRaw = pickCouponExpires(raw);
-      const exp = expRaw ? escapeHtml(formatInstantInEastern(expRaw)) : '—';
       const cbDisabled = codeStr ? '' : ' disabled';
-      return `<tr>
+      const codeCell = codeStr
+        ? `<button type="button" class="coupons-code-edit-link" data-cp-edit-code="${i}" aria-label="Edit code ${code}"><code>${code}</code></button>`
+        : `<code>${code}</code>`;
+      return `<tr${codeStr ? ` class="coupons-code-row" data-cp-code-row="${i}"` : ''}>
         <td class="coupons-code-select-cell"><input type="checkbox" class="cp-code-cb" value="${escapeHtml(codeStr)}" data-cp-code-used="${isUsed ? '1' : '0'}" aria-label="Select code ${code}"${cbDisabled} /></td>
-        <td><code>${code}</code></td><td>${active ? 'Yes' : 'No'}</td><td>${escapeHtml(String(usage))}</td><td>${exp}</td>
+        <td>${codeCell}</td>
       </tr>`;
     }).join('')
-    : '<tr><td colspan="5" class="coupons-empty" style="padding:16px">No codes for this coupon yet.</td></tr>';
+    : '<tr><td colspan="2" class="coupons-empty" style="padding:16px">No codes for this coupon yet.</td></tr>';
 
   return `
     <h3 class="coupons-section-title">Codes for this coupon</h3>
+    <p class="coupons-field-hint" style="margin:0 0 8px">Click a code to edit its properties (active, expiry, limits, discount override).</p>
     <div class="coupons-detail-actions">
       <button type="button" class="coupons-btn" data-cp-refresh-codes>Refresh</button>
       <button type="button" class="coupons-btn" data-cp-add-codes>Add new codes...</button>
@@ -2436,7 +2455,7 @@ function renderCodesSection() {
       <table class="coupons-data-table">
         <thead><tr>
           <th class="coupons-code-select-cell"><input type="checkbox" class="cp-code-cb-all" aria-label="Select all loaded codes"${state.codes.length ? '' : ' disabled'} /></th>
-          <th>Code</th><th>Active</th><th>Usage</th><th>Expires (ET)</th>
+          <th>Code</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
@@ -2577,6 +2596,28 @@ function bindCodesEvents(mount) {
   });
   mount.querySelector('[data-cp-add-codes]')?.addEventListener('click', () => openAddCodesDialog());
   mount.querySelector('[data-cp-batch]')?.addEventListener('click', () => openBatchDialog());
+
+  mount.querySelectorAll('tr[data-cp-code-row]').forEach((tr) => {
+    tr.addEventListener('click', async (e) => {
+      // The select checkbox cell toggles selection; only other cells open the editor.
+      if (e.target instanceof Element && e.target.closest('.coupons-code-select-cell')) return;
+      const idx = Number(tr.getAttribute('data-cp-code-row'));
+      const raw = Number.isInteger(idx) ? state.codes[idx] : null;
+      if (raw == null || tr.getAttribute('aria-busy') === 'true') return;
+      tr.setAttribute('aria-busy', 'true');
+      try {
+        await openEditCodeDialog(raw);
+      } catch (err) {
+        console.warn('[commerce-admin/coupons] load code detail failed', {
+          code: pickCouponCodeString(raw),
+          message: err?.message,
+        });
+        showToast(err?.message || 'Could not load coupon code settings.', 'error');
+      } finally {
+        tr.removeAttribute('aria-busy');
+      }
+    });
+  });
 
   const selectAll = mount.querySelector('.cp-code-cb-all');
   selectAll?.addEventListener('change', () => {
@@ -4054,6 +4095,127 @@ function openAddCodesDialog() {
     },
     'coupons-dialog-wide',
     ADD_CODES_SUBMIT_LABEL,
+  );
+}
+
+/**
+ * Edit dialog for a single coupon code: active flag, expiry, usage limits, and
+ * optional per-code discount override. Loads with GET and saves with PUT …/coupons/{code}.
+ * @param {string|object} raw code entry as returned by the codes list API
+ */
+async function openEditCodeDialog(raw) {
+  const codeStr = pickCouponCodeString(raw);
+  if (!codeStr) return;
+  const selectedTypeId = state.selectedCouponId;
+  const query = new URLSearchParams({ _code: String(Date.now()) });
+  const response = await couponsApiFetch(`coupons/${encodeURIComponent(codeStr)}?${query}`, {
+    method: 'GET',
+    cache: 'no-store',
+  });
+  const entry = await response.json();
+  if (!entry || typeof entry !== 'object' || entry.code !== codeStr) {
+    throw new Error('The server returned invalid coupon code settings. The editor could not be opened.');
+  }
+  const typeId = String(entry.typeId ?? entry.type_id ?? entry.type ?? selectedTypeId ?? '');
+  const active = entry.active !== false && entry.active !== 'false';
+  const { used, limit } = pickCouponUsageParts(entry);
+  const usedNum = Number(used);
+  const usedLabel = Number.isFinite(usedNum) ? String(usedNum) : '0';
+  const expIso = pickCouponExpires(entry);
+  const expLocal = expIso ? isoToEasternDatetimeLocal(expIso) : '';
+  const perCust = pickCouponUsesPerCustomer(entry);
+  const override = pickCouponDiscountOverride(entry);
+  const inner = `
+    <p class="coupons-page-lead" style="margin-bottom:10px">Update <strong><code>${escapeHtml(codeStr)}</code></strong> for <strong>${escapeHtml(typeId)}</strong> (<code>PUT …/coupons/{code}</code>). Redeemed so far: <strong>${escapeHtml(usedLabel)}</strong>.</p>
+    <div class="coupons-form-grid">
+      <div class="coupons-field coupons-field-full">
+        <label for="cp-ec-active">Status</label>
+        <select id="cp-ec-active">
+          <option value="true"${active ? ' selected' : ''}>Active</option>
+          <option value="false"${active ? '' : ' selected'}>Inactive</option>
+        </select>
+      </div>
+      <div class="coupons-field">
+        <label for="cp-ec-exp">Expires (ET)</label>
+        <input type="datetime-local" id="cp-ec-exp" value="${escapeHtml(expLocal)}" />
+      </div>
+      <div class="coupons-field">
+        <label for="cp-ec-limit">Total use limit</label>
+        <input type="number" id="cp-ec-limit" min="0" step="1" placeholder="empty = unlimited" value="${limit != null ? escapeHtml(String(limit)) : ''}" />
+      </div>
+      <div class="coupons-field">
+        <label for="cp-ec-per-cust">Uses per customer</label>
+        <input type="number" id="cp-ec-per-cust" min="0" step="1" placeholder="empty = unlimited" value="${perCust != null ? escapeHtml(String(perCust)) : ''}" />
+      </div>
+      <div class="coupons-field coupons-field-full">
+        <p class="coupons-field-hint" style="margin:0">Empty expiry/limit fields mean never expires / unlimited.</p>
+      </div>
+      <div class="coupons-field coupons-field-full">
+        <label class="coupons-checkbox-row"><input type="checkbox" id="cp-ec-override"${override ? ' checked' : ''} /> Different discount than the coupon default (override)</label>
+      </div>
+      <div class="coupons-field" id="cp-ec-ov-type-wrap" style="display:none">
+        <label for="cp-ec-ov-type">Override style</label>
+        <select id="cp-ec-ov-type"><option value="percentage">Percentage</option><option value="fixed">Fixed $</option></select>
+      </div>
+      <div class="coupons-field" id="cp-ec-ov-val-wrap" style="display:none">
+        <label for="cp-ec-ov-val">Override value</label>
+        <input type="number" id="cp-ec-ov-val" min="0" step="any" value="${override != null && Number.isFinite(override.discountValue) ? escapeHtml(String(override.discountValue)) : ''}" />
+      </div>
+    </div>`;
+  await openDialog(
+    `Edit code ${codeStr}`,
+    inner,
+    async (dlg) => {
+      const body = {
+        code: codeStr,
+        typeId,
+        active: dlg.querySelector('#cp-ec-active').value === 'true',
+      };
+      const expLocalVal = dlg.querySelector('#cp-ec-exp')?.value;
+      if (expLocalVal) {
+        const iso = easternDatetimeLocalToIso(expLocalVal);
+        if (iso) body.expiresAt = iso;
+      }
+      const lim = readOptionalInt(dlg.querySelector('#cp-ec-limit')?.value);
+      if (lim != null) body.usageLimit = lim;
+      const upc = readOptionalInt(dlg.querySelector('#cp-ec-per-cust')?.value);
+      if (upc != null) body.usesPerCustomer = upc;
+      if (dlg.querySelector('#cp-ec-override')?.checked) {
+        const dt = dlg.querySelector('#cp-ec-ov-type')?.value || 'percentage';
+        const dv = Number(dlg.querySelector('#cp-ec-ov-val')?.value);
+        if (!Number.isFinite(dv)) throw new Error('Override value required when override is checked');
+        body.discountOverride = { discountType: dt, discountValue: dv };
+      }
+      const resp = await couponsApiFetch(`coupons/${encodeURIComponent(codeStr)}`, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      });
+      const saved = await resp.json();
+      if (!saved || typeof saved !== 'object' || saved.code !== codeStr) {
+        throw new Error('The server returned an invalid updated code. Refresh the codes list to confirm the saved values.');
+      }
+      if (state.selectedCouponId === typeId) {
+        state.codes = state.codes.map((code) => (pickCouponCodeString(code) === codeStr
+          ? { ...normalizeCouponCodeEntry(code), ...saved }
+          : code));
+        afterCodesRefresh();
+      }
+      showToast('Code updated', 'success');
+    },
+    (dlg) => {
+      const cb = dlg.querySelector('#cp-ec-override');
+      const tw = dlg.querySelector('#cp-ec-ov-type-wrap');
+      const vw = dlg.querySelector('#cp-ec-ov-val-wrap');
+      const typeSel = dlg.querySelector('#cp-ec-ov-type');
+      if (typeSel instanceof HTMLSelectElement && override) typeSel.value = override.discountType;
+      const sync = () => {
+        const on = !!cb?.checked;
+        if (tw) tw.style.display = on ? '' : 'none';
+        if (vw) vw.style.display = on ? '' : 'none';
+      };
+      cb?.addEventListener('change', sync);
+      sync();
+    },
   );
 }
 

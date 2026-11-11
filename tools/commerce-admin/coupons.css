@@ -437,6 +437,37 @@
   margin: 0;
 }
 
+tr.coupons-code-row {
+  cursor: pointer;
+}
+
+tr.coupons-code-row:hover {
+  background: #f3f6fb;
+}
+
+.coupons-code-edit-link {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: underline dotted #9aa4b2;
+  text-underline-offset: 2px;
+}
+
+.coupons-code-edit-link:hover {
+  color: #1a56b0;
+  text-decoration-color: #1a56b0;
+}
+
+.coupons-code-edit-link:focus-visible {
+  outline: 2px solid #1a56b0;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
 .coupons-grid-table th .pim-th-sort-btn {
   font: inherit;
   font-size: inherit;

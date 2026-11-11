@@ -11,6 +11,16 @@ bypass the browser cache. This covers orders, details, customer-order searches,
 journals and admin access checks, as well as reads on other admin pages.
 Before the first reload, caching is unchanged. API writes are unchanged.
 
+## Coupon code edits
+
+The codes grid shows only codes, alongside checkboxes for bulk deletion. Clicking
+a code fetches its individual settings with `GET coupons/{code}` before opening
+the editor; failed detail requests show an error instead of inferred defaults.
+Saving updates the local entry from the PUT response. Individual-code and code-list
+requests bypass browser caching and include fresh `_code` / `_codes` query parameters
+to bypass proxy and upstream caches.
+These edits affect the individual code, not its parent coupon program's rules.
+
 ## Recent catalog changes and index freshness
 
 Every catalog index request bypasses the browser cache and includes a cache-busting
