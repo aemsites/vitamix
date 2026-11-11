@@ -186,8 +186,10 @@ function matchesProduct(item, entries) {
   });
 }
 
-/** Category url_keys of a product (`categories` or `custom.categories`). */
+/** Category url_keys of a product, or `null` without `categories` or `custom`. */
 function getCategoryKeys(product) {
+  const hasCustom = !!product?.custom && typeof product.custom === 'object';
+  if (!Array.isArray(product?.categories) && !hasCustom) return null;
   const keys = new Set();
   [...asList(product?.categories), ...asList(product?.custom?.categories)].forEach((entry) => {
     const key = typeof entry === 'string' ? entry : entry?.url_key;
@@ -282,11 +284,11 @@ function computeApplicableRules(promotions, items, now) {
 }
 
 /** Same shape as computeApplicableRules, from the server's `freeItems`. */
-function applicableFromGrants(payload, grants) {
+function applicableFromGrants(promotions, grants, now) {
   const applicable = new Map();
   grants.forEach(({ ruleId, path }) => {
-    const promotion = asList(payload?.promotions).find((p) => p?.id === ruleId);
-    const rule = asList(promotion?.rules).find((r) => r?.path === path);
+    const promotion = promotions.find((p) => p.id === ruleId);
+    const rule = asList(promotion?.rules).find((r) => r?.path === path && ruleIsActive(r, now));
     if (rule) applicable.set(`${ruleId}::${path}`, { promotion, rule });
   });
   return applicable;
@@ -396,6 +398,9 @@ async function ensureLineCategories(items) {
 }
 
 let isApplyingGWP = false;
+// `cart:change` source for gift changes made while settling a preview.
+let previewSyncs = 0;
+const changeOptions = () => (previewSyncs ? { source: 'gwp-preview' } : {});
 
 function removeStaleGifts(applicable) {
   const stale = cart.items.filter((item) => {
@@ -410,6 +415,7 @@ function removeStaleGifts(applicable) {
       (candidate) => candidate.custom?.giftWithPurchase
         && candidate.custom?.promotionId === promotionId
         && candidate.path === item.path,
+      changeOptions(),
     );
   });
 }
@@ -433,7 +439,7 @@ async function addOneGift(promotion, rule) {
         ...(rule.custom?.regularPrice ? { regularPrice: rule.custom.regularPrice } : {}),
       },
     },
-    { allowSeparateEntry: true },
+    { allowSeparateEntry: true, ...changeOptions() },
   );
 }
 
@@ -449,6 +455,7 @@ function updateGiftPromotionNames(applicable) {
         && candidate.custom?.promotionId === promotionId
         && candidate.path === item.path,
       { promotionName: name },
+      changeOptions(),
     );
   });
 }
@@ -475,9 +482,19 @@ let failedCheck = null;
 let reconcileTimer = null;
 let reconcileInflight = null;
 
-function paidSignature(items) {
-  return JSON.stringify(items.filter(isPaidLine)
-    .map((item) => [itemPath(item), item.sku, item.quantity, String(item.price)]));
+/** Identifies the paid lines and the active promotion rules a server answer was for. */
+function checkSignature(promotions, items, now) {
+  return JSON.stringify([
+    promotions.map((p) => [p.id, asList(p.rules)
+      .filter((r) => r?.path && ruleIsActive(r, now)).map((r) => r.path)]),
+    items.filter(isPaidLine)
+      .map((item) => [itemPath(item), item.sku, item.quantity, String(item.price)]),
+  ]);
+}
+
+function currentSignature(payload) {
+  const now = getNow();
+  return checkSignature(getActivePromotions(payload, now), cart.items, now);
 }
 
 function checkFailed(payload, signature) {
@@ -543,10 +560,10 @@ async function applyOnce() {
   if (promotions.some((p) => CATEGORY_CONDITIONS.some((k) => asList(p.conditions[k]).length))) {
     await ensureLineCategories(cart.items);
   }
-  const signature = paidSignature(cart.items);
+  const signature = checkSignature(promotions, cart.items, now);
   const server = serverResultFor(payload, signature);
   const applicable = server
-    ? applicableFromGrants(payload, server.grants)
+    ? applicableFromGrants(promotions, server.grants, now)
     : computeApplicableRules(promotions, cart.items, now);
 
   isApplyingGWP = true;
@@ -610,7 +627,7 @@ export function reconcileWithServer({ force = false } = {}) {
   if (!payload || !needsServer(payload, getActivePromotions(payload, getNow()))) {
     return Promise.resolve();
   }
-  const signature = paidSignature(cart.items);
+  const signature = currentSignature(payload);
   if (reconcileInflight?.payload === payload && reconcileInflight.signature === signature) {
     return reconcileInflight.promise;
   }
@@ -640,7 +657,7 @@ export function reconcileWithServer({ force = false } = {}) {
     } finally {
       if (reconcileInflight === entry) reconcileInflight = null;
     }
-    if (paidSignature(cart.items) === signature) await evaluateGWP();
+    if (currentSignature(payload) === signature) await evaluateGWP();
   })();
   reconcileInflight = entry;
   return entry.promise;
@@ -654,6 +671,7 @@ export function reconcileWithServer({ force = false } = {}) {
  * @returns {Promise<void>}
  */
 export async function ensureGWPReconciled({ force = false } = {}) {
+  previewSyncs += 1;
   try {
     const loaded = await ensurePriceRulesLoaded();
     if (!loaded?.payload) return;
@@ -661,11 +679,15 @@ export async function ensureGWPReconciled({ force = false } = {}) {
     clearTimeout(reconcileTimer);
     reconcileTimer = null;
     if (!needsServer(loaded.payload, getActivePromotions(loaded.payload, getNow()))) return;
+    // A check that failed earlier gets one more try before each preview.
+    failedCheck = null;
     await reconcileWithServer({ force });
     await evaluateGWP();
   } catch (e) {
     // eslint-disable-next-line no-console
     console.warn('[GWP] reconcile failed', e);
+  } finally {
+    previewSyncs -= 1;
   }
 }
 

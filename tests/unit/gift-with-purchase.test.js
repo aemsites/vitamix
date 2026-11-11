@@ -71,6 +71,8 @@ const json = (body, status = 200) => ({
 
 /** Product data served at `${path}.json`, keyed by path. */
 let productJson;
+/** JSON-LD Product served on product pages, keyed by path (default: the gift). */
+let pages;
 /** Answer to POST /estimate/price: a body, or a function of the request body. */
 let estimate;
 /** Answer to POST /orders/preview: a function of the request body. */
@@ -83,6 +85,7 @@ beforeEach(() => {
   mock.timers.enable({ apis: ['setTimeout'] });
   cart.clear();
   productJson = {};
+  pages = {};
   estimate = { freeItems: [] };
   preview = () => json({ estimateToken: 'tok' });
   calls = [];
@@ -100,7 +103,8 @@ beforeEach(() => {
     }
     return {
       ok: true,
-      text: async () => JSON.stringify({ '@type': 'Product', sku: 'gift-sku', name: 'Gift' }),
+      text: async () => JSON.stringify(pages[String(url)]
+        || { '@type': 'Product', sku: 'gift-sku', name: 'Gift' }),
     };
   });
 });
@@ -301,11 +305,21 @@ test('categories for a restored line are fetched once from the product json', as
 
 test('categories fall back to the product page JSON-LD', async () => {
   const item = { ...paidItem, sku: 'ld-only', path: '/us/en_us/products/ld-only' };
+  pages[item.path] = {
+    '@type': 'Product', sku: 'ld-only', custom: { categories: [{ url_key: 'blenders' }] },
+  };
   cart.addItem(item);
   await run([COMMERCIAL_PROMO]);
-  // The page mock serves a Product without categories: known, not commercial.
   assert.equal(gifts().length, 1);
   assert.equal(jsonCalls(item.path).length, 1);
+});
+
+test('product data without categories or custom leaves categories unknown', async () => {
+  const item = { ...paidItem, sku: 'no-custom', path: '/us/en_us/products/no-custom' };
+  pages[item.path] = { '@type': 'Product', sku: 'no-custom' };
+  cart.addItem(item);
+  await run([COMMERCIAL_PROMO]);
+  assert.equal(gifts().length, 0);
 });
 
 test('categories are not fetched without category conditions', async () => {
@@ -470,4 +484,79 @@ test('a stub without serverCheck skips the server check', async () => {
   await previewOrder({ items: cart.getItemsForAPI() });
   assert.equal(estimateCalls().length, 0);
   assert.equal(gifts().length, 1);
+});
+
+// --- review follow-ups ----------------------------------------------------------
+
+const setNow = (iso) => localStorage.setItem('vitamix.now', iso);
+
+test('a cached grant does not outlive the promotion end', async () => {
+  const promotion = {
+    ...PROMOTION,
+    id: 'ends',
+    rules: [{ path: GIFT_PATH, price: '0', end: '2030-01-02T00:00:00Z' }],
+  };
+  setNow('2030-01-01T00:00:00Z');
+  cart.addItem(paidItem);
+  await run([promotion]);
+  estimate = grant(promotion);
+  await reconcileWithServer();
+  assert.equal(gifts().length, 1);
+  setNow('2030-01-03T00:00:00Z');
+  await evaluateGWP();
+  assert.equal(gifts().length, 0);
+  const body = { items: cart.getItemsForAPI() };
+  await previewOrder(body);
+  assert.equal(previewCalls().length, 1);
+  assert.equal(giftsIn(previewCalls()[0].body.items).length, 0);
+});
+
+test('a promotion that starts forces a new server check', async () => {
+  const other = { ...PROMOTION, id: 'other', rules: [{ path: '/p/other-gift', price: '0' }] };
+  const later = {
+    ...PROMOTION,
+    id: 'later',
+    rules: [{ path: GIFT_PATH, price: '0', start: '2030-01-02T00:00:00Z' }],
+  };
+  setNow('2030-01-01T00:00:00Z');
+  cart.addItem(paidItem);
+  await run([other, later]);
+  estimate = { freeItems: [] };
+  await reconcileWithServer();
+  assert.equal(gifts().length, 0);
+  setNow('2030-01-03T00:00:00Z');
+  estimate = grant(later);
+  await evaluateGWP();
+  assert.ok(gifts().some((i) => i.custom.promotionId === 'later'));
+  mock.timers.tick(500);
+  await reconcileWithServer();
+  assert.equal(estimateCalls().length, 2);
+  assert.deepEqual(gifts().map((i) => i.custom.promotionId), ['later']);
+});
+
+test('a failed check is retried once before a preview', async () => {
+  cart.addItem({ ...paidItem, local: { categories: ['commercial'] } });
+  await run([COMMERCIAL_PROMO]);
+  estimate = new Error('network');
+  await reconcileWithServer();
+  assert.equal(gifts().length, 0);
+  estimate = grant();
+  const body = { items: cart.getItemsForAPI() };
+  await previewOrder(body);
+  assert.equal(estimateCalls().length, 2);
+  assert.equal(giftsIn(previewCalls()[0].body.items).length, 1);
+});
+
+test('gift changes made while settling a preview are tagged in cart:change', async () => {
+  cart.addItem(paidItem);
+  await run();
+  const added = globalThis.__events.filter((e) => e.detail?.action === 'add' && e.detail.item.custom?.giftWithPurchase);
+  assert.equal(added.length, 1);
+  assert.equal(added[0].detail.source, undefined);
+  estimate = { freeItems: [] };
+  globalThis.__events.length = 0;
+  await previewOrder({ items: cart.getItemsForAPI() });
+  const removed = globalThis.__events.filter((e) => e.detail?.action === 'remove');
+  assert.equal(removed.length, 1);
+  assert.equal(removed[0].detail.source, 'gwp-preview');
 });
