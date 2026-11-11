@@ -34,7 +34,7 @@ import {
   putCartPriceRules,
   putCatalogPriceRules,
 } from './price-rules-api.js';
-import { buildVariantColorMapsForLocale, colorSlugFromValue } from './commerce-variant-color.js';
+import { buildVariantColorMapsForProducts, colorSlugFromValue } from './commerce-variant-color.js';
 import {
   applyCartRuleProductScopeToConditions,
   cartRuleProductScopeFromConditions,
@@ -923,30 +923,24 @@ async function resolveRowVariantSkus(rows) {
       row,
       index: i,
       color,
-      locale: catalogLocaleFromVitamixProductUrl(row.product),
     });
   });
   if (!pending.length) return list;
 
-  const locales = [...new Set(pending.map((p) => p.locale).filter(Boolean))];
-  /** @type {Map<string, import('./commerce-variant-color.js').VariantColorMaps>} */
-  const mapsByLocale = new Map();
-  await Promise.all(locales.map(async (loc) => {
-    try {
-      mapsByLocale.set(loc, await buildVariantColorMapsForLocale(loc));
-    } catch {
-      // left unset — reported per-row below
-    }
-  }));
+  let maps;
+  try {
+    maps = await buildVariantColorMapsForProducts(pending.map((p) => p.row.product));
+  } catch (error) {
+    const first = pending[0];
+    const where = productUrlToCatalogPath(first.row.product) || first.row.product;
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Sale line ${first.index + 1}: could not load product data for ${where}: ${detail}`,
+    );
+  }
 
   pending.forEach((p) => {
     const where = productUrlToCatalogPath(p.row.product) || p.row.product;
-    const maps = p.locale ? mapsByLocale.get(p.locale) : null;
-    if (!maps) {
-      throw new Error(
-        `Sale line ${p.index + 1}: could not load the catalog to match color “${p.color}” for ${where}. Try again.`,
-      );
-    }
     const sku = maps.skuForColor(p.row.product, colorSlugFromValue(p.color));
     if (!sku) {
       throw new Error(
@@ -1121,7 +1115,7 @@ function refreshPromotionSaleLinesVisuals(dlg) {
     }
   });
   hydratePromotionTableThumbs(dlg, promotionDialogMarketSafe(dlg)).catch(() => {});
-  // Validate after `?color=` is appended so a user-typed color is checked against the index.
+  // Validate after `?color=` is appended so a user-typed color is checked against ProductBus.
   hydratePromotionRowColors(dlg)
     .catch(() => {})
     .then(() => validatePromotionRows(dlg))
@@ -1277,9 +1271,9 @@ async function hydratePromotionTableThumbs(dlg, countryKey) {
 
 /**
  * Loaded variant rows carry `data-sku` but their hidden product URL has no `?color=` yet (SKU→color
- * needs the catalog index). Resolve it and append `?color=` to both the hidden URL (so a re-save
+ * needs the product record). Resolve it and append `?color=` to both the hidden URL (so a re-save
  * keeps the same variant) and the visible path (so the user sees the color form). Best-effort:
- * rows whose catalog can't be loaded keep the plain path. Mirrors thumbnail hydration.
+ * rows whose product record can't be loaded keep the plain path. Mirrors thumbnail hydration.
  *
  * @param {HTMLDialogElement} dlg
  */
@@ -1294,36 +1288,26 @@ async function hydratePromotionRowColors(dlg) {
   });
   if (!rows.length) return;
 
-  /** @type {Map<string, Element[]>} */
-  const byLocale = new Map();
+  let maps;
+  try {
+    maps = await buildVariantColorMapsForProducts(rows.map(productValue));
+  } catch {
+    return; // best-effort; leave plain paths
+  }
   rows.forEach((tr) => {
-    const loc = catalogLocaleFromVitamixProductUrl(productValue(tr)) || 'us/en_us';
-    if (!byLocale.has(loc)) byLocale.set(loc, []);
-    byLocale.get(loc).push(tr);
+    const slug = maps.colorSlugForSku(tr.getAttribute('data-sku') || '', productValue(tr));
+    if (!slug) return;
+    const h = /** @type {HTMLInputElement | null} */ (tr.querySelector('.pr-promo-h-product'));
+    const path = productUrlToCatalogPath(h?.value || '');
+    if (h) h.value = catalogProductUrlWithColor(path, slug);
+    const pathEl = tr.querySelector('.pr-promo-path-text');
+    if (pathEl) pathEl.textContent = catalogDisplayPathWithColor(path, slug);
   });
-
-  await Promise.all([...byLocale.entries()].map(async ([loc, trs]) => {
-    let maps;
-    try {
-      maps = await buildVariantColorMapsForLocale(loc);
-    } catch {
-      return; // best-effort; leave plain path
-    }
-    trs.forEach((tr) => {
-      const slug = maps.colorSlugForSku(tr.getAttribute('data-sku') || '');
-      if (!slug) return;
-      const h = /** @type {HTMLInputElement | null} */ (tr.querySelector('.pr-promo-h-product'));
-      const path = productUrlToCatalogPath(h?.value || '');
-      if (h) h.value = catalogProductUrlWithColor(path, slug);
-      const pathEl = tr.querySelector('.pr-promo-path-text');
-      if (pathEl) pathEl.textContent = catalogDisplayPathWithColor(path, slug);
-    });
-  }));
 }
 
 /**
  * Append `?color=` to the `product` of variant rows (those carrying `sku`) so the read-only
- * promotion detail table shows the color form, never the bare parent path. Best-effort per locale.
+ * promotion detail table shows the color form, never the bare parent path. Best-effort per product.
  *
  * @param {PromotionRow[]} rows
  * @returns {Promise<PromotionRow[]>} the same rows, with colored `product` where resolved
@@ -1333,26 +1317,16 @@ async function enrichPromotionRowsWithColorSuffix(rows) {
   const pending = list.filter((r) => r && r.sku && !colorFromProductUrl(r.product));
   if (!pending.length) return list;
 
-  /** @type {Map<string, PromotionRow[]>} */
-  const byLocale = new Map();
+  let maps;
+  try {
+    maps = await buildVariantColorMapsForProducts(pending.map((r) => r.product));
+  } catch {
+    return list; // best-effort; leave plain paths
+  }
   pending.forEach((r) => {
-    const loc = catalogLocaleFromVitamixProductUrl(r.product) || 'us/en_us';
-    if (!byLocale.has(loc)) byLocale.set(loc, []);
-    byLocale.get(loc).push(r);
+    const slug = maps.colorSlugForSku(r.sku, r.product);
+    if (slug) r.product = catalogProductUrlWithColor(productUrlToCatalogPath(r.product), slug);
   });
-
-  await Promise.all([...byLocale.entries()].map(async ([loc, rs]) => {
-    let maps;
-    try {
-      maps = await buildVariantColorMapsForLocale(loc);
-    } catch {
-      return; // best-effort; leave plain path
-    }
-    rs.forEach((r) => {
-      const slug = maps.colorSlugForSku(r.sku);
-      if (slug) r.product = catalogProductUrlWithColor(productUrlToCatalogPath(r.product), slug);
-    });
-  }));
   return list;
 }
 
@@ -1387,12 +1361,11 @@ function togglePromotionSubmitDisabled(dlg, invalidCount) {
 }
 
 /**
- * Validate every sale-line product against the catalog index entirely client-side: the product
- * path must be non-empty, must exist in the catalog, and any `?color=` must be a real variant.
+ * Validate every sale-line product against ProductBus: the product path must be non-empty, the
+ * product record must exist, and any `?color=` must be a real variant.
  * Invalid rows (including empty product paths) are highlighted with a reason and the submit
- * button is disabled until they are fixed. Best-effort on index-load failure (rows with a path
- * are left unmarked so a transient outage never blocks a save; the save-time resolver still
- * guards variant colors).
+ * button is disabled until they are fixed. ProductBus failures are shown inline and block save
+ * until the product can be verified.
  *
  * @param {HTMLDialogElement} dlg
  * @returns {Promise<number>} count of invalid rows
@@ -1402,20 +1375,20 @@ async function validatePromotionRows(dlg) {
     /** @type {HTMLInputElement | null} */ (tr.querySelector('.pr-promo-h-product'))?.value ?? '',
   ).trim();
   const entries = [...dlg.querySelectorAll('tr[data-pr-promo-line]')]
-    .map((tr) => ({ tr, url: productValueOf(tr), loc: '' }));
-  entries.forEach((e) => {
-    e.loc = e.url ? (catalogLocaleFromVitamixProductUrl(e.url) || 'us/en_us') : '';
-  });
-
-  /** @type {Map<string, import('./commerce-variant-color.js').VariantColorMaps>} */
-  const mapsByLocale = new Map();
-  await Promise.all([...new Set(entries.map((e) => e.loc).filter(Boolean))].map(async (loc) => {
+    .map((tr) => ({ tr, url: productValueOf(tr) }));
+  const productChecks = await Promise.all(entries.map(async (entry) => {
+    if (!entry.url) return { entry, maps: null, error: null };
     try {
-      mapsByLocale.set(loc, await buildVariantColorMapsForLocale(loc));
-    } catch {
-      // leave unset — that locale's rows stay unmarked (best-effort)
+      return {
+        entry,
+        maps: await buildVariantColorMapsForProducts([entry.url]),
+        error: null,
+      };
+    } catch (error) {
+      return { entry, maps: null, error };
     }
   }));
+  const checksByEntry = new Map(productChecks.map((check) => [check.entry, check]));
 
   const market = promotionDialogMarketSafe(dlg);
   let invalid = 0;
@@ -1424,15 +1397,19 @@ async function validatePromotionRows(dlg) {
     if (!e.url) {
       reason = 'Product path is required.';
     } else {
-      const maps = mapsByLocale.get(e.loc);
-      // Country mismatch is path-based, so it is checked first and works even if the index failed.
+      const check = checksByEntry.get(e);
+      const maps = check?.maps;
+      // Country mismatch is path-based, so it is still checked when ProductBus is unavailable.
       const rowCountry = countryKeyFromCatalogPath(productUrlToCatalogPath(e.url));
       if (rowCountry && rowCountry !== market) {
         reason = `Product is in market ${rowCountry.toUpperCase()}, but this promotion is for ${market.toUpperCase()}.`;
+      } else if (check?.error) {
+        const detail = check.error instanceof Error ? check.error.message : String(check.error);
+        reason = `Could not verify product in ProductBus: ${detail}`;
       } else if (maps) {
         const color = colorFromProductUrl(e.url);
         if (!maps.productExists(e.url)) {
-          reason = 'Product not found in the catalog.';
+          reason = 'Product not found in ProductBus.';
         } else if (color && !maps.skuForColor(e.url, colorSlugFromValue(color))) {
           reason = `“${color}” is not a color variant of this product.`;
         }
@@ -1695,7 +1672,7 @@ function promotionFormTableRowHtml(r, index) {
   const productUrl = resolveProductUrlForRow(String(r.product || '').trim());
   const path = productUrlToCatalogPath(productUrl);
   // The user only ever sees the storefront `?color=` form; a `sku` on a loaded row has no color
-  // in the URL yet — hydratePromotionRowColors() appends it after the catalog index resolves.
+  // in the URL yet — hydratePromotionRowColors() appends it after the product record resolves.
   const colorSlug = colorFromProductUrl(productUrl);
   const displayPath = catalogDisplayPathWithColor(path, colorSlug);
   const sku = String(r.sku || '').trim();

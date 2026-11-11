@@ -4,18 +4,12 @@
  * The admin shows color variants the storefront way — a product URL with a `?color=<slug>`
  * query param (see `blocks/pdp/options.js`). The commerce API instead identifies a variant by
  * its **SKU** (`CatalogPriceRule.variants` is keyed by sku; see helix-commerce-api
- * `src/schemas/PriceRules.js`). This module maps between the two using the catalog products
- * index, whose variant rows carry `{ sku, parentSku, color }`.
+ * `src/schemas/PriceRules.js`). This module maps between the two using ProductBus product records.
  *
  * The `?color=` slug matches the storefront swatch value: `toClassName(variant.color)`.
  */
 
-import {
-  fetchProductsIndexForLocale,
-  getParentProducts,
-  getVariantProducts,
-  getUrlKeyFromProduct,
-} from './pim.js';
+import { fetchCatalogProduct } from './commerce-catalog-io.js';
 
 /**
  * Storefront color slug from a human color value, e.g. `"Very Berry"` → `"very-berry"`.
@@ -34,105 +28,86 @@ export function colorSlugFromValue(value) {
     : '';
 }
 
-/** url_key (last path segment) from a storefront product URL or catalog path. */
-function urlKeyFromProductRef(ref) {
+function catalogPathFromProductRef(ref) {
   const s = String(ref || '').trim();
   if (!s) return '';
-  let pathname = s;
   try {
-    pathname = new URL(s).pathname;
+    return new URL(s).pathname.replace(/\/+$/, '').toLowerCase();
   } catch {
-    // already a path
+    return s.split(/[?#]/, 1)[0].replace(/\/+$/, '').toLowerCase();
   }
-  const marker = '/products/';
-  const i = pathname.indexOf(marker);
-  const tail = i === -1 ? pathname : pathname.slice(i + marker.length);
-  return tail.replace(/\/+$/, '').split('/').filter(Boolean).pop() || '';
 }
 
 /**
  * @typedef {object} VariantColorMaps
  * @property {(productRef: string, colorSlug: string) => string} skuForColor
  *   Variant SKU for a product (URL or path) + color slug, or '' when unknown.
- * @property {(sku: string) => string} colorSlugForSku Color slug for a variant SKU, or ''.
+ * @property {(sku: string, productRef: string) => string} colorSlugForSku Color slug for a variant
+ *   SKU, or ''.
  * @property {(productRef: string) => boolean} productExists
- *   True when the product (URL or path) resolves to a parent in the catalog index.
+ *   True when the product (URL or path) resolves to a ProductBus product record.
  * @property {(productRef: string) => boolean} hasVariants
- *   True when the product has at least one color variant in the index.
+ *   True when the product has at least one color variant.
  */
 
-async function buildMapsUncached(locale) {
-  const json = await fetchProductsIndexForLocale(locale);
-  const raw = Array.isArray(json) ? json : (json?.data ?? []);
-  const data = Array.isArray(raw) ? raw : [];
+/** ProductBus product fetches shared by validation and row hydration during this page session. */
+const productCache = new Map();
 
-  // parent url_keys (existence check) and parent sku -> url_key (variant rows only carry parentSku)
-  const parentUrlKeys = new Set();
-  const urlKeyByParentSku = new Map();
-  getParentProducts(data).forEach((p) => {
-    const urlKey = String(getUrlKeyFromProduct(p) || '').toLowerCase();
-    if (!urlKey) return;
-    parentUrlKeys.add(urlKey);
-    if (p.sku) urlKeyByParentSku.set(String(p.sku), urlKey);
-  });
+/**
+ * Build color↔SKU + existence lookups from the ProductBus records for the supplied products.
+ * Each product record is cached for the page session; a failed fetch is evicted so a later call
+ * can retry.
+ *
+ * @param {string[]} productRefs storefront product URLs or catalog paths
+ * @returns {Promise<VariantColorMaps>}
+ */
+export async function buildVariantColorMapsForProducts(productRefs) {
+  const paths = [...new Set((productRefs || []).map(catalogPathFromProductRef).filter(Boolean))];
+  const products = await Promise.all(paths.map((path) => {
+    if (productCache.has(path)) return productCache.get(path);
+    const request = fetchCatalogProduct(path);
+    request.catch(() => {
+      if (productCache.get(path) === request) productCache.delete(path);
+    });
+    productCache.set(path, request);
+    return request;
+  }));
+  const productsByPath = new Map(paths.map((path, i) => [path, products[i]]));
+  /** `${path}\0${colorSlug}` -> variant SKU */
+  const skuByPathColor = new Map();
+  /** `${path}\0${sku}` -> color slug */
+  const colorSlugByPathSku = new Map();
+  const pathsWithVariants = new Set();
 
-  /** `${urlKey}\0${colorSlug}` -> variant sku */
-  const skuByUrlKeyColor = new Map();
-  /** variant sku -> color slug */
-  const colorSlugBySku = new Map();
-  /** url_keys that have at least one color variant */
-  const urlKeysWithVariants = new Set();
-  getVariantProducts(data).forEach((v) => {
-    const slug = colorSlugFromValue(v.color);
-    if (!slug) return;
-    colorSlugBySku.set(String(v.sku), slug);
-    const urlKey = urlKeyByParentSku.get(String(v.parentSku))
-      || String(getUrlKeyFromProduct(v) || '').toLowerCase();
-    if (urlKey) {
-      skuByUrlKeyColor.set(`${urlKey}\0${slug}`, String(v.sku));
-      urlKeysWithVariants.add(urlKey);
-    }
+  productsByPath.forEach((product, path) => {
+    const variants = Array.isArray(product?.variants) ? product.variants : [];
+    variants.forEach((variant) => {
+      const color = variant.options?.find((option) => option.id === 'color')?.value || variant.color;
+      const slug = colorSlugFromValue(color);
+      if (!slug || !variant.sku) return;
+      const sku = String(variant.sku);
+      skuByPathColor.set(`${path}\0${slug}`, sku);
+      colorSlugByPathSku.set(`${path}\0${sku}`, slug);
+      pathsWithVariants.add(path);
+    });
   });
 
   return {
     skuForColor(productRef, colorSlug) {
-      const urlKey = urlKeyFromProductRef(productRef);
-      if (!urlKey || !colorSlug) return '';
-      return skuByUrlKeyColor.get(`${urlKey.toLowerCase()}\0${colorSlug}`) || '';
+      const path = catalogPathFromProductRef(productRef);
+      if (!path || !colorSlug) return '';
+      return skuByPathColor.get(`${path}\0${colorSlug}`) || '';
     },
-    colorSlugForSku(sku) {
-      return colorSlugBySku.get(String(sku)) || '';
+    colorSlugForSku(sku, productRef) {
+      const path = catalogPathFromProductRef(productRef);
+      if (!path || !sku) return '';
+      return colorSlugByPathSku.get(`${path}\0${sku}`) || '';
     },
     productExists(productRef) {
-      const urlKey = urlKeyFromProductRef(productRef);
-      return Boolean(urlKey) && parentUrlKeys.has(urlKey.toLowerCase());
+      return Boolean(productsByPath.get(catalogPathFromProductRef(productRef)));
     },
     hasVariants(productRef) {
-      const urlKey = urlKeyFromProductRef(productRef);
-      return Boolean(urlKey) && urlKeysWithVariants.has(urlKey.toLowerCase());
+      return pathsWithVariants.has(catalogPathFromProductRef(productRef));
     },
   };
-}
-
-/** locale -> in-flight/resolved maps (validation + hydration hit the same index repeatedly). */
-const localeMapsCache = new Map();
-
-/**
- * Build color↔SKU + existence lookups for one locale from its products index. Cached per locale
- * for the page session; a failed fetch is evicted so a later call can retry.
- *
- * @param {string} locale e.g. `us/en_us`
- * @param {{ cache?: boolean }} [opts] set `cache:false` to force a fresh fetch
- * @returns {Promise<VariantColorMaps>}
- */
-export function buildVariantColorMapsForLocale(locale, opts = {}) {
-  const key = String(locale || '');
-  if (opts.cache === false) localeMapsCache.delete(key);
-  if (localeMapsCache.has(key)) return localeMapsCache.get(key);
-  const promise = buildMapsUncached(key);
-  promise.catch(() => {
-    if (localeMapsCache.get(key) === promise) localeMapsCache.delete(key);
-  });
-  localeMapsCache.set(key, promise);
-  return promise;
 }
