@@ -4,10 +4,16 @@
  * Rules come from the non-prod localStorage stub; product pages are served by
  * the fetch mock and parsed by a minimal DOMParser stand-in.
  */
-import { test, beforeEach } from 'node:test';
+import {
+  test, beforeEach, afterEach, mock,
+} from 'node:test';
 import assert from 'node:assert/strict';
 import cart from '../../scripts/cart.js';
-import { ensurePriceRulesLoaded, evaluateGWP } from '../../scripts/gift-with-purchase.js';
+import { previewOrder } from '../../scripts/commerce-api.js';
+import {
+  ensurePriceRulesLoaded, evaluateGWP, conditionsMet, reconcileWithServer,
+} from '../../scripts/gift-with-purchase.js';
+import { __resetScripts } from './mocks/scripts.mjs';
 
 globalThis.location = { hostname: 'localhost', origin: 'http://localhost' };
 
@@ -39,21 +45,76 @@ const giftItem = (custom = {}) => ({
   custom: { giftWithPurchase: true, promotionId: PROMOTION.id, ...custom },
 });
 
-async function run(promotions = [PROMOTION]) {
-  localStorage.setItem('vitamix.priceRules.stub', JSON.stringify({ promotions }));
+// A fresh stub per test keeps cached server answers from leaking across tests.
+let stubId = 0;
+
+async function loadRules(promotions = [PROMOTION]) {
+  stubId += 1;
+  localStorage.setItem('vitamix.priceRules.stub', JSON.stringify({ promotions, stubId }));
   await ensurePriceRulesLoaded();
+}
+
+async function run(promotions = [PROMOTION]) {
+  await loadRules(promotions);
   await evaluateGWP();
 }
 
 const gifts = () => cart.items.filter((i) => i.custom?.giftWithPurchase);
 
+const json = (body, status = 200) => ({
+  ok: status >= 200 && status < 300,
+  status,
+  json: async () => body,
+  text: async () => JSON.stringify(body),
+  headers: { get: () => null },
+});
+
+/** Product data served at `${path}.json`, keyed by path. */
+let productJson;
+/** Answer to POST /estimate/price: a body, or a function of the request body. */
+let estimate;
+/** Answer to POST /orders/preview: a function of the request body. */
+let preview;
+let calls;
+
 beforeEach(() => {
   globalThis.__resetTestState();
+  __resetScripts();
+  mock.timers.enable({ apis: ['setTimeout'] });
   cart.clear();
-  globalThis.__setFetchMock(async () => ({
-    ok: true,
-    text: async () => JSON.stringify({ '@type': 'Product', sku: 'gift-sku', name: 'Gift' }),
-  }));
+  productJson = {};
+  estimate = { freeItems: [] };
+  preview = () => json({ estimateToken: 'tok' });
+  calls = [];
+  globalThis.__setFetchMock(async (url, init) => {
+    const body = init?.body ? JSON.parse(init.body) : undefined;
+    calls.push({ url: String(url), body });
+    if (String(url).endsWith('/estimate/price')) {
+      const answer = typeof estimate === 'function' ? estimate(body) : estimate;
+      return answer instanceof Error ? Promise.reject(answer) : json(answer);
+    }
+    if (String(url).endsWith('/orders/preview')) return preview(body);
+    if (String(url).endsWith('.json')) {
+      const product = productJson[String(url).slice(0, -5)];
+      return product ? json(product) : json({}, 404);
+    }
+    return {
+      ok: true,
+      text: async () => JSON.stringify({ '@type': 'Product', sku: 'gift-sku', name: 'Gift' }),
+    };
+  });
+});
+
+afterEach(() => {
+  mock.timers.reset();
+});
+
+const estimateCalls = () => calls.filter((c) => c.url.endsWith('/estimate/price'));
+const jsonCalls = (path) => calls.filter((c) => c.url === `${path}.json`);
+const grant = (promotion = PROMOTION) => ({
+  freeItems: [{
+    path: GIFT_PATH, ruleId: promotion.id, quantity: 1, minimumSubtotal: 100,
+  }],
 });
 
 test('adds a qualifying gift with the promotion id and name', async () => {
@@ -105,4 +166,297 @@ test('removes a gift whose promotion no longer applies', async () => {
   cart.addItem(giftItem({ promotionName: PROMOTION.name }), { allowSeparateEntry: true });
   await run();
   assert.equal(gifts().length, 0);
+});
+
+test('promotion with a non-minimumSubtotal condition only is evaluated', async () => {
+  cart.addItem(paidItem);
+  await run([{ ...PROMOTION, conditions: { includedProducts: [paidItem.path] } }]);
+  assert.equal(gifts().length, 1);
+});
+
+test('promotion with an unknown condition key is skipped', async () => {
+  cart.addItem(paidItem);
+  await run([{ ...PROMOTION, conditions: { minimumSubtotal: 100, requiredProducts: ['/x'] } }]);
+  assert.equal(gifts().length, 0);
+});
+
+test('disabled rules are not applied', async () => {
+  cart.addItem(paidItem);
+  await run([{ ...PROMOTION, rules: [{ path: GIFT_PATH, price: '0', enabled: false }] }]);
+  assert.equal(gifts().length, 0);
+});
+
+// --- conditionsMet ----------------------------------------------------------
+
+const line = (path, price, extra = {}) => ({
+  sku: path.split('/').pop(), path, price: String(price), quantity: 1, ...extra,
+});
+const BLENDER = line('/p/blender', 400, { local: { categories: ['blenders'] } });
+const ACCESSORY = line('/p/tamper', 50, { local: { categories: ['accessories'] } });
+const COMMERCIAL = line('/p/quiet-one', 1200, { local: { categories: ['commercial', 'blenders'] } });
+const UNKNOWN = line('/p/unknown', 200);
+const GIFT_LINE = line('/p/gift', 0, { custom: { giftWithPurchase: true }, local: { categories: ['commercial'] } });
+
+test('conditionsMet: minimumSubtotal only', () => {
+  assert.equal(conditionsMet({ minimumSubtotal: 100 }, [BLENDER]), true);
+  assert.equal(conditionsMet({ minimumSubtotal: 500 }, [BLENDER]), false);
+  assert.equal(conditionsMet({ minimumSubtotal: 450 }, [BLENDER, ACCESSORY]), true);
+});
+
+test('conditionsMet: needs at least one paid line, even with no minimum', () => {
+  assert.equal(conditionsMet({ minimumSubtotal: 0 }, []), false);
+  assert.equal(conditionsMet({ minimumSubtotal: 0 }, [GIFT_LINE]), false);
+  assert.equal(conditionsMet({ minimumSubtotal: 0 }, [line('/p/free', 0)]), false);
+});
+
+test('conditionsMet: gift and $0 lines never count or disqualify', () => {
+  const gift = { ...GIFT_LINE, price: '500' };
+  assert.equal(conditionsMet({ minimumSubtotal: 500 }, [BLENDER, gift]), false);
+  assert.equal(conditionsMet({ disqualifyingCategories: ['commercial'] }, [BLENDER, GIFT_LINE]), true);
+  assert.equal(conditionsMet({ disqualifyingProducts: ['/p/free'] }, [BLENDER, line('/p/free', 0)]), true);
+});
+
+test('conditionsMet: includedProducts alone means the cart contains one', () => {
+  assert.equal(conditionsMet({ includedProducts: ['/p/blender'] }, [BLENDER]), true);
+  assert.equal(conditionsMet({ includedProducts: ['/p/blender'] }, [ACCESSORY]), false);
+  assert.equal(conditionsMet({ includedProducts: [{ path: '/p/blender', sku: 'other' }] }, [BLENDER]), false);
+  assert.equal(conditionsMet({ includedProducts: [{ path: '/p/blender', sku: 'blender' }] }, [BLENDER]), true);
+});
+
+test('conditionsMet: threshold counts in-scope lines only', () => {
+  const conditions = { minimumSubtotal: 420, includedCategories: ['blenders'] };
+  assert.equal(conditionsMet(conditions, [BLENDER, ACCESSORY]), false);
+  assert.equal(conditionsMet({ ...conditions, minimumSubtotal: 400 }, [BLENDER, ACCESSORY]), true);
+  assert.equal(conditionsMet({ minimumSubtotal: 420, excludedProducts: ['/p/tamper'] }, [BLENDER, ACCESSORY]), false);
+  assert.equal(conditionsMet({ minimumSubtotal: 420, excludedCategories: ['accessories'] }, [BLENDER, ACCESSORY]), false);
+  assert.equal(conditionsMet({ minimumSubtotal: 420, excludedCategories: ['other'] }, [BLENDER, ACCESSORY]), true);
+});
+
+test('conditionsMet: scope precedence', () => {
+  // product exclude beats product include
+  assert.equal(conditionsMet({ includedProducts: ['/p/blender'], excludedProducts: ['/p/blender'] }, [BLENDER]), false);
+  // product include beats category exclude
+  assert.equal(conditionsMet({ includedProducts: ['/p/blender'], excludedCategories: ['blenders'] }, [BLENDER]), true);
+  // category exclude beats category include
+  assert.equal(conditionsMet({ includedCategories: ['blenders'], excludedCategories: ['commercial'] }, [COMMERCIAL]), false);
+  // with an include list, unmatched lines are out of scope
+  assert.equal(conditionsMet({ includedCategories: ['blenders'] }, [ACCESSORY]), false);
+  assert.equal(conditionsMet({ includedProducts: ['/p/blender'], includedCategories: ['accessories'] }, [ACCESSORY]), true);
+});
+
+test('conditionsMet: unknown categories put the line out of category scope', () => {
+  assert.equal(conditionsMet({ excludedCategories: ['commercial'] }, [UNKNOWN]), false);
+  assert.equal(conditionsMet({ includedCategories: ['blenders'] }, [UNKNOWN]), false);
+  assert.equal(conditionsMet({ includedProducts: ['/p/unknown'], includedCategories: ['blenders'] }, [UNKNOWN]), true);
+  assert.equal(conditionsMet({ minimumSubtotal: 100 }, [UNKNOWN]), true);
+});
+
+test('conditionsMet: disqualifiers beat everything', () => {
+  const conditions = { includedProducts: ['/p/quiet-one'], disqualifyingCategories: ['commercial'] };
+  assert.equal(conditionsMet(conditions, [COMMERCIAL]), false);
+  assert.equal(conditionsMet({ disqualifyingProducts: ['/p/tamper'] }, [BLENDER, ACCESSORY]), false);
+  assert.equal(conditionsMet({ disqualifyingProducts: [{ path: '/p/tamper', sku: 'x' }] }, [BLENDER, ACCESSORY]), true);
+  assert.equal(conditionsMet({ disqualifyingCategories: ['commercial'] }, [BLENDER, COMMERCIAL]), false);
+  assert.equal(conditionsMet({ disqualifyingCategories: ['commercial'] }, [BLENDER, ACCESSORY]), true);
+});
+
+test('conditionsMet: unknown categories fail closed for category disqualifiers', () => {
+  assert.equal(conditionsMet({ disqualifyingCategories: ['commercial'] }, [BLENDER, UNKNOWN]), false);
+  assert.equal(conditionsMet({ disqualifyingProducts: ['/p/x'] }, [BLENDER, UNKNOWN]), true);
+});
+
+test('conditionsMet: unknown condition key fails closed', () => {
+  assert.equal(conditionsMet({ minimumSubtotal: 0, requiredCategories: ['blenders'] }, [BLENDER]), false);
+});
+
+// --- line categories ----------------------------------------------------------
+
+const COMMERCIAL_PROMO = {
+  ...PROMOTION,
+  conditions: { minimumSubtotal: 100, disqualifyingCategories: ['commercial'] },
+};
+
+test('a commercial line in the cart blocks the gift', async () => {
+  cart.addItem({ ...paidItem, local: { categories: ['commercial'] } });
+  await run([COMMERCIAL_PROMO]);
+  assert.equal(gifts().length, 0);
+});
+
+test('a home blender over the threshold gets the gift', async () => {
+  cart.addItem({ ...paidItem, local: { categories: ['blenders'] } });
+  await run([COMMERCIAL_PROMO]);
+  assert.equal(gifts().length, 1);
+  assert.equal(jsonCalls(paidItem.path).length, 0);
+});
+
+test('categories for a restored line are fetched once from the product json', async () => {
+  const item = { ...paidItem, sku: 'restored', path: '/us/en_us/products/restored' };
+  productJson[item.path] = { sku: 'restored', custom: { categories: [{ url_key: 'commercial', name: 'Commercial' }] } };
+  cart.addItem(item);
+  await run([COMMERCIAL_PROMO]);
+  assert.equal(gifts().length, 0);
+  await evaluateGWP();
+  assert.equal(jsonCalls(item.path).length, 1);
+});
+
+test('categories fall back to the product page JSON-LD', async () => {
+  const item = { ...paidItem, sku: 'ld-only', path: '/us/en_us/products/ld-only' };
+  cart.addItem(item);
+  await run([COMMERCIAL_PROMO]);
+  // The page mock serves a Product without categories: known, not commercial.
+  assert.equal(gifts().length, 1);
+  assert.equal(jsonCalls(item.path).length, 1);
+});
+
+test('categories are not fetched without category conditions', async () => {
+  const item = { ...paidItem, sku: 'nocat', path: '/us/en_us/products/nocat' };
+  cart.addItem(item);
+  await run();
+  assert.equal(jsonCalls(item.path).length, 0);
+});
+
+test('local categories do not block a cart merge and are not sent to the API', () => {
+  cart.addItem({ ...paidItem, local: { categories: ['blenders'] } });
+  cart.addItem({ ...paidItem, local: { categories: ['blenders'] } });
+  assert.equal(cart.items.length, 1);
+  assert.equal(cart.items[0].quantity, 2);
+  assert.equal('local' in cart.getItemsForAPI()[0], false);
+});
+
+// --- server reconciliation ---------------------------------------------------
+
+test('the server check is debounced after an evaluation', async () => {
+  cart.addItem(paidItem);
+  await run();
+  await evaluateGWP();
+  assert.equal(estimateCalls().length, 0);
+  mock.timers.tick(500);
+  await reconcileWithServer();
+  assert.equal(estimateCalls().length, 1);
+  const [{ body }] = estimateCalls();
+  assert.equal(body.country, 'us');
+  assert.equal(body.couponCode, undefined);
+  assert.deepEqual(body.items.map((i) => i.sku), ['paid']);
+});
+
+test('no server check without paid lines or conditional promotions', async () => {
+  cart.addItem(paidItem);
+  await run([{ ...PROMOTION, conditions: undefined }]);
+  mock.timers.tick(500);
+  await reconcileWithServer();
+  await evaluateGWP();
+  assert.equal(estimateCalls().length, 0);
+});
+
+test('a server denial removes the gift and it is not re-added', async () => {
+  cart.addItem(paidItem);
+  await run();
+  assert.equal(gifts().length, 1);
+  estimate = { freeItems: [] };
+  await reconcileWithServer();
+  assert.equal(gifts().length, 0);
+  await evaluateGWP();
+  assert.equal(gifts().length, 0);
+  mock.timers.tick(500);
+  assert.equal(estimateCalls().length, 1);
+});
+
+test('a server grant adds the gift the client did not', async () => {
+  cart.addItem({ ...paidItem, local: { categories: ['commercial'] } });
+  await run([COMMERCIAL_PROMO]);
+  assert.equal(gifts().length, 0);
+  estimate = grant();
+  await reconcileWithServer();
+  assert.deepEqual(gifts().map((i) => i.custom.promotionId), [PROMOTION.id]);
+});
+
+test('a server result for a different cart is ignored', async () => {
+  cart.addItem(paidItem);
+  await run();
+  estimate = { freeItems: [] };
+  await reconcileWithServer();
+  assert.equal(gifts().length, 0);
+  cart.updateItem(paidItem.sku, 2);
+  await evaluateGWP();
+  assert.equal(gifts().length, 1);
+});
+
+test('an estimate failure keeps the client result', async () => {
+  cart.addItem(paidItem);
+  await run();
+  estimate = new Error('network');
+  await reconcileWithServer();
+  assert.equal(gifts().length, 1);
+  await evaluateGWP();
+  assert.equal(gifts().length, 1);
+});
+
+// --- order preview -------------------------------------------------------------
+
+const previewCalls = () => calls.filter((c) => c.url.endsWith('/orders/preview'));
+const giftsIn = (items) => items.filter((i) => i.custom?.giftWithPurchase);
+
+test('preview waits for the server check and sends the reconciled items', async () => {
+  cart.addItem(paidItem);
+  await run();
+  assert.equal(gifts().length, 1);
+  estimate = { freeItems: [] };
+  const body = { items: cart.getItemsForAPI() };
+  await previewOrder(body);
+  assert.equal(estimateCalls().length, 1);
+  assert.equal(giftsIn(previewCalls()[0].body.items).length, 0);
+  assert.equal(giftsIn(body.items).length, 0);
+});
+
+test('preview leaves items it did not take from the cart alone', async () => {
+  cart.addItem(paidItem);
+  await run();
+  estimate = { freeItems: [] };
+  const items = [...cart.getItemsForAPI(), { sku: 'other', path: '/p/other', quantity: 1 }];
+  await previewOrder({ items });
+  assert.equal(giftsIn(previewCalls()[0].body.items).length, 1);
+});
+
+test('a rejected free gift triggers one server check and one retry', async () => {
+  cart.addItem(paidItem);
+  await run();
+  estimate = grant();
+  await reconcileWithServer();
+  assert.equal(gifts().length, 1);
+  estimate = { freeItems: [] };
+  preview = (body) => (giftsIn(body.items).length
+    ? json({ code: 'unprocessable', details: { rule: 'unauthorized_free_item' } }, 422)
+    : json({ estimateToken: 'tok' }));
+  const result = await previewOrder({ items: cart.getItemsForAPI() });
+  assert.equal(result.estimateToken, 'tok');
+  assert.equal(previewCalls().length, 2);
+  assert.equal(estimateCalls().length, 2);
+  assert.equal(gifts().length, 0);
+});
+
+test('a rejected free gift is not retried when the server check changes nothing', async () => {
+  cart.addItem(paidItem);
+  await run();
+  estimate = grant();
+  preview = () => json({ code: 'unprocessable', details: { rule: 'unauthorized_free_item' } }, 422);
+  await assert.rejects(previewOrder({ items: cart.getItemsForAPI() }), (err) => err.status === 422);
+  assert.equal(previewCalls().length, 1);
+});
+
+test('a server result is reused from session storage for the same rules and cart', async () => {
+  cart.addItem(paidItem);
+  await run();
+  const raw = localStorage.getItem('vitamix.priceRules.stub');
+  estimate = { freeItems: [] };
+  await reconcileWithServer();
+  assert.equal(gifts().length, 0);
+  // Same rules content in a new payload object, as on the next page view.
+  localStorage.setItem('vitamix.priceRules.stub', JSON.stringify({ promotions: [] }));
+  await ensurePriceRulesLoaded();
+  localStorage.setItem('vitamix.priceRules.stub', raw);
+  await ensurePriceRulesLoaded();
+  await evaluateGWP();
+  mock.timers.tick(500);
+  assert.equal(gifts().length, 0);
+  assert.equal(estimateCalls().length, 1);
 });

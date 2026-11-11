@@ -1,8 +1,9 @@
 /**
  * Gift-with-purchase (GWP) reconciliation.
  *
- * Keeps free-gift cart lines in sync with the active catalog promotions whose
- * `conditions.minimumSubtotal` is satisfied by the current cart. Lines are
+ * Keeps free-gift cart lines in sync with the active conditional catalog
+ * promotions whose `conditions` the current cart meets. The cart is evaluated
+ * here first; the server's answer for the same paid lines then wins. Lines are
  * marked with `custom.giftWithPurchase: true`, `custom.promotionId` and
  * `custom.promotionName`. The promotion id also disambiguates removal so a paid
  * copy of the same SKU is never touched.
@@ -11,6 +12,7 @@
  *   - `loadLazy` if the cart already has items (restored from localStorage)
  *   - Every `cart:change` event (refetches only on `add`)
  *   - Decoration of the cart and checkout blocks
+ *   - Order previews (`ensureGWPReconciled`)
  *
  * Non-prod overrides (ignored on prod hosts):
  *   - `localStorage['vitamix.priceRulesUrl']` — override endpoint
@@ -60,11 +62,17 @@ function getEndpoint() {
   return `${getConfig().apiOrigin}/price-rules/catalog?active=true`;
 }
 
+let lastStub = null;
+
 function getStub() {
   if (!isNonProdHost()) return null;
   const raw = readLocalStorage(STUB_KEY);
   if (!raw) return null;
-  try { return JSON.parse(raw); } catch { return null; }
+  if (lastStub?.raw === raw) return lastStub.payload;
+  try {
+    lastStub = { raw, payload: JSON.parse(raw) };
+    return lastStub.payload;
+  } catch { return null; }
 }
 
 function readSessionCache() {
@@ -151,40 +159,134 @@ function promotionAppliesToLocale(promotion, locale) {
 }
 
 function ruleIsActive(rule, now) {
+  if (rule.enabled === false) return false;
   const t = now.getTime();
   const startOk = !rule.start || new Date(rule.start).getTime() <= t;
   const endOk = !rule.end || new Date(rule.end).getTime() > t;
   return startOk && endOk;
 }
 
+const asList = (value) => (Array.isArray(value) ? value : []);
+
+function itemPath(item) {
+  if (item.path) return item.path;
+  try { return new URL(item.url, window.location.origin).pathname; } catch { return ''; }
+}
+
+function isPaidLine(item) {
+  return !item.custom?.giftWithPurchase && parseFloat(item.price) > 0 && item.quantity > 0;
+}
+
+function matchesProduct(item, entries) {
+  const path = itemPath(item);
+  return asList(entries).some((entry) => {
+    const condition = typeof entry === 'string' ? { path: entry } : entry;
+    return condition?.path === path && (condition.sku == null || condition.sku === item.sku);
+  });
+}
+
+/** Category url_keys of a product (`categories` or `custom.categories`). */
+function getCategoryKeys(product) {
+  const keys = new Set();
+  [...asList(product?.categories), ...asList(product?.custom?.categories)].forEach((entry) => {
+    const key = typeof entry === 'string' ? entry : entry?.url_key;
+    if (typeof key === 'string' && key) keys.add(key);
+  });
+  return [...keys];
+}
+
+/** Known category url_keys of a cart line, or `null` when unknown. */
+function lineCategories(item) {
+  if (Array.isArray(item.local?.categories)) return item.local.categories;
+  const cached = inMemoryCache?.productsByPath?.[itemPath(item)]?.categories;
+  return Array.isArray(cached) ? cached : null;
+}
+
+function isLineInScope(conditions, item, categories) {
+  if (matchesProduct(item, conditions.excludedProducts)) return false;
+  if (matchesProduct(item, conditions.includedProducts)) return true;
+  const included = asList(conditions.includedCategories);
+  const excluded = asList(conditions.excludedCategories);
+  if (included.length || excluded.length) {
+    if (!categories) return false;
+    if (excluded.some((c) => categories.includes(c))) return false;
+    if (included.some((c) => categories.includes(c))) return true;
+  }
+  return !(asList(conditions.includedProducts).length || included.length);
+}
+
+function isDisqualified(conditions, paidLines, getCategories) {
+  const categories = asList(conditions.disqualifyingCategories);
+  return paidLines.some((item) => {
+    if (matchesProduct(item, conditions.disqualifyingProducts)) return true;
+    if (!categories.length) return false;
+    const keys = getCategories(item);
+    return !keys || categories.some((c) => keys.includes(c));
+  });
+}
+
+const KNOWN_CONDITIONS = new Set([
+  'minimumSubtotal',
+  'includedProducts',
+  'excludedProducts',
+  'includedCategories',
+  'excludedCategories',
+  'disqualifyingProducts',
+  'disqualifyingCategories',
+]);
+const CATEGORY_CONDITIONS = ['includedCategories', 'excludedCategories', 'disqualifyingCategories'];
+
+/**
+ * Whether a promotion's `conditions` are met by the cart lines.
+ *
+ * @param {Object} conditions
+ * @param {Object[]} items cart items
+ * @param {(item: Object) => string[]|null} [getCategories]
+ * @returns {boolean}
+ */
+export function conditionsMet(conditions, items, getCategories = lineCategories) {
+  if (!conditions || typeof conditions !== 'object') return false;
+  if (Object.keys(conditions).some((key) => !KNOWN_CONDITIONS.has(key))) return false;
+  const paidLines = items.filter(isPaidLine);
+  if (isDisqualified(conditions, paidLines, getCategories)) return false;
+  const inScope = paidLines.filter((item) => isLineInScope(conditions, item, getCategories(item)));
+  if (!inScope.length) return false;
+  const subtotal = inScope.reduce((acc, item) => acc + item.quantity * parseFloat(item.price), 0);
+  const minimum = parseFloat(conditions.minimumSubtotal);
+  return Math.round(subtotal * 100) / 100 >= (Number.isFinite(minimum) ? minimum : 0);
+}
+
+/** Conditional promotions for this locale with at least one active rule. */
+function getActivePromotions(payload, now) {
+  const locale = getConfig().getLocale();
+  return asList(payload?.promotions).filter((promotion) => promotion?.conditions
+    && promotionAppliesToLocale(promotion, locale)
+    && asList(promotion.rules).some((rule) => rule?.path && ruleIsActive(rule, now)));
+}
+
 /**
  * Returns the set of GWP rules that should currently be applied, keyed by
  * `${promotionId}::${rule.path}`. Each value is `{ promotion, rule }`.
  */
-function computeApplicableRules(payload, currentCart) {
-  const locale = getConfig().getLocale();
-  const now = getNow();
-
-  // Subtract any existing GWP value from the comparison subtotal. Defensive —
-  // GWP prices are usually "0" so this is normally a no-op, but the rule
-  // contract doesn't strictly require it.
-  const subtotalSansGifts = currentCart.items.reduce((acc, item) => {
-    if (item.custom?.giftWithPurchase) return acc;
-    return acc + (item.quantity * parseFloat(item.price || 0));
-  }, 0);
-
+function computeApplicableRules(promotions, items, now) {
   const applicable = new Map();
-  const promotions = Array.isArray(payload?.promotions) ? payload.promotions : [];
   promotions.forEach((promotion) => {
-    if (!promotion.conditions || promotion.conditions.minimumSubtotal == null) return;
-    if (!promotionAppliesToLocale(promotion, locale)) return;
-    if (subtotalSansGifts < parseFloat(promotion.conditions.minimumSubtotal)) return;
-    const rules = Array.isArray(promotion.rules) ? promotion.rules : [];
-    rules.forEach((rule) => {
-      if (!ruleIsActive(rule, now)) return;
-      if (!rule.path) return;
+    if (!conditionsMet(promotion.conditions, items)) return;
+    promotion.rules.forEach((rule) => {
+      if (!rule?.path || !ruleIsActive(rule, now)) return;
       applicable.set(`${promotion.id}::${rule.path}`, { promotion, rule });
     });
+  });
+  return applicable;
+}
+
+/** Same shape as computeApplicableRules, from the server's `freeItems`. */
+function applicableFromGrants(payload, grants) {
+  const applicable = new Map();
+  grants.forEach(({ ruleId, path }) => {
+    const promotion = asList(payload?.promotions).find((p) => p?.id === ruleId);
+    const rule = asList(promotion?.rules).find((r) => r?.path === path);
+    if (rule) applicable.set(`${ruleId}::${path}`, { promotion, rule });
   });
   return applicable;
 }
@@ -207,6 +309,19 @@ function extractProductFromJsonLd(html) {
   return product;
 }
 
+function persistProducts() {
+  const sessionEntry = readSessionCache();
+  if (!sessionEntry || !inMemoryCache) return;
+  sessionEntry.productsByPath = inMemoryCache.productsByPath;
+  writeSessionCache(sessionEntry);
+}
+
+function cacheProduct(path, data) {
+  if (!inMemoryCache) return;
+  inMemoryCache.productsByPath[path] = { ...inMemoryCache.productsByPath[path], ...data };
+  persistProducts();
+}
+
 /**
  * Fetches a product page and extracts the fields we need from its JSON-LD
  * Product node. Memoised inside `inMemoryCache.productsByPath` and persisted
@@ -217,7 +332,8 @@ function extractProductFromJsonLd(html) {
  */
 async function resolveProductByPath(path) {
   if (!inMemoryCache) return null;
-  if (inMemoryCache.productsByPath[path]) return inMemoryCache.productsByPath[path];
+  const cached = inMemoryCache.productsByPath[path];
+  if (cached?.sku) return cached;
   try {
     const res = await fetch(path, { credentials: 'same-origin' });
     if (!res.ok) throw new Error(`product page ${res.status}`);
@@ -225,25 +341,57 @@ async function resolveProductByPath(path) {
     const product = extractProductFromJsonLd(html);
     if (!product || !product.sku) throw new Error('no Product JSON-LD');
     const image = Array.isArray(product.image) ? product.image[0] : product.image;
-    const resolved = {
+    cacheProduct(path, {
       sku: String(product.sku),
       name: product.name || '',
       image: image || '',
       url: path,
-    };
-    inMemoryCache.productsByPath[path] = resolved;
-    // Persist the enriched map so revisits don't re-fetch.
-    const sessionEntry = readSessionCache();
-    if (sessionEntry) {
-      sessionEntry.productsByPath = inMemoryCache.productsByPath;
-      writeSessionCache(sessionEntry);
-    }
-    return resolved;
+    });
+    return inMemoryCache.productsByPath[path];
   } catch (e) {
     // eslint-disable-next-line no-console
     console.warn(`[GWP] resolveProductByPath(${path}) failed`, e);
     return null;
   }
+}
+
+async function fetchCategoryKeys(path) {
+  try {
+    const res = await fetch(`${path}.json`, { credentials: 'same-origin' });
+    if (res.ok) {
+      const product = await res.json();
+      if (product?.sku || product?.path) return getCategoryKeys(product);
+    }
+  } catch { /* fall back to the product page */ }
+  try {
+    const res = await fetch(path, { credentials: 'same-origin' });
+    if (!res.ok) return null;
+    const product = extractProductFromJsonLd(await res.text());
+    return product ? getCategoryKeys(product) : null;
+  } catch {
+    return null;
+  }
+}
+
+const categoryLookups = new Map();
+
+function resolveCategories(path) {
+  if (!categoryLookups.has(path)) {
+    categoryLookups.set(path, fetchCategoryKeys(path).then((categories) => {
+      if (categories) cacheProduct(path, { categories });
+      return categories;
+    }));
+  }
+  return categoryLookups.get(path);
+}
+
+/** Loads categories for paid lines that don't carry them. */
+async function ensureLineCategories(items) {
+  const paths = new Set(items
+    .filter((item) => isPaidLine(item) && !lineCategories(item))
+    .map(itemPath)
+    .filter(Boolean));
+  await Promise.all([...paths].map(resolveCategories));
 }
 
 let isApplyingGWP = false;
@@ -318,17 +466,85 @@ function addMissingGifts(applicable) {
   );
 }
 
-/**
- * Reconcile the cart against the currently-cached rules. Adds gift lines that
- * should be present and removes ones that no longer qualify. Safe to call
- * without rules loaded — does nothing in that case.
- *
- * @returns {Promise<void>}
- */
-export async function evaluateGWP() {
-  if (isApplyingGWP) return;
-  if (!inMemoryCache?.payload) return;
-  const applicable = computeApplicableRules(inMemoryCache.payload, cart);
+const RECONCILE_DELAY_MS = 500;
+
+// Last server answer: `{ payload, signature, grants }`.
+let serverResult = null;
+let failedCheck = null;
+let reconcileTimer = null;
+let reconcileInflight = null;
+
+function paidSignature(items) {
+  return JSON.stringify(items.filter(isPaidLine)
+    .map((item) => [itemPath(item), item.sku, item.quantity, String(item.price)]));
+}
+
+function checkFailed(payload, signature) {
+  return failedCheck?.payload === payload && failedCheck.signature === signature;
+}
+
+const SERVER_CACHE_KEY = 'vitamix.gwp.serverCheck';
+const SERVER_CACHE_TTL_MS = 15 * 60 * 1000;
+const payloadKeys = new WeakMap();
+
+/** Short hash identifying a rules payload across page views. */
+function payloadKey(payload) {
+  if (!payloadKeys.has(payload)) {
+    const text = JSON.stringify(payload);
+    let hash = 0;
+    for (let i = 0; i < text.length; i += 1) hash = (hash * 31 + text.charCodeAt(i)) % 2147483647;
+    payloadKeys.set(payload, `${text.length}:${hash}`);
+  }
+  return payloadKeys.get(payload);
+}
+
+function storeServerResult(result) {
+  serverResult = result;
+  try {
+    sessionStorage.setItem(SERVER_CACHE_KEY, JSON.stringify({
+      key: payloadKey(result.payload),
+      signature: result.signature,
+      grants: result.grants,
+      at: Date.now(),
+    }));
+  } catch { /* best-effort */ }
+}
+
+function serverResultFor(payload, signature) {
+  if (serverResult?.payload === payload && serverResult.signature === signature) {
+    return serverResult;
+  }
+  try {
+    const stored = JSON.parse(sessionStorage.getItem(SERVER_CACHE_KEY));
+    if (stored?.signature === signature && stored.key === payloadKey(payload)
+      && Date.now() - stored.at < SERVER_CACHE_TTL_MS && Array.isArray(stored.grants)) {
+      serverResult = { payload, signature, grants: stored.grants };
+      return serverResult;
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
+function needsServer(promotions) {
+  return promotions.length > 0 && cart.items.some(isPaidLine);
+}
+
+let evaluation = null;
+let rerunEvaluation = false;
+
+async function applyOnce() {
+  const payload = inMemoryCache?.payload;
+  if (!payload) return;
+  const now = getNow();
+  const promotions = getActivePromotions(payload, now);
+  if (promotions.some((p) => CATEGORY_CONDITIONS.some((k) => asList(p.conditions[k]).length))) {
+    await ensureLineCategories(cart.items);
+  }
+  const signature = paidSignature(cart.items);
+  const server = serverResultFor(payload, signature);
+  const applicable = server
+    ? applicableFromGrants(payload, server.grants)
+    : computeApplicableRules(promotions, cart.items, now);
 
   isApplyingGWP = true;
   try {
@@ -337,6 +553,114 @@ export async function evaluateGWP() {
     await addMissingGifts(applicable);
   } finally {
     isApplyingGWP = false;
+  }
+
+  if (!server && !checkFailed(payload, signature) && needsServer(promotions)) {
+    clearTimeout(reconcileTimer);
+    reconcileTimer = setTimeout(() => {
+      reconcileTimer = null;
+      // eslint-disable-next-line no-use-before-define
+      reconcileWithServer();
+    }, RECONCILE_DELAY_MS);
+  }
+}
+
+/**
+ * Reconcile the cart against the currently-cached rules. Adds gift lines that
+ * should be present and removes ones that no longer qualify. A server result
+ * for the current paid lines wins over the client evaluation. Safe to call
+ * without rules loaded — does nothing in that case.
+ *
+ * @returns {Promise<void>}
+ */
+export function evaluateGWP() {
+  if (evaluation) {
+    rerunEvaluation = true;
+    return evaluation;
+  }
+  evaluation = (async () => {
+    try {
+      do {
+        rerunEvaluation = false;
+        // eslint-disable-next-line no-await-in-loop
+        await applyOnce();
+      } while (rerunEvaluation);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn('[GWP] evaluation failed', e);
+    } finally {
+      evaluation = null;
+    }
+  })();
+  return evaluation;
+}
+
+/**
+ * Asks the server which gifts the current paid lines qualify for and applies
+ * the answer.
+ *
+ * @param {{ force?: boolean }} [opts] `force` ignores a cached answer
+ * @returns {Promise<void>}
+ */
+export function reconcileWithServer({ force = false } = {}) {
+  const payload = inMemoryCache?.payload;
+  if (!payload || !needsServer(getActivePromotions(payload, getNow()))) return Promise.resolve();
+  const signature = paidSignature(cart.items);
+  if (reconcileInflight?.payload === payload && reconcileInflight.signature === signature) {
+    return reconcileInflight.promise;
+  }
+  if (!force && (serverResultFor(payload, signature) || checkFailed(payload, signature))) {
+    return Promise.resolve();
+  }
+  const items = cart.getItemsForAPI().filter((_, i) => isPaidLine(cart.items[i]));
+  const entry = { payload, signature };
+  entry.promise = (async () => {
+    try {
+      // Direct fetch: importing commerce-api.js here would close an import cycle.
+      const res = await fetch(`${getConfig().apiOrigin}/estimate/price`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ country: getConfig().getLocale(), items }),
+      });
+      if (!res.ok) throw new Error(`estimate ${res.status}`);
+      const result = await res.json();
+      const grants = asList(result?.freeItems).filter((f) => f?.ruleId && f?.path);
+      storeServerResult({ payload, signature, grants });
+      failedCheck = null;
+    } catch (e) {
+      failedCheck = { payload, signature };
+      // eslint-disable-next-line no-console
+      console.warn('[GWP] server check failed', e);
+      return;
+    } finally {
+      if (reconcileInflight === entry) reconcileInflight = null;
+    }
+    if (paidSignature(cart.items) === signature) await evaluateGWP();
+  })();
+  reconcileInflight = entry;
+  return entry.promise;
+}
+
+/**
+ * Settles gift lines for the current cart with the server before an order
+ * preview. Never throws.
+ *
+ * @param {{ force?: boolean }} [opts] `force` re-asks the server
+ * @returns {Promise<void>}
+ */
+export async function ensureGWPReconciled({ force = false } = {}) {
+  try {
+    const loaded = await ensurePriceRulesLoaded();
+    if (!loaded?.payload) return;
+    await evaluateGWP();
+    clearTimeout(reconcileTimer);
+    reconcileTimer = null;
+    if (!needsServer(getActivePromotions(loaded.payload, getNow()))) return;
+    await reconcileWithServer({ force });
+    await evaluateGWP();
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.warn('[GWP] reconcile failed', e);
   }
 }
 

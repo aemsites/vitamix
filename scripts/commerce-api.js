@@ -174,10 +174,57 @@ export async function estimateExpressCheckout(country, state, zip, items, contex
   });
 }
 
+async function sendPreview(orderBody) {
+  try {
+    return await post('/orders/preview', orderBody, RECAPTCHA_ACTIONS.ORDERS_PREVIEW);
+  } catch (err) {
+    // Sync cart prices with the price returned in the error, if any.
+    if (applyPriceCorrection(err)) err.cartRepriced = true;
+    throw err;
+  }
+}
+
+/**
+ * Settles free-gift lines with the server, then points `orderBody.items` at the
+ * updated cart when the body was built from it. Updated in place because
+ * callers keep this object as the payload behind the estimate token.
+ *
+ * @param {Object} orderBody
+ * @param {boolean} force
+ * @returns {Promise<boolean>} true when `orderBody.items` changed
+ */
+async function syncGiftLines(orderBody, force) {
+  const { cart } = window;
+  if (typeof cart?.getItemsForAPI !== 'function' || !Array.isArray(orderBody?.items)) return false;
+  try {
+    // Dynamic and guarded: a cached older module may lack this export.
+    const { ensureGWPReconciled } = await import('./gift-with-purchase.js');
+    if (typeof ensureGWPReconciled !== 'function') return false;
+    const before = JSON.stringify(cart.getItemsForAPI());
+    const mirrorsCart = JSON.stringify(orderBody.items) === before;
+    await ensureGWPReconciled({ force });
+    const after = cart.getItemsForAPI();
+    if (!mirrorsCart || JSON.stringify(after) === before) return false;
+    // eslint-disable-next-line no-param-reassign
+    orderBody.items = after;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isUnauthorizedFreeItem(err) {
+  return err?.status === 422 && err.body?.details?.rule === 'unauthorized_free_item';
+}
+
 /**
  * Previews an order to lock in tax, discounts, and shipping cost, and
  * obtain an `estimateToken` that must be included when placing the order.
  * Call this after the user selects a shipping method and before payment.
+ *
+ * Free-gift lines are settled with the server first; when the body was built
+ * from the cart, `orderBody.items` is updated in place. A rejected free gift
+ * triggers one more server check and one retry.
  *
  * @param {Object} orderBody - Full order body including customer, shipping, items,
  *   and shippingMethod.id
@@ -186,12 +233,12 @@ export async function estimateExpressCheckout(country, state, zip, items, contex
  * @throws {CommerceApiError}
  */
 export async function previewOrder(orderBody) {
+  await syncGiftLines(orderBody, false);
   try {
-    return await post('/orders/preview', orderBody, RECAPTCHA_ACTIONS.ORDERS_PREVIEW);
+    return await sendPreview(orderBody);
   } catch (err) {
-    // Sync cart prices with the price returned in the error, if any.
-    if (applyPriceCorrection(err)) err.cartRepriced = true;
-    throw err;
+    if (!isUnauthorizedFreeItem(err) || !(await syncGiftLines(orderBody, true))) throw err;
+    return sendPreview(orderBody);
   }
 }
 
