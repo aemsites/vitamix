@@ -85,6 +85,27 @@ invalid numbers must be corrected before switching back, downloading, or
 previewing an import. **Preview import** and **Download** use the edited tree;
 changes are not saved to the catalog until the existing import confirmation.
 
+## Syncing product images
+
+In product-detail edit mode, **Update images** previews the published image
+manifest for the current market. For an unmatched color folder, select **Add
+color variant** and enter its color name, SKU and GTIN. The suggested name is
+title-cased from the folder slug, as in Product Assets; verify it because the
+swatch configuration contains slugs, not original color names. The SKU must be
+distinct within the product, and the GTIN must contain 8, 12, 13 or 14 digits.
+Unselected folders remain unmatched.
+
+Confirming saves the new variants and their images along with the image sync.
+New variants start `OutOfStock`; price, description, custom settings, condition,
+weight and shipping dimensions are copied from the first existing variant, with
+the parent used when a field is missing. Variant JSON-LD extensions are copied
+from the first variant when present. Inventory quantity, MPN and availability
+date are not copied. The parent's tax code and tax data remain unchanged:
+the catalog API does not allow these fields on product variants. Adding a color
+to a simple product converts it to configurable: its existing SKU remains the
+parent SKU and is not automatically added as a variant. Adding colors to bundles
+or products with additional variant options is not supported by this workflow.
+
 ## Creating catalog products
 
 In Commerce Admin's production catalog, select **Add new product**. The modal

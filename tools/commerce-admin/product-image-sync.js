@@ -24,6 +24,10 @@ function colorSlugFromValue(value) {
     : '';
 }
 
+export function colorLabel(slug) {
+  return slug.split('-').map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+}
+
 async function readRespError(resp) {
   return resp.headers.get('x-error')
     || (await resp.text().catch(() => '')).trim()
@@ -307,28 +311,122 @@ function groupHtml(title, sku, images, resolvePreviewUrl, extra = '', metaImage 
   </section>`;
 }
 
+function addVariant(product, group, { color, sku, gtin }) {
+  if (product.bundleItems?.length || product.type === 'bundle' || product.custom?.type === 'bundle') {
+    throw new Error('Colors cannot be added to bundles through image sync.');
+  }
+  const options = product.options || [];
+  const variants = product.variants || [];
+  if (!Array.isArray(options) || !Array.isArray(variants)
+    || options.some((option) => !['color', 'colour'].includes(String(option.id || option.label || '').toLowerCase()))
+    || variants.some((variant) => optionEntries(variant.options)
+      .some((option) => !['color', 'colour'].includes(option.id)))) {
+    throw new Error('Colors cannot be added to products with other variant options through image sync.');
+  }
+  const slug = colorSlugFromValue(color);
+  if (!color || !colorSlugMatchesFolder(slug, group.colorSlug)) {
+    throw new Error(`The color name must match the ${group.colorSlug} folder.`);
+  }
+  if (!sku || !gtin) throw new Error(`Enter a SKU and GTIN for ${color}.`);
+  if (!/^(?:\d{8}|\d{12,14})$/.test(gtin)) {
+    throw new Error(`Enter an 8, 12, 13, or 14 digit GTIN for ${color}.`);
+  }
+  if ([product.sku, ...variants.map((variant) => variant.sku)]
+    .some((existing) => String(existing || '').trim().toLowerCase() === sku.toLowerCase())) {
+    throw new Error(`SKU ${sku} is already used by this product.`);
+  }
+  if (variants.some((variant) => variantColorSlug(variant) === slug)) {
+    throw new Error(`A variant for ${color} already exists.`);
+  }
+  if (!product.name || !product.url) {
+    throw new Error('The product needs a name and canonical URL before a color can be added.');
+  }
+  const colorOptions = options.filter((option) => (
+    ['color', 'colour'].includes(String(option.id || option.label || '').toLowerCase())
+  ));
+  if (colorOptions.length > 1 || (colorOptions[0] && !Array.isArray(colorOptions[0].values))) {
+    throw new Error('The product has an invalid or ambiguous color option.');
+  }
+  let colorOption = colorOptions[0];
+  if (!colorOption) {
+    const values = variants.map((variant) => {
+      const colorEntry = optionEntries(variant.options)
+        .find((entry) => entry.id === 'color' || entry.id === 'colour');
+      if (!colorEntry?.value) {
+        throw new Error('Existing variants need color options before a new color can be added.');
+      }
+      return { id: colorSlugFromValue(colorEntry.value), value: colorEntry.value };
+    });
+    if (new Set(values.map((value) => value.id)).size !== values.length) {
+      throw new Error('Existing variants have duplicate colors; cannot create a color option.');
+    }
+    colorOption = { id: 'color', label: 'Color', values };
+    options.push(colorOption);
+    product.options = options;
+  }
+  const existingValue = colorOption.values.find((value) => (
+    colorSlugFromValue(value.value) === slug || colorSlugFromValue(value.id) === slug
+  ));
+  if (existingValue && existingValue.value !== color) {
+    throw new Error(`Use the existing color name "${existingValue.value}" for ${color}.`);
+  }
+  if (!existingValue) colorOption.values.push({ id: slug, value: color });
+  const url = new URL(product.url);
+  url.searchParams.set('color', slug);
+  const template = variants[0];
+  const variant = {
+    sku,
+    gtin,
+    name: `${product.name} ${color}`,
+    url: url.toString(),
+    images: group.images,
+    options: [{ id: colorOption.id || 'color', value: color }],
+    availability: 'OutOfStock',
+  };
+  ['price', 'description', 'custom', 'itemCondition', 'weight', 'shippingDimensions']
+    .forEach((key) => {
+      const value = template?.[key] ?? product[key];
+      if (value != null) variant[key] = JSON.parse(JSON.stringify(value));
+    });
+  if (template?.jsonldExtensions != null) {
+    variant.jsonldExtensions = JSON.parse(JSON.stringify(template.jsonldExtensions));
+  }
+  if (variant.custom) delete variant.custom.inventoryQuantity;
+  variants.push(variant);
+  product.variants = variants;
+  if (!product.type || product.type === 'simple') product.type = 'configurable';
+}
+
 function openPlanDialog(plan, resolvePreviewUrl, onConfirm) {
   return new Promise((resolve) => {
     const dialog = document.createElement('dialog');
     dialog.className = 'pim-sync-dialog';
     const unmatchedHtml = plan.unmatched.length
-      ? plan.unmatched.map((g) => {
+      ? plan.unmatched.map((g, index) => {
         const cards = g.images.map((m) => mediaCardHtml(m, resolvePreviewUrl, plan.metaImage)).join('');
         return `<section class="pim-sync-group pim-sync-group-warn">
           <h3 class="pim-sync-group-title">Unmatched folder · ${escapeHtml(g.colorSlug)}</h3>
-          <p class="pim-sync-group-empty">No variant color option matches this folder. These files will not be written.</p>
+          <p class="pim-sync-group-empty">No variant color option matches this folder. These files will not be written unless a color is added.</p>
+          <label class="pim-sync-add-toggle"><input type="checkbox" data-sync-add="${index}"> Add color variant</label>
+          <div class="pim-sync-add-fields" data-sync-fields="${index}" hidden>
+            <label>Color name <input type="text" data-sync-color value="${escapeHtml(colorLabel(g.colorSlug))}" autocomplete="off"></label>
+            <label>SKU <input type="text" data-sync-sku autocomplete="off"></label>
+            <label>GTIN <input type="text" data-sync-gtin inputmode="numeric" autocomplete="off"></label>
+            <p class="pim-sync-group-empty">Verify the color name. The new variant starts out of stock and copies settings from the first existing variant, or the product if none exists.</p>
+            ${plan.nextProduct.type === 'simple' ? '<p class="pim-sync-group-empty">Adding a color converts this simple product to a configurable product; its current SKU will remain the parent SKU, not a variant.</p>' : ''}
+          </div>
           <div class="pim-sync-cards">${cards}</div>
         </section>`;
       }).join('')
       : '';
 
-    const summary = `${plan.imageCount} image${plan.imageCount === 1 ? '' : 's'} will be written`;
+    const summary = (count) => `${count} image${count === 1 ? '' : 's'} will be written`;
 
     dialog.innerHTML = `
       <div class="pim-sync-dialog-head">
         <h2 class="pim-sync-dialog-title">Sync images</h2>
         <p class="pim-sync-dialog-lead">Galleries from DAM <code>images.json</code>. Confirm replaces product and variant images through the catalog API.</p>
-        <p class="pim-sync-dialog-summary">${escapeHtml(summary)}</p>
+        <p class="pim-sync-dialog-summary">${escapeHtml(summary(plan.imageCount))}</p>
       </div>
       <div class="pim-sync-dialog-body">
         ${groupHtml('Product', '', plan.productImages, resolvePreviewUrl, '', plan.metaImage)}
@@ -353,8 +451,11 @@ function openPlanDialog(plan, resolvePreviewUrl, onConfirm) {
     const errEl = dialog.querySelector('.pim-sync-dialog-error');
     const cancelBtn = dialog.querySelector('[data-pim-sync-cancel]');
     const confirmBtn = dialog.querySelector('[data-pim-sync-confirm]');
+    const summaryEl = dialog.querySelector('.pim-sync-dialog-summary');
+    let saving = false;
 
     const finish = (ok) => {
+      if (saving) return;
       if (dialog.open) dialog.close();
       dialog.remove();
       resolve(ok);
@@ -366,18 +467,47 @@ function openPlanDialog(plan, resolvePreviewUrl, onConfirm) {
     });
     wireDialogEscapeDismiss(dialog, () => finish(false));
 
+    dialog.querySelectorAll('[data-sync-add]').forEach((toggle) => {
+      toggle.addEventListener('change', () => {
+        const index = Number(toggle.dataset.syncAdd);
+        dialog.querySelector(`[data-sync-fields="${index}"]`).hidden = !toggle.checked;
+        const count = plan.imageCount + [...dialog.querySelectorAll('[data-sync-add]:checked')]
+          .reduce((sum, selected) => (
+            sum + plan.unmatched[Number(selected.dataset.syncAdd)].images.length
+          ), 0);
+        summaryEl.textContent = summary(count);
+      });
+    });
+
     confirmBtn.addEventListener('click', async () => {
       confirmBtn.disabled = true;
       cancelBtn.disabled = true;
       errEl.hidden = true;
       try {
-        await onConfirm(plan.nextProduct);
+        const nextProduct = JSON.parse(JSON.stringify(plan.nextProduct));
+        dialog.querySelectorAll('[data-sync-add]:checked').forEach((toggle) => {
+          const index = Number(toggle.dataset.syncAdd);
+          const fields = dialog.querySelector(`[data-sync-fields="${index}"]`);
+          addVariant(nextProduct, plan.unmatched[index], {
+            color: fields.querySelector('[data-sync-color]').value.trim(),
+            sku: fields.querySelector('[data-sync-sku]').value.trim(),
+            gtin: fields.querySelector('[data-sync-gtin]').value.trim(),
+          });
+        });
+        saving = true;
+        dialog.querySelectorAll('[data-sync-add], [data-sync-fields] input')
+          .forEach((input) => { input.disabled = true; });
+        await onConfirm(nextProduct);
+        saving = false;
         finish(true);
       } catch (err) {
+        saving = false;
         errEl.textContent = err.message || 'Failed to write product';
         errEl.hidden = false;
         confirmBtn.disabled = false;
         cancelBtn.disabled = false;
+        dialog.querySelectorAll('[data-sync-add], [data-sync-fields] input')
+          .forEach((input) => { input.disabled = false; });
       }
     });
 
@@ -401,9 +531,10 @@ export async function startProductImageSync({
   const catalogPath = product.path || '';
   const [rows, catalogProduct] = await Promise.all([
     fetchImageSheet(urlKey),
-    fetchCatalogProduct(catalogPath).catch(() => null),
+    fetchCatalogProduct(catalogPath),
   ]);
-  const base = catalogProduct || JSON.parse(JSON.stringify(product));
+  if (!catalogProduct) throw new Error('Catalog product not found; cannot sync images.');
+  const base = catalogProduct;
   delete base.internal;
   if (!base.path && catalogPath) base.path = catalogPath.startsWith('/') ? catalogPath : `/${catalogPath}`;
   if (!base.path) {

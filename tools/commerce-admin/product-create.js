@@ -5,7 +5,7 @@ import {
 } from './commerce-catalog-io.js';
 import { categoryColorClass } from './commerce-category.js';
 import { PB_ORG, PB_SITE } from './commerce-pbus-config.js';
-import { fetchImageSheet, planImageSync } from './product-image-sync.js';
+import { colorLabel, fetchImageSheet, planImageSync } from './product-image-sync.js';
 import { escapeHtml, showToast } from './commerce-otp-ui.js';
 import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
 import { openProductSelectorModal } from './product-selection-field.js';
@@ -27,10 +27,6 @@ function priceAmount(text) {
     throw new Error('Enter a valid non-negative price with up to two decimal places.');
   }
   return Number(amount).toFixed(2);
-}
-
-function colorLabel(slug) {
-  return slug.split('-').map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 }
 
 function colorKey(label) {
