@@ -647,7 +647,8 @@ export default async function decorate(block) {
   window.addEventListener(COMPARE_STORAGE_EVENT, updateCompareVisibility);
   window.addEventListener('storage', updateCompareVisibility);
 
-  const accountLink = block.querySelector('.icon-account').parentElement;
+  const accountIcon = block.querySelector('.icon-account');
+  const accountLink = accountIcon ? accountIcon.parentElement : null;
   const defaultAccountLabel = (accountLink?.lastChild?.textContent ?? '').trim();
 
   /**
@@ -678,6 +679,7 @@ export default async function decorate(block) {
   // --- Auth state display (all pages): OTP session and/or legacy Magento customer cache ---
 
   const syncHeaderAuthDisplay = () => {
+    if (!accountLink) return;
     const combined = isHeaderAuthSessionActive();
     accountLink.classList.toggle('is-logged-in', combined);
     if (accountLink.lastChild) {
@@ -685,12 +687,14 @@ export default async function decorate(block) {
     }
   };
 
-  document.addEventListener(AUTH_EVENT, syncHeaderAuthDisplay);
-  addMagentoCacheListener(syncHeaderAuthDisplay);
-  syncHeaderAuthDisplay();
+  if (accountLink) {
+    document.addEventListener(AUTH_EVENT, syncHeaderAuthDisplay);
+    addMagentoCacheListener(syncHeaderAuthDisplay);
+    syncHeaderAuthDisplay();
+  }
 
   // --- Auth panel + OTP account drawer (edge checkout mode only) ---
-  if (window.useEdgeCheckout) {
+  if (accountLink && window.useEdgeCheckout) {
     const setAccountHash = (open) => {
       if (!open && window.location.hash !== '#account') return;
       const url = new URL(window.location.href);
@@ -811,7 +815,7 @@ export default async function decorate(block) {
   }
 
   const handleAccountHash = () => {
-    if (window.location.hash !== '#account') return;
+    if (!accountLink || window.location.hash !== '#account') return;
     accountLink.click();
   };
   window.addEventListener('hashchange', handleAccountHash);

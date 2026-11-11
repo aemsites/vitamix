@@ -2083,10 +2083,16 @@ async function loadNavBanner(main) {
     const path = new URL(meta, window.location).pathname;
     // eslint-disable-next-line import/no-cycle
     const resp = await fetch(path);
+    if (!resp.ok) throw new Error(`Failed to load nav banner ${path}: ${resp.status}`);
     const text = await resp.text();
 
     const dom = new DOMParser().parseFromString(text, 'text/html');
     const block = dom.querySelector('.alert-banners');
+    if (!block) {
+      // eslint-disable-next-line no-console
+      console.warn('Nav banner fragment missing .alert-banners block:', path);
+      return;
+    }
 
     const banners = parseAlertBanners(block);
     const selectedBanners = findCurrentAlertBanners(banners);
