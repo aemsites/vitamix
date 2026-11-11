@@ -288,7 +288,7 @@ export default async function decorate(block) {
     </div>
     <div class="recipe-additional-info-item recipe-manage-preferences">
       <p>
-        <a href="/${locale}/${language}/customer/account/login">${placeholders.managePreferences || 'Manage Preferences'}</a>
+        <a href="#account">${placeholders.managePreferences || 'Manage Preferences'}</a>
       </p>
     </div>
   </div>`;
