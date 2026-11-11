@@ -88,3 +88,37 @@ test('promotion dialog edits scope and disqualifiers and keeps other conditions'
   });
   await expect(row.locator('.pr-promo-col-scope')).toHaveText('not: refurb · never with: commercial');
 });
+
+test('add dialog saves a scope-only promotion and the detail modal shows it', async ({ page }) => {
+  const puts = await setup(page);
+  await page.goto(`${origin}/tools/commerce-admin/promotions.html`);
+  await expect(page.locator('tr[data-pr-promo-open][data-pr-id="gift"]')).toHaveCount(1);
+
+  await page.locator('[data-pr-promo-add]').click();
+  const dialog = page.locator('dialog.pr-promo-form-dialog');
+  await dialog.locator('#pr-promo-form-name').fill('Scoped gift');
+
+  await dialog.locator('#pr-promo-disqualifying-categories').evaluate((el) => { el.value = 'commercial'; });
+  await dialog.locator('#pr-promo-included-products').evaluate((el) => { el.value = '/us/en_us/products/a'; });
+  await dialog.locator('#pr-promo-form-market').selectOption('ca');
+  await expect(dialog.locator('#pr-promo-included-products')).toHaveValue('');
+  await expect(dialog.locator('#pr-promo-disqualifying-categories')).toHaveValue('commercial');
+  await expect(dialog.locator('[data-pr-promo-scope-note]')).toContainText('/us/en_us/products/a');
+
+  await dialog.locator('.pr-promo-tsv-import summary').click();
+  await expect(dialog.locator('#pr-promo-tsv-paste')).toHaveValue(/^Start/);
+  await dialog.locator('#pr-promo-tsv-paste').fill(`Start\tEnd\tProduct\tRegular Price\tSale Price\n\t${future}\t/ca/en_us/products/gift\t10\t0`);
+  await dialog.locator('[data-pr-promo-tsv-replace]').click();
+
+  await dialog.locator('[data-pr-promo-form-submit]').click();
+  await expect.poll(() => puts.length).toBe(1);
+  const added = puts[0].promotions.find((p) => p.name === 'Scoped gift');
+  expect(added.country).toBe('ca');
+  expect(added.conditions).toEqual({ disqualifyingCategories: ['commercial'] });
+
+  await page.locator('button', { hasText: 'Canada' }).first().click();
+  await page.locator(`tr[data-pr-promo-open][data-pr-id="${added.id}"]`).click();
+  const detail = page.locator('dialog.pr-promo-detail-dialog');
+  await expect(detail.locator('[data-pr-promo-scope-pills="included"]')).toHaveText('Any paid product');
+  await expect(detail.locator('[data-pr-promo-scope-pills="disqualifying"]')).toContainText('commercial');
+});

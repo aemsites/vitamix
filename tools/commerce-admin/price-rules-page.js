@@ -42,6 +42,7 @@ import {
   cartRuleScopeSummary,
   promotionScopeFromConditions,
   promotionScopeSummary,
+  splitPromotionProductPicksByMarket,
 } from './product-conditions.js';
 import {
   normalizeShippingBenefitMode as normalizeCartRuleShippingMode,
@@ -1081,6 +1082,19 @@ const PROMO_SCOPE_INPUT_IDS = /** @type {const} */ ({
 });
 
 /**
+ * @param {import('./product-conditions.js').PromotionScopeForm} scope
+ * @param {string} market
+ */
+function assertPromotionScopeMatchesMarket(scope, market) {
+  const { dropped } = splitPromotionProductPicksByMarket(scope, market);
+  if (dropped.length) {
+    throw new Error(
+      `Product conditions must be under this market (${market.toUpperCase()}): ${dropped.join(', ')}`,
+    );
+  }
+}
+
+/**
  * @param {HTMLDialogElement} dlg
  * @returns {import('./product-conditions.js').PromotionScopeForm}
  */
@@ -1163,6 +1177,22 @@ function wirePromotionScopeFields(dlg) {
     }));
   });
   dlg.querySelector('#pr-promo-form-market')?.addEventListener('change', () => {
+    const market = promotionDialogMarketSafe(dlg);
+    const scope = readPromotionScopeForm(dlg);
+    const { form, dropped } = splitPromotionProductPicksByMarket(scope, market);
+    if (dropped.length) {
+      applyPromotionScopeFormPrefill(dlg, { ...scope, ...form });
+      dlg.querySelectorAll('.psf-value-input').forEach((el) => {
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+    }
+    const note = dlg.querySelector('[data-pr-promo-scope-note]');
+    if (note instanceof HTMLElement) {
+      note.textContent = dropped.length
+        ? `Removed ${dropped.length} product pick${dropped.length === 1 ? '' : 's'} from another market: ${dropped.join(', ')}. Categories were kept.`
+        : '';
+      note.hidden = !dropped.length;
+    }
     promotionScopeSelectionFields.forEach((f) => {
       f.refresh().catch(() => {});
     });
@@ -1964,17 +1994,18 @@ function promotionEditFormInnerHtml(initialMarket, lines, opts = {}) {
       </div>
       <div class="coupons-field coupons-field-full">
         <label>Don't count these products</label>
-        <p class="coupons-field-hint">Products and categories that never count toward the minimum. Excluded products win over included categories.</p>
+        <p class="coupons-field-hint">Products and categories that never count toward the minimum. Product picks win over category picks; within each, excluded wins over included.</p>
         <div data-pr-promo-psf-mount="excluded"></div>
         <input type="text" id="pr-promo-excluded-categories" autocomplete="off" />
         <input type="text" id="pr-promo-excluded-products" autocomplete="off" />
       </div>
       <div class="coupons-field coupons-field-full">
         <label>Never apply when the cart contains</label>
-        <p class="coupons-field-hint">The promotion doesn't apply at all when any of these products or categories is in the cart, whatever the subtotal.</p>
+        <p class="coupons-field-hint">The promotion doesn't apply at all when any of these products or categories is in the cart, whatever the subtotal. Product picks match only the language of the selected index; in Canada, pick categories to cover both English and French pages.</p>
         <div data-pr-promo-psf-mount="disqualifying"></div>
         <input type="text" id="pr-promo-disqualifying-categories" autocomplete="off" />
         <input type="text" id="pr-promo-disqualifying-products" autocomplete="off" />
+        <p class="coupons-field-hint" data-pr-promo-scope-note role="status" hidden></p>
       </div>
       ${couponGateBlock}
     </div>
@@ -2263,6 +2294,7 @@ async function openPromotionAddDialog() {
         || String(new Date().getFullYear());
       const minCart = readPromotionMinCartCondition(dialog);
       const scope = readPromotionScopeForm(dialog);
+      assertPromotionScopeMatchesMarket(scope, market);
       const couponGate = readPromotionCouponGateMock(dialog);
       if (couponGate.enabled && sortedPromotionCouponTypes().length && !couponGate.couponId) {
         throw new Error('Select a coupon for the mock access gate, or turn off coupon gating.');
@@ -2416,6 +2448,7 @@ async function openPromotionEditDialog(countryKey, promoId) {
         || String(new Date().getFullYear());
       const minCart = readPromotionMinCartCondition(dialog);
       const scope = readPromotionScopeForm(dialog);
+      assertPromotionScopeMatchesMarket(scope, market);
       const couponGate = readPromotionCouponGateMock(dialog);
       if (couponGate.enabled && sortedPromotionCouponTypes().length && !couponGate.couponId) {
         throw new Error('Select a coupon for the mock access gate, or turn off coupon gating.');

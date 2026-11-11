@@ -3,7 +3,7 @@
  * Wire format: `string[] | { path: string; sku?: string }[]` (helix-commerce-api).
  */
 
-import { productUrlToCatalogPath } from './price-rules-api.js';
+import { countryKeyFromCatalogPath, productUrlToCatalogPath } from './price-rules-api.js';
 
 /**
  * @typedef {{ path: string; sku?: string }} ProductCondition
@@ -282,4 +282,29 @@ export function promotionScopeSummary(conditions) {
     part('not', 'excludedProducts', 'excludedCategories'),
     part('never with', 'disqualifyingProducts', 'disqualifyingCategories'),
   ].filter(Boolean).join(' · ');
+}
+
+/**
+ * Split promotion product picks into those under `market` and those under another market
+ * (catalog paths carry the market prefix, so the others never match a cart line).
+ *
+ * @param {Partial<PromotionScopeForm>} form
+ * @param {string} market us|ca|mx
+ * @returns {{ form: Partial<PromotionScopeForm>, dropped: string[] }}
+ */
+export function splitPromotionProductPicksByMarket(form, market) {
+  const next = { ...form };
+  /** @type {string[]} */
+  const dropped = [];
+  PROMOTION_PRODUCT_KEYS.forEach((k) => {
+    const tokens = String(form[k] ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+    const keep = tokens.filter((token) => {
+      const { path } = parseProductConditionsInput(token)[0];
+      if (countryKeyFromCatalogPath(path) === market) return true;
+      dropped.push(token);
+      return false;
+    });
+    next[k] = keep.join(', ');
+  });
+  return { form: next, dropped };
 }

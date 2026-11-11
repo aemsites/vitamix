@@ -4,6 +4,7 @@ import {
   buildPromotionConditions,
   promotionScopeFromConditions,
   promotionScopeSummary,
+  splitPromotionProductPicksByMarket,
 } from '../../tools/commerce-admin/product-conditions.js';
 
 const empty = {
@@ -97,4 +98,19 @@ test('summary lists scope and disqualifiers', () => {
     }),
     'only: blenders, a (S) · not: refurb · never with: commercial',
   );
+});
+
+test('splits product picks from another market and leaves categories alone', () => {
+  const { form, dropped } = splitPromotionProductPicksByMarket({
+    ...empty,
+    includedProducts: '/us/en_us/products/a, /ca/en_us/products/b|S',
+    disqualifyingProducts: '/us/en_us/products/x',
+    disqualifyingCategories: 'commercial',
+  }, 'ca');
+  assert.deepEqual(dropped, ['/us/en_us/products/a', '/us/en_us/products/x']);
+  assert.deepEqual(form, {
+    ...empty,
+    includedProducts: '/ca/en_us/products/b|S',
+    disqualifyingCategories: 'commercial',
+  });
 });
