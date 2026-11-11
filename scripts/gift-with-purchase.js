@@ -7,6 +7,10 @@
  * `custom.promotionName`. The promotion id also disambiguates removal so a paid
  * copy of the same SKU is never touched.
  *
+ * Gifts never apply to commercial orders: a cart with any line flagged
+ * `custom.isCommercial` (the same signal the EBS sync uses to set the
+ * "Commercial" order type) gets no gifts, and any gift already in it is removed.
+ *
  * Triggers (wired by `initGWP` and by the cart/checkout blocks):
  *   - `loadLazy` if the cart already has items (restored from localStorage)
  *   - Every `cart:change` event (refetches only on `add`)
@@ -158,10 +162,25 @@ function ruleIsActive(rule, now) {
 }
 
 /**
+ * Whether the cart is a commercial order. Mirrors the EBS sync, which sets the
+ * "Commercial" order type when any item carries `custom.isCommercial === true`.
+ *
+ * @param {{ items: Array }} currentCart
+ * @returns {boolean}
+ */
+function isCommercialCart(currentCart) {
+  return currentCart.items.some((item) => item.custom?.isCommercial === true);
+}
+
+/**
  * Returns the set of GWP rules that should currently be applied, keyed by
- * `${promotionId}::${rule.path}`. Each value is `{ promotion, rule }`.
+ * `${promotionId}::${rule.path}`. Each value is `{ promotion, rule }`. Empty
+ * for commercial carts, which are not eligible for any gift.
  */
 function computeApplicableRules(payload, currentCart) {
+  // Gifts don't apply to commercial orders.
+  if (isCommercialCart(currentCart)) return new Map();
+
   const locale = getConfig().getLocale();
   const now = getNow();
 
@@ -321,14 +340,15 @@ function addMissingGifts(applicable) {
 /**
  * Reconcile the cart against the currently-cached rules. Adds gift lines that
  * should be present and removes ones that no longer qualify. Safe to call
- * without rules loaded — does nothing in that case.
+ * without rules loaded — does nothing in that case, except that gifts are still
+ * removed from a commercial cart, since that needs no rules.
  *
  * @returns {Promise<void>}
  */
 export async function evaluateGWP() {
   if (isApplyingGWP) return;
-  if (!inMemoryCache?.payload) return;
-  const applicable = computeApplicableRules(inMemoryCache.payload, cart);
+  if (!inMemoryCache?.payload && !isCommercialCart(cart)) return;
+  const applicable = computeApplicableRules(inMemoryCache?.payload, cart);
 
   isApplyingGWP = true;
   try {
@@ -358,7 +378,7 @@ export function initGWP() {
     if (action === 'add' || action === 'restore') {
       await ensurePriceRulesLoaded();
     }
-    if (!inMemoryCache?.payload) return;
+    // evaluateGWP() is a no-op without rules, unless the cart is commercial.
     evaluateGWP();
   });
 
