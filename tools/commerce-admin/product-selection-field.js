@@ -164,6 +164,8 @@ export async function hydrateProductScopePills(container, options) {
  *   products: string;
  *   categories: string;
  *   productsOnly?: boolean;
+ *   categoriesOnly?: boolean;
+ *   noCategories?: boolean;
  *   fixedLocale?: boolean;
  *   validateSelection?: (selection: { products: string; categories: string }) => Promise<void>;
  * }} options
@@ -228,6 +230,8 @@ export function openProductSelectorModal(options) {
       localePath: options.fixedLocale ? localePath : localePathForProductSelector(localePath),
       syncUrl: false,
       productsOnly: options.productsOnly,
+      categoriesOnly: options.categoriesOnly,
+      noCategories: options.noCategories,
       fixedLocale: options.fixedLocale,
     });
 
@@ -273,7 +277,11 @@ export function openProductSelectorModal(options) {
  *   label?: string;
  *   emptyText?: string;
  *   editable?: boolean;
- * }} options
+ *   categoriesOnly?: boolean;
+ *   noCategories?: boolean;
+ *   fixedLocale?: boolean;
+ * }} options `fixedLocale` hides the selector's index switch; `categoriesOnly` /
+ *   `noCategories` limit what can be picked
  */
 export function mountProductSelectionField(container, options) {
   ensureProductSelectionStyles();
@@ -389,6 +397,9 @@ export function mountProductSelectionField(container, options) {
       localePath: getLocalePath(),
       products: productsInput.value,
       categories: categoriesInput.value,
+      categoriesOnly: options.categoriesOnly,
+      noCategories: options.noCategories,
+      fixedLocale: options.fixedLocale,
     });
     if (!result) return;
     setValues(parseCommaList(result.products), parseCommaList(result.categories));

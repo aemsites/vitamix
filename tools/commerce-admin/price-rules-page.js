@@ -41,11 +41,13 @@ import {
   cartRuleProductScopeFromConditions,
   cartRuleScopeSummary,
   collapseProductPicksAcrossCatalogs,
+  formatProductConditionEntry,
+  primaryLanguagePicks,
   expandProductPicksAcrossCatalogs,
   mapPromotionProductPicks,
   promotionScopeFromConditions,
   promotionScopeSummary,
-  splitPromotionProductPicksByMarket,
+  splitProductPicksByRegion,
 } from './product-conditions.js';
 import {
   normalizeShippingBenefitMode as normalizeCartRuleShippingMode,
@@ -1075,27 +1077,71 @@ function readPromotionCouponGateMock(dlg) {
   return { enabled, couponId };
 }
 
-/** Promotion scope form: hidden input ids by condition key. */
-const PROMO_SCOPE_INPUT_IDS = /** @type {const} */ ({
-  includedProducts: 'pr-promo-included-products',
-  includedCategories: 'pr-promo-included-categories',
-  excludedProducts: 'pr-promo-excluded-products',
-  excludedCategories: 'pr-promo-excluded-categories',
-  disqualifyingProducts: 'pr-promo-disqualifying-products',
-  disqualifyingCategories: 'pr-promo-disqualifying-categories',
-});
+/** Promotion scope kinds: form id prefix → condition keys and labels. */
+const PROMO_SCOPE_KINDS = /** @type {const} */ ([
+  {
+    kind: 'included',
+    productsKey: 'includedProducts',
+    categoriesKey: 'includedCategories',
+    label: 'Only count these products',
+    emptyCategories: 'Any category',
+    emptyProducts: 'Any product',
+  },
+  {
+    kind: 'excluded',
+    productsKey: 'excludedProducts',
+    categoriesKey: 'excludedCategories',
+    label: 'Don\'t count these products',
+    emptyCategories: 'None',
+    emptyProducts: 'None',
+  },
+  {
+    kind: 'disqualifying',
+    productsKey: 'disqualifyingProducts',
+    categoriesKey: 'disqualifyingCategories',
+    label: 'Never apply when the cart contains',
+    emptyCategories: 'None',
+    emptyProducts: 'None',
+  },
+]);
+
+/** Regions with their own product picks (each region's storefront has its own paths). */
+const PROMO_SCOPE_REGIONS = /** @type {const} */ (['us', 'ca']);
+
+/** @type {Record<(typeof PROMO_SCOPE_REGIONS)[number], { label: string, locale: string }>} */
+const PROMO_SCOPE_REGION_INFO = {
+  us: { label: 'US', locale: 'us/en_us' },
+  ca: { label: 'Canada', locale: 'ca/en_us' },
+};
+
+/** @param {string} kind @param {string} region `us` | `ca` | `other` */
+const promoScopeProductsInputId = (kind, region) => `pr-promo-${kind}-products-${region}`;
+/** @param {string} kind */
+const promoScopeCategoriesInputId = (kind) => `pr-promo-${kind}-categories`;
 
 /**
- * @param {import('./product-conditions.js').PromotionScopeForm} scope
- * @param {string} market
+ * @param {ParentNode} dlg
+ * @param {string} id
+ * @returns {HTMLInputElement | null}
  */
-function assertPromotionScopeMatchesMarket(scope, market) {
-  const { dropped } = splitPromotionProductPicksByMarket(scope, market);
-  if (dropped.length) {
-    throw new Error(
-      `Product conditions must be under this market (${market.toUpperCase()}): ${dropped.join(', ')}`,
-    );
-  }
+function promoScopeInput(dlg, id) {
+  const el = dlg.querySelector(`#${id}`);
+  return el instanceof HTMLInputElement ? el : null;
+}
+
+/**
+ * Comma-separated product picks per region as entered in the form (before save-time language
+ * copies are added).
+ *
+ * @param {HTMLDialogElement} dlg
+ * @param {string} kind
+ * @returns {Record<string, string>}
+ */
+function readPromotionScopeRegionPicks(dlg, kind) {
+  return Object.fromEntries([...PROMO_SCOPE_REGIONS, 'other'].map((region) => [
+    region,
+    String(promoScopeInput(dlg, promoScopeProductsInputId(kind, region))?.value ?? '').trim(),
+  ]));
 }
 
 /**
@@ -1105,10 +1151,32 @@ function assertPromotionScopeMatchesMarket(scope, market) {
 function readPromotionScopeForm(dlg) {
   /** @type {Record<string, string>} */
   const out = {};
-  Object.entries(PROMO_SCOPE_INPUT_IDS).forEach(([key, id]) => {
-    out[key] = String(dlg.querySelector(`#${id}`)?.value ?? '').trim();
+  PROMO_SCOPE_KINDS.forEach(({ kind, productsKey, categoriesKey }) => {
+    out[productsKey] = Object.values(readPromotionScopeRegionPicks(dlg, kind))
+      .filter(Boolean).join(', ');
+    out[categoriesKey] = String(
+      promoScopeInput(dlg, promoScopeCategoriesInputId(kind))?.value ?? '',
+    ).trim();
   });
   return /** @type {import('./product-conditions.js').PromotionScopeForm} */ (out);
+}
+
+/**
+ * Scope form for save: Canada picks also get their French page.
+ *
+ * @param {HTMLDialogElement} dlg
+ * @returns {Promise<import('./product-conditions.js').PromotionScopeForm>}
+ */
+async function readPromotionScopeFormForSave(dlg) {
+  const out = readPromotionScopeForm(dlg);
+  await Promise.all(PROMO_SCOPE_KINDS.map(async ({ kind, productsKey }) => {
+    const picks = readPromotionScopeRegionPicks(dlg, kind);
+    if (!picks.ca) return;
+    const catalogs = await loadMarketCatalogs('ca');
+    picks.ca = expandProductPicksAcrossCatalogs(picks.ca, catalogs);
+    out[productsKey] = Object.values(picks).filter(Boolean).join(', ');
+  }));
+  return out;
 }
 
 /**
@@ -1116,9 +1184,14 @@ function readPromotionScopeForm(dlg) {
  * @param {import('./product-conditions.js').PromotionScopeForm} scope
  */
 function applyPromotionScopeFormPrefill(dlg, scope) {
-  Object.entries(PROMO_SCOPE_INPUT_IDS).forEach(([key, id]) => {
-    const el = dlg.querySelector(`#${id}`);
-    if (el instanceof HTMLInputElement) el.value = scope[key] || '';
+  PROMO_SCOPE_KINDS.forEach(({ kind, productsKey, categoriesKey }) => {
+    const picks = splitProductPicksByRegion(scope[productsKey], PROMO_SCOPE_REGIONS);
+    Object.entries(picks).forEach(([region, value]) => {
+      const el = promoScopeInput(dlg, promoScopeProductsInputId(kind, region));
+      if (el) el.value = value;
+    });
+    const cats = promoScopeInput(dlg, promoScopeCategoriesInputId(kind));
+    if (cats) cats.value = scope[categoriesKey] || '';
   });
 }
 
@@ -1155,7 +1228,6 @@ function applyPromotionFormConditions(promo, minCart, scope, preserveFrom) {
 /** Index locales per market; product picks are saved for each (primary first). */
 const MARKET_CATALOG_LOCALES = /** @type {Record<string, string[]>} */ ({
   ca: ['ca/en_us', 'ca/fr_ca'],
-  mx: ['mx/en_us', 'mx/es_mx'],
 });
 
 /** Category prefilled as a disqualifier once a new promotion gets conditions. */
@@ -1216,34 +1288,16 @@ async function fetchMarketCatalogs(locales) {
 }
 
 /**
- * Product picks for every language of the market (saved form).
- *
- * @param {import('./product-conditions.js').PromotionScopeForm} scope
- * @param {string} market
- */
-async function expandPromotionScopeForMarket(scope, market) {
-  const hasProducts = scope.includedProducts || scope.excludedProducts
-    || scope.disqualifyingProducts;
-  if (!hasProducts) return scope;
-  const catalogs = await loadMarketCatalogs(market);
-  if (!catalogs) return scope;
-  return mapPromotionProductPicks(scope, (raw) => expandProductPicksAcrossCatalogs(raw, catalogs));
-}
-
-/**
- * Product picks as shown in the form (primary language only, where a match exists).
+ * Product picks as shown in the form: French copies of Canada picks are hidden.
  * Falls back to the stored picks when an index can't be loaded.
  *
  * @param {import('./product-conditions.js').PromotionScopeForm} scope
- * @param {string} market
  */
-async function collapsePromotionScopeForMarket(scope, market) {
-  const hasProducts = scope.includedProducts || scope.excludedProducts
-    || scope.disqualifyingProducts;
-  if (!hasProducts) return scope;
+async function collapsePromotionScopeLanguages(scope) {
+  const hasCa = PROMO_SCOPE_KINDS.some(({ productsKey }) => /(^|,\s*)\/ca\//.test(scope[productsKey] || ''));
+  if (!hasCa) return scope;
   try {
-    const catalogs = await loadMarketCatalogs(market);
-    if (!catalogs) return scope;
+    const catalogs = await loadMarketCatalogs('ca');
     return mapPromotionProductPicks(
       scope,
       (raw) => collapseProductPicksAcrossCatalogs(raw, catalogs),
@@ -1260,12 +1314,13 @@ async function collapsePromotionScopeForMarket(scope, market) {
  * @param {HTMLDialogElement} dlg
  */
 function wirePromotionDefaultDisqualifier(dlg) {
-  const target = dlg.querySelector(`#${PROMO_SCOPE_INPUT_IDS.disqualifyingCategories}`);
+  const target = promoScopeInput(dlg, promoScopeCategoriesInputId('disqualifying'));
   const minCb = dlg.querySelector('#pr-promo-min-cart-enabled');
-  if (!(target instanceof HTMLInputElement) || !(minCb instanceof HTMLInputElement)) return;
-  const others = ['includedProducts', 'includedCategories', 'excludedProducts', 'excludedCategories']
-    .map((k) => dlg.querySelector(`#${PROMO_SCOPE_INPUT_IDS[k]}`))
-    .filter((el) => el instanceof HTMLInputElement);
+  if (!target || !(minCb instanceof HTMLInputElement)) return;
+  const others = ['included', 'excluded'].flatMap((kind) => [
+    promoScopeInput(dlg, promoScopeCategoriesInputId(kind)),
+    ...PROMO_SCOPE_REGIONS.map((r) => promoScopeInput(dlg, promoScopeProductsInputId(kind, r))),
+  ]).filter(Boolean);
   let auto = false;
   let touched = false;
   let syncing = false;
@@ -1293,6 +1348,47 @@ function wirePromotionDefaultDisqualifier(dlg) {
   others.forEach((el) => el.addEventListener('input', sync));
 }
 
+/** @param {string} raw */
+function promoScopePickCount(raw) {
+  return String(raw || '').split(',').filter((t) => t.trim()).length;
+}
+
+/**
+ * Categories field plus one products tab per region, for each scope kind.
+ *
+ * @param {(typeof COUNTRIES)[number]} market selects the initial products tab
+ */
+function promotionScopeFieldsHtml(market) {
+  const initial = PROMO_SCOPE_REGIONS.includes(/** @type {'us'|'ca'} */ (market)) ? market : 'us';
+  const hints = {
+    included: 'Products and categories that count toward the minimum. Leave empty to count every paid product. Without a minimum, the cart must contain one of them.',
+    excluded: 'Products and categories that never count toward the minimum. Product picks win over category picks; within each, excluded wins over included.',
+    disqualifying: 'The promotion doesn\'t apply at all when any of these products or categories is in the cart, whatever the subtotal.',
+  };
+  return PROMO_SCOPE_KINDS.map(({ kind, label }) => {
+    const tabs = PROMO_SCOPE_REGIONS.map((region) => `
+          <button type="button" role="tab" class="pr-promo-scope-tab" data-pr-promo-scope-tab="${region}"
+            aria-selected="${region === initial}">${escapeHtml(PROMO_SCOPE_REGION_INFO[region].label)} <span class="pr-promo-scope-tab-count" data-pr-promo-scope-count="${region}"></span></button>`).join('');
+    const panels = PROMO_SCOPE_REGIONS.map((region) => `
+        <div role="tabpanel" class="pr-promo-scope-panel" data-pr-promo-scope-panel="${region}"${region === initial ? '' : ' hidden'}>
+          <div data-pr-promo-psf-mount="${kind}-${region}"></div>
+          <input type="text" id="${promoScopeProductsInputId(kind, region)}" autocomplete="off" />
+        </div>`).join('');
+    return `
+      <div class="coupons-field coupons-field-full pr-promo-scope-field" data-pr-promo-scope="${kind}">
+        <label>${escapeHtml(label)}</label>
+        <p class="coupons-field-hint">${escapeHtml(hints[kind])}</p>
+        <span class="pr-promo-scope-subhead">Categories</span>
+        <div data-pr-promo-psf-mount="${kind}-categories"></div>
+        <input type="text" id="${promoScopeCategoriesInputId(kind)}" autocomplete="off" />
+        <span class="pr-promo-scope-subhead">Products</span>
+        <div class="pr-promo-scope-tabs" role="tablist" aria-label="${escapeHtml(label)}: products by region">${tabs}
+        </div>${panels}
+        <input type="hidden" id="${promoScopeProductsInputId(kind, 'other')}" />
+      </div>`;
+  }).join('');
+}
+
 /** @type {Array<{ destroy: () => void; refresh: () => Promise<void> }>} */
 let promotionScopeSelectionFields = [];
 
@@ -1300,45 +1396,73 @@ let promotionScopeSelectionFields = [];
 function wirePromotionScopeFields(dlg) {
   promotionScopeSelectionFields.forEach((f) => f.destroy());
   promotionScopeSelectionFields = [];
-  const getLocalePath = () => localePathForCartRuleMarket(promotionDialogMarketSafe(dlg));
-  const input = (id) => /** @type {HTMLInputElement | null} */ (dlg.querySelector(`#${id}`));
-  /** @type {Array<[string, string, string, string, string]>} */
-  const fields = [
-    ['included', 'includedProducts', 'includedCategories', 'Only count these products', 'Any product — click to limit to products or categories.'],
-    ['excluded', 'excludedProducts', 'excludedCategories', 'Don\'t count these products', 'None — click to add products or categories.'],
-    ['disqualifying', 'disqualifyingProducts', 'disqualifyingCategories', 'Never apply when the cart contains', 'None — click to add products or categories.'],
-  ];
-  fields.forEach(([kind, productsKey, categoriesKey, label, emptyText]) => {
-    const mount = dlg.querySelector(`[data-pr-promo-psf-mount="${kind}"]`);
-    const productsInput = input(PROMO_SCOPE_INPUT_IDS[productsKey]);
-    const categoriesInput = input(PROMO_SCOPE_INPUT_IDS[categoriesKey]);
-    if (!(mount instanceof HTMLElement) || !productsInput || !categoriesInput) return;
-    promotionScopeSelectionFields.push(mountProductSelectionField(mount, {
-      productsInput,
-      categoriesInput,
-      getLocalePath,
-      label,
-      emptyText,
-    }));
-  });
-  dlg.querySelector('#pr-promo-form-market')?.addEventListener('change', () => {
-    const market = promotionDialogMarketSafe(dlg);
-    const scope = readPromotionScopeForm(dlg);
-    const { form, dropped } = splitPromotionProductPicksByMarket(scope, market);
-    if (dropped.length) {
-      applyPromotionScopeFormPrefill(dlg, { ...scope, ...form });
-      ['includedProducts', 'excludedProducts', 'disqualifyingProducts'].forEach((k) => {
-        dlg.querySelector(`#${PROMO_SCOPE_INPUT_IDS[k]}`)?.dispatchEvent(new Event('input', { bubbles: true }));
+  const categoriesLocale = () => localePathForCartRuleMarket(promotionDialogMarketSafe(dlg));
+  /** @type {Array<{ destroy: () => void; refresh: () => Promise<void> }>} */
+  const categoryFields = [];
+
+  PROMO_SCOPE_KINDS.forEach(({
+    kind, label, emptyCategories, emptyProducts,
+  }) => {
+    const field = dlg.querySelector(`[data-pr-promo-scope="${kind}"]`);
+    if (!(field instanceof HTMLElement)) return;
+    const unusedInput = () => document.createElement('input');
+
+    const catMount = field.querySelector(`[data-pr-promo-psf-mount="${kind}-categories"]`);
+    const catInput = promoScopeInput(dlg, promoScopeCategoriesInputId(kind));
+    if (catMount instanceof HTMLElement && catInput) {
+      const f = mountProductSelectionField(catMount, {
+        productsInput: unusedInput(),
+        categoriesInput: catInput,
+        getLocalePath: categoriesLocale,
+        label: `${label}: categories`,
+        emptyText: `${emptyCategories} — click to pick categories.`,
+        categoriesOnly: true,
       });
+      categoryFields.push(f);
+      promotionScopeSelectionFields.push(f);
     }
-    const note = dlg.querySelector('[data-pr-promo-scope-note]');
-    if (note instanceof HTMLElement) {
-      note.textContent = dropped.length
-        ? `Removed ${dropped.length} product pick${dropped.length === 1 ? '' : 's'} from another market: ${dropped.join(', ')}. Categories were kept.`
-        : '';
-      note.hidden = !dropped.length;
-    }
-    promotionScopeSelectionFields.forEach((f) => {
+
+    const updateCounts = () => {
+      PROMO_SCOPE_REGIONS.forEach((region) => {
+        const input = promoScopeInput(dlg, promoScopeProductsInputId(kind, region));
+        const n = promoScopePickCount(input?.value);
+        const el = field.querySelector(`[data-pr-promo-scope-count="${region}"]`);
+        if (el) el.textContent = n ? `(${n})` : '';
+      });
+    };
+    PROMO_SCOPE_REGIONS.forEach((region) => {
+      const mount = field.querySelector(`[data-pr-promo-psf-mount="${kind}-${region}"]`);
+      const input = promoScopeInput(dlg, promoScopeProductsInputId(kind, region));
+      if (!(mount instanceof HTMLElement) || !input) return;
+      const { label: regionLabel, locale } = PROMO_SCOPE_REGION_INFO[region];
+      promotionScopeSelectionFields.push(mountProductSelectionField(mount, {
+        productsInput: input,
+        categoriesInput: unusedInput(),
+        getLocalePath: () => locale,
+        label: `${label}: ${regionLabel} products`,
+        emptyText: `${emptyProducts} — click to pick ${regionLabel} products.`,
+        noCategories: true,
+        fixedLocale: true,
+      }));
+      input.addEventListener('input', updateCounts);
+    });
+    updateCounts();
+
+    field.querySelectorAll('[data-pr-promo-scope-tab]').forEach((tab) => {
+      tab.addEventListener('click', () => {
+        const region = tab.getAttribute('data-pr-promo-scope-tab');
+        field.querySelectorAll('[data-pr-promo-scope-tab]').forEach((t) => {
+          t.setAttribute('aria-selected', String(t === tab));
+        });
+        field.querySelectorAll('[data-pr-promo-scope-panel]').forEach((panel) => {
+          /** @type {HTMLElement} */ (panel).hidden = panel.getAttribute('data-pr-promo-scope-panel') !== region;
+        });
+      });
+    });
+  });
+
+  dlg.querySelector('#pr-promo-form-market')?.addEventListener('change', () => {
+    categoryFields.forEach((f) => {
       f.refresh().catch(() => {});
     });
   });
@@ -2131,28 +2255,9 @@ function promotionEditFormInnerHtml(initialMarket, lines, opts = {}) {
         </div>
       </div>
       <div class="coupons-field coupons-field-full">
-        <label>Only count these products</label>
-        <p class="coupons-field-hint">Products and categories that count toward the minimum. Leave empty to count every paid product. Without a minimum, the cart must contain one of them. Uses the product index for the selected market.</p>
-        <div data-pr-promo-psf-mount="included"></div>
-        <input type="text" id="pr-promo-included-categories" autocomplete="off" />
-        <input type="text" id="pr-promo-included-products" autocomplete="off" />
+        <p class="coupons-field-hint">Categories apply in every region and language. Pick products per region; a Canada product also covers its French page. ${edit ? '' : `<code>${DEFAULT_DISQUALIFYING_CATEGORY}</code> is added under "Never apply" once you set a minimum or scope; remove it if commercial products should qualify.`}</p>
       </div>
-      <div class="coupons-field coupons-field-full">
-        <label>Don't count these products</label>
-        <p class="coupons-field-hint">Products and categories that never count toward the minimum. Product picks win over category picks; within each, excluded wins over included.</p>
-        <div data-pr-promo-psf-mount="excluded"></div>
-        <input type="text" id="pr-promo-excluded-categories" autocomplete="off" />
-        <input type="text" id="pr-promo-excluded-products" autocomplete="off" />
-      </div>
-      <div class="coupons-field coupons-field-full">
-        <label>Never apply when the cart contains</label>
-        ${edit ? '' : `<p class="coupons-field-hint">Starts with <code>${DEFAULT_DISQUALIFYING_CATEGORY}</code> once you add a minimum or scope (gift promotions). Remove it if commercial products should qualify.</p>`}
-        <p class="coupons-field-hint">The promotion doesn't apply at all when any of these products or categories is in the cart, whatever the subtotal. Categories are the safest choice: they match every language. Product picks are saved for each language of the market (Canada: English and French; Mexico: English and Spanish) when the product is in both indexes.</p>
-        <div data-pr-promo-psf-mount="disqualifying"></div>
-        <input type="text" id="pr-promo-disqualifying-categories" autocomplete="off" />
-        <input type="text" id="pr-promo-disqualifying-products" autocomplete="off" />
-        <p class="coupons-field-hint" data-pr-promo-scope-note role="status" hidden></p>
-      </div>
+      ${promotionScopeFieldsHtml(initialMarket)}
       ${couponGateBlock}
     </div>
     <div class="pr-promo-form-lines-header">
@@ -2440,9 +2545,7 @@ async function openPromotionAddDialog() {
       const group = String(dialog.querySelector('#pr-promo-form-group')?.value ?? '').trim()
         || String(new Date().getFullYear());
       const minCart = readPromotionMinCartCondition(dialog);
-      const formScope = readPromotionScopeForm(dialog);
-      assertPromotionScopeMatchesMarket(formScope, market);
-      const scope = await expandPromotionScopeForMarket(formScope, market);
+      const scope = await readPromotionScopeFormForSave(dialog);
       const couponGate = readPromotionCouponGateMock(dialog);
       if (couponGate.enabled && sortedPromotionCouponTypes().length && !couponGate.couponId) {
         throw new Error('Select a coupon for the mock access gate, or turn off coupon gating.');
@@ -2519,9 +2622,8 @@ async function openPromotionEditDialog(countryKey, promoId, { isCancelled = () =
   const rows = rulesCo.flatMap(catalogRuleToPromotionRows);
   const groupGuess = promotionCatalogGroup(promo, ck);
   const selectedCouponId = promotionCouponGateSelection(promoId);
-  const prefillScope = await collapsePromotionScopeForMarket(
+  const prefillScope = await collapsePromotionScopeLanguages(
     promotionScopeFromConditions(promo.conditions),
-    ck,
   );
   if (isCancelled()) return;
 
@@ -2601,9 +2703,7 @@ async function openPromotionEditDialog(countryKey, promoId, { isCancelled = () =
       const group = String(dialog.querySelector('#pr-promo-form-group')?.value ?? '').trim()
         || String(new Date().getFullYear());
       const minCart = readPromotionMinCartCondition(dialog);
-      const formScope = readPromotionScopeForm(dialog);
-      assertPromotionScopeMatchesMarket(formScope, market);
-      const scope = await expandPromotionScopeForMarket(formScope, market);
+      const scope = await readPromotionScopeFormForSave(dialog);
       const couponGate = readPromotionCouponGateMock(dialog);
       if (couponGate.enabled && sortedPromotionCouponTypes().length && !couponGate.couponId) {
         throw new Error('Select a coupon for the mock access gate, or turn off coupon gating.');
@@ -2807,16 +2907,46 @@ function hydrateCartRuleDetailScopePills(root, cond, countryKey) {
  */
 function hydratePromotionDetailScopePills(root, cond, countryKey) {
   const c = cond && typeof cond === 'object' ? cond : {};
-  const localePath = localePathForCartRuleMarket(countryKey);
+  const marketLocale = localePathForCartRuleMarket(countryKey);
   root.querySelectorAll('[data-pr-promo-scope-pills]').forEach((el) => {
     if (!(el instanceof HTMLElement)) return;
     const kind = el.getAttribute('data-pr-promo-scope-pills');
-    hydrateProductScopePills(el, {
-      productsRaw: scopeListRawForHydrate(c[`${kind}Products`]),
-      categoriesRaw: scopeListRawForHydrate(c[`${kind}Categories`]),
-      localePath,
-      emptyText: el.getAttribute('data-pr-scope-empty') || 'None',
-    }).catch(() => {});
+    const emptyText = el.getAttribute('data-pr-scope-empty') || 'None';
+    const categories = scopeListRawForHydrate(c[`${kind}Categories`]);
+    const products = primaryLanguagePicks(scopeListRawForHydrate(c[`${kind}Products`]))
+      .map((entry) => (typeof entry === 'string' ? entry : formatProductConditionEntry(entry)));
+    const byRegion = splitProductPicksByRegion(products.join(', '), PROMO_SCOPE_REGIONS);
+    /** @type {Array<[string, string[], string[], string]>} label, products, categories, locale */
+    const groups = [];
+    if (categories.length) groups.push(['Categories', [], categories, marketLocale]);
+    [...PROMO_SCOPE_REGIONS, 'other'].forEach((region) => {
+      const picks = byRegion[region] ? byRegion[region].split(', ') : [];
+      if (!picks.length) return;
+      const info = PROMO_SCOPE_REGION_INFO[region];
+      groups.push([info?.label || 'Other', picks, [], info?.locale || marketLocale]);
+    });
+    if (!groups.length) {
+      el.innerHTML = `<span class="coupons-muted">${escapeHtml(emptyText)}</span>`;
+      return;
+    }
+    el.classList.remove('ps-pills', 'coupons-modal-tags');
+    el.replaceChildren(...groups.map(([label, productsRaw, categoriesRaw, localePath]) => {
+      const group = document.createElement('div');
+      group.className = 'pr-promo-scope-detail-group';
+      if (label) {
+        const heading = document.createElement('span');
+        heading.className = 'pr-promo-scope-subhead';
+        heading.textContent = label;
+        group.append(heading);
+      }
+      const pills = document.createElement('div');
+      pills.className = 'coupons-modal-tags ps-pills';
+      group.append(pills);
+      hydrateProductScopePills(pills, {
+        productsRaw, categoriesRaw, localePath, emptyText,
+      }).catch(() => {});
+      return group;
+    }));
   });
 }
 

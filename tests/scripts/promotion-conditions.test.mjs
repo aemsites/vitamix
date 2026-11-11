@@ -6,7 +6,8 @@ import {
   expandProductPicksAcrossCatalogs,
   promotionScopeFromConditions,
   promotionScopeSummary,
-  splitPromotionProductPicksByMarket,
+  primaryLanguagePicks,
+  splitProductPicksByRegion,
 } from '../../tools/commerce-admin/product-conditions.js';
 
 const empty = {
@@ -98,23 +99,28 @@ test('summary lists scope and disqualifiers', () => {
       excludedProducts: ['/us/en_us/products/refurb'],
       disqualifyingCategories: ['commercial'],
     }),
-    'only: blenders, a (S) · not: refurb · never with: commercial',
+    'only: blenders, US: a (S) · not: US: refurb · never with: commercial',
   );
 });
 
-test('splits product picks from another market and leaves categories alone', () => {
-  const { form, dropped } = splitPromotionProductPicksByMarket({
-    ...empty,
-    includedProducts: '/us/en_us/products/a, /ca/en_us/products/b|S',
-    disqualifyingProducts: '/us/en_us/products/x',
-    disqualifyingCategories: 'commercial',
-  }, 'ca');
-  assert.deepEqual(dropped, ['/us/en_us/products/a', '/us/en_us/products/x']);
-  assert.deepEqual(form, {
-    ...empty,
-    includedProducts: '/ca/en_us/products/b|S',
-    disqualifyingCategories: 'commercial',
-  });
+test('groups product picks by region and keeps others aside', () => {
+  assert.deepEqual(
+    splitProductPicksByRegion('/us/en_us/products/a, /ca/en_us/products/b|S, /ca/fr_ca/products/b-fr, /mx/en_us/products/c', ['us', 'ca']),
+    {
+      us: '/us/en_us/products/a',
+      ca: '/ca/en_us/products/b|S, /ca/fr_ca/products/b-fr',
+      other: '/mx/en_us/products/c',
+    },
+  );
+  assert.deepEqual(splitProductPicksByRegion('', ['us', 'ca']), { us: '', ca: '', other: '' });
+});
+
+test('hides French copies only when the region has English picks', () => {
+  assert.deepEqual(
+    primaryLanguagePicks([{ path: '/ca/en_us/products/a' }, { path: '/ca/fr_ca/products/a-fr' }, '/us/en_us/products/x']),
+    [{ path: '/ca/en_us/products/a' }, '/us/en_us/products/x'],
+  );
+  assert.deepEqual(primaryLanguagePicks(['/ca/fr_ca/products/a-fr']), ['/ca/fr_ca/products/a-fr']);
 });
 
 const catalog = (entries) => {
@@ -148,8 +154,8 @@ test('collapses expanded picks and keeps picks only in another catalog', () => {
 
 test('summary lists a product once across languages', () => {
   assert.equal(
-    promotionScopeSummary({ disqualifyingProducts: ['/ca/en_us/products/a', '/ca/fr_ca/products/a'] }),
-    'never with: a',
+    promotionScopeSummary({ disqualifyingProducts: ['/ca/en_us/products/a', '/ca/fr_ca/products/a-fr', '/us/en_us/products/a'] }),
+    'never with: CA: a, US: a',
   );
 });
 

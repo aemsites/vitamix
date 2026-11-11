@@ -262,8 +262,52 @@ export function buildPromotionConditions(form, previous) {
   return Object.keys(out).length ? out : undefined;
 }
 
+/** Second-language index prefix → primary-language prefix of the same market. */
+const SECOND_LANGUAGE_PREFIXES = /** @type {Record<string, string>} */ ({
+  '/ca/fr_ca/': '/ca/en_us/',
+});
+
+/** @param {unknown} entry */
+function entryPath(entry) {
+  return formatProductConditionEntry(entry).split('|')[0];
+}
+
 /**
- * Short scope / disqualifier summary for the promotion list.
+ * Drop second-language copies of picks when the primary language has picks too
+ * (for display: those copies are added on save).
+ *
+ * @param {unknown[]} entries product conditions or form tokens
+ * @returns {unknown[]}
+ */
+export function primaryLanguagePicks(entries) {
+  const paths = entries.map(entryPath);
+  return entries.filter((entry) => {
+    const prefix = Object.keys(SECOND_LANGUAGE_PREFIXES)
+      .find((p) => entryPath(entry).startsWith(p));
+    return !prefix || !paths.some((p) => p.startsWith(SECOND_LANGUAGE_PREFIXES[prefix]));
+  });
+}
+
+/**
+ * Group product picks by region (`us`, `ca`, …); picks under any other region go to `other`.
+ *
+ * @param {string} raw comma-separated product picks
+ * @param {readonly string[]} regions
+ * @returns {Record<string, string>} comma-separated picks per region, plus `other`
+ */
+export function splitProductPicksByRegion(raw, regions) {
+  /** @type {Record<string, string[]>} */
+  const out = Object.fromEntries([...regions, 'other'].map((r) => [r, []]));
+  String(raw ?? '').split(',').map((t) => t.trim()).filter(Boolean)
+    .forEach((token) => {
+      const region = countryKeyFromCatalogPath(entryPath(token));
+      out[regions.includes(region) ? region : 'other'].push(token);
+    });
+  return Object.fromEntries(Object.entries(out).map(([k, v]) => [k, v.join(', ')]));
+}
+
+/**
+ * Short scope / disqualifier summary for the promotion list. Products are grouped by region.
  *
  * @param {Record<string, unknown> | null | undefined} conditions
  * @returns {string}
@@ -271,10 +315,18 @@ export function buildPromotionConditions(form, previous) {
 export function promotionScopeSummary(conditions) {
   const c = conditions && typeof conditions === 'object' ? conditions : {};
   const part = (label, productsKey, categoriesKey) => {
-    const items = [...new Set([
-      ...categoryList(c[categoriesKey]),
-      ...productConditionDisplayLabels(c[productsKey]),
-    ])];
+    /** @type {Map<string, Set<string>>} */
+    const byRegion = new Map();
+    const products = Array.isArray(c[productsKey]) ? c[productsKey] : [];
+    primaryLanguagePicks(products).forEach((entry) => {
+      const region = countryKeyFromCatalogPath(entryPath(entry)).toUpperCase() || '?';
+      if (!byRegion.has(region)) byRegion.set(region, new Set());
+      byRegion.get(region).add(productConditionDisplayLabel(entry));
+    });
+    const items = [
+      ...new Set(categoryList(c[categoriesKey])),
+      ...[...byRegion].map(([region, labels]) => `${region}: ${[...labels].join(', ')}`),
+    ];
     return items.length ? `${label}: ${items.join(', ')}` : '';
   };
   return [
@@ -282,31 +334,6 @@ export function promotionScopeSummary(conditions) {
     part('not', 'excludedProducts', 'excludedCategories'),
     part('never with', 'disqualifyingProducts', 'disqualifyingCategories'),
   ].filter(Boolean).join(' · ');
-}
-
-/**
- * Split promotion product picks into those under `market` and those under another market
- * (catalog paths carry the market prefix, so the others never match a cart line).
- *
- * @param {Partial<PromotionScopeForm>} form
- * @param {string} market us|ca|mx
- * @returns {{ form: Partial<PromotionScopeForm>, dropped: string[] }}
- */
-export function splitPromotionProductPicksByMarket(form, market) {
-  const next = { ...form };
-  /** @type {string[]} */
-  const dropped = [];
-  PROMOTION_PRODUCT_KEYS.forEach((k) => {
-    const tokens = String(form[k] ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-    const keep = tokens.filter((token) => {
-      const { path } = parseProductConditionsInput(token)[0];
-      if (countryKeyFromCatalogPath(path) === market) return true;
-      dropped.push(token);
-      return false;
-    });
-    next[k] = keep.join(', ');
-  });
-  return { form: next, dropped };
 }
 
 /**
