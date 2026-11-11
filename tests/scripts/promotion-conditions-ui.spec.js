@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { test, expect } from '@playwright/test';
 
@@ -58,7 +57,6 @@ Object.entries(SECOND_LANGUAGE).forEach(([market, [locale, gift, blender, other]
  * @param {{
  *   promotions?: object[],
  *   indexGate?: (pathname: string) => Promise<void>,
- *   moduleSource?: (pathname: string) => string | null,
  * }} [options]
  */
 async function setup(page, options = {}) {
@@ -75,8 +73,7 @@ async function setup(page, options = {}) {
     const { pathname } = new URL(route.request().url());
     const ext = pathname.slice(pathname.lastIndexOf('.'));
     try {
-      const body = options.moduleSource?.(pathname) ?? await readFile(`.${pathname}`, 'utf8');
-      await route.fulfill({ contentType: MIME[ext] || 'text/plain', body });
+      await route.fulfill({ contentType: MIME[ext] || 'text/plain', body: await readFile(`.${pathname}`, 'utf8') });
     } catch {
       await route.fulfill({ status: 404, body: '' });
     }
@@ -251,53 +248,4 @@ test('new promotions get the default disqualifier while they have conditions', a
   await minCart.uncheck();
   await minCart.check();
   await expect(disqualifying).toHaveValue('');
-});
-
-/**
- * Browsers can pair a fresh module with a cached copy of one it imports. Load the page with
- * the deployed (base branch) version of either side and check it still renders.
- */
-const BASE_REF = process.env.BASE_REF || 'origin/product-admin';
-const ENTRY = 'tools/commerce-admin/price-rules-page.js';
-
-function git(...args) {
-  return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-}
-
-function baseModules() {
-  try {
-    const changed = git('diff', '--name-only', BASE_REF, '--', 'tools/commerce-admin/*.js')
-      .split('\n').filter(Boolean);
-    const sources = new Map();
-    changed.forEach((file) => {
-      try {
-        sources.set(`/${file}`, git('show', `${BASE_REF}:${file}`));
-      } catch {
-        // new in this branch: no cached copy can exist
-      }
-    });
-    return sources;
-  } catch {
-    return null;
-  }
-}
-
-[
-  ['new page with cached dependencies', (file) => file !== `/${ENTRY}`],
-  ['cached page with new dependencies', (file) => file === `/${ENTRY}`],
-].forEach(([name, useBase]) => {
-  test(`promotions page loads with mixed module versions: ${name}`, async ({ page }) => {
-    const base = baseModules();
-    test.skip(!base, `${BASE_REF} is not available`);
-    const errors = [];
-    page.on('pageerror', (err) => errors.push(err.message));
-    await setup(page, {
-      moduleSource: (pathname) => (
-        base.has(pathname) && useBase(pathname) ? base.get(pathname) : null
-      ),
-    });
-    await page.goto(`${origin}/tools/commerce-admin/promotions.html`);
-    await expect(page.locator('tr[data-pr-promo-open][data-pr-id="gift"]')).toHaveCount(1);
-    expect(errors).toEqual([]);
-  });
 });

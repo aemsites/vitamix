@@ -37,18 +37,16 @@ import {
 import { buildVariantColorMapsForLocale, colorSlugFromValue } from './commerce-variant-color.js';
 import {
   applyCartRuleProductScopeToConditions,
+  buildPromotionConditions,
   cartRuleProductScopeFromConditions,
   cartRuleScopeSummary,
-} from './product-conditions.js';
-import {
-  buildPromotionConditions,
   collapseProductPicksAcrossCatalogs,
   expandProductPicksAcrossCatalogs,
   mapPromotionProductPicks,
   promotionScopeFromConditions,
   promotionScopeSummary,
   splitPromotionProductPicksByMarket,
-} from './promotion-conditions.js';
+} from './product-conditions.js';
 import {
   normalizeShippingBenefitMode as normalizeCartRuleShippingMode,
   shippingBenefitFieldsFromMode as cartRuleActionsShippingFromMode,
@@ -1088,7 +1086,7 @@ const PROMO_SCOPE_INPUT_IDS = /** @type {const} */ ({
 });
 
 /**
- * @param {import('./promotion-conditions.js').PromotionScopeForm} scope
+ * @param {import('./product-conditions.js').PromotionScopeForm} scope
  * @param {string} market
  */
 function assertPromotionScopeMatchesMarket(scope, market) {
@@ -1102,7 +1100,7 @@ function assertPromotionScopeMatchesMarket(scope, market) {
 
 /**
  * @param {HTMLDialogElement} dlg
- * @returns {import('./promotion-conditions.js').PromotionScopeForm}
+ * @returns {import('./product-conditions.js').PromotionScopeForm}
  */
 function readPromotionScopeForm(dlg) {
   /** @type {Record<string, string>} */
@@ -1110,12 +1108,12 @@ function readPromotionScopeForm(dlg) {
   Object.entries(PROMO_SCOPE_INPUT_IDS).forEach(([key, id]) => {
     out[key] = String(dlg.querySelector(`#${id}`)?.value ?? '').trim();
   });
-  return /** @type {import('./promotion-conditions.js').PromotionScopeForm} */ (out);
+  return /** @type {import('./product-conditions.js').PromotionScopeForm} */ (out);
 }
 
 /**
  * @param {HTMLDialogElement} dlg
- * @param {import('./promotion-conditions.js').PromotionScopeForm} scope
+ * @param {import('./product-conditions.js').PromotionScopeForm} scope
  */
 function applyPromotionScopeFormPrefill(dlg, scope) {
   Object.entries(PROMO_SCOPE_INPUT_IDS).forEach(([key, id]) => {
@@ -1129,7 +1127,7 @@ function applyPromotionScopeFormPrefill(dlg, scope) {
  * (clears legacy per-rule custom keys on save).
  *
  * @param {{ enabled: boolean, amountRaw: string }} minCart
- * @param {import('./promotion-conditions.js').PromotionScopeForm} scope
+ * @param {import('./product-conditions.js').PromotionScopeForm} scope
  * @param {import('./price-rules-api.js').CatalogPromotion | null | undefined} [preserveFrom]
  * @returns {import('./price-rules-api.js').CatalogPromotionConditions | undefined}
  */
@@ -1144,7 +1142,7 @@ function buildPromotionConditionsFromForm(minCart, scope, preserveFrom) {
 /**
  * @param {import('./price-rules-api.js').CatalogPromotion} promo
  * @param {{ enabled: boolean, amountRaw: string }} minCart
- * @param {import('./promotion-conditions.js').PromotionScopeForm} scope
+ * @param {import('./product-conditions.js').PromotionScopeForm} scope
  * @param {import('./price-rules-api.js').CatalogPromotion | null | undefined} [preserveFrom]
  */
 function applyPromotionFormConditions(promo, minCart, scope, preserveFrom) {
@@ -1168,14 +1166,14 @@ const MARKET_CATALOGS_TTL_MS = 5 * 60 * 1000;
 /**
  * @type {Map<string, {
  *   at: number,
- *   promise: Promise<import('./promotion-conditions.js').LocaleCatalog[]>,
+ *   promise: Promise<import('./product-conditions.js').LocaleCatalog[]>,
  * }>}
  */
 const marketCatalogsCache = new Map();
 
 /**
  * @param {string} market
- * @returns {Promise<import('./promotion-conditions.js').LocaleCatalog[] | null>} null when the
+ * @returns {Promise<import('./product-conditions.js').LocaleCatalog[] | null>} null when the
  *   market has a single index locale
  */
 async function loadMarketCatalogs(market) {
@@ -1193,7 +1191,7 @@ async function loadMarketCatalogs(market) {
 
 /**
  * @param {string[]} locales
- * @returns {Promise<import('./promotion-conditions.js').LocaleCatalog[]>}
+ * @returns {Promise<import('./product-conditions.js').LocaleCatalog[]>}
  */
 async function fetchMarketCatalogs(locales) {
   return Promise.all(locales.map(async (loc) => {
@@ -1220,7 +1218,7 @@ async function fetchMarketCatalogs(locales) {
 /**
  * Product picks for every language of the market (saved form).
  *
- * @param {import('./promotion-conditions.js').PromotionScopeForm} scope
+ * @param {import('./product-conditions.js').PromotionScopeForm} scope
  * @param {string} market
  */
 async function expandPromotionScopeForMarket(scope, market) {
@@ -1236,7 +1234,7 @@ async function expandPromotionScopeForMarket(scope, market) {
  * Product picks as shown in the form (primary language only, where a match exists).
  * Falls back to the stored picks when an index can't be loaded.
  *
- * @param {import('./promotion-conditions.js').PromotionScopeForm} scope
+ * @param {import('./product-conditions.js').PromotionScopeForm} scope
  * @param {string} market
  */
 async function collapsePromotionScopeForMarket(scope, market) {
