@@ -821,7 +821,9 @@ export default async function decorate(block) {
   window.addEventListener('hashchange', handleAccountHash);
   handleAccountHash();
 
-  const cartLink = block.querySelector('.icon-cart').parentElement;
+  const cartIcon = block.querySelector('.icon-cart');
+  if (!cartIcon) return;
+  const cartLink = cartIcon.parentElement;
 
   // Read item count from locale-specific localStorage key (same logic as Cart.STORAGE_KEY)
   // to avoid stale domain-wide cookie when switching between locales (e.g. CA → US).
