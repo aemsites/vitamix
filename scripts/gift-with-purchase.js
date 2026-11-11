@@ -8,6 +8,10 @@
  * `custom.promotionName`. The promotion id also disambiguates removal so a paid
  * copy of the same SKU is never touched.
  *
+ * Gifts never apply to commercial orders: a cart with any line flagged
+ * `custom.isCommercial` (the same signal the EBS sync uses to set the
+ * "Commercial" order type) gets no gifts, and any gift already in it is removed.
+ *
  * Triggers (wired by `initGWP` and by the cart/checkout blocks):
  *   - `loadLazy` if the cart already has items (restored from localStorage)
  *   - Every `cart:change` event (refetches only on `add`)
@@ -265,6 +269,17 @@ function getActivePromotions(payload, now) {
   return asList(payload?.promotions).filter((promotion) => promotion?.conditions
     && promotionAppliesToLocale(promotion, locale)
     && asList(promotion.rules).some((rule) => rule?.path && ruleIsActive(rule, now)));
+}
+
+/**
+ * Whether the cart is a commercial order. Mirrors the EBS sync, which sets the
+ * "Commercial" order type when any item carries `custom.isCommercial === true`.
+ *
+ * @param {{ items: Array }} currentCart
+ * @returns {boolean}
+ */
+function isCommercialCart(currentCart) {
+  return currentCart.items.some((item) => item.custom?.isCommercial === true);
 }
 
 /**
@@ -546,13 +561,29 @@ function serverResultFor(payload, signature) {
 function needsServer(payload, promotions) {
   // The server doesn't know stub rules; a stub opts in with `serverCheck: true`.
   if (lastStub?.payload === payload && payload.serverCheck !== true) return false;
-  return promotions.length > 0 && cart.items.some(isPaidLine);
+  return promotions.length > 0 && cart.items.some(isPaidLine) && !isCommercialCart(cart);
 }
 
 let evaluation = null;
 let rerunEvaluation = false;
 
+async function applyGifts(applicable) {
+  isApplyingGWP = true;
+  try {
+    removeStaleGifts(applicable);
+    updateGiftPromotionNames(applicable);
+    await addMissingGifts(applicable);
+  } finally {
+    isApplyingGWP = false;
+  }
+}
+
 async function applyOnce() {
+  // Gifts never apply to commercial orders, with or without rules.
+  if (isCommercialCart(cart)) {
+    await applyGifts(new Map());
+    return;
+  }
   const payload = inMemoryCache?.payload;
   if (!payload) return;
   const now = getNow();
@@ -565,15 +596,7 @@ async function applyOnce() {
   const applicable = server
     ? applicableFromGrants(promotions, server.grants, now)
     : computeApplicableRules(promotions, cart.items, now);
-
-  isApplyingGWP = true;
-  try {
-    removeStaleGifts(applicable);
-    updateGiftPromotionNames(applicable);
-    await addMissingGifts(applicable);
-  } finally {
-    isApplyingGWP = false;
-  }
+  await applyGifts(applicable);
 
   if (!server && !checkFailed(payload, signature) && needsServer(payload, promotions)) {
     clearTimeout(reconcileTimer);
@@ -589,7 +612,8 @@ async function applyOnce() {
  * Reconcile the cart against the currently-cached rules. Adds gift lines that
  * should be present and removes ones that no longer qualify. A server result
  * for the current paid lines wins over the client evaluation. Safe to call
- * without rules loaded — does nothing in that case.
+ * without rules loaded — does nothing in that case, except that gifts are still
+ * removed from a commercial cart, since that needs no rules.
  *
  * @returns {Promise<void>}
  */
@@ -674,8 +698,8 @@ export async function ensureGWPReconciled({ force = false } = {}) {
   previewSyncs += 1;
   try {
     const loaded = await ensurePriceRulesLoaded();
-    if (!loaded?.payload) return;
     await evaluateGWP();
+    if (!loaded?.payload) return;
     clearTimeout(reconcileTimer);
     reconcileTimer = null;
     if (!needsServer(loaded.payload, getActivePromotions(loaded.payload, getNow()))) return;
@@ -709,7 +733,7 @@ export function initGWP() {
     if (action === 'add' || action === 'restore') {
       await ensurePriceRulesLoaded();
     }
-    if (!inMemoryCache?.payload) return;
+    // evaluateGWP() is a no-op without rules, unless the cart is commercial.
     evaluateGWP();
   });
 

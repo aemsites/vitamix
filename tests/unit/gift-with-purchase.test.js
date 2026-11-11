@@ -560,3 +560,67 @@ test('gift changes made while settling a preview are tagged in cart:change', asy
   assert.equal(removed.length, 1);
   assert.equal(removed[0].detail.source, 'gwp-preview');
 });
+
+const commercialItem = {
+  ...paidItem,
+  sku: 'commercial',
+  path: '/us/en_us/products/commercial/vita-prep',
+  custom: { isCommercial: true },
+};
+
+test('does not add a gift to a commercial cart that meets the minimum subtotal', async () => {
+  cart.addItem(commercialItem);
+  await run();
+  assert.equal(gifts().length, 0);
+});
+
+test('does not add a gift to a cart that mixes commercial and household items', async () => {
+  cart.addItem(paidItem);
+  cart.addItem(commercialItem);
+  await run();
+  assert.equal(gifts().length, 0);
+});
+
+test('removes an existing gift when a commercial item is in the cart', async () => {
+  cart.addItem(paidItem);
+  cart.addItem(giftItem({ promotionName: PROMOTION.name }), { allowSeparateEntry: true });
+  cart.addItem(commercialItem);
+  await run();
+  assert.equal(gifts().length, 0);
+  assert.deepEqual(cart.items.map((i) => i.sku).sort(), ['commercial', 'paid']);
+});
+
+test('removes a gift from a commercial cart even when no rules are loaded', async () => {
+  // A fresh module instance has no rules payload (e.g. the price-rules fetch failed).
+  const fresh = await import('../../scripts/gift-with-purchase.js?no-rules');
+  cart.addItem(commercialItem);
+  cart.addItem(giftItem(), { allowSeparateEntry: true });
+  await fresh.evaluateGWP();
+  assert.equal(gifts().length, 0);
+});
+
+test('leaves a household cart alone when no rules are loaded', async () => {
+  const fresh = await import('../../scripts/gift-with-purchase.js?no-rules-household');
+  cart.addItem(paidItem);
+  cart.addItem(giftItem(), { allowSeparateEntry: true });
+  await fresh.evaluateGWP();
+  assert.equal(gifts().length, 1);
+});
+
+test('still adds a gift when items are explicitly not commercial', async () => {
+  cart.addItem({ ...paidItem, custom: { isCommercial: false } });
+  await run();
+  assert.equal(gifts().length, 1);
+});
+
+test('a commercial cart gets no gift even when the server grants one', async () => {
+  cart.addItem(paidItem);
+  cart.addItem(commercialItem);
+  estimate = grant();
+  await run();
+  mock.timers.tick(500);
+  await reconcileWithServer();
+  await previewOrder({ items: cart.getItemsForAPI() });
+  assert.equal(gifts().length, 0);
+  assert.equal(estimateCalls().length, 0);
+});
