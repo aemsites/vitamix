@@ -490,6 +490,7 @@ function addMissingGifts(applicable) {
 }
 
 const RECONCILE_DELAY_MS = 500;
+const ESTIMATE_TIMEOUT_MS = 5000;
 
 // Last server answer: `{ payload, signature, grants }`.
 let serverResult = null;
@@ -667,6 +668,8 @@ export function reconcileWithServer({ force = false } = {}) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({ country: getConfig().getLocale(), items }),
+        ...(typeof AbortSignal?.timeout === 'function'
+          ? { signal: AbortSignal.timeout(ESTIMATE_TIMEOUT_MS) } : {}),
       });
       if (!res.ok) throw new Error(`estimate ${res.status}`);
       const result = await res.json();

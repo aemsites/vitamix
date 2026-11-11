@@ -624,3 +624,50 @@ test('a commercial cart gets no gift even when the server grants one', async () 
   assert.equal(gifts().length, 0);
   assert.equal(estimateCalls().length, 0);
 });
+
+test('the server check has a timeout', async () => {
+  cart.addItem(paidItem);
+  await run();
+  let init;
+  globalThis.__setFetchMock(async (url, i) => {
+    init = i;
+    return json({ freeItems: [] });
+  });
+  await reconcileWithServer();
+  assert.ok(init.signal instanceof AbortSignal);
+});
+
+test('overlapping previews: a late rejection is repaired after another preview removed the gift', async () => {
+  cart.addItem(paidItem);
+  await run();
+  estimate = grant();
+  await reconcileWithServer();
+  assert.equal(gifts().length, 1);
+
+  const rejection = () => json({ code: 'unprocessable', details: { rule: 'unauthorized_free_item' } }, 422);
+  let releaseB;
+  const heldB = new Promise((resolve) => { releaseB = resolve; });
+  let n = 0;
+  preview = (body) => {
+    n += 1;
+    if (!giftsIn(body.items).length) return json({ estimateToken: `tok-${n}` });
+    // The second request with a gift (preview B) answers only after A has retried.
+    return n === 2 ? heldB.then(rejection) : rejection();
+  };
+
+  const bodyA = { items: cart.getItemsForAPI() };
+  const bodyB = { items: cart.getItemsForAPI() };
+  estimate = { freeItems: [] };
+  const a = previewOrder(bodyA);
+  const b = previewOrder(bodyB);
+  // Let A finish (422, forced denial, retry) before B's rejection arrives.
+  const resultA = await a;
+  releaseB();
+  const resultB = await b;
+
+  assert.ok(resultA.estimateToken);
+  assert.ok(resultB.estimateToken);
+  assert.equal(giftsIn(bodyA.items).length, 0);
+  assert.equal(giftsIn(bodyB.items).length, 0);
+  assert.equal(gifts().length, 0);
+});

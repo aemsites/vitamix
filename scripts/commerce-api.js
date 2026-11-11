@@ -184,10 +184,12 @@ async function sendPreview(orderBody) {
   }
 }
 
+const withoutGifts = (items) => JSON.stringify(items.filter((i) => !i.custom?.giftWithPurchase));
+
 /**
- * Settles free-gift lines with the server, then points `orderBody.items` at the
- * updated cart when the body was built from it. Updated in place because
- * callers keep this object as the payload behind the estimate token.
+ * Settles free-gift lines with the server, then copies the cart's gift lines
+ * into `orderBody.items` when its other lines match the cart. Updated in place
+ * because callers keep this object as the payload behind the estimate token.
  *
  * @param {Object} orderBody
  * @param {boolean} force
@@ -200,11 +202,10 @@ async function syncGiftLines(orderBody, force) {
     // Dynamic and guarded: a cached older module may lack this export.
     const { ensureGWPReconciled } = await import('./gift-with-purchase.js');
     if (typeof ensureGWPReconciled !== 'function') return false;
-    const before = JSON.stringify(cart.getItemsForAPI());
-    const mirrorsCart = JSON.stringify(orderBody.items) === before;
     await ensureGWPReconciled({ force });
     const after = cart.getItemsForAPI();
-    if (!mirrorsCart || JSON.stringify(after) === before) return false;
+    if (withoutGifts(after) !== withoutGifts(orderBody.items)) return false;
+    if (JSON.stringify(after) === JSON.stringify(orderBody.items)) return false;
     // eslint-disable-next-line no-param-reassign
     orderBody.items = after;
     return true;
@@ -222,8 +223,8 @@ function isUnauthorizedFreeItem(err) {
  * obtain an `estimateToken` that must be included when placing the order.
  * Call this after the user selects a shipping method and before payment.
  *
- * Free-gift lines are settled with the server first; when the body was built
- * from the cart, `orderBody.items` is updated in place. A rejected free gift
+ * Free-gift lines are settled with the server first; when the body's other
+ * lines match the cart, its gift lines are updated in place. A rejected free gift
  * triggers one more server check and one retry.
  *
  * @param {Object} orderBody - Full order body including customer, shipping, items,
