@@ -17,6 +17,7 @@
  * Non-prod overrides (ignored on prod hosts):
  *   - `localStorage['vitamix.priceRulesUrl']` — override endpoint
  *   - `localStorage['vitamix.priceRules.stub']` — JSON payload, bypasses fetch
+ *     and the server check (unless the payload sets `serverCheck: true`)
  *   - `localStorage['vitamix.now']`            — ISO datetime for time-travel
  */
 
@@ -525,7 +526,9 @@ function serverResultFor(payload, signature) {
   return null;
 }
 
-function needsServer(promotions) {
+function needsServer(payload, promotions) {
+  // The server doesn't know stub rules; a stub opts in with `serverCheck: true`.
+  if (lastStub?.payload === payload && payload.serverCheck !== true) return false;
   return promotions.length > 0 && cart.items.some(isPaidLine);
 }
 
@@ -555,7 +558,7 @@ async function applyOnce() {
     isApplyingGWP = false;
   }
 
-  if (!server && !checkFailed(payload, signature) && needsServer(promotions)) {
+  if (!server && !checkFailed(payload, signature) && needsServer(payload, promotions)) {
     clearTimeout(reconcileTimer);
     reconcileTimer = setTimeout(() => {
       reconcileTimer = null;
@@ -604,7 +607,9 @@ export function evaluateGWP() {
  */
 export function reconcileWithServer({ force = false } = {}) {
   const payload = inMemoryCache?.payload;
-  if (!payload || !needsServer(getActivePromotions(payload, getNow()))) return Promise.resolve();
+  if (!payload || !needsServer(payload, getActivePromotions(payload, getNow()))) {
+    return Promise.resolve();
+  }
   const signature = paidSignature(cart.items);
   if (reconcileInflight?.payload === payload && reconcileInflight.signature === signature) {
     return reconcileInflight.promise;
@@ -655,7 +660,7 @@ export async function ensureGWPReconciled({ force = false } = {}) {
     await evaluateGWP();
     clearTimeout(reconcileTimer);
     reconcileTimer = null;
-    if (!needsServer(getActivePromotions(loaded.payload, getNow()))) return;
+    if (!needsServer(loaded.payload, getActivePromotions(loaded.payload, getNow()))) return;
     await reconcileWithServer({ force });
     await evaluateGWP();
   } catch (e) {

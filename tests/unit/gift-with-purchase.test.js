@@ -48,9 +48,9 @@ const giftItem = (custom = {}) => ({
 // A fresh stub per test keeps cached server answers from leaking across tests.
 let stubId = 0;
 
-async function loadRules(promotions = [PROMOTION]) {
+async function loadRules(promotions = [PROMOTION], serverCheck = true) {
   stubId += 1;
-  localStorage.setItem('vitamix.priceRules.stub', JSON.stringify({ promotions, stubId }));
+  localStorage.setItem('vitamix.priceRules.stub', JSON.stringify({ promotions, stubId, serverCheck }));
   await ensurePriceRulesLoaded();
 }
 
@@ -451,7 +451,7 @@ test('a server result is reused from session storage for the same rules and cart
   await reconcileWithServer();
   assert.equal(gifts().length, 0);
   // Same rules content in a new payload object, as on the next page view.
-  localStorage.setItem('vitamix.priceRules.stub', JSON.stringify({ promotions: [] }));
+  localStorage.setItem('vitamix.priceRules.stub', JSON.stringify({ promotions: [], serverCheck: true }));
   await ensurePriceRulesLoaded();
   localStorage.setItem('vitamix.priceRules.stub', raw);
   await ensurePriceRulesLoaded();
@@ -459,4 +459,15 @@ test('a server result is reused from session storage for the same rules and cart
   mock.timers.tick(500);
   assert.equal(gifts().length, 0);
   assert.equal(estimateCalls().length, 1);
+});
+
+test('a stub without serverCheck skips the server check', async () => {
+  cart.addItem(paidItem);
+  await loadRules([PROMOTION], false);
+  await evaluateGWP();
+  mock.timers.tick(500);
+  await reconcileWithServer();
+  await previewOrder({ items: cart.getItemsForAPI() });
+  assert.equal(estimateCalls().length, 0);
+  assert.equal(gifts().length, 1);
 });
