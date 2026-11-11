@@ -310,9 +310,10 @@ export function splitPromotionProductPicksByMarket(form, market) {
 }
 
 /**
- * One market catalog (index locale): parent product path ↔ parent SKU.
+ * One market catalog (index locale): parent product path ↔ parent SKU. A SKU can be listed
+ * under more than one path.
  *
- * @typedef {{ pathBySku: Map<string, string>; skuByPath: Map<string, string> }} LocaleCatalog
+ * @typedef {{ pathsBySku: Map<string, string[]>; skuByPath: Map<string, string> }} LocaleCatalog
  */
 
 /**
@@ -324,9 +325,40 @@ function splitProductToken(token) {
   return { path: entry?.path || '', sku: entry?.sku || '' };
 }
 
+/** @param {string} path */
+function pathUrlKey(path) {
+  return path.split('/').filter(Boolean).pop() || '';
+}
+
 /**
- * Add the same product's path in every catalog (e.g. each language of a market),
- * matched by parent SKU. Unknown picks are kept as they are.
+ * Paths of the same product in the other catalogs: matched by parent SKU, preferring the
+ * same url key when the SKU is listed under several paths.
+ *
+ * @param {string} token
+ * @param {LocaleCatalog[]} catalogs
+ * @returns {string[]} tokens (variant `|sku` kept), excluding the pick's own catalog
+ */
+function counterpartTokens(token, catalogs) {
+  const { path, sku } = splitProductToken(token);
+  const own = catalogs.find((c) => c.skuByPath.has(path));
+  if (!own) return [];
+  const parentSku = own.skuByPath.get(path);
+  const key = pathUrlKey(path);
+  return catalogs.filter((c) => c !== own).flatMap((c) => {
+    const candidates = c.pathsBySku.get(parentSku) || [];
+    const sameKey = candidates.find((p) => pathUrlKey(p) === key);
+    return (sameKey ? [sameKey] : candidates).map((p) => (sku ? `${p}|${sku}` : p));
+  });
+}
+
+/** @param {string} raw */
+function pickTokens(raw) {
+  return String(raw ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+/**
+ * Add the same product's path in every other catalog (e.g. each language of a market).
+ * Unknown picks are kept as they are.
  *
  * @param {string} raw comma-separated product picks
  * @param {LocaleCatalog[]} catalogs
@@ -336,41 +368,29 @@ export function expandProductPicksAcrossCatalogs(raw, catalogs) {
   /** @type {string[]} */
   const out = [];
   const add = (t) => { if (!out.includes(t)) out.push(t); };
-  String(raw ?? '').split(',').map((s) => s.trim()).filter(Boolean)
-    .forEach((token) => {
-      add(token);
-      const { path, sku } = splitProductToken(token);
-      const parentSku = catalogs.map((c) => c.skuByPath.get(path)).find(Boolean);
-      if (!parentSku) return;
-      catalogs.forEach((c) => {
-        const p = c.pathBySku.get(parentSku);
-        if (p) add(sku ? `${p}|${sku}` : p);
-      });
-    });
+  pickTokens(raw).forEach((token) => {
+    add(token);
+    counterpartTokens(token, catalogs).forEach(add);
+  });
   return out.join(', ');
 }
 
 /**
- * Inverse of {@link expandProductPicksAcrossCatalogs} for the form: drop picks from other
- * catalogs whose product is also picked in the first (primary) catalog.
+ * Inverse of {@link expandProductPicksAcrossCatalogs} for the form: drop picks that are
+ * counterparts of a pick in the first (primary) catalog.
  *
  * @param {string} raw comma-separated product picks
  * @param {LocaleCatalog[]} catalogs primary catalog first
  * @returns {string}
  */
 export function collapseProductPicksAcrossCatalogs(raw, catalogs) {
-  const [primary, ...others] = catalogs;
-  const tokens = String(raw ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  const [primary] = catalogs;
+  const tokens = pickTokens(raw);
   if (!primary) return tokens.join(', ');
-  const picked = new Set(tokens);
-  return tokens.filter((token) => {
-    const { path, sku } = splitProductToken(token);
-    if (primary.skuByPath.has(path)) return true;
-    const parentSku = others.map((c) => c.skuByPath.get(path)).find(Boolean);
-    const primaryPath = parentSku ? primary.pathBySku.get(parentSku) : '';
-    if (!primaryPath) return true;
-    return !picked.has(sku ? `${primaryPath}|${sku}` : primaryPath);
-  }).join(', ');
+  const counterparts = new Set(tokens
+    .filter((token) => primary.skuByPath.has(splitProductToken(token).path))
+    .flatMap((token) => counterpartTokens(token, catalogs)));
+  return tokens.filter((token) => !counterparts.has(token)).join(', ');
 }
 
 /**

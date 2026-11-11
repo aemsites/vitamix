@@ -1160,6 +1160,16 @@ const MARKET_CATALOG_LOCALES = /** @type {Record<string, string[]>} */ ({
 /** Category prefilled as a disqualifier once a new promotion gets conditions. */
 const DEFAULT_DISQUALIFYING_CATEGORY = 'commercial';
 
+const MARKET_CATALOGS_TTL_MS = 5 * 60 * 1000;
+
+/**
+ * @type {Map<string, {
+ *   at: number,
+ *   promise: Promise<import('./product-conditions.js').LocaleCatalog[]>,
+ * }>}
+ */
+const marketCatalogsCache = new Map();
+
 /**
  * @param {string} market
  * @returns {Promise<import('./product-conditions.js').LocaleCatalog[] | null>} null when the
@@ -1168,6 +1178,21 @@ const DEFAULT_DISQUALIFYING_CATEGORY = 'commercial';
 async function loadMarketCatalogs(market) {
   const locales = MARKET_CATALOG_LOCALES[market] || [];
   if (locales.length < 2) return null;
+  const hit = marketCatalogsCache.get(market);
+  if (hit && Date.now() - hit.at < MARKET_CATALOGS_TTL_MS) return hit.promise;
+  const promise = fetchMarketCatalogs(locales);
+  marketCatalogsCache.set(market, { at: Date.now(), promise });
+  promise.catch(() => {
+    if (marketCatalogsCache.get(market)?.promise === promise) marketCatalogsCache.delete(market);
+  });
+  return promise;
+}
+
+/**
+ * @param {string[]} locales
+ * @returns {Promise<import('./product-conditions.js').LocaleCatalog[]>}
+ */
+async function fetchMarketCatalogs(locales) {
   return Promise.all(locales.map(async (loc) => {
     let ctx;
     try {
@@ -1175,17 +1200,17 @@ async function loadMarketCatalogs(market) {
     } catch (err) {
       throw new Error(`Could not load the ${loc} product index to save product conditions for every language. Try again. (${err?.message || err})`);
     }
-    /** @type {Map<string, string>} */
-    const pathBySku = new Map();
+    /** @type {Map<string, string[]>} */
+    const pathsBySku = new Map();
     /** @type {Map<string, string>} */
     const skuByPath = new Map();
     ctx.productByPath.forEach((product, path) => {
       const sku = String(product?.sku || '').trim();
       if (!sku) return;
-      if (!pathBySku.has(sku)) pathBySku.set(sku, path);
+      pathsBySku.set(sku, [...(pathsBySku.get(sku) || []), path]);
       skuByPath.set(path, sku);
     });
-    return { pathBySku, skuByPath };
+    return { pathsBySku, skuByPath };
   }));
 }
 
@@ -4147,12 +4172,20 @@ async function openPromotionDetailModal(countryKey, promoId, options = {}) {
       showToast(err?.message || 'Delete failed', 'error');
     }
   });
-  footer.querySelector('[data-pr-promo-modal-edit]')?.addEventListener('click', () => {
+  footer.querySelector('[data-pr-promo-modal-edit]')?.addEventListener('click', async (e) => {
     if (!canMutate) return;
-    shut();
-    openPromotionEditDialog(countryKey, promoId).catch((err) => {
+    const btn = e.currentTarget;
+    if (btn instanceof HTMLButtonElement) {
+      btn.disabled = true;
+      btn.textContent = 'Opening…';
+    }
+    try {
+      await openPromotionEditDialog(countryKey, promoId);
+    } catch (err) {
       showToast(err?.message || 'Could not open editor', 'error');
-    });
+    } finally {
+      shut();
+    }
   });
   dialog.showModal();
   if (!options.fromUrl) {

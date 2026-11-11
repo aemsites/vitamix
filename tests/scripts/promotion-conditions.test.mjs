@@ -117,10 +117,11 @@ test('splits product picks from another market and leaves categories alone', () 
   });
 });
 
-const catalog = (entries) => ({
-  pathBySku: new Map(entries.map(([path, sku]) => [sku, path])),
-  skuByPath: new Map(entries),
-});
+const catalog = (entries) => {
+  const pathsBySku = new Map();
+  entries.forEach(([path, sku]) => pathsBySku.set(sku, [...(pathsBySku.get(sku) || []), path]));
+  return { pathsBySku, skuByPath: new Map(entries) };
+};
 const en = catalog([['/ca/en_us/products/a', 'A'], ['/ca/en_us/products/b', 'B']]);
 const fr = catalog([['/ca/fr_ca/products/a-fr', 'A'], ['/ca/fr_ca/products/c-fr', 'C']]);
 
@@ -149,5 +150,27 @@ test('summary lists a product once across languages', () => {
   assert.equal(
     promotionScopeSummary({ disqualifyingProducts: ['/ca/en_us/products/a', '/ca/fr_ca/products/a'] }),
     'never with: a',
+  );
+});
+
+test('a sku under several paths matches the same url key and adds nothing in its own catalog', () => {
+  const enDup = catalog([['/ca/en_us/products/jar-1', 'J'], ['/ca/en_us/products/jar-2806', 'J']]);
+  const frDup = catalog([['/ca/fr_ca/products/jar-1', 'J'], ['/ca/fr_ca/products/jar-2806', 'J']]);
+  const frOther = catalog([['/ca/fr_ca/products/pot-1', 'J'], ['/ca/fr_ca/products/pot-2', 'J']]);
+  assert.equal(
+    expandProductPicksAcrossCatalogs('/ca/en_us/products/jar-2806', [enDup, frDup]),
+    '/ca/en_us/products/jar-2806, /ca/fr_ca/products/jar-2806',
+  );
+  assert.equal(
+    expandProductPicksAcrossCatalogs('/ca/en_us/products/jar-2806', [enDup, frOther]),
+    '/ca/en_us/products/jar-2806, /ca/fr_ca/products/pot-1, /ca/fr_ca/products/pot-2',
+  );
+  assert.equal(
+    collapseProductPicksAcrossCatalogs('/ca/en_us/products/jar-2806, /ca/fr_ca/products/jar-2806', [enDup, frDup]),
+    '/ca/en_us/products/jar-2806',
+  );
+  assert.equal(
+    collapseProductPicksAcrossCatalogs('/ca/en_us/products/jar-2806, /ca/fr_ca/products/jar-1', [enDup, frDup]),
+    '/ca/en_us/products/jar-2806, /ca/fr_ca/products/jar-1',
   );
 });

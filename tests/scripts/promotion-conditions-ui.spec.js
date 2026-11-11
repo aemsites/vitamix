@@ -59,6 +59,7 @@ const INDEX = {
 async function setup(page, promotions = [promotion()]) {
   let doc = { promotions };
   const puts = [];
+  const indexFetches = [];
   await page.addInitScript((token) => {
     localStorage.setItem('pbus-auth-aemsites-vitamix-stage', JSON.stringify({
       token, email: 'admin@example.com', roles: ['admin'],
@@ -78,6 +79,7 @@ async function setup(page, promotions = [promotion()]) {
     const req = route.request();
     const target = new URL(new URL(req.url()).searchParams.get('url'));
     if (target.pathname.endsWith('/index.json')) {
+      indexFetches.push(target.pathname);
       await route.fulfill({ json: { data: INDEX[target.pathname] || [] } });
       return;
     }
@@ -92,6 +94,7 @@ async function setup(page, promotions = [promotion()]) {
     }
     await route.fulfill({ json: doc });
   });
+  puts.indexFetches = indexFetches;
   return puts;
 }
 
@@ -188,6 +191,7 @@ test('product picks are saved for every language of the market', async ({ page }
     ],
     disqualifyingProducts: [{ path: '/ca/en_us/products/blender' }, { path: '/ca/fr_ca/products/melangeur' }],
   });
+  expect(puts.indexFetches.filter((p) => p === '/ca/fr_ca/products/index.json')).toHaveLength(1);
 });
 
 test('new promotions get the default disqualifier while they have conditions', async ({ page }) => {
