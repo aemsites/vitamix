@@ -26,8 +26,38 @@ const promotion = () => ({
   }],
 });
 
-async function setup(page) {
-  let doc = { promotions: [promotion()] };
+const INDEX = {
+  '/us/en_us/products/index.json': [
+    {
+      path: '/us/en_us/products/gift', urlKey: 'gift', sku: 'G1', title: 'Gift',
+    },
+  ],
+  '/ca/en_us/products/index.json': [
+    {
+      path: '/ca/en_us/products/gift', urlKey: 'gift', sku: 'G1', title: 'Gift',
+    },
+    {
+      path: '/ca/en_us/products/blender', urlKey: 'blender', sku: 'B1', title: 'Blender',
+    },
+    {
+      path: '/ca/en_us/products/other', urlKey: 'other', sku: 'O1', title: 'Other',
+    },
+  ],
+  '/ca/fr_ca/products/index.json': [
+    {
+      path: '/ca/fr_ca/products/cadeau', urlKey: 'cadeau', sku: 'G1', title: 'Cadeau',
+    },
+    {
+      path: '/ca/fr_ca/products/melangeur', urlKey: 'melangeur', sku: 'B1', title: 'Melangeur',
+    },
+    {
+      path: '/ca/fr_ca/products/autre', urlKey: 'autre', sku: 'O1', title: 'Autre',
+    },
+  ],
+};
+
+async function setup(page, promotions = [promotion()]) {
+  let doc = { promotions };
   const puts = [];
   await page.addInitScript((token) => {
     localStorage.setItem('pbus-auth-aemsites-vitamix-stage', JSON.stringify({
@@ -47,6 +77,10 @@ async function setup(page) {
   await page.route('https://fcors.org/**', async (route) => {
     const req = route.request();
     const target = new URL(new URL(req.url()).searchParams.get('url'));
+    if (target.pathname.endsWith('/index.json')) {
+      await route.fulfill({ json: { data: INDEX[target.pathname] || [] } });
+      return;
+    }
     const path = target.pathname.replace('/aemsites/sites/vitamix/', '');
     if (path !== 'price-rules/catalog') {
       await route.fulfill({ json: {} });
@@ -121,4 +155,61 @@ test('add dialog saves a scope-only promotion and the detail modal shows it', as
   const detail = page.locator('dialog.pr-promo-detail-dialog');
   await expect(detail.locator('[data-pr-promo-scope-pills="included"]')).toHaveText('Any paid product');
   await expect(detail.locator('[data-pr-promo-scope-pills="disqualifying"]')).toContainText('commercial');
+});
+
+test('product picks are saved for every language of the market', async ({ page }) => {
+  const puts = await setup(page, [{
+    id: 'ca-gift',
+    name: 'CA gift',
+    country: 'ca',
+    conditions: {
+      minimumSubtotal: 100,
+      disqualifyingProducts: [{ path: '/ca/en_us/products/blender' }, { path: '/ca/fr_ca/products/melangeur' }],
+    },
+    rules: [{
+      path: '/ca/en_us/products/gift', price: '0', end: future, custom: { group: '2026' },
+    }],
+  }]);
+  await page.goto(`${origin}/tools/commerce-admin/promotions.html?market=ca`);
+  const row = page.locator('tr[data-pr-promo-open][data-pr-id="ca-gift"]');
+  await row.click();
+  await page.locator('[data-pr-promo-modal-edit]').click();
+  const dialog = page.locator('dialog.pr-promo-form-dialog');
+  await expect(dialog.locator('#pr-promo-disqualifying-products')).toHaveValue('/ca/en_us/products/blender');
+
+  await dialog.locator('#pr-promo-included-products').evaluate((el) => { el.value = '/ca/en_us/products/other|O1-RED'; });
+  await dialog.locator('[data-pr-promo-form-submit]').click();
+  await expect.poll(() => puts.length).toBe(1);
+  expect(puts[0].promotions[0].conditions).toEqual({
+    minimumSubtotal: 100,
+    includedProducts: [
+      { path: '/ca/en_us/products/other', sku: 'O1-RED' },
+      { path: '/ca/fr_ca/products/autre', sku: 'O1-RED' },
+    ],
+    disqualifyingProducts: [{ path: '/ca/en_us/products/blender' }, { path: '/ca/fr_ca/products/melangeur' }],
+  });
+});
+
+test('new promotions get the default disqualifier while they have conditions', async ({ page }) => {
+  await setup(page);
+  await page.goto(`${origin}/tools/commerce-admin/promotions.html`);
+  await page.locator('[data-pr-promo-add]').click();
+  const dialog = page.locator('dialog.pr-promo-form-dialog');
+  const disqualifying = dialog.locator('#pr-promo-disqualifying-categories');
+  const minCart = dialog.locator('#pr-promo-min-cart-enabled');
+
+  await expect(disqualifying).toHaveValue('');
+  await minCart.check();
+  await expect(disqualifying).toHaveValue('commercial');
+  await minCart.uncheck();
+  await expect(disqualifying).toHaveValue('');
+
+  await minCart.check();
+  await disqualifying.evaluate((el) => {
+    el.value = '';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await minCart.uncheck();
+  await minCart.check();
+  await expect(disqualifying).toHaveValue('');
 });

@@ -39,6 +39,9 @@ import {
   applyCartRuleProductScopeToConditions,
   buildPromotionConditions,
   cartRuleProductScopeFromConditions,
+  collapseProductPicksAcrossCatalogs,
+  expandProductPicksAcrossCatalogs,
+  mapPromotionProductPicks,
   cartRuleScopeSummary,
   promotionScopeFromConditions,
   promotionScopeSummary,
@@ -56,6 +59,7 @@ import {
   hydrateProductScopePills,
   mountProductSelectionField,
 } from './product-selection-field.js';
+import { loadProductScopeIndexContext } from './product-scope-pills.js';
 import {
   commerceGroupBadgeHtml,
   commerceMarketEmojiHtml,
@@ -1148,6 +1152,121 @@ function applyPromotionFormConditions(promo, minCart, scope, preserveFrom) {
   return rest;
 }
 
+/** Index locales per market; product picks are saved for each (primary first). */
+const MARKET_CATALOG_LOCALES = /** @type {Record<string, string[]>} */ ({
+  ca: ['ca/en_us', 'ca/fr_ca'],
+});
+
+/** Category prefilled as a disqualifier once a new promotion gets conditions. */
+const DEFAULT_DISQUALIFYING_CATEGORY = 'commercial';
+
+/**
+ * @param {string} market
+ * @returns {Promise<import('./product-conditions.js').LocaleCatalog[] | null>} null when the
+ *   market has a single index locale
+ */
+async function loadMarketCatalogs(market) {
+  const locales = MARKET_CATALOG_LOCALES[market] || [];
+  if (locales.length < 2) return null;
+  return Promise.all(locales.map(async (loc) => {
+    let ctx;
+    try {
+      ctx = await loadProductScopeIndexContext(loc, { indexFetchPath: loc });
+    } catch (err) {
+      throw new Error(`Could not load the ${loc} product index to save product conditions for every language. Try again. (${err?.message || err})`);
+    }
+    /** @type {Map<string, string>} */
+    const pathBySku = new Map();
+    /** @type {Map<string, string>} */
+    const skuByPath = new Map();
+    ctx.productByPath.forEach((product, path) => {
+      const sku = String(product?.sku || '').trim();
+      if (!sku) return;
+      if (!pathBySku.has(sku)) pathBySku.set(sku, path);
+      skuByPath.set(path, sku);
+    });
+    return { pathBySku, skuByPath };
+  }));
+}
+
+/**
+ * Product picks for every language of the market (saved form).
+ *
+ * @param {import('./product-conditions.js').PromotionScopeForm} scope
+ * @param {string} market
+ */
+async function expandPromotionScopeForMarket(scope, market) {
+  const hasProducts = scope.includedProducts || scope.excludedProducts
+    || scope.disqualifyingProducts;
+  if (!hasProducts) return scope;
+  const catalogs = await loadMarketCatalogs(market);
+  if (!catalogs) return scope;
+  return mapPromotionProductPicks(scope, (raw) => expandProductPicksAcrossCatalogs(raw, catalogs));
+}
+
+/**
+ * Product picks as shown in the form (primary language only, where a match exists).
+ * Falls back to the stored picks when an index can't be loaded.
+ *
+ * @param {import('./product-conditions.js').PromotionScopeForm} scope
+ * @param {string} market
+ */
+async function collapsePromotionScopeForMarket(scope, market) {
+  const hasProducts = scope.includedProducts || scope.excludedProducts
+    || scope.disqualifyingProducts;
+  if (!hasProducts) return scope;
+  try {
+    const catalogs = await loadMarketCatalogs(market);
+    if (!catalogs) return scope;
+    return mapPromotionProductPicks(
+      scope,
+      (raw) => collapseProductPicksAcrossCatalogs(raw, catalogs),
+    );
+  } catch {
+    return scope;
+  }
+}
+
+/**
+ * New promotions: prefill the default disqualifying category while the promotion has another
+ * condition (any condition makes it a gift promotion, not a sale). Stops once the admin edits it.
+ *
+ * @param {HTMLDialogElement} dlg
+ */
+function wirePromotionDefaultDisqualifier(dlg) {
+  const target = dlg.querySelector(`#${PROMO_SCOPE_INPUT_IDS.disqualifyingCategories}`);
+  const minCb = dlg.querySelector('#pr-promo-min-cart-enabled');
+  if (!(target instanceof HTMLInputElement) || !(minCb instanceof HTMLInputElement)) return;
+  const others = ['includedProducts', 'includedCategories', 'excludedProducts', 'excludedCategories']
+    .map((k) => dlg.querySelector(`#${PROMO_SCOPE_INPUT_IDS[k]}`))
+    .filter((el) => el instanceof HTMLInputElement);
+  let auto = false;
+  let touched = false;
+  let syncing = false;
+  const set = (value) => {
+    syncing = true;
+    target.value = value;
+    target.dispatchEvent(new Event('input', { bubbles: true }));
+    syncing = false;
+  };
+  const sync = () => {
+    if (touched) return;
+    const conditional = minCb.checked || others.some((el) => el.value.trim());
+    if (conditional && !target.value.trim()) {
+      set(DEFAULT_DISQUALIFYING_CATEGORY);
+      auto = true;
+    } else if (!conditional && auto && target.value.trim() === DEFAULT_DISQUALIFYING_CATEGORY) {
+      set('');
+      auto = false;
+    }
+  };
+  target.addEventListener('input', () => {
+    if (!syncing) touched = true;
+  });
+  minCb.addEventListener('change', sync);
+  others.forEach((el) => el.addEventListener('input', sync));
+}
+
 /** @type {Array<{ destroy: () => void; refresh: () => Promise<void> }>} */
 let promotionScopeSelectionFields = [];
 
@@ -1182,8 +1301,8 @@ function wirePromotionScopeFields(dlg) {
     const { form, dropped } = splitPromotionProductPicksByMarket(scope, market);
     if (dropped.length) {
       applyPromotionScopeFormPrefill(dlg, { ...scope, ...form });
-      dlg.querySelectorAll('.psf-value-input').forEach((el) => {
-        el.dispatchEvent(new Event('input', { bubbles: true }));
+      ['includedProducts', 'excludedProducts', 'disqualifyingProducts'].forEach((k) => {
+        dlg.querySelector(`#${PROMO_SCOPE_INPUT_IDS[k]}`)?.dispatchEvent(new Event('input', { bubbles: true }));
       });
     }
     const note = dlg.querySelector('[data-pr-promo-scope-note]');
@@ -2001,7 +2120,8 @@ function promotionEditFormInnerHtml(initialMarket, lines, opts = {}) {
       </div>
       <div class="coupons-field coupons-field-full">
         <label>Never apply when the cart contains</label>
-        <p class="coupons-field-hint">The promotion doesn't apply at all when any of these products or categories is in the cart, whatever the subtotal. Product picks match only the language of the selected index; in Canada, pick categories to cover both English and French pages.</p>
+        ${edit ? '' : `<p class="coupons-field-hint">Starts with <code>${DEFAULT_DISQUALIFYING_CATEGORY}</code> once you add a minimum or scope (gift promotions). Remove it if commercial products should qualify.</p>`}
+        <p class="coupons-field-hint">The promotion doesn't apply at all when any of these products or categories is in the cart, whatever the subtotal. Categories are the safest choice: they match every language. Product picks are saved for each language of the market (Canada: English and French) when the product is in both indexes.</p>
         <div data-pr-promo-psf-mount="disqualifying"></div>
         <input type="text" id="pr-promo-disqualifying-categories" autocomplete="off" />
         <input type="text" id="pr-promo-disqualifying-products" autocomplete="off" />
@@ -2270,6 +2390,7 @@ async function openPromotionAddDialog() {
   wirePromotionTsvImport(dialog);
   wirePromotionMinCartConditionFields(dialog);
   wirePromotionScopeFields(dialog);
+  wirePromotionDefaultDisqualifier(dialog);
   wirePromotionCouponGateFields(dialog);
   wirePromotionSaleLineTableCells(dialog);
   refreshPromotionLineIndices(dialog);
@@ -2293,8 +2414,9 @@ async function openPromotionAddDialog() {
       const group = String(dialog.querySelector('#pr-promo-form-group')?.value ?? '').trim()
         || String(new Date().getFullYear());
       const minCart = readPromotionMinCartCondition(dialog);
-      const scope = readPromotionScopeForm(dialog);
-      assertPromotionScopeMatchesMarket(scope, market);
+      const formScope = readPromotionScopeForm(dialog);
+      assertPromotionScopeMatchesMarket(formScope, market);
+      const scope = await expandPromotionScopeForMarket(formScope, market);
       const couponGate = readPromotionCouponGateMock(dialog);
       if (couponGate.enabled && sortedPromotionCouponTypes().length && !couponGate.couponId) {
         throw new Error('Select a coupon for the mock access gate, or turn off coupon gating.');
@@ -2370,6 +2492,10 @@ async function openPromotionEditDialog(countryKey, promoId) {
   const rows = rulesCo.flatMap(catalogRuleToPromotionRows);
   const groupGuess = promotionCatalogGroup(promo, ck);
   const selectedCouponId = promotionCouponGateSelection(promoId);
+  const prefillScope = await collapsePromotionScopeForMarket(
+    promotionScopeFromConditions(promo.conditions),
+    ck,
+  );
 
   const dialog = document.createElement('dialog');
   dialog.className = 'coupons-dialog coupons-dialog-wide pr-promo-form-dialog';
@@ -2403,7 +2529,7 @@ async function openPromotionEditDialog(countryKey, promoId) {
       minAmt.disabled = false;
     }
   }
-  applyPromotionScopeFormPrefill(dialog, promotionScopeFromConditions(promo.conditions));
+  applyPromotionScopeFormPrefill(dialog, prefillScope);
   const couponCb = dialog.querySelector('[data-pr-promo-coupon-gate-enabled]');
   if (couponCb instanceof HTMLInputElement && selectedCouponId) {
     couponCb.checked = true;
@@ -2447,8 +2573,9 @@ async function openPromotionEditDialog(countryKey, promoId) {
       const group = String(dialog.querySelector('#pr-promo-form-group')?.value ?? '').trim()
         || String(new Date().getFullYear());
       const minCart = readPromotionMinCartCondition(dialog);
-      const scope = readPromotionScopeForm(dialog);
-      assertPromotionScopeMatchesMarket(scope, market);
+      const formScope = readPromotionScopeForm(dialog);
+      assertPromotionScopeMatchesMarket(formScope, market);
+      const scope = await expandPromotionScopeForMarket(formScope, market);
       const couponGate = readPromotionCouponGateMock(dialog);
       if (couponGate.enabled && sortedPromotionCouponTypes().length && !couponGate.couponId) {
         throw new Error('Select a coupon for the mock access gate, or turn off coupon gating.');

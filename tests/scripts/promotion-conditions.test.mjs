@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   buildPromotionConditions,
+  collapseProductPicksAcrossCatalogs,
+  expandProductPicksAcrossCatalogs,
   promotionScopeFromConditions,
   promotionScopeSummary,
   splitPromotionProductPicksByMarket,
@@ -113,4 +115,39 @@ test('splits product picks from another market and leaves categories alone', () 
     includedProducts: '/ca/en_us/products/b|S',
     disqualifyingCategories: 'commercial',
   });
+});
+
+const catalog = (entries) => ({
+  pathBySku: new Map(entries.map(([path, sku]) => [sku, path])),
+  skuByPath: new Map(entries),
+});
+const en = catalog([['/ca/en_us/products/a', 'A'], ['/ca/en_us/products/b', 'B']]);
+const fr = catalog([['/ca/fr_ca/products/a-fr', 'A'], ['/ca/fr_ca/products/c-fr', 'C']]);
+
+test('expands product picks to every catalog by parent sku', () => {
+  assert.equal(
+    expandProductPicksAcrossCatalogs('/ca/en_us/products/a|A-RED, /ca/en_us/products/b, /ca/en_us/products/x', [en, fr]),
+    '/ca/en_us/products/a|A-RED, /ca/fr_ca/products/a-fr|A-RED, /ca/en_us/products/b, /ca/en_us/products/x',
+  );
+  assert.equal(
+    expandProductPicksAcrossCatalogs('/ca/en_us/products/a, /ca/fr_ca/products/a-fr', [en, fr]),
+    '/ca/en_us/products/a, /ca/fr_ca/products/a-fr',
+  );
+});
+
+test('collapses expanded picks and keeps picks only in another catalog', () => {
+  assert.equal(
+    collapseProductPicksAcrossCatalogs(
+      '/ca/en_us/products/a|A-RED, /ca/fr_ca/products/a-fr|A-RED, /ca/fr_ca/products/a-fr, /ca/fr_ca/products/c-fr',
+      [en, fr],
+    ),
+    '/ca/en_us/products/a|A-RED, /ca/fr_ca/products/a-fr, /ca/fr_ca/products/c-fr',
+  );
+});
+
+test('summary lists a product once across languages', () => {
+  assert.equal(
+    promotionScopeSummary({ disqualifyingProducts: ['/ca/en_us/products/a', '/ca/fr_ca/products/a'] }),
+    'never with: a',
+  );
 });

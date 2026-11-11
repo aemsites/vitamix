@@ -271,10 +271,10 @@ export function buildPromotionConditions(form, previous) {
 export function promotionScopeSummary(conditions) {
   const c = conditions && typeof conditions === 'object' ? conditions : {};
   const part = (label, productsKey, categoriesKey) => {
-    const items = [
+    const items = [...new Set([
       ...categoryList(c[categoriesKey]),
       ...productConditionDisplayLabels(c[productsKey]),
-    ];
+    ])];
     return items.length ? `${label}: ${items.join(', ')}` : '';
   };
   return [
@@ -307,4 +307,81 @@ export function splitPromotionProductPicksByMarket(form, market) {
     next[k] = keep.join(', ');
   });
   return { form: next, dropped };
+}
+
+/**
+ * One market catalog (index locale): parent product path ↔ parent SKU.
+ *
+ * @typedef {{ pathBySku: Map<string, string>; skuByPath: Map<string, string> }} LocaleCatalog
+ */
+
+/**
+ * @param {string} token `path` or `path|sku`
+ * @returns {{ path: string; sku: string }}
+ */
+function splitProductToken(token) {
+  const [entry] = parseProductConditionsInput(token);
+  return { path: entry?.path || '', sku: entry?.sku || '' };
+}
+
+/**
+ * Add the same product's path in every catalog (e.g. each language of a market),
+ * matched by parent SKU. Unknown picks are kept as they are.
+ *
+ * @param {string} raw comma-separated product picks
+ * @param {LocaleCatalog[]} catalogs
+ * @returns {string}
+ */
+export function expandProductPicksAcrossCatalogs(raw, catalogs) {
+  /** @type {string[]} */
+  const out = [];
+  const add = (t) => { if (!out.includes(t)) out.push(t); };
+  String(raw ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+    .forEach((token) => {
+      add(token);
+      const { path, sku } = splitProductToken(token);
+      const parentSku = catalogs.map((c) => c.skuByPath.get(path)).find(Boolean);
+      if (!parentSku) return;
+      catalogs.forEach((c) => {
+        const p = c.pathBySku.get(parentSku);
+        if (p) add(sku ? `${p}|${sku}` : p);
+      });
+    });
+  return out.join(', ');
+}
+
+/**
+ * Inverse of {@link expandProductPicksAcrossCatalogs} for the form: drop picks from other
+ * catalogs whose product is also picked in the first (primary) catalog.
+ *
+ * @param {string} raw comma-separated product picks
+ * @param {LocaleCatalog[]} catalogs primary catalog first
+ * @returns {string}
+ */
+export function collapseProductPicksAcrossCatalogs(raw, catalogs) {
+  const [primary, ...others] = catalogs;
+  const tokens = String(raw ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  if (!primary) return tokens.join(', ');
+  const picked = new Set(tokens);
+  return tokens.filter((token) => {
+    const { path, sku } = splitProductToken(token);
+    if (primary.skuByPath.has(path)) return true;
+    const parentSku = others.map((c) => c.skuByPath.get(path)).find(Boolean);
+    const primaryPath = parentSku ? primary.pathBySku.get(parentSku) : '';
+    if (!primaryPath) return true;
+    return !picked.has(sku ? `${primaryPath}|${sku}` : primaryPath);
+  }).join(', ');
+}
+
+/**
+ * Apply `fn` to each product pick field of a promotion scope form.
+ *
+ * @param {PromotionScopeForm} form
+ * @param {(raw: string) => string} fn
+ * @returns {PromotionScopeForm}
+ */
+export function mapPromotionProductPicks(form, fn) {
+  const next = { ...form };
+  PROMOTION_PRODUCT_KEYS.forEach((k) => { next[k] = fn(form[k] ?? ''); });
+  return next;
 }
