@@ -37,16 +37,18 @@ import {
 import { buildVariantColorMapsForLocale, colorSlugFromValue } from './commerce-variant-color.js';
 import {
   applyCartRuleProductScopeToConditions,
-  buildPromotionConditions,
   cartRuleProductScopeFromConditions,
+  cartRuleScopeSummary,
+} from './product-conditions.js';
+import {
+  buildPromotionConditions,
   collapseProductPicksAcrossCatalogs,
   expandProductPicksAcrossCatalogs,
   mapPromotionProductPicks,
-  cartRuleScopeSummary,
   promotionScopeFromConditions,
   promotionScopeSummary,
   splitPromotionProductPicksByMarket,
-} from './product-conditions.js';
+} from './promotion-conditions.js';
 import {
   normalizeShippingBenefitMode as normalizeCartRuleShippingMode,
   shippingBenefitFieldsFromMode as cartRuleActionsShippingFromMode,
@@ -1086,7 +1088,7 @@ const PROMO_SCOPE_INPUT_IDS = /** @type {const} */ ({
 });
 
 /**
- * @param {import('./product-conditions.js').PromotionScopeForm} scope
+ * @param {import('./promotion-conditions.js').PromotionScopeForm} scope
  * @param {string} market
  */
 function assertPromotionScopeMatchesMarket(scope, market) {
@@ -1100,7 +1102,7 @@ function assertPromotionScopeMatchesMarket(scope, market) {
 
 /**
  * @param {HTMLDialogElement} dlg
- * @returns {import('./product-conditions.js').PromotionScopeForm}
+ * @returns {import('./promotion-conditions.js').PromotionScopeForm}
  */
 function readPromotionScopeForm(dlg) {
   /** @type {Record<string, string>} */
@@ -1108,12 +1110,12 @@ function readPromotionScopeForm(dlg) {
   Object.entries(PROMO_SCOPE_INPUT_IDS).forEach(([key, id]) => {
     out[key] = String(dlg.querySelector(`#${id}`)?.value ?? '').trim();
   });
-  return /** @type {import('./product-conditions.js').PromotionScopeForm} */ (out);
+  return /** @type {import('./promotion-conditions.js').PromotionScopeForm} */ (out);
 }
 
 /**
  * @param {HTMLDialogElement} dlg
- * @param {import('./product-conditions.js').PromotionScopeForm} scope
+ * @param {import('./promotion-conditions.js').PromotionScopeForm} scope
  */
 function applyPromotionScopeFormPrefill(dlg, scope) {
   Object.entries(PROMO_SCOPE_INPUT_IDS).forEach(([key, id]) => {
@@ -1127,7 +1129,7 @@ function applyPromotionScopeFormPrefill(dlg, scope) {
  * (clears legacy per-rule custom keys on save).
  *
  * @param {{ enabled: boolean, amountRaw: string }} minCart
- * @param {import('./product-conditions.js').PromotionScopeForm} scope
+ * @param {import('./promotion-conditions.js').PromotionScopeForm} scope
  * @param {import('./price-rules-api.js').CatalogPromotion | null | undefined} [preserveFrom]
  * @returns {import('./price-rules-api.js').CatalogPromotionConditions | undefined}
  */
@@ -1142,7 +1144,7 @@ function buildPromotionConditionsFromForm(minCart, scope, preserveFrom) {
 /**
  * @param {import('./price-rules-api.js').CatalogPromotion} promo
  * @param {{ enabled: boolean, amountRaw: string }} minCart
- * @param {import('./product-conditions.js').PromotionScopeForm} scope
+ * @param {import('./promotion-conditions.js').PromotionScopeForm} scope
  * @param {import('./price-rules-api.js').CatalogPromotion | null | undefined} [preserveFrom]
  */
 function applyPromotionFormConditions(promo, minCart, scope, preserveFrom) {
@@ -1155,6 +1157,7 @@ function applyPromotionFormConditions(promo, minCart, scope, preserveFrom) {
 /** Index locales per market; product picks are saved for each (primary first). */
 const MARKET_CATALOG_LOCALES = /** @type {Record<string, string[]>} */ ({
   ca: ['ca/en_us', 'ca/fr_ca'],
+  mx: ['mx/en_us', 'mx/es_mx'],
 });
 
 /** Category prefilled as a disqualifier once a new promotion gets conditions. */
@@ -1165,14 +1168,14 @@ const MARKET_CATALOGS_TTL_MS = 5 * 60 * 1000;
 /**
  * @type {Map<string, {
  *   at: number,
- *   promise: Promise<import('./product-conditions.js').LocaleCatalog[]>,
+ *   promise: Promise<import('./promotion-conditions.js').LocaleCatalog[]>,
  * }>}
  */
 const marketCatalogsCache = new Map();
 
 /**
  * @param {string} market
- * @returns {Promise<import('./product-conditions.js').LocaleCatalog[] | null>} null when the
+ * @returns {Promise<import('./promotion-conditions.js').LocaleCatalog[] | null>} null when the
  *   market has a single index locale
  */
 async function loadMarketCatalogs(market) {
@@ -1190,7 +1193,7 @@ async function loadMarketCatalogs(market) {
 
 /**
  * @param {string[]} locales
- * @returns {Promise<import('./product-conditions.js').LocaleCatalog[]>}
+ * @returns {Promise<import('./promotion-conditions.js').LocaleCatalog[]>}
  */
 async function fetchMarketCatalogs(locales) {
   return Promise.all(locales.map(async (loc) => {
@@ -1217,7 +1220,7 @@ async function fetchMarketCatalogs(locales) {
 /**
  * Product picks for every language of the market (saved form).
  *
- * @param {import('./product-conditions.js').PromotionScopeForm} scope
+ * @param {import('./promotion-conditions.js').PromotionScopeForm} scope
  * @param {string} market
  */
 async function expandPromotionScopeForMarket(scope, market) {
@@ -1233,7 +1236,7 @@ async function expandPromotionScopeForMarket(scope, market) {
  * Product picks as shown in the form (primary language only, where a match exists).
  * Falls back to the stored picks when an index can't be loaded.
  *
- * @param {import('./product-conditions.js').PromotionScopeForm} scope
+ * @param {import('./promotion-conditions.js').PromotionScopeForm} scope
  * @param {string} market
  */
 async function collapsePromotionScopeForMarket(scope, market) {
@@ -2146,7 +2149,7 @@ function promotionEditFormInnerHtml(initialMarket, lines, opts = {}) {
       <div class="coupons-field coupons-field-full">
         <label>Never apply when the cart contains</label>
         ${edit ? '' : `<p class="coupons-field-hint">Starts with <code>${DEFAULT_DISQUALIFYING_CATEGORY}</code> once you add a minimum or scope (gift promotions). Remove it if commercial products should qualify.</p>`}
-        <p class="coupons-field-hint">The promotion doesn't apply at all when any of these products or categories is in the cart, whatever the subtotal. Categories are the safest choice: they match every language. Product picks are saved for each language of the market (Canada: English and French) when the product is in both indexes.</p>
+        <p class="coupons-field-hint">The promotion doesn't apply at all when any of these products or categories is in the cart, whatever the subtotal. Categories are the safest choice: they match every language. Product picks are saved for each language of the market (Canada: English and French; Mexico: English and Spanish) when the product is in both indexes.</p>
         <div data-pr-promo-psf-mount="disqualifying"></div>
         <input type="text" id="pr-promo-disqualifying-categories" autocomplete="off" />
         <input type="text" id="pr-promo-disqualifying-products" autocomplete="off" />
@@ -2498,10 +2501,11 @@ async function openPromotionAddDialog() {
 /**
  * @param {string} countryKey
  * @param {string} promoId
+ * @param {{ isCancelled?: () => boolean }} [options] skip opening when this turns true
  */
-async function openPromotionEditDialog(countryKey, promoId) {
+async function openPromotionEditDialog(countryKey, promoId, { isCancelled = () => false } = {}) {
   const ok = await fetchCatalogFromServerOrNotify();
-  if (!ok) return;
+  if (!ok || isCancelled()) return;
 
   const fresh = Array.isArray(state.catalogPromotions) ? state.catalogPromotions : [];
   const promo = fresh.find((p) => String(p.id) === String(promoId));
@@ -2521,6 +2525,7 @@ async function openPromotionEditDialog(countryKey, promoId) {
     promotionScopeFromConditions(promo.conditions),
     ck,
   );
+  if (isCancelled()) return;
 
   const dialog = document.createElement('dialog');
   dialog.className = 'coupons-dialog coupons-dialog-wide pr-promo-form-dialog';
@@ -4179,8 +4184,10 @@ async function openPromotionDetailModal(countryKey, promoId, options = {}) {
       btn.disabled = true;
       btn.textContent = 'Opening…';
     }
+    let dismissed = false;
+    dialog.addEventListener('close', () => { dismissed = true; }, { once: true });
     try {
-      await openPromotionEditDialog(countryKey, promoId);
+      await openPromotionEditDialog(countryKey, promoId, { isCancelled: () => dismissed });
     } catch (err) {
       showToast(err?.message || 'Could not open editor', 'error');
     } finally {

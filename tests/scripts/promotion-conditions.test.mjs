@@ -7,7 +7,7 @@ import {
   promotionScopeFromConditions,
   promotionScopeSummary,
   splitPromotionProductPicksByMarket,
-} from '../../tools/commerce-admin/product-conditions.js';
+} from '../../tools/commerce-admin/promotion-conditions.js';
 
 const empty = {
   includedProducts: '',

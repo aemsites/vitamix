@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { test, expect } from '@playwright/test';
 
@@ -26,38 +27,42 @@ const promotion = () => ({
   }],
 });
 
-const INDEX = {
-  '/us/en_us/products/index.json': [
-    {
-      path: '/us/en_us/products/gift', urlKey: 'gift', sku: 'G1', title: 'Gift',
-    },
-  ],
-  '/ca/en_us/products/index.json': [
-    {
-      path: '/ca/en_us/products/gift', urlKey: 'gift', sku: 'G1', title: 'Gift',
-    },
-    {
-      path: '/ca/en_us/products/blender', urlKey: 'blender', sku: 'B1', title: 'Blender',
-    },
-    {
-      path: '/ca/en_us/products/other', urlKey: 'other', sku: 'O1', title: 'Other',
-    },
-  ],
-  '/ca/fr_ca/products/index.json': [
-    {
-      path: '/ca/fr_ca/products/cadeau', urlKey: 'cadeau', sku: 'G1', title: 'Cadeau',
-    },
-    {
-      path: '/ca/fr_ca/products/melangeur', urlKey: 'melangeur', sku: 'B1', title: 'Melangeur',
-    },
-    {
-      path: '/ca/fr_ca/products/autre', urlKey: 'autre', sku: 'O1', title: 'Autre',
-    },
-  ],
+const indexRow = (locale, slug, sku) => ({
+  path: `/${locale}/products/${slug}`, urlKey: slug, sku, title: slug,
+});
+
+/** Second language per market: [locale, gift, blender, other] slugs. */
+const SECOND_LANGUAGE = {
+  ca: ['ca/fr_ca', 'cadeau', 'melangeur', 'autre'],
+  mx: ['mx/es_mx', 'regalo', 'licuadora', 'otro'],
 };
 
-async function setup(page, promotions = [promotion()]) {
-  let doc = { promotions };
+const INDEX = {
+  '/us/en_us/products/index.json': [indexRow('us/en_us', 'gift', 'G1')],
+};
+Object.entries(SECOND_LANGUAGE).forEach(([market, [locale, gift, blender, other]]) => {
+  INDEX[`/${market}/en_us/products/index.json`] = [
+    indexRow(`${market}/en_us`, 'gift', 'G1'),
+    indexRow(`${market}/en_us`, 'blender', 'B1'),
+    indexRow(`${market}/en_us`, 'other', 'O1'),
+  ];
+  INDEX[`/${locale}/products/index.json`] = [
+    indexRow(locale, gift, 'G1'),
+    indexRow(locale, blender, 'B1'),
+    indexRow(locale, other, 'O1'),
+  ];
+});
+
+/**
+ * @param {import('@playwright/test').Page} page
+ * @param {{
+ *   promotions?: object[],
+ *   indexGate?: (pathname: string) => Promise<void>,
+ *   moduleSource?: (pathname: string) => string | null,
+ * }} [options]
+ */
+async function setup(page, options = {}) {
+  let doc = { promotions: options.promotions || [promotion()] };
   const puts = [];
   const indexFetches = [];
   await page.addInitScript((token) => {
@@ -70,7 +75,8 @@ async function setup(page, promotions = [promotion()]) {
     const { pathname } = new URL(route.request().url());
     const ext = pathname.slice(pathname.lastIndexOf('.'));
     try {
-      await route.fulfill({ contentType: MIME[ext] || 'text/plain', body: await readFile(`.${pathname}`, 'utf8') });
+      const body = options.moduleSource?.(pathname) ?? await readFile(`.${pathname}`, 'utf8');
+      await route.fulfill({ contentType: MIME[ext] || 'text/plain', body });
     } catch {
       await route.fulfill({ status: 404, body: '' });
     }
@@ -80,7 +86,8 @@ async function setup(page, promotions = [promotion()]) {
     const target = new URL(new URL(req.url()).searchParams.get('url'));
     if (target.pathname.endsWith('/index.json')) {
       indexFetches.push(target.pathname);
-      await route.fulfill({ json: { data: INDEX[target.pathname] || [] } });
+      await options.indexGate?.(target.pathname);
+      await route.fulfill({ json: { data: INDEX[target.pathname] || [] } }).catch(() => {});
       return;
     }
     const path = target.pathname.replace('/aemsites/sites/vitamix/', '');
@@ -160,38 +167,66 @@ test('add dialog saves a scope-only promotion and the detail modal shows it', as
   await expect(detail.locator('[data-pr-promo-scope-pills="disqualifying"]')).toContainText('commercial');
 });
 
-test('product picks are saved for every language of the market', async ({ page }) => {
-  const puts = await setup(page, [{
-    id: 'ca-gift',
-    name: 'CA gift',
-    country: 'ca',
-    conditions: {
-      minimumSubtotal: 100,
-      disqualifyingProducts: [{ path: '/ca/en_us/products/blender' }, { path: '/ca/fr_ca/products/melangeur' }],
-    },
-    rules: [{
-      path: '/ca/en_us/products/gift', price: '0', end: future, custom: { group: '2026' },
-    }],
-  }]);
-  await page.goto(`${origin}/tools/commerce-admin/promotions.html?market=ca`);
-  const row = page.locator('tr[data-pr-promo-open][data-pr-id="ca-gift"]');
-  await row.click();
-  await page.locator('[data-pr-promo-modal-edit]').click();
-  const dialog = page.locator('dialog.pr-promo-form-dialog');
-  await expect(dialog.locator('#pr-promo-disqualifying-products')).toHaveValue('/ca/en_us/products/blender');
-
-  await dialog.locator('#pr-promo-included-products').evaluate((el) => { el.value = '/ca/en_us/products/other|O1-RED'; });
-  await dialog.locator('[data-pr-promo-form-submit]').click();
-  await expect.poll(() => puts.length).toBe(1);
-  expect(puts[0].promotions[0].conditions).toEqual({
+const scopedPromotion = (market, secondLocale, blender) => ({
+  id: `${market}-gift`,
+  name: `${market} gift`,
+  country: market,
+  conditions: {
     minimumSubtotal: 100,
-    includedProducts: [
-      { path: '/ca/en_us/products/other', sku: 'O1-RED' },
-      { path: '/ca/fr_ca/products/autre', sku: 'O1-RED' },
+    disqualifyingProducts: [
+      { path: `/${market}/en_us/products/blender` },
+      { path: `/${secondLocale}/products/${blender}` },
     ],
-    disqualifyingProducts: [{ path: '/ca/en_us/products/blender' }, { path: '/ca/fr_ca/products/melangeur' }],
+  },
+  rules: [{
+    path: `/${market}/en_us/products/gift`, price: '0', end: future, custom: { group: '2026' },
+  }],
+});
+
+Object.entries(SECOND_LANGUAGE).forEach(([market, [locale, , blender, other]]) => {
+  test(`product picks are saved for every language of the market (${market})`, async ({ page }) => {
+    const puts = await setup(page, { promotions: [scopedPromotion(market, locale, blender)] });
+    await page.goto(`${origin}/tools/commerce-admin/promotions.html?market=${market}`);
+    await page.locator(`tr[data-pr-promo-open][data-pr-id="${market}-gift"]`).click();
+    await page.locator('[data-pr-promo-modal-edit]').click();
+    const dialog = page.locator('dialog.pr-promo-form-dialog');
+    await expect(dialog.locator('#pr-promo-disqualifying-products')).toHaveValue(`/${market}/en_us/products/blender`);
+
+    await dialog.locator('#pr-promo-included-products').evaluate((el, m) => { el.value = `/${m}/en_us/products/other|O1-RED`; }, market);
+    await dialog.locator('[data-pr-promo-form-submit]').click();
+    await expect.poll(() => puts.length).toBe(1);
+    expect(puts[0].promotions[0].conditions).toEqual({
+      minimumSubtotal: 100,
+      includedProducts: [
+        { path: `/${market}/en_us/products/other`, sku: 'O1-RED' },
+        { path: `/${locale}/products/${other}`, sku: 'O1-RED' },
+      ],
+      disqualifyingProducts: [
+        { path: `/${market}/en_us/products/blender` },
+        { path: `/${locale}/products/${blender}` },
+      ],
+    });
+    expect(puts.indexFetches.filter((p) => p === `/${locale}/products/index.json`)).toHaveLength(1);
   });
-  expect(puts.indexFetches.filter((p) => p === '/ca/fr_ca/products/index.json')).toHaveLength(1);
+});
+
+test('dismissing the detail modal while the editor loads cancels it', async ({ page }) => {
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  await setup(page, {
+    promotions: [scopedPromotion('ca', 'ca/fr_ca', 'melangeur')],
+    indexGate: (pathname) => (pathname === '/ca/fr_ca/products/index.json' ? gate : Promise.resolve()),
+  });
+  await page.goto(`${origin}/tools/commerce-admin/promotions.html?market=ca`);
+  await page.locator('tr[data-pr-promo-open][data-pr-id="ca-gift"]').click();
+  const edit = page.locator('[data-pr-promo-modal-edit]');
+  await edit.click();
+  await expect(edit).toHaveText('Opening…');
+  await page.locator('[data-pr-promo-modal-done]').click();
+  await expect(page.locator('dialog.pr-promo-detail-dialog')).toHaveCount(0);
+  release();
+  await page.waitForTimeout(500);
+  await expect(page.locator('dialog.pr-promo-form-dialog')).toHaveCount(0);
 });
 
 test('new promotions get the default disqualifier while they have conditions', async ({ page }) => {
@@ -216,4 +251,53 @@ test('new promotions get the default disqualifier while they have conditions', a
   await minCart.uncheck();
   await minCart.check();
   await expect(disqualifying).toHaveValue('');
+});
+
+/**
+ * Browsers can pair a fresh module with a cached copy of one it imports. Load the page with
+ * the deployed (base branch) version of either side and check it still renders.
+ */
+const BASE_REF = process.env.BASE_REF || 'origin/product-admin';
+const ENTRY = 'tools/commerce-admin/price-rules-page.js';
+
+function git(...args) {
+  return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+}
+
+function baseModules() {
+  try {
+    const changed = git('diff', '--name-only', BASE_REF, '--', 'tools/commerce-admin/*.js')
+      .split('\n').filter(Boolean);
+    const sources = new Map();
+    changed.forEach((file) => {
+      try {
+        sources.set(`/${file}`, git('show', `${BASE_REF}:${file}`));
+      } catch {
+        // new in this branch: no cached copy can exist
+      }
+    });
+    return sources;
+  } catch {
+    return null;
+  }
+}
+
+[
+  ['new page with cached dependencies', (file) => file !== `/${ENTRY}`],
+  ['cached page with new dependencies', (file) => file === `/${ENTRY}`],
+].forEach(([name, useBase]) => {
+  test(`promotions page loads with mixed module versions: ${name}`, async ({ page }) => {
+    const base = baseModules();
+    test.skip(!base, `${BASE_REF} is not available`);
+    const errors = [];
+    page.on('pageerror', (err) => errors.push(err.message));
+    await setup(page, {
+      moduleSource: (pathname) => (
+        base.has(pathname) && useBase(pathname) ? base.get(pathname) : null
+      ),
+    });
+    await page.goto(`${origin}/tools/commerce-admin/promotions.html`);
+    await expect(page.locator('tr[data-pr-promo-open][data-pr-id="gift"]')).toHaveCount(1);
+    expect(errors).toEqual([]);
+  });
 });
