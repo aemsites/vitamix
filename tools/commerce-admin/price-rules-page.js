@@ -37,8 +37,11 @@ import {
 import { buildVariantColorMapsForLocale, colorSlugFromValue } from './commerce-variant-color.js';
 import {
   applyCartRuleProductScopeToConditions,
+  buildPromotionConditions,
   cartRuleProductScopeFromConditions,
   cartRuleScopeSummary,
+  promotionScopeFromConditions,
+  promotionScopeSummary,
 } from './product-conditions.js';
 import {
   normalizeShippingBenefitMode as normalizeCartRuleShippingMode,
@@ -103,6 +106,7 @@ const PR_APP_MODE = getPrAppMode();
  * @property {PromotionRow[]} rows
  * @property {string} [minimumSubtotalDigits] normalized digits when promotion has
  *   `conditions.minimumSubtotal`
+ * @property {import('./price-rules-api.js').CatalogPromotionConditions} [conditions]
  */
 
 const COUNTRIES = /** @type {const} */ (['us', 'ca', 'mx']);
@@ -1066,39 +1070,107 @@ function readPromotionCouponGateMock(dlg) {
   return { enabled, couponId };
 }
 
+/** Promotion scope form: hidden input ids by condition key. */
+const PROMO_SCOPE_INPUT_IDS = /** @type {const} */ ({
+  includedProducts: 'pr-promo-included-products',
+  includedCategories: 'pr-promo-included-categories',
+  excludedProducts: 'pr-promo-excluded-products',
+  excludedCategories: 'pr-promo-excluded-categories',
+  disqualifyingProducts: 'pr-promo-disqualifying-products',
+  disqualifyingCategories: 'pr-promo-disqualifying-categories',
+});
+
 /**
- * Build promotion-level `conditions` from the min-cart form
+ * @param {HTMLDialogElement} dlg
+ * @returns {import('./product-conditions.js').PromotionScopeForm}
+ */
+function readPromotionScopeForm(dlg) {
+  /** @type {Record<string, string>} */
+  const out = {};
+  Object.entries(PROMO_SCOPE_INPUT_IDS).forEach(([key, id]) => {
+    out[key] = String(dlg.querySelector(`#${id}`)?.value ?? '').trim();
+  });
+  return /** @type {import('./product-conditions.js').PromotionScopeForm} */ (out);
+}
+
+/**
+ * @param {HTMLDialogElement} dlg
+ * @param {import('./product-conditions.js').PromotionScopeForm} scope
+ */
+function applyPromotionScopeFormPrefill(dlg, scope) {
+  Object.entries(PROMO_SCOPE_INPUT_IDS).forEach(([key, id]) => {
+    const el = dlg.querySelector(`#${id}`);
+    if (el instanceof HTMLInputElement) el.value = scope[key] || '';
+  });
+}
+
+/**
+ * Build promotion-level `conditions` from the min-cart and scope fields
  * (clears legacy per-rule custom keys on save).
  *
  * @param {{ enabled: boolean, amountRaw: string }} minCart
+ * @param {import('./product-conditions.js').PromotionScopeForm} scope
  * @param {import('./price-rules-api.js').CatalogPromotion | null | undefined} [preserveFrom]
  * @returns {import('./price-rules-api.js').CatalogPromotionConditions | undefined}
  */
-function buildPromotionConditionsFromMinCart(minCart, preserveFrom) {
-  const prev = preserveFrom?.conditions && typeof preserveFrom.conditions === 'object'
-    ? { ...preserveFrom.conditions }
-    : {};
-  if (minCart.enabled) {
-    const minDigits = catalogPriceStringForApi(minCart.amountRaw);
-    const minN = parseFloat(minDigits);
-    if (Number.isFinite(minN) && minN > 0) prev.minimumSubtotal = minN;
-    else delete prev.minimumSubtotal;
-  } else {
-    delete prev.minimumSubtotal;
-  }
-  return Object.keys(prev).length ? prev : undefined;
+function buildPromotionConditionsFromForm(minCart, scope, preserveFrom) {
+  const minN = minCart.enabled ? parseFloat(catalogPriceStringForApi(minCart.amountRaw)) : NaN;
+  return buildPromotionConditions(
+    { ...scope, minimumSubtotal: Number.isFinite(minN) && minN > 0 ? minN : null },
+    preserveFrom?.conditions,
+  );
 }
 
 /**
  * @param {import('./price-rules-api.js').CatalogPromotion} promo
  * @param {{ enabled: boolean, amountRaw: string }} minCart
+ * @param {import('./product-conditions.js').PromotionScopeForm} scope
  * @param {import('./price-rules-api.js').CatalogPromotion | null | undefined} [preserveFrom]
  */
-function applyPromotionMinCartConditions(promo, minCart, preserveFrom) {
-  const conditions = buildPromotionConditionsFromMinCart(minCart, preserveFrom);
+function applyPromotionFormConditions(promo, minCart, scope, preserveFrom) {
+  const conditions = buildPromotionConditionsFromForm(minCart, scope, preserveFrom);
   if (conditions) return { ...promo, conditions };
   const { conditions: _drop, ...rest } = promo;
   return rest;
+}
+
+/** @type {Array<{ destroy: () => void; refresh: () => Promise<void> }>} */
+let promotionScopeSelectionFields = [];
+
+/** @param {HTMLDialogElement} dlg */
+function wirePromotionScopeFields(dlg) {
+  promotionScopeSelectionFields.forEach((f) => f.destroy());
+  promotionScopeSelectionFields = [];
+  const getLocalePath = () => localePathForCartRuleMarket(promotionDialogMarketSafe(dlg));
+  const input = (id) => /** @type {HTMLInputElement | null} */ (dlg.querySelector(`#${id}`));
+  /** @type {Array<[string, string, string, string, string]>} */
+  const fields = [
+    ['included', 'includedProducts', 'includedCategories', 'Only count these products', 'Any product — click to limit to products or categories.'],
+    ['excluded', 'excludedProducts', 'excludedCategories', 'Don\'t count these products', 'None — click to add products or categories.'],
+    ['disqualifying', 'disqualifyingProducts', 'disqualifyingCategories', 'Never apply when the cart contains', 'None — click to add products or categories.'],
+  ];
+  fields.forEach(([kind, productsKey, categoriesKey, label, emptyText]) => {
+    const mount = dlg.querySelector(`[data-pr-promo-psf-mount="${kind}"]`);
+    const productsInput = input(PROMO_SCOPE_INPUT_IDS[productsKey]);
+    const categoriesInput = input(PROMO_SCOPE_INPUT_IDS[categoriesKey]);
+    if (!(mount instanceof HTMLElement) || !productsInput || !categoriesInput) return;
+    promotionScopeSelectionFields.push(mountProductSelectionField(mount, {
+      productsInput,
+      categoriesInput,
+      getLocalePath,
+      label,
+      emptyText,
+    }));
+  });
+  dlg.querySelector('#pr-promo-form-market')?.addEventListener('change', () => {
+    promotionScopeSelectionFields.forEach((f) => {
+      f.refresh().catch(() => {});
+    });
+  });
+  dlg.addEventListener('close', () => {
+    promotionScopeSelectionFields.forEach((f) => f.destroy());
+    promotionScopeSelectionFields = [];
+  }, { once: true });
 }
 
 /** @param {HTMLDialogElement} dlg */
@@ -1880,8 +1952,29 @@ function promotionEditFormInnerHtml(initialMarket, lines, opts = {}) {
         </label>
         <div class="pr-promo-form-option-body">
           <input type="text" id="pr-promo-min-cart-amount" class="pr-promo-min-cart-amount-input" inputmode="decimal" placeholder="e.g. 100" disabled aria-label="Minimum cart subtotal (dollars)" />
-          <p class="coupons-field-hint">Optional. When enabled, saved as <code>conditions.minimumSubtotal</code> on the promotion (storefront applies the threshold when supported). Turn off to clear this condition.</p>
+          <p class="coupons-field-hint">Optional. When enabled, saved as <code>conditions.minimumSubtotal</code> on the promotion. Only products in scope (below) count toward it. Turn off to clear this condition.</p>
         </div>
+      </div>
+      <div class="coupons-field coupons-field-full">
+        <label>Only count these products</label>
+        <p class="coupons-field-hint">Products and categories that count toward the minimum. Leave empty to count every paid product. Without a minimum, the cart must contain one of them. Uses the product index for the selected market.</p>
+        <div data-pr-promo-psf-mount="included"></div>
+        <input type="text" id="pr-promo-included-categories" autocomplete="off" />
+        <input type="text" id="pr-promo-included-products" autocomplete="off" />
+      </div>
+      <div class="coupons-field coupons-field-full">
+        <label>Don't count these products</label>
+        <p class="coupons-field-hint">Products and categories that never count toward the minimum. Excluded products win over included categories.</p>
+        <div data-pr-promo-psf-mount="excluded"></div>
+        <input type="text" id="pr-promo-excluded-categories" autocomplete="off" />
+        <input type="text" id="pr-promo-excluded-products" autocomplete="off" />
+      </div>
+      <div class="coupons-field coupons-field-full">
+        <label>Never apply when the cart contains</label>
+        <p class="coupons-field-hint">The promotion doesn't apply at all when any of these products or categories is in the cart, whatever the subtotal.</p>
+        <div data-pr-promo-psf-mount="disqualifying"></div>
+        <input type="text" id="pr-promo-disqualifying-categories" autocomplete="off" />
+        <input type="text" id="pr-promo-disqualifying-products" autocomplete="off" />
       </div>
       ${couponGateBlock}
     </div>
@@ -2145,6 +2238,7 @@ async function openPromotionAddDialog() {
   wirePromotionFormDynamicLines(dialog);
   wirePromotionTsvImport(dialog);
   wirePromotionMinCartConditionFields(dialog);
+  wirePromotionScopeFields(dialog);
   wirePromotionCouponGateFields(dialog);
   wirePromotionSaleLineTableCells(dialog);
   refreshPromotionLineIndices(dialog);
@@ -2168,6 +2262,7 @@ async function openPromotionAddDialog() {
       const group = String(dialog.querySelector('#pr-promo-form-group')?.value ?? '').trim()
         || String(new Date().getFullYear());
       const minCart = readPromotionMinCartCondition(dialog);
+      const scope = readPromotionScopeForm(dialog);
       const couponGate = readPromotionCouponGateMock(dialog);
       if (couponGate.enabled && sortedPromotionCouponTypes().length && !couponGate.couponId) {
         throw new Error('Select a coupon for the mock access gate, or turn off coupon gating.');
@@ -2192,12 +2287,12 @@ async function openPromotionAddDialog() {
       const existing = Array.isArray(state.catalogPromotions) ? state.catalogPromotions : [];
       const slug = ruleSlugFromName(name);
       const id = uniquePromotionId(slug, existing);
-      const next = [...existing, applyPromotionMinCartConditions({
+      const next = [...existing, applyPromotionFormConditions({
         id,
         name,
         country: market,
         rules: rulesNew,
-      }, minCart)];
+      }, minCart, scope)];
       await putCatalogPromotionsDocument(next);
       setPromotionCouponGateSelection(id, couponGate.enabled ? couponGate.couponId : '');
       showToast(
@@ -2276,6 +2371,7 @@ async function openPromotionEditDialog(countryKey, promoId) {
       minAmt.disabled = false;
     }
   }
+  applyPromotionScopeFormPrefill(dialog, promotionScopeFromConditions(promo.conditions));
   const couponCb = dialog.querySelector('[data-pr-promo-coupon-gate-enabled]');
   if (couponCb instanceof HTMLInputElement && selectedCouponId) {
     couponCb.checked = true;
@@ -2284,6 +2380,7 @@ async function openPromotionEditDialog(countryKey, promoId) {
   wirePromotionFormDynamicLines(dialog);
   wirePromotionTsvImport(dialog);
   wirePromotionMinCartConditionFields(dialog);
+  wirePromotionScopeFields(dialog);
   wirePromotionCouponGateFields(dialog);
   wirePromotionSaleLineTableCells(dialog);
   refreshPromotionLineIndices(dialog);
@@ -2318,6 +2415,7 @@ async function openPromotionEditDialog(countryKey, promoId) {
       const group = String(dialog.querySelector('#pr-promo-form-group')?.value ?? '').trim()
         || String(new Date().getFullYear());
       const minCart = readPromotionMinCartCondition(dialog);
+      const scope = readPromotionScopeForm(dialog);
       const couponGate = readPromotionCouponGateMock(dialog);
       if (couponGate.enabled && sortedPromotionCouponTypes().length && !couponGate.couponId) {
         throw new Error('Select a coupon for the mock access gate, or turn off coupon gating.');
@@ -2355,12 +2453,12 @@ async function openPromotionEditDialog(countryKey, promoId) {
       const rulesOther = (prev.rules || []).filter((r) => !onTab.has(r));
       const merged = [...rulesOther, ...rulesNew];
       const next = list.slice();
-      next[idx] = applyPromotionMinCartConditions({
+      next[idx] = applyPromotionFormConditions({
         ...prev,
         name,
         country: market,
         rules: merged,
-      }, minCart, prev);
+      }, minCart, scope, prev);
       await putCatalogPromotionsDocument(next);
       setPromotionCouponGateSelection(promoId, couponGate.enabled ? couponGate.couponId : '');
       showToast(
@@ -2510,6 +2608,26 @@ function hydrateCartRuleDetailScopePills(root, cond, countryKey) {
       categoriesRaw,
       localePath,
       emptyText,
+    }).catch(() => {});
+  });
+}
+
+/**
+ * @param {ParentNode} root
+ * @param {Record<string, unknown> | undefined} cond promotion `conditions`
+ * @param {string} countryKey
+ */
+function hydratePromotionDetailScopePills(root, cond, countryKey) {
+  const c = cond && typeof cond === 'object' ? cond : {};
+  const localePath = localePathForCartRuleMarket(countryKey);
+  root.querySelectorAll('[data-pr-promo-scope-pills]').forEach((el) => {
+    if (!(el instanceof HTMLElement)) return;
+    const kind = el.getAttribute('data-pr-promo-scope-pills');
+    hydrateProductScopePills(el, {
+      productsRaw: scopeListRawForHydrate(c[`${kind}Products`]),
+      categoriesRaw: scopeListRawForHydrate(c[`${kind}Categories`]),
+      localePath,
+      emptyText: el.getAttribute('data-pr-scope-empty') || 'None',
     }).catch(() => {});
   });
 }
@@ -2850,6 +2968,7 @@ function promotionTableHtml(rows, thumbByProductUrl) {
  * @property {number} rowCount
  * @property {PromotionRow[]} rows
  * @property {string} minCartDigits normalized threshold for list display, or ''
+ * @property {string} scopeSummary product/category scope and disqualifiers, or ''
  */
 
 /** All promotion sets for the current country (flat list). */
@@ -2873,6 +2992,7 @@ function allPromotionRowsForCountry() {
       rowCount: rulesForCo.length,
       rows: rulesForCo.flatMap(catalogRuleToPromotionRows),
       minCartDigits,
+      scopeSummary: promotionScopeSummary(p.conditions),
     });
   });
   return rows;
@@ -3698,10 +3818,16 @@ function promotionDetailModalInnerHtml(
   const minDigits = String(set.minimumSubtotalDigits || '').trim();
   const minN = parseFloat(minDigits);
   const minCartDisplay = Number.isFinite(minN) && minN > 0 ? `≥ $${minN.toFixed(2)}` : '—';
+  const scope = promotionScopeFromConditions(set.conditions);
+  const hasScope = Boolean(scope.includedProducts || scope.includedCategories
+    || scope.excludedProducts || scope.excludedCategories);
+  const hasDisqualifiers = Boolean(scope.disqualifyingProducts || scope.disqualifyingCategories);
   const pills = [
     promoPillHtml('Multi-line', n > 1),
     promoPillHtml('Uniform window', uniformDates),
     promoPillHtml('Min. cart', Boolean(minDigits && Number.isFinite(minN) && minN > 0)),
+    promoPillHtml('Scoped', hasScope),
+    promoPillHtml('Disqualifiers', hasDisqualifiers),
   ].join('');
 
   return `
@@ -3730,6 +3856,19 @@ function promotionDetailModalInnerHtml(
       <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Min. cart</span><span class="coupons-modal-stat-value">${escapeHtml(minCartDisplay)}</span></div>
     </div>
     <div class="coupons-modal-pills" aria-label="Promotion shape">${pills}</div>
+    ${hasScope || hasDisqualifiers ? `
+    <section class="coupons-modal-section">
+      <h3 class="coupons-modal-section-title">Only count these products</h3>
+      <div class="coupons-modal-tags ps-pills" data-pr-promo-scope-pills="included" data-pr-scope-empty="Any paid product"></div>
+    </section>
+    <section class="coupons-modal-section">
+      <h3 class="coupons-modal-section-title">Don't count these products</h3>
+      <div class="coupons-modal-tags ps-pills" data-pr-promo-scope-pills="excluded" data-pr-scope-empty="None"></div>
+    </section>
+    <section class="coupons-modal-section">
+      <h3 class="coupons-modal-section-title">Never apply when the cart contains</h3>
+      <div class="coupons-modal-tags ps-pills" data-pr-promo-scope-pills="disqualifying" data-pr-scope-empty="None"></div>
+    </section>` : ''}
     <section class="coupons-modal-section">
       <h3 class="coupons-modal-section-title">Sale line table</h3>
       ${promotionTableHtml(rows, thumbByProductUrl)}
@@ -3765,6 +3904,7 @@ async function openPromotionDetailModal(countryKey, promoId, options = {}) {
     title: catalogPromo.name,
     rows: rulesForCo.flatMap(catalogRuleToPromotionRows),
     minimumSubtotalDigits: promotionMinimumSubtotal(catalogPromo),
+    conditions: catalogPromo.conditions,
   };
   const countryLabel = marketLabel(countryKey) || countryKey;
   closePromotionDetailDialog();
@@ -3812,6 +3952,7 @@ async function openPromotionDetailModal(countryKey, promoId, options = {}) {
     getHumanNode() {
       const w = document.createElement('div');
       w.innerHTML = humanHtml;
+      hydratePromotionDetailScopePills(w, catalogPromo.conditions, countryKey);
       return w;
     },
     getJsonValue: () => catalogPromo,
@@ -3867,9 +4008,9 @@ function renderPromotionsListPanel() {
 
   let tbodyHtml;
   if (!hasPromos) {
-    tbodyHtml = '<tr><td colspan="8" class="pr-empty-cell">No catalog promotions for this country (empty API list or no matching paths).</td></tr>';
+    tbodyHtml = '<tr><td colspan="9" class="pr-empty-cell">No catalog promotions for this country (empty API list or no matching paths).</td></tr>';
   } else if (!list.length) {
-    tbodyHtml = '<tr><td colspan="8" class="pr-empty-cell">No promotions match your filters.</td></tr>';
+    tbodyHtml = '<tr><td colspan="9" class="pr-empty-cell">No promotions match your filters.</td></tr>';
   } else {
     tbodyHtml = list
       .map((r) => {
@@ -3883,6 +4024,7 @@ function renderPromotionsListPanel() {
             <td class="pr-promo-col-date">${escapeHtml(window?.startLabel || '—')}</td>
             <td class="pr-promo-col-date">${escapeHtml(window?.endLabel || '—')}</td>
             <td class="pr-promo-col-mincart">${escapeHtml(formatPromotionMinCartListCell(r.minCartDigits))}</td>
+            <td class="pr-promo-col-scope" title="${escapeHtml(r.scopeSummary)}">${escapeHtml(r.scopeSummary || '—')}</td>
             <td class="pr-promo-col-group">${commerceGroupBadgeHtml(r.group)}</td>
             <td class="pr-promo-col-market">${commerceMarketEmojiHtml(r.countryKey)}</td>
           </tr>`;
@@ -3920,6 +4062,7 @@ function renderPromotionsListPanel() {
             ${prPromoSortTh('start', 'Start (ET)', 'pr-promo-col-date')}
             ${prPromoSortTh('end', 'End (ET)', 'pr-promo-col-date')}
             ${prPromoSortTh('mincart', 'Min. cart', 'pr-promo-col-mincart')}
+            <th scope="col" class="pr-promo-col-scope">Conditions</th>
             ${prPromoSortTh('group', 'Group', 'pr-promo-col-group')}
             ${prPromoSortTh('market', 'Market', 'pr-promo-col-market')}
           </tr>

@@ -176,3 +176,110 @@ export function cartRuleScopeSummary(row) {
   if (ec) parts.push(`excl cat: ${ec}`);
   return parts.join(' · ') || '';
 }
+
+/**
+ * Form values for promotion scope and disqualifiers (comma-separated).
+ *
+ * @typedef {{
+ *   includedProducts: string;
+ *   excludedProducts: string;
+ *   includedCategories: string;
+ *   excludedCategories: string;
+ *   disqualifyingProducts: string;
+ *   disqualifyingCategories: string;
+ * }} PromotionScopeForm
+ */
+
+const PROMOTION_PRODUCT_KEYS = /** @type {const} */ ([
+  'includedProducts',
+  'excludedProducts',
+  'disqualifyingProducts',
+]);
+const PROMOTION_CATEGORY_KEYS = /** @type {const} */ ([
+  'includedCategories',
+  'excludedCategories',
+  'disqualifyingCategories',
+]);
+
+/** Cart-rule-only fields the API rejects on promotions. */
+const PROMOTION_FORBIDDEN_KEYS = ['requiredProducts', 'requiredCategories'];
+
+/**
+ * @param {unknown} raw
+ * @returns {string[]}
+ */
+function categoryList(raw) {
+  if (Array.isArray(raw)) return raw.map((c) => String(c ?? '').trim()).filter(Boolean);
+  return String(raw ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+/**
+ * Read promotion scope / disqualifier form values from promotion `conditions`.
+ *
+ * @param {Record<string, unknown> | null | undefined} conditions
+ * @returns {PromotionScopeForm}
+ */
+export function promotionScopeFromConditions(conditions) {
+  const c = conditions && typeof conditions === 'object' ? conditions : {};
+  /** @type {Record<string, string>} */
+  const out = {};
+  PROMOTION_PRODUCT_KEYS.forEach((k) => {
+    out[k] = formatProductConditionsForForm(c[k]);
+  });
+  PROMOTION_CATEGORY_KEYS.forEach((k) => {
+    out[k] = categoryList(c[k]).join(', ');
+  });
+  return /** @type {PromotionScopeForm} */ (out);
+}
+
+/**
+ * Build promotion `conditions` from the form. Keeps condition keys the form doesn't edit,
+ * drops cart-rule-only `required*` fields.
+ *
+ * @param {{ minimumSubtotal?: number | null } & Partial<PromotionScopeForm>} form
+ * @param {Record<string, unknown> | null | undefined} [previous] current `conditions`
+ * @returns {Record<string, unknown> | undefined} undefined when no condition is set
+ */
+export function buildPromotionConditions(form, previous) {
+  const out = previous && typeof previous === 'object' ? { ...previous } : {};
+  PROMOTION_FORBIDDEN_KEYS.forEach((k) => { delete out[k]; });
+
+  const min = form.minimumSubtotal;
+  if (typeof min === 'number' && Number.isFinite(min) && min > 0) out.minimumSubtotal = min;
+  else delete out.minimumSubtotal;
+
+  PROMOTION_PRODUCT_KEYS.forEach((k) => {
+    const list = parseProductConditionsInput(form[k] ?? '');
+    if (list.length) out[k] = list;
+    else delete out[k];
+  });
+  PROMOTION_CATEGORY_KEYS.forEach((k) => {
+    const list = categoryList(form[k] ?? '');
+    if (list.length) out[k] = list;
+    else delete out[k];
+  });
+
+  return Object.keys(out).length ? out : undefined;
+}
+
+/**
+ * Short scope / disqualifier summary for the promotion list.
+ *
+ * @param {Record<string, unknown> | null | undefined} conditions
+ * @returns {string}
+ */
+export function promotionScopeSummary(conditions) {
+  const c = conditions && typeof conditions === 'object' ? conditions : {};
+  const part = (label, productsKey, categoriesKey) => {
+    const items = [
+      ...categoryList(c[categoriesKey]),
+      ...productConditionDisplayLabels(c[productsKey]),
+    ];
+    return items.length ? `${label}: ${items.join(', ')}` : '';
+  };
+  return [
+    part('only', 'includedProducts', 'includedCategories'),
+    part('not', 'excludedProducts', 'excludedCategories'),
+    part('never with', 'disqualifyingProducts', 'disqualifyingCategories'),
+  ].filter(Boolean).join(' · ');
+}
