@@ -42,7 +42,7 @@ import {
   cartRuleScopeSummary,
   collapseProductPicksAcrossCatalogs,
   formatProductConditionEntry,
-  primaryLanguagePicks,
+  displayProductPicks,
   expandProductPicksAcrossCatalogs,
   mapPromotionProductPicks,
   promotionScopeFromConditions,
@@ -1285,6 +1285,36 @@ async function fetchMarketCatalogs(locales) {
     });
     return { pathsBySku, skuByPath };
   }));
+}
+
+/** Canada catalogs for read-only views (list, detail); null until loaded. */
+let displayCatalogsCa = null;
+let displayCatalogsCaRequested = false;
+
+/** @param {import('./price-rules-api.js').CatalogPromotion | null | undefined} promo */
+function promotionHasSecondLanguagePicks(promo) {
+  const c = promo?.conditions && typeof promo.conditions === 'object' ? promo.conditions : {};
+  return PROMO_SCOPE_KINDS.some(({ productsKey }) => {
+    const list = Array.isArray(c[productsKey]) ? c[productsKey] : [];
+    return list.some((e) => formatProductConditionEntry(e).startsWith('/ca/fr_ca/'));
+  });
+}
+
+/**
+ * Load Canada catalogs for the read-only views once a promotion has French picks, then
+ * re-render so their English counterparts collapse.
+ *
+ * @param {import('./price-rules-api.js').CatalogPromotion[]} promotions
+ */
+function ensureDisplayCatalogs(promotions) {
+  if (displayCatalogsCaRequested || !promotions.some(promotionHasSecondLanguagePicks)) return;
+  displayCatalogsCaRequested = true;
+  loadMarketCatalogs('ca').then((catalogs) => {
+    displayCatalogsCa = catalogs;
+    render();
+  }).catch(() => {
+    displayCatalogsCaRequested = false;
+  });
 }
 
 /**
@@ -2904,8 +2934,10 @@ function hydrateCartRuleDetailScopePills(root, cond, countryKey) {
  * @param {ParentNode} root
  * @param {Record<string, unknown> | undefined} cond promotion `conditions`
  * @param {string} countryKey
+ * @param {import('./product-conditions.js').LocaleCatalog[] | null} [catalogs] hides proven
+ *   French copies
  */
-function hydratePromotionDetailScopePills(root, cond, countryKey) {
+function hydratePromotionDetailScopePills(root, cond, countryKey, catalogs = null) {
   const c = cond && typeof cond === 'object' ? cond : {};
   const marketLocale = localePathForCartRuleMarket(countryKey);
   root.querySelectorAll('[data-pr-promo-scope-pills]').forEach((el) => {
@@ -2913,7 +2945,7 @@ function hydratePromotionDetailScopePills(root, cond, countryKey) {
     const kind = el.getAttribute('data-pr-promo-scope-pills');
     const emptyText = el.getAttribute('data-pr-scope-empty') || 'None';
     const categories = scopeListRawForHydrate(c[`${kind}Categories`]);
-    const products = primaryLanguagePicks(scopeListRawForHydrate(c[`${kind}Products`]))
+    const products = displayProductPicks(scopeListRawForHydrate(c[`${kind}Products`]), catalogs)
       .map((entry) => (typeof entry === 'string' ? entry : formatProductConditionEntry(entry)));
     const byRegion = splitProductPicksByRegion(products.join(', '), PROMO_SCOPE_REGIONS);
     /** @type {Array<[string, string[], string[], string]>} label, products, categories, locale */
@@ -3294,6 +3326,7 @@ function allPromotionRowsForCountry() {
   const ck = state.country;
   const label = marketLabel(ck) || ck;
   const promotions = promotionsListSource();
+  ensureDisplayCatalogs(promotions);
   /** @type {PromoListRow[]} */
   const rows = [];
   promotions.forEach((p) => {
@@ -3310,7 +3343,7 @@ function allPromotionRowsForCountry() {
       rowCount: rulesForCo.length,
       rows: rulesForCo.flatMap(catalogRuleToPromotionRows),
       minCartDigits,
-      scopeSummary: promotionScopeSummary(p.conditions),
+      scopeSummary: promotionScopeSummary(p.conditions, displayCatalogsCa),
     });
   });
   return rows;
@@ -4228,6 +4261,9 @@ async function openPromotionDetailModal(countryKey, promoId, options = {}) {
   closePromotionDetailDialog();
   const rows = await enrichPromotionRowsWithColorSuffix(Array.isArray(set.rows) ? set.rows : []);
   const thumbByProductUrl = await buildThumbUrlMapForPromotionRows(rows, countryKey);
+  const detailCatalogs = promotionHasSecondLanguagePicks(catalogPromo)
+    ? await loadMarketCatalogs('ca').catch(() => null)
+    : null;
   const humanHtml = promotionDetailModalInnerHtml(
     countryKey,
     displayGroup,
@@ -4270,7 +4306,7 @@ async function openPromotionDetailModal(countryKey, promoId, options = {}) {
     getHumanNode() {
       const w = document.createElement('div');
       w.innerHTML = humanHtml;
-      hydratePromotionDetailScopePills(w, catalogPromo.conditions, countryKey);
+      hydratePromotionDetailScopePills(w, catalogPromo.conditions, countryKey, detailCatalogs);
       return w;
     },
     getJsonValue: () => catalogPromo,
@@ -4315,7 +4351,9 @@ async function openPromotionDetailModal(countryKey, promoId, options = {}) {
     let dismissed = false;
     dialog.addEventListener('close', () => { dismissed = true; }, { once: true });
     try {
-      await openPromotionEditDialog(countryKey, promoId, { isCancelled: () => dismissed });
+      await openPromotionEditDialog(countryKey, promoId, {
+        isCancelled: () => dismissed || !dialog.isConnected || !dialog.open,
+      });
     } catch (err) {
       showToast(err?.message || 'Could not open editor', 'error');
     } finally {

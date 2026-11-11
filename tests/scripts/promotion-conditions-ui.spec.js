@@ -56,6 +56,7 @@ Object.entries(SECOND_LANGUAGE).forEach(([market, [locale, gift, blender, other]
  * @param {{
  *   promotions?: object[],
  *   indexGate?: (pathname: string) => Promise<void>,
+ *   catalogGate?: () => Promise<void>,
  * }} [options]
  */
 async function setup(page, options = {}) {
@@ -94,8 +95,10 @@ async function setup(page, options = {}) {
     if (req.method() === 'PUT') {
       doc = JSON.parse(req.postData());
       puts.push(doc);
+    } else {
+      await options.catalogGate?.();
     }
-    await route.fulfill({ json: doc });
+    await route.fulfill({ json: doc }).catch(() => {});
   });
   puts.indexFetches = indexFetches;
   return puts;
@@ -258,23 +261,63 @@ test('picks outside US and Canada are kept on save', async ({ page }) => {
   await expect.poll(() => puts.length).toBe(1);
   expect(puts[0].promotions[0].conditions.excludedProducts).toEqual([{ path: '/mx/en_us/products/blender' }]);
 });
-test('dismissing the detail modal while the editor loads cancels it', async ({ page }) => {
-  let release;
-  const gate = new Promise((resolve) => { release = resolve; });
-  await setup(page, {
-    promotions: [scopedPromotion('ca', 'ca/fr_ca', 'melangeur')],
-    indexGate: (pathname) => (pathname === '/ca/fr_ca/products/index.json' ? gate : Promise.resolve()),
+[
+  ['Done', (page) => page.locator('[data-pr-promo-modal-done]').click()],
+  ['browser Back', (page) => page.goBack()],
+].forEach(([how, leave]) => {
+  test(`leaving the detail modal while the editor loads cancels it (${how})`, async ({ page }) => {
+    let gated = false;
+    let release;
+    const gate = new Promise((resolve) => { release = resolve; });
+    await setup(page, {
+      promotions: [scopedPromotion('ca', 'ca/fr_ca', 'melangeur')],
+      catalogGate: () => (gated ? gate : Promise.resolve()),
+    });
+    await page.goto(`${origin}/tools/commerce-admin/promotions.html?market=ca`);
+    await page.locator('tr[data-pr-promo-open][data-pr-id="ca-gift"]').click();
+    const edit = page.locator('[data-pr-promo-modal-edit]');
+    await expect(edit).toBeVisible();
+    gated = true;
+    await edit.click();
+    await expect(edit).toHaveText('Opening…');
+    await leave(page);
+    await expect(page.locator('dialog.pr-promo-detail-dialog')).toHaveCount(0);
+    release();
+    await page.waitForTimeout(500);
+    await expect(page.locator('dialog.pr-promo-form-dialog')).toHaveCount(0);
   });
+});
+
+test('list and detail hide only proven French copies', async ({ page }) => {
+  const promo = scopedPromotion('ca', 'ca/fr_ca', 'melangeur');
+  promo.conditions.disqualifyingProducts.push({ path: '/ca/fr_ca/products/autre' });
+  await setup(page, { promotions: [promo] });
   await page.goto(`${origin}/tools/commerce-admin/promotions.html?market=ca`);
-  await page.locator('tr[data-pr-promo-open][data-pr-id="ca-gift"]').click();
-  const edit = page.locator('[data-pr-promo-modal-edit]');
-  await edit.click();
-  await expect(edit).toHaveText('Opening…');
-  await page.locator('[data-pr-promo-modal-done]').click();
-  await expect(page.locator('dialog.pr-promo-detail-dialog')).toHaveCount(0);
-  release();
-  await page.waitForTimeout(500);
-  await expect(page.locator('dialog.pr-promo-form-dialog')).toHaveCount(0);
+  const row = page.locator('tr[data-pr-promo-open][data-pr-id="ca-gift"]');
+  await expect(row.locator('.pr-promo-col-scope')).toHaveText('never with: CA: blender, autre');
+  await row.click();
+  const pills = page.locator('dialog.pr-promo-detail-dialog [data-pr-promo-scope-pills="disqualifying"]');
+  await expect(pills).toContainText('blender');
+  await expect(pills).toContainText('autre');
+  await expect(pills).not.toContainText('elangeur');
+});
+
+test('an empty add dialog loads no product index until a field has values', async ({ page }) => {
+  const puts = await setup(page);
+  await page.goto(`${origin}/tools/commerce-admin/promotions.html`);
+  await expect(page.locator('tr[data-pr-promo-open][data-pr-id="gift"]')).toHaveCount(1);
+  puts.indexFetches.length = 0;
+  await page.locator('[data-pr-promo-add]').click();
+  const dialog = page.locator('dialog.pr-promo-form-dialog');
+  await expect(dialog.locator('[data-pr-promo-psf-mount="included-us"] .psf-root')).toHaveCount(1);
+  await page.waitForTimeout(300);
+  expect(puts.indexFetches).toEqual([]);
+
+  // the commercial prefill gives one categories field a value: one index (regular + commercial)
+  await dialog.locator('#pr-promo-min-cart-enabled').check();
+  await expect(dialog.locator('#pr-promo-disqualifying-categories')).toHaveValue('commercial');
+  await page.waitForTimeout(300);
+  expect(puts.indexFetches.length).toBeLessThanOrEqual(2);
 });
 
 test('new promotions get the default disqualifier while they have conditions', async ({ page }) => {

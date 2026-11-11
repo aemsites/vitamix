@@ -262,30 +262,26 @@ export function buildPromotionConditions(form, previous) {
   return Object.keys(out).length ? out : undefined;
 }
 
-/** Second-language index prefix → primary-language prefix of the same market. */
-const SECOND_LANGUAGE_PREFIXES = /** @type {Record<string, string>} */ ({
-  '/ca/fr_ca/': '/ca/en_us/',
-});
-
 /** @param {unknown} entry */
 function entryPath(entry) {
   return formatProductConditionEntry(entry).split('|')[0];
 }
 
 /**
- * Drop second-language copies of picks when the primary language has picks too
- * (for display: those copies are added on save).
+ * Picks to display: second-language copies of a picked product are hidden when `catalogs`
+ * proves the match (see {@link collapseProductPicksAcrossCatalogs}); without catalogs every
+ * pick is shown.
  *
  * @param {unknown[]} entries product conditions or form tokens
+ * @param {LocaleCatalog[] | null | undefined} catalogs primary catalog first
  * @returns {unknown[]}
  */
-export function primaryLanguagePicks(entries) {
-  const paths = entries.map(entryPath);
-  return entries.filter((entry) => {
-    const prefix = Object.keys(SECOND_LANGUAGE_PREFIXES)
-      .find((p) => entryPath(entry).startsWith(p));
-    return !prefix || !paths.some((p) => p.startsWith(SECOND_LANGUAGE_PREFIXES[prefix]));
-  });
+export function displayProductPicks(entries, catalogs) {
+  if (!catalogs?.length) return entries;
+  const tokens = entries.map(formatProductConditionEntry);
+  const kept = new Set(collapseProductPicksAcrossCatalogs(tokens.join(', '), catalogs)
+    .split(',').map((t) => t.trim()));
+  return entries.filter((_, i) => kept.has(tokens[i]));
 }
 
 /**
@@ -310,15 +306,16 @@ export function splitProductPicksByRegion(raw, regions) {
  * Short scope / disqualifier summary for the promotion list. Products are grouped by region.
  *
  * @param {Record<string, unknown> | null | undefined} conditions
+ * @param {LocaleCatalog[] | null} [catalogs] hides proven second-language copies
  * @returns {string}
  */
-export function promotionScopeSummary(conditions) {
+export function promotionScopeSummary(conditions, catalogs = null) {
   const c = conditions && typeof conditions === 'object' ? conditions : {};
   const part = (label, productsKey, categoriesKey) => {
     /** @type {Map<string, Set<string>>} */
     const byRegion = new Map();
     const products = Array.isArray(c[productsKey]) ? c[productsKey] : [];
-    primaryLanguagePicks(products).forEach((entry) => {
+    displayProductPicks(products, catalogs).forEach((entry) => {
       const region = countryKeyFromCatalogPath(entryPath(entry)).toUpperCase() || '?';
       if (!byRegion.has(region)) byRegion.set(region, new Set());
       byRegion.get(region).add(productConditionDisplayLabel(entry));

@@ -6,7 +6,7 @@ import {
   expandProductPicksAcrossCatalogs,
   promotionScopeFromConditions,
   promotionScopeSummary,
-  primaryLanguagePicks,
+  displayProductPicks,
   splitProductPicksByRegion,
 } from '../../tools/commerce-admin/product-conditions.js';
 
@@ -115,13 +115,6 @@ test('groups product picks by region and keeps others aside', () => {
   assert.deepEqual(splitProductPicksByRegion('', ['us', 'ca']), { us: '', ca: '', other: '' });
 });
 
-test('hides French copies only when the region has English picks', () => {
-  assert.deepEqual(
-    primaryLanguagePicks([{ path: '/ca/en_us/products/a' }, { path: '/ca/fr_ca/products/a-fr' }, '/us/en_us/products/x']),
-    [{ path: '/ca/en_us/products/a' }, '/us/en_us/products/x'],
-  );
-  assert.deepEqual(primaryLanguagePicks(['/ca/fr_ca/products/a-fr']), ['/ca/fr_ca/products/a-fr']);
-});
 
 const catalog = (entries) => {
   const pathsBySku = new Map();
@@ -154,7 +147,7 @@ test('collapses expanded picks and keeps picks only in another catalog', () => {
 
 test('summary lists a product once across languages', () => {
   assert.equal(
-    promotionScopeSummary({ disqualifyingProducts: ['/ca/en_us/products/a', '/ca/fr_ca/products/a-fr', '/us/en_us/products/a'] }),
+    promotionScopeSummary({ disqualifyingProducts: ['/ca/en_us/products/a', '/ca/fr_ca/products/a', '/us/en_us/products/a'] }),
     'never with: CA: a, US: a',
   );
 });
@@ -178,5 +171,24 @@ test('a sku under several paths matches the same url key and adds nothing in its
   assert.equal(
     collapseProductPicksAcrossCatalogs('/ca/en_us/products/jar-2806, /ca/fr_ca/products/jar-1', [enDup, frDup]),
     '/ca/en_us/products/jar-2806, /ca/fr_ca/products/jar-1',
+  );
+});
+
+test('display hides only proven second-language copies', () => {
+  const picks = [
+    { path: '/ca/en_us/products/a' },
+    { path: '/ca/fr_ca/products/a-fr' },
+    { path: '/ca/fr_ca/products/c-fr' },
+    '/us/en_us/products/x',
+  ];
+  assert.deepEqual(displayProductPicks(picks, [en, fr]), [
+    { path: '/ca/en_us/products/a' },
+    { path: '/ca/fr_ca/products/c-fr' },
+    '/us/en_us/products/x',
+  ]);
+  assert.deepEqual(displayProductPicks(picks, null), picks);
+  assert.equal(
+    promotionScopeSummary({ disqualifyingProducts: picks }, [en, fr]),
+    'never with: CA: a, c-fr, US: x',
   );
 });
