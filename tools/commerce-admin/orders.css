@@ -113,6 +113,7 @@
 }
 
 .orders-chart {
+  position: relative;
   display: flex;
   align-items: stretch;
   gap: 2px;
@@ -122,7 +123,11 @@
   overflow: hidden;
 }
 
+/* Bars sit above the annotation bands; only the bars take the pointer, so bands get hover. */
 .orders-chart-bar-col {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -139,6 +144,7 @@
 }
 
 .orders-chart-bar {
+  pointer-events: auto;
   width: 100%;
   min-width: 1px;
   background: #d2d5d8;
@@ -176,6 +182,246 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/*
+ * Chart annotations (promotion-overlay.js): promotions are light bands behind the bars, labelled
+ * above the chart; launches and checkout go-lives are lines on top of the bars; the time before a
+ * go-live is striped; a collapsed list below the chart repeats everything in text.
+ */
+.orders-chart-overlay {
+  position: relative;
+  margin: 0 2px;
+}
+
+.orders-chart-labels {
+  position: relative;
+}
+
+.orders-chart-label {
+  position: absolute;
+  height: 18px;
+  padding-left: 6px;
+  border-left: 2px solid rgb(124 58 237 / 70%);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  color: #4c2a85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.orders-chart-label-launch {
+  border-left-color: rgb(217 119 6 / 75%);
+  color: #7a4307;
+}
+
+.orders-chart-label-gift {
+  border-left-color: rgb(194 24 91 / 60%);
+  color: #8a1f52;
+}
+
+.orders-chart-label-markets {
+  font-weight: 400;
+  color: #6d7175;
+}
+
+.orders-chart-gift-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 9px;
+  background: #fbe3ee;
+  color: #8a1f52;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+.orders-chart-label-tick {
+  position: absolute;
+  width: 0;
+  border-left: 1px solid rgb(124 58 237 / 55%);
+}
+
+.orders-chart-label-tick-launch {
+  border-left: 1.5px dashed rgb(217 119 6 / 85%);
+}
+
+.orders-chart-label-tick-gift {
+  border-left-color: rgb(194 24 91 / 45%);
+}
+
+.orders-chart-annot {
+  position: absolute;
+  inset: 4px 2px 17px;
+}
+
+.orders-chart-annot-back {
+  z-index: 0;
+}
+
+.orders-chart-annot-front {
+  z-index: 2;
+  pointer-events: none;
+}
+
+.orders-chart-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgb(124 58 237 / 7%);
+}
+
+.orders-chart-band-gift {
+  background: rgb(194 24 91 / 6%);
+}
+
+.orders-chart-band-start {
+  border-left: 1px solid rgb(124 58 237 / 55%);
+}
+
+.orders-chart-band-end {
+  border-right: 1px solid rgb(124 58 237 / 30%);
+}
+
+.orders-chart-stripes {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  background: repeating-linear-gradient(135deg, rgb(0 0 0 / 9%) 0 1.5px, transparent 1.5px 7px);
+}
+
+.orders-chart-launch-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 1.5px dashed rgb(217 119 6 / 85%);
+}
+
+.orders-chart-event-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 2px solid #1f2937;
+}
+
+.orders-chart-event-pill {
+  position: absolute;
+  top: 2px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: #1f2937;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: auto;
+}
+
+/* Hovering any part of an annotation highlights all of its parts. */
+.orders-chart-band.is-highlighted {
+  background: rgb(124 58 237 / 16%);
+}
+
+.orders-chart-band-gift.is-highlighted {
+  background: rgb(194 24 91 / 14%);
+}
+
+.orders-chart-launch-line.is-highlighted {
+  border-left-style: solid;
+}
+
+.orders-chart-label.is-highlighted {
+  text-decoration: underline;
+}
+
+.orders-chart-annotations {
+  margin-top: 6px;
+  font-size: 13px;
+}
+
+.orders-chart-annotations > summary {
+  cursor: pointer;
+  color: #6d7175;
+  font-size: 12px;
+}
+
+.orders-chart-annotations-list {
+  display: grid;
+  gap: 2px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.orders-chart-annotations-list li {
+  display: grid;
+  grid-template-columns: 14px 11rem 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 3px 6px;
+  border-radius: 4px;
+}
+
+.orders-chart-annotations-list li.is-highlighted {
+  background: #f4f0fb;
+}
+
+.orders-chart-list-when,
+.orders-chart-list-markets {
+  color: #6d7175;
+  font-variant-numeric: tabular-nums;
+}
+
+.orders-chart-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  border-left: 2px solid rgb(124 58 237 / 70%);
+  background: rgb(124 58 237 / 25%);
+}
+
+.orders-chart-swatch-gift {
+  border-left-color: rgb(194 24 91 / 60%);
+  background: rgb(194 24 91 / 20%);
+}
+
+.orders-chart-swatch-launch,
+.orders-chart-swatch-event {
+  width: 2px;
+  height: 14px;
+  margin-left: 5px;
+  border-radius: 0;
+  background: none;
+  border-left: 1.5px dashed rgb(217 119 6 / 85%);
+}
+
+.orders-chart-swatch-event {
+  border-left: 2px solid #1f2937;
+}
+
+.orders-chart-swatch-stripes {
+  border: 1px solid #c9cccf;
+  background: repeating-linear-gradient(135deg, rgb(0 0 0 / 22%) 0 1.5px, transparent 1.5px 5px);
+}
+
+.orders-overlay-toggles {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.orders-overlay-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  cursor: pointer;
 }
 
 .orders-error {
