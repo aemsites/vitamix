@@ -267,19 +267,6 @@ function clearHref() {
 
 let badge = null;
 
-function updateBadge() {
-  if (!badge) return;
-  const date = getSimulatedDate();
-  if (!date) {
-    badge.root.remove();
-    badge = null;
-    return;
-  }
-  badge.root.dataset.applied = String(apiApplied);
-  badge.value.textContent = formatBadgeDate(date);
-  badge.status.hidden = apiApplied !== false;
-}
-
 function element(tag, text, style) {
   const el = document.createElement(tag);
   if (text) el.textContent = text;
@@ -287,7 +274,12 @@ function element(tag, text, style) {
   return el;
 }
 
-let watching = false;
+function button(text, onClick) {
+  const el = element('button', text, 'margin-left:6px;font:inherit;cursor:pointer');
+  el.type = 'button';
+  el.addEventListener('click', onClick);
+  return el;
+}
 
 /** Reloads without `?simulateDate`, so the reload doesn't write this page's date back. */
 function reloadWithoutParam() {
@@ -296,40 +288,101 @@ function reloadWithoutParam() {
   window.location.replace(url.href);
 }
 
-/** Reloads the page when another tab sets, changes or clears the date. */
+function createBadge() {
+  const root = element('div', '', 'position:fixed;left:8px;bottom:8px;z-index:2147483000;'
+    + 'max-width:calc(100vw - 16px);padding:6px 10px;border-radius:4px;background:#5c2d91;'
+    + 'color:#fff;font:12px/1.4 sans-serif;box-shadow:0 1px 4px rgb(0 0 0 / 30%)');
+  root.id = BADGE_ID;
+  root.setAttribute('role', 'status');
+  const line = element('div');
+  const value = element('strong');
+  const status = element('span', 'Not applied by the API', 'color:#ffd54f');
+  const clear = element('a', 'Clear', 'color:#fff');
+  clear.href = clearHref();
+  line.append('Simulated date: ', value, ' ', status, ' ', clear);
+  const notice = element('div', '', 'margin-top:4px;color:#ffd54f');
+  const message = element('span');
+  const stay = button('Stay', () => {
+    message.textContent = 'This page still uses the previous date.';
+    stay.hidden = true;
+  });
+  notice.append(message, button('Reload', reloadWithoutParam), stay);
+  notice.hidden = true;
+  root.append(line, notice);
+  badge = {
+    root, line, value, status, notice, message, stay, date: getSimulatedDate()?.getTime() ?? null,
+  };
+  document.body.append(root);
+}
+
+function updateBadge() {
+  if (!badge) return;
+  const date = getSimulatedDate();
+  if (!date && badge.notice.hidden) {
+    badge.root.remove();
+    badge = null;
+    return;
+  }
+  const time = date?.getTime() ?? null;
+  if (badge.date !== time) {
+    badge.date = time;
+    apiApplied = null;
+  }
+  badge.line.hidden = !date;
+  badge.root.dataset.applied = String(apiApplied);
+  if (date) badge.value.textContent = formatBadgeDate(date);
+  badge.status.hidden = apiApplied !== false;
+}
+
+/** Offers a reload: pricing calls use the new date at once, this page's content and quote don't. */
+function noticeChange(date) {
+  if (!badge?.root.isConnected) createBadge();
+  apiApplied = null;
+  badge.message.textContent = date
+    ? 'The date was changed in another tab.'
+    : 'The date was cleared in another tab.';
+  badge.stay.hidden = false;
+  badge.notice.hidden = false;
+  updateBadge();
+}
+
+/** Long-lived admin tools on this branch update in place instead of offering a reload. */
+function isAdminHost() {
+  return /^product-admin--vitamix--aemsites\.aem\.(page|live|network)$/.test(window.location?.hostname || '');
+}
+
+let watching = false;
+
 function watchOtherTabs() {
   if (watching) return;
   watching = true;
   let current = getSimulatedDate()?.getTime() ?? null;
   window.addEventListener?.('storage', (event) => {
     if (event.key !== STORAGE_KEY && event.key !== null) return;
-    const next = getSimulatedDate()?.getTime() ?? null;
+    const date = getSimulatedDate();
+    const next = date?.getTime() ?? null;
     if (next === current) return;
     current = next;
-    reloadWithoutParam();
+    if (!isAdminHost()) {
+      noticeChange(date);
+    } else if (badge?.root.isConnected) {
+      updateBadge();
+    } else if (date) {
+      createBadge();
+      updateBadge();
+    }
   });
 }
 
 /**
- * Shows a fixed badge with the simulated date and a link that clears it. Pages reload
- * when another tab changes the date. Does nothing on production hosts.
+ * Shows a fixed badge with the simulated date and a link that clears it, and tells the
+ * page when another tab changes the date. Does nothing on production hosts.
  */
 export function showSimulationBadge() {
   if (!isSimulationHost() || isFramed()) return;
   watchOtherTabs();
   if (badge?.root.isConnected || !getSimulatedDate()) return;
-  const root = element('div', '', 'position:fixed;left:8px;bottom:8px;z-index:2147483000;'
-    + 'padding:6px 10px;border-radius:4px;background:#5c2d91;color:#fff;'
-    + 'font:12px/1.4 sans-serif;box-shadow:0 1px 4px rgb(0 0 0 / 30%)');
-  root.id = BADGE_ID;
-  root.setAttribute('role', 'status');
-  const value = element('strong');
-  const status = element('span', 'Not applied by the API', 'color:#ffd54f');
-  const clear = element('a', 'Clear', 'color:#fff');
-  clear.href = clearHref();
-  root.append('Simulated date: ', value, ' ', status, ' ', clear);
-  badge = { root, value, status };
-  document.body.append(root);
+  createBadge();
   updateBadge();
 }
 

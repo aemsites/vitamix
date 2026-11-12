@@ -205,7 +205,10 @@ function installDom() {
       dataset: {},
       attributes: {},
       children: [],
+      listeners: {},
       setAttribute(name, value) { this.attributes[name] = value; },
+      addEventListener(type, fn) { this.listeners[type] = fn; },
+      click() { this.listeners.click?.(); },
       append(...nodes) { this.children.push(...nodes); },
       remove() { this.isConnected = false; },
     };
@@ -234,7 +237,9 @@ test('indicator: shown with the date and a clear link; flags a response without 
     showSimulationBadge();
     assert.equal(body.children.length, 1);
     const [badge] = body.children;
-    const [, value, , status, , clear] = badge.children;
+    const [line, notice] = badge.children;
+    const [, value, , status, , clear] = line.children;
+    assert.equal(notice.hidden, true);
     assert.equal(badge.id, 'simulate-date-badge');
     assert.match(value.textContent, /2030/);
     assert.equal(status.hidden, true);
@@ -264,25 +269,81 @@ test('noteSimulatedAt is a no-op without a simulated date', () => {
   assert.equal(getSimulationStatus(), before);
 });
 
-test('another tab setting, changing or clearing the date reloads the page without the parameter', () => {
+/** The badge's parts: date line, notice, and the notice's message and buttons. */
+function badgeParts(body) {
+  const root = body.children.at(-1);
+  const [line, notice] = root.children;
+  const [message, reload, stay] = notice.children;
+  return {
+    root, line, value: line.children[1], notice, message, reload, stay,
+  };
+}
+
+test('another tab changing or clearing the date offers a reload instead of reloading', () => {
   installDom();
   setLocation('localhost', '?simulateDate=2030-01-02T15:00:00Z&color=red');
   showSimulationBadge();
-  assert.equal(storageListeners.length, 1);
-  // Brings the listener's last seen date up to this test's page.
+  // Brings the listener's last seen date up to this page.
   storageListeners.forEach((fn) => fn({ key: 'vitamix.now' }));
+  const body = installDom();
+  showSimulationBadge();
   reloads.length = 0;
+  assert.equal(storageListeners.length, 1);
+  let badge = badgeParts(body);
+  assert.equal(badge.notice.hidden, true);
 
   storageListeners.forEach((fn) => fn({ key: 'vitamix.now' }));
   storageListeners.forEach((fn) => fn({ key: 'cart:us' }));
-  assert.deepEqual(reloads, [], 'no reload without a date change');
+  assert.equal(badge.notice.hidden, true, 'no notice without a date change');
 
   otherTabSets('2030-04-05T15:00:00.000Z');
+  assert.equal(badge.notice.hidden, false);
+  assert.match(badge.message.textContent, /changed in another tab/);
+  assert.match(badge.value.textContent, /Apr 5, 2030/);
+  badge.stay.click();
+  assert.match(badge.message.textContent, /previous date/);
+  assert.equal(badge.stay.hidden, true);
+  assert.deepEqual(reloads, [], 'nothing reloads by itself');
+
+  badge.reload.click();
+  assert.deepEqual(reloads, ['https://localhost/us/en_us/products/x?color=red']);
+
   otherTabSets(null);
+  assert.match(badge.message.textContent, /cleared in another tab/);
+  assert.equal(badge.line.hidden, true);
+  assert.equal(badge.stay.hidden, false);
+  assert.equal(badge.root.isConnected, true, 'the notice stays until the tester acts');
+
+  const fresh = installDom();
+  setLocation('localhost', '?page=2');
+  showSimulationBadge();
+  assert.equal(fresh.children.length, 0);
   otherTabSets('2030-06-07T15:00:00.000Z');
-  assert.deepEqual(reloads, Array(3).fill('https://localhost/us/en_us/products/x?color=red'));
+  badge = badgeParts(fresh);
+  assert.match(badge.message.textContent, /changed in another tab/);
+  assert.equal(badge.line.hidden, false);
   showSimulationBadge();
   assert.equal(storageListeners.length, 1, 'one listener per page');
+  assert.equal(reloads.length, 1);
+});
+
+test('admin branch hosts update the badge in place, without a notice', () => {
+  ['page', 'live', 'network'].forEach((tld) => {
+    const body = installDom();
+    setLocation(`product-admin--vitamix--aemsites.aem.${tld}`);
+    otherTabSets(null);
+    showSimulationBadge();
+    reloads.length = 0;
+    otherTabSets('2030-02-03T15:00:00.000Z');
+    const badge = badgeParts(body);
+    assert.equal(badge.notice.hidden, true, tld);
+    assert.match(badge.value.textContent, /Feb 3, 2030/);
+    otherTabSets('2030-03-04T15:00:00.000Z');
+    assert.match(badge.value.textContent, /Mar 4, 2030/);
+    otherTabSets(null);
+    assert.equal(badge.root.isConnected, false);
+    assert.deepEqual(reloads, []);
+  });
 });
 
 test('the parameter applies once per page, even when other query parameters change', () => {
