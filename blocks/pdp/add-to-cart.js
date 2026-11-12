@@ -157,6 +157,19 @@ export function resolveLineItemCustom(parent) {
   return parent?.custom?.isCommercial ? { custom: { isCommercial: true } } : {};
 }
 
+/**
+ * Category url_keys of a product, kept on the cart line for promotion checks.
+ * @param {Object} product - The product object from Product Bus
+ * @returns {string[]|null} `null` when the product data has no `custom`
+ */
+export function getProductCategoryKeys(product) {
+  if (!product?.custom || typeof product.custom !== 'object') return null;
+  const entries = Array.isArray(product.custom.categories) ? product.custom.categories : [];
+  return entries
+    .map((entry) => (typeof entry === 'string' ? entry : entry?.url_key))
+    .filter((key) => typeof key === 'string' && key);
+}
+
 function getCartCompatibility(parent) {
   const { type, compatibleWith, compatibilityGroup } = parent.custom || {};
   if (!compatibleWith && !compatibilityGroup) return null;
@@ -410,6 +423,7 @@ export default function renderAddToCart(ph, block, parent) {
         }));
         const availableWarranties = warrantyOptions.length > 0 ? warrantyOptions : null;
         const compatibility = getCartCompatibility(parent);
+        const categories = getProductCategoryKeys(parent);
 
         // For simple products, `selectedVariant === parent` and shippingDetails
         // lives on the auto-generated single Offer; for variants it lives on
@@ -436,10 +450,11 @@ export default function renderAddToCart(ph, block, parent) {
           // and the EBS sync job can set the "Commercial" order type.
           ...resolveLineItemCustom(parent),
           ...(parent.bundleItems ? { bundleItems: parent.bundleItems } : {}),
-          ...((availableWarranties || compatibility) ? {
+          ...((availableWarranties || compatibility || categories) ? {
             local: {
               ...(availableWarranties ? { availableWarranties } : {}),
               ...(compatibility ? { compatibility } : {}),
+              ...(categories ? { categories } : {}),
             },
           } : {}),
           ...(shippingDimensions ? { shippingDimensions } : {}),

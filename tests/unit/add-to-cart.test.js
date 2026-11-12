@@ -11,6 +11,7 @@ import {
   isVariantAvailableForSale,
   shippingDimensionsFromOffer,
   resolveLineItemCustom,
+  getProductCategoryKeys,
 } from '../../blocks/pdp/add-to-cart.js';
 import { __setMetadata, __resetMetadata } from './mocks/aem.mjs';
 import { __setOutOfStockSkus, __resetScripts } from './mocks/scripts.mjs';
@@ -186,4 +187,21 @@ test('resolveLineItemCustom: empty object for null/undefined parent', () => {
 
 test('resolveLineItemCustom: ignores a falsy isCommercial flag', () => {
   assert.deepEqual(resolveLineItemCustom({ custom: { isCommercial: false } }), {});
+});
+
+// --- getProductCategoryKeys --------------------------------------------------
+
+test('getProductCategoryKeys: returns the category url_keys', () => {
+  assert.deepEqual(getProductCategoryKeys({
+    custom: { categories: [{ name: 'Commercial', url_key: 'commercial' }, 'blenders', { name: 'x' }] },
+  }), ['commercial', 'blenders']);
+});
+
+test('getProductCategoryKeys: empty list when the product has no categories', () => {
+  assert.deepEqual(getProductCategoryKeys({ custom: { type: 'simple' } }), []);
+});
+
+test('getProductCategoryKeys: null without product custom data', () => {
+  assert.equal(getProductCategoryKeys({}), null);
+  assert.equal(getProductCategoryKeys(null), null);
 });

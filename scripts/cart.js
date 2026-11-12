@@ -76,13 +76,14 @@ export class Cart {
     getStorage().setItem(Cart.STORAGE_KEY, JSON.stringify(this));
   }
 
-  #dispatchChange(action, item = undefined) {
+  #dispatchChange(action, item = undefined, source = undefined) {
     document.dispatchEvent(
       new CustomEvent('cart:change', {
         detail: {
           cart: this,
           ...(item === undefined ? {} : { item }),
           action,
+          ...(source ? { source } : {}),
         },
       }),
     );
@@ -163,11 +164,12 @@ export class Cart {
    * warranty SKU linked to two different parent products).
    *
    * @param {CartItem} item
-   * @param {{ allowSeparateEntry?: boolean, maxQuantity?: number }} [opts]
+   * @param {{ allowSeparateEntry?: boolean, maxQuantity?: number, source?: string }} [opts]
+   *   `source` is passed on in the `cart:change` detail
    * @returns {CartItem|null} The added item, capped to `maxQuantity` when supplied;
    *   `null` when the SKU is already at its limit.
    */
-  addItem(item, { allowSeparateEntry = false, maxQuantity = undefined } = {}) {
+  addItem(item, { allowSeparateEntry = false, maxQuantity = undefined, source = undefined } = {}) {
     // A second tab can have an old in-memory snapshot. Always rebase the
     // mutation on localStorage and persist it in this same turn so its item is
     // retained instead of being overwritten by the stale snapshot.
@@ -198,7 +200,7 @@ export class Cart {
       this.#items.push(itemToAdd);
     }
     this.#persistNow();
-    this.#dispatchChange('add', itemToAdd);
+    this.#dispatchChange('add', itemToAdd, source);
     return itemToAdd;
   }
 
@@ -248,16 +250,17 @@ export class Cart {
    * @param {string} sku
    * @param {(item: CartItem) => boolean} matcher
    * @param {Object} custom
+   * @param {{ source?: string }} [opts] `source` is passed on in the `cart:change` detail
    * @returns {boolean} true when the entry's custom data changed
    */
-  updateItemCustom(sku, matcher, custom) {
+  updateItemCustom(sku, matcher, custom, { source = undefined } = {}) {
     this.#refresh();
     const item = this.#items.find((i) => i.sku === sku && matcher(i));
     if (!item) return false;
     if (Object.entries(custom).every(([key, value]) => item.custom?.[key] === value)) return false;
     item.custom = { ...item.custom, ...custom };
     this.#persistNow();
-    this.#dispatchChange('custom', item);
+    this.#dispatchChange('custom', item, source);
     return true;
   }
 
@@ -267,8 +270,9 @@ export class Cart {
    *   the same SKU has multiple entries. A string matches `custom.linkedTo`
    *   (back-compat with the warranty flow); a function is a custom predicate
    *   evaluated against each candidate item.
+   * @param {{ source?: string }} [opts] `source` is passed on in the `cart:change` detail
    */
-  removeItem(sku, matcher = undefined) {
+  removeItem(sku, matcher = undefined, { source = undefined } = {}) {
     this.#refresh();
     const predicate = typeof matcher === 'function'
       ? matcher
@@ -281,7 +285,7 @@ export class Cart {
       this.#items.splice(index, 1);
     }
     this.#persistNow();
-    this.#dispatchChange('remove', item);
+    this.#dispatchChange('remove', item, source);
     this.#maybeSendEmptyEvent();
   }
 
