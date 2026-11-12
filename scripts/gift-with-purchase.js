@@ -36,6 +36,15 @@ const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const STUB_KEY = 'vitamix.priceRules.stub';
 const NOW_KEY = 'vitamix.now';
 const ENDPOINT_OVERRIDE_KEY = 'vitamix.priceRulesUrl';
+const FETCH_TIMEOUT_MS = 5000;
+const PREVIEW_SYNC_TIMEOUT_MS = 6000;
+
+/** `fetch` options that abort after FETCH_TIMEOUT_MS where supported. */
+function withTimeout(init = {}) {
+  return typeof AbortSignal?.timeout === 'function'
+    ? { ...init, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }
+    : init;
+}
 
 /** Mirrors the prod-host check in commerce-config.js. */
 function isNonProdHost() {
@@ -135,7 +144,7 @@ export async function ensurePriceRulesLoaded() {
       let token = null;
       try { token = sessionStorage.getItem(AUTH_TOKEN_SESSION_KEY); } catch { /* noop */ }
       if (token) headers.Authorization = `Bearer ${token}`;
-      const res = await fetch(getEndpoint(), { method: 'GET', headers });
+      const res = await fetch(getEndpoint(), withTimeout({ method: 'GET', headers }));
       if (!res.ok) throw new Error(`price-rules ${res.status}`);
       const payload = await res.json();
       const entry = { fetchedAt: Date.now(), payload, productsByPath: {} };
@@ -353,7 +362,7 @@ async function resolveProductByPath(path) {
   const cached = inMemoryCache.productsByPath[path];
   if (cached?.sku) return cached;
   try {
-    const res = await fetch(path, { credentials: 'same-origin' });
+    const res = await fetch(path, withTimeout({ credentials: 'same-origin' }));
     if (!res.ok) throw new Error(`product page ${res.status}`);
     const html = await res.text();
     const product = extractProductFromJsonLd(html);
@@ -375,14 +384,14 @@ async function resolveProductByPath(path) {
 
 async function fetchCategoryKeys(path) {
   try {
-    const res = await fetch(`${path}.json`, { credentials: 'same-origin' });
+    const res = await fetch(`${path}.json`, withTimeout({ credentials: 'same-origin' }));
     if (res.ok) {
       const product = await res.json();
       if (product?.sku || product?.path) return getCategoryKeys(product);
     }
   } catch { /* fall back to the product page */ }
   try {
-    const res = await fetch(path, { credentials: 'same-origin' });
+    const res = await fetch(path, withTimeout({ credentials: 'same-origin' }));
     if (!res.ok) return null;
     const product = extractProductFromJsonLd(await res.text());
     return product ? getCategoryKeys(product) : null;
@@ -490,9 +499,8 @@ function addMissingGifts(applicable) {
 }
 
 const RECONCILE_DELAY_MS = 500;
-const ESTIMATE_TIMEOUT_MS = 5000;
 
-// Last server answer: `{ payload, signature, grants }`.
+// Last server answer: `{ payload, signature, grants, at }`.
 let serverResult = null;
 let failedCheck = null;
 let reconcileTimer = null;
@@ -533,26 +541,31 @@ function payloadKey(payload) {
 }
 
 function storeServerResult(result) {
-  serverResult = result;
+  serverResult = { ...result, at: Date.now() };
   try {
     sessionStorage.setItem(SERVER_CACHE_KEY, JSON.stringify({
       key: payloadKey(result.payload),
       signature: result.signature,
       grants: result.grants,
-      at: Date.now(),
+      at: serverResult.at,
     }));
   } catch { /* best-effort */ }
 }
 
+const isFresh = (at) => Date.now() - at < SERVER_CACHE_TTL_MS;
+
 function serverResultFor(payload, signature) {
-  if (serverResult?.payload === payload && serverResult.signature === signature) {
+  if (serverResult?.payload === payload && serverResult.signature === signature
+    && isFresh(serverResult.at)) {
     return serverResult;
   }
   try {
     const stored = JSON.parse(sessionStorage.getItem(SERVER_CACHE_KEY));
     if (stored?.signature === signature && stored.key === payloadKey(payload)
-      && Date.now() - stored.at < SERVER_CACHE_TTL_MS && Array.isArray(stored.grants)) {
-      serverResult = { payload, signature, grants: stored.grants };
+      && isFresh(stored.at) && Array.isArray(stored.grants)) {
+      serverResult = {
+        payload, signature, grants: stored.grants, at: stored.at,
+      };
       return serverResult;
     }
   } catch { /* ignore */ }
@@ -664,16 +677,19 @@ export function reconcileWithServer({ force = false } = {}) {
   entry.promise = (async () => {
     try {
       // Direct fetch: importing commerce-api.js here would close an import cycle.
-      const res = await fetch(`${getConfig().apiOrigin}/estimate/price`, {
+      const res = await fetch(`${getConfig().apiOrigin}/estimate/price`, withTimeout({
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({ country: getConfig().getLocale(), items }),
-        ...(typeof AbortSignal?.timeout === 'function'
-          ? { signal: AbortSignal.timeout(ESTIMATE_TIMEOUT_MS) } : {}),
-      });
+      }));
       if (!res.ok) throw new Error(`estimate ${res.status}`);
       const result = await res.json();
-      const grants = asList(result?.freeItems).filter((f) => f?.ruleId && f?.path);
+      // The API omits `freeItems` when nothing is granted.
+      if (!result || typeof result !== 'object'
+        || (result.freeItems !== undefined && !Array.isArray(result.freeItems))) {
+        throw new Error('unexpected estimate response');
+      }
+      const grants = asList(result.freeItems).filter((f) => f?.ruleId && f?.path);
       storeServerResult({ payload, signature, grants });
       failedCheck = null;
     } catch (e) {
@@ -690,30 +706,42 @@ export function reconcileWithServer({ force = false } = {}) {
   return entry.promise;
 }
 
+async function settleGifts(force) {
+  const loaded = await ensurePriceRulesLoaded();
+  await evaluateGWP();
+  if (!loaded?.payload) return;
+  clearTimeout(reconcileTimer);
+  reconcileTimer = null;
+  if (!needsServer(loaded.payload, getActivePromotions(loaded.payload, getNow()))) return;
+  // A check that failed earlier gets one more try before each preview.
+  failedCheck = null;
+  await reconcileWithServer({ force });
+  await evaluateGWP();
+}
+
 /**
  * Settles gift lines for the current cart with the server before an order
- * preview. Never throws.
+ * preview. Never throws, and gives up after PREVIEW_SYNC_TIMEOUT_MS.
  *
- * @param {{ force?: boolean }} [opts] `force` re-asks the server
+ * @param {{ force?: boolean, timeoutMs?: number }} [opts] `force` re-asks the server
  * @returns {Promise<void>}
  */
-export async function ensureGWPReconciled({ force = false } = {}) {
+export async function ensureGWPReconciled({
+  force = false,
+  timeoutMs = PREVIEW_SYNC_TIMEOUT_MS,
+} = {}) {
   previewSyncs += 1;
+  let timer;
   try {
-    const loaded = await ensurePriceRulesLoaded();
-    await evaluateGWP();
-    if (!loaded?.payload) return;
-    clearTimeout(reconcileTimer);
-    reconcileTimer = null;
-    if (!needsServer(loaded.payload, getActivePromotions(loaded.payload, getNow()))) return;
-    // A check that failed earlier gets one more try before each preview.
-    failedCheck = null;
-    await reconcileWithServer({ force });
-    await evaluateGWP();
+    await Promise.race([
+      settleGifts(force),
+      new Promise((resolve) => { timer = setTimeout(resolve, timeoutMs); }),
+    ]);
   } catch (e) {
     // eslint-disable-next-line no-console
     console.warn('[GWP] reconcile failed', e);
   } finally {
+    clearTimeout(timer);
     previewSyncs -= 1;
   }
 }

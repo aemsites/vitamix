@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import cart from '../../scripts/cart.js';
 import { previewOrder } from '../../scripts/commerce-api.js';
 import {
-  ensurePriceRulesLoaded, evaluateGWP, conditionsMet, reconcileWithServer,
+  ensurePriceRulesLoaded, evaluateGWP, conditionsMet, reconcileWithServer, ensureGWPReconciled,
 } from '../../scripts/gift-with-purchase.js';
 import { __resetScripts } from './mocks/scripts.mjs';
 
@@ -78,6 +78,8 @@ let estimate;
 /** Answer to POST /orders/preview: a function of the request body. */
 let preview;
 let calls;
+/** Pending responses keyed by URL. */
+let holds;
 
 beforeEach(() => {
   globalThis.__resetTestState();
@@ -89,9 +91,11 @@ beforeEach(() => {
   estimate = { freeItems: [] };
   preview = () => json({ estimateToken: 'tok' });
   calls = [];
+  holds = {};
   globalThis.__setFetchMock(async (url, init) => {
     const body = init?.body ? JSON.parse(init.body) : undefined;
     calls.push({ url: String(url), body });
+    if (holds[String(url)]) return holds[String(url)];
     if (String(url).endsWith('/estimate/price')) {
       const answer = typeof estimate === 'function' ? estimate(body) : estimate;
       return answer instanceof Error ? Promise.reject(answer) : json(answer);
@@ -670,4 +674,70 @@ test('overlapping previews: a late rejection is repaired after another preview r
   assert.equal(giftsIn(bodyA.items).length, 0);
   assert.equal(giftsIn(bodyB.items).length, 0);
   assert.equal(gifts().length, 0);
+});
+
+test('a stalled lookup does not hold gift settlement past the deadline', async () => {
+  mock.timers.reset();
+  const item = { ...paidItem, sku: 'stall', path: '/us/en_us/products/stall' };
+  cart.addItem(item);
+  await loadRules([COMMERCIAL_PROMO]);
+  let release;
+  holds[`${item.path}.json`] = new Promise((resolve) => { release = resolve; });
+  await ensureGWPReconciled({ timeoutMs: 20 });
+  assert.equal(jsonCalls(item.path).length, 1);
+  // Changes after the deadline are not tagged as part of a preview.
+  globalThis.__events.length = 0;
+  release(json({ sku: 'stall', custom: { categories: [] } }));
+  await evaluateGWP();
+  const added = globalThis.__events.filter((e) => e.detail?.action === 'add');
+  assert.equal(added.length, 1);
+  assert.equal(added[0].detail.source, undefined);
+});
+
+test('an in-memory server answer expires after the TTL', async () => {
+  mock.timers.reset();
+  mock.timers.enable({ apis: ['setTimeout', 'Date'], now: Date.now() });
+  cart.addItem(paidItem);
+  await run();
+  estimate = { freeItems: [] };
+  await reconcileWithServer();
+  assert.equal(gifts().length, 0);
+  mock.timers.tick(16 * 60 * 1000);
+  estimate = grant();
+  await previewOrder({ items: cart.getItemsForAPI() });
+  assert.equal(estimateCalls().length, 2);
+  assert.equal(gifts().length, 1);
+});
+
+test('an estimate with a malformed freeItems counts as a failed check', async () => {
+  cart.addItem(paidItem);
+  await run();
+  estimate = { freeItems: 'none' };
+  await reconcileWithServer();
+  assert.equal(gifts().length, 1);
+});
+
+test('an estimate without freeItems denies the gift', async () => {
+  cart.addItem(paidItem);
+  await run();
+  estimate = { subtotal: 150 };
+  await reconcileWithServer();
+  assert.equal(gifts().length, 0);
+});
+
+test('a paid warranty line with empty product categories does not block the gift', async () => {
+  const warranty = {
+    sku: 'warranty-3yr',
+    path: '/us/en_us/products/warranty-3yr',
+    price: '25.00',
+    quantity: 1,
+    custom: { linkedTo: 'paid' },
+    local: { showInCart: false },
+  };
+  productJson[warranty.path] = { sku: 'warranty-3yr', custom: { categories: [] } };
+  cart.addItem({ ...paidItem, local: { categories: ['blenders'] } });
+  cart.addItem(warranty);
+  await run([COMMERCIAL_PROMO]);
+  assert.equal(gifts().length, 1);
+  assert.equal(jsonCalls(warranty.path).length, 1);
 });
