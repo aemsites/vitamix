@@ -753,8 +753,8 @@ test('a paid warranty line with empty product categories does not block the gift
 
 const API = 'https://api.test.com/test-org/sites/test-site';
 const simulate = (iso) => {
-  if (iso) sessionStorage.setItem('vitamix.simulateDate', iso);
-  else sessionStorage.removeItem('vitamix.simulateDate');
+  if (iso) localStorage.setItem('vitamix.now', iso);
+  else localStorage.removeItem('vitamix.now');
 };
 const query = (iso) => `simulateDate=${encodeURIComponent(iso)}`;
 /** Drops the module's in-memory rules: a stub replaces them, then goes away. */

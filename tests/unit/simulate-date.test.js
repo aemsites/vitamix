@@ -25,11 +25,21 @@ test('null without a parameter or stored date', () => {
   assert.equal(getSimulatedDate(), null);
 });
 
-test('the URL parameter sets the date and persists it for the session', () => {
+test('the URL parameter sets the date and persists it for every tab', () => {
   setLocation('main--site--org.aem.page', '?simulateDate=2030-01-02T03:04:05.000Z');
   assert.equal(getSimulatedDate().toISOString(), '2030-01-02T03:04:05.000Z');
+  assert.equal(localStorage.getItem('vitamix.now'), '2030-01-02T03:04:05.000Z');
   setLocation('main--site--org.aem.page', '?other=1');
   assert.equal(getSimulatedDate().toISOString(), '2030-01-02T03:04:05.000Z');
+});
+
+test('the parameter applies once per page, so a newer date from another tab wins', () => {
+  setLocation('localhost', '?simulateDate=2030-01-02T00:00:00Z');
+  assert.equal(getSimulatedDate().toISOString(), '2030-01-02T00:00:00.000Z');
+  localStorage.setItem('vitamix.now', '2030-03-04T00:00:00.000Z');
+  assert.equal(getSimulatedDate().toISOString(), '2030-03-04T00:00:00.000Z');
+  localStorage.removeItem('vitamix.now');
+  assert.equal(getSimulatedDate(), null, 'Clear in another tab applies here too');
 });
 
 test('parses Eastern date times (EST and EDT)', () => {
@@ -46,7 +56,7 @@ test('parses ISO dates, including an unencoded + offset', () => {
   assert.equal(parseSimulatedDate(''), null);
 });
 
-test('an empty parameter clears the stored and legacy dates', () => {
+test('an empty parameter clears the stored date', () => {
   setLocation('localhost', '?simulateDate=2030-01-02T00:00:00Z');
   getSimulatedDate();
   localStorage.setItem('vitamix.now', '2031-01-01T00:00:00Z');
@@ -62,7 +72,7 @@ test('an invalid parameter is ignored and keeps the stored date', () => {
   getSimulatedDate();
   setLocation('localhost', '?simulateDate=garbage');
   assert.equal(getSimulatedDate().toISOString(), '2030-01-02T00:00:00.000Z');
-  sessionStorage.clear();
+  localStorage.clear();
   assert.equal(getSimulatedDate(), null);
 });
 
@@ -75,7 +85,7 @@ test('a framed page uses its parameter without changing the tab\'s date', () => 
     assert.equal(getSimulatedDate().toISOString(), '2031-03-04T00:00:00.000Z');
     setLocation('localhost', '?simulateDate=');
     assert.equal(getSimulatedDate(), null);
-    assert.equal(sessionStorage.getItem('vitamix.simulateDate'), '2030-01-02T00:00:00.000Z');
+    assert.equal(localStorage.getItem('vitamix.now'), '2030-01-02T00:00:00.000Z');
   } finally {
     delete globalThis.top;
   }
@@ -88,7 +98,7 @@ test('falls back to localStorage vitamix.now', () => {
   assert.equal(getSimulatedDate(), null);
 });
 
-test('the session date wins over vitamix.now', () => {
+test('the parameter replaces a vitamix.now set by hand', () => {
   localStorage.setItem('vitamix.now', '2030-05-01T00:00:00Z');
   setLocation('localhost', '?simulateDate=2030-06-01T00:00:00Z');
   getSimulatedDate();
@@ -96,17 +106,52 @@ test('the session date wins over vitamix.now', () => {
   assert.equal(getSimulatedDate().toISOString(), '2030-06-01T00:00:00.000Z');
 });
 
+/** Replaces `globalThis[name]` with a getter that throws, as when site data is blocked. */
+function blockStorage(name) {
+  const original = Object.getOwnPropertyDescriptor(globalThis, name);
+  Object.defineProperty(globalThis, name, {
+    configurable: true,
+    get() { throw new Error('SecurityError'); },
+  });
+  return () => Object.defineProperty(globalThis, name, original);
+}
+
+test('blocked storage: throwing storage accessors never escape', () => {
+  const restore = [blockStorage('localStorage'), blockStorage('sessionStorage')];
+  try {
+    setLocation('localhost');
+    assert.equal(getSimulatedDate(), null);
+    assert.equal(withSimulatedDate('https://api.example.com/x'), 'https://api.example.com/x');
+    setLocation('localhost', '?simulateDate=2030-01-02T00:00:00Z');
+    assert.equal(getSimulatedDate().toISOString(), '2030-01-02T00:00:00.000Z', 'the page keeps its date');
+    setLocation('localhost', '?simulateDate=');
+    assert.equal(getSimulatedDate(), null);
+  } finally {
+    restore.forEach((fn) => fn());
+  }
+});
+
+test('blocked storage: a throwing setItem keeps the page\'s date', () => {
+  const { setItem } = localStorage;
+  localStorage.setItem = () => { throw new Error('QuotaExceededError'); };
+  try {
+    setLocation('localhost', '?simulateDate=2030-01-02T00:00:00Z');
+    assert.equal(getSimulatedDate().toISOString(), '2030-01-02T00:00:00.000Z');
+  } finally {
+    localStorage.setItem = setItem;
+  }
+});
+
 test('always null on production hosts, and stores nothing', () => {
   ['www.vitamix.com', 'vitamix.com'].forEach((host) => {
-    sessionStorage.setItem('vitamix.simulateDate', '2030-01-01T00:00:00.000Z');
     localStorage.setItem('vitamix.now', '2030-01-01T00:00:00Z');
     setLocation(host, '?simulateDate=2031-01-01T00:00:00Z');
     assert.equal(isSimulationHost(), false);
     assert.equal(getSimulatedDate(), null, host);
     assert.equal(withSimulatedDate('https://api.example.com/x'), 'https://api.example.com/x');
-    sessionStorage.clear();
+    localStorage.clear();
     getSimulatedDate();
-    assert.equal(sessionStorage.getItem('vitamix.simulateDate'), null);
+    assert.equal(localStorage.getItem('vitamix.now'), null);
   });
   ['uat.vitamix.com', 'main--site--org.aem.live', 'localhost'].forEach((host) => {
     setLocation(host);

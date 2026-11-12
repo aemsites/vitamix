@@ -1,6 +1,6 @@
 const PARAM = 'simulateDate';
-const SESSION_KEY = 'vitamix.simulateDate';
-const LEGACY_KEY = 'vitamix.now';
+// Shared by all tabs, like the cart, so every tab prices gifts on the same clock.
+const STORAGE_KEY = 'vitamix.now';
 const BADGE_ID = 'simulate-date-badge';
 
 /**
@@ -134,18 +134,31 @@ export function parseSimulatedDate(value) {
   }
 }
 
-function storageGet(storage, key) {
-  try { return storage.getItem(key); } catch { return null; }
+/** The stored ISO date, `null` when absent, `undefined` when storage is unavailable. */
+function readStored() {
+  try {
+    return window.localStorage.getItem(STORAGE_KEY);
+  } catch {
+    return undefined;
+  }
 }
 
-function storageSet(storage, key, value) {
+let writeFailed = false;
+
+function writeStored(value) {
   try {
-    if (value === null) storage.removeItem(key);
-    else storage.setItem(key, value);
-  } catch { /* best-effort */ }
+    if (value === null) window.localStorage.removeItem(STORAGE_KEY);
+    else window.localStorage.setItem(STORAGE_KEY, value);
+    writeFailed = false;
+  } catch {
+    writeFailed = true;
+  }
 }
 
 let warnedParam = null;
+let applied = { location: null, search: null };
+// This page's date when storage is unavailable.
+let pageDate = null;
 
 /** Framed pages (date simulator previews) don't change the tab's date. */
 function isFramed() {
@@ -156,40 +169,60 @@ function isFramed() {
   }
 }
 
+function readParam() {
+  try {
+    return new URLSearchParams(window.location?.search || '').get(PARAM);
+  } catch {
+    return null;
+  }
+}
+
+function parseParam(param) {
+  const date = parseSimulatedDate(param);
+  if (!date && param.trim() && warnedParam !== param) {
+    warnedParam = param;
+    // eslint-disable-next-line no-console
+    console.warn(`Invalid simulateDate: ${param}`);
+  }
+  return date;
+}
+
+/** Stores `?simulateDate=` once per page load, so a newer date from another tab wins. */
+function applyParam() {
+  const { location } = window;
+  const search = location?.search || '';
+  if (applied.location === location && applied.search === search) return;
+  applied = { location, search };
+  pageDate = null;
+  writeFailed = false;
+  const param = readParam();
+  if (param === null) return;
+  if (!param.trim()) {
+    writeStored(null);
+    return;
+  }
+  const date = parseParam(param);
+  if (!date) return;
+  pageDate = date;
+  writeStored(date.toISOString());
+}
+
 /**
- * The simulated "now" for this session, or `null` (always on production hosts).
- * `?simulateDate=` sets it for the tab session, an empty value clears it.
+ * The simulated "now", or `null` (always on production hosts). `?simulateDate=` sets it
+ * for every tab of the site, an empty value clears it.
  *
  * @returns {Date|null}
  */
 export function getSimulatedDate() {
   if (!isSimulationHost()) return null;
-  let param = null;
-  try {
-    param = new URLSearchParams(window.location?.search || '').get(PARAM);
-  } catch { /* no location */ }
-  if (param !== null) {
-    if (!param.trim()) {
-      if (isFramed()) return null;
-      storageSet(sessionStorage, SESSION_KEY, null);
-      storageSet(localStorage, LEGACY_KEY, null);
-      return null;
-    }
-    const date = parseSimulatedDate(param);
-    if (date) {
-      const iso = date.toISOString();
-      if (!isFramed() && storageGet(sessionStorage, SESSION_KEY) !== iso) {
-        storageSet(sessionStorage, SESSION_KEY, iso);
-      }
-      return date;
-    }
-    if (warnedParam !== param) {
-      warnedParam = param;
-      // eslint-disable-next-line no-console
-      console.warn(`Invalid simulateDate: ${param}`);
-    }
+  if (isFramed()) {
+    const param = readParam();
+    if (param !== null) return param.trim() ? parseParam(param) : null;
+  } else {
+    applyParam();
   }
-  const stored = storageGet(sessionStorage, SESSION_KEY) || storageGet(localStorage, LEGACY_KEY);
+  const stored = readStored();
+  if (stored === undefined || writeFailed) return pageDate ? new Date(pageDate) : null;
   if (!stored) return null;
   const date = new Date(stored);
   return Number.isNaN(date.getTime()) ? null : date;

@@ -393,7 +393,7 @@ const SIMULATED_QUERY = `simulateDate=${encodeURIComponent(SIMULATED)}`;
 
 function simulate(hostname = 'main--site--org.aem.page') {
   globalThis.location = { hostname, search: '' };
-  sessionStorage.setItem('vitamix.simulateDate', SIMULATED);
+  localStorage.setItem('vitamix.now', SIMULATED);
 }
 
 async function urlOf(call) {

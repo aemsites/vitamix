@@ -770,7 +770,7 @@ export function initGWP() {
   // every action re-evaluates so qty changes can apply/unapply gifts.
   document.addEventListener('cart:change', async (event) => {
     const action = event.detail?.action;
-    // The tab that changed the cart settled its gifts on its own clock.
+    // The tab that changed the cart already settled its gifts.
     if (isApplyingGWP || action === 'sync') return;
     if (action === 'add' || action === 'restore') {
       await ensurePriceRulesLoaded();

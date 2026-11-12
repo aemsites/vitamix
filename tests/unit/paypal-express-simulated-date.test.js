@@ -28,7 +28,7 @@ test('PayPal express is rendered without a simulated date', () => {
 });
 
 test('PayPal express is not rendered while a date is simulated', () => {
-  sessionStorage.setItem('vitamix.simulateDate', '2030-06-01T00:00:00.000Z');
+  localStorage.setItem('vitamix.now', '2030-06-01T00:00:00.000Z');
   assert.equal(paypal.supportsExpress, false);
   assert.deepEqual(expressProviders(), ['apple-pay']);
   assert.deepEqual(getActiveProviders([applePayLike, paypal]).map((p) => p.id), ['apple-pay', 'paypal']);
@@ -37,7 +37,7 @@ test('PayPal express is not rendered while a date is simulated', () => {
 
 test('PayPal express is unchanged on production hosts', () => {
   setLocation('www.vitamix.com');
-  sessionStorage.setItem('vitamix.simulateDate', '2030-06-01T00:00:00.000Z');
+  localStorage.setItem('vitamix.now', '2030-06-01T00:00:00.000Z');
   localStorage.setItem('vitamix.now', '2030-06-01T00:00:00.000Z');
   assert.equal(paypal.supportsExpress, true);
   assert.deepEqual(expressProviders(), ['apple-pay', 'paypal']);
