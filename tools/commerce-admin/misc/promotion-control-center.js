@@ -960,9 +960,11 @@ function editTargetForItem(item) {
   if (item.source === 'nav-banners') {
     return `https://da.live/edit#/aemsites/vitamix/${item.where}/nav/nav-banners`;
   }
+  if (item.source === 'free-gifts') {
+    return `https://da.live/edit#/aemsites/vitamix/${item.where}/products/config/free-gifts`;
+  }
   const paths = {
     'promo-schedule': '/promotions/promo-schedule',
-    'free-gifts': '/products/config/free-gifts',
   };
   return `https://da.live/sheet#/aemsites/vitamix/${item.where}${paths[item.source]}`;
 }
