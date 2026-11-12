@@ -2237,7 +2237,7 @@ async function loadLazy(doc) {
   if (hash && element) element.scrollIntoView();
 
   loadFooter(doc.querySelector('footer'));
-  if (window.simulateDate && isSimulationHost()) showSimulationBadge();
+  if (isSimulationHost()) showSimulationBadge();
 
   loadCSS(`${window.hlx.codeBasePath}/styles/lazy-styles.css`);
   loadFonts();

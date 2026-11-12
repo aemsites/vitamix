@@ -16,6 +16,19 @@ function setLocation(hostname, search = '') {
   };
 }
 
+/** `storage` listeners registered on the window. */
+const storageListeners = [];
+globalThis.addEventListener = (type, fn) => {
+  if (type === 'storage') storageListeners.push(fn);
+};
+
+/** Another tab writes the simulated date (or clears it with `null`). */
+function otherTabSets(iso) {
+  if (iso) localStorage.setItem('vitamix.now', iso);
+  else localStorage.removeItem('vitamix.now');
+  storageListeners.forEach((fn) => fn({ key: 'vitamix.now' }));
+}
+
 beforeEach(() => {
   globalThis.__resetTestState();
   setLocation('main--site--org.aem.page');
@@ -174,8 +187,13 @@ test('withSimulatedDate appends the ISO (UTC) date', () => {
 
 // --- indicator --------------------------------------------------------------------
 
+let previousBody = null;
+
+/** A fresh page body; the previous page's badge is gone. */
 function installDom() {
+  previousBody?.children.forEach((node) => { node.isConnected = false; });
   const body = { children: [] };
+  previousBody = body;
   const createElement = (tag) => {
     const el = {
       tag,
@@ -183,7 +201,6 @@ function installDom() {
       dataset: {},
       attributes: {},
       children: [],
-      removed: false,
       setAttribute(name, value) { this.attributes[name] = value; },
       append(...nodes) { this.children.push(...nodes); },
       remove() { this.isConnected = false; },
@@ -241,4 +258,53 @@ test('noteSimulatedAt is a no-op without a simulated date', () => {
   setLocation('www.vitamix.com', '?simulateDate=2030-01-02T15:00:00Z');
   noteSimulatedAt({ simulatedAt: '2030-01-02T15:00:00.000Z' });
   assert.equal(getSimulationStatus(), before);
+});
+
+test('indicator: follows a date set or cleared in another tab', () => {
+  const body = installDom();
+  setLocation('localhost', '?page=1');
+  showSimulationBadge();
+  assert.equal(body.children.length, 0);
+  assert.equal(storageListeners.length, 1);
+
+  otherTabSets('2030-02-03T15:00:00.000Z');
+  assert.equal(body.children.length, 1);
+  const [badge] = body.children;
+  assert.match(badge.children[1].textContent, /Feb 3, 2030/);
+  assert.equal(badge.isConnected, true);
+
+  otherTabSets('2030-04-05T15:00:00.000Z');
+  assert.match(badge.children[1].textContent, /Apr 5, 2030/);
+
+  otherTabSets(null);
+  assert.equal(badge.isConnected, false);
+
+  otherTabSets('2030-06-07T15:00:00.000Z');
+  assert.equal(body.children.length, 2);
+  assert.equal(body.children[1].isConnected, true);
+  showSimulationBadge();
+  assert.equal(storageListeners.length, 1, 'one listener per page');
+});
+
+test('indicator: a new date resets the "not applied" state', () => {
+  const body = installDom();
+  setLocation('localhost', '?simulateDate=2030-01-02T15:00:00Z');
+  showSimulationBadge();
+  const badge = body.children.at(-1);
+  const status = badge.children[3];
+  noteSimulatedAt({ subtotal: 1 });
+  assert.equal(status.hidden, false);
+  otherTabSets('2030-01-09T15:00:00.000Z');
+  assert.equal(status.hidden, true);
+  assert.equal(getSimulationStatus(), null);
+});
+
+test('indicator: nothing on production hosts, even with a stored date', () => {
+  const body = installDom();
+  setLocation('www.vitamix.com', '?simulateDate=2030-01-02T15:00:00Z');
+  localStorage.setItem('vitamix.now', '2030-01-02T15:00:00.000Z');
+  const listeners = storageListeners.length;
+  showSimulationBadge();
+  assert.equal(body.children.length, 0);
+  assert.equal(storageListeners.length, listeners);
 });

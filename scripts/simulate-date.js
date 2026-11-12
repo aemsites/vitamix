@@ -268,6 +268,8 @@ function clearHref() {
 
 let badge = null;
 
+let appliedFor = null;
+
 function updateBadge() {
   if (!badge) return;
   const date = getSimulatedDate();
@@ -276,6 +278,7 @@ function updateBadge() {
     badge = null;
     return;
   }
+  if (appliedFor !== date.getTime()) apiApplied = null;
   badge.root.dataset.applied = String(apiApplied);
   badge.value.textContent = formatBadgeDate(date);
   badge.status.hidden = apiApplied !== false;
@@ -288,9 +291,23 @@ function element(tag, text, style) {
   return el;
 }
 
-/** Shows a fixed badge with the simulated date and a link that clears it. */
+let watching = false;
+
+/**
+ * Shows a fixed badge with the simulated date and a link that clears it, and keeps it
+ * current when another tab sets or clears the date. Does nothing on production hosts.
+ */
 export function showSimulationBadge() {
-  if (badge?.root.isConnected || isFramed() || !getSimulatedDate()) return;
+  if (!isSimulationHost() || isFramed()) return;
+  if (!watching) {
+    watching = true;
+    window.addEventListener?.('storage', (event) => {
+      if (event.key !== STORAGE_KEY && event.key !== null) return;
+      if (badge?.root.isConnected) updateBadge();
+      else showSimulationBadge();
+    });
+  }
+  if (badge?.root.isConnected || !getSimulatedDate()) return;
   const root = element('div', '', 'position:fixed;left:8px;bottom:8px;z-index:2147483000;'
     + 'padding:6px 10px;border-radius:4px;background:#5c2d91;color:#fff;'
     + 'font:12px/1.4 sans-serif;box-shadow:0 1px 4px rgb(0 0 0 / 30%)');
@@ -314,6 +331,7 @@ export function showSimulationBadge() {
 export function noteSimulatedAt(response) {
   if (!response || typeof response !== 'object' || !getSimulatedDate()) return;
   apiApplied = typeof response.simulatedAt === 'string';
+  appliedFor = getSimulatedDate().getTime();
   if (!apiApplied && !warnedIgnored) {
     warnedIgnored = true;
     // eslint-disable-next-line no-console
