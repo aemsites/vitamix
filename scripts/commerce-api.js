@@ -22,6 +22,8 @@ class CommerceApiError extends Error {
   }
 }
 
+const PRICING_PATHS = ['/estimate/price', '/estimate/shipping', '/estimate/order', '/orders/preview'];
+
 /**
  * Read the shopper browser timezone for Commerce API order payloads, when available.
  *
@@ -72,7 +74,7 @@ async function post(path, body, recaptchaAction) {
     payload = { ...body, couponCode: couponCode.map(normalizeCouponCode) };
   }
 
-  const pricing = path.startsWith('/estimate/') || path === '/orders/preview';
+  const pricing = PRICING_PATHS.includes(path);
   const url = `${getConfig().apiOrigin}${path}`;
   let resp;
   let data;
