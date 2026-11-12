@@ -156,7 +156,7 @@ function writeStored(value) {
 }
 
 let warnedParam = null;
-let applied = { location: null, search: null };
+let appliedLocation = null;
 // This page's date when storage is unavailable.
 let pageDate = null;
 
@@ -190,9 +190,8 @@ function parseParam(param) {
 /** Stores `?simulateDate=` once per page load, so a newer date from another tab wins. */
 function applyParam() {
   const { location } = window;
-  const search = location?.search || '';
-  if (applied.location === location && applied.search === search) return;
-  applied = { location, search };
+  if (appliedLocation === location) return;
+  appliedLocation = location;
   pageDate = null;
   writeFailed = false;
   const param = readParam();
@@ -268,8 +267,6 @@ function clearHref() {
 
 let badge = null;
 
-let appliedFor = null;
-
 function updateBadge() {
   if (!badge) return;
   const date = getSimulatedDate();
@@ -278,7 +275,6 @@ function updateBadge() {
     badge = null;
     return;
   }
-  if (appliedFor !== date.getTime()) apiApplied = null;
   badge.root.dataset.applied = String(apiApplied);
   badge.value.textContent = formatBadgeDate(date);
   badge.status.hidden = apiApplied !== false;
@@ -293,20 +289,34 @@ function element(tag, text, style) {
 
 let watching = false;
 
+/** Reloads without `?simulateDate`, so the reload doesn't write this page's date back. */
+function reloadWithoutParam() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete(PARAM);
+  window.location.replace(url.href);
+}
+
+/** Reloads the page when another tab sets, changes or clears the date. */
+function watchOtherTabs() {
+  if (watching) return;
+  watching = true;
+  let current = getSimulatedDate()?.getTime() ?? null;
+  window.addEventListener?.('storage', (event) => {
+    if (event.key !== STORAGE_KEY && event.key !== null) return;
+    const next = getSimulatedDate()?.getTime() ?? null;
+    if (next === current) return;
+    current = next;
+    reloadWithoutParam();
+  });
+}
+
 /**
- * Shows a fixed badge with the simulated date and a link that clears it, and keeps it
- * current when another tab sets or clears the date. Does nothing on production hosts.
+ * Shows a fixed badge with the simulated date and a link that clears it. Pages reload
+ * when another tab changes the date. Does nothing on production hosts.
  */
 export function showSimulationBadge() {
   if (!isSimulationHost() || isFramed()) return;
-  if (!watching) {
-    watching = true;
-    window.addEventListener?.('storage', (event) => {
-      if (event.key !== STORAGE_KEY && event.key !== null) return;
-      if (badge?.root.isConnected) updateBadge();
-      else showSimulationBadge();
-    });
-  }
+  watchOtherTabs();
   if (badge?.root.isConnected || !getSimulatedDate()) return;
   const root = element('div', '', 'position:fixed;left:8px;bottom:8px;z-index:2147483000;'
     + 'padding:6px 10px;border-radius:4px;background:#5c2d91;color:#fff;'
@@ -331,7 +341,6 @@ export function showSimulationBadge() {
 export function noteSimulatedAt(response) {
   if (!response || typeof response !== 'object' || !getSimulatedDate()) return;
   apiApplied = typeof response.simulatedAt === 'string';
-  appliedFor = getSimulatedDate().getTime();
   if (!apiApplied && !warnedIgnored) {
     warnedIgnored = true;
     // eslint-disable-next-line no-console

@@ -8,11 +8,15 @@ import {
   showSimulationBadge, parseSimulatedDate, isSimulationHost,
 } from '../../scripts/simulate-date.js';
 
+/** URLs passed to `location.replace` (page reloads). */
+const reloads = [];
+
 function setLocation(hostname, search = '') {
   globalThis.location = {
     hostname,
     search,
     href: `https://${hostname}/us/en_us/products/x${search}`,
+    replace(url) { reloads.push(url); },
   };
 }
 
@@ -260,43 +264,37 @@ test('noteSimulatedAt is a no-op without a simulated date', () => {
   assert.equal(getSimulationStatus(), before);
 });
 
-test('indicator: follows a date set or cleared in another tab', () => {
-  const body = installDom();
-  setLocation('localhost', '?page=1');
+test('another tab setting, changing or clearing the date reloads the page without the parameter', () => {
+  installDom();
+  setLocation('localhost', '?simulateDate=2030-01-02T15:00:00Z&color=red');
   showSimulationBadge();
-  assert.equal(body.children.length, 0);
   assert.equal(storageListeners.length, 1);
+  // Brings the listener's last seen date up to this test's page.
+  storageListeners.forEach((fn) => fn({ key: 'vitamix.now' }));
+  reloads.length = 0;
 
-  otherTabSets('2030-02-03T15:00:00.000Z');
-  assert.equal(body.children.length, 1);
-  const [badge] = body.children;
-  assert.match(badge.children[1].textContent, /Feb 3, 2030/);
-  assert.equal(badge.isConnected, true);
+  storageListeners.forEach((fn) => fn({ key: 'vitamix.now' }));
+  storageListeners.forEach((fn) => fn({ key: 'cart:us' }));
+  assert.deepEqual(reloads, [], 'no reload without a date change');
 
   otherTabSets('2030-04-05T15:00:00.000Z');
-  assert.match(badge.children[1].textContent, /Apr 5, 2030/);
-
   otherTabSets(null);
-  assert.equal(badge.isConnected, false);
-
   otherTabSets('2030-06-07T15:00:00.000Z');
-  assert.equal(body.children.length, 2);
-  assert.equal(body.children[1].isConnected, true);
+  assert.deepEqual(reloads, Array(3).fill('https://localhost/us/en_us/products/x?color=red'));
   showSimulationBadge();
   assert.equal(storageListeners.length, 1, 'one listener per page');
 });
 
-test('indicator: a new date resets the "not applied" state', () => {
-  const body = installDom();
-  setLocation('localhost', '?simulateDate=2030-01-02T15:00:00Z');
-  showSimulationBadge();
-  const badge = body.children.at(-1);
-  const status = badge.children[3];
-  noteSimulatedAt({ subtotal: 1 });
-  assert.equal(status.hidden, false);
-  otherTabSets('2030-01-09T15:00:00.000Z');
-  assert.equal(status.hidden, true);
-  assert.equal(getSimulationStatus(), null);
+test('the parameter applies once per page, even when other query parameters change', () => {
+  setLocation('localhost', '?simulateDate=2030-01-02T00:00:00Z');
+  assert.equal(getSimulatedDate().toISOString(), '2030-01-02T00:00:00.000Z');
+  otherTabSets('2030-05-06T00:00:00.000Z');
+  globalThis.location.search = '?simulateDate=2030-01-02T00:00:00Z&color=red';
+  assert.equal(getSimulatedDate().toISOString(), '2030-05-06T00:00:00.000Z');
+  otherTabSets(null);
+  globalThis.location.search = '?simulateDate=2030-01-02T00:00:00Z&color=blue';
+  assert.equal(getSimulatedDate(), null);
+  assert.equal(localStorage.getItem('vitamix.now'), null);
 });
 
 test('indicator: nothing on production hosts, even with a stored date', () => {
