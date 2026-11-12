@@ -150,6 +150,7 @@ export async function ensurePriceRulesLoaded() {
       const res = await fetch(getEndpoint(), withTimeout({ method: 'GET', headers }));
       if (!res.ok) throw new Error(`price-rules ${res.status}`);
       const payload = await res.json();
+      noteSimulatedAt(payload);
       const loaded = {
         fetchedAt: Date.now(), payload, productsByPath: {}, ...(clock ? { clock } : {}),
       };
@@ -768,8 +769,9 @@ export function initGWP() {
   // rules cache (the rule set itself doesn't change as items get edited);
   // every action re-evaluates so qty changes can apply/unapply gifts.
   document.addEventListener('cart:change', async (event) => {
-    if (isApplyingGWP) return;
     const action = event.detail?.action;
+    // The tab that changed the cart settled its gifts on its own clock.
+    if (isApplyingGWP || action === 'sync') return;
     if (action === 'add' || action === 'restore') {
       await ensurePriceRulesLoaded();
     }

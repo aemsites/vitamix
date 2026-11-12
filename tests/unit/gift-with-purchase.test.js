@@ -12,7 +12,9 @@ import cart from '../../scripts/cart.js';
 import { previewOrder } from '../../scripts/commerce-api.js';
 import {
   ensurePriceRulesLoaded, evaluateGWP, conditionsMet, reconcileWithServer, ensureGWPReconciled,
+  initGWP,
 } from '../../scripts/gift-with-purchase.js';
+import { getSimulationStatus } from '../../scripts/simulate-date.js';
 import { __resetScripts } from './mocks/scripts.mjs';
 
 globalThis.location = { hostname: 'localhost', origin: 'http://localhost' };
@@ -881,4 +883,64 @@ test('simulated date: the end of a rule is inclusive', async () => {
   await ensurePriceRulesLoaded();
   await evaluateGWP();
   assert.equal(gifts().length, 1);
+});
+
+test('simulated date: the rules response reports whether the API applied it', async () => {
+  await resetRulesCache();
+  simulate('2030-06-04T00:00:00.000Z');
+  rules = { promotions: [] };
+  await ensurePriceRulesLoaded();
+  assert.equal(getSimulationStatus(), false);
+  simulate('2030-06-05T00:00:00.000Z');
+  rules = { promotions: [], simulatedAt: '2030-06-05T00:00:00.000Z' };
+  await ensurePriceRulesLoaded();
+  assert.equal(getSimulationStatus(), true);
+});
+
+/** Lets work a listener started without awaiting it run. */
+const evaluation = async () => {
+  for (let i = 0; i < 20; i += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise(setImmediate);
+  }
+};
+
+/** The GWP `cart:change` listener, as wired by initGWP. */
+let cartChangeListener;
+function gwpListener() {
+  if (!cartChangeListener) {
+    const original = globalThis.document.addEventListener;
+    globalThis.document.addEventListener = (type, fn) => {
+      if (type === 'cart:change') cartChangeListener = fn;
+    };
+    initGWP();
+    globalThis.document.addEventListener = original;
+  }
+  return cartChangeListener;
+}
+
+test('simulated date: a sync from a tab on another clock does not add or remove gifts', async () => {
+  await resetRulesCache();
+  const listener = gwpListener();
+  rules = { promotions: [FUTURE_PROMO] };
+  // Another tab, simulated inside the window, added the gift; this tab runs in real time.
+  cart.addItem(paidItem);
+  cart.addItem(giftItem({ promotionId: FUTURE_PROMO.id }), { allowSeparateEntry: true });
+  await ensurePriceRulesLoaded();
+  await listener({ detail: { action: 'sync' } });
+  await evaluation();
+  assert.equal(gifts().length, 1, 'the real-clock tab keeps the other tab\'s gift');
+
+  // The reverse: this tab is simulated, another tab on the real clock removed the gift.
+  simulate('2030-06-06T00:00:00.000Z');
+  cart.clear();
+  cart.addItem(paidItem);
+  await ensurePriceRulesLoaded();
+  await listener({ detail: { action: 'sync' } });
+  await evaluation();
+  assert.equal(gifts().length, 0, 'the simulated tab does not add the gift back');
+
+  await listener({ detail: { action: 'update' } });
+  await evaluation();
+  assert.equal(gifts().length, 1, 'its own changes are still evaluated');
 });
