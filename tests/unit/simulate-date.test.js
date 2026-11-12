@@ -66,6 +66,21 @@ test('an invalid parameter is ignored and keeps the stored date', () => {
   assert.equal(getSimulatedDate(), null);
 });
 
+test('a framed page uses its parameter without changing the tab\'s date', () => {
+  setLocation('localhost', '?simulateDate=2030-01-02T00:00:00Z');
+  getSimulatedDate();
+  globalThis.top = {};
+  try {
+    setLocation('localhost', '?simulateDate=2031-03-04T00:00:00Z');
+    assert.equal(getSimulatedDate().toISOString(), '2031-03-04T00:00:00.000Z');
+    setLocation('localhost', '?simulateDate=');
+    assert.equal(getSimulatedDate(), null);
+    assert.equal(sessionStorage.getItem('vitamix.simulateDate'), '2030-01-02T00:00:00.000Z');
+  } finally {
+    delete globalThis.top;
+  }
+});
+
 test('falls back to localStorage vitamix.now', () => {
   localStorage.setItem('vitamix.now', '2030-05-01T00:00:00Z');
   assert.equal(getSimulatedDate().toISOString(), '2030-05-01T00:00:00.000Z');

@@ -147,6 +147,15 @@ function storageSet(storage, key, value) {
 
 let warnedParam = null;
 
+/** Framed pages (date simulator previews) don't change the tab's date. */
+function isFramed() {
+  try {
+    return !!window.top && window.top !== window.self;
+  } catch {
+    return true;
+  }
+}
+
 /**
  * The simulated "now" for this session, or `null` (always on production hosts).
  * `?simulateDate=` sets it for the tab session, an empty value clears it.
@@ -161,6 +170,7 @@ export function getSimulatedDate() {
   } catch { /* no location */ }
   if (param !== null) {
     if (!param.trim()) {
+      if (isFramed()) return null;
       storageSet(sessionStorage, SESSION_KEY, null);
       storageSet(localStorage, LEGACY_KEY, null);
       return null;
@@ -168,7 +178,7 @@ export function getSimulatedDate() {
     const date = parseSimulatedDate(param);
     if (date) {
       const iso = date.toISOString();
-      if (storageGet(sessionStorage, SESSION_KEY) !== iso) {
+      if (!isFramed() && storageGet(sessionStorage, SESSION_KEY) !== iso) {
         storageSet(sessionStorage, SESSION_KEY, iso);
       }
       return date;
@@ -247,7 +257,7 @@ function element(tag, text, style) {
 
 /** Shows a fixed badge with the simulated date and a link that clears it. */
 export function showSimulationBadge() {
-  if (badge?.root.isConnected || !getSimulatedDate()) return;
+  if (badge?.root.isConnected || isFramed() || !getSimulatedDate()) return;
   const root = element('div', '', 'position:fixed;left:8px;bottom:8px;z-index:2147483000;'
     + 'padding:6px 10px;border-radius:4px;background:#5c2d91;color:#fff;'
     + 'font:12px/1.4 sans-serif;box-shadow:0 1px 4px rgb(0 0 0 / 30%)');
