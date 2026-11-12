@@ -185,6 +185,7 @@ export default {
       },
 
       createOrder: async () => {
+        if (getSimulatedDate()) throw new Error('PayPal express is unavailable with a simulated date');
         const config = callbacks.getConfig();
         const cart = callbacks.getCart();
         const state = callbacks.getState();

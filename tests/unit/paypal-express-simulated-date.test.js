@@ -42,3 +42,37 @@ test('PayPal express is unchanged on production hosts', () => {
   assert.equal(paypal.supportsExpress, true);
   assert.deepEqual(expressProviders(), ['apple-pay', 'paypal']);
 });
+
+test('an express button mounted before simulation starts does not create a PayPal session', async () => {
+  let buttonConfig;
+  globalThis.window.paypal = {
+    FUNDING: { PAYPAL: 'paypal', PAYLATER: 'paylater' },
+    Buttons: (cfg) => {
+      buttonConfig ??= cfg;
+      return { render: () => {}, isEligible: () => false };
+    },
+  };
+  const originalCreateElement = globalThis.document.createElement;
+  globalThis.document.createElement = () => ({ className: '' });
+  const requests = [];
+  globalThis.__setFetchMock(async (url) => {
+    requests.push(url);
+    return {
+      ok: true, status: 200, json: async () => ({ paypalOrderId: 'pp-1' }), headers: { get: () => null },
+    };
+  });
+  try {
+    paypal.renderExpressButton({ appendChild: () => {} }, {
+      expressEntryPoint: 'cart',
+      getConfig: () => ({ getLocale: () => 'us', getLanguage: () => 'en-US', currency: 'USD' }),
+      getCart: () => ({ getItemsForAPI: () => [] }),
+      getState: () => ({}),
+    });
+    localStorage.setItem('vitamix.now', '2030-06-01T00:00:00.000Z');
+    await assert.rejects(buttonConfig.createOrder(), /simulated date/);
+    assert.deepEqual(requests, []);
+  } finally {
+    globalThis.document.createElement = originalCreateElement;
+    delete globalThis.window.paypal;
+  }
+});
