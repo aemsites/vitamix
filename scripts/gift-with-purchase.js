@@ -769,9 +769,8 @@ export function initGWP() {
   // rules cache (the rule set itself doesn't change as items get edited);
   // every action re-evaluates so qty changes can apply/unapply gifts.
   document.addEventListener('cart:change', async (event) => {
+    if (isApplyingGWP) return;
     const action = event.detail?.action;
-    // The tab that changed the cart already settled its gifts.
-    if (isApplyingGWP || action === 'sync') return;
     if (action === 'add' || action === 'restore') {
       await ensurePriceRulesLoaded();
     }
