@@ -11,6 +11,7 @@ import resolvePaymentFailureMessage from '../payment-failure.js';
 import ensureCheckoutPreviewToken, { withPayPalExpressContext } from './paypal-context.js';
 import { buildExpressOrderPayload, expressPayloadMatchesCart } from '../checkout-context.js';
 import { getCouponRequestFields } from '../commerce/coupon-state.js';
+import { getSimulatedDate } from '../simulate-date.js';
 import {
   isExpressReviewEnabled,
   resolveExpressOutcome,
@@ -100,7 +101,10 @@ function showNotConfiguredDialog() {
 export default {
   id: 'paypal',
   label: 'PayPal',
-  supportsExpress: true,
+  // Express checkout can't use a simulated date.
+  get supportsExpress() {
+    return !getSimulatedDate();
+  },
   hidesBilling: true,
 
   load: async (config) => {

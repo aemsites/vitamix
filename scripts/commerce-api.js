@@ -5,6 +5,7 @@ import { getLocaleAndLanguage, loggedFetch } from './scripts.js';
 import { logApiError, logNetworkError } from './operations-log.js';
 import { getAffiliateCode, normalizeCouponCode } from './commerce/coupon-state.js';
 import { applyPriceCorrection } from './commerce/price-correction.js';
+import { noteSimulatedAt, withSimulatedDate } from './simulate-date.js';
 
 /**
  * Error thrown when the Commerce API returns a non-2xx response.
@@ -71,10 +72,12 @@ async function post(path, body, recaptchaAction) {
     payload = { ...body, couponCode: couponCode.map(normalizeCouponCode) };
   }
 
+  const pricing = path.startsWith('/estimate/') || path === '/orders/preview';
+  const url = `${getConfig().apiOrigin}${path}`;
   let resp;
   let data;
   try {
-    resp = await loggedFetch(`${getConfig().apiOrigin}${path}`, {
+    resp = await loggedFetch(pricing ? withSimulatedDate(url) : url, {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
@@ -92,6 +95,7 @@ async function post(path, body, recaptchaAction) {
     });
     throw new CommerceApiError(resp.status, data, resp.headers.get('x-error'), resp.headers.get('x-error-code'));
   }
+  if (pricing) noteSimulatedAt(data);
   return data;
 }
 

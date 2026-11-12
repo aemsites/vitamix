@@ -77,6 +77,8 @@ let pages;
 let estimate;
 /** Answer to POST /orders/preview: a function of the request body. */
 let preview;
+/** Answer to GET /price-rules/catalog. */
+let rules;
 let calls;
 /** Pending responses keyed by URL. */
 let holds;
@@ -90,17 +92,20 @@ beforeEach(() => {
   pages = {};
   estimate = { freeItems: [] };
   preview = () => json({ estimateToken: 'tok' });
+  rules = { promotions: [] };
   calls = [];
   holds = {};
   globalThis.__setFetchMock(async (url, init) => {
     const body = init?.body ? JSON.parse(init.body) : undefined;
     calls.push({ url: String(url), body });
     if (holds[String(url)]) return holds[String(url)];
-    if (String(url).endsWith('/estimate/price')) {
+    const path = String(url).split('?')[0];
+    if (path.endsWith('/estimate/price')) {
       const answer = typeof estimate === 'function' ? estimate(body) : estimate;
       return answer instanceof Error ? Promise.reject(answer) : json(answer);
     }
-    if (String(url).endsWith('/orders/preview')) return preview(body);
+    if (path.endsWith('/orders/preview')) return preview(body);
+    if (path.endsWith('/price-rules/catalog')) return json(rules);
     if (String(url).endsWith('.json')) {
       const product = productJson[String(url).slice(0, -5)];
       return product ? json(product) : json({}, 404);
@@ -117,7 +122,7 @@ afterEach(() => {
   mock.timers.reset();
 });
 
-const estimateCalls = () => calls.filter((c) => c.url.endsWith('/estimate/price'));
+const estimateCalls = () => calls.filter((c) => c.url.split('?')[0].endsWith('/estimate/price'));
 const jsonCalls = (path) => calls.filter((c) => c.url === `${path}.json`);
 const grant = (promotion = PROMOTION) => ({
   freeItems: [{
@@ -411,7 +416,7 @@ test('an estimate failure keeps the client result', async () => {
 
 // --- order preview -------------------------------------------------------------
 
-const previewCalls = () => calls.filter((c) => c.url.endsWith('/orders/preview'));
+const previewCalls = () => calls.filter((c) => c.url.split('?')[0].endsWith('/orders/preview'));
 const giftsIn = (items) => items.filter((i) => i.custom?.giftWithPurchase);
 
 test('preview waits for the server check and sends the reconciled items', async () => {
@@ -740,4 +745,140 @@ test('a paid warranty line with empty product categories does not block the gift
   await run([COMMERCIAL_PROMO]);
   assert.equal(gifts().length, 1);
   assert.equal(jsonCalls(warranty.path).length, 1);
+});
+
+// --- simulated date ------------------------------------------------------------
+
+const API = 'https://api.test.com/test-org/sites/test-site';
+const simulate = (iso) => {
+  if (iso) sessionStorage.setItem('vitamix.simulateDate', iso);
+  else sessionStorage.removeItem('vitamix.simulateDate');
+};
+const query = (iso) => `simulateDate=${encodeURIComponent(iso)}`;
+/** Drops the module's in-memory rules: a stub replaces them, then goes away. */
+async function resetRulesCache() {
+  localStorage.setItem('vitamix.priceRules.stub', JSON.stringify({ promotions: [] }));
+  await ensurePriceRulesLoaded();
+  localStorage.removeItem('vitamix.priceRules.stub');
+}
+const rulesCalls = () => calls.filter((c) => c.url.includes('/price-rules/catalog'));
+const FUTURE_PROMO = {
+  ...PROMOTION,
+  id: 'future',
+  rules: [{
+    path: GIFT_PATH, price: '0', start: '2030-05-01T00:00:00Z', end: '2030-07-01T00:00:00Z',
+  }],
+};
+
+test('simulated date: rules and server check carry it and a future promotion applies', async () => {
+  await resetRulesCache();
+  const at = '2030-06-01T00:00:00.000Z';
+  simulate(at);
+  rules = { promotions: [FUTURE_PROMO] };
+  estimate = { ...grant(FUTURE_PROMO), simulatedAt: at };
+  cart.addItem(paidItem);
+  await ensurePriceRulesLoaded();
+  await evaluateGWP();
+  assert.deepEqual(rulesCalls().map((c) => c.url), [
+    `${API}/price-rules/catalog?active=true&${query(at)}`,
+  ]);
+  assert.equal(gifts().length, 1);
+  await reconcileWithServer();
+  assert.deepEqual(estimateCalls().map((c) => c.url), [`${API}/estimate/price?${query(at)}`]);
+  assert.deepEqual(gifts().map((i) => i.custom.promotionId), ['future']);
+
+  const body = { items: cart.getItemsForAPI() };
+  await previewOrder(body);
+  assert.ok(previewCalls()[0].url.endsWith(`/orders/preview?${query(at)}`));
+  assert.equal(giftsIn(previewCalls()[0].body.items).length, 1);
+});
+
+test('simulated date: the server grant wins at the simulated time', async () => {
+  await resetRulesCache();
+  const at = '2030-06-01T00:00:00.000Z';
+  simulate(at);
+  rules = { promotions: [{ ...FUTURE_PROMO, conditions: { minimumSubtotal: 500 } }] };
+  estimate = grant(FUTURE_PROMO);
+  cart.addItem(paidItem);
+  await ensurePriceRulesLoaded();
+  await evaluateGWP();
+  assert.equal(gifts().length, 0);
+  await reconcileWithServer({ force: true });
+  assert.equal(estimateCalls().length, 1);
+  assert.equal(gifts().length, 1);
+});
+
+test('simulated date: the rules cache does not cross clocks', async () => {
+  await resetRulesCache();
+  rules = { promotions: [FUTURE_PROMO] };
+  cart.addItem(paidItem);
+  await ensurePriceRulesLoaded();
+  await evaluateGWP();
+  assert.equal(gifts().length, 0, 'the future promotion is inactive in real time');
+
+  simulate('2030-06-01T00:00:00.000Z');
+  await ensurePriceRulesLoaded();
+  await evaluateGWP();
+  assert.equal(gifts().length, 1);
+
+  simulate('2030-06-02T00:00:00.000Z');
+  await ensurePriceRulesLoaded();
+  await ensurePriceRulesLoaded();
+
+  simulate(null);
+  await ensurePriceRulesLoaded();
+  await evaluateGWP();
+  assert.equal(gifts().length, 0);
+  assert.deepEqual(rulesCalls().map((c) => c.url), [
+    `${API}/price-rules/catalog?active=true`,
+    `${API}/price-rules/catalog?active=true&${query('2030-06-01T00:00:00.000Z')}`,
+    `${API}/price-rules/catalog?active=true&${query('2030-06-02T00:00:00.000Z')}`,
+    `${API}/price-rules/catalog?active=true`,
+  ]);
+});
+
+test('simulated date: a cached server answer does not cross clocks', async () => {
+  await resetRulesCache();
+  const promotion = { ...FUTURE_PROMO, rules: [{ path: GIFT_PATH, price: '0' }] };
+  rules = { promotions: [promotion] };
+  cart.addItem(paidItem);
+  await ensurePriceRulesLoaded();
+  await evaluateGWP();
+  estimate = { freeItems: [] };
+  await reconcileWithServer();
+  assert.equal(gifts().length, 0);
+
+  simulate('2030-06-01T00:00:00.000Z');
+  estimate = grant(promotion);
+  await ensurePriceRulesLoaded();
+  await evaluateGWP();
+  await reconcileWithServer();
+  assert.equal(gifts().length, 1);
+
+  simulate('2030-06-02T00:00:00.000Z');
+  estimate = { freeItems: [] };
+  await ensurePriceRulesLoaded();
+  await evaluateGWP();
+  await reconcileWithServer();
+  assert.equal(gifts().length, 0);
+
+  simulate(null);
+  await ensurePriceRulesLoaded();
+  await reconcileWithServer();
+  assert.deepEqual(estimateCalls().map((c) => c.url.split('?')[1] || null), [
+    null,
+    query('2030-06-01T00:00:00.000Z'),
+    query('2030-06-02T00:00:00.000Z'),
+    null,
+  ]);
+});
+
+test('simulated date: the end of a rule is inclusive', async () => {
+  await resetRulesCache();
+  simulate('2030-07-01T00:00:00.000Z');
+  rules = { promotions: [FUTURE_PROMO] };
+  cart.addItem(paidItem);
+  await ensurePriceRulesLoaded();
+  await evaluateGWP();
+  assert.equal(gifts().length, 1);
 });

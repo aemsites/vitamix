@@ -8,8 +8,9 @@ import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   getOrder, estimateShipping, estimatePrice, estimateExpressCheckout, parsePreview,
-  createOrder, patchPayPalSession, getPayPalSession,
+  createOrder, patchPayPalSession, getPayPalSession, previewOrder, initiatePayment,
 } from '../../scripts/commerce-api.js';
+import { getSimulationStatus } from '../../scripts/simulate-date.js';
 import { normalizeCouponCode, setAffiliateCode, getCouponRequestFields } from '../../scripts/commerce/coupon-state.js';
 import { __setLocale, __resetScripts } from './mocks/scripts.mjs';
 
@@ -383,4 +384,77 @@ test('createOrder: sends a lone affiliate coupon as an array with the affiliate 
   assert.deepEqual(body.couponCode, ['06-AFFILIATE']);
   assert.deepEqual(body.couponSource, ['auto']);
   assert.equal(body.custom.affiliateCode, '06-AFFILIATE');
+});
+
+// --- simulated date ------------------------------------------------------------
+
+const SIMULATED = '2030-12-01T14:00:00.000Z';
+const SIMULATED_QUERY = `simulateDate=${encodeURIComponent(SIMULATED)}`;
+
+function simulate(hostname = 'main--site--org.aem.page') {
+  globalThis.location = { hostname, search: '' };
+  sessionStorage.setItem('vitamix.simulateDate', SIMULATED);
+}
+
+async function urlOf(call) {
+  await call();
+  return lastUrl;
+}
+
+/** URLs of the calls, made one after another. */
+async function urlsOf(calls) {
+  const urls = [];
+  await calls.reduce((prev, [, call]) => prev.then(async () => {
+    urls.push(await urlOf(call));
+  }), Promise.resolve());
+  return urls;
+}
+
+const pricingCalls = [
+  ['estimateShipping', () => estimateShipping('us', 'CA', [])],
+  ['estimatePrice', () => estimatePrice('us', [])],
+  ['estimateExpressCheckout', () => estimateExpressCheckout('us', 'MN', '55441', [])],
+  ['previewOrder', () => previewOrder({ items: [] })],
+];
+
+test('simulated date: sent on estimates and order preview', async () => {
+  simulate();
+  mockFetch(200, { simulatedAt: SIMULATED });
+  const paths = ['/estimate/shipping', '/estimate/price', '/estimate/order', '/orders/preview'];
+  assert.deepEqual(
+    await urlsOf(pricingCalls),
+    paths.map((path) => `${API_ORIGIN}${path}?${SIMULATED_QUERY}`),
+  );
+  assert.equal(getSimulationStatus(), true);
+});
+
+test('simulated date: a response without simulatedAt is flagged', async () => {
+  simulate();
+  mockFetch(200, { subtotal: 1 });
+  await estimatePrice('us', []);
+  assert.equal(getSimulationStatus(), false);
+});
+
+test('simulated date: never sent on order create, payments or other calls', async () => {
+  simulate();
+  mockFetch(200, { order: { id: 'o1' } });
+  assert.equal(await urlOf(() => createOrder({ items: [] })), `${API_ORIGIN}/orders`);
+  assert.equal(
+    await urlOf(() => initiatePayment('o1', 'k1')),
+    `${API_ORIGIN}/orders/o1/payments`,
+  );
+  assert.equal(
+    await urlOf(() => getOrder('a@example.com', 'o1')),
+    `${API_ORIGIN}/customers/a@example.com/orders/o1`,
+  );
+});
+
+test('simulated date: not sent without a date or on production hosts', async () => {
+  globalThis.location = { hostname: 'localhost', search: '' };
+  mockFetch(200, {});
+  assert.equal(await urlOf(() => estimatePrice('us', [])), `${API_ORIGIN}/estimate/price`);
+  simulate('www.vitamix.com');
+  localStorage.setItem('vitamix.now', SIMULATED);
+  globalThis.location.search = `?${SIMULATED_QUERY}`;
+  (await urlsOf(pricingCalls)).forEach((url) => assert.ok(!url.includes('simulateDate'), url));
 });
