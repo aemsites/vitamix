@@ -126,14 +126,17 @@ function installDom() {
       removed: false,
       setAttribute(name, value) { this.attributes[name] = value; },
       append(...nodes) { this.children.push(...nodes); },
-      remove() { this.removed = true; },
+      remove() { this.isConnected = false; },
     };
     return el;
   };
   globalThis.document.createElement = createElement;
   globalThis.document.body = {
     ...body,
-    append(...nodes) { body.children.push(...nodes); },
+    append(...nodes) {
+      nodes.forEach((node) => { node.isConnected = true; });
+      body.children.push(...nodes);
+    },
   };
   return body;
 }

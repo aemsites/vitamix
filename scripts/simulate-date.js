@@ -204,7 +204,13 @@ let warnedIgnored = false;
 function formatBadgeDate(date) {
   try {
     return date.toLocaleString('en-US', {
-      timeZone: 'America/New_York', dateStyle: 'medium', timeStyle: 'short', timeZoneName: 'short',
+      timeZone: 'America/New_York',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZoneName: 'short',
     });
   } catch {
     return date.toISOString();
@@ -241,7 +247,7 @@ function element(tag, text, style) {
 
 /** Shows a fixed badge with the simulated date and a link that clears it. */
 export function showSimulationBadge() {
-  if (badge || !getSimulatedDate()) return;
+  if (badge?.root.isConnected || !getSimulatedDate()) return;
   const root = element('div', '', 'position:fixed;left:8px;bottom:8px;z-index:2147483000;'
     + 'padding:6px 10px;border-radius:4px;background:#5c2d91;color:#fff;'
     + 'font:12px/1.4 sans-serif;box-shadow:0 1px 4px rgb(0 0 0 / 30%)');

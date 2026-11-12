@@ -2136,7 +2136,6 @@ async function loadEager(doc) {
   /* simulation date: per page on production, for the session elsewhere */
   if (isSimulationHost()) {
     window.simulateDate = getSimulatedDate() || undefined;
-    if (window.simulateDate) showSimulationBadge();
   } else {
     const param = new URLSearchParams(window.location.search).get('simulateDate');
     if (param) {
@@ -2238,6 +2237,7 @@ async function loadLazy(doc) {
   if (hash && element) element.scrollIntoView();
 
   loadFooter(doc.querySelector('footer'));
+  if (window.simulateDate && isSimulationHost()) showSimulationBadge();
 
   loadCSS(`${window.hlx.codeBasePath}/styles/lazy-styles.css`);
   loadFonts();
