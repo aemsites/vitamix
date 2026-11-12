@@ -12,8 +12,8 @@
  *   Optional `start` / `end` must be **ISO 8601** timestamps.
  *   Optional `custom` on each rule is string values only. Use **`custom.group`** for the
  *   admin calendar / grouping label.
- *   Optional promotion-level **`conditions.minimumSubtotal`**: number; when set, the storefront
- *   may require cart subtotal ≥ this value before applying the promotion.
+ *   Optional promotion-level **`conditions`** (`CatalogPromotionConditions`): minimum
+ *   subtotal, product/category scope and disqualifiers.
  *   Optional `variants` maps sku → `{ sku, price, start?, end?, custom? }`.
  * - **Cart** `GET/PUT …/price-rules/cart`: JSON **array** of cart rules (`CartPriceRulesSchema`).
  *   Each rule may include optional **`country`** / **`locale`** (same patterns as catalog).
@@ -44,10 +44,19 @@ import { apiFetch } from './commerce-otp-api.js';
  */
 
 /**
- * Promotion-level eligibility (helix catalog promotions).
+ * Promotion-level eligibility (helix catalog promotions). Only paid lines count.
+ * Scope (`included*` / `excluded*`) picks the lines that count toward `minimumSubtotal`;
+ * at least one in-scope line is required. Any line matching `disqualifying*` blocks the
+ * promotion. Cart-rule `requiredProducts` / `requiredCategories` are rejected here.
  *
  * @typedef {object} CatalogPromotionConditions
- * @property {number} [minimumSubtotal]
+ * @property {number} [minimumSubtotal] in-scope subtotal threshold
+ * @property {ProductCondition[]} [includedProducts]
+ * @property {ProductCondition[]} [excludedProducts]
+ * @property {string[]} [includedCategories] category url keys
+ * @property {string[]} [excludedCategories]
+ * @property {ProductCondition[]} [disqualifyingProducts]
+ * @property {string[]} [disqualifyingCategories]
  */
 
 /**

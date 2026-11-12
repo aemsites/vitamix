@@ -112,6 +112,8 @@ export function mountProductSelector(container, options = {}) {
 
   const syncUrl = options.syncUrl !== false && typeof window !== 'undefined';
   const productsOnly = options.productsOnly === true;
+  const categoriesOnly = options.categoriesOnly === true;
+  const noCategories = options.noCategories === true;
 
   /** @type {Set<string>} */
   let selectedProducts = new Set(parseCommaList(productsInput?.value));
@@ -141,7 +143,10 @@ export function mountProductSelector(container, options = {}) {
   /** @type {string[]} */
   let categorySlugs = [];
 
-  let filterMode = /** @type {PickerFilter} */ (productsOnly ? 'products' : 'all');
+  let initialFilter = 'all';
+  if (productsOnly || noCategories) initialFilter = 'products';
+  else if (categoriesOnly) initialFilter = 'categories';
+  let filterMode = /** @type {PickerFilter} */ (initialFilter);
   let searchQuery = '';
   let loading = false;
   let loadError = '';
@@ -213,6 +218,21 @@ export function mountProductSelector(container, options = {}) {
     root.querySelector('.ps-panel-selection').setAttribute('aria-label', 'Selected products');
     pickerEl.setAttribute('aria-label', 'Matching products');
     searchEl.placeholder = 'Filter by product name, SKU, or path…';
+  }
+  if (categoriesOnly) {
+    selectedProducts.clear();
+    root.querySelector('.ps-filter-tabs').hidden = true;
+    root.querySelector('.ps-panel-selection').setAttribute('aria-label', 'Selected categories');
+    pickerEl.setAttribute('aria-label', 'Matching categories');
+    searchEl.placeholder = 'Filter by category name…';
+  }
+  if (noCategories) {
+    selectedCategories.clear();
+    filterTabs.forEach((tab) => {
+      const mode = tab.getAttribute('data-filter');
+      tab.hidden = mode === 'all' || mode === 'categories';
+      tab.setAttribute('aria-pressed', mode === 'products' ? 'true' : 'false');
+    });
   }
   indexSelect.value = localePath;
 
@@ -536,8 +556,10 @@ export function mountProductSelector(container, options = {}) {
     const skuCount = scopeContext?.variantSkuEntries?.length ?? 0;
     if (filterMode === 'skus') {
       statusEl.textContent = `${skuCount} SKUs`;
-    } else if (productsOnly) {
+    } else if (productsOnly || noCategories) {
       statusEl.textContent = `${parentProducts.length} products`;
+    } else if (categoriesOnly) {
+      statusEl.textContent = `${categorySlugs.length} categories`;
     } else {
       statusEl.textContent = `${parentProducts.length} products · ${categorySlugs.length} categories`;
     }

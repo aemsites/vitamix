@@ -1023,3 +1023,48 @@
   gap: 8px;
   margin-top: 10px;
 }
+
+.pr-promo-col-scope {
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #6d7175;
+}
+
+.pr-promo-scope-subhead {
+  display: block;
+  margin: 10px 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6d7175;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.pr-promo-scope-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #e1e3e5;
+}
+
+.pr-promo-scope-tab {
+  padding: 6px 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  font: inherit;
+  color: #6d7175;
+  cursor: pointer;
+}
+
+.pr-promo-scope-tab[aria-selected="true"] {
+  border-bottom-color: #202223;
+  color: #202223;
+  font-weight: 600;
+}
+
+.pr-promo-scope-detail-group + .pr-promo-scope-detail-group {
+  margin-top: 8px;
+}

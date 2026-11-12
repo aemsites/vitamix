@@ -21,6 +21,34 @@ const VALID_SELECTOR_LOCALES = new Set(PRODUCT_SELECTOR_INDEX_LOCALES);
 
 let stylesInjected = false;
 
+const SHARED_CONTEXT_TTL_MS = 60 * 1000;
+
+/**
+ * @type {Map<string, {
+ *   at: number,
+ *   promise: Promise<import('./product-scope-pills.js').ProductScopeIndexContext>,
+ * }>}
+ */
+const sharedContexts = new Map();
+
+/**
+ * Index context shared by every field on the page for the same locale (one load per minute).
+ *
+ * @param {string} selectorLocale
+ * @param {string} indexFetchPath
+ */
+function loadSharedScopeContext(selectorLocale, indexFetchPath) {
+  const key = `${selectorLocale}|${indexFetchPath}`;
+  const hit = sharedContexts.get(key);
+  if (hit && Date.now() - hit.at < SHARED_CONTEXT_TTL_MS) return hit.promise;
+  const promise = loadProductScopeIndexContext(selectorLocale, { indexFetchPath });
+  sharedContexts.set(key, { at: Date.now(), promise });
+  promise.catch(() => {
+    if (sharedContexts.get(key)?.promise === promise) sharedContexts.delete(key);
+  });
+  return promise;
+}
+
 function ensureProductSelectionStyles() {
   if (stylesInjected) return;
   stylesInjected = true;
@@ -164,6 +192,8 @@ export async function hydrateProductScopePills(container, options) {
  *   products: string;
  *   categories: string;
  *   productsOnly?: boolean;
+ *   categoriesOnly?: boolean;
+ *   noCategories?: boolean;
  *   fixedLocale?: boolean;
  *   validateSelection?: (selection: { products: string; categories: string }) => Promise<void>;
  * }} options
@@ -228,6 +258,8 @@ export function openProductSelectorModal(options) {
       localePath: options.fixedLocale ? localePath : localePathForProductSelector(localePath),
       syncUrl: false,
       productsOnly: options.productsOnly,
+      categoriesOnly: options.categoriesOnly,
+      noCategories: options.noCategories,
       fixedLocale: options.fixedLocale,
     });
 
@@ -273,7 +305,11 @@ export function openProductSelectorModal(options) {
  *   label?: string;
  *   emptyText?: string;
  *   editable?: boolean;
- * }} options
+ *   categoriesOnly?: boolean;
+ *   noCategories?: boolean;
+ *   fixedLocale?: boolean;
+ * }} options `fixedLocale` hides the selector's index switch; `categoriesOnly` /
+ *   `noCategories` limit what can be picked
  */
 export function mountProductSelectionField(container, options) {
   ensureProductSelectionStyles();
@@ -325,11 +361,16 @@ export function mountProductSelectionField(container, options) {
     const key = `${localePathForProductSelector(rawLocale)}|${indexFetchPathForLocale(rawLocale)}`;
     if (scopeContext && scopeLocaleKey === key) return scopeContext;
     scopeLocaleKey = key;
-    scopeContext = await loadProductScopeIndexContext(
+    scopeContext = await loadSharedScopeContext(
       localePathForProductSelector(rawLocale),
-      { indexFetchPath: indexFetchPathForLocale(rawLocale) },
+      indexFetchPathForLocale(rawLocale),
     );
     return scopeContext;
+  }
+
+  function hasValues() {
+    return parseCommaList(productsInput.value).length > 0
+      || parseCommaList(categoriesInput.value).length > 0;
   }
 
   function renderDisplay() {
@@ -374,6 +415,11 @@ export function mountProductSelectionField(container, options) {
 
   async function refresh() {
     scopeLocaleKey = '';
+    scopeContext = null;
+    if (!hasValues()) {
+      renderDisplay();
+      return;
+    }
     try {
       await ensureScopeContext();
     } catch {
@@ -389,6 +435,9 @@ export function mountProductSelectionField(container, options) {
       localePath: getLocalePath(),
       products: productsInput.value,
       categories: categoriesInput.value,
+      categoriesOnly: options.categoriesOnly,
+      noCategories: options.noCategories,
+      fixedLocale: options.fixedLocale,
     });
     if (!result) return;
     setValues(parseCommaList(result.products), parseCommaList(result.categories));
@@ -398,6 +447,9 @@ export function mountProductSelectionField(container, options) {
 
   const onSyncInput = () => {
     renderDisplay();
+    if (hasValues() && !scopeContext) {
+      ensureScopeContext().then(renderDisplay).catch(() => {});
+    }
   };
 
   productsInput.addEventListener('input', onSyncInput);
