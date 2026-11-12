@@ -130,13 +130,16 @@ function renderPrice(price) {
   return renderValue('Price', value);
 }
 
-function renderImages(images, canEdit = false) {
+function renderImages(images, canEdit = false, metaImage = '') {
   if (!Array.isArray(images) && !canEdit) return '';
   const list = Array.isArray(images) ? images : [];
   const items = list.map((img) => {
     const src = resolveImageUrl(img.url || img);
-    const label = img.label ? ` title="${escapeHtml(img.label)}"` : '';
-    const wrap = src ? `<a href="${escapeHtml(src)}" target="_blank" rel="noopener" class="pim-detail-img-wrap"${label}><img src="${escapeHtml(src)}" alt="" loading="lazy" class="pim-detail-img" /></a>` : '<span class="pim-detail-img-wrap pim-detail-no-img">—</span>';
+    const isSocial = Boolean(metaImage && (img.url || img) === metaImage);
+    const title = [img.label, isSocial ? 'Social sharing image' : ''].filter(Boolean).join(' — ');
+    const label = title ? ` title="${escapeHtml(title)}"` : '';
+    const badge = isSocial ? '<span class="pim-detail-img-social-badge">Social</span>' : '';
+    const wrap = src ? `<a href="${escapeHtml(src)}" target="_blank" rel="noopener" class="pim-detail-img-wrap${isSocial ? ' pim-detail-img-social' : ''}"${label}><img src="${escapeHtml(src)}" alt="" loading="lazy" class="pim-detail-img" />${badge}</a>` : '<span class="pim-detail-img-wrap pim-detail-no-img">—</span>';
     return `<span class="pim-detail-img-item">${wrap}</span>`;
   });
   return `<div class="pim-detail-section">
@@ -317,24 +320,26 @@ function openCustomButtonsDialog() {
   dialog.querySelector('input').focus();
 }
 
-function variantImageEntries(images) {
+function variantImageEntries(images, metaImage = '') {
   if (!Array.isArray(images)) return [];
   return images.map((img) => {
     const src = resolveImageUrl(img);
     if (!src) return null;
     const label = img && typeof img === 'object' ? String(img.label || '') : '';
-    return { src, label };
+    const isSocial = Boolean(metaImage && (img?.url || img) === metaImage);
+    return { src, label, isSocial };
   }).filter(Boolean);
 }
 
-function renderVariantThumbs(variant) {
-  const entries = variantImageEntries(variant.images);
+function renderVariantThumbs(variant, metaImage = '') {
+  const entries = variantImageEntries(variant.images, metaImage);
   if (!entries.length) return '—';
   const sku = variant.sku || variant.name || 'variant';
   return `<div class="pim-detail-var-thumbs">${entries.map((img, i) => {
     const alt = img.label || `${sku} image ${i + 1}`;
-    const title = img.label ? ` title="${escapeHtml(img.label)}"` : '';
-    return `<a href="${escapeHtml(img.src)}" target="_blank" rel="noopener" class="pim-detail-var-thumb-link"${title}><img src="${escapeHtml(img.src)}" alt="${escapeHtml(alt)}" loading="lazy" class="pim-detail-var-img" /></a>`;
+    const titleText = [img.label, img.isSocial ? 'Social sharing image' : ''].filter(Boolean).join(' — ');
+    const title = titleText ? ` title="${escapeHtml(titleText)}"` : '';
+    return `<a href="${escapeHtml(img.src)}" target="_blank" rel="noopener" class="pim-detail-var-thumb-link${img.isSocial ? ' pim-detail-img-social' : ''}"${title}><img src="${escapeHtml(img.src)}" alt="${escapeHtml(alt)}" loading="lazy" class="pim-detail-var-img" /></a>`;
   }).join('')}</div>`;
 }
 
@@ -348,13 +353,13 @@ function renderAvailability(value, editable = false) {
   return `<span class="pim-card-availability ${availabilityClass}">${label}</span>`;
 }
 
-function renderVariants(variants, editable = false) {
+function renderVariants(variants, editable = false, metaImage = '') {
   if (!Array.isArray(variants) || variants.length === 0) return '';
   const rows = variants.map((v) => {
     const price = v.price ? (v.price.final ?? v.price.regular ?? '') : '';
     const opts = Array.isArray(v.options) ? v.options.map((o) => `${o.id || ''}: ${o.value || ''}`).filter(Boolean).join('; ') : '';
     return `<tr>
-      <td class="pim-detail-var-thumb">${renderVariantThumbs(v)}</td>
+      <td class="pim-detail-var-thumb">${renderVariantThumbs(v, metaImage)}</td>
       <td class="pim-detail-var-sku">${escapeHtml(v.sku || '')}</td>
       <td class="pim-detail-var-name">${escapeHtml(v.name || '')}</td>
       <td class="pim-detail-var-opts">${escapeHtml(opts)}</td>
@@ -418,9 +423,9 @@ function renderProduct(data, indexByUrlKey = {}, canEdit = false) {
         ${priceBlock}
       </div>
     </div>`,
-    renderImages(data.images, canEdit),
+    renderImages(data.images, canEdit, data.metaImage),
     data.options && data.options.length ? renderOptions(data.options) : '',
-    renderVariants(data.variants, canEdit),
+    renderVariants(data.variants, canEdit, data.metaImage),
     renderCategories(data.custom?.categories),
     renderResources(data.custom?.resources),
     renderLinkedProducts(data.custom?.crosssellSkus, indexByUrlKey, 'Cross-sell'),
@@ -651,6 +656,13 @@ async function saveAvailabilityChanges(changes, onSaved) {
     groups.get(change.productPath).changes.push(change);
   });
 
+  // Ad-hoc availability edits must disable managed stock so the manual
+  // state is not overridden by inventory-driven availability.
+  const disableManagedStock = (item) => {
+    if (!item.custom) item.custom = {};
+    item.custom.managedStock = '0';
+  };
+
   const outcomes = await Promise.allSettled([...groups.values()].map(async (group) => {
     const product = await fetchCatalogProduct(group.path);
     if (!product) throw new Error(`Product not found: ${group.path}`);
@@ -660,6 +672,7 @@ async function saveAvailabilityChanges(changes, onSaved) {
           throw new Error(`custom.parentAvailability was not found in ${group.path}.`);
         }
         product.custom.parentAvailability = change.targetAvailability;
+        disableManagedStock(product);
         return;
       }
       const target = normalizeAvailabilitySku(change.sku) === normalizeAvailabilitySku(product.sku)
@@ -669,6 +682,7 @@ async function saveAvailabilityChanges(changes, onSaved) {
         ));
       if (!target) throw new Error(`SKU ${change.sku} was not found in ${group.path}.`);
       target.availability = change.targetAvailability;
+      disableManagedStock(target);
     });
     await putOrPatchResource(catalogApiPath(group.path), product);
     const saved = { path: group.path, product, changes: group.changes };

@@ -150,6 +150,7 @@ export function mountProductSelector(container, options = {}) {
   let searchQuery = '';
   let loading = false;
   let loadError = '';
+  let selectionEditing = false;
 
   const root = document.createElement('div');
   root.className = 'ps-root';
@@ -199,6 +200,7 @@ export function mountProductSelector(container, options = {}) {
   const indexSelect = /** @type {HTMLSelectElement} */ (root.querySelector('#ps-index-select'));
   const statusEl = root.querySelector('#ps-status');
   const searchEl = /** @type {HTMLInputElement} */ (root.querySelector('#ps-search'));
+  const selectionPanelEl = root.querySelector('.ps-panel-selection');
   const selectionPillsEl = root.querySelector('#ps-selection-pills');
   const pickerEl = root.querySelector('#ps-picker');
   const loadingEl = root.querySelector('#ps-loading');
@@ -375,7 +377,7 @@ export function mountProductSelector(container, options = {}) {
     if (selectionPillsEl.querySelector('.ps-pills-empty')) return;
     const empty = document.createElement('span');
     empty.className = 'ps-pills-empty';
-    empty.textContent = 'Nothing selected yet — pick items below.';
+    empty.textContent = 'Nothing selected yet — pick items below or click here to type slugs.';
     selectionPillsEl.appendChild(empty);
   }
 
@@ -434,14 +436,89 @@ export function mountProductSelector(container, options = {}) {
   }
 
   function renderSelection() {
-    if (!selectionPillsEl || !scopeContext) return;
+    if (!selectionPillsEl || !scopeContext || selectionEditing) return;
     const count = renderProductScopePills(selectionPillsEl, scopeContext, {
       productPaths: selectedProducts,
       categorySlugs: selectedCategories,
       removable: true,
-      emptyText: 'Nothing selected yet — pick items below.',
+      emptyText: 'Nothing selected yet — pick items below or click here to type slugs.',
     });
     if (clearAllBtn) clearAllBtn.disabled = count === 0;
+  }
+
+  /**
+   * Classify one comma-separated editor token: catalog paths (and `path|SKU` tokens) are
+   * products; bare slugs match known categories first, then known product url keys.
+   *
+   * @param {string} token
+   * @returns {{ kind: 'product' | 'category', key: string }}
+   */
+  function classifyEditedToken(token) {
+    if (token.includes('/') || token.includes('|')) return { kind: 'product', key: token };
+    if (categoriesOnly) return { kind: 'category', key: token };
+    if (!productsOnly && !noCategories && categorySlugs.includes(token)) {
+      return { kind: 'category', key: token };
+    }
+    const product = parentProducts.find((p) => {
+      const path = catalogPathForProduct(localePath, p);
+      return path.split('/').filter(Boolean).pop() === token;
+    });
+    if (product) return { kind: 'product', key: catalogPathForProduct(localePath, product) };
+    if (productsOnly || noCategories) {
+      return { kind: 'product', key: `/${localePath}/products/${token}` };
+    }
+    return { kind: 'category', key: token };
+  }
+
+  /**
+   * @param {string | null} rawValue committed comma-separated value, or null to cancel
+   */
+  function closeSelectionEditor(rawValue) {
+    if (!selectionEditing) return;
+    selectionEditing = false;
+    if (rawValue != null) {
+      const nextProducts = new Set();
+      const nextCategories = new Set();
+      parseCommaList(rawValue).forEach((token) => {
+        const { kind, key } = classifyEditedToken(token);
+        if (kind === 'product' && !categoriesOnly) nextProducts.add(key);
+        else if (kind === 'category') nextCategories.add(key);
+      });
+      selectedProducts = nextProducts;
+      selectedCategories = nextCategories;
+      syncInputs();
+    }
+    if (!scopeContext && selectionPillsEl) {
+      selectionPillsEl.replaceChildren();
+      if (!selectedProducts.size && !selectedCategories.size) showSelectionEmpty();
+    }
+    renderAll();
+    updateClearAllBtn();
+  }
+
+  function openSelectionEditor() {
+    if (selectionEditing || !selectionPillsEl) return;
+    selectionEditing = true;
+    const editor = document.createElement('textarea');
+    editor.className = 'ps-selection-edit';
+    editor.rows = 2;
+    editor.placeholder = 'Comma-separated slugs or catalog paths…';
+    editor.setAttribute('aria-label', 'Edit selection as comma-separated slugs');
+    editor.value = formatCommaList([...selectedProducts, ...selectedCategories]);
+    editor.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        closeSelectionEditor(editor.value);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        closeSelectionEditor(null);
+      }
+    });
+    editor.addEventListener('blur', () => closeSelectionEditor(editor.value));
+    selectionPillsEl.replaceChildren(editor);
+    editor.focus();
+    editor.setSelectionRange(editor.value.length, editor.value.length);
   }
 
   function renderPicker() {
@@ -610,6 +687,16 @@ export function mountProductSelector(container, options = {}) {
     const slug = pill?.getAttribute('data-slug');
     if (path) removeProduct(path);
     else if (slug) removeCategory(slug);
+  });
+
+  selectionPanelEl?.addEventListener('click', (e) => {
+    if (selectionEditing) return;
+    const { target } = e;
+    if (!(target instanceof HTMLElement)) return;
+    const onBackground = target === selectionPanelEl || target === selectionPillsEl;
+    if (onBackground || target.closest('.ps-pills-empty')) {
+      openSelectionEditor();
+    }
   });
 
   function togglePickerPill(pill) {

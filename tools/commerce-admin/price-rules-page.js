@@ -200,6 +200,7 @@ const AREAS = /** @type {const} */ (['rules', 'promotions']);
  *   cartLoadError: string,
  *   promoListSortKey: 'title'|'id'|'rows'|'start'|'end'|'mincart'|'group'|'market',
  *   promoListSortDir: 'asc'|'desc',
+ *   promoCalSelected: { countryKey: string, id: string } | null,
  *   cartRuleSortKey: 'title'|'id'|'min'|'off'|'freeship'|'scope'|'market',
  *   cartRuleSortDir: 'asc'|'desc',
  * }}
@@ -213,6 +214,8 @@ const state = {
   cartRuleSearch: '',
   promoListSortKey: /** @type {'title'|'id'|'rows'|'start'|'end'|'mincart'|'group'|'market'} */ ('title'),
   promoListSortDir: /** @type {'asc'|'desc'} */ ('asc'),
+  /** Promotion picked by clicking a bar in the overview calendar. */
+  promoCalSelected: /** @type {{ countryKey: string, id: string } | null} */ (null),
   cartRuleSortKey: /** @type {'title'|'id'|'min'|'off'|'freeship'|'scope'|'market'} */ ('title'),
   cartRuleSortDir: /** @type {'asc'|'desc'} */ ('asc'),
   /** @type {import('./price-rules-api.js').CatalogPromotion[]} */
@@ -2449,6 +2452,179 @@ function assertNoExpiredRuleEnds(rules) {
   );
 }
 
+/** @param {string} path */
+function caLocaleOfPath(path) {
+  const p = String(path || '').toLowerCase();
+  if (p.startsWith('/ca/en_us/')) return 'ca/en_us';
+  if (p.startsWith('/ca/fr_ca/')) return 'ca/fr_ca';
+  return '';
+}
+
+/**
+ * Counterpart catalog path in the other Canada language: same-SKU lookup via the product
+ * indexes when available (url keys can differ per language), else a plain locale swap.
+ *
+ * @param {string} path
+ * @param {string} fromLocale ca/en_us | ca/fr_ca
+ * @param {import('./product-conditions.js').LocaleCatalog[] | null} catalogs
+ *   `[ca/en_us, ca/fr_ca]` (see {@link MARKET_CATALOG_LOCALES})
+ */
+function counterpartCaPath(path, fromLocale, catalogs) {
+  const fromIdx = fromLocale === 'ca/fr_ca' ? 1 : 0;
+  const toIdx = fromIdx === 1 ? 0 : 1;
+  if (catalogs) {
+    const sku = catalogs[fromIdx]?.skuByPath.get(path);
+    const paths = sku ? catalogs[toIdx]?.pathsBySku.get(sku) : null;
+    if (paths?.length) return paths[0];
+  }
+  return fromIdx === 0
+    ? path.replace(/^\/ca\/en_us\//, '/ca/fr_ca/')
+    : path.replace(/^\/ca\/fr_ca\//, '/ca/en_us/');
+}
+
+/**
+ * Canada sale lines (path + optional variant SKU) present in one language but not the other.
+ *
+ * @param {import('./price-rules-api.js').CatalogPriceRule[]} rules
+ * @param {import('./product-conditions.js').LocaleCatalog[] | null} catalogs
+ * @returns {Array<{
+ *   rule: import('./price-rules-api.js').CatalogPriceRule,
+ *   path: string,
+ *   sku: string,
+ *   counterpartPath: string,
+ *   counterpartLocale: string,
+ * }>}
+ */
+function findMissingCanadaCounterpartLines(rules, catalogs) {
+  const keyOf = (path, sku) => `${path}\0${sku || ''}`;
+  const have = new Set();
+  /** @type {Array<{ rule: object, path: string, sku: string, locale: string }>} */
+  const lines = [];
+  rules.forEach((rule) => {
+    const locale = caLocaleOfPath(rule.path);
+    if (!locale) return;
+    const skus = rule.variants && typeof rule.variants === 'object' && !Array.isArray(rule.variants)
+      ? Object.keys(rule.variants)
+      : [''];
+    skus.forEach((sku) => {
+      have.add(keyOf(rule.path, sku));
+      lines.push({
+        rule, path: rule.path, sku, locale,
+      });
+    });
+  });
+  /** @type {Map<string, object>} */
+  const missingByKey = new Map();
+  lines.forEach((line) => {
+    const counterpartLocale = line.locale === 'ca/en_us' ? 'ca/fr_ca' : 'ca/en_us';
+    const counterpartPath = counterpartCaPath(line.path, line.locale, catalogs);
+    const key = keyOf(counterpartPath, line.sku);
+    if (have.has(key) || missingByKey.has(key)) return;
+    missingByKey.set(key, { ...line, counterpartPath, counterpartLocale });
+  });
+  return [...missingByKey.values()];
+}
+
+/**
+ * @param {import('./price-rules-api.js').CatalogPriceRule} rule source sale line
+ * @param {string} path counterpart catalog path
+ * @param {string} sku variant SKU, or '' for a whole-product line
+ * @returns {import('./price-rules-api.js').CatalogPriceRule}
+ */
+function cloneRuleForCounterpartPath(rule, path, sku) {
+  const copy = { ...rule, path };
+  if (rule.custom) copy.custom = { ...rule.custom };
+  delete copy.variants;
+  const variant = sku ? rule.variants?.[sku] : null;
+  if (sku && variant) {
+    copy.variants = {
+      [sku]: { ...variant, ...(variant.custom ? { custom: { ...variant.custom } } : {}) },
+    };
+  }
+  return copy;
+}
+
+/**
+ * @param {Array<{
+ *   path: string, sku: string, counterpartPath: string, counterpartLocale: string,
+ * }>} missing
+ * @returns {Promise<'add' | 'ignore' | 'cancel'>}
+ */
+function confirmCanadaCoverageDialog(missing) {
+  return new Promise((resolve) => {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'coupons-dialog pr-ca-coverage-dialog';
+    const itemsHtml = missing.map((m) => {
+      const lang = m.counterpartLocale === 'ca/fr_ca' ? 'French (ca/fr_ca)' : 'English (ca/en_us)';
+      const skuHtml = m.sku ? ` <span class="pr-ca-coverage-sku">SKU ${escapeHtml(m.sku)}</span>` : '';
+      return `<li class="pr-ca-coverage-item">
+          <code>${escapeHtml(m.path)}</code>${skuHtml}
+          <span class="pr-ca-coverage-missing">has no ${lang} line — would add <code>${escapeHtml(m.counterpartPath)}</code></span>
+        </li>`;
+    }).join('');
+    dialog.innerHTML = `
+      <div class="coupons-dialog-inner">
+        <div class="coupons-dialog-scroll" tabindex="-1">
+          <h2 class="coupons-dialog-title">Canada sale lines differ between languages</h2>
+          <p>${missing.length} sale line${missing.length === 1 ? ' is' : 's are'} only present in one Canada language:</p>
+          <ul class="pr-ca-coverage-list">${itemsHtml}</ul>
+          <p>“Add and save” copies each missing line (same dates and prices) into the other language before saving.</p>
+        </div>
+        <div class="coupons-dialog-actions">
+          <button type="button" class="coupons-btn" data-pr-ca-coverage="cancel">Cancel</button>
+          <button type="button" class="coupons-btn" data-pr-ca-coverage="ignore">Ignore and save</button>
+          <button type="button" class="coupons-btn coupons-btn-primary" data-pr-ca-coverage="add">Add and save</button>
+        </div>
+      </div>`;
+    document.body.appendChild(dialog);
+    let done = false;
+    /** @param {'add' | 'ignore' | 'cancel'} result */
+    const finish = (result) => {
+      if (done) return;
+      done = true;
+      dialog.close();
+      dialog.remove();
+      resolve(result);
+    };
+    dialog.querySelectorAll('[data-pr-ca-coverage]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        finish(/** @type {'add' | 'ignore' | 'cancel'} */(btn.getAttribute('data-pr-ca-coverage')));
+      });
+    });
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog) finish('cancel');
+    });
+    wireDialogEscapeDismiss(dialog, () => finish('cancel'));
+    dialog.showModal();
+  });
+}
+
+/**
+ * Pre-save check for Canada: every sale line should exist for both ca/en_us and ca/fr_ca.
+ * When lines are missing in one language, asks the user to add them, ignore, or cancel.
+ *
+ * @param {import('./price-rules-api.js').CatalogPriceRule[]} rules
+ * @returns {Promise<import('./price-rules-api.js').CatalogPriceRule[] | null>} rules to save
+ *   (possibly with added counterpart lines), or null when the user cancelled
+ */
+async function resolveCanadaSaleLineCoverage(rules) {
+  let catalogs = null;
+  try {
+    catalogs = await loadMarketCatalogs('ca');
+  } catch {
+    // Index unavailable — fall back to locale-swapped paths for counterpart lookup.
+  }
+  const missing = findMissingCanadaCounterpartLines(rules, catalogs);
+  if (!missing.length) return rules;
+  const choice = await confirmCanadaCoverageDialog(missing);
+  if (choice === 'cancel') return null;
+  if (choice === 'ignore') return rules;
+  return [
+    ...rules,
+    ...missing.map((m) => cloneRuleForCounterpartPath(m.rule, m.counterpartPath, m.sku)),
+  ];
+}
+
 /**
  * @param {string} promoId
  * @returns {Promise<boolean>}
@@ -2744,9 +2920,15 @@ async function openPromotionEditDialog(countryKey, promoId, { isCancelled = () =
         }
       }
       assertNoExpiredRuleEnds(rulesNew);
+      let rulesToSave = rulesNew;
+      if (market === 'ca') {
+        const resolved = await resolveCanadaSaleLineCoverage(rulesNew);
+        if (!resolved) return; // user cancelled from the coverage dialog
+        rulesToSave = resolved;
+      }
       const onTab = new Set(catalogRulesForCountryTab(prev, market));
       const rulesOther = (prev.rules || []).filter((r) => !onTab.has(r));
-      const merged = [...rulesOther, ...rulesNew];
+      const merged = [...rulesOther, ...rulesToSave];
       const next = list.slice();
       next[idx] = applyPromotionFormConditions({
         ...prev,
@@ -4047,8 +4229,11 @@ function renderPromotionsOverviewCalendarHtml() {
     let cls = 'current';
     if (pf === 'past') cls = 'past';
     else if (pf === 'future') cls = 'future';
+    const sel = state.promoCalSelected;
     let selected = '';
-    if (cls === 'current' && !selectedDone) {
+    if (sel) {
+      if (sel.countryKey === r.countryKey && sel.id === r.id) selected = ' pr-promo-cal-bar-selected';
+    } else if (cls === 'current' && !selectedDone) {
       selected = ' pr-promo-cal-bar-selected';
       selectedDone = true;
     }
@@ -4065,10 +4250,21 @@ function renderPromotionsOverviewCalendarHtml() {
     if (startTime < rangeStartMs) barClasses.push('pr-promo-cal-bar-open-start');
     if (!w.maxEnd || w.maxEnd.getTime() > rangeEndMs) barClasses.push('pr-promo-cal-bar-open-end');
 
+    const barLeft = Math.max(0, leftPercent);
+    const barWidth = Math.min(100, widthPercent);
+    // Title label sits after the bar, or before it when the bar ends near the right edge.
+    const labelBefore = barLeft + barWidth > 78;
+    const labelHtml = labelBefore
+      ? `<span class="pr-promo-cal-bar-title pr-promo-cal-bar-title-before" style="right:${(100 - barLeft).toFixed(3)}%">${escapeHtml(r.title)}</span>`
+      : `<span class="pr-promo-cal-bar-title" style="left:${Math.min(100, barLeft + barWidth).toFixed(3)}%">${escapeHtml(r.title)}</span>`;
+
     rowsHtmlParts.push(
       `<div class="pr-promo-cal-row">
         <div class="pr-promo-cal-track">
-          <div class="${barClasses.join(' ')}" style="left:${Math.max(0, leftPercent)}%;width:${Math.min(100, widthPercent)}%" title="${escapeHtml(`${r.title} — ${tip}`)}"></div>
+          <button type="button" class="${barClasses.join(' ')}" style="left:${barLeft}%;width:${barWidth}%" title="${escapeHtml(`${r.title} — ${tip}`)}"
+            data-pr-cal-select data-pr-cal-country="${escapeHtml(r.countryKey)}" data-pr-cal-id="${escapeHtml(r.id)}"
+            aria-label="${escapeHtml(`Select promotion ${r.title} in the list below`)}"></button>
+          ${labelHtml}
         </div>
       </div>`,
     );
@@ -4359,7 +4555,10 @@ function renderPromotionsListPanel() {
       .map((r) => {
         const label = `Open promotion ${r.title}`;
         const window = uniformPromotionWindow(r.rows);
-        return `<tr class="pr-promo-grid-row" role="button" tabindex="0" aria-label="${escapeHtml(label)}"
+        const isCalSelected = state.promoCalSelected
+          && state.promoCalSelected.countryKey === r.countryKey
+          && state.promoCalSelected.id === r.id;
+        return `<tr class="pr-promo-grid-row${isCalSelected ? ' pr-promo-grid-row-selected' : ''}" role="button" tabindex="0" aria-label="${escapeHtml(label)}"
             data-pr-promo-open data-pr-country="${escapeHtml(r.countryKey)}" data-pr-id="${escapeHtml(r.id)}">
             <td class="pr-promo-col-title">${escapeHtml(r.title)}</td>
             <td><code class="pr-promo-id-code">${escapeHtml(r.id)}</code></td>
@@ -4504,6 +4703,22 @@ function render() {
     if (PR_APP_MODE === 'promotions') {
       promoTimelineRoot.innerHTML = renderPromotionsOverviewCalendarHtml();
       promoTimelineRoot.removeAttribute('hidden');
+      promoTimelineRoot.querySelectorAll('[data-pr-cal-select]').forEach((bar) => {
+        bar.addEventListener('click', () => {
+          const countryKey = bar.getAttribute('data-pr-cal-country') || '';
+          const id = bar.getAttribute('data-pr-cal-id') || '';
+          if (!countryKey || !id) return;
+          state.promoCalSelected = { countryKey, id };
+          render();
+          const row = document.querySelector(
+            `tr.pr-promo-grid-row[data-pr-country="${CSS.escape(countryKey)}"][data-pr-id="${CSS.escape(id)}"]`,
+          );
+          if (row instanceof HTMLElement) {
+            row.focus({ preventScroll: true });
+            row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          }
+        });
+      });
     } else {
       promoTimelineRoot.innerHTML = '';
       promoTimelineRoot.setAttribute('hidden', '');
@@ -4526,6 +4741,7 @@ function render() {
       }
       state.promoListSearch = '';
       state.promoListGroupFilter = '';
+      state.promoCalSelected = null;
       state.cartRuleSearch = '';
       state.promoListSortKey = 'title';
       state.promoListSortDir = 'asc';
@@ -4694,6 +4910,7 @@ if (promotionsUrlSyncEnabled()) {
       state.country = nextMarket;
       state.promoListSearch = '';
       state.promoListGroupFilter = '';
+      state.promoCalSelected = null;
       state.promoListSortKey = 'title';
       state.promoListSortDir = 'asc';
       closeAllPricingDetailDialogs();

@@ -46,6 +46,27 @@
 
 .ps-panel-selection {
   padding: 10px 12px;
+  cursor: text;
+}
+
+/* Inline editor for the current selection as a comma-separated list */
+.ps-selection-edit {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 14px;
+  border: 1px solid var(--ps-border);
+  border-radius: 6px;
+  background: var(--ps-bg);
+  box-sizing: border-box;
+  resize: vertical;
+}
+
+.ps-selection-edit:focus {
+  outline: none;
+  border-color: #2c2c2e;
+  box-shadow: 0 0 0 2px rgb(44 44 46 / 15%);
 }
 
 .ps-panel-heading {
