@@ -32,6 +32,13 @@ https://{branch}--vitamix--aemsites.aem.page/
 
 ## Tests
 
+### Purchase analytics
+
+On order success, Adobe Analytics eVar30 contains the purchased product name and
+selected color together (for example, `Propel 510 Black`). Multiple distinct
+product/color pairs are comma-separated; items without a color are omitted.
+PDP eVar30 tracking remains color-only.
+
 ### Overview
 
 This project uses Playwright for end-to-end testing. The tests verify that key elements exist and function correctly across different product configurations.
