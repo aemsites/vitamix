@@ -1,6 +1,4 @@
-/* Compare-list toast (compare-products widget path only - Magento's compare-add flow already has
-   its own confirmation modal). Shows the message, small round thumbnails of everything currently
-   in the comparison list, and a "View Comparison" link (reusing the header's compare link). */
+/* Shared comparison and Edge recipe-book action toast. */
 .add-to-compare-toast {
   position: fixed;
   z-index: 1000;

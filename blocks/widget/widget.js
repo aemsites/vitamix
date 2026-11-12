@@ -1,4 +1,5 @@
 import { loadCSS } from '../../scripts/aem.js';
+import { logError } from '../../scripts/operations-log.js';
 
 /**
  * Constructs URL for widget resources.
@@ -13,10 +14,11 @@ function writeUrl(widgetPath, widgetName, extension) {
 /**
  * Decorates widget element by loading HTML, CSS, and JS resources.
  * @param {HTMLElement} widget - Widget container element
+ * @param {{ throwOnError?: boolean }} [options] Propagate failures to modal callers.
  * @returns {Promise<void>} Promise that resolves when widget decoration is complete
  * @throws {Error} Logs errors to console if widget loading fails
  */
-export default async function decorate(widget) {
+export default async function decorate(widget, options = {}) {
   const source = widget.querySelector('a[href]');
   const { pathname, searchParams } = new URL(source.href);
   const pathSegments = pathname.split('/').filter((p) => p);
@@ -42,6 +44,7 @@ export default async function decorate(widget) {
     });
 
     const resp = await fetch(writeUrl(widgetPath, widgetName, 'html'));
+    if (!resp.ok) throw new Error(`Widget HTML failed to load (${resp.status}): ${widgetPath}/${widgetName}`);
     widget.innerHTML = await resp.text();
 
     const cssLoaded = loadCSS(writeUrl(widgetPath, widgetName, 'css'));
@@ -51,6 +54,7 @@ export default async function decorate(widget) {
     })();
     await Promise.all([cssLoaded, decorationComplete]);
   } catch (error) {
-    // fail gracefully
+    if (options.throwOnError) throw error;
+    logError('widget', error, { widgetPath, widgetName });
   }
 }

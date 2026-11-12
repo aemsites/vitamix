@@ -1,0 +1,284 @@
+.preferences {
+  max-width: 1100px;
+  padding: var(--spacing-300);
+  margin: 0 auto;
+}
+
+.preferences [hidden] {
+  display: none;
+}
+
+.preferences .preferences-header h2 {
+  margin-top: 0;
+}
+
+.preferences .preferences-storage-note,
+.preferences .preferences-status {
+  font-size: var(--body-size-s);
+}
+
+.preferences .preferences-error {
+  padding: var(--spacing-200);
+  border-left: 4px solid var(--color-red);
+  background: var(--color-gray-200);
+}
+
+.preferences .preferences-status:empty {
+  display: none;
+}
+
+.preferences .preferences-panels {
+  display: grid;
+  gap: var(--spacing-400);
+  margin-top: var(--spacing-400);
+}
+
+.preferences .preferences-panels section {
+  padding: var(--spacing-300);
+  border: 1px solid var(--color-steel);
+  border-radius: 8px;
+}
+
+.preferences .preferences-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-200);
+}
+
+.preferences .preferences-section-heading h3 {
+  margin: 0;
+}
+
+.preferences .preferences-section-heading span {
+  flex-shrink: 0;
+  font-size: var(--body-size-s);
+}
+
+.preferences .preferences-interest-list,
+.preferences .preferences-recipe-list,
+.preferences .preferences-search-results {
+  padding: 0;
+  margin: var(--spacing-300) 0 0;
+  list-style: none;
+}
+
+.preferences .preferences-interest-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-100);
+}
+
+.preferences .preferences-interest {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-100);
+  min-height: 44px;
+  padding: var(--spacing-100) var(--spacing-200);
+  margin: 0;
+  border: 1px solid var(--color-steel);
+  border-radius: 24px;
+  background: var(--color-background);
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  text-transform: none;
+  white-space: normal;
+  cursor: pointer;
+}
+
+.preferences .preferences-interest svg {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.5;
+}
+
+.preferences .preferences-interest[aria-pressed='true'] {
+  border-color: var(--color-madder);
+  color: var(--color-madder);
+}
+
+.preferences .preferences-interest[aria-pressed='true'] svg {
+  fill: currentcolor;
+}
+
+.preferences .preferences-recipe-list,
+.preferences .preferences-search-results {
+  display: grid;
+  gap: var(--spacing-200);
+}
+
+.preferences .preferences-recipe {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-200);
+  padding-bottom: var(--spacing-200);
+  border-bottom: 1px solid var(--color-steel);
+}
+
+.preferences .preferences-recipe:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.preferences .preferences-recipe picture {
+  flex: 0 0 90px;
+}
+
+.preferences .preferences-recipe img {
+  display: block;
+  width: 90px;
+  height: 90px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.preferences .preferences-recipe-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.preferences .preferences-recipe-title {
+  display: block;
+  margin: 0;
+  font-family: var(--heading-font-family);
+  font-size: var(--heading-size-xs);
+  font-weight: bold;
+}
+
+.preferences .preferences-recipe p {
+  margin: var(--spacing-100) 0;
+  font-size: var(--body-size-s);
+}
+
+.preferences .preferences-remove {
+  min-height: 44px;
+  padding: var(--spacing-100);
+  margin: var(--spacing-100) 0 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-madder);
+  font: inherit;
+  font-size: var(--body-size-s);
+  text-decoration: underline;
+  text-transform: none;
+  cursor: pointer;
+}
+
+.preferences .preferences-book-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-100);
+}
+
+.preferences .preferences-add-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-200);
+  width: 100%;
+  padding: var(--spacing-100);
+  margin: 0;
+  border: 1px dashed var(--color-steel);
+  border-radius: 4px;
+  background: var(--color-background);
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  text-transform: none;
+  white-space: normal;
+  cursor: pointer;
+}
+
+.preferences .preferences-ghost-recipe {
+  margin-top: var(--spacing-200);
+}
+
+.preferences .preferences-ghost-image {
+  display: grid;
+  flex: 0 0 90px;
+  place-items: center;
+  height: 90px;
+  border-radius: 4px;
+  background: var(--color-gray-200);
+  font-size: 36px;
+}
+
+.preferences .preferences-search-results mark {
+  background: var(--color-gray-300);
+  color: inherit;
+}
+
+.preferences .preferences-recipe-search {
+  padding: var(--spacing-200);
+  margin-top: var(--spacing-200);
+  border: 1px solid var(--color-steel);
+  border-radius: 4px;
+}
+
+.preferences .preferences-search-input {
+  width: 100%;
+  min-height: 44px;
+  padding: var(--spacing-100);
+  border: 1px solid var(--color-steel);
+  border-radius: 4px;
+  background: var(--color-background);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.preferences .preferences-search-results {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.preferences .preferences-search-result {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-200);
+  width: 100%;
+  padding: 4px;
+  margin: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  text-transform: none;
+  white-space: normal;
+  cursor: pointer;
+}
+
+.preferences .preferences-search-result:disabled {
+  cursor: default;
+}
+
+.preferences .preferences-interest:focus-visible,
+.preferences .preferences-remove:focus-visible,
+.preferences .preferences-add-toggle:focus-visible,
+.preferences .preferences-search-result:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 3px;
+}
+
+.preferences .preferences-interest:hover,
+.preferences .preferences-remove:hover,
+.preferences .preferences-add-toggle:hover,
+.preferences .preferences-search-result:not(:disabled):hover {
+  background: var(--color-gray-200);
+}
+
+.preferences button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+@media (width >= 900px) {
+  .preferences .preferences-panels {
+    grid-template-columns: 1fr 1fr;
+  }
+}

@@ -203,6 +203,28 @@ main > .recipe-container.section > .recipe-wrapper {
   }
 }
 
+.recipe .recipe-manage-preferences {
+  flex: 1 0 100%;
+}
+
+.recipe .recipe-manage-preferences a {
+  display: flex;
+  align-items: center;
+  gap: 1ch;
+  font-size: var(--body-size-s);
+  font-weight: bold;
+}
+
+.recipe .recipe-manage-preferences a::before {
+  content: '';
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  background-image: url('./edit.svg');
+  background-size: contain;
+  background-repeat: no-repeat;
+}
+
 .recipe .recipe-submitted-by .eyebrow + p {
   font-weight: bold;
   letter-spacing: var(--letter-spacing-s);

@@ -1,0 +1,45 @@
+<div class="preferences-header">
+  <h2 data-copy="title">Manage recipes and preferences</h2>
+  <p data-copy="intro">Keep your recipe book and dietary interests in one place.</p>
+</div>
+<p class="preferences-storage-note" data-copy="storageNote">Dietary interests are saved on this device. Saved recipes also sync to your account when signed in.</p>
+<p class="preferences-error" role="alert" hidden></p>
+<p class="preferences-status" role="status" aria-live="polite" aria-atomic="true"></p>
+<div class="preferences-panels" aria-busy="true">
+  <section class="preferences-recipes">
+    <div class="preferences-section-heading">
+      <h3 data-copy="savedRecipes">Recipe book</h3>
+      <div class="preferences-book-controls">
+        <span class="preferences-recipe-count"></span>
+      </div>
+    </div>
+    <p data-copy="recipesHint">Add recipes with + or remove recipes you no longer want in your book.</p>
+    <ul class="preferences-recipe-list"></ul>
+    <p class="preferences-recipes-empty" data-copy="noRecipes" hidden>Your recipe book is empty. Use + to find and add recipes.</p>
+    <div class="preferences-ghost-recipe">
+      <button class="preferences-add-toggle" type="button" aria-label="Add recipes to your recipe book" aria-expanded="false" disabled>
+        <span class="preferences-ghost-image" aria-hidden="true">+</span>
+        <span class="preferences-recipe-title" data-copy="addRecipes">Add recipes to your recipe book</span>
+      </button>
+    </div>
+    <div class="preferences-recipe-search" hidden>
+      <form class="preferences-search-form" role="search" aria-label="Search recipes">
+        <input class="preferences-search-input" type="search" aria-label="Search recipes" placeholder="Type to search recipes" autocomplete="off">
+      </form>
+      <p class="preferences-search-hint" data-copy="searchHint">Search for a recipe, then select it to add it to your book.</p>
+      <ul class="preferences-search-results"></ul>
+      <p class="preferences-search-empty" data-copy="noResults" role="status" hidden>No matching recipes found.</p>
+    </div>
+  </section>
+  <section class="preferences-interests">
+    <div class="preferences-section-heading">
+      <h3 data-copy="dietaryInterests">Dietary interests</h3>
+      <span class="preferences-interest-count"></span>
+    </div>
+    <p data-copy="interestsHint">Heart the dietary interests you love. Select again to remove a preference.</p>
+    <ul class="preferences-interest-list"></ul>
+    <p class="preferences-interests-empty" data-copy="noInterests" hidden>No dietary interests are available yet.</p>
+  </section>
+</div>
+<p class="preferences-loading" role="status" data-copy="loading">Loading recipes and preferences...</p>
+<button class="button secondary preferences-retry" type="button" data-copy="retry" hidden>Try again</button>

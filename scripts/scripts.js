@@ -16,6 +16,7 @@ import {
   buildBlock,
   loadScript,
   getMetadata,
+  toClassName,
 } from './aem.js';
 import { logError } from './operations-log.js';
 import { addCoupon, setAffiliateCode, AUTO_COUPON_SOURCE } from './commerce/coupon-state.js';
@@ -1212,6 +1213,81 @@ function autolinkModals(doc) {
   });
 }
 
+let widgetHashModalsWired = false;
+
+/**
+ * Open /widgets/{slug}/{slug}.html for #{slug}-modal, including initial page links.
+ */
+function wireWidgetHashModals() {
+  if (widgetHashModalsWired) return;
+  widgetHashModalsWired = true;
+  let revision = 0;
+  let activeBlock = null;
+
+  const update = async () => {
+    revision += 1;
+    const currentRevision = revision;
+    if (activeBlock) {
+      const previous = activeBlock;
+      activeBlock = null;
+      previous.querySelector('dialog').close();
+    }
+    const { hash } = window.location;
+    const match = hash.match(/^#([a-z0-9]+(?:-[a-z0-9]+)*)-modal$/i);
+    if (!match) return;
+    const slug = toClassName(match[1]);
+    let block;
+    try {
+      const [{ createModal }, { default: decorateWidget }] = await Promise.all([
+        import(`${window.hlx.codeBasePath}/blocks/modal/modal.js`),
+        import(`${window.hlx.codeBasePath}/blocks/widget/widget.js`),
+      ]);
+      if (currentRevision !== revision) return;
+      const section = document.createElement('div');
+      section.className = 'section widget-container';
+      const wrapper = document.createElement('div');
+      wrapper.className = 'widget-wrapper';
+      const widget = document.createElement('div');
+      widget.className = 'widget block';
+      const source = document.createElement('a');
+      source.href = `/widgets/${slug}/${slug}.html`;
+      source.textContent = slug;
+      widget.append(source);
+      wrapper.append(widget);
+      section.append(wrapper);
+
+      const modal = await createModal([section], `/modals/${slug}`);
+      ({ block } = modal);
+      block.dataset.widgetModal = slug;
+      await decorateWidget(widget, { throwOnError: true });
+      if (currentRevision !== revision) {
+        block.remove();
+        return;
+      }
+      const dialog = block.querySelector('dialog');
+      dialog.setAttribute('aria-label', widget.querySelector('h1, h2, h3')?.textContent || slug);
+      dialog.addEventListener('close', () => {
+        if (activeBlock !== block) return;
+        activeBlock = null;
+        if (window.location.hash === hash) {
+          const url = new URL(window.location.href);
+          url.hash = '';
+          window.history.replaceState(window.history.state, '', url);
+        }
+      });
+      activeBlock = block;
+      modal.showModal();
+    } catch (error) {
+      if (activeBlock === block) activeBlock = null;
+      block?.remove();
+      logError('widget-modal', error, { widgetSlug: slug });
+    }
+  };
+
+  window.addEventListener('hashchange', update);
+  update();
+}
+
 async function decorateFragmentPreviews() {
   const path = window.location.pathname;
   if (path.includes('/nav/')) {
@@ -2349,6 +2425,7 @@ async function loadLazy(doc) {
   loadFonts();
   swapIcons(main);
   autolinkModals(document);
+  wireWidgetHashModals();
 
   // The sidekick sync button is temporarily disabled. The sync modal code
   // (tools/sidekick/sync/sync.js) is intentionally left in place so it can be re-enabled.
