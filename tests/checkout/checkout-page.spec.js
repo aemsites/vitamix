@@ -164,7 +164,7 @@ async function setupCheckoutMocks(page, overrides = {}) {
   }));
 
   // Shipping rates
-  await page.route('**/estimate/shipping', overrides.shipping || (async (route) => {
+  await page.route('**/estimate/shipping*', overrides.shipping || (async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -173,7 +173,7 @@ async function setupCheckoutMocks(page, overrides = {}) {
   }));
 
   // Coupon validation / discount estimate
-  await page.route('**/estimate/price', overrides.estimatePrice || (async (route) => {
+  await page.route('**/estimate/price*', overrides.estimatePrice || (async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -186,7 +186,7 @@ async function setupCheckoutMocks(page, overrides = {}) {
   }));
 
   // Order preview — locks totals and returns estimateToken
-  await page.route('**/orders/preview', overrides.preview || (async (route) => {
+  await page.route('**/orders/preview*', overrides.preview || (async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -1460,6 +1460,7 @@ test.describe('Edge Checkout Page', () => {
       // Without a shared clock each tab's storage sync flips the gift and previews again.
       await simulated.waitForTimeout(2000);
       const settled = previews;
+      expect(settled).toBeGreaterThan(0);
       await simulated.waitForTimeout(6000);
       expect(previews - settled).toBeLessThanOrEqual(1);
       expect(await giftCount(other)).toBe(1);
