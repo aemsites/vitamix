@@ -23,14 +23,15 @@ function applyTrackingConfig(tracker) {
 function applyProductColorConfig(tracker) {
   const isPurchase = String(tracker.events || '').split(',')
     .some((event) => event.split('=')[0] === 'purchase');
-  const purchaseColors = isPurchase
+  const purchaseProductColors = isPurchase
     ? (window.digitalData?.transaction?.item || [])
       .flatMap((item) => (item.productInfo?.productString || '').split(','))
-      .map((line) => (line.split(';')[4] || '').trim())
-      .filter(Boolean)
+      .map((line) => line.split(';'))
+      .filter((fields) => fields[4]?.trim())
+      .map((fields) => [fields[1]?.trim(), fields[4].trim()].filter(Boolean).join(' '))
     : [];
   const color = isPurchase
-    ? [...new Set(purchaseColors)].join(',')
+    ? [...new Set(purchaseProductColors)].join(',')
     : window.digitalData?.product?.[0]?.productInfo?.color;
   tracker.eVar30 = color || '';
   if (!color || !tracker.linkTrackVars) {
