@@ -36,14 +36,14 @@ function variantList(product) {
   return product.variants ? Object.values(product.variants) : [];
 }
 
-/** Product mode writes `price.final`; index mode writes the flat `price`. */
+/**
+ * Product mode writes `price.final`; index mode writes only the variants' flat `price`
+ * (the caller sets the parent row's price).
+ */
 function applyRuleToProduct(product, rule, now, isIndex) {
-  if (rule.price != null) {
-    if (isIndex) {
-      product.price = rule.price;
-    } else if (product.price && parseFloat(rule.price) < parseFloat(product.price.final)) {
-      product.price.final = rule.price;
-    }
+  if (!isIndex && rule.price != null && product.price
+    && parseFloat(rule.price) < parseFloat(product.price.final)) {
+    product.price.final = rule.price;
   }
   variantList(product).forEach((variant) => {
     const current = isIndex ? variant.price : variant.price?.final;
@@ -164,7 +164,7 @@ export function repriceIndexRows(rows, promotions, now, { locale, language } = {
     const productPrice = toNumber(parent.price);
     if (Number.isNaN(productPrice) || !(parseFloat(rule.price) < productPrice)) return;
     const variants = variantsByParent.get(parent.sku) || [];
-    applyRuleToProduct({ price: parent.price, variants }, rule, now, true);
+    applyRuleToProduct({ variants }, rule, now, true);
     parent.price = rule.price;
   });
 
@@ -258,6 +258,11 @@ export function repriceProduct(product, promotions, now, fallbackPath) {
 }
 
 let loaded = null;
+
+/** Forgets the loaded promotions, so the next call fetches them again. */
+export function resetSimulatedPromotions() {
+  loaded = null;
+}
 
 /**
  * Catalog promotions active at the simulated date, once per page and date.
