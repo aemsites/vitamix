@@ -353,12 +353,11 @@ function isAdminHost() {
 
 let watching = false;
 
-function watchOtherTabs() {
+function watchOtherTabs(loadedWith) {
   if (watching) return;
   watching = true;
-  let current = getSimulatedDate()?.getTime() ?? null;
-  window.addEventListener?.('storage', (event) => {
-    if (event.key !== STORAGE_KEY && event.key !== null) return;
+  let current = loadedWith !== undefined ? loadedWith : (getSimulatedDate()?.getTime() ?? null);
+  const onChange = () => {
     const date = getSimulatedDate();
     const next = date?.getTime() ?? null;
     if (next === current) return;
@@ -371,16 +370,25 @@ function watchOtherTabs() {
       createBadge();
       updateBadge();
     }
+  };
+  window.addEventListener?.('storage', (event) => {
+    if (event.key !== STORAGE_KEY && event.key !== null) return;
+    onChange();
   });
+  if (loadedWith !== undefined) onChange();
 }
 
 /**
  * Shows a fixed badge with the simulated date and a link that clears it, and tells the
  * page when another tab changes the date. Does nothing on production hosts.
+ *
+ * @param {Object} [options]
+ * @param {number|null} [options.loadedWith] the date (ms) this page loaded with, when this
+ *   module was loaded after another tab changed it
  */
-export function showSimulationBadge() {
+export function showSimulationBadge({ loadedWith } = {}) {
   if (!isSimulationHost() || isFramed()) return;
-  watchOtherTabs();
+  watchOtherTabs(loadedWith);
   if (badge?.root.isConnected || !getSimulatedDate()) return;
   createBadge();
   updateBadge();
