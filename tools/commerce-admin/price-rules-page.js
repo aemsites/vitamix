@@ -104,7 +104,7 @@ const PR_APP_MODE = getPrAppMode();
  * @property {string} regularPrice
  * @property {string} salePrice
  * @property {string} [sku] resolved variant SKU when the product targets a `?color=` variant
- * @property {string} [startSourceText] original spreadsheet cell (shown until edited)
+ * @property {string} [startSourceText] original spreadsheet cell (fallback for parsing)
  * @property {string} [endSourceText]
  */
 /** @typedef {object} PromotionSet
@@ -687,7 +687,7 @@ function uniquePromotionId(slug, promotions) {
  * User-facing datetimes → UTC ISO for helix.
  * Timezone-less values (date-only, datetime-local, spreadsheet, ISO without offset) are
  * **US Eastern** civil time. Strings that already include `Z` or a numeric offset are
- * absolute instants and are not re-interpreted.
+ * absolute instants and are not re-interpreted. Seconds are always truncated to 00.
  *
  * @param {string} raw
  * @returns {string}
@@ -696,7 +696,7 @@ function normalizeDateForCatalogApi(raw) {
   const s = String(raw || '').trim();
   if (!s) return '';
   if (/^\d{4}-\d{2}-\d{2}T/i.test(s) && /(?:[zZ]|[+-]\d{2}:\d{2})$/.test(s)) {
-    return catalogTimestampStringForApi(s);
+    return catalogTimestampStringForApi(s).replace(/:\d{2}Z$/, ':00Z');
   }
   const dayOnly = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (dayOnly) {
@@ -712,7 +712,7 @@ function normalizeDateForCatalogApi(raw) {
       Number(isoLocal[3]),
       Number(isoLocal[4]),
       Number(isoLocal[5]),
-      isoLocal[6] !== undefined ? Number(isoLocal[6]) : 0,
+      0,
     ));
   }
   return parseUsSpreadsheetDateTime(s) || '';
@@ -723,12 +723,12 @@ function isoToDatetimeLocalValue(iso) {
 }
 
 function datetimeLocalValueToIso(localValue) {
-  return easternDatetimeLocalToIso(localValue);
+  return normalizeDateForCatalogApi(easternDatetimeLocalToIso(localValue));
 }
 
 /** Display a UTC ISO instant in US Eastern time. @param {string} iso */
 function formatIsoForSaleLineView(iso) {
-  return formatInstantInEastern(iso);
+  return formatInstantInEastern(normalizeDateForCatalogApi(iso) || iso);
 }
 
 /** Numeric string for hidden fields / display (no currency symbol). */
@@ -777,21 +777,16 @@ function parseUsSpreadsheetDateTime(text) {
   const rest = restRaw.replace(/(am|pm)/gi, '').replace(/\s+/g, ' ').trim();
   let hh = 0;
   let mi = 0;
-  let sec = 0;
   if (rest) {
     const tm = rest.match(/^(\d{1,2})(?::(\d{2}))?(?::(\d{2}))?$/);
     if (!tm) return null;
     hh = parseInt(tm[1], 10);
     mi = parseInt(tm[2] || '0', 10);
-    sec = parseInt(tm[3] || '0', 10);
   }
-  /** Inclusive “through 11:59pm” end-of-day in Eastern time. */
-  const isEndOfDay1159pm = isPm && /\b11\s*:\s*59\b/i.test(restRaw);
-  if (isEndOfDay1159pm) sec = 59;
   if (isPm && hh < 12) hh += 12;
   if (isAm && hh === 12) hh = 0;
   // `month` is 0-based from parseInt above; easternCivilToUtc expects 1-based month.
-  const d = easternCivilToUtc(year, month + 1, day, hh, mi, sec);
+  const d = easternCivilToUtc(year, month + 1, day, hh, mi, 0);
   if (Number.isNaN(d.getTime())) return null;
   return catalogTimestampStringForApi(d);
 }
@@ -853,10 +848,8 @@ function promotionSaleLineTsvCell(value) {
 
 /** @param {string|null} paste @param {string} view @param {string} iso */
 function promotionSaleLineDateTsvCell(paste, view, iso) {
-  if (paste) return paste;
-  if (view && view !== '—') return view;
-  if (iso) return formatIsoForSaleLineView(iso);
-  return '';
+  const value = iso || paste || (view !== '—' ? view : '');
+  return value ? formatIsoForSaleLineView(value) : '';
 }
 
 /** @param {HTMLTableRowElement} tr */
@@ -1623,14 +1616,10 @@ function syncPromotionSaleRowView(tr) {
   const pasteStart = tr.getAttribute('data-pr-start-paste');
   const pasteEnd = tr.getAttribute('data-pr-end-paste');
   if (vStart) {
-    vStart.textContent = pasteStart != null && pasteStart !== ''
-      ? pasteStart
-      : formatIsoForSaleLineView(hStart?.value || '');
+    vStart.textContent = formatIsoForSaleLineView(hStart?.value || pasteStart || '');
   }
   if (vEnd) {
-    vEnd.textContent = pasteEnd != null && pasteEnd !== ''
-      ? pasteEnd
-      : formatIsoForSaleLineView(hEnd?.value || '');
+    vEnd.textContent = formatIsoForSaleLineView(hEnd?.value || pasteEnd || '');
   }
   const path = productUrlToCatalogPath(hProduct?.value || '');
   const displayPath = catalogDisplayPathWithColor(path, colorFromProductUrl(hProduct?.value || ''));
@@ -2099,8 +2088,8 @@ function promotionFormTableRowHtml(r, index) {
   );
   const startPasteAttr = startPaste ? ` data-pr-start-paste="${escapeHtml(startPaste)}"` : '';
   const endPasteAttr = endPaste ? ` data-pr-end-paste="${escapeHtml(endPaste)}"` : '';
-  const startViewLabel = startPaste || formatIsoForSaleLineView(startIso);
-  const endViewLabel = endPaste || formatIsoForSaleLineView(endIso);
+  const startViewLabel = formatIsoForSaleLineView(startIso || startPaste);
+  const endViewLabel = formatIsoForSaleLineView(endIso || endPaste);
   return `<tr class="pr-promo-sale-row" data-pr-promo-line data-pr-promo-line-idx="${index}"${skuAttr}${startPasteAttr}${endPasteAttr}>
     <td class="pr-promo-sale-col-del">
       <button type="button" class="coupons-btn pr-promo-line-remove-btn" data-pr-promo-line-remove aria-label="Remove row">×</button>
@@ -2173,7 +2162,7 @@ function promotionSaleLinesTableWrapHtml(linesHtml) {
       <p class="coupons-field-hint" style="margin-top:8px">Paste tab-separated columns in order:
         <strong>Start</strong>, <strong>End</strong>, <strong>Product</strong>, <strong>Regular Price</strong>, <strong>Sale Price</strong>.
         Include the header row from Excel if you like — it is ignored automatically.
-        Dates use <strong>US</strong> <code>M/D/YYYY</code> or <code>M/D/YY</code> with optional <code>12:00 AM</code>/<code>11:59 PM</code> (Excel’s comma is fine), or timezone-less ISO (<code>2026-08-28T00:00</code>). All of those are <strong>US Eastern (ET)</strong> — not the browser timezone — then saved as UTC. ISO values that already include <code>Z</code> are kept as UTC. The pasted text stays visible in the grid until you edit that cell. <code>11:59pm</code> is treated as the last second of that minute (ET). Prices may include <code>$</code>; values are normalized to plain numbers for the API.</p>
+        Dates use <strong>US</strong> <code>M/D/YYYY</code> or <code>M/D/YY</code> with optional <code>12:00 AM</code>/<code>11:59 PM</code> (Excel’s comma is fine), or timezone-less ISO (<code>2026-08-28T00:00</code>). All of those are <strong>US Eastern (ET)</strong> — not the browser timezone — then saved as UTC. ISO values that already include <code>Z</code> are kept as UTC. Dates are displayed to the minute; seconds are discarded and saved as <code>00</code>, including for <code>11:59 PM</code>. Prices may include <code>$</code>; values are normalized to plain numbers for the API.</p>
         <textarea id="pr-promo-tsv-paste" class="pr-promo-tsv-textarea" rows="7" spellcheck="false" placeholder="Start&#9;End&#9;Product&#9;Regular Price&#9;Sale Price"></textarea>
       <div class="pr-promo-tsv-actions">
         <button type="button" class="coupons-btn coupons-btn-primary" data-pr-promo-tsv-replace>Replace rows from paste</button>
@@ -3447,17 +3436,25 @@ function promotionTableHtml(rows, thumbByProductUrl) {
     .map((h) => `<th scope="col">${escapeHtml(h)}</th>`)
     .join('');
   const th = `<th class="pim-col-thumb" scope="col"><span class="pim-sr-only">Image</span></th>${labelTh}`;
+  const dateGroups = promotionDateGroups(rows);
   const body = rows
     .map((r) => {
+      const groupIndex = dateGroups.findIndex((g) => g.key === promotionDateGroupKey(r));
+      const groupAttrs = dateGroups.length > 1
+        ? ` class="pr-promo-date-group" style="--pr-promo-date-hue: ${promotionDateGroupHue(groupIndex)}"`
+        : '';
+      const groupLabel = dateGroups.length > 1
+        ? `<strong class="pr-promo-date-entry">Group ${groupIndex + 1}</strong>`
+        : '';
       const href = escapeHtml(r.product);
       const imgSrc = thumbs?.get(r.product) || '';
       const thumbCell = imgSrc
         ? `<img src="${escapeHtml(imgSrc)}" alt="" loading="lazy" width="48" height="48" class="pim-thumb-img" />`
         : '<span class="pim-thumb-placeholder" aria-hidden="true"></span>';
-      return `<tr>
+      return `<tr${groupAttrs}>
         <td class="pim-col-thumb pr-promo-table-thumb">${thumbCell}</td>
-        <td>${escapeHtml(formatIsoForSaleLineView(r.start))}</td>
-        <td>${escapeHtml(formatIsoForSaleLineView(r.end))}</td>
+        <td>${groupLabel}${escapeHtml(formatInstantInEastern(r.start, dateGroups.length > 1))}</td>
+        <td>${escapeHtml(formatInstantInEastern(r.end, dateGroups.length > 1))}</td>
         <td><a href="${href}" target="_blank" rel="noopener noreferrer">${href}</a></td>
         <td>${escapeHtml(r.regularPrice)}</td>
         <td>${escapeHtml(r.salePrice)}</td>
@@ -4061,6 +4058,51 @@ function promotionRowInstantMs(value) {
   return Number.isNaN(t) ? NaN : t;
 }
 
+/** @param {PromotionRow} row */
+function promotionDateGroupKey(row) {
+  return JSON.stringify([row.start, row.end].map((value) => {
+    const ms = promotionRowInstantMs(value);
+    if (Number.isFinite(ms)) return ms;
+    const text = String(value ?? '').trim();
+    return text === '—' ? '' : text;
+  }));
+}
+
+/** @param {PromotionRow[]} rows */
+function promotionDateGroups(rows) {
+  /** @type {Map<string, { key: string, start: string, end: string, count: number }>} */
+  const groups = new Map();
+  rows.forEach((row) => {
+    const key = promotionDateGroupKey(row);
+    const group = groups.get(key);
+    if (group) {
+      group.count += 1;
+    } else {
+      groups.set(key, {
+        key, start: row.start, end: row.end, count: 1,
+      });
+    }
+  });
+  return [...groups.values()];
+}
+
+/** @param {number} index */
+function promotionDateGroupHue(index) {
+  return Math.round((index * 137.508 + 210) % 360);
+}
+
+/**
+ * @param {ReturnType<typeof promotionDateGroups>} groups
+ * @param {'start'|'end'} field
+ */
+function promotionDateListCellHtml(groups, field) {
+  if (!groups.length) return '—';
+  if (groups.length === 1) return escapeHtml(formatIsoForSaleLineView(groups[0][field]));
+  return `<strong class="pr-promo-date-entry">Varies</strong>${groups.map((group, i) => (
+    `<span class="pr-promo-date-entry">${i + 1}. ${escapeHtml(formatInstantInEastern(group[field], true))}</span>`
+  )).join('')}`;
+}
+
 function uniformPromotionWindow(rows) {
   if (!rows.length) return null;
   const start = promotionRowInstantMs(rows[0].start);
@@ -4331,13 +4373,26 @@ function promotionDetailModalInnerHtml(
   const fullPath = `${countryKey.toUpperCase()} / promotions / ${groupLabel} / ${id}`;
   const rows = Array.isArray(set.rows) ? set.rows : [];
   const n = rows.length;
-  const starts = rows.map((r) => r.start);
-  const ends = rows.map((r) => r.end);
-  const uniformDates = n > 0 && new Set(starts).size === 1 && new Set(ends).size === 1;
-  const heroMain = uniformDates ? formatIsoForSaleLineView(String(starts[0])) : String(n);
+  const dateGroups = promotionDateGroups(rows);
+  const uniformDates = dateGroups.length === 1;
+  const varyingDates = dateGroups.length > 1;
+  let heroMain = uniformDates ? formatIsoForSaleLineView(dateGroups[0].start) : String(n);
+  if (varyingDates) heroMain = 'Varies';
   const heroSub = uniformDates
-    ? `through ${formatIsoForSaleLineView(String(ends[0]))} · ${n} product line${n === 1 ? '' : 's'}`
-    : 'sale line entries in this promotion (dates vary per row)';
+    ? `through ${formatIsoForSaleLineView(dateGroups[0].end)} · ${n} product line${n === 1 ? '' : 's'}`
+    : `${n} sale line entries in this promotion${varyingDates ? ' (dates vary per row)' : ''}`;
+  const dateGroupsHtml = varyingDates ? `
+    <section class="coupons-modal-section">
+      <h3 class="coupons-modal-section-title">Sale windows (ET)</h3>
+      <ul class="pr-promo-date-groups">
+        ${dateGroups.map((group, i) => `<li class="pr-promo-date-group" style="--pr-promo-date-hue: ${promotionDateGroupHue(i)}">
+          <strong>Group ${i + 1}:</strong>
+          Start: ${escapeHtml(formatInstantInEastern(group.start, true))};
+          End: ${escapeHtml(formatInstantInEastern(group.end, true))}
+          (${group.count} product line${group.count === 1 ? '' : 's'})
+        </li>`).join('')}
+      </ul>
+    </section>` : '';
   const uniqProducts = new Set(rows.map((r) => r.product)).size;
   const minDigits = String(set.minimumSubtotalDigits || '').trim();
   const minN = parseFloat(minDigits);
@@ -4367,11 +4422,12 @@ function promotionDetailModalInnerHtml(
     </div>
     <div class="coupons-modal-hero">
       <div class="coupons-modal-hero-inner">
-        <span class="coupons-modal-hero-kicker">${uniformDates ? 'Sale window' : 'Sale lines'}</span>
+        <span class="coupons-modal-hero-kicker">${uniformDates || varyingDates ? 'Sale window' : 'Sale lines'}</span>
         <span class="coupons-modal-hero-value">${escapeHtml(heroMain)}</span>
         <span class="coupons-modal-hero-note">${escapeHtml(heroSub)}</span>
       </div>
     </div>
+    ${dateGroupsHtml}
     <div class="coupons-modal-stats" role="list">
       <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Market</span><span class="coupons-modal-stat-value">${escapeHtml(countryLabel)}</span></div>
       <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Group</span><span class="coupons-modal-stat-value">${commerceGroupBadgeHtml(groupLabel)}</span></div>
@@ -4554,7 +4610,7 @@ function renderPromotionsListPanel() {
     tbodyHtml = list
       .map((r) => {
         const label = `Open promotion ${r.title}`;
-        const window = uniformPromotionWindow(r.rows);
+        const dateGroups = promotionDateGroups(r.rows);
         const isCalSelected = state.promoCalSelected
           && state.promoCalSelected.countryKey === r.countryKey
           && state.promoCalSelected.id === r.id;
@@ -4563,8 +4619,8 @@ function renderPromotionsListPanel() {
             <td class="pr-promo-col-title">${escapeHtml(r.title)}</td>
             <td><code class="pr-promo-id-code">${escapeHtml(r.id)}</code></td>
             <td>${r.rowCount}</td>
-            <td class="pr-promo-col-date">${escapeHtml(window?.startLabel || '—')}</td>
-            <td class="pr-promo-col-date">${escapeHtml(window?.endLabel || '—')}</td>
+            <td class="pr-promo-col-date">${promotionDateListCellHtml(dateGroups, 'start')}</td>
+            <td class="pr-promo-col-date">${promotionDateListCellHtml(dateGroups, 'end')}</td>
             <td class="pr-promo-col-mincart">${escapeHtml(formatPromotionMinCartListCell(r.minCartDigits))}</td>
             <td class="pr-promo-col-scope" title="${escapeHtml(r.scopeSummary)}">${escapeHtml(r.scopeSummary || '—')}</td>
             <td class="pr-promo-col-group">${commerceGroupBadgeHtml(r.group)}</td>

@@ -375,6 +375,30 @@
   white-space: nowrap;
 }
 
+.pr-promo-date-entry {
+  display: block;
+}
+
+.pr-promo-date-groups {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.pr-promo-date-groups li {
+  padding: 8px 12px;
+  border-radius: 6px;
+}
+
+.pr-promo-date-groups .pr-promo-date-group,
+.pr-data-table tbody tr.pr-promo-date-group {
+  background-color: hsl(var(--pr-promo-date-hue) 70% 94%);
+  color: #202223;
+}
+
 .pr-promo-grid-table thead th.pr-promo-col-mincart,
 .pr-promo-col-mincart {
   text-align: right;

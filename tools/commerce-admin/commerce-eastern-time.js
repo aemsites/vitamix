@@ -105,9 +105,10 @@ export function easternDatetimeLocalToIso(localValue) {
  * Display a UTC ISO instant in US Eastern time.
  *
  * @param {string} iso
+ * @param {boolean} [showSeconds=false]
  * @returns {string}
  */
-export function formatInstantInEastern(iso) {
+export function formatInstantInEastern(iso, showSeconds = false) {
   const s = String(iso || '').trim();
   if (!s) return '—';
   const d = new Date(s);
@@ -119,6 +120,7 @@ export function formatInstantInEastern(iso) {
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
+    ...(showSeconds ? { second: '2-digit' } : {}),
     timeZoneName: 'short',
   });
 }

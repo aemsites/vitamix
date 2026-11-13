@@ -21,6 +21,23 @@ requests bypass browser caching and include fresh `_code` / `_codes` query param
 to bypass proxy and upstream caches.
 These edits affect the individual code, not its parent coupon program's rules.
 
+## Promotion date groups
+
+Promotions with different sale-line date windows show **Varies** in the grid,
+followed by every start/end pair numbered in matching order (Eastern time).
+The detail view lists the same numbered groups with product-line counts and
+matching background colors on their product rows. Missing dates remain an em dash;
+these display groups do not change the saved dates or product order.
+
+Promotion date entry, pasted dates and saved sale-line windows use minute
+precision. Seconds are truncated to `00` (including `11:59 PM`, saved as
+`23:59:00` Eastern time before conversion to UTC). Entry labels and copied
+spreadsheet rows omit seconds. Existing dates are grouped by their exact instants,
+including seconds-only differences. **Varies** date pairs, detail group summaries
+and grouped product rows show seconds so those differences remain visible.
+Saving an edited promotion normalizes its edited market's sale-line dates;
+other markets and promotions are left unchanged.
+
 ## Recent catalog changes and index freshness
 
 Every catalog index request bypasses the browser cache and includes a cache-busting
