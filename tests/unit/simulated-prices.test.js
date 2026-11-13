@@ -6,8 +6,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import {
-  isRuleActive, repriceIndexRows, repriceJsonLd, simulatedIndexRows, simulatedJsonLd,
-  loadSimulatedPromotions, repriceJsonLdScript,
+  isRuleActive, repriceIndexRows, repriceJsonLd, repriceProduct, simulatedIndexRows,
+  simulatedJsonLd, simulatedProduct, loadSimulatedPromotions, repriceJsonLdScript,
 } from '../../scripts/simulated-prices.js';
 import { fetchProductIndex } from '../../scripts/plp-data.js';
 
@@ -110,6 +110,14 @@ describe('repriceJsonLd (product mode)', () => {
     assert.deepEqual(offerPrices(repriceJsonLd(configurableLd({ A: 100, B: 100 }), rules, T)), { A: '80', B: '80' });
   });
 
+  test('configurable: the lowest offer stands in for the parent price', () => {
+    const rules = [promo([{ path: PATH, price: '150' }])];
+    const out = repriceJsonLd(configurableLd({ A: 100, B: 200 }), rules, T);
+    assert.deepEqual(offerPrices(out), { A: '100', B: '200' }, '150 is not below the lowest offer (100)');
+    const lower = repriceJsonLd(configurableLd({ A: 100, B: 200 }), [promo([{ path: PATH, price: '90' }])], T);
+    assert.deepEqual(offerPrices(lower), { A: '90', B: '90' });
+  });
+
   test('variant-only rule qualifies', () => {
     const rules = [promo([{ path: PATH, price: '150', variants: { B: { price: '60' } } }])];
     assert.deepEqual(offerPrices(repriceJsonLd(configurableLd({ A: 100, B: 100 }), rules, T)), { A: '100', B: '60' });
@@ -187,6 +195,39 @@ describe('repriceJsonLd (product mode)', () => {
     delete ld.url;
     const out = repriceJsonLd(ld, [promo([{ path: PATH, price: '80' }])], T, PATH);
     assert.equal(out.offers[0].price, '80');
+  });
+});
+
+describe('repriceProduct (product JSON)', () => {
+  const product = (final = '100.00') => ({
+    sku: 'P',
+    path: PATH,
+    price: { currency: 'USD', regular: '100.00', final },
+    variants: [
+      { sku: 'A', price: { currency: 'USD', regular: '100.00', final } },
+      { sku: 'B', price: { currency: 'USD', regular: '100.00', final } },
+    ],
+  });
+  const finals = (p) => [p.price.final, ...p.variants.map((v) => v.price.final)];
+
+  test('parent rule and variant override', () => {
+    const rules = [promo([{ path: PATH, price: '80', variants: { A: { price: '70' } } }])];
+    const input = product();
+    assert.deepEqual(finals(repriceProduct(input, rules, T)), ['80', '70', '80']);
+    assert.deepEqual(finals(input), ['100.00', '100.00', '100.00'], 'input not mutated');
+  });
+
+  test('a promotion live today but not at T: back to the regular price', () => {
+    const out = repriceProduct(product('80.00'), [promo([{ path: `${PATH}-2`, price: '1' }])], T);
+    assert.deepEqual(finals(out), ['100.00', '100.00', '100.00']);
+    assert.equal(out.price.regular, '100.00');
+  });
+
+  test('uses the fallback path when the product has no path', () => {
+    const input = product();
+    delete input.path;
+    const out = repriceProduct(input, [promo([{ path: PATH, price: '80' }])], T, PATH);
+    assert.equal(out.price.final, '80');
   });
 });
 
@@ -353,6 +394,17 @@ describe('loading at the simulated date', () => {
     const data = await fetchProductIndex('us', 'en_us');
     assert.equal(data[0].price, '70');
     assert.equal(data[0].regularPrice, '100.00');
+  });
+
+  test('simulatedProduct reprices related products\' JSON', async () => {
+    const plain = { path: PATH, price: { regular: '100', final: '100' } };
+    assert.equal(await simulatedProduct(plain), plain, 'not simulating: same object');
+    localStorage.setItem('vitamix.now', '2030-06-19T12:00:00.000Z');
+    response = {
+      simulatedAt: '2030-06-19T12:00:00.000Z',
+      promotions: [promo([{ path: PATH, price: '55' }])],
+    };
+    assert.equal((await simulatedProduct(plain)).price.final, '55');
   });
 
   test('repriceJsonLdScript rewrites the head JSON-LD', async () => {

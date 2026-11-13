@@ -19,6 +19,7 @@ import {
 import addToCompare, {
   isInStoredCompare, removeFromCompare,
 } from '../../scripts/add-to-compare.js';
+import { getSimulatedDate } from '../../scripts/simulate-date.js';
 
 /**
  * Renders the title section of the PDP block.
@@ -194,7 +195,11 @@ function renderRelatedProducts(ph, custom) {
         try {
           const resp = await fetch(`${url}.json`);
           if (!resp.ok) return null;
-          const json = await resp.json();
+          let json = await resp.json();
+          if (getSimulatedDate()) {
+            const { simulatedProduct } = await import('../../scripts/simulated-prices.js');
+            json = await simulatedProduct(json, url);
+          }
           json.url = url;
           return json;
         } catch {

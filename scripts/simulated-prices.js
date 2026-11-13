@@ -6,7 +6,7 @@ import { getSimulatedDate, noteSimulatedAt, withSimulatedDate } from './simulate
  * product index render them. Only used while a date is simulated on non-prod hosts.
  */
 
-const TIMEOUT_MS = 8000;
+const TIMEOUT_MS = 5000;
 
 /**
  * @param {{ enabled?: boolean, start?: string, end?: string }} rule
@@ -227,6 +227,36 @@ export function repriceJsonLd(jsonLd, promotions, now, fallbackPath) {
   return { ...jsonLd, offers: single ? newOffers[0] : newOffers };
 }
 
+function withRegularPrice(price) {
+  if (!price || typeof price !== 'object') return price;
+  const regular = price.regular ?? price.final;
+  return regular == null ? { ...price } : { ...price, final: regular };
+}
+
+/**
+ * Product JSON (`{path}.json`) priced at `now`: the product and each variant start from
+ * `price.regular`, then the best active rule applies.
+ *
+ * @param {Object} product Product Bus product
+ * @param {Array<Object>} promotions catalog promotions
+ * @param {number} now epoch ms
+ * @param {string} [fallbackPath] product path when the product has no `path`
+ * @returns {Object} a new product with new `price` objects
+ */
+export function repriceProduct(product, promotions, now, fallbackPath) {
+  if (!product || typeof product !== 'object') return product;
+  const path = product.path || fallbackPath;
+  if (!path) return product;
+  const next = { ...product, price: withRegularPrice(product.price) };
+  if (Array.isArray(product.variants)) {
+    next.variants = product.variants.map((v) => (v && typeof v === 'object'
+      ? { ...v, price: withRegularPrice(v.price) } : v));
+  }
+  const rule = findBestRule(catalogPromotions({ promotions }), path, now, next);
+  if (rule) applyRuleToProduct(next, rule, now, false);
+  return next;
+}
+
 let loaded = null;
 
 /**
@@ -296,6 +326,23 @@ export async function simulatedJsonLd(jsonLd, fallbackPath) {
     return repriceJsonLd(jsonLd, rules.promotions, rules.now, fallbackPath);
   } catch {
     return jsonLd;
+  }
+}
+
+/**
+ * Product JSON priced at the simulated date; the same object when not simulating.
+ * @param {Object} product
+ * @param {string} [fallbackPath]
+ * @returns {Promise<Object>}
+ */
+export async function simulatedProduct(product, fallbackPath) {
+  if (!product || !getSimulatedDate()) return product;
+  const rules = await loadSimulatedPromotions();
+  if (!rules) return product;
+  try {
+    return repriceProduct(product, rules.promotions, rules.now, fallbackPath);
+  } catch {
+    return product;
   }
 }
 
