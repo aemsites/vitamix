@@ -1,5 +1,6 @@
 import { fetchPlaceholders } from '../../scripts/aem.js';
 import { getLocaleAndLanguage, formatPrice, getOfferPricing } from '../../scripts/scripts.js';
+import { getSimulatedDate } from '../../scripts/simulate-date.js';
 
 const normalize = (value) => (value || '').trim().toLowerCase();
 
@@ -207,6 +208,10 @@ async function loadProduct(href) {
       || (Array.isArray(node['@type']) && node['@type'].includes('Product'))
     ));
   });
+  if (product && getSimulatedDate()) {
+    const { simulatedJsonLd } = await import('../../scripts/simulated-prices.js');
+    product = await simulatedJsonLd(product, pageUrl.pathname);
+  }
   const title = product?.name || metadata('og:title') || doc.title.trim();
   if (!title) throw new Error('Recommended product page has no title');
   const offers = product?.offers;

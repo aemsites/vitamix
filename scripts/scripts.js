@@ -2316,6 +2316,16 @@ async function loadEager(doc) {
     }
   }
 
+  if (window.simulateDate && isSimulationHost() && document.querySelector('meta[name="sku"]')) {
+    try {
+      const { repriceJsonLdScript } = await import('./simulated-prices.js');
+      await repriceJsonLdScript(document);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn('Simulated prices failed', e);
+    }
+  }
+
   decorateTemplateAndTheme();
 
   const main = doc.querySelector('main');

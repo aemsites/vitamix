@@ -11,6 +11,7 @@ import {
 
 import loadColorSwatches from '../../scripts/color-swatches.js';
 import { getLocaleAndLanguage, formatPrice } from '../../scripts/scripts.js';
+import { getSimulatedDate } from '../../scripts/simulate-date.js';
 
 /**
  * Constructs a localized product URL path.
@@ -84,7 +85,11 @@ export async function lookupProducts(config, facets = {}) {
     const indexPath = window.location.pathname.includes('/commercial/') ? 'commercial/products' : 'products';
     const pathname = `/${locale}/${language}/${indexPath}/index.json?include=all`;
     const resp = await (isProd ? fetch(pathname) : corsProxyFetch(pathname));
-    const { data } = await resp.json();
+    let { data } = await resp.json();
+    if (getSimulatedDate()) {
+      const { simulatedIndexRows } = await import('../../scripts/simulated-prices.js');
+      data = await simulatedIndexRows(data, locale, language);
+    }
     if (!isProd && resp.ok) {
       data.forEach((product) => {
         if (product.image) product.image = `https://main--vitamix--aemsites.aem.network/${locale}/${language}/products/${product.image.substring(2)}`;
