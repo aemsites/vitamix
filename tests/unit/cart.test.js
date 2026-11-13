@@ -680,3 +680,17 @@ test('getItemsForAPI omits custom when not present', () => {
   const [api] = cart.getItemsForAPI();
   assert.equal('custom' in api, false);
 });
+
+test('cart:change carries the optional source of a change', () => {
+  const cart = new Cart();
+  cart.addItem({ sku: 'src', price: '1.00', quantity: 1 }, { source: 'test' });
+  cart.updateItemCustom('src', () => true, { a: 1 }, { source: 'test' });
+  cart.removeItem('src', undefined, { source: 'test' });
+  cart.addItem({ sku: 'plain', price: '1.00', quantity: 1 });
+  const sources = globalThis.__events
+    .filter((e) => e.type === 'cart:change' && e.detail.action !== 'empty')
+    .map((e) => [e.detail.action, e.detail.source]);
+  assert.deepEqual(sources.slice(-4), [
+    ['add', 'test'], ['custom', 'test'], ['remove', 'test'], ['add', undefined],
+  ]);
+});

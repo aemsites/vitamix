@@ -35,3 +35,11 @@ export const __rumCalls = [];
 export function sampleRUM(checkpoint, data) {
   __rumCalls.push([checkpoint, data]);
 }
+
+// No-op stubs so blocks/pdp/pdp.js and its imports can load.
+export function loadSections() {}
+export function buildBlock() {}
+export function decorateBlock() {}
+export function loadBlock() {}
+export function toClassName() {}
+export function fetchPlaceholders() {}

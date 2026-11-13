@@ -286,11 +286,6 @@ export default async function decorate(block) {
       <p class="eyebrow">${placeholders.submittedBy || 'Submitted By'}</p>
       <p>Vitamix</p>
     </div>
-    <div class="recipe-additional-info-item recipe-manage-preferences">
-      <p>
-        <a href="/${locale}/${language}/customer/account/login">${placeholders.managePreferences || 'Manage Preferences'}</a>
-      </p>
-    </div>
   </div>`;
 
   if (h1) h1.remove();

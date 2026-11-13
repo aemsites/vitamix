@@ -464,6 +464,62 @@ test.describe('PDP Integration Tests', () => {
     );
   });
 
+  test.describe('Related products', () => {
+    const productPath = '/mx/en_us/products/commercial/vita-prep';
+
+    test('hides the price on related products that cannot be added to cart', async ({ page }) => {
+      // The first related product is purchasable; every other one has addToCart=No with a
+      // stale non-zero catalog price, which must not be displayed.
+      let requested = 0;
+      await page.route('**/mx/en_us/products/commercial/*.json', (route) => {
+        requested += 1;
+        const sellable = requested === 1;
+        return route.fulfill({
+          json: {
+            name: sellable ? 'Sellable related' : `Unavailable related ${requested}`,
+            images: [{ url: './media_test.jpg' }],
+            custom: { retired: 'No', addToCart: sellable ? 'Yes' : 'No' },
+            price: { currency: 'MXN', regular: '860.00', final: '860.00' },
+          },
+        });
+      });
+
+      await page.goto(buildProductUrl(productPath, currentBranch));
+      const related = page.locator('.pdp-related-products-container');
+      await related.scrollIntoViewIfNeeded();
+
+      await expect(related.locator('li').nth(1)).toBeVisible();
+      await expect(related.locator('li', { hasText: 'Sellable related' }).locator('strong')).toBeVisible();
+      await expect(related.locator('li strong')).toHaveCount(1);
+    });
+  });
+
+  test.describe('Reviews locale', () => {
+    // The es_MX Bazaarvoice deployment only returns Spanish reviews, but reviews are written in
+    // English, so Spanish MX PDPs load the English en_MX deployment (as the legacy site did).
+    [
+      ['Spanish MX', '/mx/es_mx/products/ascent-x2', 'en_MX'],
+      ['English MX', '/mx/en_us/products/ascent-x2', 'en_US'],
+      ['US', '/us/en_us/products/ascent-x2', 'en_US'],
+    ].forEach(([name, productPath, bvLocale]) => {
+      test(`${name} PDP loads the ${bvLocale} Bazaarvoice deployment`, async ({ page }) => {
+        const bvScripts = [];
+        await page.route('**/apps.bazaarvoice.com/deployments/**/bv.js', (route) => {
+          bvScripts.push(route.request().url());
+          return route.fulfill({ contentType: 'text/javascript', body: '' });
+        });
+
+        await page.goto(buildProductUrl(productPath, currentBranch));
+        await page.waitForSelector('.pdp');
+
+        await expect.poll(() => bvScripts.length).toBeGreaterThan(0);
+        expect(bvScripts).toEqual([
+          `https://apps.bazaarvoice.com/deployments/vitamix/main_site/production/${bvLocale}/bv.js`,
+        ]);
+      });
+    });
+  });
+
   test.describe('Bundle Product Page', () => {
     const productPath = '/us/en_us/products/5200-legacy-bundle';
 

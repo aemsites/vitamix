@@ -164,7 +164,7 @@ async function setupCheckoutMocks(page, overrides = {}) {
   }));
 
   // Shipping rates
-  await page.route('**/estimate/shipping', overrides.shipping || (async (route) => {
+  await page.route('**/estimate/shipping*', overrides.shipping || (async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -173,7 +173,7 @@ async function setupCheckoutMocks(page, overrides = {}) {
   }));
 
   // Coupon validation / discount estimate
-  await page.route('**/estimate/price', overrides.estimatePrice || (async (route) => {
+  await page.route('**/estimate/price*', overrides.estimatePrice || (async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -186,7 +186,7 @@ async function setupCheckoutMocks(page, overrides = {}) {
   }));
 
   // Order preview — locks totals and returns estimateToken
-  await page.route('**/orders/preview', overrides.preview || (async (route) => {
+  await page.route('**/orders/preview*', overrides.preview || (async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -1401,6 +1401,70 @@ test.describe('Edge Checkout Page', () => {
       // After cart empty event, checkout reloads → empty state should render
       await expect(page.locator('.checkout-empty')).toBeVisible({ timeout: 15000 });
       console.log('✓ Checkout shows empty state after cart cleared mid-checkout');
+    });
+  });
+
+  // ─── Simulated date across tabs ──────────────────────────────────────────────
+
+  test.describe('Simulated date', () => {
+    const GIFT_PATH = '/us/en_us/products/ascent-x2';
+    const SIMULATED = '2030-06-01T00:00:00.000Z';
+    const FUTURE_GWP = {
+      promotions: [{
+        id: 'e2e-future-gwp',
+        name: 'Future gift',
+        country: 'us',
+        conditions: { minimumSubtotal: 100 },
+        rules: [{
+          path: GIFT_PATH, price: '0', start: '2030-01-01T00:00:00Z', end: '2030-12-31T00:00:00Z',
+        }],
+      }],
+      serverCheck: false,
+    };
+
+    test('two checkout tabs share the simulated date and settle without a preview loop', async ({ context }) => {
+      let previews = 0;
+      const pages = await Promise.all([context.newPage(), context.newPage()]);
+      await Promise.all(pages.map(async (page) => {
+        await seedCart(page);
+        await page.addInitScript((stub) => {
+          localStorage.setItem('vitamix.priceRules.stub', JSON.stringify(stub));
+        }, FUTURE_GWP);
+        await setupCheckoutMocks(page, {
+          preview: async (route) => {
+            previews += 1;
+            await route.fulfill({
+              status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_PREVIEW),
+            });
+          },
+        });
+      }));
+      const [simulated, other] = pages;
+      const giftCount = (page) => page.evaluate(() => (window.cart?.items || [])
+        .filter((item) => item.custom?.giftWithPurchase).length);
+
+      // The first tab sets the date; the second is opened without it.
+      await simulated.goto(`${baseUrl}/us/en_us/order/checkout?cart=edge&martech=off&simulateDate=${encodeURIComponent(SIMULATED)}`);
+      await expect(simulated.locator('.checkout-form')).toBeVisible({ timeout: 15000 });
+      await gotoCheckout(other, baseUrl);
+      await expect(other.locator('.checkout-form')).toBeVisible({ timeout: 15000 });
+
+      await Promise.all(pages.map(async (page) => {
+        await fillContact(page);
+        await fillShipping(page);
+        await selectCreditCardAndWaitForPreview(page);
+      }));
+      await expect.poll(() => giftCount(other), { timeout: 15000 }).toBe(1);
+      expect(await giftCount(simulated)).toBe(1);
+
+      // Without a shared clock each tab's storage sync flips the gift and previews again.
+      await simulated.waitForTimeout(2000);
+      const settled = previews;
+      expect(settled).toBeGreaterThan(0);
+      await simulated.waitForTimeout(6000);
+      expect(previews - settled).toBeLessThanOrEqual(1);
+      expect(await giftCount(other)).toBe(1);
+      console.log('✓ Two simulated checkout tabs settle on the same gift');
     });
   });
 });

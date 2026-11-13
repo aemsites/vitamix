@@ -647,7 +647,8 @@ export default async function decorate(block) {
   window.addEventListener(COMPARE_STORAGE_EVENT, updateCompareVisibility);
   window.addEventListener('storage', updateCompareVisibility);
 
-  const accountLink = block.querySelector('.icon-account').parentElement;
+  const accountIcon = block.querySelector('.icon-account');
+  const accountLink = accountIcon ? accountIcon.parentElement : null;
   const defaultAccountLabel = (accountLink?.lastChild?.textContent ?? '').trim();
 
   /**
@@ -678,6 +679,7 @@ export default async function decorate(block) {
   // --- Auth state display (all pages): OTP session and/or legacy Magento customer cache ---
 
   const syncHeaderAuthDisplay = () => {
+    if (!accountLink) return;
     const combined = isHeaderAuthSessionActive();
     accountLink.classList.toggle('is-logged-in', combined);
     if (accountLink.lastChild) {
@@ -685,17 +687,27 @@ export default async function decorate(block) {
     }
   };
 
-  document.addEventListener(AUTH_EVENT, syncHeaderAuthDisplay);
-  addMagentoCacheListener(syncHeaderAuthDisplay);
-  syncHeaderAuthDisplay();
+  if (accountLink) {
+    document.addEventListener(AUTH_EVENT, syncHeaderAuthDisplay);
+    addMagentoCacheListener(syncHeaderAuthDisplay);
+    syncHeaderAuthDisplay();
+  }
 
   // --- Auth panel + OTP account drawer (edge checkout mode only) ---
-  if (window.useEdgeCheckout) {
+  if (accountLink && window.useEdgeCheckout) {
+    const setAccountHash = (open) => {
+      if (!open && window.location.hash !== '#account') return;
+      const url = new URL(window.location.href);
+      url.hash = open ? 'account' : '';
+      window.history.replaceState(window.history.state, '', url);
+    };
+
     let authPanel = null;
     const ensureAuthPanel = async () => {
       if (authPanel) return authPanel;
       const { default: createAuthPanel } = await import('./auth-panel.js');
       authPanel = createAuthPanel();
+      authPanel.dialog.addEventListener('close', () => setAccountHash(false));
       block.append(authPanel.dialog);
       return authPanel;
     };
@@ -749,12 +761,14 @@ export default async function decorate(block) {
 
       accountMgmtDialog.addEventListener('close', () => {
         unlockBodyScroll();
+        setAccountHash(false);
       });
 
       const open = () => {
         lockBodyScroll();
         accountMgmtDialog.showModal();
         accountMgmtDialog.setAttribute('aria-expanded', 'true');
+        setAccountHash(true);
       };
       accountMgmtDialog.openModal = open;
 
@@ -773,11 +787,16 @@ export default async function decorate(block) {
     };
 
     accountLink.addEventListener('click', async (e) => {
+      if ((authPanel && authPanel.dialog.open) || (accountMgmtDialog && accountMgmtDialog.open)) {
+        e.preventDefault();
+        return;
+      }
       if (!isHeaderAuthSessionActive()) {
         e.preventDefault();
         const panel = await ensureAuthPanel();
         panel.showEmailStep();
         panel.open();
+        setAccountHash(true);
         return;
       }
       if (isLoggedIn()) {
@@ -785,15 +804,26 @@ export default async function decorate(block) {
         try {
           const dlg = await ensureAccountManagementModal();
           dlg.openModal();
-        } catch {
-          /* fall through to default navigation */
+        } catch (error) {
+          // eslint-disable-next-line no-console
+          console.error('Unable to open account management', error);
+          window.location.assign(accountLink.href);
         }
       }
       /* Legacy Magento session only: follow account href */
     });
   }
 
-  const cartLink = block.querySelector('.icon-cart').parentElement;
+  const handleAccountHash = () => {
+    if (!accountLink || window.location.hash !== '#account') return;
+    accountLink.click();
+  };
+  window.addEventListener('hashchange', handleAccountHash);
+  handleAccountHash();
+
+  const cartIcon = block.querySelector('.icon-cart');
+  if (!cartIcon) return;
+  const cartLink = cartIcon.parentElement;
 
   // Read item count from locale-specific localStorage key (same logic as Cart.STORAGE_KEY)
   // to avoid stale domain-wide cookie when switching between locales (e.g. CA → US).

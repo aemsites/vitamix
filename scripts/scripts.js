@@ -19,6 +19,11 @@ import {
 } from './aem.js';
 import { logError } from './operations-log.js';
 import { addCoupon, setAffiliateCode, AUTO_COUPON_SOURCE } from './commerce/coupon-state.js';
+import {
+  getSimulatedDate, isSimulationHost, parseEasternDateTime, parseSimulatedDate, showSimulationBadge,
+} from './simulate-date.js';
+
+export { parseEasternDateTime };
 
 const { hostname } = window.location;
 
@@ -58,7 +63,7 @@ function registerErrorLogging() {
 // Locale+language pairs enabled for edge checkout.
 // Format: '<locale>/<language>' (e.g., 'ca/fr_ca'). Add pairs as each region goes live.
 // Keep this empty to use Adobe Commerce by default in every environment.
-const EDGE_CHECKOUT_LOCALES = ['ca/fr_ca', 'ca/en_us', 'us/en_us'];
+const EDGE_CHECKOUT_LOCALES = ['ca/fr_ca', 'ca/en_us', 'us/en_us', 'mx/en_us', 'mx/es_mx', 'vr/en_us'];
 export const EDGE_CHECKOUT_OVERRIDE_STORAGE_KEY = 'edgeCheckout';
 
 /**
@@ -1356,113 +1361,6 @@ export async function loggedFetch(input, init) {
 }
 
 /**
- * Determines if a given date falls within US Eastern Daylight Saving Time.
- * DST starts: 2nd Sunday of March at 2:00 AM
- * DST ends: 1st Sunday of November at 2:00 AM
- * @param {number} year - The year
- * @param {number} month - The month (1-12)
- * @param {number} day - The day of month
- * @returns {boolean} True if the date is in DST (EDT), false if in standard time (EST)
- */
-function isEasternDST(year, month, day) {
-  // DST doesn't apply in Jan, Feb, or Dec
-  if (month < 3 || month > 11) return false;
-  // DST always applies Apr-Oct
-  if (month > 3 && month < 11) return true;
-
-  // For March: DST starts 2nd Sunday at 2am
-  if (month === 3) {
-    // Find the 2nd Sunday of March
-    const firstOfMonth = new Date(year, 2, 1); // March 1st (month is 0-indexed)
-    const firstSunday = 1 + ((7 - firstOfMonth.getDay()) % 7);
-    const secondSunday = firstSunday + 7;
-    // On or after the second Sunday means DST
-    return day >= secondSunday;
-  }
-
-  // For November: DST ends 1st Sunday at 2am
-  if (month === 11) {
-    // Find the 1st Sunday of November
-    const firstOfMonth = new Date(year, 10, 1); // November 1st (month is 0-indexed)
-    const firstSunday = 1 + ((7 - firstOfMonth.getDay()) % 7);
-    // Before the first Sunday means still in DST
-    return day < firstSunday;
-  }
-
-  return false;
-}
-
-/**
- * Parses a datetime string and returns a Date object.
- * Supports formats like "9/12/2025 9am", "9/19/2025 3pm", or "9/12/2025 9:30am"
- * Defaults to Eastern time (EST/EDT based on daylight savings) when no timezone specified.
- * @param {string} dateStr - The datetime string to parse (e.g., "6/23/2025 9am")
- * @returns {Date} The parsed Date object
- * @throws {Error} If the datetime format is invalid
- */
-export function parseEasternDateTime(dateStr) {
-  if (!dateStr) {
-    throw new Error('DateTime string is required');
-  }
-
-  // Handle formats like "9/12/2025 9am" or "9/12/2025 9:30am"
-  // Timezone is optional, defaults to Eastern (EST/EDT)
-  const regex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2})(?::(\d{2}))?(am|pm)(?:\s+([A-Z]{3,4}))?$/i;
-  const match = dateStr.trim().match(regex);
-
-  if (!match) {
-    throw new Error(`Invalid datetime format: ${dateStr}. Expected format: M/D/YYYY HHam/pm`);
-  }
-
-  const month = parseInt(match[1], 10);
-  const day = parseInt(match[2], 10);
-  const year = parseInt(match[3], 10);
-  let hours = parseInt(match[4], 10);
-  const minutesValue = match[5] ? parseInt(match[5], 10) : 0;
-  const ampm = match[6].toLowerCase();
-  const timezone = match[7];
-
-  // Convert 12-hour to 24-hour format
-  if (ampm === 'am' && hours === 12) {
-    hours = 0; // 12am = 00:00
-  } else if (ampm === 'pm' && hours !== 12) {
-    hours += 12; // 1pm-11pm = 13:00-23:00, 12pm stays 12:00
-  }
-
-  // Timezone offsets from UTC
-  const timezoneOffsets = {
-    EDT: -4,
-    EST: -5,
-    CDT: -5,
-    CST: -6,
-    MDT: -6,
-    MST: -7,
-    PDT: -7,
-    PST: -8,
-  };
-
-  let offsetHours;
-  if (timezone) {
-    // Use explicitly specified timezone
-    offsetHours = timezoneOffsets[timezone.toUpperCase()];
-    if (offsetHours === undefined) {
-      throw new Error(`Unsupported timezone: ${timezone}`);
-    }
-  } else {
-    // Default to Eastern time - auto-detect EST/EDT based on date
-    const isDST = isEasternDST(year, month, day);
-    offsetHours = isDST ? -4 : -5; // EDT = -4, EST = -5
-  }
-
-  // Convert the local time to UTC by subtracting the offset
-  // If EDT is UTC-4, then 9am EDT = 1pm UTC (9 - (-4) = 13)
-  const utcHour = hours - offsetHours;
-
-  // Create UTC date object
-  return new Date(Date.UTC(year, month - 1, day, utcHour, minutesValue, 0));
-}
-
-/**
  * Parses the start/end date cells of a scheduled content row.
  * Empty cells are treated as open-ended (always started / never expires).
  * @param {HTMLElement} startEl - Cell containing the start datetime text
@@ -2083,10 +1981,16 @@ async function loadNavBanner(main) {
     const path = new URL(meta, window.location).pathname;
     // eslint-disable-next-line import/no-cycle
     const resp = await fetch(path);
+    if (!resp.ok) throw new Error(`Failed to load nav banner ${path}: ${resp.status}`);
     const text = await resp.text();
 
     const dom = new DOMParser().parseFromString(text, 'text/html');
     const block = dom.querySelector('.alert-banners');
+    if (!block) {
+      // eslint-disable-next-line no-console
+      console.warn('Nav banner fragment missing .alert-banners block:', path);
+      return;
+    }
 
     const banners = parseAlertBanners(block);
     const selectedBanners = findCurrentAlertBanners(banners);
@@ -2229,20 +2133,15 @@ async function loadEager(doc) {
     window.useEdgeCheckout = cartModeParam !== 'magento';
   }
 
-  /* simulation date */
-  const params = new URLSearchParams(window.location.search);
-  const simulateDateParam = params.get('simulateDate');
-  if (simulateDateParam) {
-    try {
-      window.simulateDate = parseEasternDateTime(simulateDateParam);
-    } catch {
-      const date = new Date(simulateDateParam);
-      if (!Number.isNaN(date.getTime())) {
-        window.simulateDate = date;
-      } else {
-        // eslint-disable-next-line no-console
-        console.warn(`Invalid simulateDate: ${simulateDateParam}`);
-      }
+  /* simulation date: per page on production, for the session elsewhere */
+  if (isSimulationHost()) {
+    window.simulateDate = getSimulatedDate() || undefined;
+  } else {
+    const param = new URLSearchParams(window.location.search).get('simulateDate');
+    if (param) {
+      window.simulateDate = parseSimulatedDate(param) || undefined;
+      // eslint-disable-next-line no-console
+      if (!window.simulateDate) console.warn(`Invalid simulateDate: ${param}`);
     }
   }
 
@@ -2338,16 +2237,18 @@ async function loadLazy(doc) {
   if (hash && element) element.scrollIntoView();
 
   loadFooter(doc.querySelector('footer'));
+  if (isSimulationHost()) showSimulationBadge();
 
   loadCSS(`${window.hlx.codeBasePath}/styles/lazy-styles.css`);
   loadFonts();
   swapIcons(main);
   autolinkModals(document);
 
+  // The sidekick sync button is temporarily disabled. The sync modal code
+  // (tools/sidekick/sync/sync.js) is intentionally left in place so it can be re-enabled.
   const syncSku = async () => {
-    // eslint-disable-next-line import/no-unresolved
-    const { openSyncModal } = await import('https://main--vitamix--aemsites.aem.page/tools/sidekick/sync/sync.js');
-    await openSyncModal();
+    // eslint-disable-next-line no-alert
+    window.alert('Please reach out in slack to update a product');
   };
 
   const loadQuickEdit = async (...args) => {
