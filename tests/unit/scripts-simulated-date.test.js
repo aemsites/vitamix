@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { describe, it } from 'node:test';
 import { runInNewContext } from 'node:vm';
 
@@ -41,9 +41,20 @@ describe('hasSimulatedDate', () => {
   });
 });
 
-describe('scripts.js', () => {
-  it('loads the simulated date code only on demand', () => {
-    assert.doesNotMatch(source, /^import[^;]*from '\.\/simulate-date\.js';/m);
+const root = new URL('../../', import.meta.url);
+
+function sourceFiles(dir) {
+  return readdirSync(new URL(dir, root), { recursive: true })
+    .filter((file) => file.endsWith('.js'))
+    .map((file) => `${dir}${file}`);
+}
+
+describe('storefront modules', () => {
+  it('load the simulated date code only on demand', () => {
+    const files = ['scripts/', 'blocks/', 'widgets/'].flatMap(sourceFiles);
+    const staticImports = files.filter((file) => /^import[^;]*from '[^']*simulate-date\.js';/m
+      .test(readFileSync(new URL(file, root), 'utf8')));
+    assert.deepEqual(staticImports, []);
     assert.match(source, /import\('\.\/simulate-date\.js'\)/);
   });
 });
