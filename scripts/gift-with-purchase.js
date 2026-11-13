@@ -22,11 +22,12 @@
  *   - `localStorage['vitamix.priceRulesUrl']` — override endpoint
  *   - `localStorage['vitamix.priceRules.stub']` — JSON payload, bypasses fetch
  *     and the server check (unless the payload sets `serverCheck: true`)
- *   - `localStorage['vitamix.now']`            — ISO datetime for time-travel
+ *   - a simulated date (`simulate-date.js`) — time travel, also sent to the API
  */
 
 import cart from './cart.js';
 import { getConfig } from './commerce-config.js';
+import { getSimulatedDate, noteSimulatedAt, withSimulatedDate } from './simulate-date.js';
 
 // Inlined to avoid an import cycle (auth-api -> recaptcha -> scripts -> here).
 const AUTH_TOKEN_SESSION_KEY = 'auth_token';
@@ -34,7 +35,6 @@ const AUTH_TOKEN_SESSION_KEY = 'auth_token';
 const CACHE_KEY = 'vitamix.priceRules.v1';
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const STUB_KEY = 'vitamix.priceRules.stub';
-const NOW_KEY = 'vitamix.now';
 const ENDPOINT_OVERRIDE_KEY = 'vitamix.priceRulesUrl';
 const FETCH_TIMEOUT_MS = 5000;
 const PREVIEW_SYNC_TIMEOUT_MS = 6000;
@@ -56,16 +56,14 @@ function readLocalStorage(key) {
   try { return localStorage.getItem(key); } catch { return null; }
 }
 
-/** Effective "now" — honours the non-prod time-travel override. */
+/** Effective "now" — honours the non-prod simulated date. */
 function getNow() {
-  if (isNonProdHost()) {
-    const raw = readLocalStorage(NOW_KEY);
-    if (raw) {
-      const d = new Date(raw);
-      if (!Number.isNaN(d.getTime())) return d;
-    }
-  }
-  return new Date();
+  return getSimulatedDate() || new Date();
+}
+
+/** Identifies the clock that rules and server answers were loaded for. */
+function clockKey() {
+  return getSimulatedDate()?.toISOString() || null;
 }
 
 function getEndpoint() {
@@ -73,7 +71,7 @@ function getEndpoint() {
     const override = readLocalStorage(ENDPOINT_OVERRIDE_KEY);
     if (override) return override;
   }
-  return `${getConfig().apiOrigin}/price-rules/catalog?active=true`;
+  return withSimulatedDate(`${getConfig().apiOrigin}/price-rules/catalog?active=true`);
 }
 
 let lastStub = null;
@@ -96,6 +94,7 @@ function readSessionCache() {
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed.fetchedAt !== 'number' || !parsed.payload) return null;
     if (Date.now() - parsed.fetchedAt > CACHE_TTL_MS) return null;
+    if ((parsed.clock || null) !== clockKey()) return null;
     return parsed;
   } catch {
     return null;
@@ -129,16 +128,20 @@ export async function ensurePriceRulesLoaded() {
     };
     return inMemoryCache;
   }
-  if (inMemoryCache) return inMemoryCache;
+  const clock = clockKey();
+  if (inMemoryCache && inMemoryCache.clock === clock) return inMemoryCache;
 
   const cached = readSessionCache();
   if (cached) {
-    inMemoryCache = { payload: cached.payload, productsByPath: cached.productsByPath || {} };
+    inMemoryCache = {
+      payload: cached.payload, productsByPath: cached.productsByPath || {}, clock,
+    };
     return inMemoryCache;
   }
 
-  if (inflight) return inflight;
-  inflight = (async () => {
+  if (inflight?.clock === clock) return inflight.promise;
+  const entry = { clock };
+  entry.promise = (async () => {
     try {
       const headers = { Accept: 'application/json' };
       let token = null;
@@ -147,19 +150,23 @@ export async function ensurePriceRulesLoaded() {
       const res = await fetch(getEndpoint(), withTimeout({ method: 'GET', headers }));
       if (!res.ok) throw new Error(`price-rules ${res.status}`);
       const payload = await res.json();
-      const entry = { fetchedAt: Date.now(), payload, productsByPath: {} };
-      writeSessionCache(entry);
-      inMemoryCache = { payload, productsByPath: entry.productsByPath };
+      noteSimulatedAt(payload);
+      const loaded = {
+        fetchedAt: Date.now(), payload, productsByPath: {}, ...(clock ? { clock } : {}),
+      };
+      writeSessionCache(loaded);
+      inMemoryCache = { payload, productsByPath: loaded.productsByPath, clock };
       return inMemoryCache;
     } catch (e) {
       // eslint-disable-next-line no-console
       console.warn('[GWP] price-rules load failed', e);
       return null;
     } finally {
-      inflight = null;
+      if (inflight === entry) inflight = null;
     }
   })();
-  return inflight;
+  inflight = entry;
+  return entry.promise;
 }
 
 function promotionAppliesToLocale(promotion, locale) {
@@ -176,7 +183,8 @@ function ruleIsActive(rule, now) {
   if (rule.enabled === false) return false;
   const t = now.getTime();
   const startOk = !rule.start || new Date(rule.start).getTime() <= t;
-  const endOk = !rule.end || new Date(rule.end).getTime() > t;
+  // The end is inclusive.
+  const endOk = !rule.end || new Date(rule.end).getTime() >= t;
   return startOk && endOk;
 }
 
@@ -509,6 +517,7 @@ let reconcileInflight = null;
 /** Identifies the paid lines and the active promotion rules a server answer was for. */
 function checkSignature(promotions, items, now) {
   return JSON.stringify([
+    clockKey(),
     promotions.map((p) => [p.id, asList(p.rules)
       .filter((r) => r?.path && ruleIsActive(r, now)).map((r) => r.path)]),
     items.filter(isPaidLine)
@@ -677,7 +686,7 @@ export function reconcileWithServer({ force = false } = {}) {
   entry.promise = (async () => {
     try {
       // Direct fetch: importing commerce-api.js here would close an import cycle.
-      const res = await fetch(`${getConfig().apiOrigin}/estimate/price`, withTimeout({
+      const res = await fetch(withSimulatedDate(`${getConfig().apiOrigin}/estimate/price`), withTimeout({
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({ country: getConfig().getLocale(), items }),
@@ -689,6 +698,7 @@ export function reconcileWithServer({ force = false } = {}) {
         || (result.freeItems !== undefined && !Array.isArray(result.freeItems))) {
         throw new Error('unexpected estimate response');
       }
+      noteSimulatedAt(result);
       const grants = asList(result.freeItems).filter((f) => f?.ruleId && f?.path);
       storeServerResult({ payload, signature, grants });
       failedCheck = null;
