@@ -367,3 +367,15 @@ test('indicator: nothing on production hosts, even with a stored date', () => {
   assert.equal(body.children.length, 0);
   assert.equal(storageListeners.length, listeners);
 });
+
+test('loaded after another tab set a date: the badge offers a reload', async () => {
+  const fresh = await import('../../scripts/simulate-date.js?loaded-later');
+  const body = installDom();
+  setLocation('localhost');
+  localStorage.setItem('vitamix.now', '2030-08-09T15:00:00.000Z');
+  fresh.showSimulationBadge({ loadedWith: null });
+  const badge = badgeParts(body);
+  assert.equal(badge.notice.hidden, false);
+  assert.match(badge.message.textContent, /changed in another tab/);
+  assert.match(badge.value.textContent, /Aug 9, 2030/);
+});
