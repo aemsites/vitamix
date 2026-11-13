@@ -10,6 +10,7 @@ import { getLocaleAndLanguage, loggedFetch } from './scripts.js';
 import { logApiError, logNetworkError } from './operations-log.js';
 import { getAffiliateCode, normalizeCouponCode } from './commerce/coupon-state.js';
 import { applyPriceCorrection } from './commerce/price-correction.js';
+import { noteSimulatedAt, withSimulatedDate } from './simulate-date.js';
 
 /**
  * Error thrown when the Commerce API returns a non-2xx response.
@@ -25,6 +26,8 @@ class CommerceApiError extends Error {
     this.code = body?.code || errorCode || null;
   }
 }
+
+const PRICING_PATHS = ['/estimate/price', '/estimate/shipping', '/estimate/order', '/orders/preview'];
 
 /**
  * Read the shopper browser timezone for Commerce API order payloads, when available.
@@ -105,9 +108,11 @@ async function post(path, body, recaptchaAction) {
     payload = { ...body, couponCode: couponCode.map(normalizeCouponCode) };
   }
 
+  const pricing = PRICING_PATHS.includes(path);
+  const url = `${getConfig().apiOrigin}${path}`;
   const send = async () => {
     try {
-      const resp = await loggedFetch(`${getConfig().apiOrigin}${path}`, {
+      const resp = await loggedFetch(pricing ? withSimulatedDate(url) : url, {
         method: 'POST',
         headers,
         body: JSON.stringify(payload),
@@ -144,6 +149,7 @@ async function post(path, body, recaptchaAction) {
     });
     throw new CommerceApiError(resp.status, data, resp.headers.get('x-error'), resp.headers.get('x-error-code'));
   }
+  if (pricing) noteSimulatedAt(data);
   return data;
 }
 
@@ -226,10 +232,58 @@ export async function estimateExpressCheckout(country, state, zip, items, contex
   });
 }
 
+async function sendPreview(orderBody) {
+  try {
+    return await post('/orders/preview', orderBody, RECAPTCHA_ACTIONS.ORDERS_PREVIEW);
+  } catch (err) {
+    // Sync cart prices with the price returned in the error, if any.
+    if (applyPriceCorrection(err)) err.cartRepriced = true;
+    throw err;
+  }
+}
+
+const withoutGifts = (items) => JSON.stringify(items.filter((i) => !i.custom?.giftWithPurchase));
+
+/**
+ * Settles free-gift lines with the server, then copies the cart's gift lines
+ * into `orderBody.items` when its other lines match the cart. Updated in place
+ * because callers keep this object as the payload behind the estimate token.
+ *
+ * @param {Object} orderBody
+ * @param {boolean} force
+ * @returns {Promise<boolean>} true when `orderBody.items` changed
+ */
+async function syncGiftLines(orderBody, force) {
+  const { cart } = window;
+  if (typeof cart?.getItemsForAPI !== 'function' || !Array.isArray(orderBody?.items)) return false;
+  try {
+    // Dynamic and guarded: a cached older module may lack this export.
+    const { ensureGWPReconciled } = await import('./gift-with-purchase.js');
+    if (typeof ensureGWPReconciled !== 'function') return false;
+    await ensureGWPReconciled({ force });
+    const after = cart.getItemsForAPI();
+    if (withoutGifts(after) !== withoutGifts(orderBody.items)) return false;
+    if (JSON.stringify(after) === JSON.stringify(orderBody.items)) return false;
+    // eslint-disable-next-line no-param-reassign
+    orderBody.items = after;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isUnauthorizedFreeItem(err) {
+  return err?.status === 422 && err.body?.details?.rule === 'unauthorized_free_item';
+}
+
 /**
  * Previews an order to lock in tax, discounts, and shipping cost, and
  * obtain an `estimateToken` that must be included when placing the order.
  * Call this after the user selects a shipping method and before payment.
+ *
+ * Free-gift lines are settled with the server first; when the body's other
+ * lines match the cart, its gift lines are updated in place. A rejected free gift
+ * triggers one more server check and one retry.
  *
  * @param {Object} orderBody - Full order body including customer, shipping, items,
  *   and shippingMethod.id
@@ -238,12 +292,12 @@ export async function estimateExpressCheckout(country, state, zip, items, contex
  * @throws {CommerceApiError}
  */
 export async function previewOrder(orderBody) {
+  await syncGiftLines(orderBody, false);
   try {
-    return await post('/orders/preview', orderBody, RECAPTCHA_ACTIONS.ORDERS_PREVIEW);
+    return await sendPreview(orderBody);
   } catch (err) {
-    // Sync cart prices with the price returned in the error, if any.
-    if (applyPriceCorrection(err)) err.cartRepriced = true;
-    throw err;
+    if (!isUnauthorizedFreeItem(err) || !(await syncGiftLines(orderBody, true))) throw err;
+    return sendPreview(orderBody);
   }
 }
 

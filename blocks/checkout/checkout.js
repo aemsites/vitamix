@@ -481,7 +481,9 @@ export default async function decorate(block) {
     state.currentEstimateToken = null;
     state.currentEstimatePayload = null;
     state.currentPreview = null;
-    if (state.selectedShippingMethodId && e.detail?.action !== 'price') {
+    // Gift changes made while settling a preview are covered by that preview.
+    if (state.selectedShippingMethodId && e.detail?.action !== 'price'
+      && e.detail?.source !== 'gwp-preview') {
       refreshShipping();
     }
   });

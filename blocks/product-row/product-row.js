@@ -7,6 +7,7 @@ import { getLocaleAndLanguage, formatPrice, buildVideo } from '../../scripts/scr
 import {
   createCallouts, createStarRating, fetchReviewsData, getReviewsBySlug, slugFromUrl,
   fetchPlpData, getBadgesBySlug, PLP_DATASETS, fetchProductIndex, buildProductIndexBySlug,
+  hasVisiblePrice,
 } from '../../scripts/plp-data.js';
 
 const COLOR_ORDER = {
@@ -282,7 +283,7 @@ async function styleRowAsSlide(row, ph) {
 
   const footer = document.createElement('div');
   footer.className = 'slide-footer';
-  if (product.price) footer.append(createProductPrice(product, ph));
+  if (hasVisiblePrice(product)) footer.append(createProductPrice(product, ph));
   footer.append(createShopNowButton(product, ph));
   body.append(footer);
 }

@@ -65,6 +65,14 @@ function renderDetails(ph, features) {
 }
 
 /**
+ * Bazaarvoice deployment locale to load, keyed by site language code. Languages not listed
+ * use their own code. The es_MX deployment only returns Spanish reviews, but the reviews are
+ * written in English, so Spanish MX PDPs would show none. The legacy Magento site loaded the
+ * English en_MX deployment on both MX store views, so the Spanish PDP showed the same reviews.
+ */
+const BV_LOCALE_OVERRIDES = { es_MX: 'en_MX' };
+
+/**
  * Renders the reviews section of the PDP block.
  * @param {Element} block - The PDP block element
  */
@@ -75,8 +83,9 @@ async function renderReviews(ph, block, reviewsId) {
   bazaarvoiceContainer.classList.add('pdp-reviews-container');
   bazaarvoiceContainer.innerHTML = `<div data-bv-show="reviews" data-bv-product-id="${reviewsId}" data-bv-seo="false"></div>`;
 
+  const bvLocale = BV_LOCALE_OVERRIDES[ph.languageCode] || ph.languageCode || 'en_US';
   setTimeout(async () => {
-    await loadScript(`https://apps.bazaarvoice.com/deployments/vitamix/main_site/production/${ph.languageCode || 'en_US'}/bv.js`);
+    await loadScript(`https://apps.bazaarvoice.com/deployments/vitamix/main_site/production/${bvLocale}/bv.js`);
   }, 500);
 
   window.bvCallback = () => { };
@@ -207,7 +216,10 @@ function renderRelatedProducts(ph, custom) {
           const title = product.name;
           const image = new URL(product.images[0].url, window.location.href);
           const price = Number(product.price?.final);
-          const priceMarkup = price > 0 ? `<strong>${formatPrice(price, ph)}</strong>` : '';
+          // Same rule as pricing.js: no price when the product can't be added to cart. The
+          // catalog can hold stale non-zero prices on those products, so `> 0` alone isn't enough.
+          const showPrice = product.custom?.addToCart !== 'No' && price > 0;
+          const priceMarkup = showPrice ? `<strong>${formatPrice(price, ph)}</strong>` : '';
           li.innerHTML = `<a href="${product.url}"><img src="${image}?width=750&#x26;format=webply&#x26;optimize=medium" alt="${title}" /><div><p>${title}</p>${priceMarkup}</div></a>`;
           ul.appendChild(li);
         });
@@ -242,6 +254,44 @@ function renderShare(ph) {
   return shareContainer;
 }
 
+/**
+ * Parses a free gift's minimum purchase cell ("$299.95", "$1,299.95", "299,95 $").
+ * @param {string} text - Cell text
+ * @returns {number|null} The minimum, or null when the cell is empty or not a number
+ */
+export function parseMinPrice(text) {
+  let value = (text || '').replace(/[^\d.,]/g, '');
+  if (/,\d{1,2}$/.test(value)) {
+    value = value.replace(/\./g, '').replace(',', '.');
+  } else {
+    value = value.replace(/,/g, '');
+  }
+  const minPrice = parseFloat(value);
+  return Number.isFinite(minPrice) ? minPrice : null;
+}
+
+/**
+ * Finds the first free gift that is active, matches the product and that some
+ * variant of the product can qualify for on its own.
+ * @param {Object[]} gifts - Parsed free-gifts rows
+ * @param {Object} product
+ * @param {string} product.slug - Product URL slug
+ * @param {number[]} product.prices - Offer prices
+ * @param {Date} today - Current date
+ * @returns {Object|undefined} The gift to show
+ */
+export function findFreeGift(gifts, { slug, prices }, today) {
+  const maxPrice = Math.max(0, ...prices.filter(Number.isFinite));
+  return gifts.find((gift) => {
+    // Null start = open-ended past, null end = open-ended future
+    const afterStart = !gift.startDate || today >= gift.startDate;
+    const beforeEnd = !gift.endDate || today <= gift.endDate;
+    const slugMatches = !gift.productSlugs.length || gift.productSlugs.includes(slug);
+    const meetsMinimum = gift.minPrice === null || maxPrice >= gift.minPrice;
+    return afterStart && beforeEnd && slugMatches && meetsMinimum;
+  });
+}
+
 async function renderFreeGift() {
   try {
     /**
@@ -270,9 +320,6 @@ async function renderFreeGift() {
       return [...gifts.children].map((gift) => {
         const [startDateEl, endDateEl, minPrice, label, body, productSlugsEl] = gift.children;
         try {
-          const minPriceText = minPrice.textContent.startsWith('$')
-            ? minPrice.textContent.slice(1)
-            : minPrice.textContent;
           const labelText = label.textContent;
           const bodyText = body.innerHTML.replaceAll('./media_', './config/media_');
           // Optional trailing column: comma-separated product slugs. Absent/empty = all products.
@@ -284,7 +331,7 @@ async function renderFreeGift() {
             valid: true,
             startDate: parseDateOrNull(startDateEl.textContent),
             endDate: parseDateOrNull(endDateEl.textContent),
-            minPrice: minPriceText,
+            minPrice: parseMinPrice(minPrice.textContent),
             label: labelText,
             body: bodyText,
             productSlugs,
@@ -300,19 +347,14 @@ async function renderFreeGift() {
     const productSlug = (window.location.pathname.split('/').filter(Boolean).pop() || '')
       .toLowerCase();
 
-    const findGift = (giftList) => giftList.find((gift) => {
-      const today = window.simulateDate || new Date();
-      // Null start = open-ended past, null end = open-ended future
-      const afterStart = !gift.startDate || today >= gift.startDate;
-      const beforeEnd = !gift.endDate || today <= gift.endDate;
-      const slugMatches = !gift.productSlugs.length
-        || gift.productSlugs.includes(productSlug);
-      return afterStart && beforeEnd && slugMatches;
-    });
-    const gift = findGift(gifts);
+    const gift = findFreeGift(gifts, {
+      slug: productSlug,
+      prices: (window.jsonLdData?.offers || []).map((offer) => parseFloat(offer.price)),
+    }, window.simulateDate || new Date());
     if (gift) {
       const freeGiftContainer = document.createElement('div');
       freeGiftContainer.classList.add('pdp-free-gift-container');
+      if (gift.minPrice !== null) freeGiftContainer.dataset.minPrice = gift.minPrice;
       freeGiftContainer.innerHTML = `
         <div class="pdp-free-gift-heading"><span>${gift.label}</span></div>
         <div class="pdp-free-gift-body">

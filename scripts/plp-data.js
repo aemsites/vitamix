@@ -31,6 +31,15 @@ export function isIndexProductOutOfStock(product) {
 }
 
 /**
+ * Products with addToCart = No show no price, matching the PDP.
+ * @param {Object} product - Parsed product-index data
+ * @returns {boolean}
+ */
+export function hasVisiblePrice(product) {
+  return !!product?.price && product.addToCart !== 'No';
+}
+
+/**
  * Classifies authored badge text into an existing callout type (and its tier).
  * @param {string} badge - Raw badge text from plp-data's Badges column
  * @returns {string}
@@ -63,7 +72,7 @@ const CALLOUT_COPY_KEYS = {
  */
 function isOnSale(product) {
   return product.regularPrice
-    && product.price
+    && hasVisiblePrice(product)
     && Number(product.regularPrice) > Number(product.price);
 }
 

@@ -1,0 +1,39 @@
+<nav class="steps" aria-label="Recommender progress"></nav>
+<div class="step-count progress-summary">
+  <span class="quiz-progress">Step <span class="step-label">1</span> of <span class="step-total">1</span> · <span class="step-name"></span></span>
+  <span class="result-progress">All done · Your match</span>
+  <button type="reset" class="button link start-over">Start over</button>
+</div>
+
+<section class="quiz" aria-live="polite"></section>
+
+<section class="results">
+  <h2 tabindex="-1">We Found Their Perfect Vitamix</h2>
+  <p>Based on your answers.</p>
+  <div class="product" hidden></div>
+  <p class="button-wrapper fallback">
+    <a class="button emphasis recommendation" href="#">See Your Recommendation</a>
+  </p>
+</section>
+
+<section class="error">
+  <p>Sorry, the recommender could not be loaded. Please try again later.</p>
+</section>
+
+<section class="matches" aria-label="Current product matches">
+  <div class="matches-content">
+    <p class="matches-label">Matching so far</p>
+    <div class="match-list"></div>
+  </div>
+</section>
+
+<div class="footer">
+  <div data-stage="quiz">
+    <div class="button-wrapper">
+      <button type="button" class="button link prev" hidden>← Back</button>
+    </div>
+  </div>
+  <div data-stage="results">
+    <a class="button emphasis mobile-shop" hidden>Shop Now</a>
+  </div>
+</div>

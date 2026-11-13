@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import createProductCta from '../../widgets/product-list/product-cta.js';
-import { createCallouts, getProductCallouts } from '../../scripts/plp-data.js';
+import { createCallouts, getProductCallouts, hasVisiblePrice } from '../../scripts/plp-data.js';
 
 const copyByLanguage = JSON.parse(readFileSync(
   new URL('../../widgets/product-list/product-list.json', import.meta.url),
@@ -94,5 +94,18 @@ test('shared callouts preserve existing behavior when the out-of-stock option is
   assert.deepEqual(
     getProductCallouts({ availability: 'OutOfStock', badge: 'New' }, copyByLanguage.en),
     [{ type: 'new', label: copyByLanguage.en.new, tier: 'alert' }],
+  );
+});
+
+test('products with addToCart = No have no visible price or automatic sale badge', () => {
+  const product = { price: 100, regularPrice: 200 };
+  assert.equal(hasVisiblePrice(product), true);
+  assert.equal(hasVisiblePrice({ ...product, addToCart: 'Yes' }), true);
+  assert.equal(hasVisiblePrice({ ...product, addToCart: 'No' }), false);
+  assert.equal(hasVisiblePrice({ addToCart: 'Yes' }), false);
+  assert.deepEqual(getProductCallouts({ ...product, addToCart: 'No' }, copyByLanguage.en), []);
+  assert.deepEqual(
+    getProductCallouts({ ...product, addToCart: 'No', badge: 'Sale' }, copyByLanguage.en),
+    [{ type: 'sale', label: copyByLanguage.en.sale, tier: 'alert' }],
   );
 });

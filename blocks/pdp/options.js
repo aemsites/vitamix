@@ -39,10 +39,24 @@ function hasAddToCartButton(container) {
 }
 
 /**
+ * Whether the selected variant's price meets the free gift's minimum purchase.
+ * @param {Element} freeGiftContainer - The free gift container element
+ * @returns {boolean} True when there is no minimum or the price meets it
+ */
+function meetsFreeGiftMinimum(freeGiftContainer) {
+  const minPrice = parseFloat(freeGiftContainer.dataset.minPrice);
+  if (!Number.isFinite(minPrice)) return true;
+  const price = window.selectedVariant?.price?.final
+    ?? parseFloat(window.jsonLdData?.offers?.[0]?.price);
+  return !Number.isFinite(price) || price >= minPrice;
+}
+
+/**
  * Updates the visibility of the free gift (GWP) container. The slot is only
  * shown when an actual "Add to Cart" button is displayed for the product —
  * it stays hidden for "Find Locally"/"Find Dealer" CTAs and for empty
- * containers (coming-soon, out-of-stock bundles, authored `addToCart=No`).
+ * containers (coming-soon, out-of-stock bundles, authored `addToCart=No`) —
+ * and when the selected variant's price meets the gift's minimum purchase.
  * @param {Element} freeGiftContainer - The free gift container element
  * @param {boolean} isAddToCartButtonVisible - Whether an "Add to Cart" button is displayed
  */
@@ -52,7 +66,7 @@ export function updateFreeGiftVisibility(
 ) {
   if (!freeGiftContainer) return;
 
-  if (isAddToCartButtonVisible) {
+  if (isAddToCartButtonVisible && meetsFreeGiftMinimum(freeGiftContainer)) {
     freeGiftContainer.classList.remove('hidden');
   } else {
     freeGiftContainer.classList.add('hidden');
