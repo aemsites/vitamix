@@ -104,6 +104,17 @@ function getAuthContext() {
 }
 
 /**
+ * Returns the email the server verified, falling back to the typed one lowercased.
+ *
+ * @param {string} typed - The email as entered by the user
+ * @param {{ email?: string } | null | undefined} verified - The verifyCode response
+ * @returns {string}
+ */
+export function getVerifiedEmail(typed, verified) {
+  return (verified && typeof verified.email === 'string' && verified.email) || typed.toLowerCase();
+}
+
+/**
  * Builds the first step of the auth flow: an email input form.
  * The form has no submit logic attached — that is wired in `showEmailStep`
  * so it has access to the panel's closure state.
@@ -463,9 +474,9 @@ export default function createAuthPanel() {
       btn.textContent = strings.verifying;
 
       try {
-        await verifyCode(email, code, otpState.hash, otpState.exp);
+        const verified = await verifyCode(email, code, otpState.hash, otpState.exp);
         otpState = null;
-        await proceedAfterVerify(email);
+        await proceedAfterVerify(getVerifiedEmail(email, verified));
       } catch (err) {
         errEl.textContent = err.message || strings.invalidCode;
         btn.disabled = false;
