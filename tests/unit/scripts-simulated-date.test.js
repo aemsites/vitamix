@@ -52,8 +52,11 @@ function sourceFiles(dir) {
 describe('storefront modules', () => {
   it('load the simulated date code only on demand', () => {
     const files = ['scripts/', 'blocks/', 'widgets/'].flatMap(sourceFiles);
-    const staticImports = files.filter((file) => /^import[^;]*from '[^']*simulate-date\.js';/m
-      .test(readFileSync(new URL(file, root), 'utf8')));
+    const onDemand = ['scripts/simulate-date.js', 'scripts/simulated-prices.js'];
+    const staticImports = files
+      .filter((file) => !onDemand.includes(file))
+      .filter((file) => /^import[^;]*from '[^']*(simulate-date|simulated-prices)\.js';/m
+        .test(readFileSync(new URL(file, root), 'utf8')));
     assert.deepEqual(staticImports, []);
     assert.match(source, /import\('\.\/simulate-date\.js'\)/);
   });

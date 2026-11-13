@@ -15,6 +15,7 @@ import {
   parseEasternDateTime,
   getLocaleAndLanguage,
   formatPrice,
+  hasSimulatedDate,
 } from '../../scripts/scripts.js';
 import addToCompare, {
   isInStoredCompare, removeFromCompare,
@@ -194,7 +195,11 @@ function renderRelatedProducts(ph, custom) {
         try {
           const resp = await fetch(`${url}.json`);
           if (!resp.ok) return null;
-          const json = await resp.json();
+          let json = await resp.json();
+          if (hasSimulatedDate()) {
+            const { simulatedProduct } = await import('../../scripts/simulated-prices.js');
+            json = await simulatedProduct(json, url);
+          }
           json.url = url;
           return json;
         } catch {
