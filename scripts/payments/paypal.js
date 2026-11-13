@@ -4,14 +4,13 @@ import {
   patchPayPalSession,
   getPayPalSession,
 } from '../commerce-api.js';
-import { getLocaleAndLanguage } from '../scripts.js';
+import { getLocaleAndLanguage, hasSimulatedDate } from '../scripts.js';
 import { getUser, isLoggedIn } from '../auth-api.js';
 import { logOperation, getCheckoutId } from '../operations-log.js';
 import resolvePaymentFailureMessage from '../payment-failure.js';
 import ensureCheckoutPreviewToken, { withPayPalExpressContext } from './paypal-context.js';
 import { buildExpressOrderPayload, expressPayloadMatchesCart } from '../checkout-context.js';
 import { getCouponRequestFields } from '../commerce/coupon-state.js';
-import { getSimulatedDate } from '../simulate-date.js';
 import {
   isExpressReviewEnabled,
   resolveExpressOutcome,
@@ -103,7 +102,7 @@ export default {
   label: 'PayPal',
   // Express checkout can't use a simulated date.
   get supportsExpress() {
-    return !getSimulatedDate();
+    return !hasSimulatedDate();
   },
   hidesBilling: true,
 
@@ -185,7 +184,7 @@ export default {
       },
 
       createOrder: async () => {
-        if (getSimulatedDate()) throw new Error('PayPal express is unavailable with a simulated date');
+        if (hasSimulatedDate()) throw new Error('PayPal express is unavailable with a simulated date');
         const config = callbacks.getConfig();
         const cart = callbacks.getCart();
         const state = callbacks.getState();

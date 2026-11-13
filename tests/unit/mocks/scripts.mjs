@@ -75,3 +75,15 @@ export function formatPrice() {}
 export function getOfferPricing() {}
 export function rebuildIndices() {}
 export function isProductOutOfStock() {}
+
+/** Same rule as the real helper: never on production, else `?simulateDate=…` or a stored date. */
+export function hasSimulatedDate() {
+  const { hostname, search } = window.location || {};
+  if (hostname === 'www.vitamix.com' || hostname === 'vitamix.com') return false;
+  try {
+    return !!new URLSearchParams(search || '').get('simulateDate')?.trim()
+      || !!localStorage.getItem('vitamix.now');
+  } catch {
+    return false;
+  }
+}
