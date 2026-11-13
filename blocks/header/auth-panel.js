@@ -103,6 +103,19 @@ function getAuthContext() {
   return { strings };
 }
 
+// Verifies the code, then loads the customer under the server-verified email.
+export async function verifyAndLoadCustomer(typed, code, hash, exp) {
+  const verified = await verifyCode(typed, code, hash, exp);
+  const email = verified?.email || typed.toLowerCase();
+  try {
+    let customer = unwrapCustomerResponse(await getLoggedInCustomer(email));
+    if (Array.isArray(customer) && customer.length === 1) [customer] = customer;
+    return { email, customer };
+  } catch {
+    return { email, failed: true };
+  }
+}
+
 /**
  * Builds the first step of the auth flow: an email input form.
  * The form has no submit logic attached — that is wired in `showEmailStep`
@@ -412,24 +425,16 @@ export default function createAuthPanel() {
   }
 
   /**
-   * Fetches the customer record after verification and, when the first name, last name, or
-   * ZIP code is missing, shows the profile-completion step instead of finishing immediately.
-   * If the customer record can't be fetched, fails open and finishes the login normally rather
-   * than blocking sign-in on a flaky profile lookup.
+   * Shows the profile-completion step when the first name, last name, or ZIP code is missing,
+   * otherwise finishes the login. Fails open when the customer record couldn't be fetched.
    *
    * @param {string} email - The authenticated user's email address
+   * @param {unknown} customer - The customer record, if fetched
+   * @param {boolean} [failed] - True when the lookup failed
    */
-  async function proceedAfterVerify(email) {
-    let customer;
-    try {
-      customer = unwrapCustomerResponse(await getLoggedInCustomer(email));
-      if (Array.isArray(customer) && customer.length === 1) [customer] = customer;
-    } catch {
-      finishLogin(email);
-      return;
-    }
+  function proceedAfterVerify(email, customer, failed) {
     const c = customer && typeof customer === 'object' ? customer : {};
-    if (PROFILE_STEP_ENABLED && isProfileIncomplete(c)) {
+    if (!failed && PROFILE_STEP_ENABLED && isProfileIncomplete(c)) {
       showProfileStep(email, c);
     } else {
       finishLogin(email);
@@ -463,9 +468,9 @@ export default function createAuthPanel() {
       btn.textContent = strings.verifying;
 
       try {
-        await verifyCode(email, code, otpState.hash, otpState.exp);
+        const result = await verifyAndLoadCustomer(email, code, otpState.hash, otpState.exp);
         otpState = null;
-        await proceedAfterVerify(email);
+        proceedAfterVerify(result.email, result.customer, result.failed);
       } catch (err) {
         errEl.textContent = err.message || strings.invalidCode;
         btn.disabled = false;

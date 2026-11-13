@@ -6,11 +6,10 @@ import {
   RECAPTCHA_HEADER,
   RECAPTCHA_RETRY_MINT_TIMEOUT_MS,
 } from './recaptcha.js';
-import { getLocaleAndLanguage, loggedFetch } from './scripts.js';
+import { getLocaleAndLanguage, hasSimulatedDate, loggedFetch } from './scripts.js';
 import { logApiError, logNetworkError } from './operations-log.js';
 import { getAffiliateCode, normalizeCouponCode } from './commerce/coupon-state.js';
 import { applyPriceCorrection } from './commerce/price-correction.js';
-import { noteSimulatedAt, withSimulatedDate } from './simulate-date.js';
 
 /**
  * Error thrown when the Commerce API returns a non-2xx response.
@@ -108,11 +107,12 @@ async function post(path, body, recaptchaAction) {
     payload = { ...body, couponCode: couponCode.map(normalizeCouponCode) };
   }
 
-  const pricing = PRICING_PATHS.includes(path);
+  const simulation = PRICING_PATHS.includes(path) && hasSimulatedDate()
+    ? await import('./simulate-date.js') : null;
   const url = `${getConfig().apiOrigin}${path}`;
   const send = async () => {
     try {
-      const resp = await loggedFetch(pricing ? withSimulatedDate(url) : url, {
+      const resp = await loggedFetch(simulation ? simulation.withSimulatedDate(url) : url, {
         method: 'POST',
         headers,
         body: JSON.stringify(payload),
@@ -149,7 +149,7 @@ async function post(path, body, recaptchaAction) {
     });
     throw new CommerceApiError(resp.status, data, resp.headers.get('x-error'), resp.headers.get('x-error-code'));
   }
-  if (pricing) noteSimulatedAt(data);
+  simulation?.noteSimulatedAt(data);
   return data;
 }
 
