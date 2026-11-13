@@ -19,8 +19,8 @@ const DEFAULT_COPY = {
   unavailable: 'Recipe unavailable',
   remove: 'Remove',
   removeAria: 'Remove {{value}} from your recipe book',
-  interestSaved: '{{value}} added to your dietary interests.',
-  interestRemoved: '{{value}} removed from your dietary interests.',
+  interestSaved: 'Saved: {{value}} added to your dietary interests.',
+  interestRemoved: 'Saved: {{value}} removed from your dietary interests.',
   recipeRemoved: '{{value}} removed from your recipe book.',
   addRecipes: 'Add recipes to your recipe book',
   searchRecipes: 'Search recipes',
@@ -105,6 +105,7 @@ export default async function decorate(widget) {
 
   const error = widget.querySelector('.preferences-error');
   const status = widget.querySelector('.preferences-status');
+  const interestStatus = widget.querySelector('.preferences-interest-status');
   const panels = widget.querySelector('.preferences-panels');
   const loading = widget.querySelector('.preferences-loading');
   const retry = widget.querySelector('.preferences-retry');
@@ -131,6 +132,7 @@ export default async function decorate(widget) {
     error.textContent = text;
     error.hidden = false;
     status.textContent = '';
+    interestStatus.textContent = '';
   };
   const clearError = () => {
     error.hidden = true;
@@ -324,7 +326,7 @@ export default async function decorate(widget) {
       interestList.querySelectorAll('button').forEach((candidate) => {
         if (candidate.dataset.interest.toLowerCase() === interest) candidate.focus();
       });
-      status.textContent = message(wasSelected ? 'interestRemoved' : 'interestSaved', button.dataset.interest);
+      interestStatus.textContent = message(wasSelected ? 'interestRemoved' : 'interestSaved', button.dataset.interest);
     } catch (cause) {
       showError(cause, copy.saveError);
     }

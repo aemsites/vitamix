@@ -2,7 +2,8 @@
   <h2 data-copy="title">Manage recipes and preferences</h2>
   <p data-copy="intro">Keep your recipe book and dietary interests in one place.</p>
 </div>
-<p class="preferences-storage-note" data-copy="storageNote">Dietary interests are saved on this device. Saved recipes also sync to your account when signed in.</p>
+<div class="preferences-body">
+<p class="preferences-storage-note" data-copy="storageNote">Dietary interests save automatically on this device. No Save button is needed. Saved recipes also sync to your account when signed in.</p>
 <p class="preferences-error" role="alert" hidden></p>
 <p class="preferences-status" role="status" aria-live="polite" aria-atomic="true"></p>
 <div class="preferences-panels" aria-busy="true">
@@ -37,9 +38,11 @@
       <span class="preferences-interest-count"></span>
     </div>
     <p data-copy="interestsHint">Heart the dietary interests you love. Select again to remove a preference.</p>
+    <p class="preferences-interest-status" role="status" aria-live="polite" aria-atomic="true"></p>
     <ul class="preferences-interest-list"></ul>
     <p class="preferences-interests-empty" data-copy="noInterests" hidden>No dietary interests are available yet.</p>
   </section>
 </div>
 <p class="preferences-loading" role="status" data-copy="loading">Loading recipes and preferences...</p>
 <button class="button secondary preferences-retry" type="button" data-copy="retry" hidden>Try again</button>
+</div>

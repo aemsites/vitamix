@@ -9,12 +9,26 @@
 }
 
 .preferences .preferences-header h2 {
-  margin-top: 0;
+  margin: 0 0 var(--spacing-60);
+}
+
+.preferences .preferences-header p {
+  margin: 0;
 }
 
 .preferences .preferences-storage-note,
-.preferences .preferences-status {
+.preferences .preferences-status,
+.preferences .preferences-interest-status {
   font-size: var(--body-size-s);
+}
+
+.preferences .preferences-interest-status {
+  margin: var(--spacing-60) 0;
+  color: var(--color-moss);
+}
+
+.preferences .preferences-interest-status:empty {
+  display: none;
 }
 
 .preferences .preferences-error {
@@ -29,12 +43,12 @@
 
 .preferences .preferences-panels {
   display: grid;
-  gap: var(--spacing-400);
-  margin-top: var(--spacing-400);
+  gap: var(--spacing-200);
+  margin-top: var(--spacing-200);
 }
 
 .preferences .preferences-panels section {
-  padding: var(--spacing-300);
+  padding: var(--spacing-100);
   border: 1px solid var(--color-steel);
   border-radius: 8px;
 }
@@ -59,22 +73,22 @@
 .preferences .preferences-recipe-list,
 .preferences .preferences-search-results {
   padding: 0;
-  margin: var(--spacing-300) 0 0;
+  margin: var(--spacing-100) 0 0;
   list-style: none;
 }
 
 .preferences .preferences-interest-list {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--spacing-100);
+  gap: var(--spacing-60);
 }
 
 .preferences .preferences-interest {
   display: flex;
   align-items: center;
-  gap: var(--spacing-100);
+  gap: var(--spacing-60);
   min-height: 44px;
-  padding: var(--spacing-100) var(--spacing-200);
+  padding: var(--spacing-40) var(--spacing-60);
   margin: 0;
   border: 1px solid var(--color-steel);
   border-radius: 24px;
@@ -154,10 +168,14 @@
   font-size: var(--body-size-s);
 }
 
+.preferences .preferences-panels section > p {
+  margin: var(--spacing-60) 0;
+}
+
 .preferences .preferences-remove {
   min-height: 44px;
-  padding: var(--spacing-100);
-  margin: var(--spacing-100) 0 0;
+  padding: var(--spacing-40) 0;
+  margin: 0;
   border: 0;
   border-radius: 4px;
   background: transparent;
@@ -281,4 +299,46 @@
   .preferences .preferences-panels {
     grid-template-columns: 1fr 1fr;
   }
+}
+
+.modal[data-widget-modal='preferences'] dialog {
+  max-height: calc(100dvh - 32px);
+}
+
+.modal[data-widget-modal='preferences'] dialog .modal-content {
+  display: flex;
+  height: min(800px, calc(100dvh - 76px));
+  max-height: calc(100dvh - 76px);
+  padding: 0;
+}
+
+.modal[data-widget-modal='preferences'] .modal-content > .section,
+.modal[data-widget-modal='preferences'] .preferences-wrapper {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.modal[data-widget-modal='preferences'] .preferences {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+}
+
+.modal[data-widget-modal='preferences'] .preferences-header {
+  flex-shrink: 0;
+  padding: var(--spacing-200);
+  border-bottom: 1px solid var(--color-steel);
+  background: var(--color-background);
+}
+
+.modal[data-widget-modal='preferences'] .preferences-body {
+  min-height: 0;
+  padding: 0 var(--spacing-200) var(--spacing-200);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
