@@ -15,11 +15,11 @@ import {
   parseEasternDateTime,
   getLocaleAndLanguage,
   formatPrice,
+  hasSimulatedDate,
 } from '../../scripts/scripts.js';
 import addToCompare, {
   isInStoredCompare, removeFromCompare,
 } from '../../scripts/add-to-compare.js';
-import { getSimulatedDate } from '../../scripts/simulate-date.js';
 
 /**
  * Renders the title section of the PDP block.
@@ -196,7 +196,7 @@ function renderRelatedProducts(ph, custom) {
           const resp = await fetch(`${url}.json`);
           if (!resp.ok) return null;
           let json = await resp.json();
-          if (getSimulatedDate()) {
+          if (hasSimulatedDate()) {
             const { simulatedProduct } = await import('../../scripts/simulated-prices.js');
             json = await simulatedProduct(json, url);
           }

@@ -1,6 +1,7 @@
 import { fetchPlaceholders } from '../../scripts/aem.js';
-import { getLocaleAndLanguage, formatPrice, getOfferPricing } from '../../scripts/scripts.js';
-import { getSimulatedDate } from '../../scripts/simulate-date.js';
+import {
+  getLocaleAndLanguage, formatPrice, getOfferPricing, hasSimulatedDate,
+} from '../../scripts/scripts.js';
 
 const normalize = (value) => (value || '').trim().toLowerCase();
 
@@ -208,7 +209,7 @@ async function loadProduct(href) {
       || (Array.isArray(node['@type']) && node['@type'].includes('Product'))
     ));
   });
-  if (product && getSimulatedDate()) {
+  if (product && hasSimulatedDate()) {
     const { simulatedJsonLd } = await import('../../scripts/simulated-prices.js');
     product = await simulatedJsonLd(product, pageUrl.pathname);
   }

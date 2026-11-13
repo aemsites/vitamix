@@ -2316,7 +2316,7 @@ async function loadEager(doc) {
     }
   }
 
-  if (window.simulateDate && isSimulationHost() && document.querySelector('meta[name="sku"]')) {
+  if (window.simulateDate && hasSimulatedDate() && document.querySelector('meta[name="sku"]')) {
     try {
       const { repriceJsonLdScript } = await import('./simulated-prices.js');
       await repriceJsonLdScript(document);

@@ -1,5 +1,5 @@
 /* eslint-disable max-len */
-import { getSimulatedDate } from './simulate-date.js';
+import { hasSimulatedDate } from './scripts.js';
 
 /**
  * Shared PLP data layer, used by widgets/product-list and blocks/product-row:
@@ -316,7 +316,7 @@ export async function fetchProductIndex(locale, language, { commercial = false }
       if (product.image) product.image = `https://main--vitamix--aemsites.aem.network/${locale}/${language}/products/${product.image.substring(2)}`;
     });
   }
-  if (getSimulatedDate()) {
+  if (hasSimulatedDate()) {
     const { simulatedIndexRows } = await import('./simulated-prices.js');
     return simulatedIndexRows(data, locale, language);
   }

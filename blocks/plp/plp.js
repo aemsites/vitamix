@@ -10,8 +10,7 @@ import {
 } from '../../scripts/aem.js';
 
 import loadColorSwatches from '../../scripts/color-swatches.js';
-import { getLocaleAndLanguage, formatPrice } from '../../scripts/scripts.js';
-import { getSimulatedDate } from '../../scripts/simulate-date.js';
+import { getLocaleAndLanguage, formatPrice, hasSimulatedDate } from '../../scripts/scripts.js';
 
 /**
  * Constructs a localized product URL path.
@@ -86,7 +85,7 @@ export async function lookupProducts(config, facets = {}) {
     const pathname = `/${locale}/${language}/${indexPath}/index.json?include=all`;
     const resp = await (isProd ? fetch(pathname) : corsProxyFetch(pathname));
     let { data } = await resp.json();
-    if (getSimulatedDate()) {
+    if (hasSimulatedDate()) {
       const { simulatedIndexRows } = await import('../../scripts/simulated-prices.js');
       data = await simulatedIndexRows(data, locale, language);
     }
