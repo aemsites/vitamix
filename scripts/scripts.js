@@ -141,14 +141,14 @@ window.CommerceConfig = {
 const SIMULATED_DATE_KEY = 'vitamix.now';
 
 /**
- * Whether this page may have a simulated date (`?simulateDate` or a stored one), so the
+ * Whether this page may have a simulated date (`?simulateDate=…` or a stored one), so the
  * date code is worth loading. Always `false` on production.
  * @returns {boolean}
  */
 export function hasSimulatedDate() {
   if (isProdHost) return false;
   try {
-    return new URLSearchParams(window.location.search).has('simulateDate')
+    return !!new URLSearchParams(window.location.search).get('simulateDate')?.trim()
       || !!window.localStorage.getItem(SIMULATED_DATE_KEY);
   } catch {
     return false;

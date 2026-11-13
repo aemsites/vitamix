@@ -21,9 +21,10 @@ function evaluate({ isProdHost = false, search = '', stored = null, storage } = 
 describe('hasSimulatedDate', () => {
   it('is found in scripts.js', () => assert.ok(fn));
 
-  it('is true on non-prod hosts with the parameter (even empty) or a stored date', () => {
+  it('is true on non-prod hosts with the parameter or a stored date', () => {
     assert.equal(evaluate({ search: '?simulateDate=2030-01-01' }), true);
-    assert.equal(evaluate({ search: '?simulateDate=' }), true);
+    assert.equal(evaluate({ search: '?simulateDate=' }), false, 'nothing to clear');
+    assert.equal(evaluate({ search: '?simulateDate=', stored: '2030-01-01T00:00:00.000Z' }), true);
     assert.equal(evaluate({ stored: '2030-01-01T00:00:00.000Z' }), true);
     assert.equal(evaluate(), false);
   });
