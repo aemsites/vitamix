@@ -8,8 +8,10 @@ import { runInNewContext } from 'node:vm';
 import {
   isRuleActive, repriceIndexRows, repriceJsonLd, repriceProduct, simulatedIndexRows,
   simulatedJsonLd, simulatedProduct, loadSimulatedPromotions, repriceJsonLdScript,
+  resetSimulatedPromotions,
 } from '../../scripts/simulated-prices.js';
 import { fetchProductIndex } from '../../scripts/plp-data.js';
+import { lookupProducts } from '../../blocks/plp/plp.js';
 
 const T = Date.parse('2030-06-15T12:00:00.000Z');
 const PATH = '/us/en_us/products/blender';
@@ -302,6 +304,13 @@ describe('repriceIndexRows (index mode)', () => {
     assert.equal(out.regularPrice, '300');
   });
 
+  test('variant-only rule: not applied in index mode, as the pipeline renders it', () => {
+    const rules = [promo([{ path: PATH, price: '150', variants: { A: { price: '60' } } }])];
+    assert.deepEqual(prices(repriceIndexRows(rows(), rules, T)), {
+      P: '100.00', A: '100.00', B: '100.00', O: '50.00',
+    });
+  });
+
   test('rows without regularPrice keep their price', () => {
     const [out] = repriceIndexRows([{ sku: 'X', url: URL_, price: '10' }], [], T);
     assert.equal(out.price, '10');
@@ -317,14 +326,20 @@ function setLocation(hostname, pathname = PATH) {
 describe('loading at the simulated date', () => {
   let calls;
   let response;
+  let failure;
   beforeEach(() => {
     globalThis.__resetTestState();
+    resetSimulatedPromotions();
+    delete window.productIndex;
     setLocation('main--site--org.aem.page');
     calls = [];
     response = null;
+    failure = null;
     globalThis.__setFetchMock(async (url) => {
       calls.push(url);
       if (url.startsWith('https://api.test.com/')) {
+        if (failure === 'reject') throw new Error('network');
+        if (failure) return { ok: false, status: failure, json: async () => ({}) };
         return { ok: true, json: async () => response };
       }
       if (url.includes('index.json')) {
@@ -405,6 +420,38 @@ describe('loading at the simulated date', () => {
       promotions: [promo([{ path: PATH, price: '55' }])],
     };
     assert.equal((await simulatedProduct(plain)).price.final, '55');
+  });
+
+  test('a failed request rewrites nothing and is retried on the next call', async () => {
+    localStorage.setItem('vitamix.now', '2030-06-15T12:00:00.000Z');
+    const ld = simpleLd(100);
+    const check = async (kind) => {
+      calls.length = 0;
+      failure = kind;
+      assert.equal(await simulatedJsonLd(ld), ld, `${kind}: input unchanged`);
+      failure = null;
+      response = {
+        simulatedAt: '2030-06-15T12:00:00.000Z',
+        promotions: [promo([{ path: PATH, price: '80' }])],
+      };
+      assert.equal((await simulatedJsonLd(ld)).offers[0].price, '80', `${kind}: retried`);
+      assert.equal(calls.length, 2);
+      resetSimulatedPromotions();
+    };
+    await check(503);
+    await check('reject');
+  });
+
+  test('blocks/plp lookupProducts reprices the index while simulating', async () => {
+    localStorage.setItem('vitamix.now', '2030-06-15T12:00:00.000Z');
+    response = {
+      simulatedAt: '2030-06-15T12:00:00.000Z',
+      promotions: [promo([{ path: PATH, price: '65' }])],
+    };
+    const [product] = await lookupProducts([PATH]);
+    assert.equal(product.price, 65);
+    assert.equal(product.regularPrice, 100);
+    delete window.productIndex;
   });
 
   test('repriceJsonLdScript rewrites the head JSON-LD', async () => {
