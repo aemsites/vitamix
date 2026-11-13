@@ -15,6 +15,7 @@ import {
   getSavedRecipeSlugs,
   mergeRecipeSlugLists,
   recipeSlugFromPathname,
+  removeSavedRecipe,
   setSavedRecipeSlugs,
   toggleSavedRecipe,
 } from './recipe-storage.js';
@@ -58,20 +59,52 @@ export async function syncSavedRecipesWithCustomer() {
  * Re-reads the customer first so Magento-migrated slugs are not dropped.
  * @param {string} slug
  * @param {boolean} shouldBeSaved
+ * @param {boolean} [append] Append recipe-book search additions instead of prepending.
  */
-async function persistToggleToCustomer(slug, shouldBeSaved) {
+async function persistToggleToCustomer(slug, shouldBeSaved, append = false) {
   const email = getUser()?.email;
   if (!email) return;
   const customer = unwrapCustomer(await getLoggedInCustomer(email));
   const remote = getRecipeSlugsFromCustomer(customer);
   let merged = mergeRecipeSlugLists(remote, getSavedRecipeSlugs());
   if (shouldBeSaved) {
-    merged = mergeRecipeSlugLists([slug], merged);
+    merged = append
+      ? mergeRecipeSlugLists(merged, [slug])
+      : mergeRecipeSlugLists([slug], merged);
   } else {
     merged = merged.filter((item) => item !== slug);
   }
-  setSavedRecipeSlugs(merged);
   await updateCustomer(email, recipesCustomPatch(merged));
+  setSavedRecipeSlugs(merged);
+}
+
+/**
+ * Remove without toggling: a stale management card must never re-save a recipe.
+ * Customer failures propagate before changing the local list.
+ * @param {string} slugOrPath
+ */
+export async function removeEdgeRecipeFavorite(slugOrPath) {
+  const slug = recipeSlugFromPathname(slugOrPath);
+  if (!slug) throw new Error('A recipe slug is required');
+  if (isLoggedIn()) {
+    if (!getUser()?.email) throw new Error('Customer email is required');
+    await persistToggleToCustomer(slug, false);
+  }
+  removeSavedRecipe(slug);
+}
+
+/**
+ * Append recipe-book search additions, with customer failures propagated.
+ * @param {string} slugOrPath
+ */
+export async function addEdgeRecipeFavorite(slugOrPath) {
+  const slug = recipeSlugFromPathname(slugOrPath);
+  if (!slug) throw new Error('A recipe slug is required');
+  if (isLoggedIn()) {
+    if (!getUser()?.email) throw new Error('Customer email is required');
+    await persistToggleToCustomer(slug, true, true);
+  }
+  setSavedRecipeSlugs(mergeRecipeSlugLists(getSavedRecipeSlugs(), [slug]));
 }
 
 /**
