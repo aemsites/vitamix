@@ -42,4 +42,6 @@ export function buildBlock() {}
 export function decorateBlock() {}
 export function loadBlock() {}
 export function toClassName() {}
+export function toCamelCase() {}
+export function readBlockConfig() { return {}; }
 export function fetchPlaceholders() {}

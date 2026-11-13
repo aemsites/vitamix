@@ -1,4 +1,6 @@
 /* eslint-disable max-len */
+import { hasSimulatedDate } from './scripts.js';
+
 /**
  * Shared PLP data layer, used by widgets/product-list and blocks/product-row:
  * fetching/parsing the commerce product index, plp-data-{dataset}.json, and
@@ -313,6 +315,10 @@ export async function fetchProductIndex(locale, language, { commercial = false }
     data.forEach((product) => {
       if (product.image) product.image = `https://main--vitamix--aemsites.aem.network/${locale}/${language}/products/${product.image.substring(2)}`;
     });
+  }
+  if (hasSimulatedDate()) {
+    const { simulatedIndexRows } = await import('./simulated-prices.js');
+    return simulatedIndexRows(data, locale, language);
   }
   return data;
 }

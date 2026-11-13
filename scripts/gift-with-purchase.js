@@ -27,7 +27,6 @@
 
 import cart from './cart.js';
 import { getConfig } from './commerce-config.js';
-import { getSimulatedDate, noteSimulatedAt, withSimulatedDate } from './simulate-date.js';
 
 // Inlined to avoid an import cycle (auth-api -> recaptcha -> scripts -> here).
 const AUTH_TOKEN_SESSION_KEY = 'auth_token';
@@ -56,6 +55,31 @@ function readLocalStorage(key) {
   try { return localStorage.getItem(key); } catch { return null; }
 }
 
+/** `simulate-date.js`, loaded only on non-prod pages that may have a simulated date. */
+let simulation = null;
+
+/** Same rule as `hasSimulatedDate` in scripts.js, inlined to avoid an import cycle. */
+function mayHaveSimulatedDate() {
+  if (!isNonProdHost()) return false;
+  try {
+    if (new URLSearchParams(window.location.search).get('simulateDate')?.trim()) return true;
+  } catch { /* noop */ }
+  return !!readLocalStorage('vitamix.now');
+}
+
+async function loadSimulation() {
+  if (!simulation && mayHaveSimulatedDate()) {
+    try {
+      simulation = await import('./simulate-date.js');
+    } catch { /* real clock */ }
+  }
+  return simulation;
+}
+
+function getSimulatedDate() {
+  return simulation?.getSimulatedDate() || null;
+}
+
 /** Effective "now" — honours the non-prod simulated date. */
 function getNow() {
   return getSimulatedDate() || new Date();
@@ -64,6 +88,14 @@ function getNow() {
 /** Identifies the clock that rules and server answers were loaded for. */
 function clockKey() {
   return getSimulatedDate()?.toISOString() || null;
+}
+
+function withSimulatedDate(url) {
+  return simulation ? simulation.withSimulatedDate(url) : url;
+}
+
+function noteSimulatedAt(response) {
+  simulation?.noteSimulatedAt(response);
 }
 
 function getEndpoint() {
@@ -120,6 +152,7 @@ let inflight = null;
  * @returns {Promise<{ payload: object, productsByPath: object } | null>}
  */
 export async function ensurePriceRulesLoaded() {
+  await loadSimulation();
   const stub = getStub();
   if (stub) {
     inMemoryCache = {
@@ -609,6 +642,7 @@ async function applyOnce() {
   }
   const payload = inMemoryCache?.payload;
   if (!payload) return;
+  await loadSimulation();
   const now = getNow();
   const promotions = getActivePromotions(payload, now);
   if (promotions.some((p) => CATEGORY_CONDITIONS.some((k) => asList(p.conditions[k]).length))) {
@@ -685,6 +719,7 @@ export function reconcileWithServer({ force = false } = {}) {
   const entry = { payload, signature };
   entry.promise = (async () => {
     try {
+      await loadSimulation();
       // Direct fetch: importing commerce-api.js here would close an import cycle.
       const res = await fetch(withSimulatedDate(`${getConfig().apiOrigin}/estimate/price`), withTimeout({
         method: 'POST',
