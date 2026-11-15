@@ -186,16 +186,12 @@ function getCartCompatibility(parent) {
  * @returns {boolean} True if the variant is available for sale, false otherwise
  */
 export function isVariantAvailableForSale(variant) {
-  const { managedStock, addToCart, comingSoon } = variant?.custom || {};
+  const { addToCart, comingSoon } = variant?.custom || {};
 
   // Authored `addToCart` override wins over the product bus custom.addToCart.
   const effectiveAddToCart = getPdpOverride('addToCart') || addToCart;
   if (!variant || effectiveAddToCart === 'No' || comingSoon === 'Yes') {
     return false;
-  }
-
-  if (managedStock === '0') {
-    return true;
   }
 
   return !checkVariantOutOfStock(variant.sku);
@@ -265,20 +261,19 @@ export default function renderAddToCart(ph, block, parent) {
     return '';
   }
 
-  // If we have a selected variant, use it's custom object,
+  // If we have a selected variant, use its custom object,
   // otherwise use the parent product's custom object
   const { custom } = selectedVariant || parent;
-  const { managedStock } = custom;
+  const isOutOfStock = checkVariantOutOfStock(selectedVariant?.sku || parent.sku);
 
-  // When Manage Stock = 1 (for the variant) and the product is marked Out of Stock,
-  // we always show the "Find Locally" button,
-  // regardless of whether findLocally or findDealer is set to true or false.
-  if (managedStock === '1' && !isAvailableForSale) {
+  // Availability, rather than inventory tracking configuration, determines
+  // whether an out-of-stock variant can be added to cart.
+  if (isOutOfStock) {
     return renderFindLocally(ph, block);
   }
 
-  //  check if product should show "Find Locally" instead of add to cart if:
-  // findLocally is enabled, findDealer is enabled but not commercial, OR product is out of stock
+  // Show the configured alternative CTA when the variant's add-to-cart setting
+  // disables purchase.
   if (findLocally === 'Yes' && !isAvailableForSale) {
     return renderFindLocally(ph, block);
   }
@@ -293,8 +288,8 @@ export default function renderAddToCart(ph, block, parent) {
   // button. This is gated strictly on the authored override (a metadata-table
   // value surfaced as a meta tag) and never on the product bus custom value,
   // which only lives in JSON-LD and is left untouched. As the last branch, it
-  // also leaves every existing path (find locally/dealer, managed stock,
-  // availability) behaving exactly as before.
+  // also leaves every existing path (find locally/dealer and availability)
+  // behaving exactly as before.
   if (getPdpOverride('addToCart') === 'No') {
     return '';
   }
