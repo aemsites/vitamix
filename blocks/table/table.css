@@ -185,7 +185,7 @@
   border-bottom: 2px solid #333;
   background-color: #fff;
   color: #222;
-  font-size: 18px;
+  font-size: 16px;
   line-height: 1.25;
   vertical-align: bottom;
 }
@@ -194,12 +194,17 @@
   border-left: 1px solid #ececec;
 }
 
-.table.comparison.comparison-stacked .table-comparison-scroll thead th p {
-  margin: 0 0 8px;
+/* Corner cell, e.g. "3 bundles" */
+.table.comparison.comparison-stacked .table-comparison-scroll thead th:first-child {
+  color: #666;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
 }
 
-.table.comparison.comparison-stacked .table-comparison-scroll thead th p:last-child {
-  margin-bottom: 0;
+/* Model header parts (classes added by decorateHeaderCell) */
+.table.comparison.comparison-stacked .table-comparison-scroll thead th p {
+  margin: 0;
 }
 
 .table.comparison.comparison-stacked .table-comparison-scroll thead th img {
@@ -209,6 +214,60 @@
   max-height: 128px;
   margin: 0 auto;
   object-fit: contain;
+}
+
+.table.comparison.comparison-stacked .table-comparison-scroll thead .table-comparison-image {
+  margin-bottom: 12px;
+}
+
+.table.comparison.comparison-stacked .table-comparison-scroll thead .table-comparison-name {
+  color: #222;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.table.comparison.comparison-stacked .table-comparison-scroll thead .table-comparison-meta {
+  margin-top: 4px;
+  color: #666;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* "**[$000.00]** _Save $100.00_" → bold price, red savings */
+.table.comparison.comparison-stacked .table-comparison-scroll thead .table-comparison-price {
+  margin-top: 10px;
+  color: #222;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.table.comparison.comparison-stacked .table-comparison-scroll thead .table-comparison-price em {
+  margin-left: 8px;
+  color: #c8102e;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.table.comparison.comparison-stacked .table-comparison-scroll thead .table-comparison-cta {
+  margin-top: 14px;
+}
+
+.table.comparison.comparison-stacked .table-comparison-scroll thead .table-comparison-cta .button {
+  margin: 0;
+}
+
+/* Bolded values (e.g. "You save") are highlighted */
+.table.comparison.comparison-stacked .table-comparison-scroll tbody td strong {
+  color: #c8102e;
+  font-size: 1.1em;
+  font-weight: 700;
+}
+
+/* CTA footer row is mobile-only */
+.table.comparison.comparison-stacked .table-comparison-scroll tfoot {
+  display: none;
 }
 
 /* Row labels */
@@ -245,7 +304,15 @@
 
   .table.comparison.comparison-stacked .table-comparison-scroll thead th {
     padding: 28px 20px 24px;
-    font-size: 20px;
+  }
+
+  .table.comparison.comparison-stacked .table-comparison-scroll thead th:first-child {
+    padding: 28px 24px 24px;
+  }
+
+  .table.comparison.comparison-stacked .table-comparison-scroll tbody th,
+  .table.comparison.comparison-stacked .table-comparison-scroll tbody td {
+    font-size: 15px;
   }
 }
 
@@ -303,6 +370,50 @@
 
   .table.comparison.comparison-stacked .table-comparison-scroll thead th img {
     max-height: 48px;
+  }
+
+  .table.comparison.comparison-stacked .table-comparison-scroll thead .table-comparison-image {
+    margin-bottom: 6px;
+  }
+
+  .table.comparison.comparison-stacked .table-comparison-scroll thead .table-comparison-name {
+    font-size: 14px;
+  }
+
+  .table.comparison.comparison-stacked .table-comparison-scroll thead .table-comparison-meta {
+    margin-top: 2px;
+    font-size: 11px;
+  }
+
+  /* Keep the sticky header short: price and CTA live in the body/footer on mobile */
+  .table.comparison.comparison-stacked .table-comparison-scroll thead .table-comparison-price,
+  .table.comparison.comparison-stacked .table-comparison-scroll thead .table-comparison-cta {
+    display: none;
+  }
+
+  .table.comparison.comparison-stacked .table-comparison-scroll tfoot {
+    display: block;
+  }
+
+  .table.comparison.comparison-stacked .table-comparison-scroll tfoot td {
+    padding: 16px 6px 20px;
+    border: 0;
+    background-color: #fff;
+    text-align: center;
+  }
+
+  .table.comparison.comparison-stacked .table-comparison-scroll tfoot td:first-child {
+    display: none;
+  }
+
+  .table.comparison.comparison-stacked .table-comparison-scroll tfoot p {
+    margin: 0;
+  }
+
+  .table.comparison.comparison-stacked .table-comparison-scroll tfoot .button {
+    display: block;
+    margin: 0;
+    padding-inline: 8px;
   }
 
   /* Row label spans the full width above its values */
