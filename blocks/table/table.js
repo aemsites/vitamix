@@ -118,13 +118,70 @@ function buildComparisonTable(rows, { stacked = false } = {}) {
 }
 
 /**
+ * Tag the parts of a model header cell so CSS can style them:
+ * image paragraph, name (first text line), meta (plain text lines),
+ * price (lines with bold/italic: **price** and _savings_), and CTA (link-only line).
+ * @param {HTMLTableCellElement} th
+ */
+function decorateHeaderCell(th) {
+  const parts = [...th.children].filter((el) => el.matches('p, div, h2, h3, h4, h5, h6, picture'));
+  if (!parts.length) {
+    if (!th.textContent.trim()) return;
+    const name = document.createElement('p');
+    name.className = 'table-comparison-name';
+    name.append(...th.childNodes);
+    th.append(name);
+    return;
+  }
+  let hasName = false;
+  parts.forEach((el) => {
+    const link = el.querySelector('a');
+    if (el.matches('picture') || el.querySelector('picture, img')) {
+      el.classList.add('table-comparison-image');
+    } else if (link && el.textContent.trim() === link.textContent.trim()) {
+      el.classList.add('table-comparison-cta');
+    } else if (!hasName) {
+      el.classList.add('table-comparison-name');
+      hasName = true;
+    } else if (el.querySelector('strong, em')) {
+      el.classList.add('table-comparison-price');
+    } else {
+      el.classList.add('table-comparison-meta');
+    }
+  });
+}
+
+/**
+ * Mobile has no room for buttons in the sticky header, so copy each model's
+ * CTA into a footer row (shown on mobile only; hidden on desktop).
+ * @param {HTMLTableElement} table
+ */
+function buildCtaFooter(table) {
+  const ctas = [...table.querySelectorAll('thead th')]
+    .slice(1)
+    .map((th) => th.querySelector('.table-comparison-cta'));
+  if (!ctas.some(Boolean)) return;
+  const tfoot = document.createElement('tfoot');
+  tfoot.className = 'table-comparison-cta-row';
+  const tr = document.createElement('tr');
+  tr.appendChild(document.createElement('td')); // aligns with the label column
+  ctas.forEach((cta) => {
+    const td = document.createElement('td');
+    if (cta) td.appendChild(cta.cloneNode(true));
+    tr.appendChild(td);
+  });
+  tfoot.appendChild(tr);
+  table.appendChild(tfoot);
+}
+
+/**
  * The stacked layout changes `display` on table elements, which drops native
  * table semantics in Safari/VoiceOver. Explicit roles restore them.
  * @param {HTMLTableElement} table
  */
 function addTableRoles(table) {
   table.setAttribute('role', 'table');
-  table.querySelectorAll('thead, tbody').forEach((el) => el.setAttribute('role', 'rowgroup'));
+  table.querySelectorAll('thead, tbody, tfoot').forEach((el) => el.setAttribute('role', 'rowgroup'));
   table.querySelectorAll('tr').forEach((el) => el.setAttribute('role', 'row'));
   table.querySelectorAll('th').forEach((th) => {
     th.setAttribute('role', th.getAttribute('scope') === 'col' ? 'columnheader' : 'rowheader');
@@ -209,6 +266,8 @@ export default function decorate(block) {
     if (stacked) {
       block.classList.add('comparison-stacked');
       comparisonTable.style.setProperty('--compare-cols', comparedCount);
+      comparisonTable.querySelectorAll('thead th:not(:first-child)').forEach(decorateHeaderCell);
+      buildCtaFooter(comparisonTable);
       addTableRoles(comparisonTable);
     }
     const scrollWrapper = document.createElement('div');
