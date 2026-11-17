@@ -1,6 +1,17 @@
 import { toClassName } from '../../scripts/aem.js';
 import loadColorSwatches from '../../scripts/color-swatches.js';
 
+/**
+ * Comparison tables with this many compared columns or fewer use the stacked
+ * layout (label above values on mobile, sticky header). Wider tables keep the
+ * horizontal-scroll layout. Authors can force scrolling with the `scroll` variant.
+ */
+const STACK_MAX_COLUMNS = 3;
+
+function hasContent(el) {
+  return !!(el.querySelector('img, picture, svg') || el.textContent.trim());
+}
+
 function buildRow(row, cellType = 'td') {
   const tr = document.createElement('tr');
   [...row.children].forEach((col) => {
@@ -23,21 +34,22 @@ function buildRowWithRowHeaders(row) {
   return tr;
 }
 
-function buildComparisonTable(rows) {
+function buildComparisonTable(rows, { stacked = false } = {}) {
   const table = document.createElement('table');
   const colCount = rows[0]?.children?.length || 0;
 
-  // colgroup: first column 2x width of others (2/(n+1) vs 1/(n+1))
+  // colgroup: first column 2x width of others (2/(n+1) vs 1/(n+1)).
+  // Stacked tables size the label column in CSS instead.
   if (colCount > 0) {
     const colgroup = document.createElement('colgroup');
     const firstPct = (200 / (1 + colCount)).toFixed(2);
     const otherPct = (100 / (1 + colCount)).toFixed(2);
     const firstCol = document.createElement('col');
-    firstCol.style.width = `${firstPct}%`;
+    if (!stacked) firstCol.style.width = `${firstPct}%`;
     colgroup.appendChild(firstCol);
     for (let i = 1; i < colCount; i += 1) {
       const col = document.createElement('col');
-      col.style.width = `${otherPct}%`;
+      if (!stacked) col.style.width = `${otherPct}%`;
       colgroup.appendChild(col);
     }
     table.appendChild(colgroup);
@@ -53,8 +65,34 @@ function buildComparisonTable(rows) {
     thead.appendChild(headerRow);
   }
 
-  const tbody = document.createElement('tbody');
+  let tbody = document.createElement('tbody');
+  const tbodies = [tbody];
   rows.slice(1).forEach((row) => {
+    const cols = [...row.children];
+
+    // Section heading row (e.g. "Specs", "Pricing"): label in the first cell,
+    // every other cell empty. Starts a new <tbody> group.
+    const isSection = stacked
+      && cols.length > 1
+      && hasContent(cols[0])
+      && cols.slice(1).every((col) => !hasContent(col));
+    if (isSection) {
+      if (tbody.children.length) {
+        tbody = document.createElement('tbody');
+        tbodies.push(tbody);
+      }
+      const tr = document.createElement('tr');
+      tr.className = 'table-comparison-section';
+      const th = document.createElement('th');
+      th.setAttribute('scope', 'rowgroup');
+      th.colSpan = colCount;
+      th.setAttribute('aria-colspan', colCount);
+      th.innerHTML = cols[0].innerHTML;
+      tr.appendChild(th);
+      tbody.appendChild(tr);
+      return;
+    }
+
     const tr = document.createElement('tr');
     let rowHeaderEmpty = false;
     [...row.children].forEach((col, index) => {
@@ -75,8 +113,23 @@ function buildComparisonTable(rows) {
     tbody.appendChild(tr);
   });
 
-  table.append(thead, tbody);
+  table.append(thead, ...tbodies);
   return table;
+}
+
+/**
+ * The stacked layout changes `display` on table elements, which drops native
+ * table semantics in Safari/VoiceOver. Explicit roles restore them.
+ * @param {HTMLTableElement} table
+ */
+function addTableRoles(table) {
+  table.setAttribute('role', 'table');
+  table.querySelectorAll('thead, tbody').forEach((el) => el.setAttribute('role', 'rowgroup'));
+  table.querySelectorAll('tr').forEach((el) => el.setAttribute('role', 'row'));
+  table.querySelectorAll('th').forEach((th) => {
+    th.setAttribute('role', th.getAttribute('scope') === 'col' ? 'columnheader' : 'rowheader');
+  });
+  table.querySelectorAll('td').forEach((el) => el.setAttribute('role', 'cell'));
 }
 
 function createColorSwatch(slug, label) {
@@ -94,8 +147,8 @@ function createColorSwatch(slug, label) {
  * @param {HTMLTableElement} table
  */
 function replaceColorsRowWithSwatches(table) {
-  const tbody = table.querySelector('tbody');
-  if (!tbody) return;
+  const bodyRows = table.querySelectorAll('tbody tr');
+  if (!bodyRows.length) return;
 
   const probe = document.createElement('div');
   probe.className = 'color-swatch';
@@ -114,7 +167,7 @@ function replaceColorsRowWithSwatches(table) {
     return colorCache[slug];
   };
 
-  tbody.querySelectorAll('tr').forEach((tr) => {
+  bodyRows.forEach((tr) => {
     tr.querySelectorAll('td').forEach((td) => {
       const tokens = td.textContent.trim().split(',').map((t) => t.trim()).filter(Boolean);
       if (!tokens.length) return;
@@ -148,7 +201,16 @@ export default function decorate(block) {
 
   if (isComparison) {
     loadColorSwatches();
-    const comparisonTable = buildComparisonTable(rows);
+    const comparedCount = (rows[0]?.children?.length || 1) - 1;
+    const stacked = comparedCount > 0
+      && comparedCount <= STACK_MAX_COLUMNS
+      && !block.classList.contains('scroll');
+    const comparisonTable = buildComparisonTable(rows, { stacked });
+    if (stacked) {
+      block.classList.add('comparison-stacked');
+      comparisonTable.style.setProperty('--compare-cols', comparedCount);
+      addTableRoles(comparisonTable);
+    }
     const scrollWrapper = document.createElement('div');
     scrollWrapper.className = 'table-comparison-scroll';
     scrollWrapper.appendChild(comparisonTable);
