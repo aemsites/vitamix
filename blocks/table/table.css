@@ -143,3 +143,203 @@
   font-size: 0.9em;
   color: #666;
 }
+
+/* ==========================================================================
+   Comparison table – stacked layout (3 or fewer compared columns)
+   Mobile: row label spans full width, values sit in columns beneath it.
+   Desktop: narrow label column on the left. Header sticks while scrolling.
+   ========================================================================== */
+
+/* No overflow clipping, otherwise position: sticky can't attach to the page */
+.table.comparison.comparison-stacked,
+.table.comparison.comparison-stacked .table-comparison-scroll {
+  overflow: visible;
+}
+
+.table.comparison.comparison-stacked .table-comparison-scroll table {
+  min-width: 0;
+  border-collapse: separate; /* sticky cells keep their borders */
+  border-spacing: 0;
+  border: 1px solid #e2e2e2;
+  background-color: #fff;
+}
+
+.table.comparison.comparison-stacked .table-comparison-scroll th,
+.table.comparison.comparison-stacked .table-comparison-scroll td {
+  border: 0;
+  border-bottom: 1px solid #e2e2e2;
+  vertical-align: middle;
+}
+
+.table.comparison.comparison-stacked .table-comparison-scroll td {
+  border-left: 1px solid #ececec;
+  line-height: 1.45;
+}
+
+/* Sticky model header */
+.table.comparison.comparison-stacked .table-comparison-scroll thead th {
+  position: sticky;
+  top: var(--nav-height, 0);
+  z-index: 2;
+  padding: 24px 16px;
+  border-bottom: 2px solid #333;
+  background-color: #fff;
+  color: #222;
+  font-size: 18px;
+  line-height: 1.25;
+  vertical-align: bottom;
+}
+
+.table.comparison.comparison-stacked .table-comparison-scroll thead th + th {
+  border-left: 1px solid #ececec;
+}
+
+.table.comparison.comparison-stacked .table-comparison-scroll thead th p {
+  margin: 0 0 8px;
+}
+
+.table.comparison.comparison-stacked .table-comparison-scroll thead th p:last-child {
+  margin-bottom: 0;
+}
+
+.table.comparison.comparison-stacked .table-comparison-scroll thead th img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  max-height: 128px;
+  margin: 0 auto;
+  object-fit: contain;
+}
+
+/* Row labels */
+.table.comparison.comparison-stacked .table-comparison-scroll tbody th {
+  padding: 20px 24px;
+  font-weight: 700;
+}
+
+/* Section heading rows ("Specs", "Pricing") */
+.table.comparison.comparison-stacked .table-comparison-scroll tbody tr.table-comparison-section th {
+  padding: 14px 24px;
+  background-color: #f5f5f5;
+  color: #555;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.table.comparison.comparison-stacked .table-comparison-scroll tbody td {
+  padding: 20px;
+}
+
+/* Tablet / desktop: fixed-width label column */
+@media (width >= 600px) {
+  .table.comparison.comparison-stacked .table-comparison-scroll col:first-child {
+    width: 180px;
+  }
+}
+
+@media (width >= 900px) {
+  .table.comparison.comparison-stacked .table-comparison-scroll col:first-child {
+    width: 240px;
+  }
+
+  .table.comparison.comparison-stacked .table-comparison-scroll thead th {
+    padding: 28px 20px 24px;
+    font-size: 20px;
+  }
+}
+
+/* Mobile: label on top, values in columns */
+@media (width < 600px) {
+  .table.comparison.comparison-stacked .table-comparison-scroll table,
+  .table.comparison.comparison-stacked .table-comparison-scroll thead,
+  .table.comparison.comparison-stacked .table-comparison-scroll tbody {
+    display: block;
+  }
+
+  .table.comparison.comparison-stacked .table-comparison-scroll colgroup {
+    display: none;
+  }
+
+  .table.comparison.comparison-stacked .table-comparison-scroll tr {
+    display: grid;
+    grid-template-columns: repeat(var(--compare-cols, 3), minmax(0, 1fr));
+  }
+
+  /* The whole header row sticks, not each cell */
+  .table.comparison.comparison-stacked .table-comparison-scroll thead {
+    position: sticky;
+    top: var(--nav-height, 0);
+    z-index: 2;
+    border-bottom: 2px solid #333;
+    background-color: #fff;
+  }
+
+  .table.comparison.comparison-stacked .table-comparison-scroll thead th {
+    position: static;
+    padding: 12px 6px 10px;
+    border-bottom: 0;
+    font-size: 14px;
+    line-height: 1.2;
+    vertical-align: top;
+  }
+
+  /* Empty corner cell: hidden visually, kept for screen readers so columns stay aligned */
+  .table.comparison.comparison-stacked .table-comparison-scroll thead th:first-child {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .table.comparison.comparison-stacked .table-comparison-scroll thead th:first-child + th {
+    border-left: 0;
+  }
+
+  .table.comparison.comparison-stacked .table-comparison-scroll thead th img {
+    max-height: 48px;
+  }
+
+  /* Row label spans the full width above its values */
+  .table.comparison.comparison-stacked .table-comparison-scroll tbody th {
+    grid-column: 1 / -1;
+    padding: 14px 16px 8px;
+    border-bottom: 0;
+    background-color: #f5f5f5;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .table.comparison.comparison-stacked .table-comparison-scroll tbody tr.table-comparison-section th {
+    padding: 24px 16px 10px;
+    border-bottom: 2px solid #333;
+    background-color: #fff;
+    color: #222;
+    font-size: 16px;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .table.comparison.comparison-stacked .table-comparison-scroll tbody tr.table-comparison-row-header-empty th {
+    display: none;
+  }
+
+  .table.comparison.comparison-stacked .table-comparison-scroll tbody td {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 8px 14px;
+    font-size: 14px;
+    line-height: 1.35;
+  }
+
+  .table.comparison.comparison-stacked .table-comparison-scroll tbody th + td {
+    border-left: 0;
+  }
+}
