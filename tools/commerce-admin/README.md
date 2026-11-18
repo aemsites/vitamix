@@ -21,6 +21,16 @@ requests bypass browser caching and include fresh `_code` / `_codes` query param
 to bypass proxy and upstream caches.
 These edits affect the individual code, not its parent coupon program's rules.
 
+## Coupon groups
+
+A coupon program can carry free-form `groups` labels (case-sensitive). Promotions
+can allow or block many coupons at once by group. The Edit/New form suggests the
+groups already used by any loaded program; a new group needs an explicit **Add**.
+Saving sends the whole list (`[]` clears it). The overview shows groups as badges and
+filters by one group (`?group=`). Export, import and cross-environment copy keep
+`groups`; import rejects anything other than a list of non-empty names.
+The year in a coupon id is not a group.
+
 ## Promotion date groups
 
 Promotions with different sale-line date windows show **Varies** in the grid,

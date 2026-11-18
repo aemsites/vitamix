@@ -56,6 +56,13 @@ import {
   wireCouponProductListRows,
 } from './coupons-product-list.js';
 import { jsonDiffLines, jsonEqual, renderJsonDiffHtml } from './commerce-json-diff.js';
+import {
+  collectCouponGroups,
+  couponGroupBadgesHtml,
+  couponGroupsOf,
+  mountCouponGroupsField,
+  normalizeCouponGroups,
+} from './coupon-groups-field.js';
 
 /**
  * ProductBus coupon type (`…/coupons/types`). Shapes match **helix-commerce-api**.
@@ -77,6 +84,7 @@ import { jsonDiffLines, jsonEqual, renderJsonDiffHtml } from './commerce-json-di
  * @property {ProductCondition[]} [excludedProducts]
  * @property {boolean} [stackable]
  * @property {string[]} [includeStackableCouponTypes]
+ * @property {string[]} [groups] Free-form labels; promotions can allow or block coupons by group
  * @property {boolean} [autoApply]
  * @property {boolean} [allowManualEntry]
  * @property {boolean} [excludeDiscountedProducts] When true, blocks coupon on
@@ -90,7 +98,7 @@ import { jsonDiffLines, jsonEqual, renderJsonDiffHtml } from './commerce-json-di
  * @property {string[]} [countries]
  * @property {string} [createdAt]
  * @property {string} [updatedAt]
- * @property {{ group?: string }} [custom]
+ * @property {Record<string, unknown>} [custom]
  */
 
 async function readRespError(resp) {
@@ -146,6 +154,8 @@ function hydrateCouponDetailScopePills(root, d) {
 let couponProductSelectionFields = [];
 /** @type {Array<{ destroy: () => void }>} */
 let couponStackableSelectionFields = [];
+/** @type {{ destroy: () => void }[]} */
+let couponGroupsFields = [];
 
 /**
  * @param {HTMLDialogElement} dlg
@@ -404,8 +414,10 @@ function couponMatchesOverviewSearch(row, q) {
 }
 
 function couponsVisibleForOverview() {
+  const group = state.groupFilter;
   return couponsVisibleForMarket().filter((row) => (
     couponMatchesOverviewSearch(row, state.overviewSearch)
+    && (!group || couponGroupsOf(row).includes(group))
   ));
 }
 
@@ -829,6 +841,29 @@ function mountCouponStackableSelectionField(container, input, options = {}) {
   };
 }
 
+/** @param {HTMLElement} dlg */
+function wireCouponGroupsField(dlg) {
+  couponGroupsFields.forEach((f) => f.destroy());
+  couponGroupsFields = [];
+  const field = mountCouponGroupsField(
+    dlg.querySelector('[data-cp-groups-mount]'),
+    dlg.querySelector('#cp-form-groups'),
+    { suggestions: collectCouponGroups(state.coupons) },
+  );
+  if (field) couponGroupsFields.push(field);
+}
+
+/** @param {HTMLElement} dlg */
+function readCouponGroupsFromForm(dlg) {
+  const raw = dlg.querySelector('#cp-form-groups')?.value || '';
+  if (!raw.trim()) return [];
+  try {
+    return normalizeCouponGroups(JSON.parse(raw));
+  } catch {
+    return [];
+  }
+}
+
 /** @param {HTMLDialogElement} dlg */
 function wireCouponStackableSelectionField(dlg) {
   couponStackableSelectionFields.forEach((f) => f.destroy());
@@ -1021,6 +1056,7 @@ function couponDetailModalInnerHtml(d, thumbByPath) {
       pillHtml('Manual entry', d.allowManualEntry !== false),
     ].join(''),
   )}
+      ${couponDetailPillGroupHtml('Groups', couponGroupBadgesHtml(couponGroupsOf(d), '<span class="coupons-modal-groups-empty">None</span>'))}
     </div>
     <section class="coupons-modal-section coupons-stackable-section">
       <h3 class="coupons-modal-section-title">Stackable coupons</h3>
@@ -1259,6 +1295,19 @@ function renderMarketTabs() {
   }).join('');
 }
 
+function renderGroupFilterSelect() {
+  const groups = collectCouponGroups(state.coupons);
+  if (state.groupFilter && !groups.includes(state.groupFilter)) groups.push(state.groupFilter);
+  if (!groups.length) return '';
+  const options = groups.map((g) => {
+    const sel = g === state.groupFilter ? ' selected' : '';
+    return `<option value="${escapeHtml(g)}"${sel}>${escapeHtml(g)}</option>`;
+  }).join('');
+  return `<select id="coupons-group-filter" class="coupons-group-filter" aria-label="Filter by group">
+    <option value="">All groups</option>${options}
+  </select>`;
+}
+
 async function alignSelectionToMarketFilter() {
   closeCouponDetailDialog();
   const visible = couponsVisibleForMarket();
@@ -1332,12 +1381,15 @@ const state = {
   overviewSortDir: /** @type {'asc'|'desc'} */ ('asc'),
   /** Text filter on name / id (orders-style search). */
   overviewSearch: '',
+  /** Exact coupon group filter; empty = all. */
+  groupFilter: '',
 };
 
 const QS_COUPON_SEARCH = 'q';
 const QS_COUPON_SORT = 'sort';
 const QS_COUPON_DIR = 'dir';
 const QS_COUPON_ID = 'id';
+const QS_COUPON_GROUP = 'group';
 
 let couponsListUrlSyncMuted = false;
 let couponsListUrlTimer = 0;
@@ -1347,7 +1399,7 @@ let couponsModalApplySeq = 0;
 
 /**
  * @param {string} [search]
- * @returns {{ q: string, sort: string, dir: ''|'asc'|'desc', id: string }}
+ * @returns {{ q: string, sort: string, dir: ''|'asc'|'desc', id: string, group: string }}
  */
 function readCouponsListUrlState(search = window.location.search) {
   const params = new URLSearchParams(search);
@@ -1357,14 +1409,18 @@ function readCouponsListUrlState(search = window.location.search) {
   const sort = isCouponOverviewSortKey(sortRaw) ? sortRaw : '';
   const dir = dirRaw === 'asc' || dirRaw === 'desc' ? dirRaw : '';
   const id = String(params.get(QS_COUPON_ID) || '').trim();
+  const group = String(params.get(QS_COUPON_GROUP) || '').trim();
   return {
-    q, sort, dir, id,
+    q, sort, dir, id, group,
   };
 }
 
 function applyCouponsListUrlToState() {
-  const { q, sort, dir } = readCouponsListUrlState();
+  const {
+    q, sort, dir, group,
+  } = readCouponsListUrlState();
   state.overviewSearch = q;
+  state.groupFilter = group;
   if (sort) {
     state.overviewSortKey = /** @type {typeof state.overviewSortKey} */ (sort);
     state.overviewSortDir = dir || (sort === 'modified' ? 'desc' : 'asc');
@@ -1383,6 +1439,8 @@ function syncCouponsListUrl(opts = {}) {
   const q = state.overviewSearch.trim();
   if (q) url.searchParams.set(QS_COUPON_SEARCH, q);
   else url.searchParams.delete(QS_COUPON_SEARCH);
+  if (state.groupFilter) url.searchParams.set(QS_COUPON_GROUP, state.groupFilter);
+  else url.searchParams.delete(QS_COUPON_GROUP);
   const isDefault = state.overviewSortKey === COUPON_OVERVIEW_SORT_DEFAULT_KEY
     && state.overviewSortDir === COUPON_OVERVIEW_SORT_DEFAULT_DIR;
   if (isDefault) {
@@ -1651,6 +1709,7 @@ function couponOverviewRowHtml(row, {
       ${statusCell}
       <td${tdAttr('title', 'coupons-grid-lead coupons-grid-name')}>${highlightMatch(String(name), query)}</td>
       <td${tdAttr('id', 'coupons-grid-col-id')}><code class="coupons-grid-id">${highlightMatch(id || '—', query)}</code></td>
+      <td${tdAttr('groups', 'coupons-grid-col-groups')}>${couponGroupBadgesHtml(couponGroupsOf(row), '—')}</td>
       <td${tdAttr('discount')}>${disc}</td>
       <td${tdAttr('min')}>${escapeHtml(min)}</td>
       <td${tdAttr('cap')}>${escapeHtml(cap)}</td>
@@ -1671,6 +1730,7 @@ function couponOverviewHeadHtml({ sortable = true, importPreview = false } = {})
               ${status}
               ${couponSortableTh('title', 'Title')}
               ${couponSortableTh('id', 'Id', 'coupons-grid-col-id')}
+              <th scope="col" class="coupons-grid-col-groups">Groups</th>
               ${couponSortableTh('discount', 'Discount')}
               ${couponSortableTh('min', 'Min order')}
               ${couponSortableTh('cap', 'Cap')}
@@ -1685,6 +1745,7 @@ function couponOverviewHeadHtml({ sortable = true, importPreview = false } = {})
               ${status}
               <th scope="col">Title</th>
               <th scope="col" class="coupons-grid-col-id">Id</th>
+              <th scope="col" class="coupons-grid-col-groups">Groups</th>
               <th scope="col">Discount</th>
               <th scope="col">Min order</th>
               <th scope="col">Cap</th>
@@ -1697,13 +1758,16 @@ function couponOverviewHeadHtml({ sortable = true, importPreview = false } = {})
 }
 
 function renderCouponsOverviewBody(filtered) {
-  const emptyCell = (msg) => `<tr><td colspan="10" class="coupons-empty-cell">${msg}</td></tr>`;
+  const emptyCell = (msg) => `<tr><td colspan="11" class="coupons-empty-cell">${msg}</td></tr>`;
   if (!state.coupons.length) {
     return emptyCell('No coupons yet (empty list or missing <code>coupons:read</code>).');
   }
   if (!filtered.length) {
     if (state.overviewSearch.trim()) {
       return emptyCell('No coupons match your search. Try a different name or id, or clear the search.');
+    }
+    if (state.groupFilter) {
+      return emptyCell('No coupons in this group for this market. Try <strong>All groups</strong> or another market.');
     }
     return emptyCell('No coupons for this market. Try <strong>All</strong> or another country tab.');
   }
@@ -1906,6 +1970,8 @@ async function openDialog(title, innerHtml, onSubmit, afterMount, dialogClass, s
     couponProductSelectionFields = [];
     couponStackableSelectionFields.forEach((f) => f.destroy());
     couponStackableSelectionFields = [];
+    couponGroupsFields.forEach((f) => f.destroy());
+    couponGroupsFields = [];
   };
   dialog.addEventListener('close', onDialogClose, { once: true });
   if (typeof afterMount === 'function') {
@@ -2041,6 +2107,12 @@ function couponFormHtml({ idReadonly }) {
       <div class="coupons-field coupons-field-full">
         <label for="cp-form-name">Display name</label>
         <input type="text" id="cp-form-name" autocomplete="off" required />
+      </div>
+      <div class="coupons-field coupons-field-full cp-groups-field">
+        <label>Groups</label>
+        <p class="coupons-field-hint">Groups let promotions allow or block many coupons at once. Pick an existing group or add a new one.</p>
+        <div data-cp-groups-mount></div>
+        <input type="text" id="cp-form-groups" autocomplete="off" />
       </div>
       <div class="coupons-field" data-cp-discount-only>
         <label for="cp-form-discount-type">Discount style</label>
@@ -2226,6 +2298,7 @@ function readCouponBodyFromForm(dlg, { requireId }) {
   const body = {
     id: id || state.selectedCouponId,
     name,
+    groups: readCouponGroupsFromForm(dlg),
     minimumOrderAmount: Number.isFinite(minimumOrderAmount) ? minimumOrderAmount : 0,
     maximumDiscountAmount: maxCap,
     ...shipFields,
@@ -2281,9 +2354,6 @@ function readCouponBodyFromForm(dlg, { requireId }) {
     }
   } else if (seg && /^(us|ca|mx)$/.test(seg.country)) {
     body.country = seg.country;
-  }
-  if (seg && seg.year) {
-    body.custom = { group: String(seg.year).trim() };
   }
   return body;
 }
@@ -2366,6 +2436,8 @@ function fillCouponForm(dlg, d) {
   const idEl = dlg.querySelector('#cp-form-id');
   if (idEl) idEl.value = d.id ?? '';
   dlg.querySelector('#cp-form-name').value = d.name ?? '';
+  const groups = couponGroupsOf(d);
+  dlg.querySelector('#cp-form-groups').value = groups.length ? JSON.stringify(groups) : '';
   dlg.querySelector('#cp-form-discount-type').value = d.discountType === 'fixed' ? 'fixed' : 'percentage';
   dlg.querySelector('#cp-form-discount-value').value = d.discountValue != null ? String(d.discountValue) : '';
   dlg.querySelector('#cp-form-min').value = d.minimumOrderAmount != null ? String(d.minimumOrderAmount) : '';
@@ -2658,6 +2730,7 @@ function render() {
       <input type="search" id="coupons-search" class="pim-search coupons-search-wide" placeholder="Search by name or id…" aria-label="Search coupons" value="${searchVal}" />
       <div class="coupons-toolbar-left">
         <div class="coupons-market-tabs" role="tablist" aria-label="Market">${renderMarketTabs()}</div>
+        ${renderGroupFilterSelect()}
       </div>
       <div class="coupons-toolbar-right">
         <span class="pim-count" id="coupons-count">${escapeHtml(countText)}</span>
@@ -2694,6 +2767,15 @@ function render() {
           next.setSelectionRange(start, end);
         }
       }
+    });
+  }
+
+  const groupSelect = mount.querySelector('#coupons-group-filter');
+  if (groupSelect instanceof HTMLSelectElement) {
+    groupSelect.addEventListener('change', () => {
+      state.groupFilter = groupSelect.value;
+      render();
+      flushCouponsListUrlPush();
     });
   }
 
@@ -2898,10 +2980,22 @@ function validateCouponTypeForImport(raw, index) {
     throw new Error(`${label}: countries must be a list of us, ca, and/or mx.`);
   }
 
+  if (raw.groups !== undefined) {
+    if (!Array.isArray(raw.groups)) {
+      throw new Error(`${label}: groups must be an array of group names.`);
+    }
+    raw.groups.forEach((g, i) => {
+      if (typeof g !== 'string' || !g.trim()) {
+        throw new Error(`${label}: group ${i + 1} must be a non-empty string.`);
+      }
+    });
+  }
+
   const body = sanitizeCouponTypeForExport(raw);
   if (!body) throw new Error(`${label}: could not normalize this coupon.`);
   body.id = id;
   body.name = name;
+  if (raw.groups !== undefined) body.groups = normalizeCouponGroups(raw.groups);
   return body;
 }
 
@@ -2916,6 +3010,7 @@ function couponImportOverviewChangedKeys(incoming, existing) {
   if (!existing) return keys;
   if (String(incoming?.name ?? '') !== String(existing?.name ?? '')) keys.add('title');
   if (couponIdFromRow(incoming) !== couponIdFromRow(existing)) keys.add('id');
+  if (!jsonEqual(couponGroupsOf(incoming), couponGroupsOf(existing))) keys.add('groups');
   const incDisc = {
     discountType: incoming.discountType ?? incoming.discount_type,
     discountValue: incoming.discountValue ?? incoming.discount_value,
@@ -3042,7 +3137,7 @@ function couponImportPreviewTableHtml(parsed) {
       const lines = jsonDiffLines(prev, next).filter((l) => l.type !== 'same');
       const n = lines.length;
       const summary = n === 1 ? 'Show 1 changed line' : `Show ${n} changed lines`;
-      html += `<tr class="coupons-import-diff-row"><td colspan="11">
+      html += `<tr class="coupons-import-diff-row"><td colspan="12">
         <details class="coupons-import-diff">
           <summary>${escapeHtml(summary)}</summary>
           ${renderJsonDiffHtml(lines)}
@@ -3424,7 +3519,7 @@ function openCouponExportImportDialog() {
     if (tableHost) {
       const body = bodies.length
         ? couponImportPreviewTableHtml(parsed)
-        : '<tr><td colspan="11" class="coupons-empty-cell">No coupon programs in this JSON.</td></tr>';
+        : '<tr><td colspan="12" class="coupons-empty-cell">No coupon programs in this JSON.</td></tr>';
       tableHost.innerHTML = `<table class="coupons-grid-table" aria-label="Imported coupon programs">
           <thead>${couponOverviewHeadHtml({ sortable: false, importPreview: true })}</thead>
           <tbody>${body}</tbody>
@@ -3642,6 +3737,7 @@ function openNewCouponDialog() {
       syncPreview();
       wireCouponProductSelectionFields(dlg);
       wireCouponStackableSelectionField(dlg);
+      wireCouponGroupsField(dlg);
       wireCouponProductListRows(dlg);
       wireCouponFormTabs(dlg);
     },
@@ -3674,6 +3770,7 @@ function openEditCouponDialog() {
       wireCouponCountryCheckboxGuards(dlg);
       wireCouponProductSelectionFields(dlg);
       wireCouponStackableSelectionField(dlg);
+      wireCouponGroupsField(dlg);
       wireCouponProductListRows(dlg);
       wireCouponFormTabs(dlg, { isEdit: true });
     },
