@@ -494,6 +494,27 @@ tr.coupons-code-row:hover {
   min-width: 10rem;
 }
 
+.coupons-grid-table td.coupons-grid-col-groups .cgf-badges {
+  gap: 4px;
+}
+
+.coupons-group-filter {
+  max-width: 14rem;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid #c9cccf;
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+  font-size: 14px;
+  color: #202223;
+}
+
+.coupons-modal-groups-empty {
+  font-size: 13px;
+  color: #6d7175;
+}
+
 .coupons-grid-table th.coupons-grid-col-year,
 .coupons-grid-table td.coupons-grid-col-year {
   text-align: right;
