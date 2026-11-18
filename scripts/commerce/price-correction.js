@@ -4,11 +4,12 @@ export const CONSISTENCY_MISMATCH = 'ADOBE_COMMERCE_CONSISTENCY_MISMATCH';
 
 /**
  * Returns the price update carried by a price mismatch error, or null:
- * - `price`: `details.actualPrice` (`final`, else `regular`) for `details.sku`
+ * - `price`: `details.actualPrice` (`final`, else `regular`) for `details.sku`,
+ *   with `regularPrice` from `actualPrice.regular` when present
  * - `bundle_price`: `details.itemSum` for `details.sku`
  *
  * @param {Object} err - CommerceApiError
- * @returns {{ sku: string, price: string }|null}
+ * @returns {{ sku: string, price: string, regularPrice?: string }|null}
  */
 export function getPriceCorrection(err) {
   const body = err?.body;
@@ -23,7 +24,12 @@ export function getPriceCorrection(err) {
   else return null;
   const price = parseFloat(next);
   if (!Number.isFinite(price) || price < 0) return null;
-  return { sku, price: price.toFixed(2) };
+  const regular = field === 'price' ? parseFloat(actualPrice?.regular) : NaN;
+  return {
+    sku,
+    price: price.toFixed(2),
+    ...(Number.isFinite(regular) ? { regularPrice: regular.toFixed(2) } : {}),
+  };
 }
 
 /**
@@ -37,7 +43,9 @@ export function applyPriceCorrection(err, cart = window.cart) {
   const correction = getPriceCorrection(err);
   if (!correction || typeof cart?.updateItemPrice !== 'function') return false;
   const from = cart.items?.find((i) => i.sku === correction.sku)?.price;
-  const changed = cart.updateItemPrice(correction.sku, correction.price);
+  const changed = cart.updateItemPrice(correction.sku, correction.price, {
+    regularPrice: correction.regularPrice,
+  });
   if (changed) {
     logOperation('cart-price-corrected', { sku: correction.sku, from, to: correction.price });
   }

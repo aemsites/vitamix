@@ -156,6 +156,35 @@ test('updateItemPrice ignores unknown SKUs, invalid prices, and gift lines', () 
   assert.equal(cart.items[0].price, '0');
 });
 
+test('updateItemPrice sets local.regularPrice when it is above the new price', () => {
+  const cart = new Cart();
+  cart.addItem(sampleItem({ sku: 'x4', price: '699.95', local: { showInCart: true } }));
+  assert.equal(cart.updateItemPrice('x4', '649.95', { regularPrice: '699.95' }), true);
+  assert.equal(cart.items[0].price, '649.95');
+  assert.deepEqual(cart.items[0].local, { showInCart: true, regularPrice: '699.95' });
+  assert.deepEqual(JSON.parse(localStorage.getItem(STORAGE_KEY)).items[0].local.regularPrice, '699.95');
+});
+
+test('updateItemPrice keeps the regular price on a lower price and drops it when the price returns', () => {
+  const cart = new Cart();
+  cart.addItem(sampleItem({ sku: 'x4', price: '649.95', local: { regularPrice: '699.95' } }));
+  assert.equal(cart.updateItemPrice('x4', '599.95'), true);
+  assert.equal(cart.items[0].local.regularPrice, '699.95');
+  assert.equal(cart.updateItemPrice('x4', '699.95'), true);
+  assert.equal(cart.items[0].price, '699.95');
+  assert.equal(cart.items[0].local, undefined);
+});
+
+test('updateItemPrice updates only the regular price when the price matches', () => {
+  const cart = new Cart();
+  cart.addItem(sampleItem({ sku: 'x4', price: '649.95', local: { regularPrice: '699.95' } }));
+  globalThis.__events.length = 0;
+  assert.equal(cart.updateItemPrice('x4', '649.95', { regularPrice: '699.95' }), false);
+  assert.equal(cart.updateItemPrice('x4', '649.95', { regularPrice: '649.95' }), true);
+  assert.equal(cart.items[0].local, undefined);
+  assert.equal(globalThis.__events.filter((e) => e.detail.action === 'price').length, 1);
+});
+
 // --- updateItemCustom -------------------------------------------------------
 
 test('updateItemCustom merges into the matching entry, persists, and dispatches action="custom"', () => {
