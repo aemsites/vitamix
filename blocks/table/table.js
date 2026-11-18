@@ -59,7 +59,9 @@ function buildComparisonTable(rows, { stacked = false } = {}) {
   if (rows.length > 0) {
     const headerRow = buildRow(rows[0], 'th');
     const firstHeaderCell = headerRow.querySelector('th');
-    if (firstHeaderCell && !firstHeaderCell.querySelector('img') && !firstHeaderCell.textContent.trim()) {
+    // Stacked tables style the header row themselves; this class would make it
+    // transparent and borderless (no white sticky background, no divider line).
+    if (!stacked && firstHeaderCell && !firstHeaderCell.querySelector('img') && !firstHeaderCell.textContent.trim()) {
       headerRow.classList.add('table-comparison-row-header-empty');
     }
     thead.appendChild(headerRow);
