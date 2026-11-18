@@ -144,6 +144,10 @@
   color: #666;
 }
 
+/* This section intentionally overrides the base comparison styles above, so
+   selector order doesn't follow specificity order. */
+/* stylelint-disable no-descending-specificity */
+
 /* ==========================================================================
    Comparison table – stacked layout (3 or fewer compared columns)
    Mobile: row label spans full width, values sit in columns beneath it.
@@ -274,6 +278,16 @@
 .table.comparison.comparison-stacked .table-comparison-scroll tbody th {
   padding: 20px 24px;
   font-weight: 700;
+}
+
+/* Authored <p> in cells: no extra margins, and labels stay bold even if global p styles set a weight */
+.table.comparison.comparison-stacked .table-comparison-scroll tbody th p,
+.table.comparison.comparison-stacked .table-comparison-scroll tbody td p {
+  margin: 0;
+}
+
+.table.comparison.comparison-stacked .table-comparison-scroll tbody th p {
+  font-weight: inherit;
 }
 
 /* Section heading rows ("Specs", "Pricing") */
@@ -454,3 +468,5 @@
     border-left: 0;
   }
 }
+
+/* stylelint-enable no-descending-specificity */
