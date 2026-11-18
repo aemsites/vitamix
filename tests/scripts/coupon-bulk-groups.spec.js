@@ -25,8 +25,8 @@ const coupon = (id, name, extra = {}) => ({
 });
 
 const COUPONS = () => [
-  coupon('us-2026-acme', 'Acme corp', { groups: ['corporate'] }),
-  coupon('us-2026-beta', 'Beta corp', { groups: ['corporate'] }),
+  coupon('us-2026-acme', 'Acme Inc', { groups: ['corporate'] }),
+  coupon('us-2026-beta', 'Beta Inc', { groups: ['corporate'] }),
   coupon('us-2026-spring', 'Spring sale', { groups: ['seasonal', 'corporate'] }),
   coupon('ca-2026-summer', 'Summer sale'),
 ];
@@ -153,7 +153,7 @@ test('header checkbox reflects and acts on the visible rows only', async ({ page
   await rowBox(page, 'us-2026-acme').check();
   expect(await selectAllState(page)).toBe('indeterminate');
 
-  await page.locator('#coupons-search').fill('corp');
+  await page.locator('#coupons-search').fill('inc');
   await expect(page.locator('tr.coupons-grid-row')).toHaveCount(2);
   await rowBox(page, 'us-2026-beta').check();
   expect(await selectAllState(page)).toBe('checked');
@@ -234,7 +234,7 @@ test('Edit all opens with the count; Edit is disabled when the groups differ', a
 test('Edit is prefilled with the shared groups and replaces them', async ({ page }) => {
   const { calls } = await setup(page);
   await page.goto(PAGE);
-  await page.locator('#coupons-search').fill('corp');
+  await page.locator('#coupons-search').fill('inc');
   await selectAll(page).check();
   await editAll(page).click();
   const dialog = bulkDialog(page);

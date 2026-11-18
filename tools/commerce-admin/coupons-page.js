@@ -421,7 +421,8 @@ function couponMatchesOverviewSearch(row, q) {
   if (!needle) return true;
   const id = couponIdFromRow(row).toLowerCase();
   const name = String(row?.name ?? '').toLowerCase();
-  return name.includes(needle) || id.includes(needle);
+  return name.includes(needle) || id.includes(needle)
+    || couponGroupsOf(row).some((g) => g.toLowerCase().includes(needle));
 }
 
 function couponsVisibleForOverview() {
@@ -1784,7 +1785,7 @@ function renderCouponsOverviewBody(filtered) {
   }
   if (!filtered.length) {
     if (state.overviewSearch.trim()) {
-      return emptyCell('No coupons match your search. Try a different name or id, or clear the search.');
+      return emptyCell('No coupons match your search. Try a different name, id or group, or clear the search.');
     }
     if (state.groupFilter) {
       return emptyCell('No coupons in this group for this market. Try <strong>All groups</strong> or another market.');
@@ -2751,7 +2752,7 @@ function render() {
 
   mount.innerHTML = `
     <div class="coupons-toolbar pim-toolbar">
-      <input type="search" id="coupons-search" class="pim-search coupons-search-wide" placeholder="Search by name or id…" aria-label="Search coupons" value="${searchVal}" />
+      <input type="search" id="coupons-search" class="pim-search coupons-search-wide" placeholder="Search by name, id or group…" aria-label="Search coupons" value="${searchVal}" />
       <div class="coupons-toolbar-left">
         <div class="coupons-market-tabs" role="tablist" aria-label="Market">${renderMarketTabs()}</div>
         ${renderGroupFilterSelect()}
