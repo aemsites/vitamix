@@ -79,7 +79,8 @@ export function buildGiftItem(item, {
  * below the row's primary content; this component has no knowledge of
  * what they represent.
  *
- * @param {Object} item              Cart item — sku, name, image, price, quantity, url?, variant?
+ * @param {Object} item              Cart item — sku, name, image, price, quantity, url?, variant?,
+ *   local.regularPrice? (shown struck through when above `price`)
  * @param {{
  *   onQtyChange: Function,
  *   onRemove: Function,
@@ -162,8 +163,21 @@ export default function buildCartItem(item, {
   const priceEl = el.querySelector('.cart-item-price');
   const perUnitEl = el.querySelector('.cart-item-per-unit');
 
+  const regularPrice = parseFloat(item.local?.regularPrice);
+  const isDiscounted = regularPrice > price;
+
   const updatePrice = (qty) => {
-    priceEl.textContent = formatPrice(price * qty, currencyCode);
+    if (isDiscounted) {
+      const original = document.createElement('del');
+      original.className = 'cart-item-price-original';
+      original.textContent = formatPrice(regularPrice * qty, currencyCode);
+      const final = document.createElement('strong');
+      final.className = 'cart-item-price-final';
+      final.textContent = formatPrice(price * qty, currencyCode);
+      priceEl.replaceChildren(original, final);
+    } else {
+      priceEl.textContent = formatPrice(price * qty, currencyCode);
+    }
     perUnitEl.textContent = qty > 1 ? `${formatPrice(price, currencyCode)} each` : '';
   };
   updatePrice(item.quantity);

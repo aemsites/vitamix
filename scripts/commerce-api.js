@@ -220,6 +220,45 @@ async function syncGiftLines(orderBody, force) {
   }
 }
 
+/**
+ * Moves catalog promotion discounts in a preview into the cart line prices, so
+ * a line added before a promotion started shows its promotional price. The
+ * repriced lines are written to `orderBody.items` in place.
+ *
+ * @param {Object} preview - `/orders/preview` response
+ * @param {Object} orderBody
+ * @returns {boolean} true when `orderBody.items` changed
+ */
+function syncPromotionPrices(preview, orderBody) {
+  const { cart } = window;
+  const promotionIds = new Set((preview?.discounts ?? [])
+    .filter((d) => d.source === 'promotion')
+    .map((d) => d.id));
+  if (!promotionIds.size || typeof cart?.updateItemPrice !== 'function'
+    || !Array.isArray(preview.lineItems) || !Array.isArray(orderBody?.items)) return false;
+
+  let changed = false;
+  const items = orderBody.items.map((item, idx) => {
+    const amount = (preview.lineItems[idx]?.discounts ?? [])
+      .filter((d) => promotionIds.has(d.id))
+      .reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
+    const price = parseFloat(item.price?.final ?? item.price?.regular);
+    const quantity = item.quantity || 1;
+    if (!(amount > 0) || !Number.isFinite(price) || item.custom?.giftWithPurchase) return item;
+    const next = Math.round((price - amount / quantity) * 100) / 100;
+    if (next < 0) return item;
+
+    const cartItem = cart.items?.find((i) => i.sku === item.sku);
+    const regular = Math.max(price, parseFloat(cartItem?.local?.regularPrice) || 0);
+    cart.updateItemPrice(item.sku, next.toFixed(2), { regularPrice: regular.toFixed(2) });
+    changed = true;
+    return { ...item, price: { ...item.price, final: next.toFixed(2) } };
+  });
+  // eslint-disable-next-line no-param-reassign
+  if (changed) orderBody.items = items;
+  return changed;
+}
+
 function isUnauthorizedFreeItem(err) {
   return err?.status === 422 && err.body?.details?.rule === 'unauthorized_free_item';
 }
@@ -231,7 +270,9 @@ function isUnauthorizedFreeItem(err) {
  *
  * Free-gift lines are settled with the server first; when the body's other
  * lines match the cart, its gift lines are updated in place. A rejected free gift
- * triggers one more server check and one retry.
+ * triggers one more server check and one retry. Lines discounted by a catalog
+ * promotion are repriced in the cart and in `orderBody.items`, then previewed
+ * again so the estimate token matches the cart.
  *
  * @param {Object} orderBody - Full order body including customer, shipping, items,
  *   and shippingMethod.id
@@ -241,12 +282,14 @@ function isUnauthorizedFreeItem(err) {
  */
 export async function previewOrder(orderBody) {
   await syncGiftLines(orderBody, false);
+  let preview;
   try {
-    return await sendPreview(orderBody);
+    preview = await sendPreview(orderBody);
   } catch (err) {
     if (!isUnauthorizedFreeItem(err) || !(await syncGiftLines(orderBody, true))) throw err;
-    return sendPreview(orderBody);
+    preview = await sendPreview(orderBody);
   }
+  return syncPromotionPrices(preview, orderBody) ? sendPreview(orderBody) : preview;
 }
 
 /**

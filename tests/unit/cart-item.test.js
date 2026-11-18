@@ -11,6 +11,8 @@ import buildCartItem from '../../scripts/commerce/cart-item.js';
 function fakeElement() {
   const listeners = {};
   const el = {
+    children: [],
+    replaceChildren(...nodes) { el.children = nodes; el.textContent = ''; },
     value: '',
     textContent: '',
     className: '',
@@ -180,4 +182,24 @@ test('typing a quantity below 1 removes the item instead of committing', () => {
 
   assert.deepEqual(row.removals, ['VX1']);
   assert.deepEqual(row.qtyChanges, []);
+});
+
+test('a line with a regular price above its price shows both, regular struck through', () => {
+  const row = mountRow(baseItem({ price: '649.95', local: { regularPrice: '699.95' } }));
+
+  const [original, final] = row.price.children;
+  assert.equal(original.className, 'cart-item-price-original');
+  assert.equal(original.textContent, '$699.95');
+  assert.equal(final.className, 'cart-item-price-final');
+  assert.equal(final.textContent, '$649.95');
+
+  typeQty(row.qtyInput, 2);
+  assert.deepEqual(row.price.children.map((c) => c.textContent), ['$1,399.90', '$1,299.90']);
+});
+
+test('a line whose regular price is not above its price shows only the price', () => {
+  const row = mountRow(baseItem({ price: '699.95', local: { regularPrice: '699.95' } }));
+
+  assert.equal(row.price.textContent, '$699.95');
+  assert.deepEqual(row.price.children, []);
 });

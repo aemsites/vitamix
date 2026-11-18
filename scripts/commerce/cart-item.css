@@ -192,11 +192,15 @@
   width: fit-content;
 }
 
-.cart-item-gift .cart-item-price-original {
+.cart-item-price-original {
   text-decoration: line-through;
   color: var(--commerce-color-text-muted, #6b7280);
   font-weight: 400;
   margin-right: 6px;
+}
+
+.cart-item-price-final {
+  font-weight: 700;
 }
 
 .cart-item-gift .cart-item-price-free {
