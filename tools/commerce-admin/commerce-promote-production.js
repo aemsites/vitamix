@@ -25,6 +25,12 @@ import {
   putCatalogPriceRules,
 } from './price-rules-api.js';
 import { wireDialogEscapeDismiss } from './commerce-dialog-dismiss.js';
+import {
+  couponScopeTypeIds,
+  couponTypeIdOf,
+  couponTypeRowsFromResponse,
+  missingCouponTypeIds,
+} from './promotion-coupon-scope.js';
 
 /** Metadata that must not show up as a diff or be meaningfully copied. */
 const VOLATILE_KEYS = ['createdAt', 'updatedAt', 'created_at', 'updated_at'];
@@ -161,6 +167,17 @@ const COPY_ADAPTERS = {
       else promotions[i] = entity;
       await putCatalogPriceRules(org, site, { promotions }, { env });
     },
+    // The target rejects coupon type ids it doesn't have (unless its copy already lists them).
+    precheck: async (org, site, entity, existing, env) => {
+      if (!couponScopeTypeIds(entity).length) return null;
+      const resp = await apiFetch(org, site, 'coupons/types', {
+        method: 'GET', env, quiet: true, skipAuthRedirect: true,
+      });
+      if (!resp.ok) throw new Error(`Could not check coupon types: ${await readError(resp)}`);
+      const known = couponTypeRowsFromResponse(await resp.json()).map(couponTypeIdOf);
+      const missing = missingCouponTypeIds(entity, known, existing);
+      return missing.length ? { missing } : null;
+    },
   },
 };
 
@@ -243,6 +260,24 @@ function openCopyDialog(cfg, {
       setStatus(err?.message || `Could not read ${cfg.targetLower}.`, 'error');
       cancelBtn.textContent = 'Close';
       return;
+    }
+
+    if (adapter.precheck && !(existing && jsonEqual(existing, entity, adapter.omitKeys))) {
+      try {
+        const check = await adapter.precheck(org, site, entity, existing, cfg.target);
+        if (check?.missing?.length) {
+          titleEl.textContent = `Cannot ${cfg.verb.toLowerCase()} yet`;
+          leadEl.innerHTML = `${escapeHtml(`This ${adapter.label} uses coupon types that don't exist in ${cfg.targetLower}. ${cfg.verb} them first:`)}
+            <ul class="commerce-promote-missing">${check.missing.map((m) => `<li><code>${escapeHtml(m)}</code></li>`).join('')}</ul>`;
+          setStatus(`Missing in ${cfg.targetLower}: ${check.missing.join(', ')}`, 'error');
+          cancelBtn.textContent = 'Close';
+          return;
+        }
+      } catch (err) {
+        setStatus(err?.message || `Could not check ${cfg.targetLower}.`, 'error');
+        cancelBtn.textContent = 'Close';
+        return;
+      }
     }
 
     if (existing && jsonEqual(existing, entity, adapter.omitKeys)) {

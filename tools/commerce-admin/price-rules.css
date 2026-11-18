@@ -1150,3 +1150,70 @@
   font-size: 13px;
   color: #6b2d1a;
 }
+
+/* Promotion form: coupon scope */
+.pr-promo-coupon-scope[hidden],
+.pr-promo-coupon-side[hidden],
+.pr-promo-coupon-modes[hidden] {
+  display: none;
+}
+
+.pr-promo-coupon-modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.coupons-field label.pr-promo-coupon-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 400;
+  color: #202223;
+  cursor: pointer;
+}
+
+.coupons-field .pr-promo-coupon-mode input[type='radio'] {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.pr-promo-coupon-advanced-btn {
+  margin-left: auto;
+}
+
+.pr-promo-coupon-side {
+  padding: 4px 0 0;
+}
+
+.pr-promo-coupon-conditions-error {
+  margin: 8px 0 0;
+  color: #bf0711;
+  font-size: 13px;
+}
+
+.pcs-chip-unknown {
+  border-color: #e0b3b2;
+  background: #fff4f4;
+}
+
+.pcs-unknown-tag {
+  font-size: 11px;
+  font-weight: 600;
+  color: #bf0711;
+  text-transform: uppercase;
+}
+
+.pcs-other-market {
+  color: #6d7175;
+}
+
+.pr-promo-coupon-policy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}

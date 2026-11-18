@@ -31,6 +31,19 @@ filters by one group (`?group=`). Export, import and cross-environment copy keep
 `groups`; import rejects anything other than a list of non-empty names.
 The year in a coupon id is not a group.
 
+## Promotion coupon scope
+
+The promotion form's **Coupons** section sets which coupons apply to the lines a
+promotion prices: all (no fields), **Block selected coupons** (`excludedCouponTypes` /
+`excludedCouponGroups`) or **Only allow selected coupons** (`includedCouponTypes` /
+`includedCouponGroups`). A stored promotion that mixes allow and block lists shows all
+four lists (or use **Mix allow and block…**). Coupon types for the promotion's market are
+suggested first; ids that no longer exist show as **unknown** chips. Only non-empty lists
+are saved. Promotions with a minimum or product conditions can't have a coupon scope: the
+section is hidden for them, and adding a condition to a scoped promotion blocks the save.
+The list's Conditions column and the detail modal show the policy. Promote / Copy checks
+that the target environment has the coupon types first.
+
 ## Promotion date groups
 
 Promotions with different sale-line date windows show **Varies** in the grid,
