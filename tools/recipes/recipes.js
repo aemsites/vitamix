@@ -101,7 +101,7 @@ function parsePositiveQuantity(qty) {
   const unicodeFraction = UNICODE_FRACTIONS.get(trimmed);
   if (unicodeFraction !== undefined) return unicodeFraction;
 
-  const mixedUnicode = trimmed.match(/^(\d+)([½¼¾⅓⅔⅛⅜⅝⅞])$/);
+  const mixedUnicode = trimmed.match(/^(\d+)\s*([½¼¾⅓⅔⅛⅜⅝⅞])$/);
   if (mixedUnicode) {
     const fraction = UNICODE_FRACTIONS.get(mixedUnicode[2]);
     if (fraction !== undefined) {
