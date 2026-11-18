@@ -1850,3 +1850,133 @@ tr.coupons-code-row:hover {
 .cp-add-codes-grid tbody tr[data-cp-add-code-failed='1'] .cp-add-codes-input-code {
   border-color: #d72c0d;
 }
+
+.coupons-grid-table tbody tr.coupons-row-selected {
+  background: #eef3fb;
+}
+
+.coupons-grid-table .coupons-grid-col-select {
+  padding: 0;
+}
+
+.coupons-select-hit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.coupons-select-hit input {
+  cursor: pointer;
+  margin: 0;
+}
+
+.coupons-grid-table th.coupons-grid-col-select input {
+  cursor: pointer;
+  margin: 0 10px;
+}
+
+.coupons-panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 6px;
+}
+
+.coupons-panel-head .coupons-panel-title {
+  margin: 0;
+}
+
+.coupons-selection-bar [hidden] {
+  display: none;
+}
+
+.coupons-selection-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  font-size: 13px;
+  color: #202223;
+}
+
+.coupons-bulk-groups-dialog .cp-bg-heading {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #202223;
+}
+
+.coupons-bulk-groups-dialog .cp-bg-selected {
+  margin: 12px 0;
+  font-size: 13px;
+}
+
+.coupons-bulk-groups-dialog .cp-bg-selected summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.cp-bg-selected-list,
+.cp-bg-summary-list,
+.cp-bg-failed {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+
+.cp-bg-selected-list {
+  max-height: 240px;
+  overflow: auto;
+}
+
+.coupons-bulk-groups-dialog .cp-bg-selected-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 4px 0;
+  border-bottom: 1px solid #f0f0f1;
+}
+
+.cp-bg-summary-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-bottom: 12px;
+}
+
+.coupons-bulk-groups-dialog .cp-bg-summary-list li {
+  display: inline-flex;
+  align-items: center;
+}
+
+.coupons-bulk-groups-dialog .cp-bg-failed li {
+  padding: 2px 0;
+}
+
+.coupons-bulk-groups-dialog .cp-bg-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0 0 14px;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.coupons-bulk-groups-dialog .cp-bg-name {
+  font-weight: 600;
+}
+
+.coupons-bulk-groups-dialog .cp-bg-preview .coupons-table-wrap {
+  max-height: min(40vh, 360px);
+  overflow: auto;
+}
+
+.coupons-bulk-groups-dialog .coupons-export-status p {
+  margin: 0;
+}
