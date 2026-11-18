@@ -67,6 +67,13 @@ import { apiFetch } from './commerce-otp-api.js';
  * @property {CatalogPromotionConditions} [conditions]
  * @property {string} [country] ISO 3166-1 alpha-2 (`^[a-z]{2}$`, helix `COUNTRY_PATTERN`)
  * @property {string} [locale] BCP-47 subset (helix `LOCALE_PATTERN`, e.g. `en-US`, `fr-CA`)
+ * @property {string[]} [includedCouponTypes] coupon scope: coupon type ids allowed on lines this
+ *   promotion prices. First match wins: type excluded → blocked; type included → allowed;
+ *   any group excluded → blocked; any group included → allowed; else blocked when any
+ *   `included*` list is set. Not allowed on promotions with `conditions`.
+ * @property {string[]} [excludedCouponTypes] coupon type ids blocked
+ * @property {string[]} [includedCouponGroups] coupon type `groups` allowed
+ * @property {string[]} [excludedCouponGroups] coupon type `groups` blocked
  */
 
 /**
@@ -231,7 +238,32 @@ export async function putCatalogPriceRules(org, site, body, options = {}) {
     body: JSON.stringify(body),
     ...options,
   });
-  if (!resp.ok) throw new Error(await readRespError(resp));
+  if (!resp.ok) throw await catalogPutError(resp);
+}
+
+/**
+ * Error with the validation `errors` (`[{ path, message }]`) from the response body, if any.
+ *
+ * @param {Response} resp
+ * @returns {Promise<Error & {
+ *   status?: number, errors?: Array<{ path?: string, message?: string }>
+ * }>}
+ */
+async function catalogPutError(resp) {
+  const text = (await resp.text().catch(() => '')).trim();
+  let errors;
+  try {
+    const parsed = text ? JSON.parse(text) : null;
+    if (Array.isArray(parsed?.errors)) errors = parsed.errors;
+  } catch {
+    // not JSON
+  }
+  const err = /** @type {Error & { status?: number, errors?: unknown[] }} */ (
+    new Error(resp.headers.get('x-error') || text || `HTTP ${resp.status}`)
+  );
+  err.status = resp.status;
+  if (errors) err.errors = errors;
+  return err;
 }
 
 /**
