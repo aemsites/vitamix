@@ -27,7 +27,7 @@ A coupon program can carry free-form `groups` labels (case-sensitive). Promotion
 can allow or block many coupons at once by group. The Edit/New form suggests the
 groups already used by any loaded program; a new group needs an explicit **Add**.
 Saving sends the whole list (`[]` clears it). The overview shows groups as badges and
-filters by one group (`?group=`). Export, import and cross-environment copy keep
+filters by one group (`?group=`); the search box also matches group names. Export, import and cross-environment copy keep
 `groups`; import rejects anything other than a list of non-empty names.
 The year in a coupon id is not a group.
 

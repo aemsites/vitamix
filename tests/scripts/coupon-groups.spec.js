@@ -129,6 +129,22 @@ test('overview shows group badges and the group filter narrows the list and surv
   expect(new URL(page.url()).searchParams.has('group')).toBe(false);
 });
 
+test('search matches groups as well as name and id', async ({ page }) => {
+  await setup(page);
+  await page.goto(PAGE);
+  const search = page.locator('#coupons-search');
+  await search.fill('employ');
+  await expect(page.locator('tr.coupons-grid-row')).toHaveCount(1);
+  await expect(page.locator('tr[data-cp-coupon-id="us-2026-staff"]')).toHaveCount(1);
+  await search.fill('PARTNER');
+  await expect(page.locator('tr.coupons-grid-row')).toHaveCount(1);
+  await expect(page.locator('tr[data-cp-coupon-id="us-2026-aff"]')).toHaveCount(1);
+  await search.fill('plain');
+  await expect(page.locator('tr[data-cp-coupon-id="us-2026-plain"]')).toHaveCount(1);
+  await search.fill('nomatch');
+  await expect(page.locator('td.coupons-empty-cell')).toContainText('name, id or group');
+});
+
 test('detail modal lists the groups', async ({ page }) => {
   await setup(page);
   await page.goto(`${PAGE}&id=us-2026-aff`);
