@@ -224,21 +224,45 @@ export class Cart {
    * Sets the unit price of every non-gift entry with the given SKU.
    * Dispatches `cart:change` (action `price`) only when a price changed.
    *
+   * `local.regularPrice` (the struck-through price in the cart UI) is set to
+   * `regularPrice`, or kept when omitted, and dropped unless it is above the
+   * new price.
+   *
    * @param {string} sku
    * @param {string|number} price
+   * @param {{ regularPrice?: string|number }} [opts]
    * @returns {boolean} true when at least one entry was repriced
    */
-  updateItemPrice(sku, price) {
+  updateItemPrice(sku, price, { regularPrice = undefined } = {}) {
     const next = parseFloat(price);
     if (!sku || !Number.isFinite(next) || next < 0) return false;
     this.#refresh();
     const changed = this.#items.filter((i) => i.sku === sku
       && !i.custom?.giftWithPurchase
-      && parseFloat(i.price) !== next);
+      && Cart.#reprice(i, price, regularPrice));
     if (!changed.length) return false;
-    changed.forEach((i) => { i.price = String(price); });
     this.#persistNow();
     this.#dispatchChange('price', changed[0]);
+    return true;
+  }
+
+  /**
+   * Applies a unit price and regular price to one entry.
+   *
+   * @returns {boolean} true when the entry changed
+   */
+  static #reprice(item, price, regularPrice) {
+    const next = parseFloat(price);
+    const regular = parseFloat(regularPrice ?? item.local?.regularPrice);
+    const nextRegular = regular > next ? regular.toFixed(2) : undefined;
+    if (parseFloat(item.price) === next && item.local?.regularPrice === nextRegular) return false;
+    item.price = String(price);
+    if (nextRegular) {
+      item.local = { ...item.local, regularPrice: nextRegular };
+    } else if (item.local) {
+      delete item.local.regularPrice;
+      if (!Object.keys(item.local).length) delete item.local;
+    }
     return true;
   }
 

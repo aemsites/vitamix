@@ -8,6 +8,7 @@ import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   normalizeCartPrice,
+  getCartRegularPrice,
   isVariantAvailableForSale,
   shippingDimensionsFromOffer,
   resolveLineItemCustom,
@@ -204,4 +205,19 @@ test('getProductCategoryKeys: empty list when the product has no categories', ()
 test('getProductCategoryKeys: null without product custom data', () => {
   assert.equal(getProductCategoryKeys({}), null);
   assert.equal(getProductCategoryKeys(null), null);
+});
+
+test('getCartRegularPrice: list price from an offer when above the line price', () => {
+  const offer = { price: '649.95', priceSpecification: { price: 699.95 } };
+  assert.equal(getCartRegularPrice(offer, '649.95'), '699.95');
+});
+
+test('getCartRegularPrice: regular price from a Product Bus price', () => {
+  assert.equal(getCartRegularPrice({ price: { regular: '379.95', final: '299.95' } }, '299.95'), '379.95');
+});
+
+test('getCartRegularPrice: undefined when not discounted or missing', () => {
+  assert.equal(getCartRegularPrice({ price: '699.95', priceSpecification: { price: 699.95 } }, '699.95'), undefined);
+  assert.equal(getCartRegularPrice({ price: '699.95' }, '699.95'), undefined);
+  assert.equal(getCartRegularPrice(undefined, '699.95'), undefined);
 });

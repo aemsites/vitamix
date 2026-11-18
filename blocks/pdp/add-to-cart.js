@@ -123,6 +123,19 @@ export function normalizeCartPrice(value) {
 }
 
 /**
+ * Regular (list) price for an edge cart line when it is above the line price,
+ * read from the offer's list price or a Product Bus `{ regular, final }` price.
+ * @param {Object|undefined} offer - JSON-LD offer, or the product for simple products
+ * @param {string} price - Normalized line price
+ * @returns {string|undefined} Two-decimal string, or undefined when not discounted
+ */
+export function getCartRegularPrice(offer, price) {
+  const value = offer?.priceSpecification?.price ?? offer?.price?.regular;
+  const regular = parseFloat(value);
+  return regular > parseFloat(price) ? regular.toFixed(2) : undefined;
+}
+
+/**
  * Extract shippingDimensions from a JSON-LD Offer's `shippingDetails`, converting
  * each schema.org `QuantitativeValue` back to the Product Bus `{ value, unit }` shape
  * the Commerce API expects on cart items. Returns `undefined` when the offer has no
@@ -396,8 +409,10 @@ export default function renderAddToCart(ph, block, parent) {
         // Prefer the selected variant's price so variant-specific pricing
         // wins; fall back to offers[0] for simple products, where
         // selectedVariant is the parent and has no top-level price.
-        const rawPrice = selectedVariant.price ?? parent.offers?.[0]?.price;
+        const priceOffer = selectedVariant.price != null ? selectedVariant : parent.offers?.[0];
+        const rawPrice = priceOffer?.price;
         const price = normalizeCartPrice(rawPrice);
+        const regularPrice = getCartRegularPrice(priceOffer, price);
 
         // Semantic {id, value} options for the edge cart. The edge cart
         // carries no Magento-specific data — UIDs stay on the Magento side.
@@ -450,8 +465,9 @@ export default function renderAddToCart(ph, block, parent) {
           // and the EBS sync job can set the "Commercial" order type.
           ...resolveLineItemCustom(parent),
           ...(parent.bundleItems ? { bundleItems: parent.bundleItems } : {}),
-          ...((availableWarranties || compatibility || categories) ? {
+          ...((availableWarranties || compatibility || categories || regularPrice) ? {
             local: {
+              ...(regularPrice ? { regularPrice } : {}),
               ...(availableWarranties ? { availableWarranties } : {}),
               ...(compatibility ? { compatibility } : {}),
               ...(categories ? { categories } : {}),
