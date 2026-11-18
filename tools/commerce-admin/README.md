@@ -31,6 +31,13 @@ filters by one group (`?group=`). Export, import and cross-environment copy keep
 `groups`; import rejects anything other than a list of non-empty names.
 The year in a coupon id is not a group.
 
+**Edit groups of several coupons:** tick rows in the overview (the header checkbox acts on
+the rows shown; ticks are kept across search, filters, market tabs and sort, until reload or
+**Clear**), then **Edit all…**. Replace the groups (only when every selected coupon has the
+same set), add groups, or remove groups; a preview lists each change. Each changed coupon is
+read again and then written with `PUT coupons/types/{id}` and a body of only `{ groups }`, at
+most 5 at a time, in the active environment. Failed coupons can be retried.
+
 ## Promotion coupon scope
 
 The promotion form's **Coupons** section sets which coupons apply to the lines a

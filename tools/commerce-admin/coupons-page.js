@@ -63,6 +63,17 @@ import {
   mountCouponGroupsField,
   normalizeCouponGroups,
 } from './coupon-groups-field.js';
+import {
+  applyCouponBulkGroupEdit,
+  couponGroupCounts,
+  couponSelectAllState,
+  mapWithConcurrency,
+  normalizeCouponBulkGroupEdit,
+  parseCouponGroupList,
+  planCouponBulkGroupEdit,
+  sameCouponGroupSet,
+  sharedCouponGroupSet,
+} from './coupon-bulk-groups.js';
 
 /**
  * ProductBus coupon type (`…/coupons/types`). Shapes match **helix-commerce-api**.
@@ -1383,6 +1394,8 @@ const state = {
   overviewSearch: '',
   /** Exact coupon group filter; empty = all. */
   groupFilter: '',
+  /** Coupon ids checked in the overview (kept across filters; not in the URL). */
+  selectedIds: /** @type {Set<string>} */ (new Set()),
 };
 
 const QS_COUPON_SEARCH = 'q';
@@ -1668,6 +1681,7 @@ function couponImportStatusBadge(kind) {
 
 function couponOverviewRowHtml(row, {
   interactive = true,
+  selectable = false,
   query = '',
   importKind = '',
   changedKeys = null,
@@ -1698,14 +1712,19 @@ function couponOverviewRowHtml(row, {
     ].filter(Boolean);
     return parts.length ? ` class="${parts.join(' ')}"` : '';
   };
-  const kindClass = importKind ? ` coupons-import-row-${escapeHtml(importKind)}` : '';
+  const selected = selectable && state.selectedIds.has(id);
+  const kindClass = `${importKind ? ` coupons-import-row-${escapeHtml(importKind)}` : ''}${selected ? ' coupons-row-selected' : ''}`;
   const openAttrs = interactive
     ? ` class="coupons-grid-row coupons-row-open${kindClass}" data-cp-coupon-id="${escapeHtml(id)}" tabindex="0" role="button" aria-label="${escapeHtml(`Open coupon ${String(name)}`)}"`
     : ` class="coupons-grid-row${kindClass}"`;
   const statusCell = importKind
     ? `<td class="coupons-grid-col-status">${couponImportStatusBadge(importKind)}</td>`
     : '';
+  const selectCell = selectable
+    ? `<td class="coupons-code-select-cell coupons-grid-col-select"><label class="coupons-select-hit"><input type="checkbox" data-cp-select value="${escapeHtml(id)}" aria-label="${escapeHtml(`Select coupon ${String(name)}`)}"${selected ? ' checked' : ''} /></label></td>`
+    : '';
   return `<tr${openAttrs}>
+      ${selectCell}
       ${statusCell}
       <td${tdAttr('title', 'coupons-grid-lead coupons-grid-name')}>${highlightMatch(String(name), query)}</td>
       <td${tdAttr('id', 'coupons-grid-col-id')}><code class="coupons-grid-id">${highlightMatch(id || '—', query)}</code></td>
@@ -1727,6 +1746,7 @@ function couponOverviewHeadHtml({ sortable = true, importPreview = false } = {})
     : '';
   if (sortable) {
     return `<tr>
+              <th scope="col" class="coupons-code-select-cell coupons-grid-col-select"><input type="checkbox" data-cp-select-all aria-label="Select all shown coupons" /></th>
               ${status}
               ${couponSortableTh('title', 'Title')}
               ${couponSortableTh('id', 'Id', 'coupons-grid-col-id')}
@@ -1758,7 +1778,7 @@ function couponOverviewHeadHtml({ sortable = true, importPreview = false } = {})
 }
 
 function renderCouponsOverviewBody(filtered) {
-  const emptyCell = (msg) => `<tr><td colspan="11" class="coupons-empty-cell">${msg}</td></tr>`;
+  const emptyCell = (msg) => `<tr><td colspan="12" class="coupons-empty-cell">${msg}</td></tr>`;
   if (!state.coupons.length) {
     return emptyCell('No coupons yet (empty list or missing <code>coupons:read</code>).');
   }
@@ -1772,13 +1792,17 @@ function renderCouponsOverviewBody(filtered) {
     return emptyCell('No coupons for this market. Try <strong>All</strong> or another country tab.');
   }
   const query = state.overviewSearch;
-  return filtered.map((row) => couponOverviewRowHtml(row, { query })).join('');
+  return filtered.map((row) => couponOverviewRowHtml(row, { query, selectable: true })).join('');
 }
 
 async function fetchCouponList() {
   const resp = await couponsApiFetch('coupons/types', { method: 'GET' });
   const data = await resp.json();
   state.coupons = asArray(data, ['types', 'items', 'data', 'results', 'coupons']);
+  const ids = new Set(state.coupons.map((row) => couponIdFromRow(row)));
+  state.selectedIds.forEach((id) => {
+    if (!ids.has(id)) state.selectedIds.delete(id);
+  });
 }
 
 async function fetchCouponDetail(id) {
@@ -2740,7 +2764,14 @@ function render() {
     </div>
     <p class="coupons-market-hint">Ids: <code>us-2026-name</code>, <code>ca-2026-name</code>, <code>mx-2026-name</code> (country-year-key). Click a row for a <strong>modal</strong> with full rules and codes (like opening an order).</p>
     <section class="coupons-overview coupons-overview-solo" aria-label="Coupon programs overview">
-      <h2 class="coupons-panel-title">Coupon programs</h2>
+      <div class="coupons-panel-head">
+        <h2 class="coupons-panel-title">Coupon programs</h2>
+        <div class="coupons-selection-bar">
+          <span class="coupons-selection-count" data-cp-selection-count role="status"></span>
+          <button type="button" class="coupons-link-button" data-cp-selection-clear hidden>Clear</button>
+          <button type="button" class="coupons-btn" data-cp-edit-all disabled>Edit all…</button>
+        </div>
+      </div>
       <p class="coupons-panel-hint">Quick columns; open the modal for edit, delete, and code tools.</p>
       <div class="coupons-table-wrap coupons-overview-table-wrap pim-list-wrapper">
         <table class="coupons-grid-table">
@@ -2800,6 +2831,30 @@ function render() {
   });
   mount.querySelector('[data-cp-new]')?.addEventListener('click', () => openNewCouponDialog());
 
+  const visibleIds = sorted.map((row) => couponIdFromRow(row)).filter(Boolean);
+  mount.querySelector('[data-cp-select-all]')?.addEventListener('change', (e) => {
+    const on = e.target instanceof HTMLInputElement && e.target.checked;
+    visibleIds.forEach((id) => {
+      if (on) state.selectedIds.add(id);
+      else state.selectedIds.delete(id);
+    });
+    syncCouponSelectionUi(mount, visibleIds);
+  });
+  mount.querySelectorAll('input[data-cp-select]').forEach((cb) => {
+    cb.addEventListener('change', () => {
+      if (!(cb instanceof HTMLInputElement)) return;
+      if (cb.checked) state.selectedIds.add(cb.value);
+      else state.selectedIds.delete(cb.value);
+      syncCouponSelectionUi(mount, visibleIds);
+    });
+  });
+  mount.querySelector('[data-cp-selection-clear]')?.addEventListener('click', () => {
+    state.selectedIds.clear();
+    syncCouponSelectionUi(mount, visibleIds);
+  });
+  mount.querySelector('[data-cp-edit-all]')?.addEventListener('click', () => openBulkGroupsDialog());
+  syncCouponSelectionUi(mount, visibleIds);
+
   mount.querySelector('table.coupons-grid-table')?.addEventListener('click', (e) => {
     const btn = /** @type {HTMLElement | null} */ (e.target)?.closest('[data-cp-sort]');
     if (!btn || !(btn instanceof HTMLButtonElement)) return;
@@ -2840,10 +2895,18 @@ function render() {
         render();
       }
     };
-    rowEl.addEventListener('click', () => {
+    rowEl.addEventListener('click', (e) => {
+      const cell = e.target instanceof Element ? e.target.closest('.coupons-grid-col-select') : null;
+      if (cell) {
+        if (!(e.target instanceof Element && e.target.closest('label'))) {
+          cell.querySelector('input')?.click();
+        }
+        return;
+      }
       openRow();
     });
     rowEl.addEventListener('keydown', (e) => {
+      if (e.target !== rowEl) return;
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         openRow();
@@ -2855,6 +2918,279 @@ function render() {
     const row = sorted.find((r) => couponIdFromRow(r) === couponId);
     return row ? couponCountryKeyForThumbLookup(row) : 'us';
   }).catch(() => {});
+}
+
+/**
+ * Header checkbox, row checkboxes and the title-row selection bar from `state.selectedIds`.
+ * @param {ParentNode} mount
+ * @param {string[]} visibleIds
+ */
+function syncCouponSelectionUi(mount, visibleIds) {
+  const sel = state.selectedIds;
+  const all = mount.querySelector('[data-cp-select-all]');
+  if (all instanceof HTMLInputElement) {
+    const s = couponSelectAllState(visibleIds, sel);
+    all.checked = s === 'checked';
+    all.indeterminate = s === 'indeterminate';
+    all.disabled = !visibleIds.length;
+  }
+  mount.querySelectorAll('input[data-cp-select]').forEach((cb) => {
+    if (!(cb instanceof HTMLInputElement)) return;
+    cb.checked = sel.has(cb.value);
+    cb.closest('tr')?.classList.toggle('coupons-row-selected', cb.checked);
+  });
+  const n = sel.size;
+  const visible = new Set(visibleIds);
+  const hidden = [...sel].filter((id) => !visible.has(id)).length;
+  const countEl = mount.querySelector('[data-cp-selection-count]');
+  if (countEl) {
+    countEl.textContent = n ? `${n} selected${hidden ? ` (${hidden} not shown)` : ''}` : '';
+  }
+  const clear = mount.querySelector('[data-cp-selection-clear]');
+  if (clear instanceof HTMLElement) clear.hidden = !n;
+  const editAll = mount.querySelector('[data-cp-edit-all]');
+  if (editAll instanceof HTMLButtonElement) editAll.disabled = !n;
+}
+
+const COUPON_BULK_GROUPS_CONCURRENCY = COUPON_CODE_DELETE_CONCURRENCY;
+
+/**
+ * Fresh GET, recompute from the stored groups, PUT only `{ groups }` when the set changes.
+ * @param {string} id
+ * @param {import('./coupon-bulk-groups.js').CouponBulkGroupEdit} edit
+ * @returns {Promise<'updated' | 'unchanged'>}
+ */
+async function applyBulkGroupEditToCoupon(id, edit) {
+  const path = `coupons/types/${encodeURIComponent(id)}`;
+  const resp = await couponsApiFetch(path, { method: 'GET', cache: 'no-store' });
+  const before = couponGroupsOf(await resp.json());
+  const after = applyCouponBulkGroupEdit(before, edit);
+  if (sameCouponGroupSet(before, after)) return 'unchanged';
+  await couponsApiFetch(path, { method: 'PUT', body: JSON.stringify({ groups: after }) });
+  return 'updated';
+}
+
+function couponBulkGroupsBadges(groups) {
+  return couponGroupBadgesHtml(groups, '<span class="coupons-muted">No groups</span>');
+}
+
+function openBulkGroupsDialog() {
+  const byId = new Map(state.coupons.map((row) => [couponIdFromRow(row), row]));
+  const rows = sortCouponOverviewRows(
+    [...state.selectedIds].map((id) => byId.get(id)).filter(Boolean),
+    state.overviewSortKey,
+    state.overviewSortDir,
+  );
+  if (!rows.length) return;
+  const total = rows.length;
+  const items = rows.map((row) => ({ id: couponIdFromRow(row), row }));
+  const nameById = new Map(items.map(({ id, row }) => [id, String(row.name || id)]));
+  const shared = sharedCouponGroupSet(rows);
+  const counts = couponGroupCounts(rows);
+  const noGroups = rows.filter((row) => !couponGroupsOf(row).length).length;
+  const envLabel = getApiEnvironment() === 'prod' ? 'Production' : 'Staging';
+  const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  const optionsHtml = (list) => list.map((g) => `<option value="${escapeHtml(g)}"></option>`).join('');
+
+  const summaryItems = counts.map(({ group, count }) => `<li>${commerceGroupBadgeHtml(group)}<span>: ${count} of ${total}</span></li>`);
+  if (noGroups) summaryItems.push(`<li class="coupons-muted">No groups: ${noGroups} of ${total}</li>`);
+
+  const dialog = document.createElement('dialog');
+  dialog.className = 'coupons-dialog coupons-dialog-wide coupons-bulk-groups-dialog';
+  dialog.innerHTML = `
+    <div class="coupons-dialog-inner">
+      <div class="coupons-dialog-scroll" tabindex="-1">
+        <h2 class="coupons-dialog-title">Edit groups for ${escapeHtml(plural(total, 'coupon'))}</h2>
+        <p class="coupons-field-hint" data-cp-bg-env>Saves to <strong>${escapeHtml(envLabel)}</strong>.</p>
+        <details class="cp-bg-selected">
+          <summary>Selected coupons (${total})</summary>
+          <ul class="cp-bg-selected-list">${items.map(({ id, row }) => `<li>
+            <span class="cp-bg-name">${escapeHtml(String(row.name || '—'))}</span>
+            <code>${escapeHtml(id)}</code>
+            ${couponBulkGroupsBadges(couponGroupsOf(row))}
+          </li>`).join('')}</ul>
+        </details>
+        <div class="cp-bg-summary">
+          <h3 class="cp-bg-heading">Current groups</h3>
+          <ul class="cp-bg-summary-list" data-cp-bg-summary>${summaryItems.join('')}</ul>
+        </div>
+        <fieldset class="cp-bg-form" data-cp-bg-form>
+          <div class="coupons-field cp-bg-section" data-cp-bg-edit>
+            <h3 class="cp-bg-heading">Edit</h3>
+            ${shared
+    ? `<p class="coupons-field-hint">All selected coupons have the same groups. Changes here replace the groups on every selected coupon.</p>
+            <div data-cp-bg-edit-mount></div>
+            <input type="text" id="cp-bg-edit-value" autocomplete="off" value="${escapeHtml(shared.length ? JSON.stringify(shared) : '')}" />`
+    : '<p class="coupons-field-hint" data-cp-bg-edit-disabled>The selected coupons have different groups. Use Add or Remove.</p>'}
+          </div>
+          <div class="coupons-field cp-bg-section">
+            <label for="cp-bg-add">Add</label>
+            <input type="text" id="cp-bg-add" list="cp-bg-known" autocomplete="off" placeholder="group, another group" />
+            <p class="coupons-field-hint">Separate groups with commas or paste one per line. Added to each coupon that lacks them.</p>
+          </div>
+          <div class="coupons-field cp-bg-section">
+            <label for="cp-bg-remove">Remove</label>
+            <input type="text" id="cp-bg-remove" list="cp-bg-current" autocomplete="off" placeholder="group, another group" />
+            <p class="coupons-field-hint">Removed from each coupon that has them.</p>
+          </div>
+          <datalist id="cp-bg-known">${optionsHtml(collectCouponGroups(state.coupons))}</datalist>
+          <datalist id="cp-bg-current">${optionsHtml(collectCouponGroups(rows))}</datalist>
+        </fieldset>
+        <div class="cp-bg-preview" data-cp-bg-preview></div>
+        <div class="coupons-export-status" data-cp-bg-status role="status" hidden></div>
+      </div>
+      <div class="coupons-dialog-actions">
+        <button type="button" class="coupons-btn" data-cp-cancel>Cancel</button>
+        <button type="button" class="coupons-btn" data-cp-bg-retry hidden>Retry failed</button>
+        <button type="button" class="coupons-btn coupons-btn-primary" data-cp-bg-apply disabled>Update coupons</button>
+      </div>
+    </div>`;
+  document.body.appendChild(dialog);
+
+  const form = /** @type {HTMLFieldSetElement} */ (dialog.querySelector('[data-cp-bg-form]'));
+  const addInput = /** @type {HTMLInputElement} */ (dialog.querySelector('#cp-bg-add'));
+  const removeInput = /** @type {HTMLInputElement} */ (dialog.querySelector('#cp-bg-remove'));
+  const previewEl = /** @type {HTMLElement} */ (dialog.querySelector('[data-cp-bg-preview]'));
+  const statusEl = /** @type {HTMLElement} */ (dialog.querySelector('[data-cp-bg-status]'));
+  const btnCancel = /** @type {HTMLButtonElement} */ (dialog.querySelector('[data-cp-cancel]'));
+  const btnRetry = /** @type {HTMLButtonElement} */ (dialog.querySelector('[data-cp-bg-retry]'));
+  const btnApply = /** @type {HTMLButtonElement} */ (dialog.querySelector('[data-cp-bg-apply]'));
+  const editField = shared
+    ? mountCouponGroupsField(
+      dialog.querySelector('[data-cp-bg-edit-mount]'),
+      dialog.querySelector('#cp-bg-edit-value'),
+      { suggestions: collectCouponGroups(state.coupons) },
+    )
+    : null;
+
+  let busy = false;
+  let applied = false;
+  /** @type {import('./coupon-bulk-groups.js').CouponBulkGroupEdit | null} */
+  let currentEdit = null;
+  /** @type {string[]} */
+  let pendingIds = [];
+  /** @type {string[]} */
+  let failedIds = [];
+
+  const setStatus = (html, tone = 'ok') => {
+    statusEl.hidden = !html;
+    statusEl.innerHTML = html;
+    statusEl.classList.toggle('coupons-export-status-error', Boolean(html) && tone === 'error');
+    statusEl.classList.toggle('coupons-export-status-ok', Boolean(html) && tone !== 'error');
+  };
+
+  const updatePreview = () => {
+    if (applied) return;
+    const picked = editField ? editField.getValue() : null;
+    const replace = picked && shared && !sameCouponGroupSet(picked, shared) ? picked : null;
+    const { edit, error } = normalizeCouponBulkGroupEdit({
+      replace,
+      add: parseCouponGroupList(addInput.value),
+      remove: parseCouponGroupList(removeInput.value),
+    });
+    const plan = planCouponBulkGroupEdit(items, edit);
+    currentEdit = error ? null : edit;
+    pendingIds = error ? [] : plan.changes.map((c) => c.id);
+    setStatus(error ? escapeHtml(error) : '', 'error');
+    const k = pendingIds.length;
+    btnApply.disabled = !k;
+    btnApply.textContent = `Update ${plural(k, 'coupon')}`;
+    if (error || (!plan.changes.length && !replace && !edit.add.length && !edit.remove.length)) {
+      previewEl.innerHTML = '';
+      return;
+    }
+    const skipped = plan.unchanged.length;
+    const rowsHtml = plan.changes.map(({ id, before, after }) => `<tr data-cp-bg-change="${escapeHtml(id)}">
+        <td><span class="cp-bg-name">${escapeHtml(nameById.get(id) || id)}</span> <code>${escapeHtml(id)}</code></td>
+        <td>${couponBulkGroupsBadges(before)}</td>
+        <td>${couponBulkGroupsBadges(after)}</td>
+      </tr>`).join('');
+    previewEl.innerHTML = `
+      <h3 class="cp-bg-heading">Preview</h3>
+      <p class="coupons-field-hint" data-cp-bg-preview-lead>${escapeHtml(`${plural(k, 'coupon')} will change.${skipped ? ` ${skipped} unchanged (skipped).` : ''}`)}</p>
+      ${k ? `<div class="coupons-table-wrap"><table class="coupons-grid-table cp-bg-preview-table">
+        <thead><tr><th scope="col">Coupon</th><th scope="col">Before</th><th scope="col">After</th></tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table></div>` : ''}`;
+  };
+
+  const run = async (ids) => {
+    if (!currentEdit || !ids.length) return;
+    busy = true;
+    applied = true;
+    form.disabled = true;
+    previewEl.innerHTML = '';
+    btnApply.disabled = true;
+    btnRetry.hidden = true;
+    btnCancel.disabled = true;
+    const edit = currentEdit;
+    setStatus(escapeHtml(`Updating 0 of ${ids.length}…`));
+    const results = await mapWithConcurrency(
+      ids,
+      COUPON_BULK_GROUPS_CONCURRENCY,
+      (id) => applyBulkGroupEditToCoupon(id, edit),
+      (done, n) => setStatus(escapeHtml(`Updating ${done} of ${n}…`)),
+    );
+    const updated = results.filter((r) => r.ok && r.value === 'updated').length;
+    const unchanged = results.filter((r) => r.ok && r.value === 'unchanged').length;
+    const failed = results.filter((r) => !r.ok).map((r) => ({
+      id: r.item,
+      message: (r.error instanceof Error && r.error.message) || String(r.error),
+    }));
+    failedIds = failed.map((f) => f.id);
+    const summary = `Updated ${updated} · unchanged ${unchanged} · failed ${failed.length}`;
+    const failedHtml = failed.length
+      ? `<ul class="cp-bg-failed" data-cp-bg-failed>${failed.map((f) => `<li data-cp-bg-failed-id="${escapeHtml(f.id)}"><code>${escapeHtml(f.id)}</code>: ${escapeHtml(f.message)}</li>`).join('')}</ul>`
+      : '';
+    setStatus(`<p data-cp-bg-result>${escapeHtml(summary)}</p>${failedHtml}`, failed.length ? 'error' : 'ok');
+    try {
+      await refreshCouponList();
+      render();
+    } catch (err) {
+      console.warn('[commerce-admin/coupons] reload after bulk groups failed', { message: err?.message });
+    }
+    busy = false;
+    btnCancel.disabled = false;
+    btnCancel.textContent = 'Close';
+    btnApply.hidden = true;
+    btnRetry.hidden = !failedIds.length;
+    showToast(summary, failed.length ? 'error' : 'success');
+  };
+
+  const dismiss = () => {
+    if (busy) return;
+    dialog.close();
+    dialog.remove();
+  };
+  dialog.addEventListener('close', () => {
+    editField?.destroy();
+    unlockCouponsBodyScroll();
+  }, { once: true });
+  dialog.addEventListener('input', updatePreview);
+  [addInput, removeInput].forEach((input) => {
+    input.addEventListener('paste', (e) => {
+      const text = e.clipboardData?.getData('text') || '';
+      if (!/[\r\n]/.test(text)) return;
+      e.preventDefault();
+      const list = parseCouponGroupList(text).join(', ');
+      input.setRangeText(list, input.selectionStart ?? input.value.length, input.selectionEnd ?? input.value.length, 'end');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  });
+  btnCancel.addEventListener('click', dismiss);
+  btnApply.addEventListener('click', () => {
+    run(pendingIds).catch((err) => showToast(err?.message || 'Update failed', 'error'));
+  });
+  btnRetry.addEventListener('click', () => {
+    run(failedIds).catch((err) => showToast(err?.message || 'Update failed', 'error'));
+  });
+  dialog.addEventListener('click', (e) => {
+    if (e.target === dialog) dismiss();
+  });
+  wireDialogEscapeDismiss(dialog, dismiss);
+  updatePreview();
+  lockCouponsBodyScroll();
+  dialog.showModal();
 }
 
 const COUPON_EXPORT_OMIT_KEYS = [
