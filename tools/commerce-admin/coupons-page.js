@@ -2082,7 +2082,7 @@ function couponFormOptionsSectionHtml() {
       couponFormOptionRow(
         'cp-form-stackable',
         'Allow stacking with automatic pricing rules',
-        'When enabled, this coupon can combine with catalog promotions and cart rules instead of being blocked.',
+        'When off, applying this coupon turns off all automatic cart rules, including site-wide free shipping. Catalog promotions are not affected.',
       ),
       couponFormOptionRow(
         'cp-form-auto',
@@ -2179,7 +2179,7 @@ function couponFormHtml({ idReadonly }) {
         <select id="cp-form-shipping">
           ${shippingBenefitSelectOptionsHtml('none', escapeHtml)}
         </select>
-        <p class="coupons-field-hint">Same options as cart rules: standard only, or standard and priority.</p>
+        <p class="coupons-field-hint">Free shipping this coupon adds: standard only, or standard and priority. <strong>No Free Shipping</strong> adds none, and site-wide free shipping rules still apply unless stacking with automatic pricing rules is turned off below.</p>
       </div>
       ${couponFormOptionsSectionHtml()}
       <div class="coupons-field">
