@@ -30,6 +30,7 @@ import {
 } from './commerce-otp-ui.js';
 import { highlightMatch } from './search-highlight.js';
 import {
+  COUPON_SHIPPING_NONE_LABEL,
   couponShippingModeFromRow,
   normalizeShippingBenefitMode,
   shippingBenefitFieldsFromMode,
@@ -1052,7 +1053,7 @@ function couponDetailModalInnerHtml(d, thumbByPath) {
     <div class="coupons-modal-stats" role="list">
       <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Minimum order</span><span class="coupons-modal-stat-value">${escapeHtml(min)}</span></div>
       <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Discount cap</span><span class="coupons-modal-stat-value">${escapeHtml(cap)}</span></div>
-      <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Shipping benefit</span><span class="coupons-modal-stat-value">${escapeHtml(shippingBenefitModeLabel(couponShippingModeFromRow(d)))}</span></div>
+      <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Shipping benefit</span><span class="coupons-modal-stat-value">${escapeHtml(shippingBenefitModeLabel(couponShippingModeFromRow(d), { noneLabel: COUPON_SHIPPING_NONE_LABEL }))}</span></div>
       <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Total cap per code</span><span class="coupons-modal-stat-value">${escapeHtml(d.defaultUsageLimit != null ? String(d.defaultUsageLimit) : '—')}</span></div>
       <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Cap per customer</span><span class="coupons-modal-stat-value">${escapeHtml(d.defaultUsesPerCode != null ? String(d.defaultUsesPerCode) : '—')}</span></div>
     </div>
@@ -1694,7 +1695,10 @@ function couponOverviewRowHtml(row, {
   const disc = overviewDiscountText(row);
   const min = overviewMinOrder(row);
   const cap = overviewCap(row);
-  const ship = shippingBenefitModeLabel(couponShippingModeFromRow(row));
+  const ship = shippingBenefitModeLabel(
+    couponShippingModeFromRow(row),
+    { noneLabel: COUPON_SHIPPING_NONE_LABEL },
+  );
   const stack = yn(row.stackable !== false);
   const countries = normalizeCouponCountries(row);
   const mHtml = countries.length
@@ -2177,9 +2181,9 @@ function couponFormHtml({ idReadonly }) {
       <div class="coupons-field coupons-field-full">
         <label for="cp-form-shipping">Shipping benefit</label>
         <select id="cp-form-shipping">
-          ${shippingBenefitSelectOptionsHtml('none', escapeHtml)}
+          ${shippingBenefitSelectOptionsHtml('none', escapeHtml, { noneLabel: COUPON_SHIPPING_NONE_LABEL })}
         </select>
-        <p class="coupons-field-hint">Free shipping this coupon adds: standard only, or standard and priority. <strong>No Free Shipping</strong> adds none, and site-wide free shipping rules still apply unless stacking with Cart Rules is turned off below.</p>
+        <p class="coupons-field-hint">Free shipping this coupon adds: standard only, or standard and priority. <strong>No change</strong> adds none; site-wide free shipping still applies when stacking with Cart Rules is on (below).</p>
       </div>
       ${couponFormOptionsSectionHtml()}
       <div class="coupons-field">

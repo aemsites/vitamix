@@ -53,12 +53,17 @@ export function shippingBenefitFieldsFromMode(mode) {
   return { freeShipping: false };
 }
 
+/** Coupons add no shipping benefit of their own for `none`. */
+export const COUPON_SHIPPING_NONE_LABEL = 'No change';
+
 /**
  * @param {ShippingBenefitMode | string} mode
+ * @param {{ noneLabel?: string }} [opts]
  * @returns {string}
  */
-export function shippingBenefitModeLabel(mode) {
+export function shippingBenefitModeLabel(mode, { noneLabel } = {}) {
   const m = normalizeShippingBenefitMode(mode);
+  if (m === 'none' && noneLabel) return noneLabel;
   const hit = SHIPPING_BENEFIT_OPTIONS.find((o) => o.value === m);
   return hit ? hit.label : SHIPPING_BENEFIT_OPTIONS[0].label;
 }
@@ -66,13 +71,15 @@ export function shippingBenefitModeLabel(mode) {
 /**
  * @param {string} selected
  * @param {(s: string) => string} escape
+ * @param {{ noneLabel?: string }} [opts]
  * @returns {string}
  */
-export function shippingBenefitSelectOptionsHtml(selected, escape) {
+export function shippingBenefitSelectOptionsHtml(selected, escape, { noneLabel } = {}) {
   const sel = normalizeShippingBenefitMode(selected);
   return SHIPPING_BENEFIT_OPTIONS.map((o) => {
     const picked = o.value === sel ? ' selected' : '';
-    return `<option value="${escape(o.value)}"${picked}>${escape(o.label)}</option>`;
+    const label = o.value === 'none' && noneLabel ? noneLabel : o.label;
+    return `<option value="${escape(o.value)}"${picked}>${escape(label)}</option>`;
   }).join('');
 }
 
