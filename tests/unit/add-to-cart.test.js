@@ -67,7 +67,7 @@ test('normalizeCartPrice: undefined stringifies to "undefined"', () => {
 
 const inStockVariant = (overrides = {}) => ({
   sku: 'SKU-1',
-  custom: { managedStock: '1', addToCart: 'Yes', ...overrides },
+  custom: { addToCart: 'Yes', ...overrides },
 });
 
 test('isVariantAvailableForSale: false when page metadata disables add-to-cart', () => {
@@ -82,24 +82,20 @@ test('isVariantAvailableForSale: false when variant.custom.addToCart is "No"', (
   );
 });
 
-test('isVariantAvailableForSale: true when managedStock is "0" (stock not tracked)', () => {
-  // managedStock "0" means stock is not managed — variant is always purchasable,
-  // even if the out-of-stock list happens to include the SKU.
-  __setOutOfStockSkus(['SKU-1']);
-  assert.equal(
-    isVariantAvailableForSale(inStockVariant({ managedStock: '0' })),
-    true,
-  );
-});
-
-test('isVariantAvailableForSale: true when managed stock and SKU is in stock', () => {
+test('isVariantAvailableForSale: SKU in-stock status wins regardless of managedStock', () => {
   __setOutOfStockSkus([]);
-  assert.equal(isVariantAvailableForSale(inStockVariant()), true);
+  [undefined, '0', '1'].forEach((managedStock) => {
+    const custom = managedStock === undefined ? {} : { managedStock };
+    assert.equal(isVariantAvailableForSale(inStockVariant(custom)), true);
+  });
 });
 
-test('isVariantAvailableForSale: false when managed stock and SKU is out of stock', () => {
+test('isVariantAvailableForSale: SKU out-of-stock status wins regardless of managedStock', () => {
   __setOutOfStockSkus(['SKU-1']);
-  assert.equal(isVariantAvailableForSale(inStockVariant()), false);
+  [undefined, '0', '1'].forEach((managedStock) => {
+    const custom = managedStock === undefined ? {} : { managedStock };
+    assert.equal(isVariantAvailableForSale(inStockVariant(custom)), false);
+  });
 });
 
 test('isVariantAvailableForSale: page metadata gate wins over variant flags', () => {
