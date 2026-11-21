@@ -5,6 +5,8 @@ import {
 } from '../../scripts/scripts.js';
 import { getHiddenContainers, isHiddenContainer } from './recipe-containers.js';
 import linkRecipeMentions from './recipe-links.js';
+import showListToast from '../../scripts/list-toast.js';
+import { logError } from '../../scripts/operations-log.js';
 
 const RECIPE_IDS_URL = '/assets/recipes/recipe-ids.json';
 let recipeIdsPromise;
@@ -61,8 +63,25 @@ async function initEdgeRecipeSave(saveButton, placeholders) {
   saveButton.addEventListener('click', async () => {
     saveButton.disabled = true;
     try {
-      await toggleEdgeRecipeFavorite(window.location.pathname);
+      const saved = await toggleEdgeRecipeFavorite(window.location.pathname);
+      const { isRecipeSaved } = await import('../../scripts/recipe-storage.js');
+      if (isRecipeSaved(window.location.pathname) !== saved) {
+        throw new Error('Recipe favorite change was not persisted');
+      }
       await syncEdgeSaveButton(saveButton, placeholders);
+      const recipe = saveButton.closest('.recipe');
+      const image = recipe?.querySelector('.recipe-image img')?.src;
+      const title = recipe?.querySelector('h1')?.textContent || '';
+      showListToast(saved
+        ? placeholders.recipeAddedToBook || 'Added to your recipe book'
+        : placeholders.recipeRemovedFromBook || 'Removed from your recipe book', {
+        items: image ? [{ image, title }] : [],
+        href: '#preferences-modal',
+        label: placeholders.manageRecipesAndPreferences || 'Manage recipes and preferences',
+      });
+    } catch (error) {
+      logError('recipe-favorite', error);
+      showListToast(placeholders.recipeFavoriteError || 'Could not update your recipe book. Please try again.');
     } finally {
       saveButton.disabled = false;
     }
@@ -285,6 +304,9 @@ export default async function decorate(block) {
     <div class="recipe-additional-info-item recipe-submitted-by">
       <p class="eyebrow">${placeholders.submittedBy || 'Submitted By'}</p>
       <p>Vitamix</p>
+    </div>
+    <div class="recipe-additional-info-item recipe-manage-preferences">
+      <p><a href="#preferences-modal">${placeholders.manageRecipesAndPreferences || 'Manage recipes and preferences'}</a></p>
     </div>
   </div>`;
 

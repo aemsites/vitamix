@@ -1,4 +1,4 @@
-import { loadCSS } from './aem.js';
+import showListToast from './list-toast.js';
 import {
   getCompareSlug, getStoredCompareItems, setStoredCompareItems, MAX_COMPARE_ITEMS,
 } from './compare-storage.js';
@@ -19,11 +19,6 @@ const DEFAULT_REMOVED_MESSAGE = 'Removed from comparison';
 const DEFAULT_LIMIT_MESSAGE = `You can compare up to ${MAX_COMPARE_ITEMS} products. Remove one to add another.`;
 const DEFAULT_VIEW_COMPARISON_LABEL = 'View Comparison';
 
-/** How long the compare toast stays visible, in ms. */
-const TOAST_VISIBLE_MS = 15000;
-
-let toastHideTimer;
-
 /**
  * Finds the header's compare nav link, if present, so callers can reuse the same URL
  * ("View Comparison") instead of guessing at one.
@@ -43,55 +38,11 @@ export function getHeaderCompareHref() {
  * @param {string} [options.viewComparisonLabel] - Localized override for the link text
  */
 function showCompareToast(message, options = {}) {
-  loadCSS(`${window.hlx?.codeBasePath || ''}/styles/add-to-compare.css`);
-  let toast = document.querySelector('.add-to-compare-toast');
-  if (!toast) {
-    toast = document.createElement('div');
-    toast.className = 'add-to-compare-toast';
-    toast.setAttribute('role', 'status');
-    toast.setAttribute('aria-live', 'polite');
-    document.body.appendChild(toast);
-  }
-  toast.innerHTML = '';
-
-  const text = document.createElement('p');
-  text.className = 'add-to-compare-toast-message';
-  text.textContent = message;
-  toast.appendChild(text);
-
-  const items = getStoredCompareItems().filter((item) => item.image);
-  if (items.length) {
-    const thumbs = document.createElement('div');
-    thumbs.className = 'add-to-compare-toast-thumbs';
-    items.forEach((item) => {
-      const img = document.createElement('img');
-      img.className = 'add-to-compare-toast-thumb';
-      img.src = item.image;
-      img.alt = item.title || '';
-      img.loading = 'lazy';
-      thumbs.appendChild(img);
-    });
-    toast.appendChild(thumbs);
-  }
-
-  const viewHref = getHeaderCompareHref();
-  if (viewHref) {
-    const link = document.createElement('a');
-    link.className = 'add-to-compare-toast-link';
-    link.href = viewHref;
-    link.textContent = options.viewComparisonLabel || DEFAULT_VIEW_COMPARISON_LABEL;
-    toast.appendChild(link);
-  }
-
-  // Restart the show/hide cycle even if a toast is already visible (rapid repeat clicks).
-  toast.classList.remove('add-to-compare-toast-visible');
-  // eslint-disable-next-line no-void
-  void toast.offsetWidth;
-  toast.classList.add('add-to-compare-toast-visible');
-  clearTimeout(toastHideTimer);
-  toastHideTimer = setTimeout(() => {
-    toast.classList.remove('add-to-compare-toast-visible');
-  }, TOAST_VISIBLE_MS);
+  showListToast(message, {
+    items: getStoredCompareItems(),
+    href: getHeaderCompareHref(),
+    label: options.viewComparisonLabel || DEFAULT_VIEW_COMPARISON_LABEL,
+  });
 }
 
 /**
