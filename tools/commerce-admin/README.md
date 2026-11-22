@@ -153,8 +153,8 @@ or products with additional variant options is not supported by this workflow.
 
 ## Creating catalog products
 
-In Commerce Admin's production catalog, select **Add new product**. The modal
-supports selecting multiple countries using round flags and Household or Commercial
+In Commerce Admin's production catalog, select **New product…**. The modal
+supports selecting multiple countries using market-style buttons and Household or Commercial
 placement. Canada includes both English and French catalogs; Mexico includes both
 English and Spanish catalogs automatically.
 Images and inferred variants are checked separately for each selected market.

@@ -17,6 +17,7 @@ import { BUTTON_SETTINGS, renderProductButtons } from './product-buttons.js';
 const ASSETS_APP = 'https://da.live/app/aemsites/vitamix/tools/product-assets/app?ref=product-assets';
 const LOCALES = ['us/en_us', 'ca/en_us', 'ca/fr_ca', 'mx/en_us', 'mx/es_mx', 'vr/en_us'];
 const STEPS = ['Product assets', 'Product & pricing', 'Settings', 'Review & create'];
+const ASSET_CHECK_DEBOUNCE_MS = 400;
 const MARKET_CURRENCIES = {
   us: 'USD', ca: 'CAD', mx: 'MXN', vr: 'USD',
 };
@@ -410,47 +411,49 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
   dialog.className = 'product-create-dialog';
   dialog.setAttribute('aria-labelledby', 'productCreateTitle');
   dialog.innerHTML = `
-    <header><h2 id="productCreateTitle">Add new product</h2><p data-progress aria-live="polite"></p></header>
+    <header><h2 id="productCreateTitle">New product</h2><p data-progress aria-live="polite"></p></header>
     <form novalidate><div class="product-create-body">
       <section data-step="0">
-        <p>Published product assets determine the type, colors and image assignments.
-          Set up the images before continuing.</p>
-        <div class="product-create-fields">
-          ${input('URL key', 'urlKey', 'required pattern="[a-z0-9]+(-[a-z0-9]+)*" maxlength="200"')}
-          <label>Placement<select name="placement"><option value="">Household</option><option value="commercial/">Commercial</option></select></label>
-        </div>
-        <div class="product-create-bundle product-create-bundle-choice">
-          <label class="product-create-bundle-toggle"><input type="checkbox" name="virtualBundle"> Virtual Bundle</label>
-        </div>
-        <fieldset class="product-create-catalogs">
-          <legend>Catalogs</legend>
-          <p>Select one or more countries. Canada includes English and French; Mexico includes English and Spanish.</p>
-          <div class="product-create-catalog-options">
-            ${['us', 'ca', 'mx', 'vr'].map((market) => {
-    const label = {
-      us: 'United States', ca: 'Canada (English and French)', mx: 'Mexico (English and Spanish)', vr: 'Rest of World',
-    }[market];
-    return `<label class="product-create-catalog" title="${label}">
-              <input type="checkbox" name="locale" value="${market}" aria-label="${label}" ${market === locale.split('/')[0] ? 'checked' : ''}>
-              <span class="product-create-catalog-pill">
-                <span class="product-create-flag product-create-flag-${market}">
-                  <img src="/icons/flag-${market}.svg" alt="">
-                </span>
-              </span>
-            </label>`;
-  }).join('')}
+        <div class="product-create-setup">
+          <label class="product-create-name-field">Product name
+            <input name="name" required autocomplete="off" placeholder="e.g. Ascent X5">
+          </label>
+          <fieldset class="product-create-market-field">
+            <legend>Countries</legend>
+            <div class="product-create-market-options" role="group" aria-label="Countries">
+              ${[
+    ['us', 'United States'],
+    ['ca', 'Canada'],
+    ['mx', 'Mexico'],
+    ['vr', 'Rest of World'],
+  ].map(([market, label]) => `<label class="product-create-market-option">
+                <input type="checkbox" name="locale" value="${market}" aria-label="${label}" ${market === locale.split('/')[0] ? 'checked' : ''}>
+                <span>${label}</span>
+              </label>`).join('')}
+            </div>
+          </fieldset>
+          <div class="product-create-fields product-create-setup-fields">
+            <label><span>Slug <small class="product-create-generated">(generated from name)</small></span>
+              <input name="urlKey" readonly>
+            </label>
+            <label>Placement<select name="placement"><option value="">Household</option><option value="commercial/">Commercial</option></select></label>
           </div>
-        </fieldset>
-        <p>Catalog path: <code data-path></code></p>
-        <p data-assets-help hidden><a href="${ASSETS_APP}" target="_blank" rel="noopener noreferrer">Set up product assets</a>
-          in a new tab, then return here and check again.</p>
-        <button type="button" data-check>Check assets</button>
-        <p data-assets-status role="status"></p><div data-assets-preview></div>
+          <label class="product-create-bundle-card">
+            <input type="checkbox" name="virtualBundle">
+            <span><strong>Virtual bundle</strong><small>Build a product from existing catalog products.</small></span>
+          </label>
+        </div>
+        <div class="product-create-assets-check">
+          <p data-assets-help hidden><a href="${ASSETS_APP}" target="_blank" rel="noopener noreferrer">Set up product assets</a>
+            in a new tab, then return here.</p>
+          <p data-assets-status role="status"></p>
+          <div data-assets-preview></div>
+        </div>
+        <p class="product-create-path"><span>Catalog path</span><code data-path></code></p>
       </section>
       <section data-step="1" hidden>
         <div data-product-details>
         <div class="product-create-fields">
-          ${input('Product name', 'name', 'required')}
           <label data-product-sku>Product SKU<input name="sku" required></label>
         </div>
         <h3>Categories</h3>
@@ -473,12 +476,15 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
       <section data-step="2" hidden>
         <div data-standard-settings>
         <div class="product-create-fields product-create-tax">
-          <label>Tax classification<select name="taxPreset">
-            <option value="">Not set</option>
-            ${TAX_PRESETS.map((preset, index) => `<option value="${index}">${escapeHtml(
-    `${preset.taxCode} / ${preset.taxData.UDF10} / ${preset.taxData.UDF11}`,
-  )}</option>`).join('')}
-          </select></label>
+          <label>Tax code<input name="taxCode" list="product-create-tax-codes" autocomplete="off"></label>
+          <datalist id="product-create-tax-codes">${[...new Set(TAX_PRESETS.map((preset) => preset.taxCode))]
+    .map((taxCode) => `<option value="${escapeHtml(taxCode)}"></option>`).join('')}</datalist>
+          <label>UDF10<input name="taxUDF10" list="product-create-tax-udf10" autocomplete="off"></label>
+          <datalist id="product-create-tax-udf10">${[...new Set(TAX_PRESETS.map((preset) => preset.taxData.UDF10))]
+    .map((value) => `<option value="${escapeHtml(value)}"></option>`).join('')}</datalist>
+          <label>UDF11<input name="taxUDF11" list="product-create-tax-udf11" autocomplete="off"></label>
+          <datalist id="product-create-tax-udf11">${[...new Set(TAX_PRESETS.map((preset) => preset.taxData.UDF11))]
+    .map((value) => `<option value="${escapeHtml(value)}"></option>`).join('')}</datalist>
         </div>
         <div class="product-create-fields">
           ${input('Weight', 'weight', 'type="number" min="0" step="any" inputmode="decimal"')}
@@ -494,9 +500,12 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
           </label>
         </div>
         <div class="product-create-options-section">
-          <label class="product-create-options-toggle"><input type="checkbox" name="showOptions"
-            aria-controls="product-create-option-fields" aria-expanded="false"> Options</label>
+          <h3 class="product-create-settings-section-title">
+            <button type="button" class="product-create-options-toggle product-create-settings-toggle"
+              aria-controls="product-create-option-fields" aria-expanded="false">Options</button>
+          </h3>
           <div id="product-create-option-fields" role="region" aria-label="Options" hidden>
+            <p class="product-create-settings-description">Add optional products customers can choose when they purchase this item.</p>
             <div class="product-create-options">
               ${OPTION_PRESETS.map((option, index) => `<label class="product-create-option-choice">
                 <input type="checkbox" name="productOption" value="${index}">
@@ -506,9 +515,12 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
           </div>
         </div>
         <div class="product-create-advanced">
-          <label class="product-create-advanced-toggle"><input type="checkbox" name="advancedSettings"
-            aria-controls="product-create-advanced-fields" aria-expanded="false"> Advanced Settings</label>
+          <h3 class="product-create-settings-section-title">
+            <button type="button" class="product-create-advanced-toggle product-create-settings-toggle"
+              aria-controls="product-create-advanced-fields" aria-expanded="false">Advanced Settings</button>
+          </h3>
           <div id="product-create-advanced-fields" role="region" aria-label="Advanced Settings" hidden>
+            <p class="product-create-settings-description">Set additional catalog attributes for the product.</p>
             <div class="product-create-fields">
               <label>Condition<select name="itemCondition">
                 <option value="NewCondition">New</option>
@@ -533,8 +545,8 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
       <p class="product-create-error" role="alert" hidden></p>
     </div><footer>
       <button type="button" data-json-toggle aria-pressed="false" hidden>JSON</button>
-      <button type="button" data-cancel>Cancel</button>
       <button type="button" data-back hidden>Back</button>
+      <button type="button" data-cancel>Cancel</button>
       <button type="submit" data-next disabled>Next</button>
     </footer></form>`;
 
@@ -542,7 +554,6 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
   const error = dialog.querySelector('[role="alert"]');
   const next = dialog.querySelector('[data-next]');
   const back = dialog.querySelector('[data-back]');
-  const check = dialog.querySelector('[data-check]');
   const cancel = dialog.querySelector('[data-cancel]');
   const jsonToggle = dialog.querySelector('[data-json-toggle]');
   const preview = dialog.querySelector('[data-assets-preview]');
@@ -581,6 +592,7 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
   let checking = false;
   let dirty = false;
   let revision = 0;
+  let assetCheckTimer;
 
   function showError(message) {
     error.textContent = message;
@@ -782,15 +794,12 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
     }
     updateStepTwoMode();
   });
-  field('advancedSettings').addEventListener('change', () => {
-    const enabled = field('advancedSettings').checked;
-    dialog.querySelector('#product-create-advanced-fields').hidden = !enabled;
-    field('advancedSettings').setAttribute('aria-expanded', String(enabled));
-  });
-  field('showOptions').addEventListener('change', () => {
-    const enabled = field('showOptions').checked;
-    dialog.querySelector('#product-create-option-fields').hidden = !enabled;
-    field('showOptions').setAttribute('aria-expanded', String(enabled));
+  dialog.querySelectorAll('.product-create-settings-toggle').forEach((toggle) => {
+    toggle.addEventListener('click', () => {
+      const expanded = toggle.getAttribute('aria-expanded') !== 'true';
+      toggle.setAttribute('aria-expanded', String(expanded));
+      dialog.querySelector(`#${toggle.getAttribute('aria-controls')}`).hidden = !expanded;
+    });
   });
   jsonToggle.addEventListener('click', () => {
     const showJson = jsonToggle.getAttribute('aria-pressed') !== 'true';
@@ -915,7 +924,10 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
     const stepLabel = field('virtualBundle').checked ? bundleSteps[step] : STEPS[step];
     dialog.querySelector('[data-progress]').textContent = `Step ${step + 1} of ${STEPS.length}: ${stepLabel}`;
     back.hidden = step === 0;
-    next.textContent = step === 3 ? 'Create product' : 'Next';
+    let nextLabel = 'Next';
+    if (step === 0) nextLabel = 'Continue';
+    if (step === 3) nextLabel = 'Create product';
+    next.textContent = nextLabel;
     next.disabled = step === 0 && !plan;
     jsonToggle.hidden = step !== 3;
     jsonToggle.setAttribute('aria-pressed', 'false');
@@ -936,28 +948,52 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
       ? `${created.size} catalogs have been created and will remain. Close without creating the remaining catalogs?`
       : 'Discard this new product and close?';
     if (dirty && !window.confirm(message)) return;
+    clearTimeout(assetCheckTimer);
     revision += 1;
     dialog.close();
     dialog.remove();
   }
 
   function invalidate() {
+    clearTimeout(assetCheckTimer);
+    assetCheckTimer = undefined;
     revision += 1;
     plan = undefined;
     plans = new Map();
     checkedRows = undefined;
     next.disabled = true;
     preview.replaceChildren();
-    status.textContent = 'Check assets for the selected product and catalog.';
+    status.textContent = '';
     assetsHelp.hidden = true;
-    dialog.querySelector('[data-path]').textContent = selectedLocales().map((catalog) => path(catalog)).join(', ');
-    check.textContent = 'Check assets';
+    const urlKey = value('urlKey');
+    dialog.querySelector('[data-path]').textContent = urlKey
+      ? selectedLocales().map((catalog) => path(catalog)).join(', ') || 'Select a country'
+      : 'Generated from the product name';
+  }
+
+  function scheduleAssetCheck() {
+    clearTimeout(assetCheckTimer);
+    assetCheckTimer = setTimeout(() => {
+      assetCheckTimer = undefined;
+      if (!dialog.isConnected || checking) return;
+      if (!value('name') || !value('urlKey')) return;
+      if (!selectedLocales().length) {
+        status.textContent = 'Select at least one country to check product assets.';
+        return;
+      }
+      inspectAssets();
+    }, ASSET_CHECK_DEBOUNCE_MS);
   }
 
   function updateCatalogPlans() {
-    dialog.querySelector('[data-path]').textContent = selectedLocales()
-      .map((catalog) => path(catalog)).join(', ');
-    if (!checkedRows) return;
+    const urlKey = value('urlKey');
+    dialog.querySelector('[data-path]').textContent = urlKey
+      ? selectedLocales().map((catalog) => path(catalog)).join(', ') || 'Select a country'
+      : 'Generated from the product name';
+    if (!checkedRows) {
+      next.disabled = true;
+      return;
+    }
     plans = new Map();
     plan = undefined;
     next.disabled = true;
@@ -973,8 +1009,16 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
       });
       plan = plans.values().next().value;
       next.disabled = false;
+      status.textContent = '';
+      assetsHelp.hidden = true;
     } catch (err) {
-      showError(err.message);
+      if (/No images are available for this market/i.test(err.message)) {
+        status.textContent = '';
+        assetsHelp.hidden = true;
+      } else {
+        status.textContent = err.message;
+        assetsHelp.hidden = false;
+      }
     }
   }
 
@@ -1104,9 +1148,15 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
     const amount = priceAmount(value(`price-${market}`));
     const price = { currency: MARKET_CURRENCIES[market], final: amount, regular: amount };
     const url = `https://www.vitamix.com${path(catalog)}`;
-    const taxPreset = !isVirtualBundle && value('taxPreset') !== '' ? TAX_PRESETS[Number(value('taxPreset'))] : undefined;
-    const manualTax = taxPreset
-      ? { taxCode: taxPreset.taxCode, taxData: { ...taxPreset.taxData } }
+    const taxCode = value('taxCode');
+    const taxUDF10 = value('taxUDF10');
+    const taxUDF11 = value('taxUDF11');
+    const taxData = {
+      ...(taxUDF10 ? { UDF10: taxUDF10 } : {}),
+      ...(taxUDF11 ? { UDF11: taxUDF11 } : {}),
+    };
+    const manualTax = !isVirtualBundle && (taxCode || Object.keys(taxData).length)
+      ? { ...(taxCode ? { taxCode } : {}), ...(Object.keys(taxData).length ? { taxData } : {}) }
       : {};
     const condition = isVirtualBundle ? 'NewCondition' : value('itemCondition');
     const weightValue = value('weight');
@@ -1202,10 +1252,9 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
   }
 
   async function inspectAssets() {
-    if (!validateStep() || checking) return;
+    if (checking) return;
     const requestRevision = revision;
     checking = true;
-    check.disabled = true;
     next.disabled = true;
     plan = undefined;
     checkedRows = undefined;
@@ -1225,13 +1274,19 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
       updateCatalogPlans();
     } catch (err) {
       if (revision !== requestRevision) return;
-      status.textContent = '';
-      assetsHelp.hidden = false;
-      showError(err.message || 'Could not check product assets.');
+      const message = err.message || 'Could not check product assets.';
+      const assetsNotReady = /No images\.json|No images are available for this market|images\.json is not available/i
+        .test(message);
+      if (assetsNotReady) {
+        status.textContent = '';
+        assetsHelp.hidden = true;
+      } else {
+        status.textContent = `Could not check product assets: ${message}`;
+        assetsHelp.hidden = false;
+      }
     } finally {
       checking = false;
-      check.disabled = false;
-      check.textContent = 'Check again';
+      if (revision !== requestRevision) scheduleAssetCheck();
     }
   }
 
@@ -1241,7 +1296,14 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
       event.target.closest('.product-create-promo')
         .classList.toggle('product-create-promo-selected', Boolean(value('promoButton')));
     }
-    if (event.target.name === 'urlKey') invalidate();
+    if (event.target.name === 'name') {
+      const slug = categorySlugFromName(value('name'));
+      if (field('urlKey').value !== slug) {
+        field('urlKey').value = slug;
+        invalidate();
+        scheduleAssetCheck();
+      }
+    }
     if (event.target.dataset.currency) event.target.setCustomValidity('');
   });
   form.addEventListener('focusout', (event) => {
@@ -1259,9 +1321,10 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
     }
   });
   form.addEventListener('change', (event) => {
-    if (['locale', 'placement'].includes(event.target.name)) updateCatalogPlans();
+    if (['locale', 'placement'].includes(event.target.name)) {
+      updateCatalogPlans();
+    }
   });
-  check.addEventListener('click', inspectAssets);
   cancel.addEventListener('click', dismiss);
   wireDialogEscapeDismiss(dialog, dismiss);
   dialog.addEventListener('cancel', (event) => { event.preventDefault(); dismiss(); });
@@ -1371,6 +1434,7 @@ export function startProductCreate({ locale = 'us/en_us', categories = [] } = {}
         const params = new URLSearchParams({
           catalog: selectedLocales()[0], product: products[0].path,
         });
+        clearTimeout(assetCheckTimer);
         dialog.close();
         dialog.remove();
         window.location.href = commerceAdminHref(`product-detail.html?${params}`);
