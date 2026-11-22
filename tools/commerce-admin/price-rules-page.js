@@ -62,18 +62,15 @@ import {
   mountProductSelectionField,
 } from './product-selection-field.js';
 import { loadProductScopeIndexContext } from './product-scope-pills.js';
-import { collectCouponGroups, mountCouponGroupsField } from './coupon-groups-field.js';
 import {
   applyCouponScope,
   COUPON_SCOPE_FIELDS,
-  couponScopeForMode,
-  couponScopeMode,
   couponScopeOf,
   couponScopeSummary,
   couponTypeRowsFromResponse,
   describeCatalogSaveErrors,
   hasCouponScope,
-  mountCouponTypesField,
+  mountCouponScopeBrowserField,
 } from './promotion-coupon-scope.js';
 import {
   commerceGroupBadgeHtml,
@@ -98,6 +95,11 @@ function getPrAppMode() {
 }
 
 const PR_APP_MODE = getPrAppMode();
+const PROMOTION_AEM_BASE = 'https://main--vitamix--aemsites.aem.network';
+const PROMOTION_FCORS_URL = 'https://fcors.org/?url=';
+const PROMOTION_FCORS_KEY = '&key=Mg23N96GgR8O3NjU';
+/** @type {Map<string, Promise<string>>} */
+const promotionGiftImagePromises = new Map();
 
 /** @typedef {object} RuleRow
  * @property {string} name
@@ -206,13 +208,12 @@ const AREAS = /** @type {const} */ (['rules', 'promotions']);
  *   catalogPromotions: import('./price-rules-api.js').CatalogPromotion[],
  *   promotionCouponTypes: Record<string, unknown>[],
  *   promotionCouponLoadError: string,
- *   promotionCouponGateSelections: Record<string, string>,
  *   catalogDataSource: 'api'|'unavailable',
  *   catalogLoadError: string,
  *   cartRulesList: import('./price-rules-api.js').HelixCartPriceRule[]|null,
  *   cartDataSource: 'api'|'unavailable',
  *   cartLoadError: string,
- *   promoListSortKey: 'title'|'id'|'rows'|'start'|'end'|'mincart'|'group'|'market',
+ *   promoListSortKey: 'recency'|'title'|'id'|'rows'|'start'|'end'|'mincart'|'group'|'market',
  *   promoListSortDir: 'asc'|'desc',
  *   promoCalSelected: { countryKey: string, id: string } | null,
  *   cartRuleSortKey: 'title'|'id'|'min'|'off'|'freeship'|'scope'|'market',
@@ -226,7 +227,7 @@ const state = {
   promoListSearch: '',
   promoListGroupFilter: '',
   cartRuleSearch: '',
-  promoListSortKey: /** @type {'title'|'id'|'rows'|'start'|'end'|'mincart'|'group'|'market'} */ ('title'),
+  promoListSortKey: /** @type {'recency'|'title'|'id'|'rows'|'start'|'end'|'mincart'|'group'|'market'} */ ('recency'),
   promoListSortDir: /** @type {'asc'|'desc'} */ ('asc'),
   /** Promotion picked by clicking a bar in the overview calendar. */
   promoCalSelected: /** @type {{ countryKey: string, id: string } | null} */ (null),
@@ -237,8 +238,6 @@ const state = {
   /** @type {Record<string, unknown>[]} */
   promotionCouponTypes: [],
   promotionCouponLoadError: '',
-  /** Mock-only, session-local until the promotion access API exists. */
-  promotionCouponGateSelections: /** @type {Record<string, string>} */ ({}),
   /** @type {'api'|'unavailable'} */
   catalogDataSource: 'unavailable',
   catalogLoadError: '',
@@ -500,68 +499,6 @@ async function readProductBusResponseError(resp) {
  * @param {Record<string, unknown>} row
  * @returns {string}
  */
-function couponTypeIdFromRow(row) {
-  return String(row?.id ?? row?.typeId ?? '').trim();
-}
-
-/**
- * @param {Record<string, unknown>} row
- * @returns {string}
- */
-function couponTypeLabelFromRow(row) {
-  const id = couponTypeIdFromRow(row);
-  const name = String(row?.name ?? '').trim();
-  if (name && id) return `${name} (${id})`;
-  return name || id || 'Untitled coupon';
-}
-
-function sortedPromotionCouponTypes() {
-  return state.promotionCouponTypes
-    .filter((row) => couponTypeIdFromRow(row))
-    .slice()
-    .sort((a, b) => couponTypeLabelFromRow(a).localeCompare(
-      couponTypeLabelFromRow(b),
-      undefined,
-      { sensitivity: 'base', numeric: true },
-    ));
-}
-
-function promotionCouponLabelById(couponId) {
-  const id = String(couponId || '').trim();
-  if (!id) return '';
-  const row = state.promotionCouponTypes.find((r) => couponTypeIdFromRow(r) === id);
-  return row ? couponTypeLabelFromRow(row) : id;
-}
-
-function promotionCouponGateOptionsHtml(selected = '') {
-  const rows = sortedPromotionCouponTypes();
-  const selectedId = String(selected || '').trim();
-  if (!rows.length) {
-    const label = state.promotionCouponLoadError
-      ? 'Coupon list unavailable'
-      : 'No coupons available';
-    return `<option value="">${escapeHtml(label)}</option>`;
-  }
-  const opts = rows.map((row) => {
-    const id = couponTypeIdFromRow(row);
-    const sel = id === selectedId ? ' selected' : '';
-    return `<option value="${escapeHtml(id)}"${sel}>${escapeHtml(couponTypeLabelFromRow(row))}</option>`;
-  });
-  return `<option value="">Select a coupon…</option>${opts.join('')}`;
-}
-
-function promotionCouponGateSelection(promoId) {
-  return String(state.promotionCouponGateSelections[String(promoId || '').trim()] || '').trim();
-}
-
-function setPromotionCouponGateSelection(promoId, couponId) {
-  const id = String(promoId || '').trim();
-  if (!id) return;
-  const coupon = String(couponId || '').trim();
-  if (coupon) state.promotionCouponGateSelections[id] = coupon;
-  else delete state.promotionCouponGateSelections[id];
-}
-
 async function loadPromotionCouponTypesFromApi() {
   try {
     const resp = await apiFetch(PB_ORG, PB_SITE, 'coupons/types', { method: 'GET' });
@@ -1040,18 +977,6 @@ function wirePromotionMinCartConditionFields(dlg) {
   sync();
 }
 
-/** @param {ParentNode} root */
-function wirePromotionCouponGateFields(root) {
-  const cb = root.querySelector('[data-pr-promo-coupon-gate-enabled]');
-  const sel = root.querySelector('[data-pr-promo-coupon-gate-select]');
-  if (!(cb instanceof HTMLInputElement) || !(sel instanceof HTMLSelectElement)) return;
-  const sync = () => {
-    sel.disabled = !cb.checked || !sortedPromotionCouponTypes().length;
-  };
-  cb.addEventListener('change', sync);
-  sync();
-}
-
 /** @param {HTMLDialogElement} dlg */
 function readPromotionMinCartCondition(dlg) {
   const cb = dlg.querySelector('#pr-promo-min-cart-enabled');
@@ -1060,40 +985,31 @@ function readPromotionMinCartCondition(dlg) {
   return { enabled, amountRaw: raw };
 }
 
-/** @param {HTMLDialogElement} dlg */
-function readPromotionCouponGateMock(dlg) {
-  const cb = dlg.querySelector('[data-pr-promo-coupon-gate-enabled]');
-  const sel = dlg.querySelector('[data-pr-promo-coupon-gate-select]');
-  const enabled = cb instanceof HTMLInputElement && cb.checked;
-  const couponId = sel instanceof HTMLSelectElement ? String(sel.value || '').trim() : '';
-  return { enabled, couponId };
-}
-
 /** Promotion scope kinds: form id prefix → condition keys and labels. */
 const PROMO_SCOPE_KINDS = /** @type {const} */ ([
   {
     kind: 'included',
     productsKey: 'includedProducts',
     categoriesKey: 'includedCategories',
-    label: 'Only count these products',
-    emptyCategories: 'Any category',
-    emptyProducts: 'Any product',
+    label: 'Included products',
+    emptyText: 'None — click to add products or categories.',
+    hint: 'Products and categories that count toward the minimum. Leave empty to count every paid product.',
   },
   {
     kind: 'excluded',
     productsKey: 'excludedProducts',
     categoriesKey: 'excludedCategories',
-    label: 'Don\'t count these products',
-    emptyCategories: 'None',
-    emptyProducts: 'None',
+    label: 'Excluded products',
+    emptyText: 'None — click to add products or categories.',
+    hint: 'Products and categories that never count toward the minimum.',
   },
   {
     kind: 'disqualifying',
     productsKey: 'disqualifyingProducts',
     categoriesKey: 'disqualifyingCategories',
-    label: 'Never apply when the cart contains',
-    emptyCategories: 'None',
-    emptyProducts: 'None',
+    label: 'Blocked products',
+    emptyText: 'None — click to add products or categories.',
+    hint: 'The promotion does not apply when the cart contains these products or categories.',
   },
 ]);
 
@@ -1110,6 +1026,8 @@ const PROMO_SCOPE_REGION_INFO = {
 const promoScopeProductsInputId = (kind, region) => `pr-promo-${kind}-products-${region}`;
 /** @param {string} kind */
 const promoScopeCategoriesInputId = (kind) => `pr-promo-${kind}-categories`;
+/** @param {string} market */
+const promoScopeRegionForMarket = (market) => (market === 'ca' ? 'ca' : 'us');
 
 /**
  * @param {ParentNode} dlg
@@ -1222,22 +1140,12 @@ const COUPON_SCOPE_SIDES = /** @type {const} */ ([
     side: 'block',
     types: 'excludedCouponTypes',
     groups: 'excludedCouponGroups',
-    typesLabel: 'Blocked coupon types',
-    groupsLabel: 'Blocked coupon groups',
   },
   {
     side: 'allow',
     types: 'includedCouponTypes',
     groups: 'includedCouponGroups',
-    typesLabel: 'Allowed coupon types',
-    groupsLabel: 'Allowed coupon groups',
   },
-]);
-
-const COUPON_SCOPE_MODES = /** @type {const} */ ([
-  ['all', 'All coupons allowed'],
-  ['block', 'Block selected coupons'],
-  ['allow', 'Only allow selected coupons'],
 ]);
 
 const COUPON_SCOPE_CONDITIONS_MESSAGE = 'A promotion with a minimum or product conditions can\'t limit coupons. Remove the coupon limits or the conditions.';
@@ -1251,42 +1159,23 @@ const promoCouponInputId = (field) => `pr-promo-coupon-${field}`;
  */
 function promotionCouponScopeFieldsHtml(promo) {
   const scope = couponScopeOf(promo);
-  const mode = couponScopeMode(scope);
-  const advanced = mode === 'advanced';
-  const radios = COUPON_SCOPE_MODES.map(([value, label]) => `
-      <label class="pr-promo-coupon-mode">
-        <input type="radio" name="pr-promo-coupon-mode" value="${value}"${value === mode ? ' checked' : ''} />
-        <span>${escapeHtml(label)}</span>
-      </label>`).join('');
   const sides = COUPON_SCOPE_SIDES.map((s) => `
-      <div class="pr-promo-coupon-side" data-pr-promo-coupon-side="${s.side}">
-        ${[[s.types, s.typesLabel], [s.groups, s.groupsLabel]].map(([field, label]) => `
-        <span class="pr-promo-scope-subhead">${escapeHtml(label)}</span>
-        <div data-pr-promo-coupon-mount="${field}"></div>
-        <input type="text" id="${promoCouponInputId(field)}" value="${escapeHtml(scope[field].length ? JSON.stringify(scope[field]) : '')}" />`).join('')}
+      <div class="pr-promo-coupon-policy" data-pr-promo-coupon-side="${s.side}">
+        <h4 class="pr-promo-coupon-policy-title">${s.side === 'allow' ? 'Allowed' : 'Blocked'}</h4>
+        <div data-pr-promo-coupon-mount="${s.side}"></div>
+        <input type="text" id="${promoCouponInputId(s.types)}" value="${escapeHtml(scope[s.types].length ? JSON.stringify(scope[s.types]) : '')}" autocomplete="off" />
+        <input type="text" id="${promoCouponInputId(s.groups)}" value="${escapeHtml(scope[s.groups].length ? JSON.stringify(scope[s.groups]) : '')}" autocomplete="off" />
       </div>`).join('');
   const loadError = state.promotionCouponLoadError
-    ? `<p class="coupons-field-hint pr-promo-coupon-gate-error">Coupon list unavailable: ${escapeHtml(state.promotionCouponLoadError)}</p>`
+    ? `<p class="coupons-field-hint pr-promo-coupon-load-error">Coupon list unavailable: ${escapeHtml(state.promotionCouponLoadError)}</p>`
     : '';
   return `
-      <div class="coupons-field coupons-field-full pr-promo-coupon-scope" data-pr-promo-coupon-scope data-mode="${mode}">
-        <label>Coupons</label>
-        <p class="coupons-field-hint">Which coupons apply to the products this promotion prices. Groups let you allow or block many coupons at once.</p>
-        <div class="pr-promo-coupon-modes" role="radiogroup" aria-label="Coupons"${advanced ? ' hidden' : ''}>${radios}
-          <button type="button" class="coupons-btn pr-promo-coupon-advanced-btn" data-pr-promo-coupon-advanced>Mix allow and block…</button>
-        </div>
-        <p class="coupons-field-hint" data-pr-promo-coupon-precedence${advanced ? '' : ' hidden'}>First match wins: blocked type, allowed type, blocked group, allowed group; anything else is blocked when an allow list is set.</p>
-        ${sides}
+      <div class="coupons-field coupons-field-full pr-promo-coupon-scope" data-pr-promo-coupon-scope>
+        <p class="coupons-field-hint">Choose coupon types and groups that are allowed or blocked for this promotion.</p>
+        <div class="pr-promo-coupon-policies">${sides}</div>
         <p class="pr-promo-coupon-conditions-error" data-pr-promo-coupon-conditions role="alert" hidden>${escapeHtml(COUPON_SCOPE_CONDITIONS_MESSAGE)}</p>
         ${loadError}
       </div>`;
-}
-
-/** @param {ParentNode} dlg */
-function readPromotionCouponScopeMode(dlg) {
-  const section = dlg.querySelector('[data-pr-promo-coupon-scope]');
-  const mode = section?.getAttribute('data-mode') || 'all';
-  return /** @type {import('./promotion-coupon-scope.js').CouponScopeMode} */ (mode);
 }
 
 /**
@@ -1304,7 +1193,7 @@ function readPromotionCouponScopeForm(dlg) {
       raw[field] = [];
     }
   });
-  return couponScopeForMode(readPromotionCouponScopeMode(dlg), raw);
+  return couponScopeOf(raw);
 }
 
 /**
@@ -1324,67 +1213,33 @@ function promotionFormHasConditions(dlg) {
 function wirePromotionCouponScopeFields(dlg) {
   const section = dlg.querySelector('[data-pr-promo-coupon-scope]');
   if (!(section instanceof HTMLElement)) return;
-  const typesLoaded = !state.promotionCouponLoadError;
-  const typeFields = [];
-  const groupSuggestions = collectCouponGroups(state.promotionCouponTypes);
   COUPON_SCOPE_SIDES.forEach((s) => {
     const typeInput = dlg.querySelector(`#${promoCouponInputId(s.types)}`);
-    const tf = mountCouponTypesField(
-      section.querySelector(`[data-pr-promo-coupon-mount="${s.types}"]`),
+    const groupsInput = dlg.querySelector(`#${promoCouponInputId(s.groups)}`);
+    mountCouponScopeBrowserField(
+      section.querySelector(`[data-pr-promo-coupon-mount="${s.side}"]`),
       typeInput instanceof HTMLInputElement ? typeInput : null,
+      groupsInput instanceof HTMLInputElement ? groupsInput : null,
       {
         types: state.promotionCouponTypes,
-        typesLoaded,
-        getMarket: () => promotionDialogMarketSafe(dlg),
-        label: s.typesLabel.toLowerCase(),
+        couponRows: state.promotionCouponTypes,
+        label: `${s.side === 'allow' ? 'Allowed' : 'Blocked'} coupons`,
       },
-    );
-    if (tf) typeFields.push(tf);
-    const groupInput = dlg.querySelector(`#${promoCouponInputId(s.groups)}`);
-    mountCouponGroupsField(
-      section.querySelector(`[data-pr-promo-coupon-mount="${s.groups}"]`),
-      groupInput instanceof HTMLInputElement ? groupInput : null,
-      { suggestions: groupSuggestions, label: s.groupsLabel.toLowerCase() },
     );
   });
 
   const conditionsMsg = section.querySelector('[data-pr-promo-coupon-conditions]');
   const sync = () => {
-    const mode = readPromotionCouponScopeMode(dlg);
-    section.querySelectorAll('[data-pr-promo-coupon-side]').forEach((el) => {
-      const side = el.getAttribute('data-pr-promo-coupon-side');
-      /** @type {HTMLElement} */ (el).hidden = !(mode === 'advanced' || mode === side);
-    });
     const conditional = promotionFormHasConditions(dlg);
     const scoped = hasCouponScope(readPromotionCouponScopeForm(dlg));
-    section.hidden = conditional && !scoped;
     if (conditionsMsg instanceof HTMLElement) conditionsMsg.hidden = !(conditional && scoped);
   };
-  section.querySelectorAll('input[name="pr-promo-coupon-mode"]').forEach((radio) => {
-    radio.addEventListener('change', () => {
-      if (radio instanceof HTMLInputElement && radio.checked) {
-        section.setAttribute('data-mode', radio.value);
-        sync();
-      }
-    });
-  });
-  section.querySelector('[data-pr-promo-coupon-advanced]')?.addEventListener('click', () => {
-    section.setAttribute('data-mode', 'advanced');
-    const modes = section.querySelector('.pr-promo-coupon-modes');
-    if (modes instanceof HTMLElement) modes.hidden = true;
-    const hint = section.querySelector('[data-pr-promo-coupon-precedence]');
-    if (hint instanceof HTMLElement) hint.hidden = false;
-    sync();
-  });
   section.addEventListener('input', sync);
   dlg.querySelector('#pr-promo-min-cart-enabled')?.addEventListener('change', sync);
   PROMO_SCOPE_KINDS.forEach(({ kind }) => {
     [promoScopeCategoriesInputId(kind), ...[...PROMO_SCOPE_REGIONS, 'other']
       .map((r) => promoScopeProductsInputId(kind, r))]
       .forEach((id) => promoScopeInput(dlg, id)?.addEventListener('input', sync));
-  });
-  dlg.querySelector('#pr-promo-form-market')?.addEventListener('change', () => {
-    typeFields.forEach((f) => f.refresh());
   });
   sync();
 }
@@ -1513,8 +1368,8 @@ async function collapsePromotionScopeLanguages(scope) {
 }
 
 /**
- * New promotions: prefill the default disqualifying category while the promotion has another
- * condition (any condition makes it a gift promotion, not a sale). Stops once the admin edits it.
+ * New promotions: prefill the default disqualifying category while eligibility conditions exist.
+ * Stops once the admin edits it.
  *
  * @param {HTMLDialogElement} dlg
  */
@@ -1524,7 +1379,8 @@ function wirePromotionDefaultDisqualifier(dlg) {
   if (!target || !(minCb instanceof HTMLInputElement)) return;
   const others = ['included', 'excluded'].flatMap((kind) => [
     promoScopeInput(dlg, promoScopeCategoriesInputId(kind)),
-    ...PROMO_SCOPE_REGIONS.map((r) => promoScopeInput(dlg, promoScopeProductsInputId(kind, r))),
+    ...[...PROMO_SCOPE_REGIONS, 'other']
+      .map((r) => promoScopeInput(dlg, promoScopeProductsInputId(kind, r))),
   ]).filter(Boolean);
   let auto = false;
   let touched = false;
@@ -1551,45 +1407,32 @@ function wirePromotionDefaultDisqualifier(dlg) {
   });
   minCb.addEventListener('change', sync);
   others.forEach((el) => el.addEventListener('input', sync));
-}
-
-/** @param {string} raw */
-function promoScopePickCount(raw) {
-  return String(raw || '').split(',').filter((t) => t.trim()).length;
+  sync();
 }
 
 /**
- * Categories field plus one products tab per region, for each scope kind.
+ * Combined category and product selector for each scope kind. Picks for other markets stay
+ * hidden and are preserved when the promotion is saved.
  *
- * @param {(typeof COUNTRIES)[number]} market selects the initial products tab
+ * @param {(typeof COUNTRIES)[number]} market selects the product index
  */
 function promotionScopeFieldsHtml(market) {
-  const initial = PROMO_SCOPE_REGIONS.includes(/** @type {'us'|'ca'} */ (market)) ? market : 'us';
-  const hints = {
-    included: 'Products and categories that count toward the minimum. Leave empty to count every paid product. Without a minimum, the cart must contain one of them.',
-    excluded: 'Products and categories that never count toward the minimum. Product picks win over category picks; within each, excluded wins over included.',
-    disqualifying: 'The promotion doesn\'t apply at all when any of these products or categories is in the cart, whatever the subtotal.',
-  };
-  return PROMO_SCOPE_KINDS.map(({ kind, label }) => {
-    const tabs = PROMO_SCOPE_REGIONS.map((region) => `
-          <button type="button" role="tab" class="pr-promo-scope-tab" data-pr-promo-scope-tab="${region}"
-            aria-selected="${region === initial}">${escapeHtml(PROMO_SCOPE_REGION_INFO[region].label)} <span class="pr-promo-scope-tab-count" data-pr-promo-scope-count="${region}"></span></button>`).join('');
-    const panels = PROMO_SCOPE_REGIONS.map((region) => `
-        <div role="tabpanel" class="pr-promo-scope-panel" data-pr-promo-scope-panel="${region}"${region === initial ? '' : ' hidden'}>
-          <div data-pr-promo-psf-mount="${kind}-${region}"></div>
-          <input type="text" id="${promoScopeProductsInputId(kind, region)}" autocomplete="off" />
-        </div>`).join('');
+  const selectedRegion = promoScopeRegionForMarket(market);
+  return PROMO_SCOPE_KINDS.map(({
+    kind, label, hint,
+  }) => {
+    const otherInputs = [...PROMO_SCOPE_REGIONS, 'other']
+      .filter((region) => region !== selectedRegion)
+      .map((region) => `<input type="hidden" id="${promoScopeProductsInputId(kind, region)}" />`)
+      .join('');
     return `
       <div class="coupons-field coupons-field-full pr-promo-scope-field" data-pr-promo-scope="${kind}">
         <label>${escapeHtml(label)}</label>
-        <p class="coupons-field-hint">${escapeHtml(hints[kind])}</p>
-        <span class="pr-promo-scope-subhead">Categories</span>
-        <div data-pr-promo-psf-mount="${kind}-categories"></div>
+        <p class="coupons-field-hint">${escapeHtml(hint)}</p>
+        <div data-pr-promo-psf-mount="${kind}"></div>
         <input type="text" id="${promoScopeCategoriesInputId(kind)}" autocomplete="off" />
-        <span class="pr-promo-scope-subhead">Products</span>
-        <div class="pr-promo-scope-tabs" role="tablist" aria-label="${escapeHtml(label)}: products by region">${tabs}
-        </div>${panels}
-        <input type="hidden" id="${promoScopeProductsInputId(kind, 'other')}" />
+        <input type="text" id="${promoScopeProductsInputId(kind, selectedRegion)}" autocomplete="off" />
+        ${otherInputs}
       </div>`;
   }).join('');
 }
@@ -1597,77 +1440,76 @@ function promotionScopeFieldsHtml(market) {
 /** @type {Array<{ destroy: () => void; refresh: () => Promise<void> }>} */
 let promotionScopeSelectionFields = [];
 
+/** @type {Array<{ destroy: () => void }>} */
+let promotionGiftProductFields = [];
+
+/** @param {HTMLDialogElement} dlg */
+function wirePromotionGiftProductFields(dlg) {
+  promotionGiftProductFields.forEach((field) => field.destroy());
+  promotionGiftProductFields = [];
+  dlg.querySelectorAll('[data-pr-promo-gift-product-mount]').forEach((mount) => {
+    const row = dlg.querySelector('#pr-promo-form-lines-tbody [data-pr-promo-line]');
+    const productsInput = row?.querySelector('.pr-promo-h-product');
+    if (!(mount instanceof HTMLElement) || !(productsInput instanceof HTMLInputElement)) return;
+    const categoriesInput = document.createElement('input');
+    const field = mountProductSelectionField(mount, {
+      productsInput,
+      categoriesInput,
+      getLocalePath: () => localePathForCartRuleMarket(promotionDialogMarketSafe(dlg)),
+      label: 'Choose one gift product',
+      emptyText: 'No gift product selected — click to choose one.',
+      noCategories: true,
+      fixedLocale: true,
+      maxProducts: 1,
+      resolveProductImage: (path) => fetchPromotionGiftOgImage(path),
+    });
+    promotionGiftProductFields.push(field);
+    productsInput.addEventListener('input', () => {
+      if (row instanceof HTMLTableRowElement) syncPromotionSaleRowView(row);
+      validatePromotionRows(dlg).catch(() => {});
+    });
+  });
+  if (dlg.dataset.prPromoGiftCleanupWired !== '1') {
+    dlg.dataset.prPromoGiftCleanupWired = '1';
+    dlg.querySelector('#pr-promo-form-market')?.addEventListener('change', () => {
+      promotionGiftProductFields.forEach((field) => {
+        field.refresh().catch(() => {});
+      });
+    });
+    dlg.addEventListener('close', () => {
+      promotionGiftProductFields.forEach((field) => field.destroy());
+      promotionGiftProductFields = [];
+    }, { once: true });
+  }
+}
+
 /** @param {HTMLDialogElement} dlg */
 function wirePromotionScopeFields(dlg) {
   promotionScopeSelectionFields.forEach((f) => f.destroy());
   promotionScopeSelectionFields = [];
-  const categoriesLocale = () => localePathForCartRuleMarket(promotionDialogMarketSafe(dlg));
-  /** @type {Array<{ destroy: () => void; refresh: () => Promise<void> }>} */
-  const categoryFields = [];
-
-  PROMO_SCOPE_KINDS.forEach(({
-    kind, label, emptyCategories, emptyProducts,
-  }) => {
+  PROMO_SCOPE_KINDS.forEach(({ kind, label, emptyText }) => {
     const field = dlg.querySelector(`[data-pr-promo-scope="${kind}"]`);
     if (!(field instanceof HTMLElement)) return;
-    const unusedInput = () => document.createElement('input');
-
-    const catMount = field.querySelector(`[data-pr-promo-psf-mount="${kind}-categories"]`);
+    const mount = field.querySelector(`[data-pr-promo-psf-mount="${kind}"]`);
     const catInput = promoScopeInput(dlg, promoScopeCategoriesInputId(kind));
-    if (catMount instanceof HTMLElement && catInput) {
-      const f = mountProductSelectionField(catMount, {
-        productsInput: unusedInput(),
-        categoriesInput: catInput,
-        getLocalePath: categoriesLocale,
-        label: `${label}: categories`,
-        emptyText: `${emptyCategories} — click to pick categories.`,
-        categoriesOnly: true,
-      });
-      categoryFields.push(f);
-      promotionScopeSelectionFields.push(f);
-    }
-
-    const updateCounts = () => {
-      PROMO_SCOPE_REGIONS.forEach((region) => {
-        const input = promoScopeInput(dlg, promoScopeProductsInputId(kind, region));
-        const n = promoScopePickCount(input?.value);
-        const el = field.querySelector(`[data-pr-promo-scope-count="${region}"]`);
-        if (el) el.textContent = n ? `(${n})` : '';
-      });
-    };
-    PROMO_SCOPE_REGIONS.forEach((region) => {
-      const mount = field.querySelector(`[data-pr-promo-psf-mount="${kind}-${region}"]`);
-      const input = promoScopeInput(dlg, promoScopeProductsInputId(kind, region));
-      if (!(mount instanceof HTMLElement) || !input) return;
-      const { label: regionLabel, locale } = PROMO_SCOPE_REGION_INFO[region];
+    const market = promotionDialogMarketSafe(dlg);
+    const productsInput = promoScopeInput(
+      dlg,
+      promoScopeProductsInputId(kind, promoScopeRegionForMarket(market)),
+    );
+    if (mount instanceof HTMLElement && catInput && productsInput) {
       promotionScopeSelectionFields.push(mountProductSelectionField(mount, {
-        productsInput: input,
-        categoriesInput: unusedInput(),
-        getLocalePath: () => locale,
-        label: `${label}: ${regionLabel} products`,
-        emptyText: `${emptyProducts} — click to pick ${regionLabel} products.`,
-        noCategories: true,
-        fixedLocale: true,
+        productsInput,
+        categoriesInput: catInput,
+        getLocalePath: () => localePathForCartRuleMarket(promotionDialogMarketSafe(dlg)),
+        label,
+        emptyText,
       }));
-      input.addEventListener('input', updateCounts);
-    });
-    updateCounts();
-
-    field.querySelectorAll('[data-pr-promo-scope-tab]').forEach((tab) => {
-      tab.addEventListener('click', () => {
-        const region = tab.getAttribute('data-pr-promo-scope-tab');
-        field.querySelectorAll('[data-pr-promo-scope-tab]').forEach((t) => {
-          t.setAttribute('aria-selected', String(t === tab));
-        });
-        field.querySelectorAll('[data-pr-promo-scope-panel]').forEach((panel) => {
-          /** @type {HTMLElement} */ (panel).hidden = panel.getAttribute('data-pr-promo-scope-panel') !== region;
-        });
-      });
-    });
+    }
   });
 
   dlg.querySelector('#pr-promo-form-market')?.addEventListener('change', () => {
-    categoryFields.forEach((f) => {
+    promotionScopeSelectionFields.forEach((f) => {
       f.refresh().catch(() => {});
     });
   });
@@ -1969,11 +1811,12 @@ async function validatePromotionRows(dlg) {
   const checksByEntry = new Map(productChecks.map((check) => [check.entry, check]));
 
   const market = promotionDialogMarketSafe(dlg);
+  const isGift = dlg.dataset.prPromoType === 'gift';
   let invalid = 0;
   entries.forEach((e) => {
     let reason = '';
     if (!e.url) {
-      reason = 'Product path is required.';
+      if (!isGift) reason = 'Product path is required.';
     } else {
       const check = checksByEntry.get(e);
       const maps = check?.maps;
@@ -1994,6 +1837,13 @@ async function validatePromotionRows(dlg) {
       }
     }
     setPromotionRowValidity(e.tr, reason);
+    if (isGift) {
+      const giftError = dlg.querySelector('[data-pr-promo-gift-error]');
+      if (giftError instanceof HTMLElement) {
+        giftError.textContent = reason;
+        giftError.hidden = !reason;
+      }
+    }
     if (reason) invalid += 1;
   });
   togglePromotionSubmitDisabled(dlg, invalid);
@@ -2246,7 +2096,7 @@ function wirePromotionSaleLineTableCells(dlg) {
  * @param {PromotionRow} r
  * @param {number} index
  */
-function promotionFormTableRowHtml(r, index) {
+function promotionFormTableRowHtml(r, index, giftWithPurchase = false) {
   const productUrl = resolveProductUrlForRow(String(r.product || '').trim());
   const path = productUrlToCatalogPath(productUrl);
   // The user only ever sees the storefront `?color=` form; a `sku` on a loaded row has no color
@@ -2267,7 +2117,7 @@ function promotionFormTableRowHtml(r, index) {
   if (!startIso && startPaste) startIso = normalizeDateForCatalogApi(startPaste);
   let endIso = endPrimary && endPrimary !== '—' ? normalizeDateForCatalogApi(endPrimary) : '';
   if (!endIso && endPaste) endIso = normalizeDateForCatalogApi(endPaste);
-  const saleDigits = priceDigitsForUi(r.salePrice);
+  const saleDigits = giftWithPurchase ? '0' : priceDigitsForUi(r.salePrice);
   const regDigits = priceDigitsForUi(
     r.regularPrice === '—' || r.regularPrice == null ? '' : String(r.regularPrice),
   );
@@ -2296,6 +2146,7 @@ function promotionFormTableRowHtml(r, index) {
     </td>
     <td class="pr-promo-cell pr-promo-cell-wide" data-field="product">
       <input type="hidden" class="pr-promo-h-product" value="${escapeHtml(productUrl)}" />
+      ${giftWithPurchase ? '' : '<div class="pr-promo-gift-product" data-pr-promo-gift-product-mount></div>'}
       <div class="pr-promo-cell-view pr-promo-product-view" tabindex="0" role="button">
         <span class="pr-promo-thumb-cell"></span>
         <div class="pr-promo-product-main">
@@ -2307,14 +2158,14 @@ function promotionFormTableRowHtml(r, index) {
         <input type="text" class="pr-promo-input-product" placeholder="/us/en_us/products/… or https://…" />
       </div>
     </td>
-    <td class="pr-promo-cell" data-field="regular">
+    <td class="pr-promo-cell pr-promo-sale-col-regular" data-field="regular">
       <input type="hidden" class="pr-promo-h-regular" value="${escapeHtml(regDigits)}" />
       <div class="pr-promo-cell-view" tabindex="0" role="button">${regDigits ? escapeHtml(regDigits) : '—'}</div>
       <div class="pr-promo-cell-edit" hidden>
         <input type="text" class="pr-promo-input-regular" inputmode="decimal" placeholder="449.95" />
       </div>
     </td>
-    <td class="pr-promo-cell" data-field="sale">
+    <td class="pr-promo-cell pr-promo-sale-col-sale" data-field="sale">
       <input type="hidden" class="pr-promo-h-sale" value="${escapeHtml(saleDigits)}" />
       <div class="pr-promo-cell-view" tabindex="0" role="button">${saleDigits ? escapeHtml(saleDigits) : '—'}</div>
       <div class="pr-promo-cell-edit" hidden>
@@ -2324,25 +2175,26 @@ function promotionFormTableRowHtml(r, index) {
   </tr>`;
 }
 
-function promotionSaleLinesTableWrapHtml(linesHtml) {
+function promotionSaleLinesTableWrapHtml(linesHtml, type = 'productlist') {
+  const isGift = type === 'gift';
   return `<div class="pr-promo-form-lines-wrap">
     <div class="pr-promo-form-lines-scroll">
-      <table class="pr-data-table pr-promo-sale-grid" aria-label="Sale lines">
+      <table class="pr-data-table pr-promo-sale-grid${isGift ? ' pr-promo-sale-grid-gift' : ''}" aria-label="${isGift ? 'Gift product and schedule' : 'Sale lines'}">
         <thead>
           <tr>
             <th scope="col" class="pr-promo-sale-col-del"><span class="pim-sr-only">Remove</span></th>
             <th scope="col" class="pr-promo-sale-col-num">#</th>
-            <th scope="col">Start (ET)</th>
-            <th scope="col">End (ET)</th>
-            <th scope="col">Product path</th>
-            <th scope="col">Regular</th>
-            <th scope="col">Sale</th>
+            <th scope="col" class="pr-promo-sale-col-start">Start (ET)</th>
+            <th scope="col" class="pr-promo-sale-col-end">End (ET)</th>
+            <th scope="col" class="pr-promo-sale-col-product">${isGift ? 'Gift product' : 'Product path'}</th>
+            <th scope="col" class="pr-promo-sale-col-regular">Regular</th>
+            <th scope="col" class="pr-promo-sale-col-sale">${isGift ? 'Gift price' : 'Sale'}</th>
           </tr>
         </thead>
         <tbody id="pr-promo-form-lines-tbody">${linesHtml}</tbody>
       </table>
     </div>
-    <details class="pr-promo-tsv-import">
+    <details class="pr-promo-tsv-import"${isGift ? ' hidden' : ''}>
       <summary>Import from spreadsheet (TSV)</summary>
       <p class="coupons-field-hint" style="margin-top:8px">Paste tab-separated columns in order:
         <strong>Start</strong>, <strong>End</strong>, <strong>Product</strong>, <strong>Regular Price</strong>, <strong>Sale Price</strong>.
@@ -2359,97 +2211,279 @@ function promotionSaleLinesTableWrapHtml(linesHtml) {
 }
 
 /**
+ * @param {PromotionRow} row
+ */
+function promotionGiftScheduleFieldsHtml(row) {
+  const start = normalizeDateForCatalogApi(
+    String(row.start ?? '').trim() || String(row.startSourceText ?? '').trim(),
+  );
+  const end = normalizeDateForCatalogApi(
+    String(row.end ?? '').trim() || String(row.endSourceText ?? '').trim(),
+  );
+  return `<div class="pr-promo-gift-schedule" data-pr-promo-gift-schedule>
+    <div class="coupons-field">
+      <label for="pr-promo-gift-start">Start (ET)</label>
+      <input type="datetime-local" id="pr-promo-gift-start" data-pr-promo-gift-date="start" step="60" value="${escapeHtml(isoToDatetimeLocalValue(start))}" />
+    </div>
+    <div class="coupons-field">
+      <label for="pr-promo-gift-end">End (ET)</label>
+      <input type="datetime-local" id="pr-promo-gift-end" data-pr-promo-gift-date="end" step="60" value="${escapeHtml(isoToDatetimeLocalValue(end))}" />
+    </div>
+  </div>`;
+}
+
+/** @param {'productlist'|'gift'} type */
+function promotionFormTypeLabel(type) {
+  return type === 'gift' ? 'Gift with purchase' : 'Product-list promotion';
+}
+
+/**
+ * @param {string} promoId
+ * @param {'productlist'|'gift'} type
+ * @param {(typeof COUNTRIES)[number]} market
+ * @param {string} group
+ */
+function promotionIdentityHeaderHtml(promoId, type, market, group) {
+  const badges = promotionIdentityBadgesHtml(type, market, group);
+  const shownId = promoId || 'Generated from name';
+  return `<div class="pr-promo-identity-header" role="group" aria-label="Promotion identity">
+    <div class="coupons-modal-badges" data-pr-promo-identity-badges>${badges}</div>
+    <div class="cp-edit-coupon-name-field">
+      <label for="pr-promo-form-name">Name</label>
+      <input type="text" id="pr-promo-form-name" autocomplete="off" required placeholder="e.g. Spring sale" />
+    </div>
+    <p class="coupons-modal-idline"><code data-pr-promo-id-preview>${escapeHtml(shownId)}</code></p>
+    <input type="hidden" id="pr-promo-form-id" value="${escapeHtml(promoId)}" />
+    <input type="hidden" id="pr-promo-form-group" value="${escapeHtml(group)}" />
+    <div hidden>
+      <select id="pr-promo-form-market" required>
+        ${COUNTRIES.map((key) => `<option value="${key}"${key === market ? ' selected' : ''}>${marketLabel(key)}</option>`).join('')}
+      </select>
+    </div>
+  </div>`;
+}
+
+/**
+ * @param {'productlist'|'gift'} type
+ * @param {string} market
+ * @param {string} group
+ */
+function promotionIdentityBadgesHtml(type, market, group) {
+  const marketClasses = { us: 'coupons-tag-us', ca: 'coupons-tag-ca', mx: 'coupons-tag-mx' };
+  const marketLabelShort = { us: 'US', ca: 'CA', mx: 'MX' };
+  return [
+    `<span class="coupons-tag coupons-tag-muted" data-pr-promo-identity-type>${promotionFormTypeLabel(type)}</span>`,
+    `<span class="coupons-tag ${marketClasses[market] || 'coupons-tag-muted'}" data-pr-promo-identity-market>${marketLabelShort[market] || escapeHtml(market.toUpperCase())}</span>`,
+    `<span class="coupons-tag coupons-tag-year" data-pr-promo-identity-year>${escapeHtml(group || String(new Date().getFullYear()))}</span>`,
+  ].join('');
+}
+
+/**
+ * Infer the mode from the supported catalog data shape: one zero-priced product line plus a
+ * positive minimum subtotal is a gift with purchase.
+ *
+ * @param {PromotionRow[]} rows
+ * @param {string} minimumSubtotal
+ * @returns {'productlist'|'gift'}
+ */
+function promotionTypeFromRows(rows, minimumSubtotal) {
+  const min = parseFloat(catalogPriceStringForApi(minimumSubtotal));
+  if (!Number.isFinite(min) || min <= 0 || rows.length !== 1) return 'productlist';
+  const rawPrice = String(rows[0].salePrice ?? '').trim();
+  if (!rawPrice) return 'productlist';
+  const priceDigits = catalogPriceStringForApi(rawPrice);
+  if (!priceDigits) return 'productlist';
+  const price = parseFloat(priceDigits);
+  return Number.isFinite(price) && price === 0 ? 'gift' : 'productlist';
+}
+
+/** @param {(typeof COUNTRIES)[number]} initialMarket */
+function promotionNewSetupHtml(initialMarket) {
+  const marketOptions = COUNTRIES.map((key) => {
+    const label = marketLabel(key).trim() || key.toUpperCase();
+    return `<label class="coupons-market-tab coupons-market-tab-toggle">
+        <input type="radio" name="pr-promo-setup-market" value="${escapeHtml(key)}"${key === initialMarket ? ' checked' : ''} />
+        <span class="coupons-market-tab-label">${escapeHtml(label)}</span>
+      </label>`;
+  }).join('');
+  return `
+    <div class="pr-promo-new-setup" data-pr-promo-setup-step>
+      <div class="coupons-field coupons-field-full cp-new-coupon-name-field">
+        <label for="pr-promo-setup-name">Name</label>
+        <input type="text" id="pr-promo-setup-name" autocomplete="off" required placeholder="e.g. Spring sale" />
+      </div>
+      <div class="coupons-field coupons-field-full cp-new-country-field pr-promo-setup-country-field">
+        <span class="coupons-country-field-label" id="pr-promo-setup-country-legend">Country</span>
+        <div class="coupons-market-tabs coupons-market-tabs-form" role="radiogroup" aria-labelledby="pr-promo-setup-country-legend">
+          ${marketOptions}
+        </div>
+      </div>
+      <section class="pr-promo-setup-details">
+        <div class="pr-promo-form-section-box pr-promo-details-grid">
+          <div class="coupons-field">
+            <label for="pr-promo-setup-group">Year</label>
+            <input type="text" id="pr-promo-setup-group" inputmode="numeric" placeholder="${new Date().getFullYear()}" />
+          </div>
+          <div class="coupons-field">
+            <label>Promotion slug <span class="coupons-field-hint">(generated)</span></label>
+            <p class="pr-promo-readonly-value"><code data-pr-promo-id-preview>Generated from name</code></p>
+          </div>
+        </div>
+      </section>
+      <div class="pim-io-choice-options pr-promo-type-options" role="group" aria-label="Promotion type">
+        <button type="button" class="pim-io-choice-option" data-pr-promo-new-type="productlist" aria-pressed="false">
+          <strong>Product-list promotion</strong>
+          <span>Set scheduled sale prices for one or more products.</span>
+        </button>
+        <button type="button" class="pim-io-choice-option" data-pr-promo-new-type="gift" aria-pressed="false">
+          <strong>Gift with purchase</strong>
+          <span>Offer one product for free when the cart meets a minimum subtotal.</span>
+        </button>
+      </div>
+    </div>`;
+}
+
+/**
+ * @param {HTMLDialogElement} dlg
+ * @param {'productlist'|'gift'} type
+ */
+function setPromotionFormType(dlg, type) {
+  dlg.dataset.prPromoType = type;
+  const typeBadge = dlg.querySelector('[data-pr-promo-identity-type]');
+  if (typeBadge) typeBadge.textContent = promotionFormTypeLabel(type);
+  const groupValue = String(dlg.querySelector('#pr-promo-form-group')?.value ?? '').trim();
+  const yearBadge = dlg.querySelector('[data-pr-promo-identity-year]');
+  if (yearBadge) yearBadge.textContent = groupValue || String(new Date().getFullYear());
+  const offerHeading = dlg.querySelector('[data-pr-promo-offer-heading]');
+  if (offerHeading) offerHeading.textContent = type === 'gift' ? 'Gift product and schedule' : 'Offer';
+  const offerHint = dlg.querySelector('[data-pr-promo-offer-hint]');
+  if (offerHint) {
+    offerHint.textContent = type === 'gift'
+      ? 'Choose one product to offer for free. A positive minimum cart subtotal is required; the gift price is fixed at $0.'
+      : 'Add one or more sale lines. Click a cell to edit; dates use US Eastern (ET) and prices are numbers only (no $) for the API.';
+  }
+  const linesHeading = dlg.querySelector('[data-pr-promo-lines-heading]');
+  if (linesHeading) linesHeading.textContent = type === 'gift' ? 'Gift product' : 'Sale lines';
+  const table = dlg.querySelector('.pr-promo-sale-grid');
+  if (table) {
+    table.setAttribute('aria-label', type === 'gift' ? 'Gift product and schedule' : 'Sale lines');
+    table.classList.toggle('pr-promo-sale-grid-gift', type === 'gift');
+  }
+  const productHeading = dlg.querySelector('.pr-promo-sale-col-product');
+  if (productHeading) productHeading.textContent = type === 'gift' ? 'Gift product' : 'Product path';
+  const priceHeading = dlg.querySelector('.pr-promo-sale-col-sale');
+  if (priceHeading) priceHeading.textContent = type === 'gift' ? 'Gift price' : 'Sale';
+  const lines = [...dlg.querySelectorAll('#pr-promo-form-lines-tbody [data-pr-promo-line]')];
+  if (type === 'gift') {
+    lines.slice(1).forEach((line) => line.remove());
+    const sale = dlg.querySelector('#pr-promo-form-lines-tbody .pr-promo-h-sale');
+    if (sale instanceof HTMLInputElement) sale.value = '0';
+  }
+  const addButton = dlg.querySelector('[data-pr-promo-line-add]');
+  if (addButton instanceof HTMLButtonElement) addButton.hidden = type === 'gift';
+  const tsvImport = dlg.querySelector('.pr-promo-tsv-import');
+  if (tsvImport instanceof HTMLDetailsElement) tsvImport.hidden = type === 'gift';
+  if (type === 'gift') wirePromotionGiftProductFields(dlg);
+  else {
+    promotionGiftProductFields.forEach((field) => field.destroy());
+    promotionGiftProductFields = [];
+  }
+  dlg.querySelectorAll('#pr-promo-form-lines-tbody [data-pr-promo-line]').forEach((line) => {
+    if (line instanceof HTMLTableRowElement) syncPromotionSaleRowView(line);
+  });
+  refreshPromotionLineIndices(dlg);
+}
+
+/**
  * @param {(typeof COUNTRIES)[number]} initialMarket
  * @param {PromotionRow[]} lines
- * @param {{ edit?: boolean, promoId?: string, selectedCouponId?: string, promo?: object }} [opts]
+ * @param {{
+ *   promoId?: string,
+ *   promo?: object,
+ *   type?: 'productlist'|'gift',
+ *   group?: string,
+ * }} [opts]
  */
 function promotionEditFormInnerHtml(initialMarket, lines, opts = {}) {
-  const edit = Boolean(opts.edit);
+  const type = opts.type === 'gift' ? 'gift' : 'productlist';
   const promoId = opts.promoId ? String(opts.promoId) : '';
-  const selectedCouponId = opts.selectedCouponId ? String(opts.selectedCouponId) : '';
-  const optsHtml = COUNTRIES.map((key) => {
-    const label = marketLabel(key).trim() || key.toUpperCase();
-    const sel = key === initialMarket ? ' selected' : '';
-    return `<option value="${escapeHtml(key)}"${sel}>${escapeHtml(label)}</option>`;
-  }).join('');
-  const marketDis = edit ? ' disabled' : '';
-  const idBlock = edit && promoId
-    ? `<div class="coupons-field coupons-field-full">
-        <label>Promotion id <span class="coupons-field-hint">(fixed)</span></label>
-        <p class="pr-cart-rule-id-display"><code>${escapeHtml(promoId)}</code></p>
-      </div>`
-    : '';
+  const group = String(opts.group || new Date().getFullYear());
   const seed = lines.length
     ? lines
     : [{
       product: '',
-      salePrice: '',
+      salePrice: type === 'gift' ? '0' : '',
       regularPrice: '',
       start: '',
       end: '',
     }];
-  const linesHtml = seed.map((r, i) => promotionFormTableRowHtml(r, i)).join('');
-  const couponGateBlock = edit ? `
-      <div class="coupons-field coupons-field-full pr-promo-form-option pr-promo-coupon-gate">
-        <label class="pr-promo-form-checkbox">
-          <input type="checkbox" data-pr-promo-coupon-gate-enabled />
-          <span class="pr-promo-form-checkbox-label">Gate promotion access by coupon</span>
-        </label>
-        <div class="pr-promo-form-option-body">
-          <select data-pr-promo-coupon-gate-select disabled aria-label="Coupon required for promotion access">
-            ${promotionCouponGateOptionsHtml(selectedCouponId)}
-          </select>
-          <p class="coupons-field-hint">UX mock only. The selected coupon is not included in <code>PUT …/price-rules/catalog</code> until the promotion access API is available.</p>
-        ${state.promotionCouponLoadError
-    ? `<p class="coupons-field-hint pr-promo-coupon-gate-error">${escapeHtml(state.promotionCouponLoadError)}</p>`
-    : ''}
-        </div>
-      </div>` : '';
+  const linesHtml = seed.map((r, i) => promotionFormTableRowHtml(r, i, type === 'gift')).join('');
   return `
-    <p class="coupons-page-lead" style="margin:0 0 12px;font-size:14px;color:#6d7175">
-    ${edit
-    ? 'Edit sale lines for this market. Lines for other markets on the same promotion are left unchanged. Click a cell to edit; start/end use a US Eastern (ET) date/time picker (saved as UTC ISO 8601). Prices are numbers only (no <code>$</code>) for the API.'
-    : 'New promotion for one market. Click a cell to edit sale lines; start/end use US Eastern (ET) time. Product column shows the storefront path and a thumbnail from the catalog index when the URL resolves. Prices are numbers only (no <code>$</code>) for the API.'}
-    </p>
     <div class="coupons-form-grid">
-      ${idBlock}
-      <div class="coupons-field coupons-field-full">
-        <label for="pr-promo-form-market">Market</label>
-        <select id="pr-promo-form-market" required${marketDis}>${optsHtml}</select>
-    ${edit
-    ? '<p class="coupons-field-hint">Paths in sale lines must stay under this market\'s storefront.</p>'
-    : '<p class="coupons-field-hint">Promotion <code>id</code> is a slug from the title (unique across all promotions). Market is stored in the <code>country</code> field.</p>'}
-      </div>
-      <div class="coupons-field coupons-field-full">
-        <label for="pr-promo-form-name">Promotion title</label>
-        <input type="text" id="pr-promo-form-name" autocomplete="off" required placeholder="e.g. Spring sale" />
-      </div>
-      <div class="coupons-field">
-        <label for="pr-promo-form-group">Group <span class="coupons-field-hint">(e.g. calendar year)</span></label>
-        <input type="text" id="pr-promo-form-group" inputmode="text" placeholder="2026" />
-      </div>
-      <div class="coupons-field coupons-field-full pr-promo-form-option">
-        <label class="pr-promo-form-checkbox" for="pr-promo-min-cart-enabled">
-          <input type="checkbox" id="pr-promo-min-cart-enabled" />
-          <span class="pr-promo-form-checkbox-label">Require minimum cart subtotal</span>
-        </label>
-        <div class="pr-promo-form-option-body">
-          <input type="text" id="pr-promo-min-cart-amount" class="pr-promo-min-cart-amount-input" inputmode="decimal" placeholder="e.g. 100" disabled aria-label="Minimum cart subtotal (dollars)" />
-          <p class="coupons-field-hint">Optional. When enabled, saved as <code>conditions.minimumSubtotal</code> on the promotion. Only products in scope (below) count toward it. Turn off to clear this condition.</p>
+      <section class="coupons-field-full pr-promo-form-section">
+        ${promotionIdentityHeaderHtml(promoId, type, initialMarket, group)}
+      </section>
+      <section class="coupons-field-full pr-promo-form-section">
+        <h3 class="pr-promo-form-section-title" data-pr-promo-offer-heading>${type === 'gift' ? 'Gift product and schedule' : 'Offer'}</h3>
+        <div class="pr-promo-form-section-box">
+          <p class="coupons-field-hint" data-pr-promo-offer-hint>${type === 'gift'
+    ? 'Choose one product to offer for free. A positive minimum cart subtotal is required; the gift price is fixed at $0.'
+    : 'Add one or more sale lines. Click a cell to edit; dates use US Eastern (ET) and prices are numbers only (no $) for the API.'}</p>
+          ${type === 'gift' ? promotionGiftScheduleFieldsHtml(seed[0]) : ''}
+          <div class="pr-promo-form-lines-header">
+            <h4 class="pr-promo-form-lines-title" data-pr-promo-lines-heading>${type === 'gift' ? 'Gift product' : 'Sale lines'}</h4>
+            <button type="button" class="coupons-btn" data-pr-promo-line-add${type === 'gift' ? ' hidden' : ''}>Add row</button>
+          </div>
+          ${type === 'gift' ? `
+            <div class="pr-promo-gift-product" data-pr-promo-gift-product-mount></div>
+            <p class="pr-promo-product-invalid pr-promo-gift-product-invalid" data-pr-promo-gift-error role="alert" hidden></p>
+            <div hidden>${promotionSaleLinesTableWrapHtml(linesHtml, type)}</div>
+          ` : promotionSaleLinesTableWrapHtml(linesHtml, type)}
         </div>
-      </div>
-      <div class="coupons-field coupons-field-full">
-        <p class="coupons-field-hint">Categories apply in every region and language. Pick products per region; a Canada product also covers its French page. ${edit ? '' : `<code>${DEFAULT_DISQUALIFYING_CATEGORY}</code> is added under "Never apply" once you set a minimum or scope; remove it if commercial products should qualify.`}</p>
-      </div>
-      ${promotionScopeFieldsHtml(initialMarket)}
-      ${promotionCouponScopeFieldsHtml(opts.promo || null)}
-      ${couponGateBlock}
+      </section>
+      <section class="coupons-field-full pr-promo-form-section">
+        <h3 class="pr-promo-form-section-title">Eligibility</h3>
+        <div class="pr-promo-form-section-box pr-promo-eligibility-box">
+          <div class="pr-promo-min-cart-control">
+            <label class="pr-promo-form-checkbox" for="pr-promo-min-cart-enabled">
+              <input type="checkbox" id="pr-promo-min-cart-enabled" />
+              <span class="pr-promo-form-checkbox-label">Require minimum cart subtotal</span>
+            </label>
+            <div class="pr-promo-min-cart-details">
+              <input type="text" id="pr-promo-min-cart-amount" class="pr-promo-min-cart-amount-input" inputmode="decimal" placeholder="e.g. 100" disabled aria-label="Minimum cart subtotal (dollars)" />
+              <p class="coupons-field-hint">When enabled, only products in scope below count toward the threshold.</p>
+            </div>
+          </div>
+          ${promotionScopeFieldsHtml(initialMarket)}
+        </div>
+      </section>
+      <section class="coupons-field-full pr-promo-form-section">
+        <h3 class="pr-promo-form-section-title">Coupon compatibility</h3>
+        <div class="pr-promo-form-section-box">
+          ${promotionCouponScopeFieldsHtml(opts.promo || null)}
+        </div>
+      </section>
     </div>
-    <div class="pr-promo-form-lines-header">
-      <h3 class="pr-promo-form-lines-title">Sale lines</h3>
-      <button type="button" class="coupons-btn" data-pr-promo-line-add>Add row</button>
-    </div>
-    ${promotionSaleLinesTableWrapHtml(linesHtml)}`;
+  `;
+}
+
+/** @param {HTMLDialogElement} dlg */
+function wirePromotionGiftScheduleFields(dlg) {
+  dlg.querySelectorAll('[data-pr-promo-gift-date]').forEach((input) => {
+    if (!(input instanceof HTMLInputElement)) return;
+    input.addEventListener('input', () => {
+      const line = dlg.querySelector('#pr-promo-form-lines-tbody [data-pr-promo-line]');
+      if (!(line instanceof HTMLTableRowElement)) return;
+      const field = input.getAttribute('data-pr-promo-gift-date');
+      const dateInput = line.querySelector(
+        field === 'start' ? '.pr-promo-h-start' : '.pr-promo-h-end',
+      );
+      if (!(dateInput instanceof HTMLInputElement)) return;
+      dateInput.value = input.value ? datetimeLocalValueToIso(input.value) : '';
+      line.removeAttribute(field === 'start' ? 'data-pr-start-paste' : 'data-pr-end-paste');
+      syncPromotionSaleRowView(line);
+    });
+  });
 }
 
 /**
@@ -2822,7 +2856,6 @@ async function deletePromotionById(promoId) {
   }
   try {
     await putCatalogPromotionsDocument(next);
-    setPromotionCouponGateSelection(promoId, '');
     showToast('Promotion deleted', 'success');
     return true;
   } catch (err) {
@@ -2864,33 +2897,174 @@ async function openPromotionAddDialog() {
 
   const initial = COUNTRIES.includes(state.country) ? state.country : 'us';
   const dialog = document.createElement('dialog');
-  dialog.className = 'coupons-dialog coupons-dialog-wide pr-promo-form-dialog';
+  dialog.className = 'coupons-dialog coupons-dialog-wide coupons-dialog-editor pr-promo-form-dialog';
   dialog.innerHTML = `
     <div class="coupons-dialog-inner">
+      <header class="coupons-dialog-editor-header">
+        <h2 class="coupons-dialog-title">New promotion</h2>
+      </header>
       <div class="coupons-dialog-scroll" tabindex="-1">
-        <h2 class="coupons-dialog-title">Add promotion</h2>
-        ${promotionEditFormInnerHtml(initial, [], { edit: false })}
-      </div>
-      <div class="coupons-dialog-actions">
         <p class="pr-promo-form-error" role="alert" hidden></p>
-        <button type="button" class="coupons-btn" data-pr-promo-form-cancel>Cancel</button>
-        <button type="button" class="coupons-btn coupons-btn-primary" data-pr-promo-form-submit>Add promotion</button>
+        ${promotionNewSetupHtml(initial)}
+        <div data-pr-promo-form-step hidden></div>
       </div>
+      <footer class="coupons-dialog-actions coupons-dialog-editor-footer">
+        <button type="button" class="coupons-btn" data-pr-promo-form-back hidden>Back</button>
+        <button type="button" class="coupons-btn" data-pr-promo-form-cancel>Cancel</button>
+        <button type="button" class="coupons-btn" data-pr-promo-setup-next disabled>Continue</button>
+        <button type="button" class="coupons-btn coupons-btn-primary" data-pr-promo-form-submit hidden>Add promotion</button>
+      </footer>
     </div>`;
   document.body.appendChild(dialog);
-  const groupEl = dialog.querySelector('#pr-promo-form-group');
-  if (groupEl && 'value' in groupEl) /** @type {HTMLInputElement} */ (groupEl).value = String(new Date().getFullYear());
+  const year = String(new Date().getFullYear());
+  const setupGroup = dialog.querySelector('#pr-promo-setup-group');
+  if (setupGroup instanceof HTMLInputElement) setupGroup.value = year;
+  const setupName = /** @type {HTMLInputElement | null} */ (dialog.querySelector('#pr-promo-setup-name'));
+  const setupMarket = () => /** @type {HTMLInputElement | null} */ (
+    dialog.querySelector('input[name="pr-promo-setup-market"]:checked')
+  );
+  const updateIdPreview = (rawName) => {
+    const name = String(rawName ?? '').trim();
+    const existing = Array.isArray(state.catalogPromotions) ? state.catalogPromotions : [];
+    const preview = name
+      ? uniquePromotionId(ruleSlugFromName(name), existing)
+      : 'Generated from name';
+    dialog.querySelectorAll('[data-pr-promo-id-preview]').forEach((el) => {
+      el.textContent = preview;
+    });
+  };
+  setupName?.addEventListener('input', () => {
+    updateIdPreview(setupName.value);
+  });
+  dialog.querySelectorAll('input[name="pr-promo-setup-market"]').forEach((input) => {
+    input.addEventListener('change', () => {
+      setPromotionFormError(dialog, '');
+    });
+  });
 
-  wirePromotionFormDynamicLines(dialog);
-  wirePromotionTsvImport(dialog);
-  wirePromotionMinCartConditionFields(dialog);
-  wirePromotionScopeFields(dialog);
-  wirePromotionDefaultDisqualifier(dialog);
-  wirePromotionCouponScopeFields(dialog);
-  wirePromotionCouponGateFields(dialog);
-  wirePromotionSaleLineTableCells(dialog);
-  refreshPromotionLineIndices(dialog);
-  refreshPromotionSaleLinesVisuals(dialog);
+  dialog.querySelectorAll('[data-pr-promo-new-type]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const type = button.getAttribute('data-pr-promo-new-type');
+      if (type !== 'gift' && type !== 'productlist') return;
+      dialog.dataset.prPromoType = type;
+      dialog.querySelectorAll('[data-pr-promo-new-type]').forEach((option) => {
+        option.setAttribute('aria-pressed', String(option === button));
+      });
+      const next = dialog.querySelector('[data-pr-promo-setup-next]');
+      if (next instanceof HTMLButtonElement) next.disabled = false;
+      setPromotionFormError(dialog, '');
+    });
+  });
+
+  dialog.querySelector('[data-pr-promo-setup-next]')?.addEventListener('click', () => {
+    setPromotionFormError(dialog, '');
+    const type = dialog.dataset.prPromoType;
+    if (type !== 'gift' && type !== 'productlist') {
+      setPromotionFormError(dialog, 'Choose a promotion type to continue.');
+      return;
+    }
+    const name = String(setupName?.value ?? '').trim();
+    if (!name) {
+      setPromotionFormError(dialog, 'Enter a promotion name to continue.');
+      setupName?.focus();
+      return;
+    }
+    const market = String(setupMarket()?.value ?? '').trim();
+    if (!COUNTRIES.includes(/** @type {(typeof COUNTRIES)[number]} */ (market))) {
+      setPromotionFormError(dialog, 'Select a valid market to continue.');
+      setupMarket()?.focus();
+      return;
+    }
+    const group = setupGroup instanceof HTMLInputElement ? setupGroup.value.trim() || year : year;
+    const form = dialog.querySelector('[data-pr-promo-form-step]');
+    if (!(form instanceof HTMLElement)) return;
+    if (!form.dataset.initialized) {
+      form.innerHTML = promotionEditFormInnerHtml(
+        /** @type {(typeof COUNTRIES)[number]} */ (market),
+        [],
+        { edit: false, type, group },
+      );
+      form.dataset.initialized = 'true';
+      const formName = /** @type {HTMLInputElement | null} */ (form.querySelector('#pr-promo-form-name'));
+      const formGroup = /** @type {HTMLInputElement | null} */ (form.querySelector('#pr-promo-form-group'));
+      const formMarket = /** @type {HTMLSelectElement | null} */ (form.querySelector('#pr-promo-form-market'));
+      if (formName) {
+        formName.value = name;
+        formName.addEventListener('input', () => {
+          updateIdPreview(formName.value);
+          if (setupName) setupName.value = formName.value;
+        });
+      }
+      if (formGroup) formGroup.value = group;
+      if (formMarket) formMarket.value = market;
+      wirePromotionFormDynamicLines(dialog);
+      wirePromotionTsvImport(dialog);
+      wirePromotionMinCartConditionFields(dialog);
+      wirePromotionScopeFields(dialog);
+      wirePromotionDefaultDisqualifier(dialog);
+      wirePromotionCouponScopeFields(dialog);
+      wirePromotionSaleLineTableCells(dialog);
+      wirePromotionGiftScheduleFields(dialog);
+      refreshPromotionLineIndices(dialog);
+      refreshPromotionSaleLinesVisuals(dialog);
+    }
+    const formName = dialog.querySelector('#pr-promo-form-name');
+    const formMarket = dialog.querySelector('#pr-promo-form-market');
+    if (formName instanceof HTMLInputElement) formName.value = name;
+    if (formMarket instanceof HTMLSelectElement) formMarket.value = market;
+    updateIdPreview(name);
+    const marketBadge = dialog.querySelector('[data-pr-promo-identity-market]');
+    if (marketBadge) {
+      const marketClasses = ['coupons-tag-us', 'coupons-tag-ca', 'coupons-tag-mx'];
+      marketBadge.classList.remove(...marketClasses);
+      marketBadge.classList.add(`coupons-tag-${market}`);
+      marketBadge.textContent = market.toUpperCase();
+    }
+    setPromotionFormType(dialog, type);
+    const formGroup = dialog.querySelector('#pr-promo-form-group');
+    if (formGroup instanceof HTMLInputElement) formGroup.value = group;
+    const identityYear = dialog.querySelector('[data-pr-promo-identity-year]');
+    if (identityYear) identityYear.textContent = group;
+    const setup = dialog.querySelector('[data-pr-promo-setup-step]');
+    if (setup instanceof HTMLElement) setup.hidden = true;
+    if (form instanceof HTMLElement) form.hidden = false;
+    const scroll = dialog.querySelector('.coupons-dialog-scroll');
+    if (scroll instanceof HTMLElement) scroll.scrollTop = 0;
+    const next = dialog.querySelector('[data-pr-promo-setup-next]');
+    const back = dialog.querySelector('[data-pr-promo-form-back]');
+    const submit = dialog.querySelector('[data-pr-promo-form-submit]');
+    if (next instanceof HTMLButtonElement) next.hidden = true;
+    if (back instanceof HTMLButtonElement) back.hidden = false;
+    if (submit instanceof HTMLButtonElement) submit.hidden = false;
+  });
+  dialog.querySelector('[data-pr-promo-form-back]')?.addEventListener('click', () => {
+    const formName = dialog.querySelector('#pr-promo-form-name');
+    if (setupName instanceof HTMLInputElement && formName instanceof HTMLInputElement) {
+      setupName.value = formName.value;
+    }
+    const formMarket = dialog.querySelector('#pr-promo-form-market');
+    if (formMarket instanceof HTMLSelectElement) {
+      const matchingMarket = dialog.querySelector(
+        `input[name="pr-promo-setup-market"][value="${formMarket.value}"]`,
+      );
+      if (matchingMarket instanceof HTMLInputElement) matchingMarket.checked = true;
+    }
+    const formGroup = dialog.querySelector('#pr-promo-form-group');
+    if (setupGroup instanceof HTMLInputElement && formGroup instanceof HTMLInputElement) {
+      setupGroup.value = formGroup.value;
+    }
+    updateIdPreview(formName instanceof HTMLInputElement ? formName.value : setupName?.value);
+    const setup = dialog.querySelector('[data-pr-promo-setup-step]');
+    const form = dialog.querySelector('[data-pr-promo-form-step]');
+    if (setup instanceof HTMLElement) setup.hidden = false;
+    if (form instanceof HTMLElement) form.hidden = true;
+    const next = dialog.querySelector('[data-pr-promo-setup-next]');
+    const back = dialog.querySelector('[data-pr-promo-form-back]');
+    const submit = dialog.querySelector('[data-pr-promo-form-submit]');
+    if (next instanceof HTMLButtonElement) next.hidden = false;
+    if (back instanceof HTMLButtonElement) back.hidden = true;
+    if (submit instanceof HTMLButtonElement) submit.hidden = true;
+  });
 
   const close = () => {
     dialog.close();
@@ -2911,9 +3085,8 @@ async function openPromotionAddDialog() {
         || String(new Date().getFullYear());
       const minCart = readPromotionMinCartCondition(dialog);
       const scope = await readPromotionScopeFormForSave(dialog);
-      const couponGate = readPromotionCouponGateMock(dialog);
-      if (couponGate.enabled && sortedPromotionCouponTypes().length && !couponGate.couponId) {
-        throw new Error('Select a coupon for the mock access gate, or turn off coupon gating.');
+      if (dialog.dataset.prPromoType === 'gift' && !minCart.enabled) {
+        throw new Error('Gift with purchase promotions require a minimum cart subtotal.');
       }
       if (minCart.enabled) {
         const d = catalogPriceStringForApi(minCart.amountRaw);
@@ -2923,6 +3096,11 @@ async function openPromotionAddDialog() {
         }
       }
       const lineRows = await resolveRowVariantSkus(readPromotionLineRowsFromDom(dialog));
+      if (dialog.dataset.prPromoType === 'gift' && (
+        lineRows.length !== 1 || Number(catalogPriceStringForApi(lineRows[0]?.salePrice)) !== 0
+      )) {
+        throw new Error('A gift with purchase must have exactly one product with a $0 price.');
+      }
       const rulesNew = promotionRowsToCatalogRules(lineRows, group);
       for (let i = 0; i < rulesNew.length; i += 1) {
         if (countryKeyFromCatalogPath(rulesNew[i].path) !== market) {
@@ -2942,13 +3120,7 @@ async function openPromotionAddDialog() {
         rules: rulesNew,
       }, minCart, scope), dialog)];
       await putCatalogPromotionsDocument(next);
-      setPromotionCouponGateSelection(id, couponGate.enabled ? couponGate.couponId : '');
-      showToast(
-        couponGate.enabled
-          ? 'Promotion added. Coupon gate selection is a UX mock and was not saved yet.'
-          : 'Promotion added',
-        'success',
-      );
+      showToast('Promotion added', 'success');
       close();
       render();
     } catch (err) {
@@ -2985,38 +3157,41 @@ async function openPromotionEditDialog(countryKey, promoId, { isCancelled = () =
     COUNTRIES.includes(/** @type {(typeof COUNTRIES)[number]} */(countryKey)) ? countryKey : 'us'
   );
   const rows = rulesCo.flatMap(catalogRuleToPromotionRows);
+  const minDigits = promotionMinimumSubtotal(promo);
+  const type = promotionTypeFromRows(rows, minDigits);
   const groupGuess = promotionCatalogGroup(promo, ck);
-  const selectedCouponId = promotionCouponGateSelection(promoId);
   const prefillScope = await collapsePromotionScopeLanguages(
     promotionScopeFromConditions(promo.conditions),
   );
   if (isCancelled()) return;
 
   const dialog = document.createElement('dialog');
-  dialog.className = 'coupons-dialog coupons-dialog-wide pr-promo-form-dialog';
+  dialog.className = 'coupons-dialog coupons-dialog-wide coupons-dialog-editor pr-promo-form-dialog';
   dialog.innerHTML = `
     <div class="coupons-dialog-inner">
-      <div class="coupons-dialog-scroll" tabindex="-1">
+      <header class="coupons-dialog-editor-header">
         <h2 class="coupons-dialog-title">Edit promotion</h2>
+      </header>
+      <div class="coupons-dialog-scroll" tabindex="-1">
+        <p class="pr-promo-form-error" role="alert" hidden></p>
         ${promotionEditFormInnerHtml(ck, rows, {
-    edit: true, promoId, selectedCouponId, promo,
+    promoId, promo, type, group: groupGuess,
   })}
       </div>
-      <div class="coupons-dialog-actions pr-cart-rule-edit-dialog-actions">
+      <footer class="coupons-dialog-actions coupons-dialog-editor-footer pr-promo-edit-actions">
         <button type="button" class="coupons-btn coupons-btn-danger" data-pr-promo-form-delete>Delete promotion…</button>
-        <p class="pr-promo-form-error" role="alert" hidden></p>
-        <div class="pr-cart-rule-edit-actions-end">
-          <button type="button" class="coupons-btn" data-pr-promo-form-cancel>Cancel</button>
-          <button type="button" class="coupons-btn coupons-btn-primary" data-pr-promo-form-submit>Save changes</button>
-        </div>
-      </div>
+        <button type="button" class="coupons-btn" data-pr-promo-form-cancel>Cancel</button>
+        <button type="button" class="coupons-btn coupons-btn-primary" data-pr-promo-form-submit>Save changes</button>
+      </footer>
     </div>`;
   document.body.appendChild(dialog);
+  setPromotionFormType(dialog, type);
   const nameEl = dialog.querySelector('#pr-promo-form-name');
   if (nameEl && 'value' in nameEl) /** @type {HTMLInputElement} */ (nameEl).value = promo.name || '';
   const groupEl = dialog.querySelector('#pr-promo-form-group');
   if (groupEl && 'value' in groupEl) /** @type {HTMLInputElement} */ (groupEl).value = groupGuess;
-  const minDigits = promotionMinimumSubtotal(promo);
+  const identityYear = dialog.querySelector('[data-pr-promo-identity-year]');
+  if (identityYear) identityYear.textContent = groupGuess;
   const minCb = dialog.querySelector('#pr-promo-min-cart-enabled');
   const minAmt = dialog.querySelector('#pr-promo-min-cart-amount');
   if (minCb instanceof HTMLInputElement && minAmt instanceof HTMLInputElement) {
@@ -3027,18 +3202,14 @@ async function openPromotionEditDialog(countryKey, promoId, { isCancelled = () =
     }
   }
   applyPromotionScopeFormPrefill(dialog, prefillScope);
-  const couponCb = dialog.querySelector('[data-pr-promo-coupon-gate-enabled]');
-  if (couponCb instanceof HTMLInputElement && selectedCouponId) {
-    couponCb.checked = true;
-  }
-
   wirePromotionFormDynamicLines(dialog);
   wirePromotionTsvImport(dialog);
   wirePromotionMinCartConditionFields(dialog);
   wirePromotionScopeFields(dialog);
+  wirePromotionDefaultDisqualifier(dialog);
   wirePromotionCouponScopeFields(dialog);
-  wirePromotionCouponGateFields(dialog);
   wirePromotionSaleLineTableCells(dialog);
+  wirePromotionGiftScheduleFields(dialog);
   refreshPromotionLineIndices(dialog);
   refreshPromotionSaleLinesVisuals(dialog);
 
@@ -3072,9 +3243,8 @@ async function openPromotionEditDialog(countryKey, promoId, { isCancelled = () =
         || String(new Date().getFullYear());
       const minCart = readPromotionMinCartCondition(dialog);
       const scope = await readPromotionScopeFormForSave(dialog);
-      const couponGate = readPromotionCouponGateMock(dialog);
-      if (couponGate.enabled && sortedPromotionCouponTypes().length && !couponGate.couponId) {
-        throw new Error('Select a coupon for the mock access gate, or turn off coupon gating.');
+      if (type === 'gift' && !minCart.enabled) {
+        throw new Error('Gift with purchase promotions require a minimum cart subtotal.');
       }
       if (minCart.enabled) {
         const d = catalogPriceStringForApi(minCart.amountRaw);
@@ -3084,6 +3254,11 @@ async function openPromotionEditDialog(countryKey, promoId, { isCancelled = () =
         }
       }
       const lineRows = await resolveRowVariantSkus(readPromotionLineRowsFromDom(dialog));
+      if (type === 'gift' && (
+        lineRows.length !== 1 || Number(catalogPriceStringForApi(lineRows[0]?.salePrice)) !== 0
+      )) {
+        throw new Error('A gift with purchase must have exactly one product with a $0 price.');
+      }
       const list = Array.isArray(state.catalogPromotions) ? state.catalogPromotions : [];
       const idx = list.findIndex((p) => String(p.id) === String(promoId));
       if (idx === -1) {
@@ -3122,13 +3297,7 @@ async function openPromotionEditDialog(countryKey, promoId, { isCancelled = () =
         rules: merged,
       }, minCart, scope, prev), dialog);
       await putCatalogPromotionsDocument(next);
-      setPromotionCouponGateSelection(promoId, couponGate.enabled ? couponGate.couponId : '');
-      showToast(
-        couponGate.enabled
-          ? 'Promotion updated. Coupon gate selection is a UX mock and was not saved yet.'
-          : 'Promotion updated',
-        'success',
-      );
+      showToast('Promotion updated', 'success');
       close();
       render();
     } catch (err) {
@@ -3739,10 +3908,40 @@ function comparePromoListRows(a, b, key) {
 
 /**
  * @param {PromoListRow[]} list
- * @param {'title'|'id'|'rows'|'start'|'end'|'mincart'|'group'|'market'} key
+ * @param {'recency'|'title'|'id'|'rows'|'start'|'end'|'mincart'|'group'|'market'} key
  * @param {'asc'|'desc'} dir
  */
 function sortPromoListRows(list, key, dir) {
+  if (key === 'recency') {
+    const now = new Date();
+    const ranked = list.map((row) => {
+      const window = promotionWindowForTimeline(row.rows);
+      const status = window
+        ? promotionRangePastFuture(window.minStart, window.maxEnd, now)
+        : 'unknown';
+      let rank = 3;
+      if (status === 'current') rank = 0;
+      else if (status === 'future') rank = 1;
+      else if (status === 'past') rank = 2;
+      return { row, window, rank };
+    });
+    return ranked.sort((a, b) => {
+      if (a.rank !== b.rank) return a.rank - b.rank;
+      if (a.window && b.window) {
+        let startOrder = 0;
+        if (a.rank === 0) {
+          startOrder = b.window.minStart.getTime() - a.window.minStart.getTime();
+        } else if (a.rank === 1) {
+          startOrder = a.window.minStart.getTime() - b.window.minStart.getTime();
+        } else {
+          startOrder = (b.window.maxEnd?.getTime() || 0) - (a.window.maxEnd?.getTime() || 0);
+        }
+        if (startOrder) return startOrder;
+      }
+      return String(a.row.title).localeCompare(String(b.row.title), undefined, { sensitivity: 'base' });
+    }).map(({ row }) => row);
+  }
+
   const m = dir === 'desc' ? -1 : 1;
   return list.slice().sort((a, b) => {
     if (key === 'start' || key === 'end') {
@@ -3867,14 +4066,6 @@ function promoMarketTagHtml(countryKey) {
 function promoPillHtml(label, on) {
   const cl = on ? 'coupons-pill coupons-pill-on' : 'coupons-pill coupons-pill-off';
   return `<span class="${cl}">${escapeHtml(label)}</span>`;
-}
-
-function promotionCouponGateBadgeHtml(promoId) {
-  const couponId = promotionCouponGateSelection(promoId);
-  if (!couponId) {
-    return '<span class="coupons-tag coupons-tag-muted pr-promo-coupon-code-badge">No coupon required</span>';
-  }
-  return `<span class="coupons-tag coupons-tag-slug pr-promo-coupon-code-badge">${escapeHtml(promotionCouponLabelById(couponId))}</span>`;
 }
 
 /** @param {string} digits normalized plain number string */
@@ -4211,6 +4402,43 @@ function urlKeyFromVitamixProductUrl(productUrl) {
   } catch {
     return '';
   }
+}
+
+/**
+ * Gift thumbnails use the storefront page's social image rather than the catalog index image.
+ * @param {string} productPath catalog path or storefront product URL
+ * @returns {Promise<string>}
+ */
+function fetchPromotionGiftOgImage(productPath) {
+  const path = productUrlToCatalogPath(String(productPath).split('|', 1)[0]);
+  const match = path.match(/^\/([a-z]{2}\/[a-z]{2}_[a-z]{2})\/products\/[^/]+$/i);
+  if (!match) return Promise.resolve('');
+  const pageUrl = new URL(path, PROMOTION_AEM_BASE).href;
+  const cached = promotionGiftImagePromises.get(pageUrl);
+  if (cached) return cached;
+
+  const request = fetch(
+    `${PROMOTION_FCORS_URL}${encodeURIComponent(pageUrl)}${PROMOTION_FCORS_KEY}`,
+    { cache: 'no-store' },
+  ).then(async (response) => {
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const html = await response.text();
+    const documentHtml = new DOMParser().parseFromString(html, 'text/html');
+    const content = documentHtml.querySelector('meta[property="og:image"]')?.getAttribute('content')?.trim();
+    if (!content) return '';
+    const imageUrl = new URL(content, pageUrl);
+    if (imageUrl.protocol !== 'https:' && imageUrl.protocol !== 'http:') return '';
+    return imageUrl.href;
+  }).catch((error) => {
+    /* eslint-disable-next-line no-console -- missing social images are non-fatal */
+    console.warn('[commerce-admin/promotions] gift product og:image lookup failed', {
+      productPath: path,
+      message: error?.message || String(error),
+    });
+    return '';
+  });
+  promotionGiftImagePromises.set(pageUrl, request);
+  return request;
 }
 
 /**
@@ -4568,9 +4796,10 @@ function promotionDetailModalInnerHtml(
   thumbByProductUrl,
 ) {
   const { id } = set;
-  const fullPath = `${countryKey.toUpperCase()} / promotions / ${groupLabel} / ${id}`;
   const rows = Array.isArray(set.rows) ? set.rows : [];
   const n = rows.length;
+  const minDigits = String(set.minimumSubtotalDigits || '').trim();
+  const type = promotionTypeFromRows(rows, minDigits);
   const dateGroups = promotionDateGroups(rows);
   const uniformDates = dateGroups.length === 1;
   const varyingDates = dateGroups.length > 1;
@@ -4579,7 +4808,7 @@ function promotionDetailModalInnerHtml(
   const heroSub = uniformDates
     ? `through ${formatIsoForSaleLineView(dateGroups[0].end)} · ${n} product line${n === 1 ? '' : 's'}`
     : `${n} sale line entries in this promotion${varyingDates ? ' (dates vary per row)' : ''}`;
-  const dateGroupsHtml = varyingDates ? `
+  const dateGroupsHtml = varyingDates && type !== 'gift' ? `
     <section class="coupons-modal-section">
       <h3 class="coupons-modal-section-title">Sale windows (ET)</h3>
       <ul class="pr-promo-date-groups">
@@ -4592,7 +4821,6 @@ function promotionDetailModalInnerHtml(
       </ul>
     </section>` : '';
   const uniqProducts = new Set(rows.map((r) => r.product)).size;
-  const minDigits = String(set.minimumSubtotalDigits || '').trim();
   const minN = parseFloat(minDigits);
   const minCartDisplay = Number.isFinite(minN) && minN > 0 ? `≥ $${minN.toFixed(2)}` : '—';
   const scope = promotionScopeFromConditions(set.conditions);
@@ -4607,25 +4835,91 @@ function promotionDetailModalInnerHtml(
     promoPillHtml('Disqualifiers', hasDisqualifiers),
     promoPillHtml('Coupon limits', hasCouponScope(set.couponScope)),
   ].join('');
-
-  return `
-    <div class="coupons-modal-head">
-      <div class="coupons-modal-badges">
-        ${promoMarketTagHtml(countryKey)}
-        ${commerceGroupBadgeHtml(groupLabel)}
-        <span class="coupons-tag coupons-tag-slug">${escapeHtml(id)}</span>
-        ${promotionCouponGateBadgeHtml(id)}
+  const gift = rows[0];
+  const giftProductPath = gift ? productUrlToCatalogPath(gift.product) : '';
+  const giftSlug = giftProductPath.split('/').filter(Boolean).pop() || gift?.product || 'Gift product';
+  const giftName = giftSlug.split('-').map((word) => (
+    word ? `${word[0].toUpperCase()}${word.slice(1)}` : ''
+  )).join(' ');
+  const giftImage = gift ? thumbByProductUrl.get(gift.product) : '';
+  const giftThumb = giftImage
+    ? `<img class="pr-promo-gift-summary-thumb" src="${escapeHtml(giftImage)}" alt="" loading="lazy" width="72" height="72" />`
+    : '<span class="pr-promo-gift-summary-thumb-placeholder" aria-hidden="true"></span>';
+  let giftWindow = 'Not scheduled';
+  if (varyingDates) {
+    giftWindow = dateGroups
+      .map((group) => `${formatInstantInEastern(group.start, true)} – ${formatInstantInEastern(group.end, true)}`)
+      .join(' · ');
+  } else if (uniformDates) {
+    giftWindow = `${formatInstantInEastern(dateGroups[0].start, true)} – ${formatInstantInEastern(dateGroups[0].end, true)}`;
+  }
+  const giftSummaryHtml = type === 'gift' ? `
+    <div class="coupons-modal-hero pr-promo-gift-summary">
+      <div class="coupons-modal-hero-inner">
+        <span class="coupons-modal-hero-kicker">Promotion summary</span>
+        <div class="pr-promo-gift-summary-product">
+          ${giftThumb}
+          <div class="pr-promo-gift-summary-copy">
+            <span class="pr-promo-gift-summary-label">Free gift:</span>
+            ${gift ? `<a href="${escapeHtml(gift.product)}" target="_blank" rel="noopener noreferrer">${escapeHtml(giftName)}</a>` : '<span>Product not set</span>'}
+          </div>
+        </div>
+        <div class="pr-promo-gift-summary-window">
+          <span class="pr-promo-gift-summary-label">Sale window</span>
+          <span>${escapeHtml(giftWindow)}</span>
+        </div>
       </div>
-      <h2 class="coupons-modal-title">${escapeHtml(set.title)}</h2>
-      <p class="coupons-modal-idline"><code>${escapeHtml(fullPath)}</code></p>
-    </div>
+    </div>` : '';
+  const saleWindowHero = type !== 'gift' ? `
     <div class="coupons-modal-hero">
       <div class="coupons-modal-hero-inner">
         <span class="coupons-modal-hero-kicker">${uniformDates || varyingDates ? 'Sale window' : 'Sale lines'}</span>
         <span class="coupons-modal-hero-value">${escapeHtml(heroMain)}</span>
         <span class="coupons-modal-hero-note">${escapeHtml(heroSub)}</span>
       </div>
+    </div>` : '';
+  const saleLinesHtml = type === 'gift' ? '' : `
+    <section class="pr-promo-form-section pr-promo-detail-section">
+      <h3 class="pr-promo-form-section-title">Offer</h3>
+      <div class="pr-promo-form-section-box pr-promo-detail-box">
+        ${promotionTableHtml(rows, thumbByProductUrl)}
+      </div>
+    </section>`;
+  const eligibilityHtml = `
+    <section class="pr-promo-form-section pr-promo-detail-section">
+      <h3 class="pr-promo-form-section-title">Eligibility</h3>
+      <div class="pr-promo-form-section-box pr-promo-detail-box">
+        <div class="pr-promo-detail-minimum">
+          <span class="pr-promo-detail-label">Minimum cart subtotal</span>
+          <strong>${escapeHtml(Number.isFinite(minN) && minN > 0 ? `≥ $${minN.toFixed(2)}` : 'No minimum subtotal')}</strong>
+        </div>
+        <div class="pr-promo-detail-scope-grid">
+          <div class="pr-promo-detail-scope">
+            <span class="pr-promo-detail-label">Included products</span>
+            <div class="coupons-modal-tags ps-pills" data-pr-promo-scope-pills="included" data-pr-scope-empty="Any paid product"></div>
+          </div>
+          <div class="pr-promo-detail-scope">
+            <span class="pr-promo-detail-label">Excluded products</span>
+            <div class="coupons-modal-tags ps-pills" data-pr-promo-scope-pills="excluded" data-pr-scope-empty="None"></div>
+          </div>
+          <div class="pr-promo-detail-scope">
+            <span class="pr-promo-detail-label">Blocked products</span>
+            <div class="coupons-modal-tags ps-pills" data-pr-promo-scope-pills="disqualifying" data-pr-scope-empty="None"></div>
+          </div>
+        </div>
+      </div>
+    </section>`;
+
+  return `
+    <div class="coupons-modal-head">
+      <div class="coupons-modal-badges">
+        ${promotionIdentityBadgesHtml(type, countryKey, groupLabel)}
+      </div>
+      <h2 class="coupons-modal-title">${escapeHtml(set.title)}</h2>
+      <p class="coupons-modal-idline"><code>${escapeHtml(id)}</code></p>
     </div>
+    ${giftSummaryHtml}
+    ${saleWindowHero}
     ${dateGroupsHtml}
     <div class="coupons-modal-stats" role="list">
       <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Market</span><span class="coupons-modal-stat-value">${escapeHtml(countryLabel)}</span></div>
@@ -4635,45 +4929,37 @@ function promotionDetailModalInnerHtml(
       <div class="coupons-modal-stat" role="listitem"><span class="coupons-modal-stat-label">Min. cart</span><span class="coupons-modal-stat-value">${escapeHtml(minCartDisplay)}</span></div>
     </div>
     <div class="coupons-modal-pills" aria-label="Promotion shape">${pills}</div>
-    ${hasScope || hasDisqualifiers ? `
-    <section class="coupons-modal-section">
-      <h3 class="coupons-modal-section-title">Only count these products</h3>
-      <div class="coupons-modal-tags ps-pills" data-pr-promo-scope-pills="included" data-pr-scope-empty="Any paid product"></div>
-    </section>
-    <section class="coupons-modal-section">
-      <h3 class="coupons-modal-section-title">Don't count these products</h3>
-      <div class="coupons-modal-tags ps-pills" data-pr-promo-scope-pills="excluded" data-pr-scope-empty="None"></div>
-    </section>
-    <section class="coupons-modal-section">
-      <h3 class="coupons-modal-section-title">Never apply when the cart contains</h3>
-      <div class="coupons-modal-tags ps-pills" data-pr-promo-scope-pills="disqualifying" data-pr-scope-empty="None"></div>
-    </section>` : ''}
+    ${saleLinesHtml}
+    ${eligibilityHtml}
     ${promotionCouponScopeDetailHtml(set.couponScope)}
-    <section class="coupons-modal-section">
-      <h3 class="coupons-modal-section-title">Sale line table</h3>
-      ${promotionTableHtml(rows, thumbByProductUrl)}
-    </section>`;
+    `;
 }
 
 /** @param {unknown} scope */
 function promotionCouponScopeDetailHtml(scope) {
-  if (!hasCouponScope(scope)) return '';
   const s = couponScopeOf(scope);
   const typeTag = (id) => `<span class="coupons-tag coupons-tag-slug">${escapeHtml(id)}</span>`;
-  const row = (label, list, tag = commerceGroupBadgeHtml) => (list.length ? `
+  const row = (label, list, tag = commerceGroupBadgeHtml) => `
         <div class="coupons-modal-pill-group" data-pr-promo-coupon-list="${escapeHtml(label)}">
           <span class="coupons-modal-pill-group-label">${escapeHtml(label)}</span>
-          <span class="cgf-badges">${list.map((v) => tag(v)).join('')}</span>
-        </div>` : '');
+          <span class="cgf-badges">${list.length ? list.map((v) => tag(v)).join('') : '<span class="coupons-muted">None</span>'}</span>
+        </div>`;
   return `
-    <section class="coupons-modal-section" data-pr-promo-coupon-policy>
-      <h3 class="coupons-modal-section-title">Coupons</h3>
-      <p class="pr-promo-coupon-policy-summary">${escapeHtml(couponScopeSummary(s).replace(/^Coupons: (\w)/, (_, c) => c.toUpperCase()))}</p>
-      <div class="pr-promo-coupon-policy">
-        ${row('Blocked coupon types', s.excludedCouponTypes, typeTag)}
-        ${row('Blocked coupon groups', s.excludedCouponGroups)}
-        ${row('Allowed coupon types', s.includedCouponTypes, typeTag)}
-        ${row('Allowed coupon groups', s.includedCouponGroups)}
+    <section class="pr-promo-form-section pr-promo-detail-section" data-pr-promo-coupon-policy>
+      <h3 class="pr-promo-form-section-title">Coupon compatibility</h3>
+      <div class="pr-promo-form-section-box pr-promo-detail-box">
+        <div class="pr-promo-coupon-policies pr-promo-detail-coupon-policies">
+          <div class="pr-promo-coupon-policy">
+            <h4 class="pr-promo-coupon-policy-title">Blocked</h4>
+            ${row('Coupon types', s.excludedCouponTypes, typeTag)}
+            ${row('Coupon groups', s.excludedCouponGroups)}
+          </div>
+          <div class="pr-promo-coupon-policy">
+            <h4 class="pr-promo-coupon-policy-title">Allowed</h4>
+            ${row('Coupon types', s.includedCouponTypes, typeTag)}
+            ${row('Coupon groups', s.includedCouponGroups)}
+          </div>
+        </div>
       </div>
     </section>`;
 }
@@ -4824,6 +5110,7 @@ function renderPromotionsListPanel() {
   const list = sortPromoListRows(baseList, state.promoListSortKey, state.promoListSortDir);
   const searchVal = escapeHtml(state.promoListSearch);
   const hasPromos = allPromotionRowsForCountry().length > 0;
+  const now = new Date();
 
   let tbodyHtml;
   if (!hasPromos) {
@@ -4839,7 +5126,14 @@ function renderPromotionsListPanel() {
         const isCalSelected = state.promoCalSelected
           && state.promoCalSelected.countryKey === r.countryKey
           && state.promoCalSelected.id === r.id;
-        return `<tr class="pr-promo-grid-row${isCalSelected ? ' pr-promo-grid-row-selected' : ''}" role="button" tabindex="0" aria-label="${escapeHtml(label)}"
+        const window = promotionWindowForTimeline(r.rows);
+        const status = window
+          ? promotionRangePastFuture(window.minStart, window.maxEnd, now)
+          : 'unknown';
+        let statusClass = '';
+        if (status === 'current') statusClass = ' pr-promo-grid-row-current';
+        else if (status === 'future') statusClass = ' pr-promo-grid-row-future';
+        return `<tr class="pr-promo-grid-row${statusClass}${isCalSelected ? ' pr-promo-grid-row-selected' : ''}" role="button" tabindex="0" aria-label="${escapeHtml(label)}"
             data-pr-promo-open data-pr-country="${escapeHtml(r.countryKey)}" data-pr-id="${escapeHtml(r.id)}">
             <td class="pr-promo-col-title">${escapeHtml(r.title)}</td>
             <td><code class="pr-promo-id-code">${escapeHtml(r.id)}</code></td>
@@ -4861,9 +5155,9 @@ function renderPromotionsListPanel() {
 
   return `${catalogErr}
     <div class="pr-promo-toolbar pim-toolbar pr-promo-toolbar-with-actions">
-      <input type="search" id="pr-promo-search" class="pim-search pr-promo-search-wide" placeholder="Search title or promotion id…" aria-label="Search promotions" value="${searchVal}" />
+      <input type="search" id="pr-promo-search" class="pim-search pr-promo-search-wide" placeholder="Search name or promotion id…" aria-label="Search promotions" value="${searchVal}" />
       <div class="pr-promo-api-actions">
-        <button type="button" class="coupons-btn coupons-btn-primary" data-pr-promo-add>Add promotion…</button>
+        <button type="button" class="coupons-btn coupons-btn-primary" data-pr-promo-add>New promotion…</button>
       </div>
       <div class="pr-promo-toolbar-right">
         <div class="pr-promo-filter-field">
@@ -4879,7 +5173,7 @@ function renderPromotionsListPanel() {
       <table class="pr-data-table pr-promo-grid-table" aria-label="Promotions">
         <thead>
           <tr>
-            ${prPromoSortTh('title', 'Title', 'pr-promo-col-title')}
+            ${prPromoSortTh('title', 'Name', 'pr-promo-col-title')}
             ${prPromoSortTh('id', 'Id')}
             ${prPromoSortTh('rows', 'Rows')}
             ${prPromoSortTh('start', 'Start (ET)', 'pr-promo-col-date')}
@@ -5024,7 +5318,7 @@ function render() {
       state.promoListGroupFilter = '';
       state.promoCalSelected = null;
       state.cartRuleSearch = '';
-      state.promoListSortKey = 'title';
+      state.promoListSortKey = 'recency';
       state.promoListSortDir = 'asc';
       state.cartRuleSortKey = 'title';
       state.cartRuleSortDir = 'asc';
@@ -5192,7 +5486,7 @@ if (promotionsUrlSyncEnabled()) {
       state.promoListSearch = '';
       state.promoListGroupFilter = '';
       state.promoCalSelected = null;
-      state.promoListSortKey = 'title';
+      state.promoListSortKey = 'recency';
       state.promoListSortDir = 'asc';
       closeAllPricingDetailDialogs();
       render();

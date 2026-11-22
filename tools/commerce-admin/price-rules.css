@@ -202,6 +202,26 @@
   font-size: 13px;
 }
 
+:where(.pr-promo-grid-table tbody tr.pr-promo-grid-row-current:not(.pr-promo-grid-row-selected)) > td {
+  background: rgb(129 199 132 / 18%);
+  backdrop-filter: blur(6px);
+}
+
+:where(.pr-promo-grid-table tbody tr.pr-promo-grid-row-current:not(.pr-promo-grid-row-selected):hover) > td {
+  background: rgb(129 199 132 / 28%);
+  backdrop-filter: blur(8px);
+}
+
+:where(.pr-promo-grid-table tbody tr.pr-promo-grid-row-future:not(.pr-promo-grid-row-selected)) > td {
+  background: rgb(100 181 246 / 18%);
+  backdrop-filter: blur(6px);
+}
+
+:where(.pr-promo-grid-table tbody tr.pr-promo-grid-row-future:not(.pr-promo-grid-row-selected):hover) > td {
+  background: rgb(100 181 246 / 28%);
+  backdrop-filter: blur(8px);
+}
+
 .pr-data-table th,
 .pr-data-table td {
   padding: 10px 12px;
@@ -410,6 +430,211 @@
   max-width: 200px;
 }
 
+.pr-promo-new-setup {
+  display: grid;
+  gap: 16px;
+}
+
+.pr-promo-new-setup[hidden] {
+  display: none;
+}
+
+.pr-promo-new-setup .cp-new-coupon-name-field input[type='text'] {
+  min-height: 62px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.pr-promo-setup-country-field {
+  margin: 0;
+}
+
+.pr-promo-type-options {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.pr-promo-type-options .pim-io-choice-option {
+  min-height: 132px;
+  padding: 18px;
+}
+
+.pr-promo-type-options .pim-io-choice-option[aria-pressed='true'] {
+  border-color: #2d4016;
+  background: #f0f5e9;
+  color: #2d4016;
+  box-shadow: 0 0 0 1px #2d4016;
+}
+
+.pr-promo-form-section {
+  margin-top: 22px;
+}
+
+.pr-promo-form-section-title {
+  margin: 0 0 10px;
+  color: #202223;
+  font-size: 18px;
+  font-weight: 650;
+}
+
+.pr-promo-identity-header {
+  grid-column: 1 / -1;
+  min-width: 0;
+  margin-bottom: 4px;
+}
+
+.pr-promo-identity-header .coupons-modal-badges {
+  margin-bottom: 12px;
+}
+
+.pr-promo-identity-header .cp-edit-coupon-name-field input#pr-promo-form-name {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 62px;
+  margin: 0 0 6px;
+  padding: 14px 16px;
+  border: 1px solid #d5d9de;
+  border-radius: 10px;
+  background: #fff;
+  color: #202223;
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.pr-promo-identity-header .cp-edit-coupon-name-field input#pr-promo-form-name:hover {
+  border-color: #b8bec5;
+}
+
+.pr-promo-identity-header .cp-edit-coupon-name-field input#pr-promo-form-name:focus {
+  border-color: #6b8f4e;
+  outline: none;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgb(107 143 78 / 18%);
+}
+
+.pr-promo-identity-header .coupons-modal-idline {
+  margin: 8px 0 0;
+}
+
+.pr-promo-form-section-box {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid #e1e3e5;
+  border-radius: 12px;
+  background: #f6f7f8;
+}
+
+.pr-promo-details-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.pr-promo-readonly-value {
+  display: flex;
+  align-items: center;
+  min-height: 42px;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 9px 12px;
+  border: 1px solid #e1e3e5;
+  border-radius: 8px;
+  background: #fff;
+  color: #202223;
+}
+
+.pr-promo-readonly-value code {
+  overflow-wrap: anywhere;
+}
+
+.pr-promo-eligibility-box {
+  gap: 14px;
+}
+
+.pr-promo-min-cart-control {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pr-promo-min-cart-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-left: 28px;
+}
+
+.pr-promo-gift-product {
+  display: none;
+}
+
+.pr-promo-gift-product-invalid {
+  margin: 0;
+}
+
+:where(.pr-promo-sale-grid-gift) .pr-promo-sale-col-del,
+:where(.pr-promo-sale-grid-gift) .pr-promo-sale-col-num,
+:where(.pr-promo-sale-grid-gift) .pr-promo-sale-col-start,
+:where(.pr-promo-sale-grid-gift) .pr-promo-sale-col-end,
+:where(.pr-promo-sale-grid-gift) .pr-promo-sale-col-regular,
+:where(.pr-promo-sale-grid-gift) .pr-promo-sale-col-sale,
+:where(.pr-promo-sale-grid-gift) .pr-promo-line-num {
+  display: none;
+}
+
+:where(.pr-promo-sale-grid-gift) .pr-promo-cell[data-field='start'],
+:where(.pr-promo-sale-grid-gift) .pr-promo-cell[data-field='end'] {
+  display: none;
+}
+
+.pr-promo-gift-schedule {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  min-width: 0;
+}
+
+.pr-promo-gift-schedule > .coupons-field {
+  min-width: 0;
+}
+
+.pr-promo-gift-schedule input[type='datetime-local'] {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+:where(.pr-promo-sale-grid-gift) .pr-promo-gift-product {
+  display: block;
+}
+
+.pr-promo-form-section-box > .pr-promo-gift-product {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+}
+
+:where(.pr-promo-sale-grid-gift .pr-promo-cell[data-field='product']) > .pr-promo-cell-view,
+:where(.pr-promo-sale-grid-gift .pr-promo-cell[data-field='product']) > .pr-promo-cell-edit {
+  display: none;
+}
+
+@media (width <= 680px) {
+  .pr-promo-type-options,
+  .pr-promo-details-grid,
+  .pr-promo-gift-schedule {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pr-promo-edit-actions [data-pr-promo-form-delete] {
+  margin-right: auto;
+}
+
 /* Promotion form: modern checkbox rows (edit/add dialog) */
 .pr-promo-form-option {
   display: flex;
@@ -494,47 +719,7 @@
   padding: 0;
 }
 
-.pr-promo-coupon-gate .pr-promo-form-option-body:not(:has(select:not(:disabled))) {
-  opacity: 0.72;
-}
-
-.pr-promo-coupon-gate select {
-  appearance: none;
-  background-color: #fff;
-  background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 20 20' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5 7.5L10 12.5L15 7.5' stroke='%235c5f62' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-  background-position: right 12px center;
-  background-repeat: no-repeat;
-  background-size: 16px 16px;
-  border: 1px solid #c9cccf;
-  border-radius: 10px;
-  box-shadow: 0 1px 2px rgb(16 24 40 / 6%);
-  color: #202223;
-  display: block;
-  font: inherit;
-  min-height: 42px;
-  padding: 9px 40px 9px 12px;
-  transition: border-color 0.14s ease, box-shadow 0.14s ease, background-color 0.14s ease;
-  width: 100%;
-  max-width: 520px;
-}
-
-.pr-promo-coupon-gate select:focus {
-  border-color: #2c6ecb;
-  box-shadow: 0 0 0 3px rgb(44 110 203 / 16%);
-  outline: none;
-}
-
-.pr-promo-coupon-gate select:disabled {
-  background-color: #f6f6f7;
-  color: #8c9196;
-  cursor: not-allowed;
-}
-
-.pr-promo-coupon-gate select:hover:not(:disabled) {
-  border-color: #8c9196;
-}
-
-.pr-promo-coupon-gate-error {
+.pr-promo-coupon-load-error {
   color: #bf0711;
 }
 
@@ -580,14 +765,127 @@
   max-width: min(96vw, 920px);
 }
 
-.pr-promo-detail-dialog.coupons-detail-dialog .coupons-modal-section .pr-data-table {
+.pr-promo-detail-dialog.coupons-detail-dialog .pr-data-table {
   min-width: 640px;
 }
 
-.pr-promo-coupon-code-badge {
-  max-width: 100%;
-  white-space: normal;
-  word-break: break-word;
+.pr-promo-detail-section {
+  margin-top: 22px;
+}
+
+.pr-promo-detail-box {
+  gap: 14px;
+}
+
+.pr-promo-detail-minimum {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 12px;
+  padding: 12px 14px;
+  border: 1px solid #e1e3e5;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.pr-promo-detail-label {
+  display: block;
+  margin-bottom: 6px;
+  color: #6d7175;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.pr-promo-detail-minimum .pr-promo-detail-label {
+  margin: 0;
+}
+
+.pr-promo-detail-scope-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+.pr-promo-detail-scope {
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid #e1e3e5;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.pr-promo-detail-scope > .ps-pills {
+  min-height: 0;
+}
+
+.pr-promo-detail-coupon-policies .coupons-modal-pill-group {
+  padding: 8px 0;
+  border-top: 1px solid #f0f1f2;
+}
+
+.pr-promo-detail-coupon-policies .coupons-modal-pill-group-label {
+  margin-bottom: 4px;
+}
+
+.pr-promo-gift-summary {
+  margin-bottom: 18px;
+}
+
+.pr-promo-gift-summary-product {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  margin-top: 8px;
+}
+
+.pr-promo-gift-summary-thumb,
+.pr-promo-gift-summary-thumb-placeholder {
+  box-sizing: border-box;
+  display: block;
+  flex: 0 0 72px;
+  width: 72px;
+  height: 72px;
+  border: 1px solid #e1e3e5;
+  border-radius: 8px;
+  background: #fff;
+  object-fit: contain;
+}
+
+.pr-promo-gift-summary-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.pr-promo-detail-dialog .pr-promo-gift-summary-copy a {
+  color: #202223;
+  font-size: 1.15rem;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+}
+
+.pr-promo-gift-summary-label {
+  color: #6d7175;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.pr-promo-gift-summary-window {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid #d0dce8;
+  color: #202223;
+  font-size: 13px;
 }
 
 .pr-promo-overview-timeline-mount {
@@ -1100,29 +1398,6 @@
   letter-spacing: 0.02em;
 }
 
-.pr-promo-scope-tabs {
-  display: flex;
-  gap: 4px;
-  margin-bottom: 8px;
-  border-bottom: 1px solid #e1e3e5;
-}
-
-.pr-promo-scope-tab {
-  padding: 6px 12px;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: none;
-  font: inherit;
-  color: #6d7175;
-  cursor: pointer;
-}
-
-.pr-promo-scope-tab[aria-selected="true"] {
-  border-bottom-color: #202223;
-  color: #202223;
-  font-weight: 600;
-}
-
 .pr-promo-scope-detail-group + .pr-promo-scope-detail-group {
   margin-top: 8px;
 }
@@ -1152,42 +1427,89 @@
 }
 
 /* Promotion form: coupon scope */
-.pr-promo-coupon-scope[hidden],
-.pr-promo-coupon-side[hidden],
-.pr-promo-coupon-modes[hidden] {
+.pr-promo-coupon-scope[hidden] {
   display: none;
 }
 
-.pr-promo-coupon-modes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 18px;
-  align-items: center;
-  margin-top: 6px;
+.pr-promo-coupon-policies {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
 }
 
-.coupons-field label.pr-promo-coupon-mode {
-  display: inline-flex;
+.pr-promo-coupon-policy {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #e1e3e5;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.pcs-scope-browser .ps-picker-list {
+  height: min(46vh, 430px);
+  max-height: min(46vh, 430px);
+}
+
+.pcs-scope-item {
+  box-sizing: border-box;
+  display: flex;
+  width: 100%;
+  max-width: none;
   align-items: center;
-  gap: 6px;
-  font-size: 14px;
-  font-weight: 400;
+  border: 1px solid #e1e3e5;
+  background: #fff;
   color: #202223;
+  font: inherit;
+  line-height: 1.3;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.pcs-coupon-icon {
+  display: block;
+  flex: 0 0 50px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+}
+
+.pcs-type-pill,
+.pcs-group-pill {
+  max-width: min(100%, 352px);
+}
+
+.pcs-scope-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.pcs-scope-filters button {
+  padding: 5px 10px;
+  border: 1px solid #e1e3e5;
+  border-radius: 999px;
+  background: #fff;
+  color: #202223;
+  font: inherit;
+  font-size: 13px;
   cursor: pointer;
 }
 
-.coupons-field .pr-promo-coupon-mode input[type='radio'] {
-  min-width: 0;
-  margin: 0;
-  padding: 0;
+.pcs-scope-filters button[aria-pressed='true'] {
+  border-color: #202223;
+  background: #202223;
+  color: #fff;
 }
 
-.pr-promo-coupon-advanced-btn {
-  margin-left: auto;
-}
-
-.pr-promo-coupon-side {
-  padding: 4px 0 0;
+.pr-promo-coupon-policy-title {
+  margin: 0 0 2px;
+  color: #202223;
+  font-size: 15px;
+  font-weight: 650;
 }
 
 .pr-promo-coupon-conditions-error {
@@ -1210,10 +1532,4 @@
 
 .pcs-other-market {
   color: #6d7175;
-}
-
-.pr-promo-coupon-policy {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
 }

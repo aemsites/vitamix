@@ -308,8 +308,10 @@ export function openProductSelectorModal(options) {
  *   categoriesOnly?: boolean;
  *   noCategories?: boolean;
  *   fixedLocale?: boolean;
+ *   maxProducts?: number;
+ *   resolveProductImage?: (productPath: string) => Promise<string>;
  * }} options `fixedLocale` hides the selector's index switch; `categoriesOnly` /
- *   `noCategories` limit what can be picked
+ *   `noCategories` limit what can be picked. `maxProducts` limits product selections.
  */
 export function mountProductSelectionField(container, options) {
   ensureProductSelectionStyles();
@@ -346,6 +348,8 @@ export function mountProductSelectionField(container, options) {
   const displayEl = root.querySelector('.psf-display');
   const pillsEl = root.querySelector('.psf-pills');
   const emptyEl = root.querySelector('.psf-empty');
+  /** @type {Map<string, Promise<string>>} */
+  const productImagePromises = new Map();
   if (emptyEl) emptyEl.textContent = emptyText;
 
   container.replaceChildren(root);
@@ -396,6 +400,49 @@ export function mountProductSelectionField(container, options) {
       categorySlugs: parseCommaList(categoriesInput.value),
       emptyText,
     });
+    if (options.resolveProductImage) {
+      pillsEl.querySelectorAll('.ps-pill-product[data-path]').forEach((pill) => {
+        const path = pill.getAttribute('data-path') || '';
+        const image = pill.querySelector('.ps-pill-product-thumb');
+        if (!path) return;
+        const productPath = path.split('|', 1)[0];
+        let imagePromise = productImagePromises.get(productPath);
+        if (!imagePromise) {
+          imagePromise = Promise.resolve().then(() => options.resolveProductImage(productPath));
+          productImagePromises.set(productPath, imagePromise);
+        }
+        let placeholder = pill.querySelector('.ps-pill-thumb-placeholder');
+        if (!image && !placeholder) {
+          placeholder = document.createElement('span');
+          placeholder.className = 'ps-pill-thumb-placeholder';
+          placeholder.setAttribute('aria-hidden', 'true');
+          pill.insertBefore(placeholder, pill.firstChild);
+        }
+        imagePromise.then((src) => {
+          if (!src || !pill.isConnected
+            || !parseCommaList(productsInput.value).includes(path)) return;
+          if (image?.isConnected) {
+            image.src = src;
+            return;
+          }
+          if (!placeholder?.isConnected) return;
+          const thumb = document.createElement('img');
+          thumb.className = 'ps-pill-product-thumb';
+          thumb.src = src;
+          thumb.alt = '';
+          thumb.loading = 'lazy';
+          thumb.width = 39;
+          thumb.height = 39;
+          placeholder.replaceWith(thumb);
+        }).catch((error) => {
+          /* eslint-disable-next-line no-console -- thumbnail lookup is best-effort */
+          console.warn('[commerce-admin] product thumbnail lookup failed', {
+            path: productPath,
+            message: error?.message || String(error),
+          });
+        });
+      });
+    }
   }
 
   function dispatchInputChange() {
@@ -436,6 +483,13 @@ export function mountProductSelectionField(container, options) {
       categoriesOnly: options.categoriesOnly,
       noCategories: options.noCategories,
       fixedLocale: options.fixedLocale,
+      validateSelection: options.maxProducts
+        ? ({ products }) => {
+          if (parseCommaList(products).length > options.maxProducts) {
+            throw new Error(`Select no more than ${options.maxProducts} product${options.maxProducts === 1 ? '' : 's'}.`);
+          }
+        }
+        : undefined,
     });
     if (!result) return;
     setValues(parseCommaList(result.products), parseCommaList(result.categories));

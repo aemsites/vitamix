@@ -61,6 +61,8 @@ import { apiFetch } from './commerce-otp-api.js';
 
 /**
  * @typedef {object} CatalogPromotion
+ * Promotion mode is inferred from catalog data rather than persisted separately: a single
+ * zero-priced product rule with a positive minimum subtotal is a gift with purchase.
  * @property {string} id
  * @property {string} name
  * @property {CatalogPriceRule[]} rules

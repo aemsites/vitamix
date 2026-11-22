@@ -63,7 +63,7 @@ export function couponGroupBadgesHtml(groups, emptyHtml = '') {
   return `<span class="cgf-badges">${list.map((g) => commerceGroupBadgeHtml(g)).join('')}</span>`;
 }
 
-function couponGroupIconHtml() {
+export function couponGroupIconHtml() {
   return `<svg class="cgf-group-icon" viewBox="0 0 50 50" fill="none" aria-hidden="true" focusable="false">
     <g transform="translate(6 6) scale(.76)">
     <path d="M17 7h20a3 3 0 0 1 3 3v26a3 3 0 0 1-3 3H17a3 3 0 0 1-3-3V10a3 3 0 0 1 3-3Z" fill="#fff" stroke="currentColor" stroke-width="1.5" />

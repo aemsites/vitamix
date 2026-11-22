@@ -530,12 +530,12 @@ function newCouponSetupFieldsHtml() {
       <div class="coupons-form-grid">
       <div class="coupons-field coupons-field-full cp-new-coupon-name-field">
         <label for="cp-new-name">Name</label>
-        <input type="text" id="cp-new-name" autocomplete="off" required placeholder="Spring Sale" />
+        <input type="text" id="cp-new-name" autocomplete="off" required placeholder="Corporate Coupon" />
       </div>
       ${newCouponCountryCheckboxesHtml()}
       <div class="coupons-field cp-new-coupon-slug-field">
         <label for="cp-new-slug">Coupon slug</label>
-        <input type="text" id="cp-new-slug" autocomplete="off" required placeholder="spring-sale" />
+        <input type="text" id="cp-new-slug" autocomplete="off" required placeholder="corporate-coupon" />
         <p class="coupons-field-hint">Lowercase letters, numbers, and hyphens only.</p>
       </div>
       <div class="coupons-field">
