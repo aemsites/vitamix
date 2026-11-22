@@ -1,8 +1,6 @@
 /**
- * Product-list coupon tab: the form-top tabs and the editable discounted-products
- * grid. Kept in its own file so the coupon form's core styling (coupons.css)
- * stays focused; visual language matches the toolbar market tabs and the
- * promotions sale-lines grid.
+ * Product-list coupon fields and the editable discounted-products grid. Kept
+ * in its own file so the coupon form's core styling stays focused.
  */
 
 /**
@@ -13,41 +11,6 @@
 [data-cp-discount-only][hidden],
 [data-cp-plc-only][hidden] {
   display: none !important;
-}
-
-/* Tabs at the top of the coupon create/update form. */
-.cp-form-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 0 0 12px;
-}
-
-.cp-form-tab {
-  font: inherit;
-  font-size: 14px;
-  padding: 8px 14px;
-  border-radius: 6px;
-  border: 1px solid #e1e3e5;
-  background: #fff;
-  color: #202223;
-  cursor: pointer;
-}
-
-.cp-form-tab:hover {
-  background: #f6f6f7;
-}
-
-.cp-form-tab:focus-visible {
-  outline: 2px solid #1a56b0;
-  outline-offset: 2px;
-}
-
-.cp-form-tab[aria-selected='true'] {
-  border-color: #2c2c2e;
-  background: #202223;
-  color: #fff;
-  font-weight: 600;
 }
 
 /* Read-only discounted-products table in the detail modal. */

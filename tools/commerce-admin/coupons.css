@@ -106,15 +106,30 @@
   pointer-events: none;
 }
 
+.cp-new-country-field,
+.cp-edit-country-field {
+  box-sizing: border-box;
+  padding: 14px;
+  border: 1px solid #e1e3e5;
+  border-radius: 10px;
+  background: #f6f7f7;
+}
+
+.cp-new-country-field .coupons-country-field-label,
+.cp-edit-country-field .coupons-country-field-label {
+  margin: 0;
+  font-size: 14px;
+}
+
 .coupons-market-tab-toggle:has(:focus-visible) {
-  outline: 2px solid #1a56b0;
+  outline: 2px solid var(--market-tab-focus-color, #1a56b0);
   outline-offset: 2px;
 }
 
 .coupons-market-tab-toggle:has(input:checked) {
-  border-color: #2c2c2e;
-  background: #202223;
-  color: #fff;
+  border-color: var(--market-tab-selected-border, #2c2c2e);
+  background: var(--market-tab-selected-background, #202223);
+  color: var(--market-tab-selected-color, #fff);
   font-weight: 600;
 }
 
@@ -615,6 +630,25 @@ tr.coupons-code-row:hover {
   border-color: #e1e3e5;
 }
 
+.cp-coupon-type-discount {
+  --coupon-type-color: #0d47a1;
+  --coupon-type-background: #e8eef7;
+  --coupon-type-border: #b8c9e8;
+}
+
+.cp-coupon-type-productlist {
+  --coupon-type-color: #5b3e91;
+  --coupon-type-background: #f3edff;
+  --coupon-type-border: #d5c4f0;
+}
+
+.coupons-tag.cp-coupon-type-discount,
+.coupons-tag.cp-coupon-type-productlist {
+  background: var(--coupon-type-background);
+  color: var(--coupon-type-color);
+  border-color: var(--coupon-type-border);
+}
+
 .coupons-pill {
   font-size: 12px;
   font-weight: 600;
@@ -1088,6 +1122,185 @@ tr.coupons-code-row:hover {
   grid-column: 1 / -1;
 }
 
+.cp-new-coupon-setup > .coupons-page-lead {
+  margin: 0 0 16px;
+}
+
+.cp-new-coupon-type-field {
+  margin-top: 4px;
+}
+
+.cp-discount-specification,
+.cp-compatibility-box,
+.cp-caps-box {
+  box-sizing: border-box;
+  padding: 14px;
+  border: 1px solid #e1e3e5;
+  border-radius: 10px;
+  background: #f6f7f7;
+}
+
+.cp-form-section {
+  margin-top: 20px;
+}
+
+.cp-compatibility-box {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cp-caps-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+}
+
+.cp-form-section-title {
+  margin: 0 0 12px;
+  color: #202223;
+  font-size: 19px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.cp-form-options-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cp-discount-spec-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+}
+
+.cp-discount-spec-grid .coupons-field-full {
+  grid-column: 1 / -1;
+}
+
+.coupons-field .cp-new-type-state {
+  display: none;
+}
+
+.cp-new-coupon-type-options {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.cp-new-coupon-type-options .pim-io-choice-option {
+  min-height: 132px;
+  padding: 18px;
+}
+
+.cp-new-coupon-type-options .cp-coupon-type-discount,
+.cp-new-coupon-type-options .cp-coupon-type-productlist {
+  border-color: var(--coupon-type-border);
+  background: color-mix(in srgb, var(--coupon-type-background) 48%, white);
+  color: var(--coupon-type-color);
+}
+
+.cp-new-coupon-type-options .cp-coupon-type-discount:focus-visible,
+.cp-new-coupon-type-options .cp-coupon-type-discount:hover:not(:disabled),
+.cp-new-coupon-type-options .cp-coupon-type-productlist:focus-visible,
+.cp-new-coupon-type-options .cp-coupon-type-productlist:hover:not(:disabled) {
+  border-color: var(--coupon-type-color);
+  background: var(--coupon-type-background);
+}
+
+.cp-new-coupon-type-options .pim-io-choice-option[aria-pressed='true'] {
+  border-color: var(--coupon-type-color);
+  background: var(--coupon-type-background);
+  color: var(--coupon-type-color);
+  box-shadow: 0 0 0 1px var(--coupon-type-color);
+}
+
+.cp-new-coupon-id-preview {
+  padding: 10px 12px;
+  border: 1px solid #e1e3e5;
+  border-radius: 8px;
+  background: #fafbfb;
+}
+
+.cp-new-coupon-id-preview code {
+  color: #202223;
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+
+.cp-edit-coupon-header {
+  grid-column: 1 / -1;
+  min-width: 0;
+  margin-bottom: 4px;
+}
+
+.cp-edit-coupon-header .coupons-modal-badges {
+  margin-bottom: 12px;
+}
+
+.cp-edit-coupon-name-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cp-edit-coupon-name-field label {
+  color: #6d7175;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.coupons-dialog .coupons-form-grid .cp-edit-coupon-name-field input#cp-form-name {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 62px;
+  margin: 0 0 6px;
+  padding: 14px 16px;
+  border: 1px solid #d5d9de;
+  border-radius: 10px;
+  background: #fff;
+  color: #202223;
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.coupons-dialog .coupons-form-grid .cp-edit-coupon-name-field input#cp-form-name:hover {
+  border-color: #b8bec5;
+}
+
+.coupons-dialog .coupons-form-grid .cp-edit-coupon-name-field input#cp-form-name:focus {
+  border-color: #6b8f4e;
+  outline: none;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgb(107 143 78 / 18%);
+}
+
+.cp-edit-coupon-header .coupons-modal-idline {
+  margin: 8px 0 0;
+}
+
+.cp-edit-coupon-header .coupons-modal-idline code {
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #f0f0f1;
+  color: #6d7175;
+  font-size: 13px;
+}
+
+.cp-new-coupon-back {
+  margin-top: 12px;
+}
+
+@media (width <= 520px) {
+  .cp-new-coupon-type-options,
+  .cp-discount-spec-grid,
+  .cp-caps-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .coupons-checkbox-row {
   display: flex;
   align-items: center;
@@ -1103,12 +1316,12 @@ tr.coupons-code-row:hover {
 
 /* Coupon edit form: modern checkbox option (discount basis mock) */
 .cp-form-options-group {
-  margin-top: 4px;
+  margin-top: 20px;
 }
 
 .cp-form-options-title {
   margin: 0 0 12px;
-  font-size: 15px;
+  font-size: 19px;
   font-weight: 600;
   color: #202223;
 }
@@ -1125,8 +1338,8 @@ tr.coupons-code-row:hover {
 
 .cp-form-options-subtitle {
   margin: 0 0 8px;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 650;
   color: #202223;
   letter-spacing: 0.01em;
 }
@@ -1358,6 +1571,19 @@ tr.coupons-code-row:hover {
   color: #202223;
 }
 
+.coupons-dialog-editor .coupons-dialog-editor-header {
+  flex-shrink: 0;
+  padding: 14px 20px;
+  border-bottom: 1px solid #e1e3e5;
+  background: #fafafa;
+}
+
+.coupons-dialog-editor .coupons-dialog-title {
+  margin: 0;
+  font-size: 1.35rem;
+  letter-spacing: -0.02em;
+}
+
 .coupons-dialog-actions {
   display: flex;
   flex-shrink: 0;
@@ -1367,6 +1593,13 @@ tr.coupons-code-row:hover {
   padding: 12px 18px 16px;
   border-top: 1px solid #e1e3e5;
   background: #fff;
+}
+
+.coupons-dialog-editor .coupons-dialog-actions {
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid #e1e3e5;
+  background: #fafafa;
 }
 
 .coupons-dialog-wide {
@@ -1632,16 +1865,47 @@ tr.coupons-code-row:hover {
   width: 100%;
   box-sizing: border-box;
   min-width: 0;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid #d5d9de;
+  border-radius: 9px;
+  background-color: #fff;
+  color: #202223;
+  font-size: 16px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
 }
 
 .coupons-dialog .coupons-form-grid textarea {
-  min-height: 4.5rem;
+  min-height: 5rem;
   resize: vertical;
   font: inherit;
-  font-size: 14px;
-  padding: 8px 10px;
-  border: 1px solid #e1e3e5;
-  border-radius: 6px;
+}
+
+.coupons-dialog .coupons-form-grid .cp-new-coupon-name-field input[type='text'] {
+  min-height: 62px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.coupons-dialog .coupons-form-grid .cp-new-coupon-slug-field input[type='text'] {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.coupons-dialog .coupons-form-grid input[type='text']:focus,
+.coupons-dialog .coupons-form-grid input[type='number']:focus,
+.coupons-dialog .coupons-form-grid select:focus,
+.coupons-dialog .coupons-form-grid textarea:focus {
+  border-color: #6b8f4e;
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(107 143 78 / 18%);
+}
+
+.coupons-dialog .coupons-form-grid input[readonly] {
+  background-color: #f5f6f7;
+  color: #50565b;
 }
 
 /* Add codes dialog — grid + TSV (pattern aligned with catalog promotions) */

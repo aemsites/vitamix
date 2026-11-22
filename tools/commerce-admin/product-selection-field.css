@@ -68,22 +68,6 @@
   pointer-events: none;
 }
 
-.psf-edit-btn {
-  align-self: flex-start;
-  font: inherit;
-  font-size: 13px;
-  padding: 6px 12px;
-  border-radius: 6px;
-  border: 1px solid #e1e3e5;
-  background: #f6f6f7;
-  color: #202223;
-  cursor: pointer;
-}
-
-.psf-edit-btn:hover {
-  background: #edeeef;
-}
-
 /* Product selector modal */
 .ps-modal-dialog {
   width: min(980px, 96vw);

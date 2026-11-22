@@ -341,13 +341,11 @@ export function mountProductSelectionField(container, options) {
     <div class="psf-display${editable ? ' psf-display-editable' : ''}" ${editable ? 'role="button" tabindex="0"' : ''}>
       <div class="ps-pills psf-pills" aria-live="polite"></div>
       <span class="psf-empty"></span>
-    </div>
-    ${editable ? '<button type="button" class="psf-edit-btn">Edit selection…</button>' : ''}`;
+    </div>`;
 
   const displayEl = root.querySelector('.psf-display');
   const pillsEl = root.querySelector('.psf-pills');
   const emptyEl = root.querySelector('.psf-empty');
-  const editBtn = root.querySelector('.psf-edit-btn');
   if (emptyEl) emptyEl.textContent = emptyText;
 
   container.replaceChildren(root);
@@ -464,11 +462,6 @@ export function mountProductSelectionField(container, options) {
       }
     });
   }
-  editBtn?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    openEditor().catch(() => {});
-  });
-
   refresh().catch(() => renderDisplay());
 
   return {
