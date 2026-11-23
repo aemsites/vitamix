@@ -881,8 +881,7 @@
   transform: rotate(225deg);
 }
 
-.product-create-dialog [data-step="2"] .product-create-options,
-.product-create-dialog [data-step="2"] #product-create-advanced-fields {
+.product-create-dialog [data-step="2"] .product-create-options {
   font-size: 14px;
 }
 
