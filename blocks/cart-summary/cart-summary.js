@@ -268,7 +268,8 @@ export default async function decorate(block) {
   const renderDiscountRows = (discounts, currency) => {
     discountsEl.innerHTML = '';
     const manualCode = getManualCoupon().toLowerCase();
-    const rows = discounts.filter((d) => parseFloat(d.amount) > 0);
+    // Catalog promotions are already included in the subtotal.
+    const rows = discounts.filter((d) => d.source !== 'promotion' && parseFloat(d.amount) > 0);
     discountsEl.hidden = rows.length === 0;
     rows.forEach((d) => {
       const code = couponCodeFromDiscount(d);
@@ -318,12 +319,17 @@ export default async function decorate(block) {
   let priceEstimateRequest = 0;
   const renderPriceEstimate = (estimate) => {
     const currency = getCurrencyCode();
-    const subtotal = parseFloat(estimate.subtotal) || cart.subtotal;
-    const discountTotal = parseFloat(estimate.orderDiscountTotal) || 0;
+    const parsedSubtotal = parseFloat(estimate.subtotal);
+    const subtotal = Number.isFinite(parsedSubtotal) ? parsedSubtotal : cart.subtotal;
+    const discounts = (estimate.discounts ?? []).filter((d) => d.source !== 'promotion');
+    const discountTotal = discounts.reduce(
+      (sum, d) => sum + Math.round((parseFloat(d.amount) || 0) * 100),
+      0,
+    ) / 100;
     const total = Math.max(0, subtotal - discountTotal);
     subtotalEl.textContent = formatPrice(subtotal, currency);
     grandTotalEl.textContent = formatPriceAmount(total, currency);
-    renderDiscountRows(estimate.discounts ?? [], currency);
+    renderDiscountRows(discounts, currency);
   };
 
   const updatePriceEstimate = async () => {

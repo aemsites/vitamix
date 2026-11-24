@@ -303,7 +303,8 @@ export default async function decorate(block) {
   const renderDiscountRows = (discounts, currency) => {
     discountsEl.innerHTML = '';
     const manualCode = getManualCoupon().toLowerCase();
-    const rows = discounts.filter((d) => parseFloat(d.amount) > 0);
+    // Catalog promotions are already included in the subtotal.
+    const rows = discounts.filter((d) => d.source !== 'promotion' && parseFloat(d.amount) > 0);
     discountsEl.hidden = rows.length === 0;
     rows.forEach((d) => {
       const code = couponCodeFromDiscount(d);
@@ -387,10 +388,15 @@ export default async function decorate(block) {
   const renderPriceEstimate = (estimate) => {
     if (hasOrderPreview) return;
     const currency = getCurrencyCode();
-    estimatedSubtotal = parseFloat(estimate.subtotal) || cart.subtotal;
-    estimatedDiscountTotal = parseFloat(estimate.orderDiscountTotal) || 0;
+    const parsedSubtotal = parseFloat(estimate.subtotal);
+    estimatedSubtotal = Number.isFinite(parsedSubtotal) ? parsedSubtotal : cart.subtotal;
+    const discounts = (estimate.discounts ?? []).filter((d) => d.source !== 'promotion');
+    estimatedDiscountTotal = discounts.reduce(
+      (sum, d) => sum + Math.round((parseFloat(d.amount) || 0) * 100),
+      0,
+    ) / 100;
     subtotalEl.textContent = formatPrice(estimatedSubtotal, currency);
-    renderDiscountRows(estimate.discounts ?? [], currency);
+    renderDiscountRows(discounts, currency);
     renderEstimatedTotals();
   };
 
