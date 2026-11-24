@@ -810,7 +810,6 @@ body.product-list-widget-drawer-open {
 .product-list-widget .product-list-widget-price .save {
   margin-left: 0.5ch;
   vertical-align: middle;
-  white-space: nowrap;
 }
 
 .product-list-widget .product-list-widget-cta {

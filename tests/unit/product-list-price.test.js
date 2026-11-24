@@ -99,6 +99,39 @@ test('varying variant prices retain Starting At and the existing price compariso
   assert.equal(savingsBadge(price).textContent, 'Save $150.00');
 });
 
+test('Starting At savings subtract the displayed variant price, not the parent price', () => {
+  const price = render({
+    price: 299.95,
+    regularPrice: 399.95,
+    variants: [{ price: 249.95 }, { price: 299.95 }],
+  });
+  assert.equal(price.children[0].textContent, 'Starting At');
+  assert.equal(price.children[1].textContent, '$249.95');
+  assert.equal(savingsBadge(price).textContent, 'Save $150.00');
+});
+
+test('Starting At shows savings when only the displayed variant price is discounted', () => {
+  const price = render({
+    price: 399.95,
+    regularPrice: 399.95,
+    variants: [{ price: 249.95 }, { price: 399.95 }],
+  });
+  assert.equal(price.children[1].textContent, '$249.95');
+  assert.equal(find(price, (node) => node.tagName === 'del').textContent, '$399.95');
+  assert.equal(savingsBadge(price).textContent, 'Save $150.00');
+});
+
+test('Starting At omits savings when the displayed variant price is not discounted', () => {
+  const price = render({
+    price: 199.95,
+    regularPrice: 249.95,
+    variants: [{ price: 249.95 }, { price: 299.95 }],
+  });
+  assert.equal(price.children[1].textContent, '$249.95');
+  assert.equal(savingsBadge(price), undefined);
+  assert.equal(find(price, (node) => node.tagName === 'del'), undefined);
+});
+
 test('savings round decimal differences to currency precision', () => {
   assert.equal(savingsBadge(render({ price: 0.1, regularPrice: 0.3 })).textContent, 'Save $0.20');
 });
