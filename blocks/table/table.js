@@ -177,6 +177,55 @@ function buildCtaFooter(table) {
 }
 
 /**
+ * Freeze the header row below the site header. Once it sticks, it switches to
+ * a compact version (no image or subtitle). The height it gives up is reserved
+ * as margin in its original spot, so the page doesn't jump while scrolling.
+ * @param {HTMLElement} block
+ * @param {HTMLTableElement} table
+ */
+function freezeHeader(block, table) {
+  const thead = table.querySelector('thead');
+  if (!thead || !('IntersectionObserver' in window)) return;
+
+  const sentinel = document.createElement('div');
+  sentinel.className = 'table-comparison-sentinel';
+  sentinel.setAttribute('aria-hidden', 'true');
+  table.before(sentinel);
+
+  let stuck = false;
+  const setStuck = (value) => {
+    stuck = value;
+    thead.style.marginBottom = '';
+    block.classList.remove('is-stuck');
+    if (!value) return;
+    const fullHeight = thead.offsetHeight;
+    block.classList.add('is-stuck');
+    thead.style.marginBottom = `${fullHeight - thead.offsetHeight}px`;
+  };
+
+  let observer;
+  const observe = () => {
+    if (observer) observer.disconnect();
+    const offset = parseInt(
+      getComputedStyle(document.documentElement).getPropertyValue('--header-height'),
+      10,
+    ) || 0;
+    observer = new IntersectionObserver(([entry]) => {
+      const value = !entry.isIntersecting && entry.boundingClientRect.top < offset;
+      if (value !== stuck) setStuck(value);
+    }, { rootMargin: `-${offset}px 0px 0px 0px` });
+    observer.observe(sentinel);
+  };
+
+  observe();
+  // --header-height changes at 1000px (see styles.css)
+  window.matchMedia('(width >= 1000px)').addEventListener('change', observe);
+  window.addEventListener('resize', () => {
+    if (stuck) setStuck(true);
+  });
+}
+
+/**
  * The stacked layout changes `display` on table elements, which drops native
  * table semantics in Safari/VoiceOver. Explicit roles restore them.
  * @param {HTMLTableElement} table
@@ -277,6 +326,7 @@ export default function decorate(block) {
     scrollWrapper.appendChild(comparisonTable);
     block.replaceChildren(scrollWrapper);
     replaceColorsRowWithSwatches(comparisonTable);
+    if (stacked) freezeHeader(block, comparisonTable);
   } else if (hasRowHeaders) {
     // build table with row headers (first column is header)
     const tbody = document.createElement('tbody');
