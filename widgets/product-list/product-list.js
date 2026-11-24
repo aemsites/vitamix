@@ -228,6 +228,8 @@ function createProductPrice(product, ph, copy) {
   const displayPrice = varyingPrice ? Math.min(...getVariantPrices(product)) : Number(product.price);
   const amount = document.createElement('span');
   amount.className = 'product-list-widget-price-amount';
+  const value = document.createElement('span');
+  value.className = 'product-list-widget-price-value';
 
   if (varyingPrice) {
     const label = document.createElement('span');
@@ -235,14 +237,15 @@ function createProductPrice(product, ph, copy) {
     label.textContent = copy.startingAt;
     price.append(label);
   }
-  amount.textContent = formatPrice(displayPrice, ph);
+  value.textContent = formatPrice(displayPrice, ph);
+  amount.append(value);
   price.append(amount);
 
   const regular = product.originalPrice || product.regularPrice;
   if (regular && Number(regular) > displayPrice) {
     const regularPrice = document.createElement('del');
     regularPrice.textContent = formatPrice(regular, ph);
-    amount.append(' ', regularPrice);
+    value.append(' ', regularPrice);
 
     const savings = (regular - displayPrice).toFixed(2);
     const save = document.createElement('span');
