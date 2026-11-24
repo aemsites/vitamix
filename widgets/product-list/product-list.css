@@ -816,6 +816,15 @@ body.product-list-widget-drawer-open {
   vertical-align: middle;
 }
 
+@media (width >= 600px) {
+  .product-list-widget .product-list-widget-price-amount {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-60);
+  }
+}
+
 .product-list-widget .product-list-widget-cta {
   margin: var(--spacing-100, 0.5rem) 0 0;
   padding-top: 0;

@@ -53,10 +53,10 @@ function savingsBadge(price) {
 test('discounted PLP cards show savings beside the struck-through regular price', () => {
   const price = render({ price: 249.95, regularPrice: 399.95 });
   const amount = price.children[0];
-  assert.equal(amount.textContent, '$249.95');
-  assert.equal(amount.children[1].tagName, 'del');
-  assert.equal(amount.children[1].textContent, '$399.95');
-  assert.equal(amount.children[3], savingsBadge(price));
+  assert.equal(amount.children[0].textContent, '$249.95');
+  assert.equal(amount.children[0].children[1].tagName, 'del');
+  assert.equal(amount.children[0].children[1].textContent, '$399.95');
+  assert.equal(amount.children[2], savingsBadge(price));
   assert.equal(savingsBadge(price).textContent, 'Save $150.00');
 });
 
@@ -95,7 +95,7 @@ test('varying variant prices retain Starting At and the existing price compariso
     variants: [{ price: 249.95 }, { price: 299.95 }],
   });
   assert.equal(price.children[0].textContent, 'Starting At');
-  assert.equal(price.children[1].textContent, '$249.95');
+  assert.equal(price.children[1].children[0].textContent, '$249.95');
   assert.equal(savingsBadge(price).textContent, 'Save $150.00');
 });
 
@@ -106,7 +106,7 @@ test('Starting At savings subtract the displayed variant price, not the parent p
     variants: [{ price: 249.95 }, { price: 299.95 }],
   });
   assert.equal(price.children[0].textContent, 'Starting At');
-  assert.equal(price.children[1].textContent, '$249.95');
+  assert.equal(price.children[1].children[0].textContent, '$249.95');
   assert.equal(savingsBadge(price).textContent, 'Save $150.00');
 });
 
@@ -116,7 +116,7 @@ test('Starting At shows savings when only the displayed variant price is discoun
     regularPrice: 399.95,
     variants: [{ price: 249.95 }, { price: 399.95 }],
   });
-  assert.equal(price.children[1].textContent, '$249.95');
+  assert.equal(price.children[1].children[0].textContent, '$249.95');
   assert.equal(find(price, (node) => node.tagName === 'del').textContent, '$399.95');
   assert.equal(savingsBadge(price).textContent, 'Save $150.00');
 });
@@ -127,7 +127,7 @@ test('Starting At omits savings when the displayed variant price is not discount
     regularPrice: 249.95,
     variants: [{ price: 249.95 }, { price: 299.95 }],
   });
-  assert.equal(price.children[1].textContent, '$249.95');
+  assert.equal(price.children[1].children[0].textContent, '$249.95');
   assert.equal(savingsBadge(price), undefined);
   assert.equal(find(price, (node) => node.tagName === 'del'), undefined);
 });
