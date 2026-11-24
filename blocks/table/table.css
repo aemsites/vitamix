@@ -252,6 +252,13 @@
   font-weight: var(--weight-medium);
 }
 
+/* Names bolded in the doc arrive wrapped in <strong>, which styles.css sets to
+   medium. Let them take the name's weight instead. */
+.table.comparison.comparison-stacked .table-comparison-scroll thead .table-comparison-name strong,
+.table.comparison.comparison-stacked .table-comparison-scroll thead .table-comparison-name b {
+  font-weight: inherit;
+}
+
 .table.comparison.comparison-stacked .table-comparison-scroll thead .table-comparison-meta {
   margin-top: var(--spacing-20);
   color: var(--color-gray-900);
