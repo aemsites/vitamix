@@ -106,22 +106,30 @@ const coupon = (amount = 30) => ({
       };
       const summary = await mount();
       assert.equal(requests[0].items[0].price.final, price);
-      assert.equal(summary.subtotal.textContent, '$160.00');
+      assert.equal(cart.items[0].price, price);
+      assert.equal(summary.subtotal.textContent, `$${price}`);
       assert.equal(summary.total.textContent, '130.00');
-      assert.equal(summary.discounts.childElementCount, 1);
-      assert.doesNotMatch(summary.discounts.textContent, /Test promotion/);
+      assert.equal(summary.discounts.childElementCount, promoAmount ? 2 : 1);
+      if (promoAmount) assert.match(summary.discounts.textContent, /Test promotion.*-\$40.00/);
+      else assert.doesNotMatch(summary.discounts.textContent, /Test promotion/);
+      if (prefix === 'order-summary') {
+        const line = summary.block.querySelector('.order-summary-items').children[0];
+        assert.equal(line.querySelector('.cart-item-price').textContent, `$${price}`);
+      }
       assert.match(summary.discounts.textContent, /-\$30.00/);
       assert.equal(summary.discounts.hidden, false);
     });
   });
 
-  test(`${prefix}: promotion with no additional discount has no deduction row`, async () => {
+  test(`${prefix}: promotion-only savings explain the difference from stored line prices`, async () => {
     seedCart();
     response = { subtotal: 160, orderDiscountTotal: 40, discounts: [promotion()] };
     const summary = await mount();
+    assert.equal(summary.subtotal.textContent, '$200.00');
     assert.equal(summary.total.textContent, '160.00');
-    assert.equal(summary.discounts.childElementCount, 0);
-    assert.equal(summary.discounts.hidden, true);
+    assert.equal(summary.discounts.childElementCount, 1);
+    assert.match(summary.discounts.textContent, /Test promotion.*-\$40.00/);
+    assert.equal(summary.discounts.hidden, false);
   });
 
   test(`${prefix}: coupon and cart-rule discounts still reduce the subtotal`, async () => {
@@ -145,12 +153,58 @@ const coupon = (amount = 30) => ({
     assert.equal(summary.total.textContent, '0.70');
   });
 
-  test(`${prefix}: preserves a zero subtotal rather than using the stored cart price`, async () => {
+  test(`${prefix}: preserves a zero net subtotal with a full promotional deduction`, async () => {
     seedCart();
     response = { subtotal: '0.00', orderDiscountTotal: 200, discounts: [promotion(200)] };
     const summary = await mount();
+    assert.equal(summary.subtotal.textContent, '$200.00');
+    assert.match(summary.discounts.textContent, /-\$200.00/);
+    assert.equal(summary.total.textContent, '0.00');
+  });
+
+  test(`${prefix}: preserves a zero subtotal without promotional deductions`, async () => {
+    seedCart();
+    response = { subtotal: '0.00', discounts: [] };
+    const summary = await mount();
     assert.equal(summary.subtotal.textContent, '$0.00');
     assert.equal(summary.total.textContent, '0.00');
+  });
+
+  [['missing', undefined], ['non-numeric', 'invalid'], ['non-finite', Infinity]]
+    .forEach(([label, subtotal]) => {
+      test(`${prefix}: ${label} subtotal falls back to the stored cart subtotal`, async () => {
+        seedCart();
+        response = { subtotal, discounts: [coupon()] };
+        const summary = await mount();
+        assert.equal(summary.subtotal.textContent, '$200.00');
+        assert.equal(summary.total.textContent, '170.00');
+      });
+    });
+
+  test(`${prefix}: mixed regular and promoted lines retain an additive summary`, async () => {
+    seedCart();
+    cart.addItem({
+      sku: 'second-sku', name: 'Second Product', quantity: 1, price: '100.00',
+    });
+    response = {
+      subtotal: 260, discounts: [promotion('40.00'), promotion('0.00'), coupon()],
+    };
+    const summary = await mount();
+    assert.equal(summary.subtotal.textContent, '$300.00');
+    assert.equal(summary.total.textContent, '230.00');
+    assert.equal(summary.discounts.childElementCount, 2);
+    assert.equal(cart.subtotal, 300);
+  });
+
+  test(`${prefix}: promotion savings cover the full line quantity`, async () => {
+    seedCart();
+    cart.updateItem('test-sku', 2);
+    response = { subtotal: 320, discounts: [promotion(80), coupon()] };
+    const summary = await mount();
+    assert.equal(summary.subtotal.textContent, '$400.00');
+    assert.equal(summary.total.textContent, '290.00');
+    assert.match(summary.discounts.textContent, /-\$80.00/);
+    assert.equal(cart.subtotal, 400);
   });
 
   test(`${prefix}: missing discounts do not reuse the aggregate discount total`, async () => {
@@ -176,7 +230,7 @@ const coupon = (amount = 30) => ({
   });
 });
 
-test('order-summary: shipping estimate and authoritative preview keep promotions out of deduction rows', async () => {
+test('order-summary: promotion rows stay additive through shipping selection and preview', async () => {
   seedCart();
   response = { subtotal: 160, orderDiscountTotal: 70, discounts: [promotion(), coupon()] };
   const block = element();
@@ -199,11 +253,25 @@ test('order-summary: shipping estimate and authoritative preview keep promotions
     },
   });
   assert.equal(total.textContent, '147.23');
-  assert.equal(block.querySelector('.order-summary-subtotal').textContent, '$160.00');
+  assert.equal(block.querySelector('.order-summary-subtotal').textContent, '$200.00');
   assert.equal(block.querySelector('.order-summary-header-total').textContent, '$147.23');
   assert.equal(block.querySelector('.order-summary-taxes').textContent, '$7.23');
   const discounts = block.querySelector('.order-summary-discounts');
+  assert.equal(discounts.childElementCount, 2);
+  assert.match(discounts.textContent, /Test promotion.*-\$40.00/);
+  assert.match(discounts.textContent, /-\$30.00/);
+
+  events.emit('checkout:preview', {
+    preview: {
+      subtotal: '160.00',
+      total: '147.23',
+      taxAmount: '7.23',
+      shippingMethod: { rate: '10.00' },
+      discounts: [promotion(0), coupon()],
+    },
+  });
+  assert.equal(block.querySelector('.order-summary-subtotal').textContent, '$160.00');
+  assert.equal(total.textContent, '147.23');
   assert.equal(discounts.childElementCount, 1);
   assert.doesNotMatch(discounts.textContent, /Test promotion/);
-  assert.match(discounts.textContent, /-\$30.00/);
 });

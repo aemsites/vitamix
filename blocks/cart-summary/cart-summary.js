@@ -83,6 +83,13 @@ function getCouponErrorMessage(errorCode) {
   return msgs[errorCode] || msgs.default;
 }
 
+function getDiscountTotal(discounts) {
+  return discounts.reduce(
+    (sum, d) => sum + Math.round((parseFloat(d.amount) || 0) * 100),
+    0,
+  ) / 100;
+}
+
 function getCurrencyCode() {
   const config = getConfig();
   return typeof config.currency === 'function' ? config.currency(config.getLocale()) : config.currency;
@@ -268,8 +275,7 @@ export default async function decorate(block) {
   const renderDiscountRows = (discounts, currency) => {
     discountsEl.innerHTML = '';
     const manualCode = getManualCoupon().toLowerCase();
-    // Catalog promotions are already included in the subtotal.
-    const rows = discounts.filter((d) => d.source !== 'promotion' && parseFloat(d.amount) > 0);
+    const rows = discounts.filter((d) => parseFloat(d.amount) > 0);
     discountsEl.hidden = rows.length === 0;
     rows.forEach((d) => {
       const code = couponCodeFromDiscount(d);
@@ -321,13 +327,12 @@ export default async function decorate(block) {
     const currency = getCurrencyCode();
     const parsedSubtotal = parseFloat(estimate.subtotal);
     const subtotal = Number.isFinite(parsedSubtotal) ? parsedSubtotal : cart.subtotal;
-    const discounts = (estimate.discounts ?? []).filter((d) => d.source !== 'promotion');
-    const discountTotal = discounts.reduce(
-      (sum, d) => sum + Math.round((parseFloat(d.amount) || 0) * 100),
-      0,
-    ) / 100;
+    const discounts = estimate.discounts ?? [];
+    const promotionTotal = getDiscountTotal(discounts.filter((d) => d.source === 'promotion'));
+    const discountTotal = getDiscountTotal(discounts.filter((d) => d.source !== 'promotion'));
     const total = Math.max(0, subtotal - discountTotal);
-    subtotalEl.textContent = formatPrice(subtotal, currency);
+    // Show promotion savings against the submitted line prices, not the net subtotal.
+    subtotalEl.textContent = formatPrice(subtotal + promotionTotal, currency);
     grandTotalEl.textContent = formatPriceAmount(total, currency);
     renderDiscountRows(discounts, currency);
   };

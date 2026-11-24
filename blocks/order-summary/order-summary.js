@@ -67,6 +67,13 @@ function getCouponErrorMessage(errorCode) {
   return msgs[errorCode] || msgs.default;
 }
 
+function getDiscountTotal(discounts) {
+  return discounts.reduce(
+    (sum, d) => sum + Math.round((parseFloat(d.amount) || 0) * 100),
+    0,
+  ) / 100;
+}
+
 function getCurrencyCode() {
   const { currency, getLocale } = getConfig();
   return typeof currency === 'function' ? currency(getLocale()) : currency;
@@ -303,8 +310,7 @@ export default async function decorate(block) {
   const renderDiscountRows = (discounts, currency) => {
     discountsEl.innerHTML = '';
     const manualCode = getManualCoupon().toLowerCase();
-    // Catalog promotions are already included in the subtotal.
-    const rows = discounts.filter((d) => d.source !== 'promotion' && parseFloat(d.amount) > 0);
+    const rows = discounts.filter((d) => parseFloat(d.amount) > 0);
     discountsEl.hidden = rows.length === 0;
     rows.forEach((d) => {
       const code = couponCodeFromDiscount(d);
@@ -353,6 +359,7 @@ export default async function decorate(block) {
   let priceEstimateRequest = 0;
   let hasOrderPreview = false;
   let estimatedSubtotal = cart.subtotal;
+  let estimatedPromotionTotal = 0;
   let estimatedDiscountTotal = 0;
   let estimatedShippingMethod = null;
 
@@ -367,7 +374,7 @@ export default async function decorate(block) {
       estimatedSubtotal - estimatedDiscountTotal + (shippingRate ?? 0),
     );
 
-    subtotalEl.textContent = formatPrice(estimatedSubtotal, currency);
+    subtotalEl.textContent = formatPrice(estimatedSubtotal + estimatedPromotionTotal, currency);
     if (shippingRate == null) {
       shippingEl.textContent = '--';
     } else {
@@ -380,6 +387,7 @@ export default async function decorate(block) {
 
   const updateTotals = ({ resetShipping = false } = {}) => {
     estimatedSubtotal = cart.subtotal;
+    estimatedPromotionTotal = 0;
     estimatedDiscountTotal = 0;
     if (resetShipping) estimatedShippingMethod = null;
     renderEstimatedTotals();
@@ -390,12 +398,9 @@ export default async function decorate(block) {
     const currency = getCurrencyCode();
     const parsedSubtotal = parseFloat(estimate.subtotal);
     estimatedSubtotal = Number.isFinite(parsedSubtotal) ? parsedSubtotal : cart.subtotal;
-    const discounts = (estimate.discounts ?? []).filter((d) => d.source !== 'promotion');
-    estimatedDiscountTotal = discounts.reduce(
-      (sum, d) => sum + Math.round((parseFloat(d.amount) || 0) * 100),
-      0,
-    ) / 100;
-    subtotalEl.textContent = formatPrice(estimatedSubtotal, currency);
+    const discounts = estimate.discounts ?? [];
+    estimatedPromotionTotal = getDiscountTotal(discounts.filter((d) => d.source === 'promotion'));
+    estimatedDiscountTotal = getDiscountTotal(discounts.filter((d) => d.source !== 'promotion'));
     renderDiscountRows(discounts, currency);
     renderEstimatedTotals();
   };
@@ -611,7 +616,8 @@ export default async function decorate(block) {
     } = parsePreview(preview, cart.subtotal);
 
     const currency = getCurrencyCode();
-    subtotalEl.textContent = formatPrice(subtotal, currency);
+    const promotionTotal = getDiscountTotal(discounts.filter((d) => d.source === 'promotion'));
+    subtotalEl.textContent = formatPrice(subtotal + promotionTotal, currency);
 
     renderDiscountRows(discounts, currency);
     handleCouponStatus(preview.couponStatus);
