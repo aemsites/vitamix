@@ -566,6 +566,7 @@ body.product-list-widget-drawer-open {
    the traditional single-column mobile stack. */
 .product-list-widget .product-list-widget-product-card {
   flex: 0 0 calc((100% - var(--product-list-widget-gap)) / 2);
+  min-width: 0;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -805,6 +806,23 @@ body.product-list-widget-drawer-open {
   margin-left: 0.5ch;
   color: var(--color-gray);
   font-weight: var(--weight-regular, 400);
+}
+
+/* Use the gutter without widening the card or touching its neighbor. */
+.product-list-widget .product-list-widget-price .save {
+  width: max-content;
+  max-width: calc(100% + var(--product-list-widget-gap) - var(--spacing-40));
+  box-sizing: border-box;
+  vertical-align: middle;
+}
+
+@media (width >= 600px) {
+  .product-list-widget .product-list-widget-price-amount {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-60);
+  }
 }
 
 .product-list-widget .product-list-widget-cta {

@@ -225,25 +225,33 @@ function createProductPrice(product, ph, copy) {
   if (!hasVisiblePrice(product)) return price;
 
   const varyingPrice = hasVaryingPrice(product);
+  const displayPrice = varyingPrice ? Math.min(...getVariantPrices(product)) : Number(product.price);
   const amount = document.createElement('span');
   amount.className = 'product-list-widget-price-amount';
+  const value = document.createElement('span');
+  value.className = 'product-list-widget-price-value';
 
   if (varyingPrice) {
     const label = document.createElement('span');
     label.className = 'product-list-widget-price-label';
     label.textContent = copy.startingAt;
     price.append(label);
-    amount.textContent = formatPrice(Math.min(...getVariantPrices(product)), ph);
-  } else {
-    amount.textContent = formatPrice(product.price, ph);
   }
+  value.textContent = formatPrice(displayPrice, ph);
+  amount.append(value);
   price.append(amount);
 
   const regular = product.originalPrice || product.regularPrice;
-  if (regular && Number(regular) > Number(product.price)) {
+  if (regular && Number(regular) > displayPrice) {
     const regularPrice = document.createElement('del');
     regularPrice.textContent = formatPrice(regular, ph);
-    amount.append(' ', regularPrice);
+    value.append(' ', regularPrice);
+
+    const savings = (regular - displayPrice).toFixed(2);
+    const save = document.createElement('span');
+    save.className = 'product-badge product-badge-tier-alert save';
+    save.textContent = `${ph.save || 'Save'} ${formatPrice(savings, ph)}`;
+    amount.append(' ', save);
   }
   return price;
 }
