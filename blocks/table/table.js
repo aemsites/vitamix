@@ -154,29 +154,6 @@ function decorateHeaderCell(th) {
 }
 
 /**
- * Mobile has no room for buttons in the sticky header, so copy each model's
- * CTA into a footer row (shown on mobile only; hidden on desktop).
- * @param {HTMLTableElement} table
- */
-function buildCtaFooter(table) {
-  const ctas = [...table.querySelectorAll('thead th')]
-    .slice(1)
-    .map((th) => th.querySelector('.table-comparison-cta'));
-  if (!ctas.some(Boolean)) return;
-  const tfoot = document.createElement('tfoot');
-  tfoot.className = 'table-comparison-cta-row';
-  const tr = document.createElement('tr');
-  tr.appendChild(document.createElement('td')); // aligns with the label column
-  ctas.forEach((cta) => {
-    const td = document.createElement('td');
-    if (cta) td.appendChild(cta.cloneNode(true));
-    tr.appendChild(td);
-  });
-  tfoot.appendChild(tr);
-  table.appendChild(tfoot);
-}
-
-/**
  * Freeze the header row below the site header. Once it sticks, it switches to
  * a compact version (no image or subtitle). The height it gives up is reserved
  * as margin in its original spot, so the page doesn't jump while scrolling.
@@ -232,7 +209,7 @@ function freezeHeader(block, table) {
  */
 function addTableRoles(table) {
   table.setAttribute('role', 'table');
-  table.querySelectorAll('thead, tbody, tfoot').forEach((el) => el.setAttribute('role', 'rowgroup'));
+  table.querySelectorAll('thead, tbody').forEach((el) => el.setAttribute('role', 'rowgroup'));
   table.querySelectorAll('tr').forEach((el) => el.setAttribute('role', 'row'));
   table.querySelectorAll('th').forEach((th) => {
     th.setAttribute('role', th.getAttribute('scope') === 'col' ? 'columnheader' : 'rowheader');
@@ -318,7 +295,6 @@ export default function decorate(block) {
       block.classList.add('comparison-stacked');
       comparisonTable.style.setProperty('--compare-cols', comparedCount);
       comparisonTable.querySelectorAll('thead th:not(:first-child)').forEach(decorateHeaderCell);
-      buildCtaFooter(comparisonTable);
       addTableRoles(comparisonTable);
     }
     const scrollWrapper = document.createElement('div');
