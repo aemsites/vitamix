@@ -807,6 +807,12 @@ body.product-list-widget-drawer-open {
   font-weight: var(--weight-regular, 400);
 }
 
+.product-list-widget .product-list-widget-price .save {
+  margin-left: 0.5ch;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
 .product-list-widget .product-list-widget-cta {
   margin: var(--spacing-100, 0.5rem) 0 0;
   padding-top: 0;

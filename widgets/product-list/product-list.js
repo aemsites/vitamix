@@ -244,6 +244,12 @@ function createProductPrice(product, ph, copy) {
     const regularPrice = document.createElement('del');
     regularPrice.textContent = formatPrice(regular, ph);
     amount.append(' ', regularPrice);
+
+    const savings = (regular - product.price).toFixed(2);
+    const save = document.createElement('span');
+    save.className = 'product-badge product-badge-tier-alert save';
+    save.textContent = `${ph.save || 'Save'} ${formatPrice(savings, ph)}`;
+    amount.append(' ', save);
   }
   return price;
 }
