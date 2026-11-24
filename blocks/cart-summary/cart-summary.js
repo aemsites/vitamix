@@ -85,6 +85,13 @@ function getCouponErrorMessage(errorCode) {
   return msgs[errorCode] || msgs.default;
 }
 
+function getDiscountTotal(discounts) {
+  return discounts.reduce(
+    (sum, d) => sum + Math.round((parseFloat(d.amount) || 0) * 100),
+    0,
+  ) / 100;
+}
+
 function getCurrencyCode() {
   const config = getConfig();
   return typeof config.currency === 'function' ? config.currency(config.getLocale()) : config.currency;
@@ -320,12 +327,16 @@ export default async function decorate(block) {
   let priceEstimateRequest = 0;
   const renderPriceEstimate = (estimate) => {
     const currency = getCurrencyCode();
-    const subtotal = parseFloat(estimate.subtotal) || cart.subtotal;
-    const discountTotal = parseFloat(estimate.orderDiscountTotal) || 0;
+    const parsedSubtotal = parseFloat(estimate.subtotal);
+    const subtotal = Number.isFinite(parsedSubtotal) ? parsedSubtotal : cart.subtotal;
+    const discounts = estimate.discounts ?? [];
+    const promotionTotal = getDiscountTotal(discounts.filter((d) => d.source === 'promotion'));
+    const discountTotal = getDiscountTotal(discounts.filter((d) => d.source !== 'promotion'));
     const total = Math.max(0, subtotal - discountTotal);
-    subtotalEl.textContent = formatPrice(subtotal, currency);
+    // Show promotion savings against the submitted line prices, not the net subtotal.
+    subtotalEl.textContent = formatPrice(subtotal + promotionTotal, currency);
     grandTotalEl.textContent = formatPriceAmount(total, currency);
-    renderDiscountRows(estimate.discounts ?? [], currency);
+    renderDiscountRows(discounts, currency);
   };
 
   const updatePriceEstimate = async () => {
