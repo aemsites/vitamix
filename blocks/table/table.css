@@ -162,8 +162,7 @@
 
 .table.comparison.comparison-stacked .table-comparison-scroll table,
 .table.comparison.comparison-stacked .table-comparison-scroll thead,
-.table.comparison.comparison-stacked .table-comparison-scroll tbody,
-.table.comparison.comparison-stacked .table-comparison-scroll tfoot {
+.table.comparison.comparison-stacked .table-comparison-scroll tbody {
   display: block;
 }
 
@@ -259,7 +258,9 @@
   font-size: var(--detail-size-s);
 }
 
+/* Mobile: price stays out of the frozen header to keep it short (shown again at 900px) */
 .table.comparison.comparison-stacked .table-comparison-scroll thead .table-comparison-price {
+  display: none;
   margin-top: var(--spacing-80);
   font-size: var(--title-size-m);
   font-weight: var(--weight-medium);
@@ -278,13 +279,9 @@
 }
 
 .table.comparison.comparison-stacked .table-comparison-scroll thead .table-comparison-cta {
+  display: flex;
+  justify-content: center;
   margin-top: var(--spacing-100);
-}
-
-/* Mobile: price and CTA move out of the frozen header to keep it short */
-.table.comparison.comparison-stacked .table-comparison-scroll thead .table-comparison-price,
-.table.comparison.comparison-stacked .table-comparison-scroll thead .table-comparison-cta {
-  display: none;
 }
 
 /* ---------- Rows: label above values ---------- */
@@ -292,9 +289,9 @@
   grid-column: 1 / -1;
   padding: var(--spacing-80) var(--spacing-100) var(--spacing-60);
   border-bottom: 0;
-  background-color: var(--layer-depth);
+  background-color: var(--color-gray-100);
   font-size: var(--detail-size-s);
-  font-weight: var(--weight-medium);
+  font-weight: bold;
   letter-spacing: var(--letter-spacing-s);
   line-height: var(--line-height-m);
   text-align: left;
@@ -342,27 +339,24 @@
   text-transform: none;
 }
 
-/* ---------- Mobile CTA row (copied from the header) ---------- */
-.table.comparison.comparison-stacked .table-comparison-scroll tfoot td {
-  padding: var(--spacing-100) var(--spacing-60) var(--spacing-200);
-  border: 0;
-  text-align: center;
-}
+/* ---------- Mobile: Shop link under the product name ---------- */
+@media (width < 900px) {
+  .table.comparison.comparison-stacked .table-comparison-scroll thead .table-comparison-cta {
+    margin-top: var(--spacing-40);
+  }
 
-.table.comparison.comparison-stacked .table-comparison-scroll tfoot td:first-child {
-  display: none;
-}
-
-.table.comparison.comparison-stacked .table-comparison-scroll tfoot .button-wrapper {
-  display: block;
-  margin: 0;
-}
-
-.table.comparison.comparison-stacked .table-comparison-scroll tfoot .button {
-  display: block;
-  width: 100%;
-  margin: 0;
-  padding: var(--spacing-80) var(--spacing-60);
+  .table.comparison.comparison-stacked .table-comparison-scroll thead .table-comparison-cta .button {
+    display: inline-block;
+    min-height: 24px;
+    padding: var(--spacing-40) 0;
+    border: 0;
+    background-color: transparent;
+    color: var(--color-link);
+    font-size: var(--body-size-xs);
+    text-decoration: underline;
+    text-transform: none;
+    text-underline-offset: var(--spacing-40);
+  }
 }
 
 /* ---------- Compact header once it's frozen (is-stuck set by freezeHeader) ---------- */
@@ -392,6 +386,7 @@
 
   .table.comparison.comparison-stacked .table-comparison-scroll thead .table-comparison-name {
     font-size: var(--title-size-m);
+    font-weight: bold;
   }
 
   .table.comparison.comparison-stacked .table-comparison-scroll thead .table-comparison-meta {
@@ -400,10 +395,6 @@
   }
 
   .table.comparison.comparison-stacked .table-comparison-scroll thead .table-comparison-price {
-    display: block;
-  }
-
-  .table.comparison.comparison-stacked .table-comparison-scroll thead .table-comparison-cta {
     display: block;
   }
 
@@ -420,10 +411,6 @@
   .table.comparison.comparison-stacked .table-comparison-scroll tbody tr.table-comparison-section th {
     padding: var(--spacing-400) var(--spacing-300) var(--spacing-80);
     font-size: var(--title-size-l);
-  }
-
-  .table.comparison.comparison-stacked .table-comparison-scroll tfoot {
-    display: none;
   }
 
   /* Frozen: one line per model, name beside its Shop button */
