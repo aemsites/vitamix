@@ -189,7 +189,16 @@ export function formatAnalyticsMoney(value) {
 }
 
 /**
- * Adobe Analytics checkout products string segment: ;{name};{qty};{lineTotal};{color};;
+ * Build a product-syntax merchandising eVar30 assignment.
+ * @param {string} value
+ * @returns {string}
+ */
+export function buildProductColorEvar(value) {
+  return value ? `eVar30=${value.replace(/[;,|]/g, ' ').trim()}` : '';
+}
+
+/**
+ * Adobe Analytics checkout products string segment: ;{name};{qty};{lineTotal};;{eVars}
  * @param {string} name
  * @param {number|string} qty
  * @param {number|string} unitPrice
@@ -199,8 +208,8 @@ export function formatAnalyticsMoney(value) {
 export function buildCheckoutProductLine(name, qty, unitPrice, color = '') {
   const quantity = formatAnalyticsQuantity(qty);
   const lineTotal = formatAnalyticsMoney(Number(qty) * Number(unitPrice));
-  const colorField = color ? `${color.replace(/[;,|]/g, ' ')};;` : ';';
-  return `;${name};${quantity};${lineTotal};${colorField}`;
+  const productColor = color ? buildProductColorEvar(`${name} ${color}`) : '';
+  return `;${name};${quantity};${lineTotal};;${productColor}`;
 }
 
 /**
