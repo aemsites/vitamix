@@ -1,4 +1,10 @@
-import { debugLog, debugWarn } from './shared.js';
+import {
+  buildProductColorEvar,
+  buildProductId,
+  debugLog,
+  debugWarn,
+  getProductName,
+} from './shared.js';
 
 /** Max wait for Launch/AppMeasurement to finish sending a beacon before navigation. */
 const BEACON_COMPLETE_TIMEOUT_MS = 2000;
@@ -23,25 +29,33 @@ function applyTrackingConfig(tracker) {
 function applyProductColorConfig(tracker) {
   const isPurchase = String(tracker.events || '').split(',')
     .some((event) => event.split('=')[0] === 'purchase');
-  const purchaseProductColors = isPurchase
-    ? (window.digitalData?.transaction?.item || [])
-      .flatMap((item) => (item.productInfo?.productString || '').split(','))
-      .map((line) => line.split(';'))
-      .filter((fields) => fields[4]?.trim())
-      .map((fields) => [fields[1]?.trim(), fields[4].trim()].filter(Boolean).join(' '))
-    : [];
-  const color = isPurchase
-    ? [...new Set(purchaseProductColors)].join(',')
-    : window.digitalData?.product?.[0]?.productInfo?.color;
-  tracker.eVar30 = color || '';
-  if (!color || !tracker.linkTrackVars) {
+  // eVar30 is product-scoped; never send a competing hit-level value from Launch.
+  tracker.eVar30 = '';
+  if (isPurchase) {
+    return;
+  }
+  const productInfo = window.digitalData?.product?.[0]?.productInfo;
+  const products = tracker.products || productInfo?.productID;
+  if (!productInfo?.color || !products) {
+    return;
+  }
+  const colorEvar = buildProductColorEvar(productInfo.color);
+  tracker.products = products.split(',').map((line) => {
+    const fields = line.split(';');
+    while (fields.length < 6) fields.push('');
+    const evars = fields[5].split('|')
+      .filter((evar) => evar && !evar.startsWith('eVar30='));
+    fields[5] = [...evars, colorEvar].join('|');
+    return fields.join(';');
+  }).join(',');
+  if (!tracker.linkTrackVars) {
     return;
   }
   const linkTrackVars = tracker.linkTrackVars.split(',')
     .map((variable) => variable.trim())
     .filter((variable) => variable && variable !== 'None');
-  if (!linkTrackVars.includes('eVar30')) {
-    linkTrackVars.push('eVar30');
+  if (!linkTrackVars.includes('products')) {
+    linkTrackVars.push('products');
   }
   tracker.linkTrackVars = linkTrackVars.join(',');
 }
@@ -564,7 +578,16 @@ export async function pushProductColorEvent(eventName, color, { waitForBeacon = 
     return false;
   }
   setDigitalDataProductColor(color);
-  return triggerLaunchEvent(eventName, window.digitalData.product, { waitForBeacon });
+  let { productID } = window.digitalData.product[0].productInfo;
+  if (!productID) {
+    const productName = getProductName();
+    if (!productName) {
+      debugWarn(`Adobe Analytics ${eventName} skipped: product name not found on PDP`);
+      return false;
+    }
+    productID = buildProductId(productName);
+  }
+  return pushProductEvent(eventName, productID, { waitForBeacon });
 }
 
 /**
